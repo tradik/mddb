@@ -1,0 +1,79 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+coverage.out
+
+# Go workspace file
+go.work
+
+# Dependency directories
+vendor/
+
+# Build artifacts
+services/mddbd/mddbd
+services/mddbd/mddbd-linux
+services/mddbd/mddbd.exe
+
+# Database files
+*.db
+backup-*.db
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Air (hot reload) temporary files
+tmp/
+
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+
+# Test results
+test/performance-results-*.txt
+test/lorem-*.md
+
+# Generated protobuf code (regenerate with: make generate-proto)
+services/mddbd/proto/*.pb.go
+clients/python/mddb_client/*_pb2.py
+clients/python/mddb_client/*_pb2_grpc.py
+clients/nodejs/proto/*.js
+clients/go/proto/*.pb.go
+services/php-extension/proto/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Node.js
+node_modules/
+package-lock.json
+yarn.lock
+.windsurf/rules/*.md

@@ -1,0 +1,41 @@
+services:
+  mddb:
+    build:
+      context: .
+      dockerfile: services/mddbd/Dockerfile
+    image: mddb:latest
+    container_name: mddb-server
+    restart: unless-stopped
+    ports:
+      - "11023:11023"  # HTTP API
+      - "11024:11024"  # gRPC API
+    volumes:
+      - mddb-data:/app/data
+      - ./backups:/app/backups
+    environment:
+      - MDDB_ADDR=:11023
+      - MDDB_GRPC_ADDR=:11024
+      - MDDB_MODE=wr
+      - MDDB_PATH=/app/data/mddb.db
+      - TZ=UTC
+    networks:
+      - mddb-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11023/v1/stats"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - "com.mddb.description=MDDB Markdown Database Server"
+      - "com.mddb.version=1.0.0"
+
+volumes:
+  mddb-data:
+    driver: local
+    name: mddb-data
+
+networks:
+  mddb-network:
+    driver: bridge
+    name: mddb-network

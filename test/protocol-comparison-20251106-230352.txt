@@ -1,0 +1,17 @@
+HTTP vs gRPC Performance Comparison
+====================================
+Date: Thu  6 Nov 2025 23:03:52 GMT
+Documents tested: 3000
+
+HTTP/JSON:
+  Time: 594s
+  Avg: 15ms
+  Throughput: 64.88 docs/sec
+
+gRPC/Protobuf:
+  Time: 29s
+  Avg: 929.017µs
+  Throughput: 1076.41 docs/sec
+
+Improvement: 1559.00%
+Speedup: 16.59x

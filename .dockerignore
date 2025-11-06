@@ -1,0 +1,70 @@
+.windsurf
+.windsurf/rules/*
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+LICENSE
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.html
+coverage.out
+
+# Database files
+*.db
+backup-*.db
+
+# Temporary files
+tmp/
+*.tmp
+*.temp
+*.log
+
+# Air config (will be generated in container)
+.air.toml
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Environment
+.env*
+
+# Node modules
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+
+# Go
+vendor/
+go.work

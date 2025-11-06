@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package mddb;
+
+option go_package = "mddb/proto";
+
+// MDDB Service - gRPC API for Markdown Database
+service MDDB {
+  // Add or update a document
+  rpc Add(AddRequest) returns (Document);
+  
+  // Get a document by key and language
+  rpc Get(GetRequest) returns (Document);
+  
+  // Search documents with filters
+  rpc Search(SearchRequest) returns (SearchResponse);
+  
+  // Export documents (streaming)
+  rpc Export(ExportRequest) returns (stream ExportChunk);
+  
+  // Create database backup
+  rpc Backup(BackupRequest) returns (BackupResponse);
+  
+  // Restore database from backup
+  rpc Restore(RestoreRequest) returns (RestoreResponse);
+  
+  // Truncate revision history
+  rpc Truncate(TruncateRequest) returns (TruncateResponse);
+  
+  // Get server statistics
+  rpc Stats(StatsRequest) returns (StatsResponse);
+}
+
+// Document represents a markdown document
+message Document {
+  string id = 1;
+  string key = 2;
+  string lang = 3;
+  map<string, MetaValues> meta = 4;
+  string content_md = 5;
+  int64 added_at = 6;
+  int64 updated_at = 7;
+}
+
+// MetaValues holds multiple values for a metadata key
+message MetaValues {
+  repeated string values = 1;
+}
+
+// Add/Update document request
+message AddRequest {
+  string collection = 1;
+  string key = 2;
+  string lang = 3;
+  map<string, MetaValues> meta = 4;
+  string content_md = 5;
+}
+
+// Get document request
+message GetRequest {
+  string collection = 1;
+  string key = 2;
+  string lang = 3;
+  map<string, string> env = 4; // Template variables
+}
+
+// Search request
+message SearchRequest {
+  string collection = 1;
+  map<string, MetaValues> filter_meta = 2;
+  string sort = 3; // addedAt, updatedAt, key
+  bool asc = 4;
+  int32 limit = 5;
+  int32 offset = 6;
+}
+
+// Search response
+message SearchResponse {
+  repeated Document documents = 1;
+  int32 total = 2;
+}
+
+// Export request
+message ExportRequest {
+  string collection = 1;
+  map<string, MetaValues> filter_meta = 2;
+  string format = 3; // ndjson, zip
+}
+
+// Export chunk (streaming)
+message ExportChunk {
+  bytes data = 1;
+  bool is_last = 2;
+}
+
+// Backup request
+message BackupRequest {
+  string to = 1; // Backup filename
+}
+
+// Backup response
+message BackupResponse {
+  string backup = 1;
+}
+
+// Restore request
+message RestoreRequest {
+  string from = 1; // Backup filename
+}
+
+// Restore response
+message RestoreResponse {
+  string restored = 1;
+}
+
+// Truncate request
+message TruncateRequest {
+  string collection = 1;
+  int32 keep_revs = 2;
+  bool drop_cache = 3;
+}
+
+// Truncate response
+message TruncateResponse {
+  string status = 1;
+}
+
+// Stats request
+message StatsRequest {
+  // Empty - no parameters needed
+}
+
+// Stats response
+message StatsResponse {
+  string database_path = 1;
+  int64 database_size = 2;
+  string mode = 3;
+  repeated CollectionStats collections = 4;
+  int32 total_documents = 5;
+  int32 total_revisions = 6;
+  int32 total_meta_indices = 7;
+}
+
+// Collection statistics
+message CollectionStats {
+  string name = 1;
+  int32 document_count = 2;
+  int32 revision_count = 3;
+  int32 meta_index_count = 4;
+}

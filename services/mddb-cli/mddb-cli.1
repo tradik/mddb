@@ -1,0 +1,337 @@
+.TH MDDB-CLI 1 "November 2024" "mddb-cli 1.0.0" "User Commands"
+.SH NAME
+mddb-cli \- command-line client for MDDB (Markdown Database)
+.SH SYNOPSIS
+.B mddb-cli
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR...]
+.SH DESCRIPTION
+.B mddb-cli
+is a command-line client for MDDB, providing an interface similar to mysql-client
+for managing markdown documents with metadata. It communicates with an MDDB server
+via HTTP/JSON API.
+.SH GLOBAL OPTIONS
+.TP
+.BR \-s ", " \-\-server =\fIURL\fR
+MDDB server URL (default: http://localhost:11023)
+.TP
+.BR \-j ", " \-\-json
+Output raw JSON responses
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output
+.TP
+.BR \-h ", " \-\-help
+Display help information
+.TP
+.BR \-\-version
+Display version information
+.SH COMMANDS
+.SS add
+Add or update a markdown document in the database.
+.PP
+.B mddb-cli add
+[\fIOPTIONS\fR] \fICOLLECTION\fR \fIKEY\fR \fILANG\fR
+.PP
+Reads content from stdin or a file specified with \fB\-f\fR.
+.PP
+Options:
+.TP
+.BR \-f ", " \-\-file =\fIFILE\fR
+Read content from FILE instead of stdin
+.TP
+.BR \-m ", " \-\-meta =\fIMETA\fR
+Metadata in format: key=val1|val2,key2=val
+.PP
+Examples:
+.RS
+.nf
+echo "# Hello World" | mddb-cli add blog hello en_US
+mddb-cli add blog post1 en_US -f post.md -m "category=tech,author=John"
+.fi
+.RE
+.SS get
+Retrieve a document from the database.
+.PP
+.B mddb-cli get
+[\fIOPTIONS\fR] \fICOLLECTION\fR \fIKEY\fR \fILANG\fR
+.PP
+Options:
+.TP
+.BR \-e ", " \-\-env =\fIENV\fR
+Environment variables for templating: key=val,key2=val2
+.TP
+.BR \-c ", " \-\-content-only
+Output only content (no metadata)
+.PP
+Examples:
+.RS
+.nf
+mddb-cli get blog hello en_US
+mddb-cli get blog post en_US -e "year=2024,author=John"
+mddb-cli get blog post en_US -c > output.md
+.fi
+.RE
+.SS search
+Search documents in a collection with optional filters.
+.PP
+.B mddb-cli search
+[\fIOPTIONS\fR] \fICOLLECTION\fR
+.PP
+Options:
+.TP
+.BR \-f ", " \-\-filter =\fIFILTER\fR
+Filter by metadata: key=val1|val2,key2=val
+.TP
+.BR \-S ", " \-\-sort =\fIFIELD\fR
+Sort field: addedAt, updatedAt, key (default: updatedAt)
+.TP
+.BR \-a ", " \-\-asc
+Sort ascending (default: descending)
+.TP
+.BR \-l ", " \-\-limit =\fIN\fR
+Limit results (default: 50)
+.TP
+.BR \-o ", " \-\-offset =\fIN\fR
+Offset results (default: 0)
+.PP
+Examples:
+.RS
+.nf
+mddb-cli search blog
+mddb-cli search blog -f "category=tech|tutorial"
+mddb-cli search blog -f "category=tech,status=published" -S addedAt -a
+mddb-cli search blog -l 10 -o 20
+.fi
+.RE
+.SS export
+Export documents from a collection.
+.PP
+.B mddb-cli export
+[\fIOPTIONS\fR] \fICOLLECTION\fR
+.PP
+Options:
+.TP
+.BR \-F ", " \-\-format =\fIFORMAT\fR
+Export format: ndjson, zip (default: ndjson)
+.TP
+.BR \-o ", " \-\-output =\fIFILE\fR
+Output file (default: stdout)
+.TP
+.BR \-f ", " \-\-filter =\fIFILTER\fR
+Filter by metadata: key=val1|val2,key2=val
+.PP
+Examples:
+.RS
+.nf
+mddb-cli export blog -o backup.ndjson
+mddb-cli export blog -F zip -o backup.zip
+mddb-cli export blog -f "status=published" -o published.ndjson
+.fi
+.RE
+.SS backup
+Create a backup of the database.
+.PP
+.B mddb-cli backup
+[\fIFILENAME\fR]
+.PP
+If FILENAME is not specified, generates a timestamped filename.
+.PP
+Examples:
+.RS
+.nf
+mddb-cli backup
+mddb-cli backup my-backup.db
+.fi
+.RE
+.SS restore
+Restore the database from a backup file.
+.PP
+.B mddb-cli restore
+\fIFILENAME\fR
+.PP
+.B WARNING:
+This operation replaces the current database. Use with caution!
+.PP
+Examples:
+.RS
+.nf
+mddb-cli restore backup-1699296000.db
+.fi
+.RE
+.SS truncate
+Remove old revisions from a collection.
+.PP
+.B mddb-cli truncate
+[\fIOPTIONS\fR] \fICOLLECTION\fR
+.PP
+Options:
+.TP
+.BR \-k ", " \-\-keep =\fIN\fR
+Number of revisions to keep per document (default: 5)
+.TP
+.BR \-d ", " \-\-drop-cache
+Drop cache (default: true)
+.PP
+Examples:
+.RS
+.nf
+mddb-cli truncate blog
+mddb-cli truncate blog -k 10
+mddb-cli truncate blog -k 0  # Remove all revisions
+.fi
+.RE
+.SS stats
+Display server and database statistics.
+.PP
+.B mddb-cli stats
+.PP
+Shows information about:
+.RS
+- Database path and size
+.br
+- Access mode
+.br
+- Total documents, revisions, and indices
+.br
+- Per-collection statistics
+.RE
+.PP
+Examples:
+.RS
+.nf
+mddb-cli stats
+mddb-cli stats -j  # JSON output
+.fi
+.RE
+.SH ENVIRONMENT
+.TP
+.B MDDB_SERVER
+Default server URL (overridden by \fB\-\-server\fR)
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Error occurred
+.SH EXAMPLES
+.SS Basic Workflow
+.nf
+# Add a document
+echo "# My First Post" | mddb-cli add blog first-post en_US \\
+  -m "category=blog,author=John Doe"
+
+# Retrieve it
+mddb-cli get blog first-post en_US
+
+# Search for all blog posts
+mddb-cli search blog -f "category=blog"
+
+# Export all published posts
+mddb-cli export blog -f "status=published" -o published.ndjson
+
+# Create a backup
+mddb-cli backup daily-backup.db
+.fi
+.SS Working with Templates
+.nf
+# Add document with template variables
+echo "# Welcome to %%siteName%% in %%year%%" | \\
+  mddb-cli add blog welcome en_US
+
+# Retrieve with substitution
+mddb-cli get blog welcome en_US -e "siteName=My Blog,year=2024"
+.fi
+.SS Bulk Operations
+.nf
+# Import multiple files
+for file in posts/*.md; do
+  key=$(basename "$file" .md)
+  mddb-cli add blog "$key" en_US -f "$file" \\
+    -m "category=blog,status=published"
+done
+
+# Export and process
+mddb-cli export blog -f "category=tutorial" | \\
+  jq -r '.key + ": " + .meta.category[0]'
+.fi
+.SS Maintenance
+.nf
+# Create daily backup
+mddb-cli backup "backup-$(date +%Y-%m-%d).db"
+
+# Clean up old revisions (keep last 5)
+mddb-cli truncate blog -k 5
+
+# Restore from backup
+mddb-cli restore backup-2024-11-06.db
+.fi
+.SH METADATA FORMAT
+Metadata is specified as comma-separated key=value pairs. Multiple values for
+the same key are separated by pipes (|).
+.PP
+Format: \fBkey1=val1|val2,key2=val3\fR
+.PP
+This creates:
+.RS
+.nf
+{
+  "key1": ["val1", "val2"],
+  "key2": ["val3"]
+}
+.fi
+.RE
+.SH FILTERING
+Filters use the same format as metadata. Multiple values for the same key are
+combined with OR logic. Multiple keys are combined with AND logic.
+.PP
+Example: \fBcategory=tech|tutorial,status=published\fR
+.PP
+Matches documents where:
+.RS
+(category = "tech" OR category = "tutorial") AND (status = "published")
+.RE
+.SH OUTPUT FORMATS
+.SS Human-Readable (default)
+Formatted output with labels and structure.
+.SS JSON (\-\-json)
+Raw JSON responses from the server.
+.SS Content-Only (\-c with get command)
+Only the markdown content, suitable for piping to other tools.
+.SH TIPS
+.TP
+.B Piping Content
+Use \fB\-c\fR with \fBget\fR to pipe content to other tools:
+.RS
+mddb-cli get blog post en_US -c | pandoc -o post.html
+.RE
+.TP
+.B JSON Processing
+Use \fB\-j\fR with \fBjq\fR for advanced processing:
+.RS
+mddb-cli search blog -j | jq '.[] | select(.meta.category[] == "tech")'
+.RE
+.TP
+.B Batch Operations
+Use shell loops for bulk operations:
+.RS
+for key in post1 post2 post3; do
+  mddb-cli get blog "$key" en_US -c > "${key}.md"
+done
+.RE
+.SH FILES
+.TP
+.I ~/.mddb-cli.conf
+User configuration file (future feature)
+.SH SEE ALSO
+.BR mddb (1),
+.BR jq (1),
+.BR curl (1)
+.PP
+Full documentation: <https://github.com/tradik/mddb/docs>
+.SH BUGS
+Report bugs to: <https://github.com/tradik/mddb/issues>
+.SH AUTHOR
+MDDB Project Contributors
+.SH COPYRIGHT
+Copyright \(co 2024 MDDB Project. License MIT.
