@@ -1,42 +1,108 @@
 # MDDB Performance Tests
 
-This directory contains performance testing scripts for MDDB, including HTTP vs gRPC protocol comparison.
+This directory contains comprehensive performance testing scripts comparing MDDB against traditional databases (MySQL, PostgreSQL).
 
 ## Files
 
+### Test Scripts
 - `generate-lorem.sh` - Generates Lorem Ipsum markdown files in 3 sizes
 - `performance-test.sh` - HTTP/JSON performance test script
-- `grpc-performance-test.go` - gRPC/Protobuf performance test
 - `compare-protocols.sh` - Compare HTTP vs gRPC performance
-- `lorem-*.md` - Generated test documents (3 sizes)
-- `performance-results-*.txt` - Test results (generated)
-- `grpc-performance-results.txt` - gRPC test results
+- `compare-all-databases.sh` - **Complete benchmark: MDDB vs MySQL vs PostgreSQL**
+
+### Test Clients
+- `grpc-performance-test.go` - MDDB gRPC/Protobuf performance test
+- `mysql-benchmark.go` - MySQL performance test client
+- `postgres-benchmark.go` - PostgreSQL performance test client
+
+### Docker
+- `docker-compose.benchmark.yml` - MySQL 9.1 and PostgreSQL 17 containers
+
+### Generated Files
+- `lorem-*.md` - Test documents (3 sizes: ~124B, ~707B, ~1876B)
+- `*-performance-results.txt` - Individual test results
 - `protocol-comparison-*.txt` - HTTP vs gRPC comparison
+- `database-comparison-*.txt` - **MDDB vs MySQL vs PostgreSQL comparison**
 
 ## Quick Start
+
+### Option 1: Full Database Comparison (Recommended)
+
+```bash
+# Start MDDB server
+cd /path/to/mddb
+make docker-up-dev
+
+# Run complete benchmark
+cd test
+./compare-all-databases.sh
+```
+
+This will:
+1. Start MySQL 9.1 and PostgreSQL 17 in Docker
+2. Run MDDB (gRPC) benchmark
+3. Run MySQL benchmark
+4. Run PostgreSQL benchmark
+5. Generate comparison report
+
+### Option 2: Protocol Comparison Only
 
 ```bash
 # Make sure MDDB server is running
 make docker-up-dev
 
-# Run HTTP performance test
+# Compare HTTP vs gRPC
 cd test
+./compare-protocols.sh
+```
+
+### Option 3: Individual Tests
+
+```bash
+# HTTP test
 ./performance-test.sh
 
-# Run gRPC performance test
+# gRPC test
 go run grpc-performance-test.go
 
-# Compare both protocols
-./compare-protocols.sh
+# MySQL test (requires Docker containers)
+docker-compose -f docker-compose.benchmark.yml up -d
+go run mysql-benchmark.go
+
+# PostgreSQL test (requires Docker containers)
+docker-compose -f docker-compose.benchmark.yml up -d
+go run postgres-benchmark.go
 ```
 
 ## What it Tests
 
-The script performs 3 test runs:
+### Document Sizes
 
-1. **Short Documents** (~124 bytes) - 10,000 documents
-2. **Medium Documents** (~707 bytes) - 10,000 documents  
-3. **Long Documents** (~1,876 bytes) - 10,000 documents
+Each test uses 3 document sizes rotated evenly:
+
+1. **Short Documents** (~124 bytes) - Simple markdown
+2. **Medium Documents** (~707 bytes) - Standard blog post
+3. **Long Documents** (~1,876 bytes) - Detailed article
+
+### Test Volume
+
+- **Protocol comparison**: 3,000 documents (1,000 per protocol)
+- **Database comparison**: 1,000 documents per database
+- Configurable via constants in source files
+
+### Databases Tested
+
+1. **MDDB (gRPC)** - Embedded BoltDB with gRPC/Protobuf
+2. **MySQL 9.1** - Traditional relational database
+3. **PostgreSQL 17** - Advanced relational database
+
+### Metrics Collected
+
+- **Throughput** - Documents per second
+- **Average Latency** - Mean insert time
+- **Median Latency** - 50th percentile
+- **Min/Max Latency** - Best and worst case
+- **Total Time** - Complete test duration
 
 **Total: 30,000 documents**
 

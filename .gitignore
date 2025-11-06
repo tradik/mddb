@@ -55,6 +55,16 @@ tmp/
 # Test results
 test/performance-results-*.txt
 test/lorem-*.md
+test/protocol-comparison-*.txt
+test/database-comparison-*.txt
+test/grpc-performance-results.txt
+test/mysql-performance-results.txt
+test/postgres-performance-results.txt
+
+# Test binaries
+test/grpc-performance-test
+test/mysql-benchmark
+test/postgres-benchmark
 
 # Generated protobuf code (regenerate with: make generate-proto)
 services/mddbd/proto/*.pb.go
