@@ -6,6 +6,175 @@
 [![gRPC](https://img.shields.io/badge/gRPC-enabled-blue.svg)](https://grpc.io)
 [![Protocol Buffers](https://img.shields.io/badge/protobuf-3-blue.svg)](https://protobuf.dev)
 
+**A high-performance, version-controlled markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf)**
+
+MDDB is a lightweight, embedded database specifically designed for storing and managing markdown documents with rich metadata. Built with Go and BoltDB, it provides blazing-fast document operations with full revision history, making it perfect for content management systems, documentation platforms, and knowledge bases.
+
+## 🎯 What is MDDB?
+
+MDDB (Markdown Database) is a specialized database server that treats markdown documents as first-class citizens. Unlike traditional databases that store markdown as plain text, MDDB provides:
+
+- **Native Markdown Support** - Store, version, and query markdown documents with their metadata
+- **Dual Protocol APIs** - Choose between HTTP/JSON (easy debugging) or gRPC/Protobuf (16x faster performance)
+- **Full Revision History** - Every document update creates a new revision with complete content snapshot
+- **Rich Metadata Indexing** - Fast searches using multi-value metadata tags
+- **Template Variables** - Dynamic content with variable substitution
+- **Multi-language Support** - Store documents in multiple languages with the same key
+- **Zero Configuration** - Single binary, embedded database, no external dependencies
+
+## 🚀 Why MDDB?
+
+### vs Traditional Databases (PostgreSQL, MySQL)
+- ✅ **Specialized for Markdown** - Native support vs treating as plain text
+- ✅ **Embedded** - No separate database server to manage
+- ✅ **Built-in Versioning** - Automatic revision history without triggers
+- ✅ **Simpler Deployment** - Single binary vs complex database setup
+- ✅ **Lower Resource Usage** - ~15MB Docker image vs 200MB+
+
+### vs Document Databases (MongoDB, CouchDB)
+- ✅ **Markdown-First Design** - Purpose-built for markdown workflows
+- ✅ **Dual Protocol** - HTTP + gRPC (16x faster than HTTP)
+- ✅ **Smaller Footprint** - Embedded BoltDB vs separate server
+- ✅ **Type-Safe gRPC** - Compile-time validation vs runtime schemas
+- ✅ **Simpler Operations** - No sharding, replication complexity
+
+### vs File-Based Systems (Git, Filesystem)
+- ✅ **Instant Queries** - Indexed metadata vs scanning files
+- ✅ **API Access** - REST + gRPC vs file operations
+- ✅ **Concurrent Access** - ACID transactions vs file locks
+- ✅ **Rich Metadata** - Structured tags vs filename conventions
+- ✅ **Performance** - 1000+ docs/sec vs slow file I/O
+
+### vs CMS Platforms (WordPress, Strapi)
+- ✅ **Lightweight** - 15MB vs 500MB+ installations
+- ✅ **API-First** - No admin UI overhead
+- ✅ **Version Control** - Built-in vs plugins
+- ✅ **High Performance** - 16x faster with gRPC
+- ✅ **Developer-Friendly** - Simple API vs complex frameworks
+
+## 💡 Use Cases
+
+### 1. **Documentation Platforms**
+```bash
+# Store API documentation with versioning
+mddb-cli add api-docs authentication en_US -f auth.md -m "version=2.0,status=published"
+mddb-cli search api-docs -f "status=published" --sort updatedAt
+```
+**Perfect for**: Technical documentation, API references, knowledge bases
+
+### 2. **Content Management Systems**
+```bash
+# Multi-language blog posts with metadata
+mddb-cli add blog "getting-started" en_US -f post-en.md -m "author=John,tags=tutorial|beginner"
+mddb-cli add blog "getting-started" pl_PL -f post-pl.md -m "author=John,tags=tutorial|beginner"
+```
+**Perfect for**: Blogs, news sites, multi-language content
+
+### 3. **Configuration Management**
+```bash
+# Store configuration templates with variables
+mddb-cli add configs nginx-prod en_US -f nginx.conf.md -m "env=production,service=web"
+# Variables like {{domain}} are substituted on retrieval
+```
+**Perfect for**: Infrastructure configs, deployment templates
+
+### 4. **Knowledge Bases**
+```bash
+# Searchable documentation with rich metadata
+mddb-cli add kb troubleshooting en_US -f guide.md -m "category=support,difficulty=advanced,tags=network|vpn"
+mddb-cli search kb -f "category=support,difficulty=beginner"
+```
+**Perfect for**: Internal wikis, support documentation, FAQs
+
+### 5. **Microservices Communication**
+```go
+// High-performance gRPC for service-to-service communication
+client := mddb.NewMDDBClient(conn)
+doc, _ := client.Get(ctx, &mddb.GetRequest{
+    Collection: "templates",
+    Key: "email-welcome",
+    Lang: "en_US",
+})
+```
+**Perfect for**: Template storage, shared content, configuration distribution
+
+### 6. **Version-Controlled Content**
+```bash
+# Track all changes with full history
+mddb-cli add docs readme en_US -f README.md -m "version=1.0"
+# Update creates new revision
+mddb-cli add docs readme en_US -f README-v2.md -m "version=2.0"
+# Access any revision through API
+```
+**Perfect for**: Legal documents, compliance, audit trails
+
+## ⚡ Performance
+
+Real-world benchmarks (3000 documents):
+
+| Protocol | Throughput | Avg Latency | Payload Size |
+|----------|------------|-------------|--------------|
+| **gRPC** | 1076 docs/sec | 0.93ms | 30% |
+| **HTTP** | 65 docs/sec | 15ms | 100% |
+
+**gRPC is 16.59x faster than HTTP!**
+
+See [Performance Tests](test/README.md) for detailed benchmarks.
+
+## 🎯 Key Features
+
+### Core Functionality
+- **Document Management** - Add, update, retrieve markdown with metadata
+- **Revision History** - Every update creates a new revision with full content
+- **Metadata Search** - Fast indexed search with multi-value tags
+- **Multi-language** - Store same document in multiple languages
+- **Template Variables** - Dynamic content with `{{variable}}` substitution
+- **Collections** - Organize documents into logical groups
+
+### APIs & Protocols
+- **Dual Protocol Support** - HTTP/JSON and gRPC/Protobuf simultaneously
+- **RESTful HTTP API** - Easy debugging with curl, Postman
+- **High-Performance gRPC** - 16x faster, 70% smaller payload
+- **gRPC Reflection** - Use grpcurl for debugging
+- **CLI Client** - Full-featured command-line interface
+
+### Operations
+- **Export** - NDJSON or ZIP formats with filtering
+- **Backup/Restore** - Full database backup and restore
+- **Truncate** - Remove old revisions to save space
+- **Statistics** - Real-time server and database metrics
+- **Access Modes** - Read-only, write-only, or read-write
+
+### Developer Experience
+- **Single Binary** - No external dependencies
+- **Docker Support** - 15MB Alpine Linux images
+- **Hot Reload** - Development mode with automatic restart
+- **Monorepo Structure** - Shared protobuf definitions
+- **Multi-language Clients** - Generated code for Go, Python, Node.js, PHP
+- **Comprehensive Docs** - API reference, examples, guides
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────┐
+│         Client Applications             │
+├──────────────┬──────────────────────────┤
+│  HTTP/JSON   │    gRPC/Protobuf        │
+│  Port 11023  │    Port 11024           │
+├──────────────┴──────────────────────────┤
+│         MDDB Server (Go)                │
+│  - Request Handling                     │
+│  - Metadata Indexing                    │
+│  - Template Processing                  │
+│  - Revision Management                  │
+├─────────────────────────────────────────┤
+│      BoltDB (Embedded)                  │
+│  - ACID Transactions                    │
+│  - B+Tree Storage                       │
+│  - Single File Database                 │
+└─────────────────────────────────────────┘
+```
+
 ## Quick Start
 
 ### Prerequisites
@@ -109,23 +278,43 @@ make tidy          # Tidy Go modules
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - System design and internals
 - **[Deployment Guide](docs/DEPLOYMENT.md)** - Production deployment instructions
 
-## ✨ Features
+## 🎨 Example Workflows
 
-### Core Functionality
-- **Document Management** - Add, update, and retrieve markdown documents with metadata
-- **Revision History** - Every update creates a new revision with full content snapshot
-- **Metadata Search** - Fast indexed search with multi-value metadata support
-- **Multi-language** - Built-in support for multiple languages per document
-- **Template Engine** - Variable substitution with `%%varName%%` syntax
-- **Export** - Export documents as NDJSON or ZIP files with filtering
-- **Backup/Restore** - Simple file-based backup and restore operations
-- **Access Modes** - Read-only, write-only, or read-write modes
+### Blog Platform
+```bash
+# Add a blog post with tags
+echo "# Getting Started with MDDB" | mddb-cli add blog intro en_US \
+  -m "author=Jane,tags=tutorial|beginner,status=published"
 
-### Dual Protocol Support
-- **HTTP/JSON API** - RESTful API on port 11023 (easy debugging, curl-friendly)
-- **gRPC API** - Binary protocol on port 11024 (70% smaller payload, faster)
-- **Automatic Compression** - HTTP/2 with gzip/deflate compression
-- **Streaming** - gRPC streaming for large exports
+# Search published posts
+mddb-cli search blog -f "status=published" --sort updatedAt
+
+# Export all blog posts
+curl "http://localhost:11023/v1/export?collection=blog&format=zip" -o blog-backup.zip
+```
+
+### API Documentation
+```bash
+# Store versioned API docs
+mddb-cli add api-docs auth-v2 en_US -f authentication.md \
+  -m "version=2.0,endpoint=/api/auth,method=POST"
+
+# Quick search by endpoint
+mddb-cli search api-docs -f "endpoint=/api/auth"
+```
+
+### Multi-language Content
+```bash
+# Same key, different languages
+mddb-cli add products laptop-x1 en_US -f laptop-en.md -m "category=electronics,price=999"
+mddb-cli add products laptop-x1 pl_PL -f laptop-pl.md -m "category=electronics,price=999"
+mddb-cli add products laptop-x1 de_DE -f laptop-de.md -m "category=electronics,price=999"
+
+# Retrieve in user's language
+mddb-cli get products laptop-x1 pl_PL
+```
+
+## 🔧 Technical Details
 
 ### Storage Engine
 - **BoltDB** - Embedded key-value store (single file)
