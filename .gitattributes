@@ -1,0 +1,47 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Go source files
+*.go text eol=lf
+
+# Proto files
+*.proto text eol=lf
+
+# Generated proto files - always include in git
+*.pb.go text eol=lf linguist-generated=false
+
+# Shell scripts
+*.sh text eol=lf
+
+# Markdown
+*.md text eol=lf
+
+# YAML
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# JSON
+*.json text eol=lf
+
+# Makefiles
+Makefile text eol=lf
+*.mk text eol=lf
+
+# Docker
+Dockerfile* text eol=lf
+*.dockerignore text eol=lf
+
+# Git
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Binary files
+*.db binary
+*.so binary
+*.dylib binary
+*.dll binary
+*.exe binary
+*.tar.gz binary
+*.zip binary
+*.deb binary
+*.rpm binary

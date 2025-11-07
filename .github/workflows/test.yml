@@ -33,7 +33,10 @@ jobs:
 
       - name: Install dependencies
         working-directory: services/mddbd
-        run: go mod download
+        run: |
+          go mod download
+          go mod verify
+          go mod tidy
 
       - name: Run tests
         working-directory: services/mddbd

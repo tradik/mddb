@@ -55,6 +55,21 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Install dependencies
+        working-directory: services/mddbd
+        run: |
+          go mod download
+          go mod verify
+          go mod tidy
+
+      - name: Verify proto files
+        working-directory: services/mddbd
+        run: |
+          if [ ! -f proto/mddb.pb.go ]; then
+            echo "Error: proto files not found. Please commit generated proto files."
+            exit 1
+          fi
+
       - name: Get version
         id: version
         run: |
@@ -320,6 +335,12 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        working-directory: services/mddb-cli
+        run: |
+          go mod download
+          go mod verify
 
       - name: Get version
         id: version
