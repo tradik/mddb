@@ -26,19 +26,21 @@ const (
 )
 
 type Server struct {
-	DB            *bolt.DB
-	Path          string
-	Mode          AccessMode
-	Hooks         Hooks // optional extensions
-	BucketNames   BucketNames
-	Cache         *DocumentCache       // Read-through cache (legacy)
-	LockFreeCache *LockFreeCache       // Lock-free cache (extreme performance)
-	IndexQueue    *IndexQueue          // Async metadata indexing
-	WAL           *WAL                 // Write-Ahead Log
-	MVCC          *MVCC                // Multi-Version Concurrency Control
-	BloomFilters  *BloomFilterManager  // Bloom filters for negative lookups
-	DeltaEncoder  *DeltaEncoder        // Delta encoding for revisions
-	UseExtreme    bool                 // Enable extreme performance features
+	DB              *bolt.DB
+	Path            string
+	Mode            AccessMode
+	Hooks           Hooks // optional extensions
+	BucketNames     BucketNames
+	Cache           *DocumentCache          // Read-through cache (legacy)
+	LockFreeCache   *LockFreeCache          // Lock-free cache (extreme performance)
+	IndexQueue      *IndexQueue             // Async metadata indexing
+	WAL             *WAL                    // Write-Ahead Log
+	MVCC            *MVCC                   // Multi-Version Concurrency Control
+	BloomFilters    *BloomFilterManager     // Bloom filters for negative lookups
+	DeltaEncoder    *DeltaEncoder           // Delta encoding for revisions
+	AdaptiveIndex   *AdaptiveIndexManager   // Adaptive indexing
+	AsyncIO         *AsyncIO                // Async I/O
+	UseExtreme      bool                    // Enable extreme performance features
 }
 
 // BucketNames caches bucket name byte slices to avoid repeated allocations
@@ -141,6 +143,8 @@ func main() {
 		IndexQueue:    NewIndexQueue(nil, 4),           // 4 workers (will set server below)
 		BloomFilters:  NewBloomFilterManager(),         // Bloom filters
 		DeltaEncoder:  NewDeltaEncoder(),               // Delta encoding
+		AdaptiveIndex: NewAdaptiveIndexManager(),       // Adaptive indexing
+		AsyncIO:       NewAsyncIO(),                    // Async I/O
 		UseExtreme:    useExtreme,
 	}
 	s.IndexQueue.server = s // Set server reference
@@ -165,6 +169,8 @@ func main() {
 		log.Println("  ✓ Bloom Filters enabled")
 		log.Println("  ✓ Delta Encoding enabled")
 		log.Println("  ✓ Adaptive Compression enabled (Snappy + Zstd)")
+		log.Println("  ✓ Adaptive Indexing enabled")
+		log.Println("  ✓ Async I/O enabled")
 	}
 	
 	if err := s.ensureBuckets(); err != nil {
