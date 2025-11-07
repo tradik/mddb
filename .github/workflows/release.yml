@@ -460,22 +460,13 @@ jobs:
           %install
           mkdir -p %{buildroot}/usr/bin
           mkdir -p %{buildroot}/usr/share/doc/mddb-cli
-          mkdir -p %{buildroot}/usr/share/man/man1
           
           install -m 755 mddb-cli %{buildroot}/usr/bin/mddb-cli
           install -m 644 README.md %{buildroot}/usr/share/doc/mddb-cli/
-          
-          if [ -f mddb-cli.1 ]; then
-            install -m 644 mddb-cli.1 %{buildroot}/usr/share/man/man1/
-            gzip %{buildroot}/usr/share/man/man1/mddb-cli.1
-          fi
 
           %files
           /usr/bin/mddb-cli
           /usr/share/doc/mddb-cli/README.md
-          %if 0
-          /usr/share/man/man1/mddb-cli.1.gz
-          %endif
 
           %changelog
           * $(date "+%a %b %d %Y") MDDB Team <team@mddb.io> - ${VERSION_NUM}-1
