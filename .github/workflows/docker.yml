@@ -19,7 +19,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -58,9 +58,9 @@ jobs:
           echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
 
       - name: Build and push server image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
-          context: ./services/mddbd
+          context: .
           file: ./services/mddbd/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
@@ -86,9 +86,9 @@ jobs:
             COMMIT_SHA=${{ steps.meta.outputs.COMMIT_SHA }}
 
       - name: Build and push dev image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
-          context: ./services/mddbd
+          context: .
           file: ./services/mddbd/Dockerfile.dev
           platforms: linux/amd64,linux/arm64
           push: true
@@ -114,7 +114,7 @@ jobs:
             COMMIT_SHA=${{ steps.meta.outputs.COMMIT_SHA }}
 
       - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v4
+        uses: peter-evans/dockerhub-description@v5
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
