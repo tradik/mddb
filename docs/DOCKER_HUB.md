@@ -46,19 +46,6 @@ docker run -d \
   tradik/mddb:latest
 ```
 
-### Development Server (with hot reload)
-
-```bash
-docker run -d \
-  --name mddb-dev \
-  -p 11023:11023 \
-  -p 11024:11024 \
-  -v mddb-data:/data \
-  -v $(pwd)/services/mddbd:/app \
-  -e MDDB_EXTREME=true \
-  tradik/mddb:dev
-```
-
 ### Docker Compose
 
 ```yaml
@@ -121,17 +108,12 @@ Enable with `MDDB_EXTREME=true` to activate:
 
 ### Production Images
 - `latest` - Latest stable release
-- `2.0.0`, `2.0`, `2` - Specific version tags
-- `v2.0.0` - Version with 'v' prefix
-
-### Development Images
-- `dev` - Latest development build with hot reload
-- `2.0.0-dev` - Specific version development build
+- `2.0.1`, `2.0`, `2` - Specific version tags
 
 ### Platform Support
 All images support:
-- `linux/amd64` (x86_64)
-- `linux/arm64` (aarch64)
+- `linux/amd64` (Intel/AMD x86_64)
+- `linux/arm64` (ARM/Apple Silicon aarch64)
 
 ## 🔌 API Examples
 

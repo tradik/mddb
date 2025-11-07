@@ -85,34 +85,6 @@ jobs:
             BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
             COMMIT_SHA=${{ steps.meta.outputs.COMMIT_SHA }}
 
-      - name: Build and push dev image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./services/mddbd/Dockerfile.dev
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.VERSION_NUM }}-dev
-            ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:dev
-          labels: |
-            org.opencontainers.image.title=MDDB Server (Development)
-            org.opencontainers.image.description=Development image with hot reload for MDDB server
-            org.opencontainers.image.version=${{ steps.meta.outputs.VERSION_NUM }}-dev
-            org.opencontainers.image.created=${{ steps.meta.outputs.BUILD_DATE }}
-            org.opencontainers.image.revision=${{ steps.meta.outputs.COMMIT_SHA }}
-            org.opencontainers.image.source=https://github.com/tradik/mddb
-            org.opencontainers.image.url=https://github.com/tradik/mddb
-            org.opencontainers.image.documentation=https://github.com/tradik/mddb/blob/main/README.md
-            org.opencontainers.image.licenses=MIT
-            org.opencontainers.image.vendor=MDDB Team
-          cache-from: type=registry,ref=${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:buildcache-dev
-          cache-to: type=registry,ref=${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:buildcache-dev,mode=max
-          build-args: |
-            VERSION=${{ steps.meta.outputs.VERSION }}
-            BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
-            COMMIT_SHA=${{ steps.meta.outputs.COMMIT_SHA }}
-
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@v5
         with:
@@ -128,17 +100,13 @@ jobs:
           cat >> $GITHUB_STEP_SUMMARY << 'EOF'
           ## 🐳 Docker Images Published
           
-          ### Server Images
+          ### Production Images
           - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.VERSION_NUM }}`
           - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest`
           
-          ### Development Images
-          - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.VERSION_NUM }}-dev`
-          - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:dev`
-          
           ### Platforms
-          - `linux/amd64`
-          - `linux/arm64`
+          - `linux/amd64` (Intel/AMD)
+          - `linux/arm64` (ARM/Apple Silicon)
           
           ### Quick Start
           ```bash
