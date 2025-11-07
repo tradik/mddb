@@ -26,13 +26,17 @@ const (
 )
 
 type Server struct {
-	DB          *bolt.DB
-	Path        string
-	Mode        AccessMode
-	Hooks       Hooks // optional extensions
-	BucketNames BucketNames
-	Cache       *DocumentCache // Read-through cache
-	IndexQueue  *IndexQueue    // Async metadata indexing
+	DB           *bolt.DB
+	Path         string
+	Mode         AccessMode
+	Hooks        Hooks // optional extensions
+	BucketNames  BucketNames
+	Cache        *DocumentCache  // Read-through cache (legacy)
+	LockFreeCache *LockFreeCache // Lock-free cache (extreme performance)
+	IndexQueue   *IndexQueue     // Async metadata indexing
+	WAL          *WAL            // Write-Ahead Log
+	MVCC         *MVCC           // Multi-Version Concurrency Control
+	UseExtreme   bool            // Enable extreme performance features
 }
 
 // BucketNames caches bucket name byte slices to avoid repeated allocations
@@ -117,6 +121,9 @@ func main() {
 	}
 	defer db.Close()
 
+	// Check for extreme performance mode
+	useExtreme := os.Getenv("MDDB_EXTREME") == "true"
+	
 	s := &Server{
 		DB:   db,
 		Path: dbPath,
@@ -127,10 +134,31 @@ func main() {
 			Rev:     []byte("rev"),
 			ByKey:   []byte("bykey"),
 		},
-		Cache:      NewDocumentCache(1000, 300),  // 1000 docs, 5min TTL
-		IndexQueue: NewIndexQueue(nil, 4),        // 4 workers (will set server below)
+		Cache:         NewDocumentCache(1000, 300),     // 1000 docs, 5min TTL
+		LockFreeCache: NewLockFreeCache(10000, 300),    // 10k docs, 5min TTL (lock-free)
+		IndexQueue:    NewIndexQueue(nil, 4),           // 4 workers (will set server below)
+		UseExtreme:    useExtreme,
 	}
 	s.IndexQueue.server = s // Set server reference
+	
+	// Initialize extreme performance features
+	if useExtreme {
+		log.Println("🚀 Extreme Performance Mode ENABLED")
+		
+		// Initialize WAL
+		wal, err := NewWAL(dbPath, SyncPeriodic)
+		if err != nil {
+			log.Fatalf("Failed to initialize WAL: %v", err)
+		}
+		s.WAL = wal
+		log.Println("  ✓ WAL initialized (SyncPeriodic)")
+		
+		// Initialize MVCC
+		s.MVCC = NewMVCC()
+		log.Println("  ✓ MVCC initialized")
+		
+		log.Println("  ✓ Lock-Free Cache enabled")
+	}
 	
 	if err := s.ensureBuckets(); err != nil {
 		log.Fatal(err)

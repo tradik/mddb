@@ -151,9 +151,13 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Update cache
+	// Update cache (use lock-free cache if extreme mode)
 	cacheKey := BuildCacheKey(req.Collection, req.Key, req.Lang)
-	g.server.Cache.Set(cacheKey, cachedBuf)
+	if g.server.UseExtreme {
+		g.server.LockFreeCache.Set(cacheKey, cachedBuf)
+	} else {
+		g.server.Cache.Set(cacheKey, cachedBuf)
+	}
 
 	return docToProto(&saved), nil
 }
@@ -188,9 +192,19 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 		return nil, status.Error(codes.InvalidArgument, "missing required fields")
 	}
 
-	// Check cache first
+	// Check cache first (use lock-free cache if extreme mode)
 	cacheKey := BuildCacheKey(req.Collection, req.Key, req.Lang)
-	if cachedData, found := g.server.Cache.Get(cacheKey); found {
+	
+	var cachedData []byte
+	var found bool
+	
+	if g.server.UseExtreme {
+		cachedData, found = g.server.LockFreeCache.Get(cacheKey)
+	} else {
+		cachedData, found = g.server.Cache.Get(cacheKey)
+	}
+	
+	if found {
 		docPtr, err := unmarshalDoc(cachedData)
 		if err == nil {
 			// Apply template variables if needed
@@ -228,9 +242,13 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 		return nil
 	})
 	
-	// Update cache
+	// Update cache (use lock-free cache if extreme mode)
 	if err == nil && docData != nil {
-		g.server.Cache.Set(cacheKey, docData)
+		if g.server.UseExtreme {
+			g.server.LockFreeCache.Set(cacheKey, docData)
+		} else {
+			g.server.Cache.Set(cacheKey, docData)
+		}
 	}
 
 	if err != nil {

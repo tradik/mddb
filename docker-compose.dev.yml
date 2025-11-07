@@ -22,6 +22,7 @@ services:
       - MDDB_GRPC_ADDR=:11024
       - MDDB_MODE=wr
       - MDDB_PATH=/app/data/mddb.db
+      - MDDB_EXTREME=true
       - TZ=UTC
       - GO_ENV=development
     networks:
