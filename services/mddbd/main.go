@@ -974,12 +974,14 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "deleted",
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":     "deleted",
 		"collection": req.Collection,
-		"key": req.Key,
-		"lang": req.Lang,
-	})
+		"key":        req.Key,
+		"lang":       req.Lang,
+	}); err != nil {
+		log.Printf("Error encoding delete response: %v", err)
+	}
 }
 
 // handleDeleteCollection deletes all documents in a collection
@@ -1053,9 +1055,11 @@ func (s *Server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"status": "deleted",
-		"collection": req.Collection,
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":       "deleted",
+		"collection":   req.Collection,
 		"deletedCount": deletedCount,
-	})
+	}); err != nil {
+		log.Printf("Error encoding delete collection response: %v", err)
+	}
 }

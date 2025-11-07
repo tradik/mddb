@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ReactMarkdown compatibility** - Removed deprecated className prop
 - **Content overflow issues** - Fixed margin and layout problems in document viewer
 - **UI responsiveness** - Better loading states and user feedback
+- **golangci-lint errors** - Fixed unchecked error returns in JSON encoding
 
 ### Improved
 - **Document viewer layout** - Better container constraints and overflow handling
