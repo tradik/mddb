@@ -12,6 +12,12 @@ service MDDB {
   // Add or update multiple documents in a single transaction (batch)
   rpc AddBatch(AddBatchRequest) returns (AddBatchResponse);
   
+  // Update multiple documents in a single transaction (batch)
+  rpc UpdateBatch(UpdateBatchRequest) returns (UpdateBatchResponse);
+  
+  // Delete multiple documents in a single transaction (batch)
+  rpc DeleteBatch(DeleteBatchRequest) returns (DeleteBatchResponse);
+  
   // Get a document by key and language
   rpc Get(GetRequest) returns (Document);
   
@@ -172,4 +178,44 @@ message CollectionStats {
   int32 document_count = 2;
   int32 revision_count = 3;
   int32 meta_index_count = 4;
+}
+
+// Update batch request
+message UpdateBatchRequest {
+  string collection = 1;
+  repeated UpdateDocument documents = 2;
+}
+
+// Document for update operations
+message UpdateDocument {
+  string key = 1;
+  string lang = 2;
+  map<string, MetaValues> meta = 3;
+  string content_md = 4;
+}
+
+// Update batch response
+message UpdateBatchResponse {
+  int32 updated = 1;
+  int32 failed = 2;
+  repeated string errors = 3;
+}
+
+// Delete batch request
+message DeleteBatchRequest {
+  string collection = 1;
+  repeated DeleteDocument documents = 2;
+}
+
+// Document for delete operations
+message DeleteDocument {
+  string key = 1;
+  string lang = 2;
+}
+
+// Delete batch response
+message DeleteBatchResponse {
+  int32 deleted = 1;
+  int32 failed = 2;
+  repeated string errors = 3;
 }

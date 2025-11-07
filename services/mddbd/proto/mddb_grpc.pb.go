@@ -19,15 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MDDB_Add_FullMethodName      = "/mddb.MDDB/Add"
-	MDDB_AddBatch_FullMethodName = "/mddb.MDDB/AddBatch"
-	MDDB_Get_FullMethodName      = "/mddb.MDDB/Get"
-	MDDB_Search_FullMethodName   = "/mddb.MDDB/Search"
-	MDDB_Export_FullMethodName   = "/mddb.MDDB/Export"
-	MDDB_Backup_FullMethodName   = "/mddb.MDDB/Backup"
-	MDDB_Restore_FullMethodName  = "/mddb.MDDB/Restore"
-	MDDB_Truncate_FullMethodName = "/mddb.MDDB/Truncate"
-	MDDB_Stats_FullMethodName    = "/mddb.MDDB/Stats"
+	MDDB_Add_FullMethodName         = "/mddb.MDDB/Add"
+	MDDB_AddBatch_FullMethodName    = "/mddb.MDDB/AddBatch"
+	MDDB_UpdateBatch_FullMethodName = "/mddb.MDDB/UpdateBatch"
+	MDDB_DeleteBatch_FullMethodName = "/mddb.MDDB/DeleteBatch"
+	MDDB_Get_FullMethodName         = "/mddb.MDDB/Get"
+	MDDB_Search_FullMethodName      = "/mddb.MDDB/Search"
+	MDDB_Export_FullMethodName      = "/mddb.MDDB/Export"
+	MDDB_Backup_FullMethodName      = "/mddb.MDDB/Backup"
+	MDDB_Restore_FullMethodName     = "/mddb.MDDB/Restore"
+	MDDB_Truncate_FullMethodName    = "/mddb.MDDB/Truncate"
+	MDDB_Stats_FullMethodName       = "/mddb.MDDB/Stats"
 )
 
 // MDDBClient is the client API for MDDB service.
@@ -40,6 +42,10 @@ type MDDBClient interface {
 	Add(ctx context.Context, in *AddRequest, opts ...grpc.CallOption) (*Document, error)
 	// Add or update multiple documents in a single transaction (batch)
 	AddBatch(ctx context.Context, in *AddBatchRequest, opts ...grpc.CallOption) (*AddBatchResponse, error)
+	// Update multiple documents in a single transaction (batch)
+	UpdateBatch(ctx context.Context, in *UpdateBatchRequest, opts ...grpc.CallOption) (*UpdateBatchResponse, error)
+	// Delete multiple documents in a single transaction (batch)
+	DeleteBatch(ctx context.Context, in *DeleteBatchRequest, opts ...grpc.CallOption) (*DeleteBatchResponse, error)
 	// Get a document by key and language
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*Document, error)
 	// Search documents with filters
@@ -78,6 +84,26 @@ func (c *mDDBClient) AddBatch(ctx context.Context, in *AddBatchRequest, opts ...
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AddBatchResponse)
 	err := c.cc.Invoke(ctx, MDDB_AddBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) UpdateBatch(ctx context.Context, in *UpdateBatchRequest, opts ...grpc.CallOption) (*UpdateBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateBatchResponse)
+	err := c.cc.Invoke(ctx, MDDB_UpdateBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) DeleteBatch(ctx context.Context, in *DeleteBatchRequest, opts ...grpc.CallOption) (*DeleteBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteBatchResponse)
+	err := c.cc.Invoke(ctx, MDDB_DeleteBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -173,6 +199,10 @@ type MDDBServer interface {
 	Add(context.Context, *AddRequest) (*Document, error)
 	// Add or update multiple documents in a single transaction (batch)
 	AddBatch(context.Context, *AddBatchRequest) (*AddBatchResponse, error)
+	// Update multiple documents in a single transaction (batch)
+	UpdateBatch(context.Context, *UpdateBatchRequest) (*UpdateBatchResponse, error)
+	// Delete multiple documents in a single transaction (batch)
+	DeleteBatch(context.Context, *DeleteBatchRequest) (*DeleteBatchResponse, error)
 	// Get a document by key and language
 	Get(context.Context, *GetRequest) (*Document, error)
 	// Search documents with filters
@@ -202,6 +232,12 @@ func (UnimplementedMDDBServer) Add(context.Context, *AddRequest) (*Document, err
 }
 func (UnimplementedMDDBServer) AddBatch(context.Context, *AddBatchRequest) (*AddBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddBatch not implemented")
+}
+func (UnimplementedMDDBServer) UpdateBatch(context.Context, *UpdateBatchRequest) (*UpdateBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateBatch not implemented")
+}
+func (UnimplementedMDDBServer) DeleteBatch(context.Context, *DeleteBatchRequest) (*DeleteBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteBatch not implemented")
 }
 func (UnimplementedMDDBServer) Get(context.Context, *GetRequest) (*Document, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
@@ -277,6 +313,42 @@ func _MDDB_AddBatch_Handler(srv interface{}, ctx context.Context, dec func(inter
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MDDBServer).AddBatch(ctx, req.(*AddBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_UpdateBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).UpdateBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_UpdateBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).UpdateBatch(ctx, req.(*UpdateBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_DeleteBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).DeleteBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_DeleteBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).DeleteBatch(ctx, req.(*DeleteBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -414,6 +486,14 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AddBatch",
 			Handler:    _MDDB_AddBatch_Handler,
+		},
+		{
+			MethodName: "UpdateBatch",
+			Handler:    _MDDB_UpdateBatch_Handler,
+		},
+		{
+			MethodName: "DeleteBatch",
+			Handler:    _MDDB_DeleteBatch_Handler,
 		},
 		{
 			MethodName: "Get",
