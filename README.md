@@ -201,6 +201,7 @@ See [Performance Tests](test/README.md) for detailed benchmarks.
 - **High-Performance gRPC** - 16x faster, 70% smaller payload
 - **gRPC Reflection** - Use grpcurl for debugging
 - **CLI Client** - Full-featured command-line interface
+- **Web Admin Panel** - Modern React-based UI for browsing and managing data
 
 ### Operations
 - **Export** - NDJSON or ZIP formats with filtering
@@ -208,6 +209,7 @@ See [Performance Tests](test/README.md) for detailed benchmarks.
 - **Truncate** - Remove old revisions to save space
 - **Statistics** - Real-time server and database metrics
 - **Access Modes** - Read-only, write-only, or read-write
+- **Bulk Import** - Load entire folders of markdown files
 
 ### Developer Experience
 - **Single Binary** - No external dependencies
@@ -215,6 +217,7 @@ See [Performance Tests](test/README.md) for detailed benchmarks.
 - **Hot Reload** - Development mode with automatic restart
 - **Monorepo Structure** - Shared protobuf definitions
 - **Multi-language Clients** - Generated code for Go, Python, Node.js, PHP
+- **Web Admin Panel** - Visual interface for data management
 - **Comprehensive Docs** - API reference, examples, guides
 
 ## 🏗️ Architecture
@@ -431,6 +434,11 @@ make tidy          # Tidy Go modules
 ## 📚 Documentation
 
 - **[Quick Start Guide](docs/QUICKSTART.md)** - Get started in 5 minutes
+- **[Web Panel Guide](docs/PANEL.md)** - Web admin interface documentation
+- **[Quick Start Panel (PL)](QUICK-START-PANEL.md)** - Szybki start panelu webowego (Polski)
+- **[Bulk Import Guide](docs/BULK-IMPORT.md)** - Import markdown files from folders
+- **[Bulk Import Guide (PL)](docs/BULK-IMPORT-PL.md)** - Przewodnik importu masowego (Polski)
+- **[Quick Start Import (PL)](QUICK-START-IMPORT-PL.md)** - Szybki start importu (Polski)
 - **[API Documentation](docs/API.md)** - Complete HTTP/JSON API reference
 - **[gRPC Documentation](docs/GRPC.md)** - High-performance gRPC API guide
 - **[Docker Guide](docs/DOCKER.md)** - Docker deployment with Alpine Linux
@@ -592,6 +600,61 @@ mddb-cli backup daily-backup.db
 mddb-cli stats
 ```
 
+### Using Web Admin Panel
+
+```bash
+# Install dependencies
+make panel-install
+
+# Run in development mode
+make panel-dev
+
+# Or use Docker Compose
+docker-compose up -d
+
+# Access panel at http://localhost:3000
+```
+
+**Features:**
+- 📊 Server statistics dashboard
+- 📁 Browse collections and documents
+- 🔍 Advanced filtering by metadata
+- 📄 View document content and metadata
+- ✏️ Edit documents with live markdown preview
+- ➕ Create new documents
+- 📝 Split-view markdown editor (edit/preview/both)
+- 🎨 Markdown toolbar with formatting buttons
+- 💡 Syntax highlighting for code blocks
+- 📋 Pre-built templates (blog, docs, README, API)
+- 📋 Copy markdown content
+- 🎨 Modern, responsive UI
+
+### Bulk Import from Folder
+
+```bash
+# Load all .md files from a folder
+./scripts/load-md-folder.sh ./docs blog
+
+# Load recursively with custom language
+./scripts/load-md-folder.sh ./content articles -r -l pl_PL
+
+# Add custom metadata to all files
+./scripts/load-md-folder.sh ./posts blog -m "author=John Doe" -m "status=published"
+
+# Dry run to preview what would be imported
+./scripts/load-md-folder.sh ./docs blog -d
+
+# Verbose output with progress
+./scripts/load-md-folder.sh ./docs blog -v
+```
+
+The folder loader script automatically:
+- Generates unique keys from filenames
+- Extracts frontmatter metadata (YAML-style)
+- Supports recursive folder scanning
+- Shows progress with statistics
+- Handles errors gracefully
+
 ## 🗺️ Roadmap
 
 ### Planned Features
@@ -618,6 +681,10 @@ mddb/
 │   │   ├── grpc_server.go
 │   │   └── proto/           # Generated Go code
 │   ├── mddb-cli/            # CLI client
+│   ├── mddb-panel/          # Web admin panel (React)
+│   │   ├── src/             # React components
+│   │   ├── public/          # Static assets
+│   │   └── Dockerfile       # Docker build
 │   └── php-extension/       # PHP extension
 ├── clients/                 # Client libraries
 │   ├── python/              # Python client
@@ -627,6 +694,9 @@ mddb/
 │   │   ├── proto/           # Proto files
 │   │   └── example.js
 │   └── go/                  # Go client library
+├── scripts/                 # Utility scripts
+│   └── load-md-folder.sh    # Bulk import script
+├── examples/                # Example files
 └── docs/                    # Documentation
 ```
 

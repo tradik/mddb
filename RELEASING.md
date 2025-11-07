@@ -35,7 +35,27 @@ git tag -a v2.0.0 -m "Release v2.0.0 - Ultra Performance"
 git push origin v2.0.0
 ```
 
-### 4. Monitor GitHub Actions
+### 4. Build Docker Images (Optional)
+
+For Docker releases, build the panel image:
+
+```bash
+# Build panel Docker image
+make docker-build-panel
+
+# Or build all images (server + panel)
+make docker-build-all
+
+# Tag with version
+docker tag mddb-panel:latest mddb-panel:2.0.3
+docker tag mddb:latest mddb:2.0.3
+
+# Push to registry (if configured)
+docker push mddb-panel:2.0.3
+docker push mddb:2.0.3
+```
+
+### 5. Monitor GitHub Actions
 
 The release workflow will automatically:
 1. Build binaries for all platforms (Linux, macOS, FreeBSD)
@@ -47,7 +67,7 @@ The release workflow will automatically:
 
 Check progress at: https://github.com/tradik/mddb/actions
 
-### 5. Verify Release
+### 6. Verify Release
 
 Once the workflow completes:
 
@@ -61,9 +81,16 @@ Once the workflow completes:
    - `mddbd-v2.0.0-darwin-arm64.tar.gz`
    - `mddbd-v2.0.0-freebsd-amd64.tar.gz`
    - Same for `mddb-cli`
-3. Test installation on at least one platform
+3. Test Docker images (if built):
+   ```bash
+   docker pull mddb:2.0.3
+   docker pull mddb-panel:2.0.3
+   docker run --rm mddb:2.0.3 --version
+   docker run --rm mddb-panel:2.0.3 --help
+   ```
+4. Test installation on at least one platform
 
-### 6. Update Homebrew Tap (Optional)
+### 7. Update Homebrew Tap (Optional)
 
 If you maintain a Homebrew tap:
 
@@ -84,7 +111,7 @@ git commit -m "Update to v2.0.0"
 git push origin main
 ```
 
-### 7. Announce Release
+### 8. Announce Release
 
 - Update project website (if any)
 - Post on social media

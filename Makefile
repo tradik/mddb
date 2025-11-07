@@ -237,6 +237,17 @@ docker-build: ## 🐳 Build Docker image
 	@docker build -t mddb:latest -f services/mddbd/Dockerfile .
 	@echo "${GREEN}✓ Docker image built: mddb:latest${RESET}"
 
+docker-build-panel: ## 🐳 Build MDDB Panel Docker image
+	@echo "${YELLOW}🐳 Building MDDB Panel Docker image...${RESET}"
+	@docker build -t mddb-panel:latest -f services/mddb-panel/Dockerfile ./services/mddb-panel
+	@echo "${GREEN}✓ Docker image built: mddb-panel:latest${RESET}"
+
+docker-build-all: ## 🐳 Build all Docker images (server + panel)
+	@echo "${YELLOW}🐳 Building all Docker images...${RESET}"
+	@docker build -t mddb:latest -f services/mddbd/Dockerfile .
+	@docker build -t mddb-panel:latest -f services/mddb-panel/Dockerfile ./services/mddb-panel
+	@echo "${GREEN}✓ All Docker images built${RESET}"
+
 docker-build-dev: ## 🐳 Build development Docker image
 	@echo "${YELLOW}🐳 Building development Docker image...${RESET}"
 	@docker build -t mddb:dev -f services/mddbd/Dockerfile.dev .
@@ -248,6 +259,7 @@ docker-up: ## 🚀 Start Docker containers (production)
 	@echo "${GREEN}✓ Containers started${RESET}"
 	@echo "${BLUE}  HTTP API: http://localhost:11023${RESET}"
 	@echo "${BLUE}  gRPC API: localhost:11024${RESET}"
+	@echo "${BLUE}  Web Panel: http://localhost:3000${RESET}"
 
 docker-up-dev: ## 🔧 Start Docker containers (development with hot reload)
 	@echo "${YELLOW}🔧 Starting development containers...${RESET}"
@@ -255,6 +267,7 @@ docker-up-dev: ## 🔧 Start Docker containers (development with hot reload)
 	@echo "${GREEN}✓ Development containers started${RESET}"
 	@echo "${BLUE}  HTTP API: http://localhost:11023${RESET}"
 	@echo "${BLUE}  gRPC API: localhost:11024${RESET}"
+	@echo "${BLUE}  Web Panel: http://localhost:3000${RESET}"
 	@echo "${BLUE}  Hot reload enabled with Air${RESET}"
 
 docker-down: ## 🛑 Stop Docker containers
@@ -276,10 +289,51 @@ docker-clean: ## 🧹 Clean Docker resources
 	@echo "${YELLOW}🧹 Cleaning Docker resources...${RESET}"
 	@docker compose down -v
 	@docker compose -f docker-compose.dev.yml down -v 2>/dev/null || true
-	@docker rmi mddb:latest mddb:dev 2>/dev/null || true
+	@docker rmi mddb:latest mddb:dev mddb-panel:latest 2>/dev/null || true
 	@echo "${GREEN}✓ Docker resources cleaned${RESET}"
 
 docker-setup-network: ## 🌐 Create Docker network
 	@echo "${YELLOW}🌐 Creating Docker network...${RESET}"
 	@docker network create mddb-network 2>/dev/null || echo "${BLUE}  Network already exists${RESET}"
 	@echo "${GREEN}✓ Network ready${RESET}"
+
+# Import/Export targets
+import-folder: ## 📥 Import markdown files from folder (usage: make import-folder FOLDER=./docs COLLECTION=blog)
+	@if [ -z "$(FOLDER)" ] || [ -z "$(COLLECTION)" ]; then \
+		echo "${RED}Error: FOLDER and COLLECTION are required${RESET}"; \
+		echo "${BLUE}Usage: make import-folder FOLDER=./docs COLLECTION=blog [LANG=en_US] [META=\"key=value\"]${RESET}"; \
+		exit 1; \
+	fi
+	@echo "${YELLOW}📥 Importing markdown files...${RESET}"
+	@./scripts/load-md-folder.sh "$(FOLDER)" "$(COLLECTION)" $(if $(LANG),-l $(LANG)) $(if $(META),-m "$(META)") $(if $(RECURSIVE),-r) $(if $(VERBOSE),-v)
+
+import-folder-dry: ## 🔍 Preview folder import without executing (usage: make import-folder-dry FOLDER=./docs COLLECTION=blog)
+	@if [ -z "$(FOLDER)" ] || [ -z "$(COLLECTION)" ]; then \
+		echo "${RED}Error: FOLDER and COLLECTION are required${RESET}"; \
+		echo "${BLUE}Usage: make import-folder-dry FOLDER=./docs COLLECTION=blog${RESET}"; \
+		exit 1; \
+	fi
+	@echo "${YELLOW}🔍 Previewing import (dry run)...${RESET}"
+	@./scripts/load-md-folder.sh "$(FOLDER)" "$(COLLECTION)" -d $(if $(LANG),-l $(LANG)) $(if $(RECURSIVE),-r)
+
+import-folder-recursive: ## 📥 Import markdown files recursively (usage: make import-folder-recursive FOLDER=./docs COLLECTION=blog)
+	@$(MAKE) import-folder FOLDER="$(FOLDER)" COLLECTION="$(COLLECTION)" RECURSIVE=true LANG="$(LANG)" META="$(META)" VERBOSE="$(VERBOSE)"
+
+# Panel targets
+panel-install: ## 📦 Install panel dependencies
+	@echo "${YELLOW}📦 Installing panel dependencies...${RESET}"
+	@cd services/mddb-panel && npm install
+	@echo "${GREEN}✓ Panel dependencies installed${RESET}"
+
+panel-dev: ## 🔧 Run panel in development mode
+	@echo "${YELLOW}🔧 Starting panel development server...${RESET}"
+	@cd services/mddb-panel && npm run dev
+
+panel-build: ## 🔨 Build panel for production
+	@echo "${YELLOW}🔨 Building panel...${RESET}"
+	@cd services/mddb-panel && npm run build
+	@echo "${GREEN}✓ Panel built${RESET}"
+
+panel-preview: ## 👀 Preview production build
+	@echo "${YELLOW}👀 Starting panel preview...${RESET}"
+	@cd services/mddb-panel && npm run preview

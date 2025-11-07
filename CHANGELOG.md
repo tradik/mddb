@@ -5,7 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3] - 2025-11-07
+
+### Added
+- **Document deletion functionality** - Delete documents with confirmation dialog
+  - Delete button in document list items
+  - Delete button in document viewer header
+  - Confirmation modal with document details
+  - Automatic list refresh after deletion
+- **Error handling improvements** - Better error boundaries and fallbacks
+  - ReactMarkdown error boundary with raw content fallback
+  - Progressive document loading (immediate display + background fetch)
+  - User-friendly error messages with recovery options
+- **Docker image for mddb-panel** - Complete containerization
+  - Multi-stage Docker build for production
+  - Development Docker configuration
+  - Docker Compose integration
+  - Makefile targets for panel Docker operations
+
+### Fixed
+- **Blank document viewer issue** - Documents now display immediately with content
+- **Document content loading** - Fixed API integration for full document fetching
+- **ReactMarkdown compatibility** - Removed deprecated className prop
+- **Content overflow issues** - Fixed margin and layout problems in document viewer
+- **UI responsiveness** - Better loading states and user feedback
+
+### Improved
+- **Document viewer layout** - Better container constraints and overflow handling
+- **User experience** - Immediate feedback when clicking documents
+- **Error recovery** - Users can always access document content in some form
+- **Development workflow** - Added panel to development Docker setup
+
 ## [Unreleased]
+
+### Added
+- **Web Admin Panel (mddb-panel)** - Modern React-based admin interface
+  - Server statistics dashboard
+  - Collection browser with document count
+  - Document list with metadata preview
+  - Document viewer with full content and metadata
+  - **Document editor** - Edit markdown content and metadata
+  - **New document creation** - Create documents directly from UI
+  - **Markdown editor with live preview** - Split view with real-time rendering
+  - **Markdown toolbar** - Quick formatting buttons (bold, italic, headings, lists, etc.)
+  - **Syntax highlighting** - Code blocks with language-specific highlighting
+  - **Markdown templates** - Pre-built templates (blog, docs, README, API, changelog)
+  - Advanced filtering by metadata fields
+  - Sort by date, key, or custom fields
+  - Copy document content to clipboard
+  - Modern UI with TailwindCSS and Lucide icons
+  - Built with React 19, Vite 6, and Zustand 5
+  - Docker support with multi-stage builds
+  - Proxy configuration for API requests
+- Bulk import script for loading markdown files from folders
+- `load-md-folder.sh` script with features:
+  - Automatic key generation from filenames
+  - YAML frontmatter metadata extraction
+  - Recursive folder scanning
+  - Progress tracking with statistics
+  - Dry run mode for preview
+  - Custom metadata support
+  - Multi-language support
+- Makefile targets for folder import:
+  - `import-folder` - Import markdown files
+  - `import-folder-dry` - Preview import without executing
+  - `import-folder-recursive` - Import recursively
+- Makefile targets for panel:
+  - `panel-install` - Install panel dependencies
+  - `panel-dev` - Run panel in development mode
+  - `panel-build` - Build panel for production
+  - `panel-preview` - Preview production build
+- Comprehensive bulk import documentation (BULK-IMPORT.md)
+- README section for bulk import usage
+- README section for web admin panel
+- Docker Compose configuration for panel service
 
 ## [2.0.2] - 2025-11-07
 

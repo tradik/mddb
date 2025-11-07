@@ -108,6 +108,16 @@ type TruncateRequest struct {
 	DropCache  bool   `json:"dropCache"`
 }
 
+type DeleteRequest struct {
+	Collection string `json:"collection"`
+	Key        string `json:"key"`
+	Lang       string `json:"lang"`
+}
+
+type DeleteCollectionRequest struct {
+	Collection string `json:"collection"`
+}
+
 // getOptimizedBoltOptions returns optimized BoltDB options for performance
 func getOptimizedBoltOptions() *bolt.Options {
 	return &bolt.Options{
@@ -199,6 +209,8 @@ func main() {
 	mux.HandleFunc("/v1/backup", s.handleBackup)
 	mux.HandleFunc("/v1/restore", s.guardWrite(s.handleRestore))
 	mux.HandleFunc("/v1/truncate", s.guardWrite(s.handleTruncate))
+	mux.HandleFunc("/v1/delete", s.guardWrite(s.handleDelete))
+	mux.HandleFunc("/v1/delete-collection", s.guardWrite(s.handleDeleteCollection))
 	mux.HandleFunc("/v1/stats", s.handleStats)
 
 	httpAddr := env("MDDB_ADDR", ":11023")
@@ -889,5 +901,161 @@ func sortDocs(docs []Doc, field string, asc bool) {
 			return less
 		}
 		return !less
+	})
+}
+
+// handleDelete deletes a single document from a collection
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
+	var req DeleteRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		bad(w, err)
+		return
+	}
+	if req.Collection == "" || req.Key == "" || req.Lang == "" {
+		bad(w, errors.New("missing fields"))
+		return
+	}
+
+	docID := genID(req.Collection, req.Key, req.Lang)
+	
+	err := s.DB.Update(func(tx *bolt.Tx) error {
+		bDocs := tx.Bucket([]byte("docs"))
+		bIdx := tx.Bucket([]byte("idxmeta"))
+		bRev := tx.Bucket([]byte("rev"))
+		bByK := tx.Bucket([]byte("bykey"))
+
+		// Check if document exists and load it for cleanup
+		v := bDocs.Get(kDoc(req.Collection, docID))
+		if v == nil {
+			return errors.New("document not found")
+		}
+
+		// Load document to get metadata for index cleanup
+		var doc Doc
+		if err := json.Unmarshal(v, &doc); err != nil {
+			return err
+		}
+
+		// Delete document
+		if err := bDocs.Delete(kDoc(req.Collection, docID)); err != nil {
+			return err
+		}
+
+		// Delete from bykey index
+		if err := bByK.Delete(kByKey(req.Collection, req.Key, req.Lang)); err != nil {
+			return err
+		}
+
+		// Delete all revisions
+		c := bRev.Cursor()
+		rp := kRevPrefix(req.Collection, docID)
+		for k, _ := c.Seek(rp); k != nil && bytes.HasPrefix(k, rp); k, _ = c.Next() {
+			if err := bRev.Delete(k); err != nil {
+				return err
+			}
+		}
+
+		// Delete metadata indices
+		for mk, vals := range doc.Meta {
+			for _, mv := range vals {
+				key := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(docID)...)
+				if err := bIdx.Delete(key); err != nil {
+					return err
+				}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		bad(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "deleted",
+		"collection": req.Collection,
+		"key": req.Key,
+		"lang": req.Lang,
+	})
+}
+
+// handleDeleteCollection deletes all documents in a collection
+func (s *Server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) {
+	var req DeleteCollectionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		bad(w, err)
+		return
+	}
+	if req.Collection == "" {
+		bad(w, errors.New("missing collection"))
+		return
+	}
+
+	var deletedCount int
+	
+	err := s.DB.Update(func(tx *bolt.Tx) error {
+		bDocs := tx.Bucket([]byte("docs"))
+		bIdx := tx.Bucket([]byte("idxmeta"))
+		bRev := tx.Bucket([]byte("rev"))
+		bByK := tx.Bucket([]byte("bykey"))
+
+		// Delete all documents in collection
+		c := bDocs.Cursor()
+		prefix := []byte("doc|" + req.Collection + "|")
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			// Load document to get metadata for index cleanup
+			var doc Doc
+			if err := json.Unmarshal(v, &doc); err != nil {
+				continue
+			}
+
+			// Delete document
+			if err := bDocs.Delete(k); err != nil {
+				return err
+			}
+
+			// Delete from bykey index
+			if err := bByK.Delete(kByKey(req.Collection, doc.Key, doc.Lang)); err != nil {
+				return err
+			}
+
+			// Delete all revisions
+			rc := bRev.Cursor()
+			rp := kRevPrefix(req.Collection, doc.ID)
+			for rk, _ := rc.Seek(rp); rk != nil && bytes.HasPrefix(rk, rp); rk, _ = rc.Next() {
+				if err := bRev.Delete(rk); err != nil {
+					return err
+				}
+			}
+
+			// Delete metadata indices
+			for mk, vals := range doc.Meta {
+				for _, mv := range vals {
+					key := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
+					if err := bIdx.Delete(key); err != nil {
+						return err
+					}
+				}
+			}
+
+			deletedCount++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		bad(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "deleted",
+		"collection": req.Collection,
+		"deletedCount": deletedCount,
 	})
 }

@@ -91,3 +91,8 @@ node_modules/
 package-lock.json
 yarn.lock
 .windsurf/rules/*.md
+
+# Panel build artifacts
+services/mddb-panel/dist/
+services/mddb-panel/.env
+services/mddb-panel/.env.local

@@ -39,6 +39,27 @@ services:
       - "com.mddb.description=MDDB Development Server with Hot Reload"
       - "com.mddb.environment=development"
 
+  mddb-panel-dev:
+    build:
+      context: ./services/mddb-panel
+      dockerfile: Dockerfile
+    image: mddb-panel:dev
+    container_name: mddb-panel-dev
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Web UI
+    environment:
+      - VITE_MDDB_SERVER=http://mddb-dev:11023
+    networks:
+      - mddb-network
+    depends_on:
+      mddb-dev:
+        condition: service_healthy
+    labels:
+      - "com.mddb.description=MDDB Panel - Development Web Interface"
+      - "com.mddb.environment=development"
+      - "com.mddb.version=2.0.3"
+
 volumes:
   mddb-dev-data:
     driver: local

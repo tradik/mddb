@@ -31,6 +31,25 @@ services:
       - "com.mddb.version=2.0.0"
       - "com.mddb.performance=29810 docs/sec"
 
+  mddb-panel:
+    build:
+      context: ./services/mddb-panel
+      dockerfile: Dockerfile
+    container_name: mddb-panel
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # Web UI
+    environment:
+      - VITE_MDDB_SERVER=http://mddb:11023
+    networks:
+      - mddb-network
+    depends_on:
+      mddb:
+        condition: service_healthy
+    labels:
+      - "com.mddb.description=MDDB Panel - Web Admin Interface"
+      - "com.mddb.version=2.0.3"
+
 volumes:
   mddb-data:
     driver: local
