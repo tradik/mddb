@@ -5,16 +5,28 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// Marshal document to protobuf bytes for storage
+// Marshal document to protobuf bytes for storage with optional compression
 func marshalDoc(doc *Doc) ([]byte, error) {
 	protoDoc := docToProtoInternal(doc)
-	return proto.Marshal(protoDoc)
+	data, err := proto.Marshal(protoDoc)
+	if err != nil {
+		return nil, err
+	}
+	
+	// Compress if beneficial
+	return compressDoc(data), nil
 }
 
-// Unmarshal document from protobuf bytes
+// Unmarshal document from protobuf bytes with decompression support
 func unmarshalDoc(data []byte) (*Doc, error) {
+	// Decompress if needed
+	decompressed, err := decompressDoc(data)
+	if err != nil {
+		return nil, err
+	}
+	
 	protoDoc := &pb.Document{}
-	if err := proto.Unmarshal(data, protoDoc); err != nil {
+	if err := proto.Unmarshal(decompressed, protoDoc); err != nil {
 		return nil, err
 	}
 	return protoToDoc(protoDoc), nil

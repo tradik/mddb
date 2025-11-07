@@ -75,6 +75,9 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	now := time.Now().Unix()
 	docID := genID(req.Collection, req.Key, req.Lang)
 
+	// Use KeyBuilder for efficient key construction
+	var kb KeyBuilder
+
 	var saved Doc
 	err := g.server.DB.Update(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
@@ -84,7 +87,8 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 
 		// Load existing
 		existing := Doc{}
-		if v := bDocs.Get(kDoc(req.Collection, docID)); v != nil {
+		docKey := kb.BuildDocKey(req.Collection, docID)
+		if v := bDocs.Get(docKey); v != nil {
 			existingDoc, err := unmarshalDoc(v)
 			if err != nil {
 				return err
@@ -104,10 +108,15 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 		if err != nil {
 			return err
 		}
-		if err := bDocs.Put(kDoc(req.Collection, docID), buf); err != nil {
+		
+		// Use KeyBuilder for all keys
+		docKey = kb.BuildDocKey(req.Collection, docID)
+		if err := bDocs.Put(docKey, buf); err != nil {
 			return err
 		}
-		if err := bByK.Put(kByKey(req.Collection, req.Key, req.Lang), []byte(docID)); err != nil {
+		
+		byKeyKey := kb.BuildByKey(req.Collection, req.Key, req.Lang)
+		if err := bByK.Put(byKeyKey, []byte(docID)); err != nil {
 			return err
 		}
 
@@ -117,8 +126,8 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 			if existing.ID != "" && existing.Meta != nil {
 				for mk, vals := range existing.Meta {
 					for _, mv := range vals {
-						prefix := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(existing.ID)...)
-						_ = bIdx.Delete(prefix)
+						metaKey := kb.BuildMetaKey(req.Collection, mk, mv, existing.ID)
+						_ = bIdx.Delete(metaKey)
 					}
 				}
 			}
@@ -126,8 +135,8 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 			// Add new indices
 			for mk, vals := range doc.Meta {
 				for _, mv := range vals {
-					key := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-					if err := bIdx.Put(key, []byte("1")); err != nil {
+					metaKey := kb.BuildMetaKey(req.Collection, mk, mv, doc.ID)
+					if err := bIdx.Put(metaKey, []byte("1")); err != nil {
 						return err
 					}
 				}
@@ -135,8 +144,8 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 		}
 
 		// Revision (reuse buf from marshal above)
-		rkey := append(kRevPrefix(req.Collection, doc.ID), []byte(fmt.Sprintf("%020d", now))...)
-		if err := bRev.Put(rkey, buf); err != nil {
+		revKey := kb.BuildRevKey(req.Collection, doc.ID, now)
+		if err := bRev.Put(revKey, buf); err != nil {
 			return err
 		}
 
