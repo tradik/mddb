@@ -12,6 +12,12 @@ service MDDB {
   // Add or update multiple documents in a single transaction (batch)
   rpc AddBatch(AddBatchRequest) returns (AddBatchResponse);
   
+  // Delete multiple documents in a single transaction (batch)
+  rpc DeleteBatch(DeleteBatchRequest) returns (DeleteBatchResponse);
+  
+  // Update multiple documents in a single transaction (batch)
+  rpc UpdateBatch(UpdateBatchRequest) returns (UpdateBatchResponse);
+  
   // Get a document by key and language
   rpc Get(GetRequest) returns (Document);
   
@@ -57,6 +63,7 @@ message AddRequest {
   string lang = 3;
   map<string, MetaValues> meta = 4;
   string content_md = 5;
+  bool save_revision = 6;  // Optional: save revision history (default: false)
 }
 
 // Batch add request
@@ -71,6 +78,7 @@ message BatchDocument {
   string lang = 2;
   map<string, MetaValues> meta = 3;
   string content_md = 4;
+  bool save_revision = 5;  // Optional: save revision history (default: false)
 }
 
 // Batch add response
@@ -172,4 +180,47 @@ message CollectionStats {
   int32 document_count = 2;
   int32 revision_count = 3;
   int32 meta_index_count = 4;
+}
+
+// Delete batch request
+message DeleteBatchRequest {
+  string collection = 1;
+  repeated DeleteDocument documents = 2;
+}
+
+// Document to delete
+message DeleteDocument {
+  string key = 1;
+  string lang = 2;
+}
+
+// Delete batch response
+message DeleteBatchResponse {
+  int32 deleted = 1;
+  int32 not_found = 2;
+  int32 failed = 3;
+  repeated string errors = 4;
+}
+
+// Update batch request
+message UpdateBatchRequest {
+  string collection = 1;
+  repeated UpdateDocument documents = 2;
+}
+
+// Document to update
+message UpdateDocument {
+  string key = 1;
+  string lang = 2;
+  map<string, MetaValues> meta = 3;
+  string content_md = 4;
+  bool save_revision = 5;
+}
+
+// Update batch response
+message UpdateBatchResponse {
+  int32 updated = 1;
+  int32 not_found = 2;
+  int32 failed = 3;
+  repeated string errors = 4;
 }

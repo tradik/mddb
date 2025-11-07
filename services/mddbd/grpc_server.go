@@ -23,6 +23,8 @@ type GRPCServer struct {
 	proto.UnimplementedMDDBServer
 	server         *Server
 	batchProcessor *BatchProcessor
+	batchDeleter   *BatchDeleter
+	batchUpdater   *BatchUpdater
 	workerPool     *WorkerPool
 }
 
@@ -31,6 +33,8 @@ func NewGRPCServer(s *Server) *GRPCServer {
 	gs := &GRPCServer{
 		server:         s,
 		batchProcessor: NewBatchProcessor(s, 8), // 8 parallel workers
+		batchDeleter:   NewBatchDeleter(s, 8),   // 8 parallel workers
+		batchUpdater:   NewBatchUpdater(s, 8),   // 8 parallel workers
 	}
 	// Worker pool will be initialized when needed
 	return gs
@@ -79,9 +83,9 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	var kb KeyBuilder
 
 	var saved Doc
+	var cachedBuf []byte
 	err := g.server.DB.Update(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
 		bRev := tx.Bucket(g.server.BucketNames.Rev)
 		bByK := tx.Bucket(g.server.BucketNames.ByKey)
 
@@ -108,6 +112,7 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 		if err != nil {
 			return err
 		}
+		cachedBuf = buf // Save for cache
 		
 		// Use KeyBuilder for all keys
 		docKey = kb.BuildDocKey(req.Collection, docID)
@@ -120,33 +125,22 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 			return err
 		}
 
-		// Only reindex metadata if it has changed (MAJOR OPTIMIZATION)
+		// Lazy metadata indexing - queue for async processing
 		if metadataChanged(existing.Meta, doc.Meta) {
-			// Delete old indices
-			if existing.ID != "" && existing.Meta != nil {
-				for mk, vals := range existing.Meta {
-					for _, mv := range vals {
-						metaKey := kb.BuildMetaKey(req.Collection, mk, mv, existing.ID)
-						_ = bIdx.Delete(metaKey)
-					}
-				}
-			}
-
-			// Add new indices
-			for mk, vals := range doc.Meta {
-				for _, mv := range vals {
-					metaKey := kb.BuildMetaKey(req.Collection, mk, mv, doc.ID)
-					if err := bIdx.Put(metaKey, []byte("1")); err != nil {
-						return err
-					}
-				}
-			}
+			g.server.IndexQueue.Enqueue(&IndexJob{
+				Collection: req.Collection,
+				DocID:      docID,
+				OldMeta:    existing.Meta,
+				NewMeta:    doc.Meta,
+			})
 		}
 
-		// Revision (reuse buf from marshal above)
-		revKey := kb.BuildRevKey(req.Collection, doc.ID, now)
-		if err := bRev.Put(revKey, buf); err != nil {
-			return err
+		// Revision (optional - only if requested)
+		if req.SaveRevision {
+			revKey := kb.BuildRevKey(req.Collection, doc.ID, now)
+			if err := bRev.Put(revKey, buf); err != nil {
+				return err
+			}
 		}
 
 		saved = doc
@@ -156,6 +150,10 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	// Update cache
+	cacheKey := BuildCacheKey(req.Collection, req.Key, req.Lang)
+	g.server.Cache.Set(cacheKey, cachedBuf)
 
 	return docToProto(&saved), nil
 }
@@ -190,7 +188,21 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 		return nil, status.Error(codes.InvalidArgument, "missing required fields")
 	}
 
+	// Check cache first
+	cacheKey := BuildCacheKey(req.Collection, req.Key, req.Lang)
+	if cachedData, found := g.server.Cache.Get(cacheKey); found {
+		docPtr, err := unmarshalDoc(cachedData)
+		if err == nil {
+			// Apply template variables if needed
+			if len(req.Env) > 0 {
+				docPtr.ContentMD = applyEnv(docPtr.ContentMD, req.Env)
+			}
+			return docToProto(docPtr), nil
+		}
+	}
+
 	var doc Doc
+	var docData []byte
 	err := g.server.DB.View(func(tx *bolt.Tx) error {
 		bByK := tx.Bucket(g.server.BucketNames.ByKey)
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
@@ -205,6 +217,9 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 			return errors.New("not found")
 		}
 
+		docData = make([]byte, len(v))
+		copy(docData, v)
+
 		docPtr, err := unmarshalDoc(v)
 		if err != nil {
 			return err
@@ -212,6 +227,11 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 		doc = *docPtr
 		return nil
 	})
+	
+	// Update cache
+	if err == nil && docData != nil {
+		g.server.Cache.Set(cacheKey, docData)
+	}
 
 	if err != nil {
 		if err.Error() == "not found" {
@@ -240,11 +260,14 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 		filterMeta[k] = v.Values
 	}
 
-	var docIDs []string
+	// Single transaction for both ID collection and document loading
+	var docs []Doc
 	err := g.server.DB.View(func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
+		var docIDs []string
+		
 		if len(filterMeta) == 0 {
 			// No filter: scan all docs
 			c := bDocs.Cursor()
@@ -274,17 +297,8 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 			}
 			docIDs = intersect(sets...)
 		}
-		return nil
-	})
-
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// Load documents
-	var docs []Doc
-	err = g.server.DB.View(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(g.server.BucketNames.Docs)
+		
+		// Load documents in the same transaction
 		for _, id := range docIDs {
 			v := bDocs.Get(kDoc(req.Collection, id))
 			if v != nil {
@@ -294,6 +308,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 				}
 			}
 		}
+		
 		return nil
 	})
 
@@ -530,4 +545,40 @@ func docToProto(doc *Doc) *proto.Document {
 		AddedAt:   doc.AddedAt,
 		UpdatedAt: doc.UpdatedAt,
 	}
+}
+
+// DeleteBatch implements the DeleteBatch RPC - deletes multiple documents in a single transaction
+func (g *GRPCServer) DeleteBatch(ctx context.Context, req *proto.DeleteBatchRequest) (*proto.DeleteBatchResponse, error) {
+	if g.server.Mode == ModeRead {
+		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	}
+
+	if req.Collection == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing collection")
+	}
+
+	resp, err := g.batchDeleter.ProcessBatchDelete(ctx, req.Collection, req.Documents)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return resp, nil
+}
+
+// UpdateBatch implements the UpdateBatch RPC - updates multiple documents in a single transaction
+func (g *GRPCServer) UpdateBatch(ctx context.Context, req *proto.UpdateBatchRequest) (*proto.UpdateBatchResponse, error) {
+	if g.server.Mode == ModeRead {
+		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	}
+
+	if req.Collection == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing collection")
+	}
+
+	resp, err := g.batchUpdater.ProcessBatchUpdate(ctx, req.Collection, req.Documents)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return resp, nil
 }

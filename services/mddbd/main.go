@@ -31,6 +31,8 @@ type Server struct {
 	Mode        AccessMode
 	Hooks       Hooks // optional extensions
 	BucketNames BucketNames
+	Cache       *DocumentCache // Read-through cache
+	IndexQueue  *IndexQueue    // Async metadata indexing
 }
 
 // BucketNames caches bucket name byte slices to avoid repeated allocations
@@ -125,7 +127,11 @@ func main() {
 			Rev:     []byte("rev"),
 			ByKey:   []byte("bykey"),
 		},
+		Cache:      NewDocumentCache(1000, 300),  // 1000 docs, 5min TTL
+		IndexQueue: NewIndexQueue(nil, 4),        // 4 workers (will set server below)
 	}
+	s.IndexQueue.server = s // Set server reference
+	
 	if err := s.ensureBuckets(); err != nil {
 		log.Fatal(err)
 	}

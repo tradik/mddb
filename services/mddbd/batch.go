@@ -29,13 +29,14 @@ func NewBatchProcessor(server *Server, maxWorkers int) *BatchProcessor {
 
 // ProcessedDoc represents a processed document ready for storage
 type ProcessedDoc struct {
-	DocID      string
-	Doc        Doc
-	Buf        []byte
-	Meta       map[string][]string
-	Existing   Doc
-	IsUpdate   bool
-	Error      error
+	DocID        string
+	Doc          Doc
+	Buf          []byte
+	Meta         map[string][]string
+	Existing     Doc
+	IsUpdate     bool
+	SaveRevision bool
+	Error        error
 }
 
 // ProcessBatch processes multiple documents in parallel, then commits in single transaction
@@ -160,6 +161,7 @@ func (bp *BatchProcessor) processDocument(collection string, batchDoc *proto.Bat
 	
 	result.Doc = doc
 	result.Buf = buf
+	result.SaveRevision = batchDoc.SaveRevision
 	
 	return result
 }
@@ -222,12 +224,14 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 				}
 			}
 			
-			// Revision
-			rkey := append(kRevPrefix(collection, p.Doc.ID), []byte(fmt.Sprintf("%020d", now))...)
-			if err := bRev.Put(rkey, p.Buf); err != nil {
-				resp.Failed++
-				resp.Errors = append(resp.Errors, fmt.Sprintf("%s: revision error: %v", p.Doc.Key, err))
-				continue
+			// Revision (optional - only if requested)
+			if p.SaveRevision {
+				rkey := append(kRevPrefix(collection, p.Doc.ID), []byte(fmt.Sprintf("%020d", now))...)
+				if err := bRev.Put(rkey, p.Buf); err != nil {
+					resp.Failed++
+					resp.Errors = append(resp.Errors, fmt.Sprintf("%s: revision error: %v", p.Doc.Key, err))
+					continue
+				}
 			}
 			
 			// Count success
