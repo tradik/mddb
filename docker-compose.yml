@@ -28,7 +28,7 @@ services:
       start_period: 10s
     labels:
       - "com.mddb.description=MDDB - High-Performance Markdown Database"
-      - "com.mddb.version=2.0.0"
+      - "com.mddb.version=2.0.3"
       - "com.mddb.performance=29810 docs/sec"
 
   mddb-panel:
