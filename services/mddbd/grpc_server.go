@@ -21,11 +21,10 @@ import (
 // GRPCServer implements the MDDB gRPC service
 type GRPCServer struct {
 	proto.UnimplementedMDDBServer
-	server              *Server
-	batchProcessor      *BatchProcessor
-	batchUpdater        *BatchUpdater
-	batchDeleter        *BatchDeleter
-	finalBatchProcessor *FinalBatchProcessor
+	server         *Server
+	batchProcessor *BatchProcessor
+	batchUpdater   *BatchUpdater
+	batchDeleter   *BatchDeleter
 }
 
 // NewGRPCServer creates a new gRPC server wrapper

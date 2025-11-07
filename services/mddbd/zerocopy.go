@@ -12,7 +12,6 @@ type ZeroCopyManager struct {
 	enabled   bool
 	transfers atomic.Uint64
 	bytesCopy atomic.Uint64
-	mu        sync.RWMutex
 }
 
 // NewZeroCopyManager creates a new zero-copy manager

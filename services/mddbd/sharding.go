@@ -23,7 +23,6 @@ type Shard struct {
 	Weight   int
 	Active   bool
 	DocCount atomic.Uint64
-	mu       sync.RWMutex
 }
 
 // ConsistentHash implements consistent hashing for shard routing
