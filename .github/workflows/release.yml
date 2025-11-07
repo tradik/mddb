@@ -460,13 +460,18 @@ jobs:
           %install
           mkdir -p %{buildroot}/usr/bin
           mkdir -p %{buildroot}/usr/share/doc/mddb-cli
+          mkdir -p %{buildroot}/usr/share/man/man1
           
           install -m 755 mddb-cli %{buildroot}/usr/bin/mddb-cli
           install -m 644 README.md %{buildroot}/usr/share/doc/mddb-cli/
+          
+          # Install man page if exists
+          [ -f mddb-cli.1 ] && install -m 644 mddb-cli.1 %{buildroot}/usr/share/man/man1/ && gzip %{buildroot}/usr/share/man/man1/mddb-cli.1 || true
 
           %files
           /usr/bin/mddb-cli
           /usr/share/doc/mddb-cli/README.md
+          %{_mandir}/man1/mddb-cli.1.gz
 
           %changelog
           * $(date "+%a %b %d %Y") MDDB Team <team@mddb.io> - ${VERSION_NUM}-1
@@ -477,7 +482,25 @@ jobs:
           mkdir -p mddb-cli-${VERSION_NUM}
           cp mddb-cli-${{ matrix.platform }} mddb-cli-${VERSION_NUM}/mddb-cli
           cp ../../README.md mddb-cli-${VERSION_NUM}/
-          [ -f mddb-cli.1 ] && cp mddb-cli.1 mddb-cli-${VERSION_NUM}/ || true
+          
+          # Create man page if it doesn't exist
+          if [ ! -f mddb-cli.1 ]; then
+            cat > mddb-cli-${VERSION_NUM}/mddb-cli.1 << 'MANEOF'
+          .TH MDDB-CLI 1 "$(date +%Y-%m-%d)" "MDDB ${VERSION_NUM}" "User Commands"
+          .SH NAME
+          mddb-cli \- Command-line client for MDDB
+          .SH SYNOPSIS
+          .B mddb-cli
+          [\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]
+          .SH DESCRIPTION
+          Full-featured CLI client for MDDB (Markdown Database).
+          .SH SEE ALSO
+          Full documentation at: https://github.com/tradik/mddb
+          MANEOF
+          else
+            cp mddb-cli.1 mddb-cli-${VERSION_NUM}/
+          fi
+          
           tar czf dist/rpm/SOURCES/mddb-cli-${VERSION_NUM}.tar.gz mddb-cli-${VERSION_NUM}
           
           # Build RPM
