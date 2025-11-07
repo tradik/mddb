@@ -1,11 +1,6 @@
 name: Docker Build and Push
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
-    branches:
-      - main
   workflow_dispatch:
 
 env:
@@ -78,21 +73,21 @@ jobs:
             org.opencontainers.image.documentation=https://github.com/tradik/mddb/blob/main/README.md
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.vendor=MDDB Team
-          cache-from: type=registry,ref=${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             VERSION=${{ steps.meta.outputs.VERSION }}
             BUILD_DATE=${{ steps.meta.outputs.BUILD_DATE }}
             COMMIT_SHA=${{ steps.meta.outputs.COMMIT_SHA }}
 
-      - name: Update Docker Hub description
-        uses: peter-evans/dockerhub-description@v5
-        with:
-          username: ${{ env.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-          repository: ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
-          readme-filepath: ./docs/DOCKER_HUB.md
-          short-description: "High-performance markdown database with gRPC/HTTP/3 - 29,810 docs/sec, 5.75x faster than MongoDB"
+      # Docker Hub description update disabled - update manually on Docker Hub
+      # Token needs additional permissions: https://hub.docker.com/settings/security
+      # - name: Update Docker Hub description
+      #   uses: peter-evans/dockerhub-description@v5
+      #   with:
+      #     username: ${{ env.DOCKER_HUB_USERNAME }}
+      #     password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      #     repository: ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
+      #     readme-filepath: ./docs/DOCKER_HUB.md
+      #     short-description: "High-performance markdown database with gRPC/HTTP/3 - 29,810 docs/sec, 5.75x faster than MongoDB"
 
       - name: Create release summary
         if: steps.meta.outputs.IS_RELEASE == 'true'
