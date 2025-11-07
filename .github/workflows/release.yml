@@ -1,0 +1,680 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v2.0.0)'
+        required: true
+
+env:
+  GO_VERSION: '1.25'
+
+jobs:
+  build-server:
+    name: Build MDDB Server
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux AMD64
+          - goos: linux
+            goarch: amd64
+            platform: linux-amd64
+            package_formats: deb,rpm
+          # Linux ARM64
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+            package_formats: deb,rpm
+          # FreeBSD AMD64
+          - goos: freebsd
+            goarch: amd64
+            platform: freebsd-amd64
+            package_formats: tar.gz
+          # macOS AMD64 (Intel)
+          - goos: darwin
+            goarch: amd64
+            platform: darwin-amd64
+            package_formats: tar.gz
+          # macOS ARM64 (Apple Silicon)
+          - goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+            package_formats: tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build server binary
+        working-directory: services/mddbd
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          go build -ldflags="-s -w -X main.Version=${VERSION}" -o mddbd-${{ matrix.platform }} .
+
+      - name: Create tarball
+        working-directory: services/mddbd
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          mkdir -p dist/mddbd-${VERSION}-${{ matrix.platform }}
+          cp mddbd-${{ matrix.platform }} dist/mddbd-${VERSION}-${{ matrix.platform }}/mddbd
+          cp ../../README.md dist/mddbd-${VERSION}-${{ matrix.platform }}/
+          cp ../../LICENSE dist/mddbd-${VERSION}-${{ matrix.platform }}/ || true
+          cd dist
+          tar czf mddbd-${VERSION}-${{ matrix.platform }}.tar.gz mddbd-${VERSION}-${{ matrix.platform }}
+
+      - name: Install packaging tools
+        if: matrix.package_formats == 'deb,rpm'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Create DEB package
+        if: contains(matrix.package_formats, 'deb')
+        working-directory: services/mddbd
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION_NUM=${VERSION#v}
+          
+          # Create package structure
+          mkdir -p dist/deb/mddbd-${VERSION_NUM}/DEBIAN
+          mkdir -p dist/deb/mddbd-${VERSION_NUM}/usr/bin
+          mkdir -p dist/deb/mddbd-${VERSION_NUM}/usr/share/doc/mddbd
+          mkdir -p dist/deb/mddbd-${VERSION_NUM}/etc/systemd/system
+          
+          # Copy binary
+          cp mddbd-${{ matrix.platform }} dist/deb/mddbd-${VERSION_NUM}/usr/bin/mddbd
+          chmod +x dist/deb/mddbd-${VERSION_NUM}/usr/bin/mddbd
+          
+          # Copy docs
+          cp ../../README.md dist/deb/mddbd-${VERSION_NUM}/usr/share/doc/mddbd/
+          cp ../../CHANGELOG.md dist/deb/mddbd-${VERSION_NUM}/usr/share/doc/mddbd/ || true
+          
+          # Create systemd service
+          cat > dist/deb/mddbd-${VERSION_NUM}/etc/systemd/system/mddbd.service << 'EOF'
+          [Unit]
+          Description=MDDB - Markdown Database Server
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=mddbd
+          Group=mddbd
+          ExecStart=/usr/bin/mddbd
+          Restart=on-failure
+          RestartSec=5s
+          Environment="MDDB_PATH=/var/lib/mddbd/mddb.db"
+          Environment="MDDB_MODE=wr"
+          Environment="MDDB_EXTREME=true"
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+          
+          # Create control file
+          cat > dist/deb/mddbd-${VERSION_NUM}/DEBIAN/control << EOF
+          Package: mddbd
+          Version: ${VERSION_NUM}
+          Section: database
+          Priority: optional
+          Architecture: ${{ matrix.goarch }}
+          Maintainer: MDDB Team <team@mddb.io>
+          Description: High-performance markdown database server
+           MDDB is a specialized database server for storing and managing
+           markdown documents with rich metadata, full revision history,
+           and dual protocol support (HTTP/JSON + gRPC/Protobuf).
+           .
+           Performance: 29,810 docs/sec with 29 advanced optimizations.
+          Homepage: https://github.com/tradik/mddb
+          EOF
+          
+          # Create postinst script
+          cat > dist/deb/mddbd-${VERSION_NUM}/DEBIAN/postinst << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          # Create user and group
+          if ! getent group mddbd >/dev/null; then
+              groupadd --system mddbd
+          fi
+          
+          if ! getent passwd mddbd >/dev/null; then
+              useradd --system --gid mddbd --home-dir /var/lib/mddbd --shell /bin/false mddbd
+          fi
+          
+          # Create data directory
+          mkdir -p /var/lib/mddbd
+          chown mddbd:mddbd /var/lib/mddbd
+          chmod 750 /var/lib/mddbd
+          
+          # Reload systemd
+          systemctl daemon-reload || true
+          
+          echo "MDDB server installed successfully!"
+          echo "Start with: sudo systemctl start mddbd"
+          echo "Enable on boot: sudo systemctl enable mddbd"
+          EOF
+          
+          chmod +x dist/deb/mddbd-${VERSION_NUM}/DEBIAN/postinst
+          
+          # Build package
+          dpkg-deb --build dist/deb/mddbd-${VERSION_NUM}
+          mv dist/deb/mddbd-${VERSION_NUM}.deb dist/mddbd-${VERSION_NUM}-${{ matrix.platform }}.deb
+
+      - name: Create RPM package
+        if: contains(matrix.package_formats, 'rpm')
+        working-directory: services/mddbd
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION_NUM=${VERSION#v}
+          
+          # Create RPM build structure
+          mkdir -p dist/rpm/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          
+          # Create spec file
+          cat > dist/rpm/SPECS/mddbd.spec << EOF
+          Name:           mddbd
+          Version:        ${VERSION_NUM}
+          Release:        1%{?dist}
+          Summary:        High-performance markdown database server
+          License:        MIT
+          URL:            https://github.com/tradik/mddb
+          Source0:        mddbd-${VERSION_NUM}.tar.gz
+
+          %description
+          MDDB is a specialized database server for storing and managing
+          markdown documents with rich metadata, full revision history,
+          and dual protocol support (HTTP/JSON + gRPC/Protobuf).
+          
+          Performance: 29,810 docs/sec with 29 advanced optimizations.
+
+          %prep
+          %setup -q
+
+          %install
+          mkdir -p %{buildroot}/usr/bin
+          mkdir -p %{buildroot}/etc/systemd/system
+          mkdir -p %{buildroot}/usr/share/doc/mddbd
+          
+          install -m 755 mddbd %{buildroot}/usr/bin/mddbd
+          install -m 644 README.md %{buildroot}/usr/share/doc/mddbd/
+          
+          cat > %{buildroot}/etc/systemd/system/mddbd.service << 'SERVICEEOF'
+          [Unit]
+          Description=MDDB - Markdown Database Server
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=mddbd
+          Group=mddbd
+          ExecStart=/usr/bin/mddbd
+          Restart=on-failure
+          RestartSec=5s
+          Environment="MDDB_PATH=/var/lib/mddbd/mddb.db"
+          Environment="MDDB_MODE=wr"
+          Environment="MDDB_EXTREME=true"
+
+          [Install]
+          WantedBy=multi-user.target
+          SERVICEEOF
+
+          %files
+          /usr/bin/mddbd
+          /etc/systemd/system/mddbd.service
+          /usr/share/doc/mddbd/README.md
+
+          %post
+          getent group mddbd >/dev/null || groupadd -r mddbd
+          getent passwd mddbd >/dev/null || useradd -r -g mddbd -d /var/lib/mddbd -s /sbin/nologin mddbd
+          mkdir -p /var/lib/mddbd
+          chown mddbd:mddbd /var/lib/mddbd
+          chmod 750 /var/lib/mddbd
+          systemctl daemon-reload || true
+
+          %changelog
+          * $(date "+%a %b %d %Y") MDDB Team <team@mddb.io> - ${VERSION_NUM}-1
+          - Release ${VERSION_NUM}
+          EOF
+          
+          # Create source tarball
+          mkdir -p mddbd-${VERSION_NUM}
+          cp mddbd-${{ matrix.platform }} mddbd-${VERSION_NUM}/mddbd
+          cp ../../README.md mddbd-${VERSION_NUM}/
+          tar czf dist/rpm/SOURCES/mddbd-${VERSION_NUM}.tar.gz mddbd-${VERSION_NUM}
+          
+          # Build RPM
+          rpmbuild --define "_topdir $(pwd)/dist/rpm" -bb dist/rpm/SPECS/mddbd.spec
+          
+          # Copy RPM to dist
+          find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddbd-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mddbd-${{ matrix.platform }}
+          path: |
+            services/mddbd/dist/*.tar.gz
+            services/mddbd/dist/*.deb
+            services/mddbd/dist/*.rpm
+
+  build-client:
+    name: Build MDDB CLI Client
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux AMD64
+          - goos: linux
+            goarch: amd64
+            platform: linux-amd64
+            package_formats: deb,rpm
+          # Linux ARM64
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+            package_formats: deb,rpm
+          # FreeBSD AMD64
+          - goos: freebsd
+            goarch: amd64
+            platform: freebsd-amd64
+            package_formats: tar.gz
+          # macOS AMD64 (Intel)
+          - goos: darwin
+            goarch: amd64
+            platform: darwin-amd64
+            package_formats: tar.gz
+          # macOS ARM64 (Apple Silicon)
+          - goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+            package_formats: tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build client binary
+        working-directory: services/mddb-cli
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          go build -ldflags="-s -w -X main.Version=${VERSION}" -o mddb-cli-${{ matrix.platform }} .
+
+      - name: Create tarball
+        working-directory: services/mddb-cli
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          mkdir -p dist/mddb-cli-${VERSION}-${{ matrix.platform }}
+          cp mddb-cli-${{ matrix.platform }} dist/mddb-cli-${VERSION}-${{ matrix.platform }}/mddb-cli
+          cp ../../README.md dist/mddb-cli-${VERSION}-${{ matrix.platform }}/
+          cp ../../LICENSE dist/mddb-cli-${VERSION}-${{ matrix.platform }}/ || true
+          
+          # Add man page if exists
+          if [ -f mddb-cli.1 ]; then
+            cp mddb-cli.1 dist/mddb-cli-${VERSION}-${{ matrix.platform }}/
+          fi
+          
+          cd dist
+          tar czf mddb-cli-${VERSION}-${{ matrix.platform }}.tar.gz mddb-cli-${VERSION}-${{ matrix.platform }}
+
+      - name: Install packaging tools
+        if: matrix.package_formats == 'deb,rpm'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Create DEB package
+        if: contains(matrix.package_formats, 'deb')
+        working-directory: services/mddb-cli
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION_NUM=${VERSION#v}
+          
+          # Create package structure
+          mkdir -p dist/deb/mddb-cli-${VERSION_NUM}/DEBIAN
+          mkdir -p dist/deb/mddb-cli-${VERSION_NUM}/usr/bin
+          mkdir -p dist/deb/mddb-cli-${VERSION_NUM}/usr/share/doc/mddb-cli
+          mkdir -p dist/deb/mddb-cli-${VERSION_NUM}/usr/share/man/man1
+          
+          # Copy binary
+          cp mddb-cli-${{ matrix.platform }} dist/deb/mddb-cli-${VERSION_NUM}/usr/bin/mddb-cli
+          chmod +x dist/deb/mddb-cli-${VERSION_NUM}/usr/bin/mddb-cli
+          
+          # Copy docs
+          cp ../../README.md dist/deb/mddb-cli-${VERSION_NUM}/usr/share/doc/mddb-cli/
+          
+          # Copy man page if exists
+          if [ -f mddb-cli.1 ]; then
+            cp mddb-cli.1 dist/deb/mddb-cli-${VERSION_NUM}/usr/share/man/man1/
+            gzip dist/deb/mddb-cli-${VERSION_NUM}/usr/share/man/man1/mddb-cli.1
+          fi
+          
+          # Create control file
+          cat > dist/deb/mddb-cli-${VERSION_NUM}/DEBIAN/control << EOF
+          Package: mddb-cli
+          Version: ${VERSION_NUM}
+          Section: utils
+          Priority: optional
+          Architecture: ${{ matrix.goarch }}
+          Maintainer: MDDB Team <team@mddb.io>
+          Description: Command-line client for MDDB
+           Full-featured CLI client for MDDB (Markdown Database).
+           Provides commands for document management, search, export,
+           backup, and statistics.
+          Homepage: https://github.com/tradik/mddb
+          EOF
+          
+          # Build package
+          dpkg-deb --build dist/deb/mddb-cli-${VERSION_NUM}
+          mv dist/deb/mddb-cli-${VERSION_NUM}.deb dist/mddb-cli-${VERSION_NUM}-${{ matrix.platform }}.deb
+
+      - name: Create RPM package
+        if: contains(matrix.package_formats, 'rpm')
+        working-directory: services/mddb-cli
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          VERSION_NUM=${VERSION#v}
+          
+          # Create RPM build structure
+          mkdir -p dist/rpm/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          
+          # Create spec file
+          cat > dist/rpm/SPECS/mddb-cli.spec << EOF
+          Name:           mddb-cli
+          Version:        ${VERSION_NUM}
+          Release:        1%{?dist}
+          Summary:        Command-line client for MDDB
+          License:        MIT
+          URL:            https://github.com/tradik/mddb
+          Source0:        mddb-cli-${VERSION_NUM}.tar.gz
+
+          %description
+          Full-featured CLI client for MDDB (Markdown Database).
+          Provides commands for document management, search, export,
+          backup, and statistics.
+
+          %prep
+          %setup -q
+
+          %install
+          mkdir -p %{buildroot}/usr/bin
+          mkdir -p %{buildroot}/usr/share/doc/mddb-cli
+          mkdir -p %{buildroot}/usr/share/man/man1
+          
+          install -m 755 mddb-cli %{buildroot}/usr/bin/mddb-cli
+          install -m 644 README.md %{buildroot}/usr/share/doc/mddb-cli/
+          
+          if [ -f mddb-cli.1 ]; then
+            install -m 644 mddb-cli.1 %{buildroot}/usr/share/man/man1/
+            gzip %{buildroot}/usr/share/man/man1/mddb-cli.1
+          fi
+
+          %files
+          /usr/bin/mddb-cli
+          /usr/share/doc/mddb-cli/README.md
+          %if 0
+          /usr/share/man/man1/mddb-cli.1.gz
+          %endif
+
+          %changelog
+          * $(date "+%a %b %d %Y") MDDB Team <team@mddb.io> - ${VERSION_NUM}-1
+          - Release ${VERSION_NUM}
+          EOF
+          
+          # Create source tarball
+          mkdir -p mddb-cli-${VERSION_NUM}
+          cp mddb-cli-${{ matrix.platform }} mddb-cli-${VERSION_NUM}/mddb-cli
+          cp ../../README.md mddb-cli-${VERSION_NUM}/
+          [ -f mddb-cli.1 ] && cp mddb-cli.1 mddb-cli-${VERSION_NUM}/ || true
+          tar czf dist/rpm/SOURCES/mddb-cli-${VERSION_NUM}.tar.gz mddb-cli-${VERSION_NUM}
+          
+          # Build RPM
+          rpmbuild --define "_topdir $(pwd)/dist/rpm" -bb dist/rpm/SPECS/mddb-cli.spec
+          
+          # Copy RPM to dist
+          find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddb-cli-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mddb-cli-${{ matrix.platform }}
+          path: |
+            services/mddb-cli/dist/*.tar.gz
+            services/mddb-cli/dist/*.deb
+            services/mddb-cli/dist/*.rpm
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-server, build-client]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create release notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          # MDDB ${{ steps.version.outputs.VERSION }} - Ultra Performance Release
+
+          ## 🚀 Performance Highlights
+
+          **MDDB is now 37.4x faster than baseline!**
+
+          - **29,810 docs/sec** throughput
+          - **34µs** average latency
+          - **5.75x faster** than MongoDB
+          - **6.89x faster** than PostgreSQL
+          - **24.54x faster** than MySQL
+          - **95.43x faster** than CouchDB
+
+          ## 📦 Installation
+
+          ### Ubuntu/Debian
+          ```bash
+          # Server
+          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
+          sudo dpkg -i mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
+          
+          # Client
+          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
+          sudo dpkg -i mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
+          ```
+
+          ### RHEL/CentOS/Fedora
+          ```bash
+          # Server
+          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
+          sudo rpm -i mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
+          
+          # Client
+          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
+          sudo rpm -i mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
+          ```
+
+          ### macOS (Homebrew)
+          ```bash
+          # Intel
+          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz
+          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz
+          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64/mddbd /usr/local/bin/
+          
+          # Apple Silicon
+          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz
+          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz
+          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64/mddbd /usr/local/bin/
+          ```
+
+          ### FreeBSD
+          ```bash
+          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz
+          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz
+          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64/mddbd /usr/local/bin/
+          ```
+
+          ## ✨ What's New
+
+          See [CHANGELOG.md](https://github.com/tradik/mddb/blob/main/CHANGELOG.md) for full details.
+
+          ## 📊 Benchmarks
+
+          All benchmarks available in the repository under `test/`.
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: MDDB ${{ steps.version.outputs.VERSION }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            release-artifacts/**/*.tar.gz
+            release-artifacts/**/*.deb
+            release-artifacts/**/*.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-homebrew-formula:
+    name: Create Homebrew Formula
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+          VERSION_NUM=${GITHUB_REF#refs/tags/v}
+          echo "VERSION_NUM=${VERSION_NUM}" >> $GITHUB_OUTPUT
+
+      - name: Create Homebrew formula
+        run: |
+          mkdir -p homebrew-formula
+          
+          cat > homebrew-formula/mddbd.rb << 'EOF'
+          class Mddbd < Formula
+            desc "High-performance markdown database server"
+            homepage "https://github.com/tradik/mddb"
+            version "${{ steps.version.outputs.VERSION_NUM }}"
+            
+            if Hardware::CPU.intel?
+              url "https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz"
+              sha256 "INTEL_SHA256"
+            else
+              url "https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz"
+              sha256 "ARM_SHA256"
+            end
+
+            def install
+              bin.install "mddbd"
+            end
+
+            service do
+              run [opt_bin/"mddbd"]
+              keep_alive true
+              log_path var/"log/mddbd.log"
+              error_log_path var/"log/mddbd.log"
+              environment_variables MDDB_PATH: var/"lib/mddbd/mddb.db", MDDB_MODE: "wr", MDDB_EXTREME: "true"
+            end
+
+            test do
+              system "#{bin}/mddbd", "--version"
+            end
+          end
+          EOF
+          
+          cat > homebrew-formula/mddb-cli.rb << 'EOF'
+          class MddbCli < Formula
+            desc "Command-line client for MDDB"
+            homepage "https://github.com/tradik/mddb"
+            version "${{ steps.version.outputs.VERSION_NUM }}"
+            
+            if Hardware::CPU.intel?
+              url "https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz"
+              sha256 "CLI_INTEL_SHA256"
+            else
+              url "https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz"
+              sha256 "CLI_ARM_SHA256"
+            end
+
+            def install
+              bin.install "mddb-cli"
+              man1.install "mddb-cli.1" if File.exist?("mddb-cli.1")
+            end
+
+            test do
+              system "#{bin}/mddb-cli", "--version"
+            end
+          end
+          EOF
+
+      - name: Upload Homebrew formulas
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formulas
+          path: homebrew-formula/*.rb

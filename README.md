@@ -2,7 +2,9 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.25-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+[![Release](https://img.shields.io/github/v/release/tradik/mddb)](https://github.com/tradik/mddb/releases)
+[![Tests](https://github.com/tradik/mddb/workflows/Tests/badge.svg)](https://github.com/tradik/mddb/actions)
+[![Performance](https://img.shields.io/badge/performance-29.8k%20docs%2Fs-brightgreen.svg)]()
 [![gRPC](https://img.shields.io/badge/gRPC-enabled-blue.svg)](https://grpc.io)
 [![Protocol Buffers](https://img.shields.io/badge/protobuf-3-blue.svg)](https://protobuf.dev)
 
@@ -260,15 +262,68 @@ Enable with `MDDB_EXTREME=true` environment variable to activate all 29 optimiza
 
 ## Quick Start
 
-### Prerequisites
+### Installation
+
+#### Ubuntu/Debian
+```bash
+# Server
+wget https://github.com/tradik/mddb/releases/latest/download/mddbd-latest-linux-amd64.deb
+sudo dpkg -i mddbd-latest-linux-amd64.deb
+sudo systemctl start mddbd
+sudo systemctl enable mddbd
+
+# Client
+wget https://github.com/tradik/mddb/releases/latest/download/mddb-cli-latest-linux-amd64.deb
+sudo dpkg -i mddb-cli-latest-linux-amd64.deb
+```
+
+#### RHEL/CentOS/Fedora
+```bash
+# Server
+wget https://github.com/tradik/mddb/releases/latest/download/mddbd-latest-linux-amd64.rpm
+sudo rpm -i mddbd-latest-linux-amd64.rpm
+sudo systemctl start mddbd
+sudo systemctl enable mddbd
+
+# Client
+wget https://github.com/tradik/mddb/releases/latest/download/mddb-cli-latest-linux-amd64.rpm
+sudo rpm -i mddb-cli-latest-linux-amd64.rpm
+```
+
+#### macOS (Homebrew)
+```bash
+# Coming soon - Homebrew tap
+brew tap tradik/mddb
+brew install mddbd mddb-cli
+
+# Or download directly
+# Intel Mac
+wget https://github.com/tradik/mddb/releases/latest/download/mddbd-latest-darwin-amd64.tar.gz
+tar xzf mddbd-latest-darwin-amd64.tar.gz
+sudo mv mddbd-latest-darwin-amd64/mddbd /usr/local/bin/
+
+# Apple Silicon
+wget https://github.com/tradik/mddb/releases/latest/download/mddbd-latest-darwin-arm64.tar.gz
+tar xzf mddbd-latest-darwin-arm64.tar.gz
+sudo mv mddbd-latest-darwin-arm64/mddbd /usr/local/bin/
+```
+
+#### FreeBSD
+```bash
+wget https://github.com/tradik/mddb/releases/latest/download/mddbd-latest-freebsd-amd64.tar.gz
+tar xzf mddbd-latest-freebsd-amd64.tar.gz
+sudo mv mddbd-latest-freebsd-amd64/mddbd /usr/local/bin/
+```
+
+### Building from Source
+
+#### Prerequisites
 - Go 1.25 or later
 - Make (optional, for using Makefile commands)
 
-### Installation
-
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/tradik/mddb.git
 cd mddb
 
 # Build the project
