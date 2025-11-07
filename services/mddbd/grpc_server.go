@@ -21,20 +21,22 @@ import (
 // GRPCServer implements the MDDB gRPC service
 type GRPCServer struct {
 	proto.UnimplementedMDDBServer
-	server         *Server
-	batchProcessor *BatchProcessor
-	batchDeleter   *BatchDeleter
-	batchUpdater   *BatchUpdater
-	workerPool     *WorkerPool
+	server                  *Server
+	batchProcessor          *BatchProcessor
+	optimizedBatchProcessor *OptimizedBatchProcessor
+	batchDeleter            *BatchDeleter
+	batchUpdater            *BatchUpdater
+	workerPool              *WorkerPool
 }
 
 // NewGRPCServer creates a new gRPC server wrapper
 func NewGRPCServer(s *Server) *GRPCServer {
 	gs := &GRPCServer{
-		server:         s,
-		batchProcessor: NewBatchProcessor(s, 8), // 8 parallel workers
-		batchDeleter:   NewBatchDeleter(s, 8),   // 8 parallel workers
-		batchUpdater:   NewBatchUpdater(s, 8),   // 8 parallel workers
+		server:                  s,
+		batchProcessor:          NewBatchProcessor(s, 8),          // 8 parallel workers (legacy)
+		optimizedBatchProcessor: NewOptimizedBatchProcessor(s, 8), // 8 parallel workers (optimized)
+		batchDeleter:            NewBatchDeleter(s, 8),            // 8 parallel workers
+		batchUpdater:            NewBatchUpdater(s, 8),            // 8 parallel workers
 	}
 	// Worker pool will be initialized when needed
 	return gs
@@ -177,8 +179,16 @@ func (g *GRPCServer) AddBatch(ctx context.Context, req *proto.AddBatchRequest) (
 		return &proto.AddBatchResponse{}, nil
 	}
 
-	// Use batch processor with parallel processing
-	resp, err := g.batchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
+	// Use optimized batch processor if extreme mode, otherwise legacy
+	var resp *proto.AddBatchResponse
+	var err error
+	
+	if g.server.UseExtreme {
+		resp, err = g.optimizedBatchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
+	} else {
+		resp, err = g.batchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
+	}
+	
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
