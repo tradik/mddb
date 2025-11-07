@@ -26,17 +26,19 @@ const (
 )
 
 type Server struct {
-	DB           *bolt.DB
-	Path         string
-	Mode         AccessMode
-	Hooks        Hooks // optional extensions
-	BucketNames  BucketNames
-	Cache        *DocumentCache  // Read-through cache (legacy)
-	LockFreeCache *LockFreeCache // Lock-free cache (extreme performance)
-	IndexQueue   *IndexQueue     // Async metadata indexing
-	WAL          *WAL            // Write-Ahead Log
-	MVCC         *MVCC           // Multi-Version Concurrency Control
-	UseExtreme   bool            // Enable extreme performance features
+	DB            *bolt.DB
+	Path          string
+	Mode          AccessMode
+	Hooks         Hooks // optional extensions
+	BucketNames   BucketNames
+	Cache         *DocumentCache       // Read-through cache (legacy)
+	LockFreeCache *LockFreeCache       // Lock-free cache (extreme performance)
+	IndexQueue    *IndexQueue          // Async metadata indexing
+	WAL           *WAL                 // Write-Ahead Log
+	MVCC          *MVCC                // Multi-Version Concurrency Control
+	BloomFilters  *BloomFilterManager  // Bloom filters for negative lookups
+	DeltaEncoder  *DeltaEncoder        // Delta encoding for revisions
+	UseExtreme    bool                 // Enable extreme performance features
 }
 
 // BucketNames caches bucket name byte slices to avoid repeated allocations
@@ -137,6 +139,8 @@ func main() {
 		Cache:         NewDocumentCache(1000, 300),     // 1000 docs, 5min TTL
 		LockFreeCache: NewLockFreeCache(10000, 300),    // 10k docs, 5min TTL (lock-free)
 		IndexQueue:    NewIndexQueue(nil, 4),           // 4 workers (will set server below)
+		BloomFilters:  NewBloomFilterManager(),         // Bloom filters
+		DeltaEncoder:  NewDeltaEncoder(),               // Delta encoding
 		UseExtreme:    useExtreme,
 	}
 	s.IndexQueue.server = s // Set server reference
@@ -158,6 +162,9 @@ func main() {
 		log.Println("  ✓ MVCC initialized")
 		
 		log.Println("  ✓ Lock-Free Cache enabled")
+		log.Println("  ✓ Bloom Filters enabled")
+		log.Println("  ✓ Delta Encoding enabled")
+		log.Println("  ✓ Adaptive Compression enabled (Snappy + Zstd)")
 	}
 	
 	if err := s.ensureBuckets(); err != nil {
@@ -184,6 +191,21 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+
+	// Start HTTP/3 server if extreme mode
+	if useExtreme {
+		http3Addr := env("MDDB_HTTP3_ADDR", ":11443")
+		go func() {
+			h3Server, err := NewHTTP3Server(http3Addr, HTTP3Middleware(withJSON(mux)))
+			if err != nil {
+				log.Printf("⚠️  Failed to start HTTP/3 server: %v", err)
+				return
+			}
+			if err := h3Server.Start(); err != nil {
+				log.Printf("⚠️  HTTP/3 server error: %v", err)
+			}
+		}()
+	}
 
 	// Start gRPC server
 	log.Printf("mddb gRPC listening on %s (mode=%s, db=%s)", grpcAddr, s.Mode, dbPath)

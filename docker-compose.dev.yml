@@ -9,6 +9,7 @@ services:
     ports:
       - "11023:11023"  # HTTP API
       - "11024:11024"  # gRPC API
+      - "11443:11443/udp"  # HTTP/3 (QUIC)
     volumes:
       - ./services/mddbd:/app:delegated
       - ./proto:/proto:ro
