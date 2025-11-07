@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2025-11-07
+
+### Changed
+- Updated quic-go to v0.55.0 (HTTP/3 improvements)
+- Updated Alpine base image to 3.22 (security updates)
+- Updated Go dependencies (crypto, net, sys, mod, text, tools)
+- Disabled automatic workflow triggers (manual only)
+- Removed Docker buildcache (not needed for users)
+- Removed dev Docker images (production only)
+
+### Fixed
+- Docker build context issues
+- Docker Hub description update (now manual)
+
 ## [2.0.1] - 2025-11-07
 
 ### Fixed
