@@ -127,7 +127,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("Error closing database: %v", err)
+		}
+	}()
 
 	// Check for extreme performance mode
 	useExtreme := os.Getenv("MDDB_EXTREME") == "true"
@@ -519,7 +523,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	case "ndjson":
 		// stream NDJSON
 		res, _ := http.Post("http://localhost"+env("MDDB_ADDR", ":11023")+"/v1/search", "application/json", bytes.NewReader(mustJSON(sr)))
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		var docs []Doc
 		_ = json.NewDecoder(res.Body).Decode(&docs)
 		for _, d := range docs {
@@ -533,7 +537,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	case "zip":
 		// pack contentMd as files {key}.{lang}.md
 		res, _ := http.Post("http://localhost"+env("MDDB_ADDR", ":11023")+"/v1/search", "application/json", bytes.NewReader(mustJSON(sr)))
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 		var docs []Doc
 		_ = json.NewDecoder(res.Body).Decode(&docs)
 		var z bytes.Buffer
@@ -655,7 +659,7 @@ func ok(w http.ResponseWriter, v any) {
 }
 func bad(w http.ResponseWriter, err error) {
 	w.WriteHeader(400)
-	_, _ = w.Write([]byte(fmt.Sprintf(`{"error":%q}`, err.Error())))
+	_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error())
 }
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	type CollectionStats struct {
@@ -846,14 +850,14 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 	tmp := dst + ".tmp"
 	out, err := os.Create(tmp)
 	if err != nil {
 		return err
 	}
 	if _, err = io.Copy(out, in); err != nil {
-		out.Close()
+		_ = out.Close()
 		return err
 	}
 	if err = out.Close(); err != nil {

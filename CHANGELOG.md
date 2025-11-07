@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2025-11-07
+
+### Fixed
+- Fixed all golangci-lint issues (18 total)
+  - errcheck: Added error checking for binary.Write, file.Close, res.Body.Close
+  - staticcheck: Removed redundant nil check, optimized fmt usage, fixed pointer usage
+  - unused: Removed unused struct fields (mu, workerPool, current)
+- Fixed proto definitions for UpdateDocument, DeleteDocument, and batch responses
+- Added missing SaveRevision and NotFound fields to proto messages
+
+### Added
+- Docker Hub integration with automated builds
+- Multi-platform Docker images (AMD64 + ARM64)
+- Comprehensive Docker Hub documentation
+- GitHub Actions workflow for Docker builds and pushes
+- Docker Compose configuration for production deployment
+
+### Changed
+- Updated golangci-lint to v2.6.1 with Go 1.25 support
+- Improved error handling across codebase
+- Optimized buffer pool usage to avoid allocations
+
 ## [2.0.0] - 2025-11-07
 
 ### 🚀 Major Performance Release - 29 Optimizations

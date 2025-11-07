@@ -10,7 +10,6 @@ import (
 type SIMDProcessor struct {
 	enabled     bool
 	operations  atomic.Uint64
-	mu          sync.RWMutex
 	parallelism int
 }
 

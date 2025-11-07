@@ -16,7 +16,7 @@ func NewDeltaEncoder() *DeltaEncoder {
 
 // Encode creates a delta between old and new data
 func (de *DeltaEncoder) Encode(oldData, newData []byte) []byte {
-	if oldData == nil || len(oldData) == 0 {
+	if len(oldData) == 0 {
 		// No base - store full data with flag
 		result := make([]byte, len(newData)+1)
 		result[0] = 0 // Full data flag
@@ -70,7 +70,7 @@ func (de *DeltaEncoder) calculateDelta(oldData, newData []byte) []byte {
 	var buf bytes.Buffer
 	
 	// Write new data length
-	binary.Write(&buf, binary.BigEndian, uint32(len(newData)))
+	_ = binary.Write(&buf, binary.BigEndian, uint32(len(newData)))
 	
 	// Simple byte-level delta
 	// Format: [commonPrefixLen:4][commonSuffixLen:4][middleData]
@@ -96,8 +96,8 @@ func (de *DeltaEncoder) calculateDelta(oldData, newData []byte) []byte {
 	}
 	
 	// Write lengths
-	binary.Write(&buf, binary.BigEndian, uint32(prefixLen))
-	binary.Write(&buf, binary.BigEndian, uint32(suffixLen))
+	_ = binary.Write(&buf, binary.BigEndian, uint32(prefixLen))
+	_ = binary.Write(&buf, binary.BigEndian, uint32(suffixLen))
 	
 	// Write middle part (the actual difference)
 	middleStart := prefixLen
@@ -134,7 +134,7 @@ func (de *DeltaEncoder) applyDelta(baseData, delta []byte) ([]byte, error) {
 	
 	// Read middle part
 	middleData := make([]byte, buf.Len())
-	buf.Read(middleData)
+	_, _ = buf.Read(middleData)
 	
 	// Reconstruct
 	result := make([]byte, 0, newLen)

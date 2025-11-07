@@ -8,9 +8,8 @@ import (
 
 // AdaptiveIndexManager manages adaptive indexing strategies
 type AdaptiveIndexManager struct {
-	queryStats   sync.Map // query pattern -> *QueryStats
+	queryStats      sync.Map // query pattern -> *QueryStats
 	indexStrategies sync.Map // collection -> *IndexStrategy
-	mu           sync.RWMutex
 }
 
 // QueryStats tracks query performance statistics

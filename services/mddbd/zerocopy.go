@@ -100,7 +100,7 @@ func (bp *BufferPool) Get() []byte {
 // Put returns a buffer to pool
 func (bp *BufferPool) Put(buf []byte) {
 	if len(buf) == bp.size {
-		bp.pool.Put(buf)
+		bp.pool.Put(&buf)
 	}
 }
 

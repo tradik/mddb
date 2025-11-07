@@ -18,7 +18,6 @@ type MVCC struct {
 type VersionChain struct {
 	mu       sync.RWMutex
 	versions []*Version
-	current  int // Index of current version
 }
 
 // Version represents a single version of a document

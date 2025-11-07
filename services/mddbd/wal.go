@@ -64,7 +64,7 @@ func NewWAL(dbPath string, policy SyncPolicy) (*WAL, error) {
 	
 	stat, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, fmt.Errorf("failed to stat WAL: %w", err)
 	}
 	

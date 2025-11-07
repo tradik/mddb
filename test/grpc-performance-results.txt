@@ -1,27 +1,27 @@
 MDDB gRPC Performance Test Results
 ===================================
-Date: 2025-11-07T09:12:05Z
+Date: 2025-11-07T10:44:39Z
 Server: localhost:11024
 
 Short Documents:
-  Average: 496.812µs
-  Min: 343.209µs
-  Max: 4.651583ms
-  Throughput: 2012.83 docs/sec
+  Average: 548.204µs
+  Min: 334.75µs
+  Max: 6.739834ms
+  Throughput: 1824.14 docs/sec
 
 Medium Documents:
-  Average: 488.102µs
-  Min: 343.458µs
-  Max: 1.878417ms
-  Throughput: 2048.75 docs/sec
+  Average: 588.226µs
+  Min: 352.292µs
+  Max: 31.988084ms
+  Throughput: 1700.02 docs/sec
 
 Long Documents:
-  Average: 552.783µs
-  Min: 393.166µs
-  Max: 2.590667ms
-  Throughput: 1809.03 docs/sec
+  Average: 567.299µs
+  Min: 379.209µs
+  Max: 2.443292ms
+  Throughput: 1762.74 docs/sec
 
 Overall:
-  Total time: 1.537697764s
-  Average: 512.565µs
-  Throughput: 1950.97 docs/sec
+  Total time: 1.703731068s
+  Average: 567.91µs
+  Throughput: 1760.84 docs/sec
