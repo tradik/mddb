@@ -30,11 +30,27 @@ type GRPCServer struct {
 
 // NewGRPCServer creates a new gRPC server wrapper
 func NewGRPCServer(s *Server) *GRPCServer {
+	// Use FinalBatchProcessor if extreme mode, otherwise standard
+	var batchProc *BatchProcessor
+	if s.UseExtreme {
+		// In extreme mode, use wrapper that calls FinalBatchProcessor
+		batchProc = &BatchProcessor{
+			server:     s,
+			maxWorkers: 8,
+		}
+		// Override with final processor
+		finalProc := NewFinalBatchProcessor(s, 8)
+		// Store final processor for use
+		s.finalBatchProcessor = finalProc
+	} else {
+		batchProc = NewBatchProcessor(s, 8)
+	}
+	
 	gs := &GRPCServer{
 		server:         s,
-		batchProcessor: NewBatchProcessor(s, 8), // 8 parallel workers
-		batchDeleter:   NewBatchDeleter(s, 8),   // 8 parallel workers
-		batchUpdater:   NewBatchUpdater(s, 8),   // 8 parallel workers
+		batchProcessor: batchProc,
+		batchDeleter:   NewBatchDeleter(s, 8), // 8 parallel workers
+		batchUpdater:   NewBatchUpdater(s, 8), // 8 parallel workers
 	}
 	// Worker pool will be initialized when needed
 	return gs
@@ -177,8 +193,16 @@ func (g *GRPCServer) AddBatch(ctx context.Context, req *proto.AddBatchRequest) (
 		return &proto.AddBatchResponse{}, nil
 	}
 
-	// Use batch processor with parallel processing
-	resp, err := g.batchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
+	// Use final batch processor if extreme mode, otherwise standard
+	var resp *proto.AddBatchResponse
+	var err error
+	
+	if g.server.UseExtreme && g.server.finalBatchProcessor != nil {
+		resp, err = g.server.finalBatchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
+	} else {
+		resp, err = g.batchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
+	}
+	
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

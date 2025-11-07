@@ -26,24 +26,25 @@ const (
 )
 
 type Server struct {
-	DB              *bolt.DB
-	Path            string
-	Mode            AccessMode
-	Hooks           Hooks // optional extensions
-	BucketNames     BucketNames
-	Cache           *DocumentCache          // Read-through cache (legacy)
-	LockFreeCache   *LockFreeCache          // Lock-free cache (extreme performance)
-	IndexQueue      *IndexQueue             // Async metadata indexing
-	WAL             *WAL                    // Write-Ahead Log
-	MVCC            *MVCC                   // Multi-Version Concurrency Control
-	BloomFilters    *BloomFilterManager     // Bloom filters for negative lookups
-	DeltaEncoder    *DeltaEncoder           // Delta encoding for revisions
-	AdaptiveIndex   *AdaptiveIndexManager   // Adaptive indexing
-	AsyncIO         *AsyncIO                // Async I/O
-	ZeroCopy        *ZeroCopyManager        // Zero-copy I/O
-	SIMD            *SIMDProcessor          // Vectorized operations
-	ShardCluster    *ShardCluster           // Distributed sharding
-	UseExtreme      bool                    // Enable extreme performance features
+	DB                 *bolt.DB
+	Path               string
+	Mode               AccessMode
+	Hooks              Hooks // optional extensions
+	BucketNames        BucketNames
+	Cache              *DocumentCache          // Read-through cache (legacy)
+	LockFreeCache      *LockFreeCache          // Lock-free cache (extreme performance)
+	IndexQueue         *IndexQueue             // Async metadata indexing
+	WAL                *WAL                    // Write-Ahead Log
+	MVCC               *MVCC                   // Multi-Version Concurrency Control
+	BloomFilters       *BloomFilterManager     // Bloom filters for negative lookups
+	DeltaEncoder       *DeltaEncoder           // Delta encoding for revisions
+	AdaptiveIndex      *AdaptiveIndexManager   // Adaptive indexing
+	AsyncIO            *AsyncIO                // Async I/O
+	ZeroCopy           *ZeroCopyManager        // Zero-copy I/O
+	SIMD               *SIMDProcessor          // Vectorized operations
+	ShardCluster       *ShardCluster           // Distributed sharding
+	finalBatchProcessor *FinalBatchProcessor   // Final optimized batch processor
+	UseExtreme         bool                    // Enable extreme performance features
 }
 
 // BucketNames caches bucket name byte slices to avoid repeated allocations
