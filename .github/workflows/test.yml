@@ -67,6 +67,9 @@ jobs:
         with:
           version: latest
           working-directory: services/mddbd
+          args: --timeout=5m
+          skip-cache: true
+          install-mode: binary
 
   build:
     name: Build Binaries
