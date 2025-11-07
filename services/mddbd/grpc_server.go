@@ -21,22 +21,20 @@ import (
 // GRPCServer implements the MDDB gRPC service
 type GRPCServer struct {
 	proto.UnimplementedMDDBServer
-	server                  *Server
-	batchProcessor          *BatchProcessor
-	optimizedBatchProcessor *OptimizedBatchProcessor
-	batchDeleter            *BatchDeleter
-	batchUpdater            *BatchUpdater
-	workerPool              *WorkerPool
+	server         *Server
+	batchProcessor *BatchProcessor
+	batchDeleter   *BatchDeleter
+	batchUpdater   *BatchUpdater
+	workerPool     *WorkerPool
 }
 
 // NewGRPCServer creates a new gRPC server wrapper
 func NewGRPCServer(s *Server) *GRPCServer {
 	gs := &GRPCServer{
-		server:                  s,
-		batchProcessor:          NewBatchProcessor(s, 8),          // 8 parallel workers (legacy)
-		optimizedBatchProcessor: NewOptimizedBatchProcessor(s, 8), // 8 parallel workers (optimized)
-		batchDeleter:            NewBatchDeleter(s, 8),            // 8 parallel workers
-		batchUpdater:            NewBatchUpdater(s, 8),            // 8 parallel workers
+		server:         s,
+		batchProcessor: NewBatchProcessor(s, 8), // 8 parallel workers
+		batchDeleter:   NewBatchDeleter(s, 8),   // 8 parallel workers
+		batchUpdater:   NewBatchUpdater(s, 8),   // 8 parallel workers
 	}
 	// Worker pool will be initialized when needed
 	return gs
@@ -179,16 +177,8 @@ func (g *GRPCServer) AddBatch(ctx context.Context, req *proto.AddBatchRequest) (
 		return &proto.AddBatchResponse{}, nil
 	}
 
-	// Use optimized batch processor if extreme mode, otherwise legacy
-	var resp *proto.AddBatchResponse
-	var err error
-	
-	if g.server.UseExtreme {
-		resp, err = g.optimizedBatchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
-	} else {
-		resp, err = g.batchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
-	}
-	
+	// Use batch processor with parallel processing
+	resp, err := g.batchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -290,9 +280,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 
 	// Single transaction for both ID collection and document loading
 	var docs []Doc
-	// Get pooled string slice for docIDs
-	docIDsSlice := GlobalSlicePool.GetStringSlice()
-	defer GlobalSlicePool.PutStringSlice(docIDsSlice)
+	var docIDs []string
 	
 	err := g.server.DB.View(func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
@@ -305,7 +293,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 			for k, _ := c.Seek(prefix); k != nil && BytesHasPrefix(k, prefix); k, _ = c.Next() {
 				// Extract docID (3rd part) without string allocations
 				if docID := ExtractPart(k, 2); docID != nil {
-					docIDsSlice = append(docIDsSlice, string(docID))
+					docIDs = append(docIDs, string(docID))
 				}
 			}
 		} else {
@@ -325,11 +313,11 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 				}
 				sets = append(sets, unique(union))
 			}
-			docIDsSlice = intersect(sets...)
+			docIDs = intersect(sets...)
 		}
 		
 		// Load documents in the same transaction
-		for _, id := range docIDsSlice {
+		for _, id := range docIDs {
 			v := bDocs.Get(kDoc(req.Collection, id))
 			if v != nil {
 				d, err := unmarshalDoc(v)
