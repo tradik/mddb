@@ -9,6 +9,9 @@ service MDDB {
   // Add or update a document
   rpc Add(AddRequest) returns (Document);
   
+  // Add or update multiple documents in a single transaction (batch)
+  rpc AddBatch(AddBatchRequest) returns (AddBatchResponse);
+  
   // Get a document by key and language
   rpc Get(GetRequest) returns (Document);
   
@@ -54,6 +57,28 @@ message AddRequest {
   string lang = 3;
   map<string, MetaValues> meta = 4;
   string content_md = 5;
+}
+
+// Batch add request
+message AddBatchRequest {
+  string collection = 1;
+  repeated BatchDocument documents = 2;
+}
+
+// Document for batch operations
+message BatchDocument {
+  string key = 1;
+  string lang = 2;
+  map<string, MetaValues> meta = 3;
+  string content_md = 4;
+}
+
+// Batch add response
+message AddBatchResponse {
+  int32 added = 1;
+  int32 updated = 2;
+  int32 failed = 3;
+  repeated string errors = 4; // Error messages for failed documents
 }
 
 // Get document request

@@ -1,20 +1,21 @@
 package main
 
 import (
-	"database/sql"
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"sort"
 	"time"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 const (
-	mysqlDSN   = "mddb:benchmark123@tcp(localhost:13306)/mddb_test?charset=utf8mb4&parseTime=True"
-	totalDocs  = 3000
-	batchSize  = 100
+	couchURL  = "http://mddb:benchmark123@localhost:5984"
+	totalDocs = 3000
+	batchSize = 100
+	dbName    = "mddb_test"
 )
 
 type Stats struct {
@@ -27,56 +28,42 @@ type Stats struct {
 	Throughput float64
 }
 
+type CouchDoc struct {
+	Key     string `json:"key"`
+	Lang    string `json:"lang"`
+	Content string `json:"content"`
+}
+
 func main() {
 	fmt.Println("════════════════════════════════════════════════")
-	fmt.Println("  MySQL Performance Test")
+	fmt.Println("  CouchDB Performance Test")
 	fmt.Println("════════════════════════════════════════════════")
 	fmt.Println()
 
-	// Connect to MySQL
-	fmt.Print("Connecting to MySQL... ")
-	db, err := sql.Open("mysql", mysqlDSN)
+	// Check connection
+	fmt.Print("Connecting to CouchDB... ")
+	resp, err := http.Get(couchURL)
 	if err != nil {
 		fmt.Printf("✗ Failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
-
-	// Wait for connection
-	for i := 0; i < 30; i++ {
-		if err := db.Ping(); err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	if err := db.Ping(); err != nil {
-		fmt.Printf("✗ Failed: %v\n", err)
-		os.Exit(1)
-	}
+	resp.Body.Close()
 	fmt.Println("✓ Connected")
 
-	// Create table
-	fmt.Print("Creating table... ")
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS documents (
-			id VARCHAR(255) PRIMARY KEY,
-			content TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_created (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-	`)
-	if err != nil {
-		fmt.Printf("✗ Failed: %v\n", err)
-		os.Exit(1)
-	}
+	// Create/recreate database
+	fmt.Print("Preparing database... ")
+	// Delete if exists
+	req, _ := http.NewRequest("DELETE", couchURL+"/"+dbName, nil)
+	http.DefaultClient.Do(req)
 
-	// Truncate table
-	_, err = db.Exec("TRUNCATE TABLE documents")
+	// Create new
+	req, _ = http.NewRequest("PUT", couchURL+"/"+dbName, nil)
+	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		fmt.Printf("✗ Failed: %v\n", err)
 		os.Exit(1)
 	}
+	resp.Body.Close()
 	fmt.Println("✓ Ready")
 	fmt.Println()
 
@@ -87,8 +74,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Run tests
-	stats := runTest(db, docs)
+	// Run test
+	stats := runTest(docs)
 
 	// Print results
 	printStats(stats)
@@ -112,26 +99,16 @@ func loadDocuments() map[string]string {
 	return docs
 }
 
-func runTest(db *sql.DB, docs map[string]string) Stats {
+func runTest(docs map[string]string) Stats {
 	var stats Stats
 	stats.Times = make([]time.Duration, 0, totalDocs)
 
-	fmt.Printf("Inserting %d documents...\n", totalDocs)
-	fmt.Println()
+	fmt.Printf("Inserting %d documents...\n\n", totalDocs)
 
 	startTotal := time.Now()
-	docNum := 0
-
-	// Prepare statement
-	stmt, err := db.Prepare("INSERT INTO documents (id, content) VALUES (?, ?)")
-	if err != nil {
-		fmt.Printf("✗ Failed to prepare statement: %v\n", err)
-		os.Exit(1)
-	}
-	defer stmt.Close()
+	client := &http.Client{}
 
 	for i := 0; i < totalDocs; i++ {
-		// Rotate through document sizes
 		var content string
 		switch i % 3 {
 		case 0:
@@ -142,19 +119,32 @@ func runTest(db *sql.DB, docs map[string]string) Stats {
 			content = docs["lorem-long.md"]
 		}
 
-		docID := fmt.Sprintf("doc-%d", i+1)
+		doc := CouchDoc{
+			Key:     fmt.Sprintf("doc-%d", i+1),
+			Lang:    "en_US",
+			Content: content,
+		}
+
+		jsonData, _ := json.Marshal(doc)
 
 		start := time.Now()
-		_, err := stmt.Exec(docID, content)
+		req, _ := http.NewRequest("POST", couchURL+"/"+dbName, bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
 		elapsed := time.Since(start)
 
 		if err != nil {
-			fmt.Printf("✗ Failed to insert doc %d: %v\n", i+1, err)
+			fmt.Printf("✗ Insert failed: %v\n", err)
+			continue
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode != 201 {
+			fmt.Printf("✗ Insert failed with status: %d\n", resp.StatusCode)
 			continue
 		}
 
 		stats.Times = append(stats.Times, elapsed)
-		docNum++
 
 		// Progress indicator
 		if (i+1)%100 == 0 {
@@ -185,7 +175,9 @@ func runTest(db *sql.DB, docs map[string]string) Stats {
 		// Calculate median
 		sorted := make([]time.Duration, len(stats.Times))
 		copy(sorted, stats.Times)
-		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i] < sorted[j]
+		})
 		stats.MedianTime = sorted[len(sorted)/2]
 
 		// Calculate throughput
@@ -202,17 +194,17 @@ func printStats(stats Stats) {
 	fmt.Println("════════════════════════════════════════════════")
 	fmt.Println()
 	fmt.Printf("Documents inserted: %d\n", len(stats.Times))
-	fmt.Printf("Total time:         %s\n", stats.TotalTime.Round(time.Millisecond))
-	fmt.Printf("Average time:       %s\n", stats.AvgTime.Round(time.Microsecond))
-	fmt.Printf("Median time:        %s\n", stats.MedianTime.Round(time.Microsecond))
-	fmt.Printf("Min time:           %s\n", stats.MinTime.Round(time.Microsecond))
-	fmt.Printf("Max time:           %s\n", stats.MaxTime.Round(time.Microsecond))
+	fmt.Printf("Total time:         %dms\n", stats.TotalTime.Milliseconds())
+	fmt.Printf("Average time:       %dµs\n", stats.AvgTime.Microseconds())
+	fmt.Printf("Median time:        %dµs\n", stats.MedianTime.Microseconds())
+	fmt.Printf("Min time:           %dµs\n", stats.MinTime.Microseconds())
+	fmt.Printf("Max time:           %.3fms\n", float64(stats.MaxTime.Microseconds())/1000.0)
 	fmt.Printf("Throughput:         %.2f docs/sec\n", stats.Throughput)
 	fmt.Println()
 }
 
 func saveResults(stats Stats) {
-	filename := "mysql-performance-results.txt"
+	filename := "couchdb-performance-results.txt"
 	f, err := os.Create(filename)
 	if err != nil {
 		fmt.Printf("Warning: Could not save results: %v\n", err)
@@ -220,15 +212,15 @@ func saveResults(stats Stats) {
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "MySQL Performance Test Results\n")
-	fmt.Fprintf(f, "==============================\n\n")
+	fmt.Fprintf(f, "CouchDB Performance Test Results\n")
+	fmt.Fprintf(f, "=================================\n\n")
 	fmt.Fprintf(f, "Test Date: %s\n\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(f, "Documents inserted: %d\n", len(stats.Times))
-	fmt.Fprintf(f, "Total time:         %s\n", stats.TotalTime.Round(time.Millisecond))
-	fmt.Fprintf(f, "Average time:       %s\n", stats.AvgTime.Round(time.Microsecond))
-	fmt.Fprintf(f, "Median time:        %s\n", stats.MedianTime.Round(time.Microsecond))
-	fmt.Fprintf(f, "Min time:           %s\n", stats.MinTime.Round(time.Microsecond))
-	fmt.Fprintf(f, "Max time:           %s\n", stats.MaxTime.Round(time.Microsecond))
+	fmt.Fprintf(f, "Total time:         %dms\n", stats.TotalTime.Milliseconds())
+	fmt.Fprintf(f, "Average time:       %dµs\n", stats.AvgTime.Microseconds())
+	fmt.Fprintf(f, "Median time:        %dµs\n", stats.MedianTime.Microseconds())
+	fmt.Fprintf(f, "Min time:           %dµs\n", stats.MinTime.Microseconds())
+	fmt.Fprintf(f, "Max time:           %.3fms\n", float64(stats.MaxTime.Microseconds())/1000.0)
 	fmt.Fprintf(f, "Throughput:         %.2f docs/sec\n", stats.Throughput)
 
 	fmt.Printf("✓ Results saved to %s\n", filename)

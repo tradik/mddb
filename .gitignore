@@ -52,19 +52,23 @@ tmp/
 *.tmp
 *.temp
 
-# Test results
+# Test results and binaries
 test/performance-results-*.txt
 test/lorem-*.md
 test/protocol-comparison-*.txt
 test/database-comparison-*.txt
-test/grpc-performance-results.txt
-test/mysql-performance-results.txt
-test/postgres-performance-results.txt
-
-# Test binaries
 test/grpc-performance-test
+test/grpc-batch-test
 test/mysql-benchmark
 test/postgres-benchmark
+test/mongodb-benchmark
+test/couchdb-benchmark
+test/grpc-performance-results.txt
+test/grpc-batch-performance-results.txt
+test/mysql-performance-results.txt
+test/postgres-performance-results.txt
+test/mongodb-performance-results.txt
+test/couchdb-performance-results.txt
 
 # Generated protobuf code (regenerate with: make generate-proto)
 services/mddbd/proto/*.pb.go

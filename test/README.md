@@ -86,8 +86,9 @@ Each test uses 3 document sizes rotated evenly:
 
 ### Test Volume
 
-- **Protocol comparison**: 3,000 documents (1,000 per protocol)
-- **Database comparison**: 1,000 documents per database
+- **Protocol comparison**: 3,000 documents total (HTTP vs gRPC)
+- **Database comparison**: 3,000 documents per database (fair comparison)
+- All databases test identical documents with same sizes
 - Configurable via constants in source files
 
 ### Databases Tested

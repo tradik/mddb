@@ -15,7 +15,7 @@ import (
 
 const (
 	grpcAddr   = "localhost:11024"
-	totalDocs  = 10000
+	totalDocs  = 1000
 	batchSize  = 100
 	collection = "perftest-grpc"
 )

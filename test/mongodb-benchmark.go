@@ -1,20 +1,24 @@
 package main
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"sort"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
-	mysqlDSN   = "mddb:benchmark123@tcp(localhost:13306)/mddb_test?charset=utf8mb4&parseTime=True"
+	mongoURI   = "mongodb://mddb:benchmark123@localhost:27017"
 	totalDocs  = 3000
 	batchSize  = 100
+	dbName     = "mddb_test"
+	collection = "documents"
 )
 
 type Stats struct {
@@ -29,54 +33,33 @@ type Stats struct {
 
 func main() {
 	fmt.Println("════════════════════════════════════════════════")
-	fmt.Println("  MySQL Performance Test")
+	fmt.Println("  MongoDB Performance Test")
 	fmt.Println("════════════════════════════════════════════════")
 	fmt.Println()
 
-	// Connect to MySQL
-	fmt.Print("Connecting to MySQL... ")
-	db, err := sql.Open("mysql", mysqlDSN)
+	// Connect to MongoDB
+	fmt.Print("Connecting to MongoDB... ")
+	ctx := context.Background()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
 		fmt.Printf("✗ Failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer db.Close()
+	defer client.Disconnect(ctx)
 
-	// Wait for connection
-	for i := 0; i < 30; i++ {
-		if err := db.Ping(); err == nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	if err := db.Ping(); err != nil {
+	// Ping to verify connection
+	if err := client.Ping(ctx, nil); err != nil {
 		fmt.Printf("✗ Failed: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("✓ Connected")
 
-	// Create table
-	fmt.Print("Creating table... ")
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS documents (
-			id VARCHAR(255) PRIMARY KEY,
-			content TEXT NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_created (created_at)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-	`)
-	if err != nil {
-		fmt.Printf("✗ Failed: %v\n", err)
-		os.Exit(1)
-	}
+	// Get collection
+	coll := client.Database(dbName).Collection(collection)
 
-	// Truncate table
-	_, err = db.Exec("TRUNCATE TABLE documents")
-	if err != nil {
-		fmt.Printf("✗ Failed: %v\n", err)
-		os.Exit(1)
-	}
+	// Drop collection to start fresh
+	fmt.Print("Preparing collection... ")
+	coll.Drop(ctx)
 	fmt.Println("✓ Ready")
 	fmt.Println()
 
@@ -87,8 +70,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Run tests
-	stats := runTest(db, docs)
+	// Run test
+	stats := runTest(ctx, coll, docs)
 
 	// Print results
 	printStats(stats)
@@ -112,26 +95,15 @@ func loadDocuments() map[string]string {
 	return docs
 }
 
-func runTest(db *sql.DB, docs map[string]string) Stats {
+func runTest(ctx context.Context, coll *mongo.Collection, docs map[string]string) Stats {
 	var stats Stats
 	stats.Times = make([]time.Duration, 0, totalDocs)
 
-	fmt.Printf("Inserting %d documents...\n", totalDocs)
-	fmt.Println()
+	fmt.Printf("Inserting %d documents...\n\n", totalDocs)
 
 	startTotal := time.Now()
-	docNum := 0
-
-	// Prepare statement
-	stmt, err := db.Prepare("INSERT INTO documents (id, content) VALUES (?, ?)")
-	if err != nil {
-		fmt.Printf("✗ Failed to prepare statement: %v\n", err)
-		os.Exit(1)
-	}
-	defer stmt.Close()
 
 	for i := 0; i < totalDocs; i++ {
-		// Rotate through document sizes
 		var content string
 		switch i % 3 {
 		case 0:
@@ -142,19 +114,22 @@ func runTest(db *sql.DB, docs map[string]string) Stats {
 			content = docs["lorem-long.md"]
 		}
 
-		docID := fmt.Sprintf("doc-%d", i+1)
+		doc := bson.M{
+			"key":     fmt.Sprintf("doc-%d", i+1),
+			"lang":    "en_US",
+			"content": content,
+		}
 
 		start := time.Now()
-		_, err := stmt.Exec(docID, content)
+		_, err := coll.InsertOne(ctx, doc)
 		elapsed := time.Since(start)
 
 		if err != nil {
-			fmt.Printf("✗ Failed to insert doc %d: %v\n", i+1, err)
+			fmt.Printf("✗ Insert failed: %v\n", err)
 			continue
 		}
 
 		stats.Times = append(stats.Times, elapsed)
-		docNum++
 
 		// Progress indicator
 		if (i+1)%100 == 0 {
@@ -185,7 +160,9 @@ func runTest(db *sql.DB, docs map[string]string) Stats {
 		// Calculate median
 		sorted := make([]time.Duration, len(stats.Times))
 		copy(sorted, stats.Times)
-		sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i] < sorted[j]
+		})
 		stats.MedianTime = sorted[len(sorted)/2]
 
 		// Calculate throughput
@@ -202,17 +179,17 @@ func printStats(stats Stats) {
 	fmt.Println("════════════════════════════════════════════════")
 	fmt.Println()
 	fmt.Printf("Documents inserted: %d\n", len(stats.Times))
-	fmt.Printf("Total time:         %s\n", stats.TotalTime.Round(time.Millisecond))
-	fmt.Printf("Average time:       %s\n", stats.AvgTime.Round(time.Microsecond))
-	fmt.Printf("Median time:        %s\n", stats.MedianTime.Round(time.Microsecond))
-	fmt.Printf("Min time:           %s\n", stats.MinTime.Round(time.Microsecond))
-	fmt.Printf("Max time:           %s\n", stats.MaxTime.Round(time.Microsecond))
+	fmt.Printf("Total time:         %dms\n", stats.TotalTime.Milliseconds())
+	fmt.Printf("Average time:       %dµs\n", stats.AvgTime.Microseconds())
+	fmt.Printf("Median time:        %dµs\n", stats.MedianTime.Microseconds())
+	fmt.Printf("Min time:           %dµs\n", stats.MinTime.Microseconds())
+	fmt.Printf("Max time:           %.3fms\n", float64(stats.MaxTime.Microseconds())/1000.0)
 	fmt.Printf("Throughput:         %.2f docs/sec\n", stats.Throughput)
 	fmt.Println()
 }
 
 func saveResults(stats Stats) {
-	filename := "mysql-performance-results.txt"
+	filename := "mongodb-performance-results.txt"
 	f, err := os.Create(filename)
 	if err != nil {
 		fmt.Printf("Warning: Could not save results: %v\n", err)
@@ -220,15 +197,15 @@ func saveResults(stats Stats) {
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "MySQL Performance Test Results\n")
-	fmt.Fprintf(f, "==============================\n\n")
+	fmt.Fprintf(f, "MongoDB Performance Test Results\n")
+	fmt.Fprintf(f, "=================================\n\n")
 	fmt.Fprintf(f, "Test Date: %s\n\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(f, "Documents inserted: %d\n", len(stats.Times))
-	fmt.Fprintf(f, "Total time:         %s\n", stats.TotalTime.Round(time.Millisecond))
-	fmt.Fprintf(f, "Average time:       %s\n", stats.AvgTime.Round(time.Microsecond))
-	fmt.Fprintf(f, "Median time:        %s\n", stats.MedianTime.Round(time.Microsecond))
-	fmt.Fprintf(f, "Min time:           %s\n", stats.MinTime.Round(time.Microsecond))
-	fmt.Fprintf(f, "Max time:           %s\n", stats.MaxTime.Round(time.Microsecond))
+	fmt.Fprintf(f, "Total time:         %dms\n", stats.TotalTime.Milliseconds())
+	fmt.Fprintf(f, "Average time:       %dµs\n", stats.AvgTime.Microseconds())
+	fmt.Fprintf(f, "Median time:        %dµs\n", stats.MedianTime.Microseconds())
+	fmt.Fprintf(f, "Min time:           %dµs\n", stats.MinTime.Microseconds())
+	fmt.Fprintf(f, "Max time:           %.3fms\n", float64(stats.MaxTime.Microseconds())/1000.0)
 	fmt.Fprintf(f, "Throughput:         %.2f docs/sec\n", stats.Throughput)
 
 	fmt.Printf("✓ Results saved to %s\n", filename)

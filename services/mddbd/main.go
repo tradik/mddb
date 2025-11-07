@@ -26,10 +26,19 @@ const (
 )
 
 type Server struct {
-	DB    *bolt.DB
-	Path  string
-	Mode  AccessMode
-	Hooks Hooks // optional extensions
+	DB          *bolt.DB
+	Path        string
+	Mode        AccessMode
+	Hooks       Hooks // optional extensions
+	BucketNames BucketNames
+}
+
+// BucketNames caches bucket name byte slices to avoid repeated allocations
+type BucketNames struct {
+	Docs   []byte
+	IdxMeta []byte
+	Rev    []byte
+	ByKey  []byte
 }
 
 type Hooks struct {
@@ -85,16 +94,38 @@ type TruncateRequest struct {
 	DropCache  bool   `json:"dropCache"`
 }
 
+// getOptimizedBoltOptions returns optimized BoltDB options for performance
+func getOptimizedBoltOptions() *bolt.Options {
+	return &bolt.Options{
+		Timeout:         2 * time.Second,
+		NoFreelistSync:  true,                    // Don't sync freelist to disk on every commit (faster writes)
+		FreelistType:    bolt.FreelistMapType,    // Use hashmap for freelist (faster than array)
+		NoGrowSync:      false,                   // Sync after growing mmap (safer)
+		InitialMmapSize: 100 * 1024 * 1024,       // 100MB initial mmap (reduce remapping)
+	}
+}
+
 func main() {
 	dbPath := env("MDDB_PATH", "mddb.db")
 	mode := AccessMode(env("MDDB_MODE", "wr")) // read|write|wr
-	db, err := bolt.Open(dbPath, 0600, &bolt.Options{Timeout: 2 * time.Second})
+	
+	db, err := bolt.Open(dbPath, 0600, getOptimizedBoltOptions())
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 
-	s := &Server{DB: db, Path: dbPath, Mode: mode}
+	s := &Server{
+		DB:   db,
+		Path: dbPath,
+		Mode: mode,
+		BucketNames: BucketNames{
+			Docs:    []byte("docs"),
+			IdxMeta: []byte("idxmeta"),
+			Rev:     []byte("rev"),
+			ByKey:   []byte("bykey"),
+		},
+	}
 	if err := s.ensureBuckets(); err != nil {
 		log.Fatal(err)
 	}
@@ -131,10 +162,10 @@ func main() {
 
 func (s *Server) ensureBuckets() error {
 	return s.DB.Update(func(tx *bolt.Tx) error {
-		_, _ = tx.CreateBucketIfNotExists([]byte("docs"))    // doc|collection|id -> json
-		_, _ = tx.CreateBucketIfNotExists([]byte("idxmeta")) // meta|collection|key|value|docID -> 1
-		_, _ = tx.CreateBucketIfNotExists([]byte("rev"))     // rev|collection|docID|ts -> json
-		_, _ = tx.CreateBucketIfNotExists([]byte("bykey"))   // bykey|collection|key|lang -> docID
+		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.Docs)    // doc|collection|id -> json
+		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.IdxMeta) // meta|collection|key|value|docID -> 1
+		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.Rev)     // rev|collection|docID|ts -> json
+		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.ByKey)   // bykey|collection|key|lang -> docID
 		return nil
 	})
 }
@@ -212,22 +243,24 @@ func (s *Server) handleAdd(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		// index meta: first delete old, then insert new
-		// delete old indices
-		if existing.ID != "" && existing.Meta != nil {
-			for mk, vals := range existing.Meta {
-				for _, mv := range vals {
-					prefix := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(existing.ID)...)
-					_ = bIdx.Delete(prefix)
+		// Only reindex metadata if it has changed (MAJOR OPTIMIZATION)
+		if metadataChanged(existing.Meta, doc.Meta) {
+			// delete old indices
+			if existing.ID != "" && existing.Meta != nil {
+				for mk, vals := range existing.Meta {
+					for _, mv := range vals {
+						prefix := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(existing.ID)...)
+						_ = bIdx.Delete(prefix)
+					}
 				}
 			}
-		}
-		// add new indices
-		for mk, vals := range doc.Meta {
-			for _, mv := range vals {
-				key := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-				if err := bIdx.Put(key, []byte("1")); err != nil {
-					return err
+			// add new indices
+			for mk, vals := range doc.Meta {
+				for _, mv := range vals {
+					key := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
+					if err := bIdx.Put(key, []byte("1")); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -479,7 +512,8 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
-	db, err := bolt.Open(s.Path, 0600, &bolt.Options{Timeout: 2 * time.Second})
+	
+	db, err := bolt.Open(s.Path, 0600, getOptimizedBoltOptions())
 	if err != nil {
 		bad(w, err)
 		return

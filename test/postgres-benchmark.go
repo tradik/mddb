@@ -13,7 +13,7 @@ import (
 
 const (
 	postgresDSN = "host=localhost port=15432 user=mddb password=benchmark123 dbname=mddb_test sslmode=disable"
-	totalDocs   = 1000
+	totalDocs   = 3000
 	batchSize   = 100
 )
 

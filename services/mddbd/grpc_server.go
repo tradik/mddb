@@ -4,29 +4,36 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"mddb/proto"
 	"net"
 	"os"
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
+
+	proto "mddb/proto"
 )
 
 // GRPCServer implements the MDDB gRPC service
 type GRPCServer struct {
 	proto.UnimplementedMDDBServer
-	server *Server
+	server         *Server
+	batchProcessor *BatchProcessor
+	workerPool     *WorkerPool
 }
 
 // NewGRPCServer creates a new gRPC server wrapper
 func NewGRPCServer(s *Server) *GRPCServer {
-	return &GRPCServer{server: s}
+	gs := &GRPCServer{
+		server:         s,
+		batchProcessor: NewBatchProcessor(s, 8), // 8 parallel workers
+	}
+	// Worker pool will be initialized when needed
+	return gs
 }
 
 // startGRPCServer starts the gRPC server on the specified address
@@ -70,17 +77,19 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 
 	var saved Doc
 	err := g.server.DB.Update(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		bRev := tx.Bucket([]byte("rev"))
-		bByK := tx.Bucket([]byte("bykey"))
+		bDocs := tx.Bucket(g.server.BucketNames.Docs)
+		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
+		bRev := tx.Bucket(g.server.BucketNames.Rev)
+		bByK := tx.Bucket(g.server.BucketNames.ByKey)
 
 		// Load existing
 		existing := Doc{}
 		if v := bDocs.Get(kDoc(req.Collection, docID)); v != nil {
-			if err := json.Unmarshal(v, &existing); err != nil {
+			existingDoc, err := unmarshalDoc(v)
+			if err != nil {
 				return err
 			}
+			existing = *existingDoc
 		}
 		added := existing.AddedAt
 		if added == 0 {
@@ -91,7 +100,10 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 			ID: docID, Key: req.Key, Lang: req.Lang, Meta: meta,
 			ContentMD: req.ContentMd, AddedAt: added, UpdatedAt: now,
 		}
-		buf, _ := json.Marshal(doc)
+		buf, err := marshalDoc(&doc)
+		if err != nil {
+			return err
+		}
 		if err := bDocs.Put(kDoc(req.Collection, docID), buf); err != nil {
 			return err
 		}
@@ -99,27 +111,30 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 			return err
 		}
 
-		// Delete old indices
-		if existing.ID != "" && existing.Meta != nil {
-			for mk, vals := range existing.Meta {
+		// Only reindex metadata if it has changed (MAJOR OPTIMIZATION)
+		if metadataChanged(existing.Meta, doc.Meta) {
+			// Delete old indices
+			if existing.ID != "" && existing.Meta != nil {
+				for mk, vals := range existing.Meta {
+					for _, mv := range vals {
+						prefix := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(existing.ID)...)
+						_ = bIdx.Delete(prefix)
+					}
+				}
+			}
+
+			// Add new indices
+			for mk, vals := range doc.Meta {
 				for _, mv := range vals {
-					prefix := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(existing.ID)...)
-					_ = bIdx.Delete(prefix)
+					key := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
+					if err := bIdx.Put(key, []byte("1")); err != nil {
+						return err
+					}
 				}
 			}
 		}
 
-		// Add new indices
-		for mk, vals := range doc.Meta {
-			for _, mv := range vals {
-				key := append(kMetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-				if err := bIdx.Put(key, []byte("1")); err != nil {
-					return err
-				}
-			}
-		}
-
-		// Revision
+		// Revision (reuse buf from marshal above)
 		rkey := append(kRevPrefix(req.Collection, doc.ID), []byte(fmt.Sprintf("%020d", now))...)
 		if err := bRev.Put(rkey, buf); err != nil {
 			return err
@@ -136,6 +151,30 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	return docToProto(&saved), nil
 }
 
+// AddBatch implements the AddBatch RPC - adds multiple documents in a single transaction
+// Uses parallel processing for preparation, then single transaction for commit
+func (g *GRPCServer) AddBatch(ctx context.Context, req *proto.AddBatchRequest) (*proto.AddBatchResponse, error) {
+	if g.server.Mode == ModeRead {
+		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	}
+
+	if req.Collection == "" {
+		return nil, status.Error(codes.InvalidArgument, "missing collection")
+	}
+
+	if len(req.Documents) == 0 {
+		return &proto.AddBatchResponse{}, nil
+	}
+
+	// Use batch processor with parallel processing
+	resp, err := g.batchProcessor.ProcessBatch(ctx, req.Collection, req.Documents)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return resp, nil
+}
+
 // Get implements the Get RPC
 func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Document, error) {
 	if req.Collection == "" || req.Key == "" || req.Lang == "" {
@@ -144,8 +183,8 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 
 	var doc Doc
 	err := g.server.DB.View(func(tx *bolt.Tx) error {
-		bByK := tx.Bucket([]byte("bykey"))
-		bDocs := tx.Bucket([]byte("docs"))
+		bByK := tx.Bucket(g.server.BucketNames.ByKey)
+		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
 		docID := bByK.Get(kByKey(req.Collection, req.Key, req.Lang))
 		if docID == nil {
@@ -157,7 +196,12 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 			return errors.New("not found")
 		}
 
-		return json.Unmarshal(v, &doc)
+		docPtr, err := unmarshalDoc(v)
+		if err != nil {
+			return err
+		}
+		doc = *docPtr
+		return nil
 	})
 
 	if err != nil {
@@ -189,8 +233,8 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 
 	var docIDs []string
 	err := g.server.DB.View(func(tx *bolt.Tx) error {
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		bDocs := tx.Bucket([]byte("docs"))
+		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
+		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
 		if len(filterMeta) == 0 {
 			// No filter: scan all docs
@@ -231,13 +275,13 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 	// Load documents
 	var docs []Doc
 	err = g.server.DB.View(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
+		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 		for _, id := range docIDs {
 			v := bDocs.Get(kDoc(req.Collection, id))
 			if v != nil {
-				var d Doc
-				if err := json.Unmarshal(v, &d); err == nil {
-					docs = append(docs, d)
+				d, err := unmarshalDoc(v)
+				if err == nil {
+					docs = append(docs, *d)
 				}
 			}
 		}
@@ -336,8 +380,8 @@ func (g *GRPCServer) Truncate(ctx context.Context, req *proto.TruncateRequest) (
 	}
 
 	err := g.server.DB.Update(func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		bDocs := tx.Bucket([]byte("docs"))
+		bRev := tx.Bucket(g.server.BucketNames.Rev)
+		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
 		// Get all doc IDs in collection
 		var docIDs []string
@@ -396,7 +440,7 @@ func (g *GRPCServer) Stats(ctx context.Context, req *proto.StatsRequest) (*proto
 
 	err := g.server.DB.View(func(tx *bolt.Tx) error {
 		// Count documents
-		bDocs := tx.Bucket([]byte("docs"))
+		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 		if bDocs != nil {
 			c := bDocs.Cursor()
 			for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -413,7 +457,7 @@ func (g *GRPCServer) Stats(ctx context.Context, req *proto.StatsRequest) (*proto
 		}
 
 		// Count revisions
-		bRev := tx.Bucket([]byte("rev"))
+		bRev := tx.Bucket(g.server.BucketNames.Rev)
 		if bRev != nil {
 			c := bRev.Cursor()
 			for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -430,7 +474,7 @@ func (g *GRPCServer) Stats(ctx context.Context, req *proto.StatsRequest) (*proto
 		}
 
 		// Count meta indices
-		bIdx := tx.Bucket([]byte("idxmeta"))
+		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
 		if bIdx != nil {
 			c := bIdx.Cursor()
 			for k, _ := c.First(); k != nil; k, _ = c.Next() {
