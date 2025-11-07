@@ -63,6 +63,7 @@ message AddRequest {
   string lang = 3;
   map<string, MetaValues> meta = 4;
   string content_md = 5;
+  bool save_revision = 6;
 }
 
 // Batch add request
@@ -77,6 +78,7 @@ message BatchDocument {
   string lang = 2;
   map<string, MetaValues> meta = 3;
   string content_md = 4;
+  bool save_revision = 5;
 }
 
 // Batch add response
@@ -192,6 +194,7 @@ message UpdateDocument {
   string lang = 2;
   map<string, MetaValues> meta = 3;
   string content_md = 4;
+  bool save_revision = 5;
 }
 
 // Update batch response
@@ -199,6 +202,7 @@ message UpdateBatchResponse {
   int32 updated = 1;
   int32 failed = 2;
   repeated string errors = 3;
+  int32 not_found = 4;
 }
 
 // Delete batch request
@@ -218,4 +222,5 @@ message DeleteBatchResponse {
   int32 deleted = 1;
   int32 failed = 2;
   repeated string errors = 3;
+  int32 not_found = 4;
 }

@@ -167,6 +167,7 @@ type AddRequest struct {
 	Lang          string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
 	Meta          map[string]*MetaValues `protobuf:"bytes,4,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	ContentMd     string                 `protobuf:"bytes,5,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
+	SaveRevision  bool                   `protobuf:"varint,6,opt,name=save_revision,json=saveRevision,proto3" json:"save_revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -236,6 +237,13 @@ func (x *AddRequest) GetContentMd() string {
 	return ""
 }
 
+func (x *AddRequest) GetSaveRevision() bool {
+	if x != nil {
+		return x.SaveRevision
+	}
+	return false
+}
+
 // Batch add request
 type AddBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -296,6 +304,7 @@ type BatchDocument struct {
 	Lang          string                 `protobuf:"bytes,2,opt,name=lang,proto3" json:"lang,omitempty"`
 	Meta          map[string]*MetaValues `protobuf:"bytes,3,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	ContentMd     string                 `protobuf:"bytes,4,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
+	SaveRevision  bool                   `protobuf:"varint,5,opt,name=save_revision,json=saveRevision,proto3" json:"save_revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -356,6 +365,13 @@ func (x *BatchDocument) GetContentMd() string {
 		return x.ContentMd
 	}
 	return ""
+}
+
+func (x *BatchDocument) GetSaveRevision() bool {
+	if x != nil {
+		return x.SaveRevision
+	}
+	return false
 }
 
 // Batch add response
@@ -1293,6 +1309,7 @@ type UpdateDocument struct {
 	Lang          string                 `protobuf:"bytes,2,opt,name=lang,proto3" json:"lang,omitempty"`
 	Meta          map[string]*MetaValues `protobuf:"bytes,3,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	ContentMd     string                 `protobuf:"bytes,4,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
+	SaveRevision  bool                   `protobuf:"varint,5,opt,name=save_revision,json=saveRevision,proto3" json:"save_revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1355,12 +1372,20 @@ func (x *UpdateDocument) GetContentMd() string {
 	return ""
 }
 
+func (x *UpdateDocument) GetSaveRevision() bool {
+	if x != nil {
+		return x.SaveRevision
+	}
+	return false
+}
+
 // Update batch response
 type UpdateBatchResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Updated       int32                  `protobuf:"varint,1,opt,name=updated,proto3" json:"updated,omitempty"`
 	Failed        int32                  `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"`
 	Errors        []string               `protobuf:"bytes,3,rep,name=errors,proto3" json:"errors,omitempty"`
+	NotFound      int32                  `protobuf:"varint,4,opt,name=not_found,json=notFound,proto3" json:"not_found,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1414,6 +1439,13 @@ func (x *UpdateBatchResponse) GetErrors() []string {
 		return x.Errors
 	}
 	return nil
+}
+
+func (x *UpdateBatchResponse) GetNotFound() int32 {
+	if x != nil {
+		return x.NotFound
+	}
+	return 0
 }
 
 // Delete batch request
@@ -1528,6 +1560,7 @@ type DeleteBatchResponse struct {
 	Deleted       int32                  `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
 	Failed        int32                  `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"`
 	Errors        []string               `protobuf:"bytes,3,rep,name=errors,proto3" json:"errors,omitempty"`
+	NotFound      int32                  `protobuf:"varint,4,opt,name=not_found,json=notFound,proto3" json:"not_found,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1583,6 +1616,13 @@ func (x *DeleteBatchResponse) GetErrors() []string {
 	return nil
 }
 
+func (x *DeleteBatchResponse) GetNotFound() int32 {
+	if x != nil {
+		return x.NotFound
+	}
+	return 0
+}
+
 var File_proto_mddb_proto protoreflect.FileDescriptor
 
 const file_proto_mddb_proto_rawDesc = "" +
@@ -1603,7 +1643,7 @@ const file_proto_mddb_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"$\n" +
 	"\n" +
 	"MetaValues\x12\x16\n" +
-	"\x06values\x18\x01 \x03(\tR\x06values\"\xec\x01\n" +
+	"\x06values\x18\x01 \x03(\tR\x06values\"\x91\x02\n" +
 	"\n" +
 	"AddRequest\x12\x1e\n" +
 	"\n" +
@@ -1613,7 +1653,8 @@ const file_proto_mddb_proto_rawDesc = "" +
 	"\x04lang\x18\x03 \x01(\tR\x04lang\x12.\n" +
 	"\x04meta\x18\x04 \x03(\v2\x1a.mddb.AddRequest.MetaEntryR\x04meta\x12\x1d\n" +
 	"\n" +
-	"content_md\x18\x05 \x01(\tR\tcontentMd\x1aI\n" +
+	"content_md\x18\x05 \x01(\tR\tcontentMd\x12#\n" +
+	"\rsave_revision\x18\x06 \x01(\bR\fsaveRevision\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"d\n" +
@@ -1621,13 +1662,14 @@ const file_proto_mddb_proto_rawDesc = "" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
 	"collection\x121\n" +
-	"\tdocuments\x18\x02 \x03(\v2\x13.mddb.BatchDocumentR\tdocuments\"\xd2\x01\n" +
+	"\tdocuments\x18\x02 \x03(\v2\x13.mddb.BatchDocumentR\tdocuments\"\xf7\x01\n" +
 	"\rBatchDocument\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04lang\x18\x02 \x01(\tR\x04lang\x121\n" +
 	"\x04meta\x18\x03 \x03(\v2\x1d.mddb.BatchDocument.MetaEntryR\x04meta\x12\x1d\n" +
 	"\n" +
-	"content_md\x18\x04 \x01(\tR\tcontentMd\x1aI\n" +
+	"content_md\x18\x04 \x01(\tR\tcontentMd\x12#\n" +
+	"\rsave_revision\x18\x05 \x01(\bR\fsaveRevision\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"r\n" +
@@ -1711,20 +1753,22 @@ const file_proto_mddb_proto_rawDesc = "" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
 	"collection\x122\n" +
-	"\tdocuments\x18\x02 \x03(\v2\x14.mddb.UpdateDocumentR\tdocuments\"\xd4\x01\n" +
+	"\tdocuments\x18\x02 \x03(\v2\x14.mddb.UpdateDocumentR\tdocuments\"\xf9\x01\n" +
 	"\x0eUpdateDocument\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
 	"\x04lang\x18\x02 \x01(\tR\x04lang\x122\n" +
 	"\x04meta\x18\x03 \x03(\v2\x1e.mddb.UpdateDocument.MetaEntryR\x04meta\x12\x1d\n" +
 	"\n" +
-	"content_md\x18\x04 \x01(\tR\tcontentMd\x1aI\n" +
+	"content_md\x18\x04 \x01(\tR\tcontentMd\x12#\n" +
+	"\rsave_revision\x18\x05 \x01(\bR\fsaveRevision\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
-	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"_\n" +
+	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"|\n" +
 	"\x13UpdateBatchResponse\x12\x18\n" +
 	"\aupdated\x18\x01 \x01(\x05R\aupdated\x12\x16\n" +
 	"\x06failed\x18\x02 \x01(\x05R\x06failed\x12\x16\n" +
-	"\x06errors\x18\x03 \x03(\tR\x06errors\"h\n" +
+	"\x06errors\x18\x03 \x03(\tR\x06errors\x12\x1b\n" +
+	"\tnot_found\x18\x04 \x01(\x05R\bnotFound\"h\n" +
 	"\x12DeleteBatchRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -1732,11 +1776,12 @@ const file_proto_mddb_proto_rawDesc = "" +
 	"\tdocuments\x18\x02 \x03(\v2\x14.mddb.DeleteDocumentR\tdocuments\"6\n" +
 	"\x0eDeleteDocument\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x12\n" +
-	"\x04lang\x18\x02 \x01(\tR\x04lang\"_\n" +
+	"\x04lang\x18\x02 \x01(\tR\x04lang\"|\n" +
 	"\x13DeleteBatchResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\x05R\adeleted\x12\x16\n" +
 	"\x06failed\x18\x02 \x01(\x05R\x06failed\x12\x16\n" +
-	"\x06errors\x18\x03 \x03(\tR\x06errors2\xde\x04\n" +
+	"\x06errors\x18\x03 \x03(\tR\x06errors\x12\x1b\n" +
+	"\tnot_found\x18\x04 \x01(\x05R\bnotFound2\xde\x04\n" +
 	"\x04MDDB\x12'\n" +
 	"\x03Add\x12\x10.mddb.AddRequest\x1a\x0e.mddb.Document\x129\n" +
 	"\bAddBatch\x12\x15.mddb.AddBatchRequest\x1a\x16.mddb.AddBatchResponse\x12B\n" +
