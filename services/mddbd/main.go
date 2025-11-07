@@ -40,6 +40,9 @@ type Server struct {
 	DeltaEncoder    *DeltaEncoder           // Delta encoding for revisions
 	AdaptiveIndex   *AdaptiveIndexManager   // Adaptive indexing
 	AsyncIO         *AsyncIO                // Async I/O
+	ZeroCopy        *ZeroCopyManager        // Zero-copy I/O
+	SIMD            *SIMDProcessor          // Vectorized operations
+	ShardCluster    *ShardCluster           // Distributed sharding
 	UseExtreme      bool                    // Enable extreme performance features
 }
 
@@ -145,6 +148,9 @@ func main() {
 		DeltaEncoder:  NewDeltaEncoder(),               // Delta encoding
 		AdaptiveIndex: NewAdaptiveIndexManager(),       // Adaptive indexing
 		AsyncIO:       NewAsyncIO(),                    // Async I/O
+		ZeroCopy:      NewZeroCopyManager(),            // Zero-copy I/O
+		SIMD:          NewSIMDProcessor(),              // Vectorized operations
+		ShardCluster:  NewShardCluster(4, 2),           // 4 shards, 2x replication
 		UseExtreme:    useExtreme,
 	}
 	s.IndexQueue.server = s // Set server reference
@@ -171,6 +177,9 @@ func main() {
 		log.Println("  ✓ Adaptive Compression enabled (Snappy + Zstd)")
 		log.Println("  ✓ Adaptive Indexing enabled")
 		log.Println("  ✓ Async I/O enabled")
+		log.Println("  ✓ Zero-Copy I/O enabled")
+		log.Println("  ✓ Vectorized Operations (SIMD) enabled")
+		log.Println("  ✓ Distributed Sharding enabled (4 shards, 2x replication)")
 	}
 	
 	if err := s.ensureBuckets(); err != nil {
