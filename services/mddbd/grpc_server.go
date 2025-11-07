@@ -290,11 +290,13 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 
 	// Single transaction for both ID collection and document loading
 	var docs []Doc
+	// Get pooled string slice for docIDs
+	docIDsSlice := GlobalSlicePool.GetStringSlice()
+	defer GlobalSlicePool.PutStringSlice(docIDsSlice)
+	
 	err := g.server.DB.View(func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-
-		var docIDs []string
 		
 		if len(filterMeta) == 0 {
 			// No filter: scan all docs
@@ -303,7 +305,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 			for k, _ := c.Seek(prefix); k != nil && BytesHasPrefix(k, prefix); k, _ = c.Next() {
 				// Extract docID (3rd part) without string allocations
 				if docID := ExtractPart(k, 2); docID != nil {
-					docIDs = append(docIDs, string(docID))
+					docIDsSlice = append(docIDsSlice, string(docID))
 				}
 			}
 		} else {
@@ -323,11 +325,11 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 				}
 				sets = append(sets, unique(union))
 			}
-			docIDs = intersect(sets...)
+			docIDsSlice = intersect(sets...)
 		}
 		
 		// Load documents in the same transaction
-		for _, id := range docIDs {
+		for _, id := range docIDsSlice {
 			v := bDocs.Get(kDoc(req.Collection, id))
 			if v != nil {
 				d, err := unmarshalDoc(v)

@@ -41,29 +41,34 @@ func compressDoc(data []byte) []byte {
 	
 	// Small documents - no compression
 	if dataLen < compressionThresholdSmall {
-		result := make([]byte, dataLen+1)
+		// Use pooled buffer
+		result := GlobalBufferPool.Get(dataLen + 1)
 		result[0] = flagUncompressed
 		copy(result[1:], data)
-		return result
+		return result[:dataLen+1]
 	}
 	
 	// Medium documents (1KB-10KB) - use Snappy (fast)
 	if dataLen < compressionThresholdMedium {
-		compressed := snappy.Encode(nil, data)
+		// Get buffer for compression
+		compBuf := GlobalBufferPool.Get(snappy.MaxEncodedLen(dataLen))
+		compressed := snappy.Encode(compBuf[:0], data)
 		
 		// Only use if beneficial
 		if len(compressed) < dataLen {
-			result := make([]byte, len(compressed)+1)
+			result := GlobalBufferPool.Get(len(compressed) + 1)
 			result[0] = flagSnappy
 			copy(result[1:], compressed)
-			return result
+			GlobalBufferPool.Put(compBuf) // Return compression buffer
+			return result[:len(compressed)+1]
 		}
 		
 		// Compression didn't help
-		result := make([]byte, dataLen+1)
+		GlobalBufferPool.Put(compBuf)
+		result := GlobalBufferPool.Get(dataLen + 1)
 		result[0] = flagUncompressed
 		copy(result[1:], data)
-		return result
+		return result[:dataLen+1]
 	}
 	
 	// Large documents (>10KB) - use Zstd (high ratio)
@@ -71,17 +76,17 @@ func compressDoc(data []byte) []byte {
 	
 	// Only use if beneficial
 	if len(compressed) < dataLen {
-		result := make([]byte, len(compressed)+1)
+		result := GlobalBufferPool.Get(len(compressed) + 1)
 		result[0] = flagZstd
 		copy(result[1:], compressed)
-		return result
+		return result[:len(compressed)+1]
 	}
 	
 	// Compression didn't help
-	result := make([]byte, dataLen+1)
+	result := GlobalBufferPool.Get(dataLen + 1)
 	result[0] = flagUncompressed
 	copy(result[1:], data)
-	return result
+	return result[:dataLen+1]
 }
 
 // decompressDoc decompresses document data with adaptive decompression
