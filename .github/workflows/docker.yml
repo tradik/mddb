@@ -71,7 +71,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/tradik/mddb
             org.opencontainers.image.url=https://github.com/tradik/mddb
             org.opencontainers.image.documentation=https://github.com/tradik/mddb/blob/main/README.md
-            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.licenses=BSD-3-Clause
             org.opencontainers.image.vendor=MDDB Team
           build-args: |
             VERSION=${{ steps.meta.outputs.VERSION }}
@@ -87,7 +87,7 @@ jobs:
       #     password: ${{ secrets.DOCKER_HUB_TOKEN }}
       #     repository: ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
       #     readme-filepath: ./docs/DOCKER_HUB.md
-      #     short-description: "High-performance markdown database with gRPC/HTTP/3 - 29,810 docs/sec, 5.75x faster than MongoDB"
+      #     short-description: "High-performance markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf) and full revision history"
 
       - name: Create release summary
         if: steps.meta.outputs.IS_RELEASE == 'true'

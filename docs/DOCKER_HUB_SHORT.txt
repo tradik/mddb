@@ -1,1 +1,1 @@
-High-performance markdown database with gRPC/HTTP/3 - 29,810 docs/sec, 5.75x faster than MongoDB, full revision history, rich metadata
+High-performance markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf) and full revision history

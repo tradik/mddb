@@ -119,62 +119,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2025-11-07
 
-### 🚀 Major Performance Release - 29 Optimizations
+### Major Performance Release
 
-**MDDB is now 37.4x faster than baseline and 5.75x faster than MongoDB!**
+**Significant performance improvements through multiple optimization strategies**
 
-#### Extreme Performance Mode
-- **29 advanced optimizations** for ultra-high performance
-- **29,810 docs/sec** throughput (vs 797 baseline)
-- **34µs average latency**
-- Enable with `MDDB_EXTREME=true` environment variable
+#### Performance Enhancements
+- Protobuf serialization for smaller payloads
+- BoltDB tuning (NoFreelistSync, FreelistMapType, optimized mmap)
+- Conditional metadata reindexing
+- Batch processing with single transactions
+- Parallel processing with worker pools
+- Connection pooling for gRPC
+- Bucket caching
+- Optional revision history
+- Single transaction search
+- Lazy indexing with async queue
+- Read-through document cache
+- Batch delete and update operations
 
-#### Phase 1: Core Optimizations (1-7)
-- ✅ Protobuf serialization (70% smaller payload)
-- ✅ BoltDB tuning (NoFreelistSync, FreelistMapType, 100MB mmap)
-- ✅ Skip metadata reindex (only when changed)
-- ✅ Batch processing (single transaction)
-- ✅ Parallel processing (worker pool)
-- ✅ Connection pooling (gRPC)
-- ✅ Bucket caching
-
-#### Phase 2: Advanced Optimizations (8-13)
-- ✅ Optional revisions
-- ✅ Single transaction search
-- ✅ Lazy indexing (async queue)
-- ✅ Read-through cache
-- ✅ Batch delete operations
-- ✅ Batch update operations
-
-#### Phase 3: Extreme Performance (14-17)
-- ✅ WAL (Write-Ahead Log) with periodic sync
-- ✅ Lock-Free Cache (16 shards, zero mutex reads)
-- ✅ MVCC (Snapshot isolation)
-- ✅ Bloom Filters (1% false positive rate)
-
-#### Phase 4: Advanced Features (18-23)
-- ✅ Delta Encoding (5-10x smaller revisions)
-- ✅ Adaptive Compression (Snappy + Zstd)
-- ✅ HTTP/3 + QUIC (0-RTT reconnection)
-- ✅ Adaptive Indexing (smart query optimization)
-- ✅ Async I/O (non-blocking operations)
-- ✅ Zero-Copy I/O (minimize allocations)
-
-#### Phase 5: Ultra Performance (24-29)
-- ✅ Vectorized Operations (SIMD parallel processing)
-- ✅ Distributed Sharding (4 shards, 2x replication)
-- ✅ String Allocation Elimination (BytesSplit, ExtractPart)
-- ✅ Optimized genID (single allocation)
-- ✅ BytesHasPrefix (no conversions)
-- ✅ FormatTimestamp (inline digits)
+#### Advanced Features (Extreme Mode)
+Enable with `MDDB_EXTREME=true` environment variable:
+- Write-Ahead Log (WAL) with periodic sync
+- Lock-free cache with 16 shards
+- MVCC snapshot isolation
+- Bloom filters for fast lookups
+- Delta encoding for smaller revisions
+- Adaptive compression (Snappy/Zstd)
+- HTTP/3 + QUIC support
+- Adaptive indexing
+- Async I/O operations
+- Zero-copy I/O
+- Vectorized operations (SIMD)
+- Distributed sharding
 
 ### Benchmark Results
 
-**MDDB vs Competition (3000 documents):**
-- **5.75x faster** than MongoDB
-- **6.89x faster** than PostgreSQL
-- **24.54x faster** than MySQL
-- **95.43x faster** than CouchDB
+Tested with 3000 documents:
+- MDDB (Batch API): 29,810 docs/s, 34µs avg latency
+- MongoDB: 5,176 docs/s, 192µs avg latency
+- PostgreSQL: 4,324 docs/s, 231µs avg latency
+- MySQL: 1,214 docs/s, 822µs avg latency
+- CouchDB: 312 docs/s, 3,185µs avg latency
 
 ### Added
 - HTTP/3 server on port 11443 (Extreme Mode)

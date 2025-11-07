@@ -23,7 +23,7 @@ Go to: https://hub.docker.com/r/tradik/mddb
 2. Find **"Short Description"** field
 3. Copy from `docs/DOCKER_HUB_SHORT.txt`:
    ```
-   High-performance markdown database with gRPC/HTTP/3 - 29,810 docs/sec, 5.75x faster than MongoDB
+   High-performance markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf) and full revision history
    ```
 4. Paste and save
 
@@ -49,7 +49,7 @@ To enable automated description updates, the Docker Hub token needs additional p
     password: ${{ secrets.DOCKER_HUB_TOKEN }}
     repository: ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
     readme-filepath: ./docs/DOCKER_HUB.md
-    short-description: "High-performance markdown database with gRPC/HTTP/3 - 29,810 docs/sec, 5.75x faster than MongoDB"
+    short-description: "High-performance markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf) and full revision history"
 ```
 
 ## Files to Update

@@ -1,12 +1,12 @@
 # MDDB - Markdown Database
 
 [![Go Version](https://img.shields.io/badge/Go-1.25-blue.svg)](https://golang.org)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/tradik/mddb)](https://github.com/tradik/mddb/releases)
 [![Docker](https://img.shields.io/docker/v/tradik/mddb?label=docker)](https://hub.docker.com/r/tradik/mddb)
 [![Docker Pulls](https://img.shields.io/docker/pulls/tradik/mddb)](https://hub.docker.com/r/tradik/mddb)
 [![Tests](https://github.com/tradik/mddb/workflows/Tests/badge.svg)](https://github.com/tradik/mddb/actions)
-[![Performance](https://img.shields.io/badge/performance-29.8k%20docs%2Fs-brightgreen.svg)]()
+[![Performance](https://img.shields.io/badge/performance-optimized-brightgreen.svg)]()
 [![gRPC](https://img.shields.io/badge/gRPC-enabled-blue.svg)](https://grpc.io)
 [![Protocol Buffers](https://img.shields.io/badge/protobuf-3-blue.svg)](https://protobuf.dev)
 
@@ -19,7 +19,7 @@ MDDB is a lightweight, embedded database specifically designed for storing and m
 MDDB (Markdown Database) is a specialized database server that treats markdown documents as first-class citizens. Unlike traditional databases that store markdown as plain text, MDDB provides:
 
 - **Native Markdown Support** - Store, version, and query markdown documents with their metadata
-- **Dual Protocol APIs** - Choose between HTTP/JSON (easy debugging) or gRPC/Protobuf (16x faster performance)
+- **Dual Protocol APIs** - Choose between HTTP/JSON (easy debugging) or gRPC/Protobuf (high performance)
 - **Full Revision History** - Every document update creates a new revision with complete content snapshot
 - **Rich Metadata Indexing** - Fast searches using multi-value metadata tags
 - **Template Variables** - Dynamic content with variable substitution
@@ -28,33 +28,34 @@ MDDB (Markdown Database) is a specialized database server that treats markdown d
 
 ## 🚀 Why MDDB?
 
+MDDB is purpose-built for markdown document management. Here's how it compares to alternatives:
+
 ### vs Traditional Databases (PostgreSQL, MySQL)
-- ✅ **Specialized for Markdown** - Native support vs treating as plain text
-- ✅ **Embedded** - No separate database server to manage
-- ✅ **Built-in Versioning** - Automatic revision history without triggers
-- ✅ **Simpler Deployment** - Single binary vs complex database setup
-- ✅ **Lower Resource Usage** - ~15MB Docker image vs 200MB+
+- **Specialized for Markdown** - Native support with metadata indexing
+- **Embedded** - No separate database server to manage
+- **Built-in Versioning** - Automatic revision history
+- **Simpler Deployment** - Single binary, ~15MB Docker image
+- **Lower Resource Usage** - Minimal memory footprint
 
 ### vs Document Databases (MongoDB, CouchDB)
-- ✅ **Markdown-First Design** - Purpose-built for markdown workflows
-- ✅ **Dual Protocol** - HTTP + gRPC (16x faster than HTTP)
-- ✅ **Smaller Footprint** - Embedded BoltDB vs separate server
-- ✅ **Type-Safe gRPC** - Compile-time validation vs runtime schemas
-- ✅ **Simpler Operations** - No sharding, replication complexity
+- **Markdown-First Design** - Purpose-built for markdown workflows
+- **Dual Protocol** - HTTP/JSON for debugging, gRPC for performance
+- **Smaller Footprint** - Embedded BoltDB, no separate server
+- **Type-Safe gRPC** - Compile-time validation
+- **Simpler Operations** - No sharding or replication complexity
 
 ### vs File-Based Systems (Git, Filesystem)
-- ✅ **Instant Queries** - Indexed metadata vs scanning files
-- ✅ **API Access** - REST + gRPC vs file operations
-- ✅ **Concurrent Access** - ACID transactions vs file locks
-- ✅ **Rich Metadata** - Structured tags vs filename conventions
-- ✅ **Performance** - 1000+ docs/sec vs slow file I/O
+- **Instant Queries** - Indexed metadata searches
+- **API Access** - REST + gRPC interfaces
+- **Concurrent Access** - ACID transactions
+- **Rich Metadata** - Structured tags and filtering
+- **Better Performance** - Optimized for document operations
 
 ### vs CMS Platforms (WordPress, Strapi)
-- ✅ **Lightweight** - 15MB vs 500MB+ installations
-- ✅ **API-First** - No admin UI overhead
-- ✅ **Version Control** - Built-in vs plugins
-- ✅ **High Performance** - 16x faster with gRPC
-- ✅ **Developer-Friendly** - Simple API vs complex frameworks
+- **Lightweight** - Minimal installation size
+- **API-First** - No admin UI overhead (optional web panel available)
+- **Version Control** - Built-in revision tracking
+- **Developer-Friendly** - Simple, well-documented API
 
 ## 💡 Use Cases
 
@@ -114,74 +115,41 @@ mddb-cli add docs readme en_US -f README-v2.md -m "version=2.0"
 
 ## ⚡ Performance
 
-### Extreme Performance Mode
-
-MDDB includes **29 advanced optimizations** for extreme performance:
+MDDB is designed for high-performance document operations with multiple optimization strategies:
 
 **Benchmark Results (3000 documents):**
 
-| Database | Throughput | Avg Latency | vs MDDB |
-|----------|------------|-------------|---------|
-| **MDDB (Batch API)** | **29,810 docs/s** | **34µs** | **Baseline** 🏆 |
-| MongoDB | 5,176 docs/s | 192µs | **5.75x slower** |
-| PostgreSQL | 4,324 docs/s | 231µs | **6.89x slower** |
-| MySQL | 1,214 docs/s | 822µs | **24.54x slower** |
-| CouchDB | 312 docs/s | 3,185µs | **95.43x slower** |
+| Database | Throughput | Avg Latency |
+|----------|------------|-------------|
+| **MDDB (Batch API)** | **29,810 docs/s** | **34µs** |
+| MongoDB | 5,176 docs/s | 192µs |
+| PostgreSQL | 4,324 docs/s | 231µs |
+| MySQL | 1,214 docs/s | 822µs |
+| CouchDB | 312 docs/s | 3,185µs |
 
-**MDDB is the FASTEST document database in this benchmark!** 🚀
+### Key Performance Features
 
-### Implemented Optimizations (29 total):
+**Protocol & Storage:**
+- Binary protocol (Protobuf) reduces payload size by ~70%
+- Embedded BoltDB eliminates network overhead
+- Batch operations use single transactions
+- HTTP/2 multiplexing via gRPC
 
-#### Phase 1: Core Optimizations (1-7)
-1. ✅ **Protobuf Serialization** - Binary protocol vs JSON (70% smaller payload)
-2. ✅ **BoltDB Tuning** - NoFreelistSync, FreelistMapType, 100MB initial mmap
-3. ✅ **Skip Metadata Reindex** - Only reindex when metadata changes
-4. ✅ **Batch Processing** - Single transaction for multiple documents
-5. ✅ **Parallel Processing** - Worker pool for document preparation
-6. ✅ **Connection Pooling** - Reuse gRPC connections
-7. ✅ **Bucket Caching** - Cache bucket name byte slices
+**Optimization Techniques:**
+- Lock-free concurrent reads with sharded cache
+- Optional revision history (save only when needed)
+- Lazy metadata indexing with async queue
+- Bloom filters for fast negative lookups
+- Delta encoding for smaller revision storage
+- Adaptive compression (Snappy/Zstd)
 
-#### Phase 2: Advanced Optimizations (8-13)
-8. ✅ **Optional Revisions** - Save revisions only when requested
-9. ✅ **Single Transaction Search** - Load all docs in one transaction
-10. ✅ **Lazy Indexing** - Async metadata indexing with queue
-11. ✅ **Read-Through Cache** - Document cache with TTL
-12. ✅ **Batch Delete** - Parallel lookup + single transaction
-13. ✅ **Batch Update** - Parallel processing + single transaction
-
-#### Phase 3: Extreme Performance (14-17)
-14. ✅ **WAL (Write-Ahead Log)** - Durability with periodic sync
-15. ✅ **Lock-Free Cache** - 16 shards, zero mutex reads
-16. ✅ **MVCC** - Snapshot isolation for concurrent reads
-17. ✅ **Bloom Filters** - Fast negative lookups (1% false positive)
-
-#### Phase 4: Advanced Features (18-23)
-18. ✅ **Delta Encoding** - 5-10x smaller revisions
-19. ✅ **Adaptive Compression** - Snappy (fast) + Zstd (high ratio)
-20. ✅ **HTTP/3 + QUIC** - 0-RTT reconnection, multiplexing
-21. ✅ **Adaptive Indexing** - Smart query optimization
-22. ✅ **Async I/O** - Non-blocking operations
-23. ✅ **Zero-Copy I/O** - Minimize memory allocations
-
-#### Phase 5: Ultra Performance (24-29)
-24. ✅ **Vectorized Operations (SIMD)** - Parallel processing
-25. ✅ **Distributed Sharding** - 4 shards, 2x replication
-26. ✅ **String Allocation Elimination** - BytesSplit, ExtractPart
-27. ✅ **Optimized genID** - Single allocation, inline lowercase
-28. ✅ **BytesHasPrefix** - No string conversions
-29. ✅ **FormatTimestamp** - Inline digit conversion
-
-### Performance Comparison
-
-**MDDB vs Baseline (JSON)**: **37.4x faster** (797 → 29,810 docs/s)
-
-**Key Performance Features:**
-- Binary protocol (Protobuf) vs SQL text
-- Embedded database (zero network overhead)
-- Batch operations (single transaction)
-- Zero string allocations (byte operations)
-- HTTP/2 multiplexing (gRPC)
-- Lock-free concurrent reads
+**Advanced Features (Extreme Mode):**
+Enable with `MDDB_EXTREME=true` environment variable:
+- Write-Ahead Log (WAL) with periodic sync
+- MVCC snapshot isolation
+- HTTP/3 + QUIC support
+- Zero-copy I/O operations
+- Vectorized operations (SIMD)
 
 See [Performance Tests](test/README.md) for detailed benchmarks.
 
@@ -435,10 +403,7 @@ make tidy          # Tidy Go modules
 
 - **[Quick Start Guide](docs/QUICKSTART.md)** - Get started in 5 minutes
 - **[Web Panel Guide](docs/PANEL.md)** - Web admin interface documentation
-- **[Quick Start Panel (PL)](QUICK-START-PANEL.md)** - Szybki start panelu webowego (Polski)
 - **[Bulk Import Guide](docs/BULK-IMPORT.md)** - Import markdown files from folders
-- **[Bulk Import Guide (PL)](docs/BULK-IMPORT-PL.md)** - Przewodnik importu masowego (Polski)
-- **[Quick Start Import (PL)](QUICK-START-IMPORT-PL.md)** - Szybki start importu (Polski)
 - **[API Documentation](docs/API.md)** - Complete HTTP/JSON API reference
 - **[gRPC Documentation](docs/GRPC.md)** - High-performance gRPC API guide
 - **[Docker Guide](docs/DOCKER.md)** - Docker deployment with Alpine Linux
@@ -728,7 +693,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
 
 ## 🔗 Links
 

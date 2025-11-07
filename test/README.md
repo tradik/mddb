@@ -1,6 +1,6 @@
 # MDDB Performance Tests
 
-This directory contains comprehensive performance testing scripts comparing MDDB against traditional databases (MySQL, PostgreSQL).
+This directory contains performance testing scripts for MDDB and comparison benchmarks with other databases.
 
 ## Files
 
