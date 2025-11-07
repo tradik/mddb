@@ -1,9 +1,5 @@
 package main
 
-import (
-	"strconv"
-)
-
 // KeyBuilder provides efficient key construction without string allocations
 type KeyBuilder struct {
 	buf [512]byte
@@ -58,14 +54,9 @@ func (kb *KeyBuilder) BuildRevKey(coll, id string, timestamp int64) []byte {
 	kb.buf[n] = '|'
 	n++
 	
-	// Format timestamp as 20-digit zero-padded string
-	ts := strconv.FormatInt(timestamp, 10)
-	padding := 20 - len(ts)
-	for i := 0; i < padding; i++ {
-		kb.buf[n] = '0'
-		n++
-	}
-	n += copy(kb.buf[n:], ts)
+	// Use optimized timestamp formatting
+	tsBytes := FormatTimestamp(timestamp, kb.buf[n:n+20])
+	n += len(tsBytes)
 	
 	return kb.buf[:n]
 }

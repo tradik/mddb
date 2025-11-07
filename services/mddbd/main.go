@@ -771,7 +771,32 @@ func env(k, def string) string {
 	}
 	return def
 }
-func genID(parts ...string) string { return strings.ToLower(strings.Join(parts, "|")) }
+func genID(parts ...string) string {
+	// Optimized ID generation without string allocations
+	totalLen := 0
+	for i, part := range parts {
+		totalLen += len(part)
+		if i < len(parts)-1 {
+			totalLen++ // for '|'
+		}
+	}
+	
+	buf := make([]byte, 0, totalLen)
+	for i, part := range parts {
+		for j := 0; j < len(part); j++ {
+			c := part[j]
+			if c >= 'A' && c <= 'Z' {
+				c += 'a' - 'A'
+			}
+			buf = append(buf, c)
+		}
+		if i < len(parts)-1 {
+			buf = append(buf, '|')
+		}
+	}
+	
+	return string(buf)
+}
 func applyEnv(s string, env map[string]string) string {
 	for k, v := range env {
 		s = strings.ReplaceAll(s, "%%"+k+"%%", v)

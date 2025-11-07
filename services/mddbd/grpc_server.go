@@ -300,10 +300,10 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 			// No filter: scan all docs
 			c := bDocs.Cursor()
 			prefix := []byte("doc|" + req.Collection + "|")
-			for k, _ := c.Seek(prefix); k != nil && strings.HasPrefix(string(k), string(prefix)); k, _ = c.Next() {
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 3 {
-					docIDs = append(docIDs, parts[2])
+			for k, _ := c.Seek(prefix); k != nil && BytesHasPrefix(k, prefix); k, _ = c.Next() {
+				// Extract docID (3rd part) without string allocations
+				if docID := ExtractPart(k, 2); docID != nil {
+					docIDs = append(docIDs, string(docID))
 				}
 			}
 		} else {
@@ -314,10 +314,10 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 				for _, mv := range mvs {
 					c := bIdx.Cursor()
 					prefix := kMetaKeyPrefix(req.Collection, mk, mv)
-					for k, _ := c.Seek(prefix); k != nil && strings.HasPrefix(string(k), string(prefix)); k, _ = c.Next() {
-						parts := strings.Split(string(k), "|")
-						if len(parts) >= 5 {
-							union = append(union, parts[4])
+					for k, _ := c.Seek(prefix); k != nil && BytesHasPrefix(k, prefix); k, _ = c.Next() {
+						// Extract docID (5th part) without string allocations
+						if docID := ExtractPart(k, 4); docID != nil {
+							union = append(union, string(docID))
 						}
 					}
 				}
