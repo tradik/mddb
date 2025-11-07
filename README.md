@@ -3,6 +3,8 @@
 [![Go Version](https://img.shields.io/badge/Go-1.25-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/tradik/mddb)](https://github.com/tradik/mddb/releases)
+[![Docker](https://img.shields.io/docker/v/tradik/mddb?label=docker)](https://hub.docker.com/r/tradik/mddb)
+[![Docker Pulls](https://img.shields.io/docker/pulls/tradik/mddb)](https://hub.docker.com/r/tradik/mddb)
 [![Tests](https://github.com/tradik/mddb/workflows/Tests/badge.svg)](https://github.com/tradik/mddb/actions)
 [![Performance](https://img.shields.io/badge/performance-29.8k%20docs%2Fs-brightgreen.svg)]()
 [![gRPC](https://img.shields.io/badge/gRPC-enabled-blue.svg)](https://grpc.io)
@@ -261,6 +263,25 @@ See [Performance Tests](test/README.md) for detailed benchmarks.
 Enable with `MDDB_EXTREME=true` environment variable to activate all 29 optimizations.
 
 ## Quick Start
+
+### 🐳 Docker (Recommended)
+
+```bash
+# Pull and run the latest version
+docker run -d \
+  --name mddb \
+  -p 11023:11023 \
+  -p 11024:11024 \
+  -v mddb-data:/data \
+  -e MDDB_EXTREME=true \
+  tradik/mddb:latest
+
+# Or use Docker Compose
+curl -O https://raw.githubusercontent.com/tradik/mddb/main/docker-compose.yml
+docker-compose up -d
+```
+
+**Docker Hub**: https://hub.docker.com/r/tradik/mddb
 
 ### Installation
 

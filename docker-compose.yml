@@ -1,34 +1,35 @@
 services:
   mddb:
-    build:
-      context: .
-      dockerfile: services/mddbd/Dockerfile
-    image: mddb:latest
+    image: tradik/mddb:latest
     container_name: mddb-server
     restart: unless-stopped
     ports:
       - "11023:11023"  # HTTP API
       - "11024:11024"  # gRPC API
+      - "11443:11443"  # HTTP/3 (extreme mode)
     volumes:
-      - mddb-data:/app/data
-      - ./backups:/app/backups
+      - mddb-data:/data
+      - ./backups:/backups
     environment:
-      - MDDB_ADDR=:11023
-      - MDDB_GRPC_ADDR=:11024
+      - MDDB_PATH=/data/mddb.db
       - MDDB_MODE=wr
-      - MDDB_PATH=/app/data/mddb.db
+      - MDDB_EXTREME=true
+      - MDDB_HTTP_PORT=11023
+      - MDDB_GRPC_PORT=11024
+      - MDDB_HTTP3_PORT=11443
       - TZ=UTC
     networks:
       - mddb-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11023/v1/stats"]
+      test: ["CMD", "curl", "-f", "http://localhost:11023/stats"]
       interval: 30s
-      timeout: 3s
+      timeout: 10s
       retries: 3
-      start_period: 5s
+      start_period: 10s
     labels:
-      - "com.mddb.description=MDDB Markdown Database Server"
-      - "com.mddb.version=1.0.0"
+      - "com.mddb.description=MDDB - High-Performance Markdown Database"
+      - "com.mddb.version=2.0.0"
+      - "com.mddb.performance=29810 docs/sec"
 
 volumes:
   mddb-data:
