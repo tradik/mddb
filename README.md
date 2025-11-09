@@ -401,6 +401,8 @@ make tidy          # Tidy Go modules
 
 ## 📚 Documentation
 
+**🌐 [Visit the Official Website](https://tradik.github.io/mddb/)** - Complete documentation, downloads, and examples
+
 - **[Quick Start Guide](docs/QUICKSTART.md)** - Get started in 5 minutes
 - **[API Documentation](docs/API.md)** - Complete HTTP/JSON API reference
 - **[OpenAPI/Swagger Spec](docs/openapi.yaml)** - Machine-readable API specification

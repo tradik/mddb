@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MDDB - High-performance, version-controlled markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf). Lightweight, embedded, and optimized for content management systems.">
+    <meta name="keywords" content="markdown database, document database, version control, gRPC, protobuf, embedded database, content management, CMS, BoltDB, Go">
+    <meta name="author" content="MDDB Team">
+    <meta name="robots" content="index, follow">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://tradik.github.io/mddb/">
+    <meta property="og:title" content="MDDB - Markdown Database">
+    <meta property="og:description" content="High-performance, version-controlled markdown database with dual protocol support">
+    <meta property="og:image" content="https://tradik.github.io/mddb/og-image.png">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://tradik.github.io/mddb/">
+    <meta property="twitter:title" content="MDDB - Markdown Database">
+    <meta property="twitter:description" content="High-performance, version-controlled markdown database with dual protocol support">
+    <meta property="twitter:image" content="https://tradik.github.io/mddb/og-image.png">
+    
+    <title>MDDB - High-Performance Markdown Database</title>
+    <link rel="canonical" href="https://tradik.github.io/mddb/">
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <span class="logo">📝</span>
+                <span class="brand-name">MDDB</span>
+            </div>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="#download">Download</a>
+                <a href="#docs">Documentation</a>
+                <a href="#examples">Examples</a>
+                <a href="https://github.com/tradik/mddb" target="_blank" rel="noopener">GitHub</a>
+            </div>
+            <button class="mobile-menu-toggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <h1>High-Performance Markdown Database</h1>
+                <p class="hero-subtitle">Version-controlled, embedded database designed for markdown documents with dual protocol support</p>
+                <div class="hero-badges">
+                    <span class="badge">v2.0.4</span>
+                    <span class="badge">Go 1.25+</span>
+                    <span class="badge">BSD-3-Clause</span>
+                    <span class="badge">Docker Ready</span>
+                </div>
+                <div class="hero-actions">
+                    <a href="#download" class="btn btn-primary">Download v2.0.4</a>
+                    <a href="https://github.com/tradik/mddb" class="btn btn-secondary" target="_blank" rel="noopener">View on GitHub</a>
+                </div>
+                <div class="hero-quick-start">
+                    <code>docker run -p 11023:11023 tradik/mddb:latest</code>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Features Section -->
+    <section id="features" class="features">
+        <div class="container">
+            <h2>Why MDDB?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🚀</div>
+                    <h3>High Performance</h3>
+                    <p>Optimized for speed with embedded BoltDB, binary protocol support, and advanced caching strategies</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📚</div>
+                    <h3>Version Control</h3>
+                    <p>Full revision history for every document with complete content snapshots</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔌</div>
+                    <h3>Dual Protocol</h3>
+                    <p>HTTP/JSON for easy debugging, gRPC/Protobuf for high performance</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌍</div>
+                    <h3>Multi-Language</h3>
+                    <p>Store documents in multiple languages with the same key</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Rich Metadata</h3>
+                    <p>Fast searches using indexed metadata tags and filters</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Zero Config</h3>
+                    <p>Single binary, embedded database, no external dependencies</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🐳</div>
+                    <h3>Docker Ready</h3>
+                    <p>~15MB Alpine-based image with health checks</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>ACID Transactions</h3>
+                    <p>Guaranteed data consistency with BoltDB transactions</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Quick Start Section -->
+    <section class="quick-start">
+        <div class="container">
+            <h2>Quick Start</h2>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="docker">Docker</button>
+                <button class="tab-btn" data-tab="binary">Binary</button>
+                <button class="tab-btn" data-tab="source">From Source</button>
+            </div>
+            <div class="tab-content">
+                <div class="tab-pane active" id="docker">
+                    <pre><code># Run MDDB server
+docker run -d \
+  -p 11023:11023 \
+  -p 11024:11024 \
+  -v mddb-data:/data \
+  tradik/mddb:latest
+
+# Test the API
+curl http://localhost:11023/health</code></pre>
+                </div>
+                <div class="tab-pane" id="binary">
+                    <pre><code># Download binary
+wget https://github.com/tradik/mddb/releases/download/v2.0.4/mddbd-linux-amd64
+chmod +x mddbd-linux-amd64
+
+# Run server
+./mddbd-linux-amd64
+
+# Server starts on http://localhost:11023</code></pre>
+                </div>
+                <div class="tab-pane" id="source">
+                    <pre><code># Clone repository
+git clone https://github.com/tradik/mddb.git
+cd mddb
+
+# Build
+make build
+
+# Run
+./bin/mddbd</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Download Section -->
+    <section id="download" class="download">
+        <div class="container">
+            <h2>Download</h2>
+            <div class="download-grid">
+                <div class="download-card">
+                    <h3>Latest Release</h3>
+                    <div class="version">v2.0.4</div>
+                    <p class="release-date">Released: January 9, 2025</p>
+                    <div class="download-links">
+                        <a href="https://github.com/tradik/mddb/releases/download/v2.0.4/mddbd-linux-amd64" class="download-link">
+                            <span class="platform">Linux AMD64</span>
+                            <span class="size">~8MB</span>
+                        </a>
+                        <a href="https://github.com/tradik/mddb/releases/download/v2.0.4/mddbd-linux-arm64" class="download-link">
+                            <span class="platform">Linux ARM64</span>
+                            <span class="size">~8MB</span>
+                        </a>
+                        <a href="https://github.com/tradik/mddb/releases/download/v2.0.4/mddbd-darwin-amd64" class="download-link">
+                            <span class="platform">macOS AMD64</span>
+                            <span class="size">~8MB</span>
+                        </a>
+                        <a href="https://github.com/tradik/mddb/releases/download/v2.0.4/mddbd-darwin-arm64" class="download-link">
+                            <span class="platform">macOS ARM64</span>
+                            <span class="size">~8MB</span>
+                        </a>
+                        <a href="https://github.com/tradik/mddb/releases/download/v2.0.4/mddbd-freebsd-amd64" class="download-link">
+                            <span class="platform">FreeBSD AMD64</span>
+                            <span class="size">~8MB</span>
+                        </a>
+                    </div>
+                    <div class="package-links">
+                        <a href="https://github.com/tradik/mddb/releases/download/v2.0.4/mddb_2.0.4_amd64.deb" class="package-link">
+                            📦 Debian/Ubuntu (.deb)
+                        </a>
+                        <a href="https://github.com/tradik/mddb/releases/download/v2.0.4/mddb-2.0.4-1.x86_64.rpm" class="package-link">
+                            📦 RedHat/CentOS (.rpm)
+                        </a>
+                    </div>
+                </div>
+                <div class="download-card">
+                    <h3>Docker Image</h3>
+                    <div class="version">tradik/mddb:2.0.4</div>
+                    <p class="release-date">Alpine-based (~15MB)</p>
+                    <pre><code>docker pull tradik/mddb:latest
+docker pull tradik/mddb:2.0.4</code></pre>
+                    <a href="https://hub.docker.com/r/tradik/mddb" class="btn btn-secondary" target="_blank" rel="noopener">View on Docker Hub</a>
+                </div>
+            </div>
+            <div class="release-notes">
+                <h3>What's New in v2.0.4</h3>
+                <ul>
+                    <li>✨ Health check endpoints (<code>/health</code>, <code>/v1/health</code>)</li>
+                    <li>📖 Complete OpenAPI/Swagger documentation</li>
+                    <li>🐳 Comprehensive health check guide for Docker/Kubernetes</li>
+                    <li>📝 Interactive Swagger UI</li>
+                    <li>🔧 Improved documentation and examples</li>
+                </ul>
+                <a href="https://github.com/tradik/mddb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">View Full Changelog →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Documentation Section -->
+    <section id="docs" class="documentation">
+        <div class="container">
+            <h2>Documentation</h2>
+            <div class="docs-grid">
+                <a href="QUICKSTART.md" class="doc-card">
+                    <div class="doc-icon">🚀</div>
+                    <h3>Quick Start</h3>
+                    <p>Get up and running in 5 minutes</p>
+                </a>
+                <a href="swagger.html" class="doc-card featured">
+                    <div class="doc-icon">📋</div>
+                    <h3>API Documentation</h3>
+                    <p>Interactive Swagger UI</p>
+                    <span class="badge-new">Interactive</span>
+                </a>
+                <a href="openapi.yaml" class="doc-card">
+                    <div class="doc-icon">📄</div>
+                    <h3>OpenAPI Spec</h3>
+                    <p>Machine-readable API specification</p>
+                </a>
+                <a href="HEALTHCHECK.md" class="doc-card">
+                    <div class="doc-icon">💚</div>
+                    <h3>Health Checks</h3>
+                    <p>Docker & Kubernetes monitoring</p>
+                </a>
+                <a href="GRPC.md" class="doc-card">
+                    <div class="doc-icon">⚡</div>
+                    <h3>gRPC Guide</h3>
+                    <p>High-performance protocol</p>
+                </a>
+                <a href="EXAMPLES.md" class="doc-card">
+                    <div class="doc-icon">💡</div>
+                    <h3>Examples</h3>
+                    <p>Code examples and patterns</p>
+                </a>
+                <a href="DOCKER.md" class="doc-card">
+                    <div class="doc-icon">🐳</div>
+                    <h3>Docker Guide</h3>
+                    <p>Container deployment</p>
+                </a>
+                <a href="ARCHITECTURE.md" class="doc-card">
+                    <div class="doc-icon">🏗️</div>
+                    <h3>Architecture</h3>
+                    <p>System design and internals</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Examples Section -->
+    <section id="examples" class="examples">
+        <div class="container">
+            <h2>Code Examples</h2>
+            <div class="example-tabs">
+                <button class="example-tab active" data-example="add">Add Document</button>
+                <button class="example-tab" data-example="get">Get Document</button>
+                <button class="example-tab" data-example="search">Search</button>
+                <button class="example-tab" data-example="health">Health Check</button>
+            </div>
+            <div class="example-content">
+                <div class="example-pane active" id="add">
+                    <pre><code>curl -X POST http://localhost:11023/v1/add \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection": "blog",
+    "key": "hello-world",
+    "lang": "en_US",
+    "meta": {
+      "category": ["tutorial"],
+      "author": ["John Doe"],
+      "tags": ["markdown", "database"]
+    },
+    "contentMd": "# Hello World\n\nWelcome to MDDB!"
+  }'</code></pre>
+                </div>
+                <div class="example-pane" id="get">
+                    <pre><code>curl -X POST http://localhost:11023/v1/get \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection": "blog",
+    "key": "hello-world",
+    "lang": "en_US",
+    "env": {
+      "siteName": "My Blog",
+      "year": "2025"
+    }
+  }'</code></pre>
+                </div>
+                <div class="example-pane" id="search">
+                    <pre><code>curl -X POST http://localhost:11023/v1/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection": "blog",
+    "filterMeta": {
+      "category": ["tutorial"],
+      "status": ["published"]
+    },
+    "sort": "updatedAt",
+    "limit": 10
+  }'</code></pre>
+                </div>
+                <div class="example-pane" id="health">
+                    <pre><code>curl http://localhost:11023/health
+
+# Response:
+{
+  "status": "healthy",
+  "mode": "wr"
+}</code></pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section class="use-cases">
+        <div class="container">
+            <h2>Use Cases</h2>
+            <div class="use-cases-grid">
+                <div class="use-case">
+                    <h3>📝 Content Management</h3>
+                    <p>Perfect for blogs, documentation sites, and knowledge bases with version control</p>
+                </div>
+                <div class="use-case">
+                    <h3>🌐 Multi-language Sites</h3>
+                    <p>Store and manage content in multiple languages with the same document key</p>
+                </div>
+                <div class="use-case">
+                    <h3>📚 Documentation Platforms</h3>
+                    <p>Build documentation systems with full revision history and metadata search</p>
+                </div>
+                <div class="use-case">
+                    <h3>🔄 API Backend</h3>
+                    <p>Lightweight backend for mobile apps and SPAs with markdown content</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Community Section -->
+    <section class="community">
+        <div class="container">
+            <h2>Community & Support</h2>
+            <div class="community-grid">
+                <a href="https://github.com/tradik/mddb" class="community-card" target="_blank" rel="noopener">
+                    <div class="community-icon">🐙</div>
+                    <h3>GitHub</h3>
+                    <p>Source code, issues, and discussions</p>
+                </a>
+                <a href="https://github.com/tradik/mddb/issues" class="community-card" target="_blank" rel="noopener">
+                    <div class="community-icon">🐛</div>
+                    <h3>Report Issues</h3>
+                    <p>Bug reports and feature requests</p>
+                </a>
+                <a href="https://github.com/tradik/mddb/discussions" class="community-card" target="_blank" rel="noopener">
+                    <div class="community-icon">💬</div>
+                    <h3>Discussions</h3>
+                    <p>Ask questions and share ideas</p>
+                </a>
+                <a href="https://github.com/tradik/mddb/blob/main/CONTRIBUTING.md" class="community-card" target="_blank" rel="noopener">
+                    <div class="community-icon">🤝</div>
+                    <h3>Contributing</h3>
+                    <p>Help improve MDDB</p>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>MDDB</h4>
+                    <p>High-performance markdown database</p>
+                    <p class="footer-version">Version 2.0.4</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Documentation</h4>
+                    <ul>
+                        <li><a href="QUICKSTART.md">Quick Start</a></li>
+                        <li><a href="swagger.html">API Docs</a></li>
+                        <li><a href="EXAMPLES.md">Examples</a></li>
+                        <li><a href="ARCHITECTURE.md">Architecture</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="https://github.com/tradik/mddb" target="_blank" rel="noopener">GitHub</a></li>
+                        <li><a href="https://hub.docker.com/r/tradik/mddb" target="_blank" rel="noopener">Docker Hub</a></li>
+                        <li><a href="https://github.com/tradik/mddb/releases" target="_blank" rel="noopener">Releases</a></li>
+                        <li><a href="https://github.com/tradik/mddb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="https://github.com/tradik/mddb/blob/main/LICENSE" target="_blank" rel="noopener">BSD-3-Clause License</a></li>
+                        <li><a href="https://github.com/tradik/mddb/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contributing</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 MDDB Team. Licensed under BSD-3-Clause.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu toggle
+        document.querySelector('.mobile-menu-toggle').addEventListener('click', function() {
+            document.querySelector('.nav-links').classList.toggle('active');
+            this.classList.toggle('active');
+        });
+
+        // Tabs functionality
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.tab;
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(tab).classList.add('active');
+            });
+        });
+
+        // Example tabs
+        document.querySelectorAll('.example-tab').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const example = this.dataset.example;
+                document.querySelectorAll('.example-tab').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.example-pane').forEach(p => p.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(example).classList.add('active');
+            });
+        });
+
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Add scroll effect to navbar
+        window.addEventListener('scroll', function() {
+            const navbar = document.querySelector('.navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+    </script>
+</body>
+</html>
