@@ -70,7 +70,7 @@ ENV MDDB_ADDR=":11023" \
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:11023/v1/stats || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:11023/health || exit 1
 
 # Run the binary
 ENTRYPOINT ["/app/mddbd"]

@@ -30,7 +30,7 @@ services:
       - mddb-network
     command: air -c .air.toml
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11023/v1/stats"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11023/health"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -58,7 +58,7 @@ services:
     labels:
       - "com.mddb.description=MDDB Panel - Development Web Interface"
       - "com.mddb.environment=development"
-      - "com.mddb.version=2.0.3"
+      - "com.mddb.version=2.0.4"
 
 volumes:
   mddb-dev-data:

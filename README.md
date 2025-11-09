@@ -402,10 +402,13 @@ make tidy          # Tidy Go modules
 ## 📚 Documentation
 
 - **[Quick Start Guide](docs/QUICKSTART.md)** - Get started in 5 minutes
+- **[API Documentation](docs/API.md)** - Complete HTTP/JSON API reference
+- **[OpenAPI/Swagger Spec](docs/openapi.yaml)** - Machine-readable API specification
+- **[Swagger UI](docs/swagger.html)** - Interactive API documentation
+- **[Health Check Guide](docs/HEALTHCHECK.md)** - Health checks for Docker and Kubernetes
+- **[gRPC Documentation](docs/GRPC.md)** - High-performance gRPC API guide
 - **[Web Panel Guide](docs/PANEL.md)** - Web admin interface documentation
 - **[Bulk Import Guide](docs/BULK-IMPORT.md)** - Import markdown files from folders
-- **[API Documentation](docs/API.md)** - Complete HTTP/JSON API reference
-- **[gRPC Documentation](docs/GRPC.md)** - High-performance gRPC API guide
 - **[Docker Guide](docs/DOCKER.md)** - Docker deployment with Alpine Linux
 - **[Usage Examples](docs/EXAMPLES.md)** - Code examples and patterns
 - **[Architecture Guide](docs/ARCHITECTURE.md)** - System design and internals
@@ -456,14 +459,20 @@ mddb-cli get products laptop-x1 pl_PL
 - **Efficient Storage** - Optimized bucket structure for performance
 
 ### API Endpoints
+- `GET /health` - Health check endpoint
+- `GET /v1/health` - Health check endpoint (versioned)
+- `GET /v1/stats` - Server and database statistics
 - `POST /v1/add` - Add or update documents
 - `POST /v1/get` - Retrieve documents with template support
 - `POST /v1/search` - Search with metadata filters and sorting
+- `POST /v1/delete` - Delete a document
+- `POST /v1/delete-collection` - Delete entire collection
 - `POST /v1/export` - Export as NDJSON or ZIP
 - `GET /v1/backup` - Create database backup
 - `POST /v1/restore` - Restore from backup
 - `POST /v1/truncate` - Clean up old revisions
-- `GET /v1/stats` - Server and database statistics
+
+**Interactive API Documentation:** Open [docs/swagger.html](docs/swagger.html) in your browser for full API documentation with try-it-out functionality.
 
 ### Extensions
 - **Webhooks** - HTTP callbacks after add/update operations

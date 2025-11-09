@@ -202,6 +202,8 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/v1/health", s.handleHealth)
 	mux.HandleFunc("/v1/add", s.guardWrite(s.handleAdd))
 	mux.HandleFunc("/v1/get", s.handleGet)
 	mux.HandleFunc("/v1/search", s.handleSearch)
@@ -673,6 +675,24 @@ func bad(w http.ResponseWriter, err error) {
 	w.WriteHeader(400)
 	_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error())
 }
+
+// handleHealth returns a simple health check response
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	// Check if database is accessible
+	err := s.DB.View(func(tx *bolt.Tx) error {
+		return nil
+	})
+	
+	if err != nil {
+		w.WriteHeader(503)
+		_, _ = fmt.Fprintf(w, `{"status":"unhealthy","error":%q}`, err.Error())
+		return
+	}
+	
+	w.WriteHeader(200)
+	_, _ = w.Write([]byte(`{"status":"healthy","mode":"` + string(s.Mode) + `"}`))
+}
+
 func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	type CollectionStats struct {
 		Name           string `json:"name"`

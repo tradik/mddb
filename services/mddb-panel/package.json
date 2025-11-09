@@ -1,6 +1,6 @@
 {
   "name": "mddb-panel",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Web admin panel for MDDB - Markdown Database",
   "type": "module",
   "scripts": {

@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.0.4] - 2025-01-09
+
+### Added
+- **Health check endpoints** - `/health` and `/v1/health` for monitoring
+  - Simple JSON response with status and mode
+  - Database connectivity verification
+  - HTTP 200 for healthy, 503 for unhealthy
+- **OpenAPI/Swagger documentation** - Complete API specification
+  - OpenAPI 3.0.3 specification in `docs/openapi.yaml`
+  - Interactive Swagger UI in `docs/swagger.html`
+  - Machine-readable API documentation
+  - Try-it-out functionality for all endpoints
+- **Health check documentation** - Comprehensive guide in `docs/HEALTHCHECK.md`
+  - Docker and Docker Compose examples
+  - Kubernetes liveness and readiness probes
+  - Load balancer configuration (Nginx, HAProxy, Traefik)
+  - Manual health check methods (curl, wget, httpie)
+  - Monitoring integration examples
+  - Troubleshooting guide
+
+### Changed
+- Updated Docker health checks to use `/health` endpoint
+- Updated docker-compose.yml with proper health check configuration
+- Updated Dockerfile with health check using wget
+- Simplified performance claims in documentation (more pragmatic, less boastful)
+- Removed Polish documentation files (English only)
+- Fixed license badge and references (BSD-3-Clause)
+
 ## [2.0.3] - 2025-11-07
 
 ### Added

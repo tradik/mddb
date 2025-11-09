@@ -21,15 +21,15 @@ services:
     networks:
       - mddb-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11023/stats"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11023/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
     labels:
       - "com.mddb.description=MDDB - High-Performance Markdown Database"
-      - "com.mddb.version=2.0.3"
-      - "com.mddb.performance=29810 docs/sec"
+      - "com.mddb.version=2.0.4"
+      - "com.mddb.performance=optimized"
 
   mddb-panel:
     build:
@@ -48,7 +48,7 @@ services:
         condition: service_healthy
     labels:
       - "com.mddb.description=MDDB Panel - Web Admin Interface"
-      - "com.mddb.version=2.0.3"
+      - "com.mddb.version=2.0.4"
 
 volumes:
   mddb-data:

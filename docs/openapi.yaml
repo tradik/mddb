@@ -1,0 +1,724 @@
+openapi: 3.0.3
+info:
+  title: MDDB API
+  description: |
+    MDDB (Markdown Database) is a high-performance, version-controlled markdown database with dual protocol support.
+    
+    ## Features
+    - Store and manage markdown documents with metadata
+    - Full revision history for all documents
+    - Multi-language support
+    - Fast metadata-based search
+    - Template variable substitution
+    - Export capabilities (NDJSON, ZIP)
+    - Backup and restore operations
+    
+    ## Protocols
+    - **HTTP/JSON** - Port 11023 (documented here)
+    - **gRPC/Protobuf** - Port 11024 (see gRPC documentation)
+    - **HTTP/3 + QUIC** - Port 11443 (extreme mode only)
+    
+    ## Authentication
+    Currently, MDDB does not have built-in authentication. Use a reverse proxy (Nginx, Caddy) for authentication and TLS.
+    
+  version: 2.0.4
+  contact:
+    name: MDDB Team
+    url: https://github.com/tradik/mddb
+  license:
+    name: BSD-3-Clause
+    url: https://github.com/tradik/mddb/blob/main/LICENSE
+
+servers:
+  - url: http://localhost:11023
+    description: Local development server
+  - url: http://localhost:11023/v1
+    description: Local development server (with version prefix)
+
+tags:
+  - name: Health
+    description: Health check and monitoring endpoints
+  - name: Documents
+    description: Document management operations
+  - name: Search
+    description: Search and query operations
+  - name: Export
+    description: Export and backup operations
+  - name: Maintenance
+    description: Database maintenance operations
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Simple health check endpoint that verifies database connectivity
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  mode:
+                    type: string
+                    enum: [read, write, wr]
+                    example: wr
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/health:
+    get:
+      tags:
+        - Health
+      summary: Health check (versioned)
+      description: Alias for /health endpoint
+      operationId: getHealthV1
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  mode:
+                    type: string
+                    enum: [read, write, wr]
+                    example: wr
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/stats:
+    get:
+      tags:
+        - Health
+      summary: Server statistics
+      description: Get detailed server and database statistics
+      operationId: getStats
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Stats'
+
+  /v1/add:
+    post:
+      tags:
+        - Documents
+      summary: Add or update document
+      description: |
+        Add a new document or update an existing one. If a document with the same collection, key, and language exists, it will be updated and a new revision will be created.
+      operationId: addDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddRequest'
+      responses:
+        '200':
+          description: Document added/updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/get:
+    post:
+      tags:
+        - Documents
+      summary: Get document
+      description: |
+        Retrieve a document by collection, key, and language. Supports template variable substitution using the `env` parameter.
+      operationId: getDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetRequest'
+      responses:
+        '200':
+          description: Document retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/search:
+    post:
+      tags:
+        - Search
+      summary: Search documents
+      description: |
+        Search documents with metadata filtering, sorting, and pagination.
+        
+        **Filtering:** AND logic between different metadata keys, OR logic between values of the same key.
+        
+        **Sorting:** Sort by `addedAt`, `updatedAt`, or `key`.
+      operationId: searchDocuments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/delete:
+    post:
+      tags:
+        - Documents
+      summary: Delete document
+      description: Delete a specific document by collection, key, and language
+      operationId: deleteDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteRequest'
+      responses:
+        '200':
+          description: Document deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                    example: true
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/delete-collection:
+    post:
+      tags:
+        - Documents
+      summary: Delete collection
+      description: Delete all documents in a collection
+      operationId: deleteCollection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteCollectionRequest'
+      responses:
+        '200':
+          description: Collection deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: integer
+                    description: Number of documents deleted
+                    example: 42
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/export:
+    post:
+      tags:
+        - Export
+      summary: Export documents
+      description: |
+        Export documents in NDJSON or ZIP format with optional metadata filtering.
+        
+        **NDJSON:** Newline-delimited JSON, one document per line.
+        
+        **ZIP:** Archive with markdown files named `{key}.{lang}.md`.
+      operationId: exportDocuments
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportRequest'
+      responses:
+        '200':
+          description: Export file
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                format: binary
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/backup:
+    get:
+      tags:
+        - Export
+      summary: Create backup
+      description: Create a backup of the database file
+      operationId: createBackup
+      parameters:
+        - name: to
+          in: query
+          required: true
+          description: Destination path for backup file
+          schema:
+            type: string
+            example: backup-20250109.db
+      responses:
+        '200':
+          description: Backup created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  backup:
+                    type: string
+                    example: backup-20250109.db
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/restore:
+    post:
+      tags:
+        - Export
+      summary: Restore from backup
+      description: Restore database from a backup file
+      operationId: restoreBackup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - from
+              properties:
+                from:
+                  type: string
+                  description: Path to backup file
+                  example: backup-20250109.db
+      responses:
+        '200':
+          description: Database restored successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restored:
+                    type: string
+                    example: backup-20250109.db
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /v1/truncate:
+    post:
+      tags:
+        - Maintenance
+      summary: Truncate revision history
+      description: |
+        Remove old revisions to save disk space. Keeps the latest N revisions per document.
+        
+        **Warning:** This operation is irreversible.
+      operationId: truncateRevisions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TruncateRequest'
+      responses:
+        '200':
+          description: Revisions truncated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: integer
+                    description: Number of revisions deleted
+                    example: 150
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Auto-generated document ID
+          example: doc|blog|hello-world|en_US
+        key:
+          type: string
+          description: Document key (unique within collection and language)
+          example: hello-world
+        lang:
+          type: string
+          description: Language code (e.g., en_US, pl_PL, de_DE)
+          example: en_US
+        meta:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Metadata key-value pairs (values are arrays)
+          example:
+            category: [blog, tutorial]
+            author: [John Doe]
+            tags: [markdown, database]
+        contentMd:
+          type: string
+          description: Markdown content
+          example: "# Hello World\n\nWelcome to MDDB!"
+        addedAt:
+          type: integer
+          format: int64
+          description: Unix timestamp when document was created
+          example: 1704844800
+        updatedAt:
+          type: integer
+          format: int64
+          description: Unix timestamp when document was last updated
+          example: 1704931200
+
+    AddRequest:
+      type: object
+      required:
+        - collection
+        - key
+        - lang
+        - contentMd
+      properties:
+        collection:
+          type: string
+          description: Collection name
+          example: blog
+        key:
+          type: string
+          description: Document key
+          example: hello-world
+        lang:
+          type: string
+          description: Language code
+          example: en_US
+        meta:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Metadata key-value pairs
+          example:
+            category: [blog]
+            author: [John Doe]
+        contentMd:
+          type: string
+          description: Markdown content
+          example: "# Hello World\n\nWelcome to MDDB!"
+
+    GetRequest:
+      type: object
+      required:
+        - collection
+        - key
+        - lang
+      properties:
+        collection:
+          type: string
+          description: Collection name
+          example: blog
+        key:
+          type: string
+          description: Document key
+          example: hello-world
+        lang:
+          type: string
+          description: Language code
+          example: en_US
+        env:
+          type: object
+          additionalProperties:
+            type: string
+          description: Template variables for substitution
+          example:
+            siteName: My Blog
+            year: "2025"
+
+    SearchRequest:
+      type: object
+      required:
+        - collection
+      properties:
+        collection:
+          type: string
+          description: Collection name
+          example: blog
+        filterMeta:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Metadata filters (AND between keys, OR between values)
+          example:
+            category: [blog, tutorial]
+            status: [published]
+        sort:
+          type: string
+          enum: [addedAt, updatedAt, key]
+          description: Sort field
+          example: updatedAt
+        asc:
+          type: boolean
+          description: Sort ascending (default false)
+          example: false
+        limit:
+          type: integer
+          description: Maximum number of results
+          example: 10
+        offset:
+          type: integer
+          description: Number of results to skip
+          example: 0
+
+    DeleteRequest:
+      type: object
+      required:
+        - collection
+        - key
+        - lang
+      properties:
+        collection:
+          type: string
+          description: Collection name
+          example: blog
+        key:
+          type: string
+          description: Document key
+          example: hello-world
+        lang:
+          type: string
+          description: Language code
+          example: en_US
+
+    DeleteCollectionRequest:
+      type: object
+      required:
+        - collection
+      properties:
+        collection:
+          type: string
+          description: Collection name to delete
+          example: blog
+
+    ExportRequest:
+      type: object
+      required:
+        - collection
+        - format
+      properties:
+        collection:
+          type: string
+          description: Collection name
+          example: blog
+        filterMeta:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Optional metadata filters
+          example:
+            status: [published]
+        format:
+          type: string
+          enum: [ndjson, zip]
+          description: Export format
+          example: ndjson
+
+    TruncateRequest:
+      type: object
+      required:
+        - collection
+        - keepRevs
+      properties:
+        collection:
+          type: string
+          description: Collection name
+          example: blog
+        keepRevs:
+          type: integer
+          description: Number of revisions to keep per document (0 = delete all history)
+          example: 3
+        dropCache:
+          type: boolean
+          description: Clear document cache after truncation
+          example: true
+
+    Stats:
+      type: object
+      properties:
+        databasePath:
+          type: string
+          example: /data/mddb.db
+        databaseSize:
+          type: integer
+          format: int64
+          description: Database file size in bytes
+          example: 10485760
+        mode:
+          type: string
+          enum: [read, write, wr]
+          example: wr
+        collections:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                example: blog
+              documentCount:
+                type: integer
+                example: 42
+              revisionCount:
+                type: integer
+                example: 156
+              metaIndexCount:
+                type: integer
+                example: 84
+        totalDocuments:
+          type: integer
+          example: 42
+        totalRevisions:
+          type: integer
+          example: 156
+        totalMetaIndices:
+          type: integer
+          example: 84
+        uptime:
+          type: string
+          example: 2h15m30s
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: document not found
