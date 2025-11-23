@@ -7,41 +7,86 @@ import (
 	"github.com/tradik/mddb/services/mddb-mcp/internal/mddb"
 )
 
-// Handler obsługuje żądania MCP przez stdio.
+// Handler handles MCP requests via stdio.
 type Handler struct {
 	client mddb.Client
 }
 
-// NewHandler tworzy nowy handler MCP.
+// NewHandler creates a new MCP handler.
 func NewHandler(client mddb.Client) *Handler {
 	return &Handler{
 		client: client,
 	}
 }
 
-// Handle przetwarza żądanie MCP i zwraca odpowiedź.
+// Handle processes MCP request and returns response.
 func (h *Handler) Handle(req map[string]interface{}) map[string]interface{} {
 	method, _ := req["method"].(string)
+	id, _ := req["id"]
 	ctx := context.Background()
 
+	var result map[string]interface{}
+	var err map[string]interface{}
+
 	switch method {
+	case "initialize":
+		// initialize already returns full JSON-RPC response
+		return h.handleInitialize(req)
 	case "resources/list":
-		return h.handleResourcesList()
+		result = h.handleResourcesList()
 	case "resources/read":
-		return h.handleResourcesRead(ctx, req)
+		result = h.handleResourcesRead(ctx, req)
 	case "tools/list":
-		return h.handleToolsList()
+		result = h.handleToolsList()
 	case "tools/call":
-		return h.handleToolsCall(ctx, req)
+		result = h.handleToolsCall(ctx, req)
 	case "ping":
-		return map[string]interface{}{"result": "pong"}
+		result = map[string]interface{}{"result": "pong"}
 	default:
-		return map[string]interface{}{
-			"error": map[string]interface{}{
-				"code":    -32601,
-				"message": "Method not found",
-			},
+		err = map[string]interface{}{
+			"code":    -32601,
+			"message": "Method not found",
 		}
+	}
+
+	// Wrap response in JSON-RPC format
+	response := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      id,
+	}
+
+	if err != nil {
+		response["error"] = err
+	} else {
+		response["result"] = result
+	}
+
+	return response
+}
+
+func (h *Handler) handleInitialize(req map[string]interface{}) map[string]interface{} {
+	// Extract request ID for JSON-RPC response
+	id, _ := req["id"]
+
+	return map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result": map[string]interface{}{
+			"protocolVersion": "2024-11-05",
+			"capabilities": map[string]interface{}{
+				"resources": map[string]interface{}{
+					"subscribe":   false,
+					"listChanged": false,
+				},
+				"tools": map[string]interface{}{
+					"listChanged": false,
+				},
+			},
+			"serverInfo": map[string]interface{}{
+				"name":    "mddb-mcp",
+				"version": "1.0.0",
+			},
+		},
 	}
 }
 
@@ -189,7 +234,7 @@ func (h *Handler) handleToolsCall(ctx context.Context, req map[string]interface{
 	}
 }
 
-// HandleJSON przetwarza żądanie JSON i zwraca odpowiedź JSON.
+// HandleJSON processes JSON request and returns JSON response.
 func (h *Handler) HandleJSON(reqJSON []byte) ([]byte, error) {
 	var req map[string]interface{}
 	if err := json.Unmarshal(reqJSON, &req); err != nil {

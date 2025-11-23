@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-// TransportMode określa tryb transportu.
+// TransportMode specifies transport mode.
 type TransportMode string
 
 const (
@@ -17,14 +17,14 @@ const (
 	TransportRESTWithGRPCFallback TransportMode = "rest_with_grpc_fallback"
 )
 
-// FallbackClient implementuje Client z logiką fallback między gRPC i REST.
+// FallbackClient implements Client with fallback logic between gRPC and REST.
 type FallbackClient struct {
 	mode      TransportMode
 	primary   Client
 	secondary Client
 }
 
-// NewFallbackClient tworzy klienta z fallbackiem.
+// NewFallbackClient creates client with fallback.
 func NewFallbackClient(mode TransportMode, grpcClient, restClient Client) *FallbackClient {
 	var primary, secondary Client
 

@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// ClientConfig zawiera konfigurację klienta MDDB.
+// ClientConfig contains MDDB client configuration.
 type ClientConfig struct {
 	GRPCAddress   string
 	RESTBaseURL   string
@@ -13,14 +13,14 @@ type ClientConfig struct {
 	Timeout       time.Duration
 }
 
-// NewClient tworzy klienta MDDB na podstawie konfiguracji.
+// NewClient creates MDDB client based on configuration.
 func NewClient(cfg ClientConfig) (Client, error) {
 	mode := TransportMode(cfg.TransportMode)
 
 	var grpcClient, restClient Client
 	var err error
 
-	// Inicjalizuj klientów w zależności od trybu
+	// Initialize clients depending on mode
 	switch mode {
 	case TransportGRPCOnly, TransportGRPCWithRESTFallback:
 		grpcClient, err = NewGRPCClient(cfg.GRPCAddress, cfg.Timeout)
@@ -28,7 +28,7 @@ func NewClient(cfg ClientConfig) (Client, error) {
 			if mode == TransportGRPCOnly {
 				return nil, fmt.Errorf("create grpc client: %w", err)
 			}
-			// W trybie fallback kontynuujemy z REST
+			// In fallback mode, continue with REST
 			grpcClient = nil
 		}
 	}
@@ -38,7 +38,7 @@ func NewClient(cfg ClientConfig) (Client, error) {
 		restClient = NewRESTClient(cfg.RESTBaseURL, cfg.Timeout)
 	}
 
-	// Jeśli gRPC nie udało się w trybie fallback, użyj tylko REST
+	// If gRPC failed in fallback mode, use REST only
 	if mode == TransportGRPCWithRESTFallback && grpcClient == nil {
 		return restClient, nil
 	}

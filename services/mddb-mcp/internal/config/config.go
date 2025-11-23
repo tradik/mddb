@@ -9,7 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config jest główną strukturą konfiguracyjną MCP.
+// Config is the main MCP configuration structure.
 type Config struct {
 	MCP  MCPConfig  `yaml:"mcp"`
 	MDDB MDDBConfig `yaml:"mddb"`
@@ -27,7 +27,7 @@ type MDDBConfig struct {
 	MaxRetries     int    `yaml:"maxRetries"`
 }
 
-// envConfig odwzorowuje zmienne środowiskowe.
+// envConfig maps environment variables.
 type envConfig struct {
 	MCPListenAddress string `envconfig:"MCP_LISTEN_ADDRESS"`
 
@@ -38,16 +38,16 @@ type envConfig struct {
 	MDDBMaxRetries    int    `envconfig:"MDDB_MAX_RETRIES"`
 }
 
-// Load wczytuje config w kolejności: domyślne -> YAML -> ENV (nadpisuje).
+// Load loads config in order: defaults -> YAML -> ENV (overrides).
 func Load(path string) (*Config, error) {
 	cfg := defaultConfig()
 
-	// 1) YAML (opcjonalnie)
+	// 1) YAML (optional)
 	if err := loadYAML(path, cfg); err != nil {
 		return nil, err
 	}
 
-	// 2) ENV (nadpisuje wartości z YAML)
+	// 2) ENV (overrides YAML values)
 	if err := overrideFromEnv(cfg); err != nil {
 		return nil, err
 	}

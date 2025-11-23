@@ -2,7 +2,7 @@ package mddb
 
 import "time"
 
-// Document reprezentuje dokument markdown w MDDB.
+// Document represents a markdown document in MDDB.
 type Document struct {
 	ID        string              `json:"id"`
 	Key       string              `json:"key"`
@@ -13,13 +13,13 @@ type Document struct {
 	UpdatedAt time.Time           `json:"updated_at"`
 }
 
-// Health reprezentuje status zdrowia serwera.
+// Health represents server health status.
 type Health struct {
 	Status string `json:"status"`
 	Mode   string `json:"mode"`
 }
 
-// Stats reprezentuje statystyki serwera.
+// Stats represents server statistics.
 type Stats struct {
 	DatabasePath     string            `json:"database_path"`
 	DatabaseSize     int64             `json:"database_size"`
@@ -30,7 +30,7 @@ type Stats struct {
 	TotalMetaIndices int               `json:"total_meta_indices"`
 }
 
-// CollectionStats reprezentuje statystyki kolekcji.
+// CollectionStats represents collection statistics.
 type CollectionStats struct {
 	Name           string `json:"name"`
 	DocumentCount  int    `json:"document_count"`
@@ -38,7 +38,7 @@ type CollectionStats struct {
 	MetaIndexCount int    `json:"meta_index_count"`
 }
 
-// AddRequest reprezentuje żądanie dodania/aktualizacji dokumentu.
+// AddRequest represents request to add/update a document.
 type AddRequest struct {
 	Collection   string              `json:"collection"`
 	Key          string              `json:"key"`
@@ -48,7 +48,7 @@ type AddRequest struct {
 	SaveRevision bool                `json:"save_revision"`
 }
 
-// GetRequest reprezentuje żądanie pobrania dokumentu.
+// GetRequest represents request to get a document.
 type GetRequest struct {
 	Collection string            `json:"collection"`
 	Key        string            `json:"key"`
@@ -56,7 +56,7 @@ type GetRequest struct {
 	Env        map[string]string `json:"env,omitempty"`
 }
 
-// SearchRequest reprezentuje żądanie wyszukiwania.
+// SearchRequest represents search request.
 type SearchRequest struct {
 	Collection string              `json:"collection"`
 	FilterMeta map[string][]string `json:"filter_meta,omitempty"`
@@ -66,30 +66,30 @@ type SearchRequest struct {
 	Offset     int                 `json:"offset,omitempty"`
 }
 
-// SearchResponse reprezentuje wynik wyszukiwania.
+// SearchResponse represents search result.
 type SearchResponse struct {
 	Documents []Document `json:"documents"`
 	Total     int        `json:"total"`
 }
 
-// DeleteRequest reprezentuje żądanie usunięcia dokumentu.
+// DeleteRequest represents request to delete a document.
 type DeleteRequest struct {
 	Collection string `json:"collection"`
 	Key        string `json:"key"`
 	Lang       string `json:"lang"`
 }
 
-// DeleteCollectionRequest reprezentuje żądanie usunięcia kolekcji.
+// DeleteCollectionRequest represents request to delete a collection.
 type DeleteCollectionRequest struct {
 	Collection string `json:"collection"`
 }
 
-// DeleteCollectionResponse reprezentuje wynik usunięcia kolekcji.
+// DeleteCollectionResponse represents result of collection deletion.
 type DeleteCollectionResponse struct {
 	Deleted int `json:"deleted"`
 }
 
-// BatchDocument reprezentuje dokument w operacji batch.
+// BatchDocument represents a document in batch operation.
 type BatchDocument struct {
 	Key          string              `json:"key"`
 	Lang         string              `json:"lang"`
@@ -98,13 +98,13 @@ type BatchDocument struct {
 	SaveRevision bool                `json:"save_revision"`
 }
 
-// AddBatchRequest reprezentuje żądanie dodania wielu dokumentów.
+// AddBatchRequest represents request to add multiple documents.
 type AddBatchRequest struct {
 	Collection string          `json:"collection"`
 	Documents  []BatchDocument `json:"documents"`
 }
 
-// AddBatchResponse reprezentuje wynik dodania wielu dokumentów.
+// AddBatchResponse represents result of adding multiple documents.
 type AddBatchResponse struct {
 	Added   int      `json:"added"`
 	Updated int      `json:"updated"`
@@ -112,7 +112,7 @@ type AddBatchResponse struct {
 	Errors  []string `json:"errors,omitempty"`
 }
 
-// UpdateDocument reprezentuje dokument do aktualizacji.
+// UpdateDocument represents a document to update.
 type UpdateDocument struct {
 	Key          string              `json:"key"`
 	Lang         string              `json:"lang"`
@@ -121,13 +121,13 @@ type UpdateDocument struct {
 	SaveRevision bool                `json:"save_revision"`
 }
 
-// UpdateBatchRequest reprezentuje żądanie aktualizacji wielu dokumentów.
+// UpdateBatchRequest represents request to update multiple documents.
 type UpdateBatchRequest struct {
 	Collection string           `json:"collection"`
 	Documents  []UpdateDocument `json:"documents"`
 }
 
-// UpdateBatchResponse reprezentuje wynik aktualizacji wielu dokumentów.
+// UpdateBatchResponse represents result of updating multiple documents.
 type UpdateBatchResponse struct {
 	Updated  int      `json:"updated"`
 	NotFound int      `json:"not_found"`
@@ -135,19 +135,19 @@ type UpdateBatchResponse struct {
 	Errors   []string `json:"errors,omitempty"`
 }
 
-// DeleteDocument reprezentuje dokument do usunięcia.
+// DeleteDocument represents a document to delete.
 type DeleteDocument struct {
 	Key  string `json:"key"`
 	Lang string `json:"lang"`
 }
 
-// DeleteBatchRequest reprezentuje żądanie usunięcia wielu dokumentów.
+// DeleteBatchRequest represents request to delete multiple documents.
 type DeleteBatchRequest struct {
 	Collection string           `json:"collection"`
 	Documents  []DeleteDocument `json:"documents"`
 }
 
-// DeleteBatchResponse reprezentuje wynik usunięcia wielu dokumentów.
+// DeleteBatchResponse represents result of deleting multiple documents.
 type DeleteBatchResponse struct {
 	Deleted  int      `json:"deleted"`
 	NotFound int      `json:"not_found"`
@@ -155,41 +155,41 @@ type DeleteBatchResponse struct {
 	Errors   []string `json:"errors,omitempty"`
 }
 
-// ExportRequest reprezentuje żądanie eksportu.
+// ExportRequest represents export request.
 type ExportRequest struct {
 	Collection string              `json:"collection"`
 	FilterMeta map[string][]string `json:"filter_meta,omitempty"`
 	Format     string              `json:"format"` // ndjson, zip
 }
 
-// BackupRequest reprezentuje żądanie backupu.
+// BackupRequest represents backup request.
 type BackupRequest struct {
 	To string `json:"to"`
 }
 
-// BackupResponse reprezentuje wynik backupu.
+// BackupResponse represents backup result.
 type BackupResponse struct {
 	Backup string `json:"backup"`
 }
 
-// RestoreRequest reprezentuje żądanie przywrócenia z backupu.
+// RestoreRequest represents restore from backup request.
 type RestoreRequest struct {
 	From string `json:"from"`
 }
 
-// RestoreResponse reprezentuje wynik przywrócenia.
+// RestoreResponse represents restore result.
 type RestoreResponse struct {
 	Restored string `json:"restored"`
 }
 
-// TruncateRequest reprezentuje żądanie obcięcia historii rewizji.
+// TruncateRequest represents request to truncate revision history.
 type TruncateRequest struct {
 	Collection string `json:"collection"`
 	KeepRevs   int    `json:"keep_revs"`
 	DropCache  bool   `json:"drop_cache"`
 }
 
-// TruncateResponse reprezentuje wynik obcięcia.
+// TruncateResponse represents truncate result.
 type TruncateResponse struct {
 	Status string `json:"status"`
 }

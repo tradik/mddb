@@ -8,7 +8,7 @@ import (
 	"github.com/tradik/mddb/services/mddb-mcp/internal/mddb"
 )
 
-// callTool wywołuje narzędzie MCP.
+// callTool invokes MCP tool.
 func (s *Server) callTool(ctx context.Context, name string, args map[string]interface{}) (string, error) {
 	switch name {
 	case "add_document":
@@ -87,7 +87,7 @@ func (s *Server) toolDeleteDocument(ctx context.Context, args map[string]interfa
 	return fmt.Sprintf("Document deleted: %s/%s (%s)", req.Collection, req.Key, req.Lang), nil
 }
 
-// toolGetStats zwraca statystyki.
+// toolGetStats returns statistics.
 func (s *Server) toolGetStats(ctx context.Context, args map[string]interface{}) (string, error) {
 	stats, err := s.client.Stats(ctx)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *Server) toolGetStats(ctx context.Context, args map[string]interface{}) 
 	return string(data), nil
 }
 
-// toolAddBatch dodaje wiele dokumentów.
+// toolAddBatch adds multiple documents.
 func (s *Server) toolAddBatch(ctx context.Context, args map[string]interface{}) (string, error) {
 	collection := getString(args, "collection")
 	docsRaw, ok := args["documents"].([]interface{})
@@ -132,7 +132,7 @@ func (s *Server) toolAddBatch(ctx context.Context, args map[string]interface{}) 
 	return string(data), nil
 }
 
-// toolDeleteBatch usuwa wiele dokumentów.
+// toolDeleteBatch deletes multiple documents.
 func (s *Server) toolDeleteBatch(ctx context.Context, args map[string]interface{}) (string, error) {
 	collection := getString(args, "collection")
 	docsRaw, ok := args["documents"].([]interface{})
@@ -183,7 +183,7 @@ func (s *Server) toolExport(ctx context.Context, args map[string]interface{}) (s
 	return "Export started (stream not fully implemented in MCP yet)", nil
 }
 
-// toolBackup tworzy backup.
+// toolBackup creates backup.
 func (s *Server) toolBackup(ctx context.Context, args map[string]interface{}) (string, error) {
 	req := &mddb.BackupRequest{
 		To: getString(args, "to"),
@@ -211,7 +211,7 @@ func (s *Server) toolRestore(ctx context.Context, args map[string]interface{}) (
 	return fmt.Sprintf("Database restored from: %s", resp.Restored), nil
 }
 
-// Pomocnicze funkcje do parsowania argumentów
+// Helper functions for parsing arguments
 
 func getString(m map[string]interface{}, key string) string {
 	if v, ok := m[key].(string); ok {

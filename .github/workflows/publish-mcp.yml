@@ -3,7 +3,7 @@ name: Publish MCP Docker Image
 on:
   push:
     tags:
-      - 'mcp-v*'
+      - 'v*'  # Use same version tags as main project
     branches:
       - main
     paths:
@@ -16,6 +16,7 @@ env:
   GHCR_IMAGE: ${{ github.repository }}/mddb-mcp
   DOCKER_HUB_USERNAME: tradik
   IMAGE_NAME: mddb
+  MCP_IMAGE_NAME: mddb-mcp
 
 jobs:
   build-and-push:
@@ -46,35 +47,53 @@ jobs:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
       
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE }}
-            ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch,suffix=-mcp
-            type=ref,event=pr,suffix=-mcp
-            type=semver,pattern={{version}},suffix=-mcp
-            type=semver,pattern={{major}}.{{minor}},suffix=-mcp
-            type=semver,pattern={{major}},suffix=-mcp
-            type=sha,suffix=-mcp
-            type=raw,value=mcp
-            type=raw,value=mcp-latest
+      - name: Extract version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            VERSION_NUM=${VERSION#v}
+            echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+            echo "VERSION_NUM=${VERSION_NUM}" >> $GITHUB_OUTPUT
+            echo "IS_RELEASE=true" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=latest" >> $GITHUB_OUTPUT
+            echo "VERSION_NUM=latest" >> $GITHUB_OUTPUT
+            echo "IS_RELEASE=false" >> $GITHUB_OUTPUT
+          fi
+          echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
       
-      - name: Build and push Docker image
+      - name: Build and push MCP Docker image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./services/mddb-mcp/Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:mcp
+            ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:mcp-${{ steps.version.outputs.VERSION_NUM }}
+            ${{ env.GHCR_REGISTRY }}/${{ github.repository }}:mcp
+            ${{ env.GHCR_REGISTRY }}/${{ github.repository }}:mcp-${{ steps.version.outputs.VERSION_NUM }}
+          labels: |
+            org.opencontainers.image.title=MDDB MCP Server
+            org.opencontainers.image.description=Model Context Protocol server for MDDB - provides LLM-friendly access to markdown database
+            org.opencontainers.image.version=${{ steps.version.outputs.VERSION_NUM }}
+            org.opencontainers.image.created=${{ steps.version.outputs.BUILD_DATE }}
+            org.opencontainers.image.revision=${{ steps.version.outputs.COMMIT_SHA }}
+            org.opencontainers.image.source=https://github.com/tradik/mddb
+            org.opencontainers.image.url=https://github.com/tradik/mddb
+            org.opencontainers.image.documentation=https://github.com/tradik/mddb/blob/main/services/mddb-mcp/README.md
+            org.opencontainers.image.licenses=BSD-3-Clause
+            org.opencontainers.image.vendor=MDDB Team
+          build-args: |
+            VERSION=${{ steps.version.outputs.VERSION }}
+            BUILD_DATE=${{ steps.version.outputs.BUILD_DATE }}
+            COMMIT_SHA=${{ steps.version.outputs.COMMIT_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
       
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request'
@@ -83,3 +102,57 @@ jobs:
           subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
+      
+      - name: Create release summary
+        if: steps.version.outputs.IS_RELEASE == 'true'
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          ## 🤖 MCP Docker Images Published
+          
+          ### Docker Hub
+          - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:mcp`
+          - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:mcp-${{ steps.version.outputs.VERSION_NUM }}`
+          
+          ### GitHub Container Registry
+          - `${{ env.GHCR_REGISTRY }}/${{ github.repository }}:mcp`
+          - `${{ env.GHCR_REGISTRY }}/${{ github.repository }}:mcp-${{ steps.version.outputs.VERSION_NUM }}`
+          
+          ### Platforms
+          - `linux/amd64` (Intel/AMD)
+          - `linux/arm64` (ARM/Apple Silicon)
+          
+          ### Usage with Windsurf/Claude Desktop
+          
+          **Stdio mode (for Windsurf):**
+          ```json
+          {
+            "mcpServers": {
+              "mddb": {
+                "command": "docker",
+                "args": [
+                  "run", "-i", "--rm", "--network", "host",
+                  "-e", "MCP_MODE=stdio",
+                  "-e", "MDDB_GRPC_ADDRESS=localhost:11024",
+                  "-e", "MDDB_REST_BASE_URL=http://localhost:11023",
+                  "${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:mcp-${{ steps.version.outputs.VERSION_NUM }}"
+                ]
+              }
+            }
+          }
+          ```
+          
+          **HTTP mode (for docker-compose):**
+          ```bash
+          docker run -d -p 9000:9000 \
+            -e MCP_MODE=http \
+            -e MDDB_GRPC_ADDRESS=localhost:11024 \
+            -e MDDB_REST_BASE_URL=http://localhost:11023 \
+            ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:mcp-${{ steps.version.outputs.VERSION_NUM }}
+          ```
+          
+          ### Links
+          - [MCP Documentation](https://github.com/tradik/mddb/blob/main/services/mddb-mcp/README.md)
+          - [Windsurf Setup Guide](https://github.com/tradik/mddb/blob/main/services/mddb-mcp/WINDSURF_SETUP.md)
+          - [Docker Hub](https://hub.docker.com/r/${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }})
+          - [GitHub Release](https://github.com/tradik/mddb/releases/tag/${{ steps.version.outputs.VERSION }})
+          EOF

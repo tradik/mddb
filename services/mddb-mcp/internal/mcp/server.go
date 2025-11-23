@@ -10,14 +10,14 @@ import (
 	"github.com/tradik/mddb/services/mddb-mcp/internal/mddb"
 )
 
-// Server implementuje MCP server dla MDDB.
+// Server implements MCP server for MDDB.
 type Server struct {
 	client mddb.Client
 	addr   string
 	server *http.Server
 }
 
-// NewServer tworzy nowy MCP server.
+// NewServer creates a new MCP server.
 func NewServer(client mddb.Client, addr string) *Server {
 	return &Server{
 		client: client,
@@ -25,7 +25,7 @@ func NewServer(client mddb.Client, addr string) *Server {
 	}
 }
 
-// Start uruchamia MCP server.
+// Start starts MCP server.
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
 
@@ -50,7 +50,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Stop zatrzymuje MCP server.
+// Stop stops MCP server.
 func (s *Server) Stop() error {
 	if s.server != nil {
 		return s.server.Shutdown(context.Background())
@@ -58,7 +58,7 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-// handleHealth obsługuje health check.
+// handleHealth handles health check.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	health, err := s.client.Health(ctx)
@@ -73,7 +73,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleResources zwraca listę dostępnych resources.
+// handleResources returns list of available resources.
 func (s *Server) handleResources(w http.ResponseWriter, r *http.Request) {
 	resources := []Resource{
 		{
@@ -138,7 +138,7 @@ func (s *Server) handleResourceRead(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleTools zwraca listę dostępnych tools.
+// handleTools returns list of available tools.
 func (s *Server) handleTools(w http.ResponseWriter, r *http.Request) {
 	tools := []Tool{
 		{
@@ -201,7 +201,7 @@ func (s *Server) handleTools(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleToolCall wykonuje wywołanie tool.
+// handleToolCall executes tool call.
 func (s *Server) handleToolCall(w http.ResponseWriter, r *http.Request) {
 	var req ToolCallRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

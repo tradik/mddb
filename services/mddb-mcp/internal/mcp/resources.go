@@ -10,7 +10,7 @@ import (
 	"github.com/tradik/mddb/services/mddb-mcp/internal/mddb"
 )
 
-// readResource czyta zasób na podstawie URI.
+// readResource reads resource based on URI.
 func (s *Server) readResource(ctx context.Context, uri string) (string, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
@@ -27,7 +27,7 @@ func (s *Server) readResource(ctx context.Context, uri string) (string, error) {
 	}
 }
 
-// readMDDBResource czyta zasób mddb://.
+// readMDDBResource reads mddb:// resource.
 func (s *Server) readMDDBResource(ctx context.Context, uri *url.URL) (string, error) {
 	path := strings.Trim(uri.Path, "/")
 
@@ -88,7 +88,7 @@ func (s *Server) readMDDBResource(ctx context.Context, uri *url.URL) (string, er
 	return doc.ContentMD, nil
 }
 
-// readSearchResource czyta zasób mddb-search://.
+// readSearchResource reads mddb-search:// resource.
 func (s *Server) readSearchResource(ctx context.Context, uri *url.URL) (string, error) {
 	collection := strings.Trim(uri.Path, "/")
 	if collection == "" {

@@ -12,25 +12,34 @@ WORKDIR /build/services/mddb-mcp
 # Download dependencies
 RUN go mod download
 
-# Build binary
+# Build both binaries
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mddb-mcp ./cmd/mddb-mcp
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o mddb-mcp-stdio ./cmd/mddb-mcp-stdio
 
-# Runtime stage
+# Runtime stage - supports both HTTP and stdio modes
 FROM alpine:3.22
 
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /app
 
-# Copy binary from builder
+# Copy both binaries, config, and entrypoint
 COPY --from=builder /build/services/mddb-mcp/mddb-mcp .
+COPY --from=builder /build/services/mddb-mcp/mddb-mcp-stdio .
 COPY --from=builder /build/services/mddb-mcp/config.yaml .
+COPY --from=builder /build/services/mddb-mcp/entrypoint.sh .
 
-# Expose MCP port
+# Make entrypoint executable
+RUN chmod +x entrypoint.sh
+
+# Expose MCP port (only used in HTTP mode)
 EXPOSE 9000
 
-# Health check
+# Health check (only works in HTTP mode)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:9000/health || exit 1
+  CMD [ "$MCP_MODE" = "stdio" ] || wget --no-verbose --tries=1 --spider http://localhost:9000/health || exit 1
 
-CMD ["./mddb-mcp"]
+# Use entrypoint to select mode via MCP_MODE env var
+# Default: http mode
+# Set MCP_MODE=stdio for stdio mode
+ENTRYPOINT ["./entrypoint.sh"]

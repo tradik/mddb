@@ -11,13 +11,13 @@ import (
 	"time"
 )
 
-// RESTClient implementuje Client przez HTTP/JSON API.
+// RESTClient implements Client via HTTP/JSON API.
 type RESTClient struct {
 	baseURL string
 	client  *http.Client
 }
 
-// NewRESTClient tworzy nowego klienta REST.
+// NewRESTClient creates new REST client.
 func NewRESTClient(baseURL string, timeout time.Duration) *RESTClient {
 	return &RESTClient{
 		baseURL: baseURL,

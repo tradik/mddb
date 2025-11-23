@@ -9,6 +9,7 @@
 [![Performance](https://img.shields.io/badge/performance-optimized-brightgreen.svg)]()
 [![gRPC](https://img.shields.io/badge/gRPC-enabled-blue.svg)](https://grpc.io)
 [![Protocol Buffers](https://img.shields.io/badge/protobuf-3-blue.svg)](https://protobuf.dev)
+[![MCP](https://img.shields.io/badge/MCP-enabled-purple.svg)](https://modelcontextprotocol.io)
 
 **A high-performance, version-controlled markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf)**
 
@@ -345,6 +346,42 @@ make install-grpc-tools
 make generate-proto
 ```
 
+### 🤖 MCP Server (AI/LLM Integration)
+
+MDDB includes a Model Context Protocol (MCP) server for seamless integration with AI tools like Windsurf, Claude Desktop, and other LLM applications.
+
+**Features:**
+- Dual mode: HTTP server + stdio mode for IDE integration
+- Full MDDB API access through MCP tools and resources
+- Docker ready with single image, mode selection via env var
+
+**Quick Start with Docker:**
+```bash
+# Pull MCP image (uses same version as main MDDB)
+docker pull tradik/mddb:mcp-2.0.4
+
+# For Windsurf/Claude Desktop (stdio mode)
+docker run -i --rm \
+  -e MCP_MODE=stdio \
+  -e MDDB_GRPC_ADDRESS=localhost:11024 \
+  -e MDDB_REST_BASE_URL=http://localhost:11023 \
+  tradik/mddb:mcp-2.0.4
+
+# For HTTP mode
+docker run -d -p 9000:9000 \
+  -e MCP_MODE=http \
+  -e MDDB_GRPC_ADDRESS=localhost:11024 \
+  -e MDDB_REST_BASE_URL=http://localhost:11023 \
+  tradik/mddb:mcp-2.0.4
+```
+
+**Documentation:**
+- [MCP Server README](services/mddb-mcp/README.md)
+- [Windsurf Setup Guide](services/mddb-mcp/WINDSURF_SETUP.md)
+- [MCP Configuration Examples](services/mddb-mcp/)
+
+---
+
 **Ports:**
 - HTTP API: `localhost:11023`
 - gRPC API: `localhost:11024`
@@ -659,6 +696,11 @@ mddb/
 │   │   ├── grpc_server.go
 │   │   └── proto/           # Generated Go code
 │   ├── mddb-cli/            # CLI client
+│   ├── mddb-mcp/            # MCP server (Model Context Protocol)
+│   │   ├── cmd/             # HTTP + stdio binaries
+│   │   ├── internal/        # MCP implementation
+│   │   ├── Dockerfile       # Multi-mode Docker build
+│   │   └── README.md        # MCP documentation
 │   ├── mddb-panel/          # Web admin panel (React)
 │   │   ├── src/             # React components
 │   │   ├── public/          # Static assets

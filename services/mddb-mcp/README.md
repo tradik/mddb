@@ -4,14 +4,54 @@ Model Context Protocol (MCP) server for MDDB - provides LLM-friendly access to M
 
 ## Features
 
+- **Dual Mode**: HTTP server + stdio mode for Windsurf/Claude Desktop
 - **Dual Transport**: gRPC (default) with REST fallback
 - **Full API Coverage**: All MDDB operations exposed as MCP resources and tools
 - **Configurable**: YAML config with ENV override
 - **Production Ready**: Health checks, graceful shutdown, error handling
+- **Docker Ready**: Single image, mode selection via `MCP_MODE` env var
 
 ## Quick Start
 
-### Build
+### Option 1: Docker (Recommended)
+
+**Pull from Docker Hub (recommended):**
+```bash
+# Latest version
+docker pull tradik/mddb:mcp
+
+# Specific version (same as main MDDB version)
+docker pull tradik/mddb:mcp-2.0.4
+```
+
+**Or build locally:**
+```bash
+# Build single Docker image
+docker build -t tradik/mddb:mcp -f services/mddb-mcp/Dockerfile .
+```
+
+**For Windsurf/Claude Desktop (stdio mode):**
+```bash
+# Run in stdio mode (set MCP_MODE=stdio)
+docker run -i --rm \
+  -e MCP_MODE=stdio \
+  -e MDDB_GRPC_ADDRESS=localhost:11024 \
+  -e MDDB_REST_BASE_URL=http://localhost:11023 \
+  tradik/mddb:mcp
+
+# Use in Windsurf - see mcp-docker-stdio.json.example
+```
+
+**For HTTP server mode:**
+```bash
+# Run in HTTP mode (default, or set MCP_MODE=http)
+docker run -d -p 9000:9000 \
+  -e MDDB_GRPC_ADDRESS=localhost:11024 \
+  -e MDDB_REST_BASE_URL=http://localhost:11023 \
+  tradik/mddb:mcp
+```
+
+### Option 2: Local Binary
 
 ```bash
 cd services/mddb-mcp
@@ -22,8 +62,9 @@ go build -o mddb-mcp ./cmd/mddb-mcp
 # Stdio mode (for Windsurf/Claude Desktop)
 go build -o mddb-mcp-stdio ./cmd/mddb-mcp-stdio
 
-# Or build both
-make build-all
+# Or use Makefile
+make build-stdio  # for stdio only
+make build-all    # for both
 ```
 
 ### Run

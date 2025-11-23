@@ -1,6 +1,6 @@
 package mcp
 
-// Resource reprezentuje zasób MCP.
+// Resource represents MCP resource.
 type Resource struct {
 	URI         string `json:"uri"`
 	Name        string `json:"name"`
@@ -8,19 +8,19 @@ type Resource struct {
 	MimeType    string `json:"mimeType"`
 }
 
-// ResourceReadRequest reprezentuje żądanie odczytu zasobu.
+// ResourceReadRequest represents resource read request.
 type ResourceReadRequest struct {
 	URI string `json:"uri"`
 }
 
-// Tool reprezentuje narzędzie MCP.
+// Tool represents MCP tool.
 type Tool struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	InputSchema map[string]interface{} `json:"inputSchema"`
 }
 
-// ToolCallRequest reprezentuje żądanie wywołania narzędzia.
+// ToolCallRequest represents tool call request.
 type ToolCallRequest struct {
 	Name      string                 `json:"name"`
 	Arguments map[string]interface{} `json:"arguments"`

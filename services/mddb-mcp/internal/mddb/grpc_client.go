@@ -12,13 +12,13 @@ import (
 	pb "mddb/proto"
 )
 
-// GRPCClient implementuje Client przez gRPC/Protobuf API.
+// GRPCClient implements Client via gRPC/Protobuf API.
 type GRPCClient struct {
 	conn   *grpc.ClientConn
 	client pb.MDDBClient
 }
 
-// NewGRPCClient tworzy nowego klienta gRPC.
+// NewGRPCClient creates new gRPC client.
 func NewGRPCClient(address string, timeout time.Duration) (*GRPCClient, error) {
 	conn, err := grpc.NewClient(address,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -34,7 +34,7 @@ func NewGRPCClient(address string, timeout time.Duration) (*GRPCClient, error) {
 }
 
 func (c *GRPCClient) Health(ctx context.Context) (*Health, error) {
-	// gRPC nie ma dedykowanego health check w proto, używamy Stats jako proxy
+	// gRPC doesn't have dedicated health check in proto, use Stats as proxy
 	stats, err := c.Stats(ctx)
 	if err != nil {
 		return nil, err
@@ -217,7 +217,7 @@ func (c *GRPCClient) Search(ctx context.Context, req *SearchRequest) (*SearchRes
 }
 
 func (c *GRPCClient) Delete(ctx context.Context, req *DeleteRequest) error {
-	// gRPC używa DeleteBatch dla pojedynczych usunięć
+	// gRPC uses DeleteBatch for single deletions
 	_, err := c.DeleteBatch(ctx, &DeleteBatchRequest{
 		Collection: req.Collection,
 		Documents: []DeleteDocument{
@@ -228,7 +228,7 @@ func (c *GRPCClient) Delete(ctx context.Context, req *DeleteRequest) error {
 }
 
 func (c *GRPCClient) DeleteCollection(ctx context.Context, req *DeleteCollectionRequest) (*DeleteCollectionResponse, error) {
-	// gRPC nie ma dedykowanego DeleteCollection, używamy DeleteBatch po Search
+	// gRPC doesn't have dedicated DeleteCollection, use DeleteBatch after Search
 	searchResp, err := c.Search(ctx, &SearchRequest{
 		Collection: req.Collection,
 		Limit:      10000,
@@ -353,7 +353,7 @@ func convertMetaFromProto(meta map[string]*pb.MetaValues) map[string][]string {
 	return result
 }
 
-// convertDocumentFromProto konwertuje Document z proto na wewnętrzny typ.
+// convertDocumentFromProto converts Document from proto to internal type.
 func convertDocumentFromProto(doc *pb.Document) *Document {
 	return &Document{
 		ID:        doc.Id,

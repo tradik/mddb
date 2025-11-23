@@ -49,11 +49,17 @@ func main() {
 	for scanner.Scan() {
 		line := scanner.Bytes()
 
+		// Log incoming request for debugging
+		log.Printf("Received request: %s", string(line))
+
 		resp, err := handler.HandleJSON(line)
 		if err != nil {
 			log.Printf("error handling request: %v", err)
 			continue
 		}
+
+		// Log outgoing response for debugging
+		log.Printf("Sending response: %s", string(resp))
 
 		if _, err := os.Stdout.Write(resp); err != nil {
 			log.Printf("error writing response: %v", err)
@@ -63,9 +69,10 @@ func main() {
 			log.Printf("error writing newline: %v", err)
 			continue
 		}
-		if err := os.Stdout.Sync(); err != nil {
-			log.Printf("error syncing stdout: %v", err)
-		}
+		// Skip Sync() in Docker - causes "invalid argument" error
+		// if err := os.Stdout.Sync(); err != nil {
+		// 	log.Printf("error syncing stdout: %v", err)
+		// }
 	}
 
 	if err := scanner.Err(); err != nil {
