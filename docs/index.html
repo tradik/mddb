@@ -395,8 +395,8 @@ docker pull tradik/mddb:2.0.4</code></pre>
                 <div class="example-pane" id="mcp">
                     <pre><code># Option 1: Docker (Easiest - No Build Required) ⭐
 
-# Start MDDB server
-docker run -d -p 11023:11023 -p 11024:11024 tradik/mddb:latest
+# Prerequisites: MDDB server running on localhost:11023 and localhost:11024
+# (See Quick Start section above to start MDDB)
 
 # Configure Windsurf (~/.windsurf/mcp.json)
 {
@@ -414,6 +414,7 @@ docker run -d -p 11023:11023 -p 11024:11024 tradik/mddb:latest
 }
 
 # Restart Windsurf - Done!
+# MCP will automatically pull tradik/mddb:mcp on first use
 
 # ---
 
