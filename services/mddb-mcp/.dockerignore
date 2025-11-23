@@ -3,4 +3,11 @@
 .gitignore
 Makefile
 mddb-mcp
+mddb-mcp-stdio
 *.log
+.github
+docs
+examples
+test
+*.test
+coverage.out
