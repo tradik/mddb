@@ -11,6 +11,11 @@ Model Context Protocol (MCP) server for MDDB - provides LLM-friendly access to M
 - **Production Ready**: Health checks, graceful shutdown, error handling
 - **Docker Ready**: Single image, mode selection via `MCP_MODE` env var
 
+## Platform-Specific Guides
+
+- **Windows (WSL)**: See [WSL_SETUP.md](WSL_SETUP.md) for detailed WSL integration guide
+- **macOS/Linux**: Follow instructions below
+
 ## Quick Start
 
 ### Option 1: Docker (Recommended)

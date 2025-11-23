@@ -378,6 +378,7 @@ docker run -d -p 9000:9000 \
 **Documentation:**
 - [MCP Server README](services/mddb-mcp/README.md)
 - [Windsurf Setup Guide](services/mddb-mcp/WINDSURF_SETUP.md)
+- [WSL Setup Guide](services/mddb-mcp/WSL_SETUP.md) (Windows)
 - [MCP Configuration Examples](services/mddb-mcp/)
 
 ---
