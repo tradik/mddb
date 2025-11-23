@@ -13,10 +13,9 @@ on:
 
 env:
   GHCR_REGISTRY: ghcr.io
-  GHCR_IMAGE: ${{ github.repository }}/mddb-mcp
+  GHCR_IMAGE: ${{ github.repository }}
   DOCKER_HUB_USERNAME: tradik
   IMAGE_NAME: mddb
-  MCP_IMAGE_NAME: mddb-mcp
 
 jobs:
   build-and-push:
@@ -99,7 +98,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE }}
+          subject-name: ${{ env.GHCR_REGISTRY }}/${{ github.repository }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
       
