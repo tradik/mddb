@@ -378,7 +378,33 @@ docker pull tradik/mddb:2.0.4</code></pre>
   }'</code></pre>
                 </div>
                 <div class="example-pane" id="mcp">
-                    <pre><code># 1. Build MCP stdio binary
+                    <pre><code># Option 1: Docker (Easiest - No Build Required) ⭐
+
+# Start MDDB server
+docker run -d -p 11023:11023 -p 11024:11024 tradik/mddb:latest
+
+# Configure Windsurf (~/.windsurf/mcp.json)
+{
+  "mcpServers": {
+    "mddb": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm", "--network", "host",
+        "-e", "MDDB_GRPC_ADDRESS=localhost:11024",
+        "-e", "MDDB_REST_BASE_URL=http://localhost:11023",
+        "ghcr.io/tradik/mddb/mddb-mcp:latest"
+      ]
+    }
+  }
+}
+
+# Restart Windsurf - Done!
+
+# ---
+
+# Option 2: Local Binary (For Development)
+
+# 1. Build MCP stdio binary
 cd services/mddb-mcp
 make build-stdio
 
@@ -386,18 +412,16 @@ make build-stdio
 {
   "mcpServers": {
     "mddb": {
-      "command": "/path/to/mddb-mcp-stdio",
+      "command": "/full/path/to/mddb-mcp-stdio",
       "env": {
         "MDDB_GRPC_ADDRESS": "localhost:11024",
-        "MDDB_REST_BASE_URL": "http://localhost:11023",
-        "MDDB_TRANSPORT_MODE": "grpc_with_rest_fallback"
+        "MDDB_REST_BASE_URL": "http://localhost:11023"
       }
     }
   }
 }
 
-# 3. Restart Windsurf IDE
-# Now you can use MDDB from Windsurf AI!</code></pre>
+# 3. Restart Windsurf IDE</code></pre>
                 </div>
                 <div class="example-pane" id="health">
                     <pre><code>curl http://localhost:11023/health

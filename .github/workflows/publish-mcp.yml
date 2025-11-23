@@ -6,6 +6,9 @@ on:
       - 'mcp-v*'
     branches:
       - main
+    paths:
+      - 'services/mddb-mcp/**'
+      - '.github/workflows/publish-mcp.yml'
   workflow_dispatch:
 
 env:

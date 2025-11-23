@@ -7,7 +7,103 @@ This guide shows how to connect MDDB MCP to Windsurf IDE.
 1. MDDB server running (either locally or via Docker)
 2. Built `mddb-mcp-stdio` binary
 
-## Step 1: Build the stdio binary
+## Setup Options
+
+You have two options to run MCP for Windsurf:
+
+### Option A: Docker (Easiest - No Build Required) ⭐
+
+**Pros:**
+- No need to build anything
+- Always up-to-date with published image
+- Works on all platforms
+- Easy to update
+
+**Cons:**
+- Requires Docker to be running
+- Slightly slower startup
+
+### Option B: Local Binary
+
+**Pros:**
+- Faster startup
+- No Docker dependency
+- Good for development
+
+**Cons:**
+- Need to rebuild after updates
+- Platform-specific binary
+
+---
+
+## Option A: Docker Setup (Recommended)
+
+### Step 1: Ensure Docker is running
+
+```bash
+docker --version
+```
+
+### Step 2: Start MDDB server
+
+```bash
+docker run -d -p 11023:11023 -p 11024:11024 tradik/mddb:latest
+```
+
+### Step 3: Configure Windsurf
+
+**macOS/Linux:**
+```bash
+mkdir -p ~/.windsurf
+nano ~/.windsurf/mcp.json
+```
+
+Add this configuration:
+```json
+{
+  "mcpServers": {
+    "mddb": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "--network", "host",
+        "-e", "MDDB_GRPC_ADDRESS=localhost:11024",
+        "-e", "MDDB_REST_BASE_URL=http://localhost:11023",
+        "-e", "MDDB_TRANSPORT_MODE=grpc_with_rest_fallback",
+        "ghcr.io/tradik/mddb/mddb-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+**Windows:**
+```json
+{
+  "mcpServers": {
+    "mddb": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "MDDB_GRPC_ADDRESS=host.docker.internal:11024",
+        "-e", "MDDB_REST_BASE_URL=http://host.docker.internal:11023",
+        "-e", "MDDB_TRANSPORT_MODE=grpc_with_rest_fallback",
+        "ghcr.io/tradik/mddb/mddb-mcp:latest"
+      ]
+    }
+  }
+}
+```
+
+### Step 4: Restart Windsurf
+
+Done! The Docker image will be pulled automatically on first use.
+
+---
+
+## Option B: Local Binary Setup
+
+### Step 1: Build the stdio binary
 
 ```bash
 cd /Users/rafalrabczuk/github.com/tradik/mddb/services/mddb-mcp
@@ -16,7 +112,7 @@ make build-stdio
 
 This creates `mddb-mcp-stdio` binary in the current directory.
 
-## Step 2: Start MDDB server
+## Step 2: Start MDDB server (for Option B)
 
 ### Option A: Docker Compose (recommended)
 

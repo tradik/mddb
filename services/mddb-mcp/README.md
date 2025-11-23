@@ -48,6 +48,8 @@ See [docs/mddb-mcp-config.md](docs/mddb-mcp-config.md) for full configuration re
 
 ### Windsurf / Claude Desktop Setup
 
+#### Option 1: Using Binary (Recommended for Development)
+
 1. Build the stdio binary:
    ```bash
    cd services/mddb-mcp
@@ -76,6 +78,58 @@ See [docs/mddb-mcp-config.md](docs/mddb-mcp-config.md) for full configuration re
    ```
 
 3. Restart Windsurf/Claude Desktop
+
+#### Option 2: Using Docker (No Build Required)
+
+This option is easier - no need to build the binary locally!
+
+1. Make sure MDDB server is running:
+   ```bash
+   docker run -d -p 11023:11023 -p 11024:11024 tradik/mddb:latest
+   ```
+
+2. Add to your MCP config file:
+
+   **macOS/Linux:** `~/.windsurf/mcp.json`
+   ```json
+   {
+     "mcpServers": {
+       "mddb": {
+         "command": "docker",
+         "args": [
+           "run", "-i", "--rm",
+           "--network", "host",
+           "-e", "MDDB_GRPC_ADDRESS=localhost:11024",
+           "-e", "MDDB_REST_BASE_URL=http://localhost:11023",
+           "-e", "MDDB_TRANSPORT_MODE=grpc_with_rest_fallback",
+           "ghcr.io/tradik/mddb/mddb-mcp:latest"
+         ]
+       }
+     }
+   }
+   ```
+
+   **Windows:** `%APPDATA%\Windsurf\mcp.json`
+   ```json
+   {
+     "mcpServers": {
+       "mddb": {
+         "command": "docker",
+         "args": [
+           "run", "-i", "--rm",
+           "-e", "MDDB_GRPC_ADDRESS=host.docker.internal:11024",
+           "-e", "MDDB_REST_BASE_URL=http://host.docker.internal:11023",
+           "-e", "MDDB_TRANSPORT_MODE=grpc_with_rest_fallback",
+           "ghcr.io/tradik/mddb/mddb-mcp:latest"
+         ]
+       }
+     }
+   }
+   ```
+
+3. Restart Windsurf/Claude Desktop
+
+**Note:** Docker option requires Docker to be running. The image will be pulled automatically on first use.
 
 See `mcp.json.example` and `mcp-docker.json.example` for more examples.
 
