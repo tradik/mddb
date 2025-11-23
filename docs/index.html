@@ -163,7 +163,8 @@
         <div class="container">
             <h2>Quick Start</h2>
             <div class="tabs">
-                <button class="tab-btn active" data-tab="docker">Docker</button>
+                <button class="tab-btn active" data-tab="docker">Docker (Recommended)</button>
+                <button class="tab-btn" data-tab="docker-compose">Docker Compose</button>
                 <button class="tab-btn" data-tab="binary">Binary</button>
                 <button class="tab-btn" data-tab="source">From Source</button>
             </div>
@@ -178,6 +179,20 @@ docker run -d \
 
 # Test the API
 curl http://localhost:11023/health</code></pre>
+                </div>
+                <div class="tab-pane" id="docker-compose">
+                    <pre><code># Clone repository
+git clone https://github.com/tradik/mddb.git
+cd mddb
+
+# Start all services (MDDB + Panel + MCP)
+make docker-up
+
+# Services available:
+# - MDDB HTTP: http://localhost:11023
+# - MDDB gRPC: localhost:11024
+# - Web Panel: http://localhost:3000
+# - MCP Server: http://localhost:9000</code></pre>
                 </div>
                 <div class="tab-pane" id="binary">
                     <pre><code># Download binary
@@ -273,12 +288,12 @@ docker pull tradik/mddb:2.0.4</code></pre>
         <div class="container">
             <h2>Documentation</h2>
             <div class="docs-grid">
-                <a href="QUICKSTART.md" class="doc-card">
+                <a href="md-viewer.html?doc=QUICKSTART.md" class="doc-card">
                     <div class="doc-icon">🚀</div>
                     <h3>Quick Start</h3>
                     <p>Get up and running in 5 minutes</p>
                 </a>
-                <a href="swagger.html" class="doc-card featured">
+                <a href="/mddb/swagger.html" class="doc-card featured">
                     <div class="doc-icon">📋</div>
                     <h3>API Documentation</h3>
                     <p>Interactive Swagger UI</p>
@@ -289,32 +304,32 @@ docker pull tradik/mddb:2.0.4</code></pre>
                     <h3>OpenAPI Spec</h3>
                     <p>Machine-readable API specification</p>
                 </a>
-                <a href="HEALTHCHECK.md" class="doc-card">
+                <a href="md-viewer.html?doc=HEALTHCHECK.md" class="doc-card">
                     <div class="doc-icon">💚</div>
                     <h3>Health Checks</h3>
                     <p>Docker & Kubernetes monitoring</p>
                 </a>
-                <a href="GRPC.md" class="doc-card">
+                <a href="md-viewer.html?doc=GRPC.md" class="doc-card">
                     <div class="doc-icon">⚡</div>
                     <h3>gRPC Guide</h3>
                     <p>High-performance protocol</p>
                 </a>
-                <a href="EXAMPLES.md" class="doc-card">
+                <a href="md-viewer.html?doc=EXAMPLES.md" class="doc-card">
                     <div class="doc-icon">💡</div>
                     <h3>Examples</h3>
                     <p>Code examples and patterns</p>
                 </a>
-                <a href="DOCKER.md" class="doc-card">
+                <a href="md-viewer.html?doc=DOCKER.md" class="doc-card">
                     <div class="doc-icon">🐳</div>
                     <h3>Docker Guide</h3>
                     <p>Container deployment</p>
                 </a>
-                <a href="ARCHITECTURE.md" class="doc-card">
+                <a href="md-viewer.html?doc=ARCHITECTURE.md" class="doc-card">
                     <div class="doc-icon">🏗️</div>
                     <h3>Architecture</h3>
                     <p>System design and internals</p>
                 </a>
-                <a href="../services/mddb-mcp/README.md" class="doc-card featured">
+                <a href="https://github.com/tradik/mddb/tree/main/services/mddb-mcp" class="doc-card featured" target="_blank" rel="noopener">
                     <div class="doc-icon">🤖</div>
                     <h3>MCP Server</h3>
                     <p>LLM integration for Windsurf & Claude</p>
@@ -507,10 +522,10 @@ make build-stdio
                 <div class="footer-section">
                     <h4>Documentation</h4>
                     <ul>
-                        <li><a href="QUICKSTART.md">Quick Start</a></li>
-                        <li><a href="swagger.html">API Docs</a></li>
-                        <li><a href="EXAMPLES.md">Examples</a></li>
-                        <li><a href="ARCHITECTURE.md">Architecture</a></li>
+                        <li><a href="md-viewer.html?doc=QUICKSTART.md">Quick Start</a></li>
+                        <li><a href="/mddb/swagger.html">API Docs</a></li>
+                        <li><a href="md-viewer.html?doc=EXAMPLES.md">Examples</a></li>
+                        <li><a href="md-viewer.html?doc=ARCHITECTURE.md">Architecture</a></li>
                     </ul>
                 </div>
                 <div class="footer-section">

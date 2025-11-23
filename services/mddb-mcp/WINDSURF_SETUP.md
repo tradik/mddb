@@ -106,7 +106,7 @@ Done! The Docker image will be pulled automatically on first use.
 ### Step 1: Build the stdio binary
 
 ```bash
-cd /Users/rafalrabczuk/github.com/tradik/mddb/services/mddb-mcp
+cd /Users/user/github.com/tradik/mddb/services/mddb-mcp
 make build-stdio
 ```
 
@@ -117,7 +117,7 @@ This creates `mddb-mcp-stdio` binary in the current directory.
 ### Option A: Docker Compose (recommended)
 
 ```bash
-cd /Users/rafalrabczuk/github.com/tradik/mddb
+cd /Users/user/github.com/tradik/mddb
 make docker-up
 ```
 
@@ -129,7 +129,7 @@ This starts:
 ### Option B: Local binary
 
 ```bash
-cd /Users/rafalrabczuk/github.com/tradik/mddb/services/mddbd
+cd /Users/user/github.com/tradik/mddb/services/mddbd
 go run . -path /tmp/mddb.db -mode wr
 ```
 
@@ -149,7 +149,7 @@ go run . -path /tmp/mddb.db -mode wr
    {
      "mcpServers": {
        "mddb": {
-         "command": "/Users/rafalrabczuk/github.com/tradik/mddb/services/mddb-mcp/mddb-mcp-stdio",
+         "command": "/Users/user/github.com/tradik/mddb/services/mddb-mcp/mddb-mcp-stdio",
          "env": {
            "MDDB_GRPC_ADDRESS": "localhost:11024",
            "MDDB_REST_BASE_URL": "http://localhost:11023",
@@ -184,7 +184,7 @@ In Windsurf, you should now see MDDB MCP available. You can test it by:
 
 1. Check if the binary path is correct:
    ```bash
-   ls -la /Users/rafalrabczuk/github.com/tradik/mddb/services/mddb-mcp/mddb-mcp-stdio
+   ls -la /Users/user/github.com/tradik/mddb/services/mddb-mcp/mddb-mcp-stdio
    ```
 
 2. Check if MDDB server is running:
@@ -216,7 +216,7 @@ In Windsurf, you should now see MDDB MCP available. You can test it by:
 ### Test stdio binary manually
 
 ```bash
-cd /Users/rafalrabczuk/github.com/tradik/mddb/services/mddb-mcp
+cd /Users/user/github.com/tradik/mddb/services/mddb-mcp
 
 # Start the binary
 ./mddb-mcp-stdio
