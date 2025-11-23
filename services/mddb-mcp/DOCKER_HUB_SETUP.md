@@ -22,15 +22,13 @@ To publish to Docker Hub, you need to add secrets to your GitHub repository:
 1. Go to https://github.com/tradik/mddb/settings/secrets/actions
 2. Click **New repository secret**
 
-**Add two secrets:**
+**Add one secret:**
 
-#### DOCKERHUB_USERNAME
-- Name: `DOCKERHUB_USERNAME`
-- Value: `tradik` (your Docker Hub username)
-
-#### DOCKERHUB_TOKEN
-- Name: `DOCKERHUB_TOKEN`
+#### DOCKER_HUB_TOKEN
+- Name: `DOCKER_HUB_TOKEN`
 - Value: `dckr_pat_xxxxx...` (the token you copied)
+
+**Note:** Username is hardcoded in workflow as `tradik` (see `env.DOCKER_HUB_USERNAME`)
 
 ### 3. Trigger Workflow
 
