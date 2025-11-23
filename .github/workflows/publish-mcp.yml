@@ -15,7 +15,7 @@ env:
   GHCR_REGISTRY: ghcr.io
   GHCR_IMAGE: ${{ github.repository }}/mddb-mcp
   DOCKER_HUB_USERNAME: tradik
-  DOCKERHUB_IMAGE: tradik/mddb-mcp
+  IMAGE_NAME: mddb
 
 jobs:
   build-and-push:
@@ -52,15 +52,16 @@ jobs:
         with:
           images: |
             ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE }}
-            ${{ env.DOCKERHUB_IMAGE }}
+            ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch,suffix=-mcp
+            type=ref,event=pr,suffix=-mcp
+            type=semver,pattern={{version}},suffix=-mcp
+            type=semver,pattern={{major}}.{{minor}},suffix=-mcp
+            type=semver,pattern={{major}},suffix=-mcp
+            type=sha,suffix=-mcp
+            type=raw,value=mcp
+            type=raw,value=mcp-latest
       
       - name: Build and push Docker image
         id: build

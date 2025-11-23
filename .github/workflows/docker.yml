@@ -6,11 +6,15 @@ on:
 env:
   DOCKER_HUB_USERNAME: tradik
   IMAGE_NAME: mddb
+  GHCR_REGISTRY: ghcr.io
 
 jobs:
   build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     
     steps:
       - name: Checkout code
@@ -29,6 +33,13 @@ jobs:
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.GHCR_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
         id: meta
@@ -62,6 +73,8 @@ jobs:
           tags: |
             ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.VERSION_NUM }}
             ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.GHCR_REGISTRY }}/${{ github.repository }}:${{ steps.meta.outputs.VERSION_NUM }}
+            ${{ env.GHCR_REGISTRY }}/${{ github.repository }}:latest
           labels: |
             org.opencontainers.image.title=MDDB Server
             org.opencontainers.image.description=High-performance markdown database server with gRPC and HTTP/3 support
@@ -95,9 +108,13 @@ jobs:
           cat >> $GITHUB_STEP_SUMMARY << 'EOF'
           ## 🐳 Docker Images Published
           
-          ### Production Images
+          ### Docker Hub
           - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.VERSION_NUM }}`
           - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:latest`
+          
+          ### GitHub Container Registry
+          - `${{ env.GHCR_REGISTRY }}/${{ github.repository }}:${{ steps.meta.outputs.VERSION_NUM }}`
+          - `${{ env.GHCR_REGISTRY }}/${{ github.repository }}:latest`
           
           ### Platforms
           - `linux/amd64` (Intel/AMD)
@@ -105,7 +122,13 @@ jobs:
           
           ### Quick Start
           ```bash
+          # Docker Hub
           docker pull ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.VERSION_NUM }}
+          
+          # Or GitHub Container Registry
+          docker pull ${{ env.GHCR_REGISTRY }}/${{ github.repository }}:${{ steps.meta.outputs.VERSION_NUM }}
+          
+          # Run
           docker run -d -p 11023:11023 -p 11024:11024 \
             -v mddb-data:/data \
             -e MDDB_EXTREME=true \
@@ -114,6 +137,7 @@ jobs:
           
           ### Links
           - [Docker Hub](https://hub.docker.com/r/${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }})
+          - [GitHub Packages](https://github.com/${{ github.repository }}/pkgs/container/${{ env.IMAGE_NAME }})
           - [GitHub Release](https://github.com/tradik/mddb/releases/tag/${{ steps.meta.outputs.VERSION }})
           - [Documentation](https://github.com/tradik/mddb)
           EOF

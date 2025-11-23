@@ -102,7 +102,7 @@ This option is easier - no need to build the binary locally!
            "-e", "MDDB_GRPC_ADDRESS=localhost:11024",
            "-e", "MDDB_REST_BASE_URL=http://localhost:11023",
            "-e", "MDDB_TRANSPORT_MODE=grpc_with_rest_fallback",
-           "tradik/mddb-mcp:latest"
+           "tradik/mddb:mcp"
          ]
        }
      }
@@ -120,7 +120,7 @@ This option is easier - no need to build the binary locally!
            "-e", "MDDB_GRPC_ADDRESS=host.docker.internal:11024",
            "-e", "MDDB_REST_BASE_URL=http://host.docker.internal:11023",
            "-e", "MDDB_TRANSPORT_MODE=grpc_with_rest_fallback",
-           "tradik/mddb-mcp:latest"
+           "tradik/mddb:mcp"
          ]
        }
      }
@@ -174,7 +174,7 @@ Tools are operations that can modify state or perform tasks:
 ## Docker
 
 The MCP server is available on both registries:
-- **Docker Hub**: `tradik/mddb-mcp:latest` (recommended)
+- **Docker Hub**: `tradik/mddb:mcp` (recommended - same repo as main server)
 - **GitHub Container Registry**: `ghcr.io/tradik/mddb/mddb-mcp:latest`
 
 ```bash
@@ -183,7 +183,7 @@ docker run -d \
   -p 9000:9000 \
   -e MDDB_GRPC_ADDRESS=host.docker.internal:11024 \
   -e MDDB_REST_BASE_URL=http://host.docker.internal:11023 \
-  tradik/mddb-mcp:latest
+  tradik/mddb:mcp
 
 # Or using GitHub Container Registry
 docker run -d \

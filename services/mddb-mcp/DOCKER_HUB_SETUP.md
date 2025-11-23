@@ -2,7 +2,7 @@
 
 The MCP Docker image is now published to **both** registries:
 - **GitHub Container Registry**: `ghcr.io/tradik/mddb/mddb-mcp:latest`
-- **Docker Hub**: `tradik/mddb-mcp:latest`
+- **Docker Hub**: `tradik/mddb:mcp` (same repo as main MDDB server)
 
 ## Setup GitHub Secrets
 
@@ -55,7 +55,7 @@ docker pull ghcr.io/tradik/mddb/mddb-mcp:latest
 
 ### Docker Hub
 ```bash
-docker pull tradik/mddb-mcp:latest
+docker pull tradik/mddb:mcp
 ```
 
 ## Usage
@@ -77,7 +77,7 @@ docker run -i --rm \
   --network host \
   -e MDDB_GRPC_ADDRESS=localhost:11024 \
   -e MDDB_REST_BASE_URL=http://localhost:11023 \
-  tradik/mddb-mcp:latest
+  tradik/mddb:mcp
 ```
 
 ## Workflow Details
@@ -102,6 +102,6 @@ See `.github/workflows/publish-mcp.yml` for details.
 - Wait a few minutes - Docker Hub can be slow to update
 
 ### "denied: requested access to the resource is denied"
-- Make sure repository `tradik/mddb-mcp` exists on Docker Hub
-- Or create it: https://hub.docker.com/repository/create
-- Set visibility to **Public**
+- MCP uses the same repository as main MDDB server: `tradik/mddb`
+- No need to create a separate repository
+- Tags are: `tradik/mddb:mcp`, `tradik/mddb:mcp-latest`, etc.
