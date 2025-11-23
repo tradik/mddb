@@ -50,6 +50,34 @@ services:
       - "com.mddb.description=MDDB Panel - Web Admin Interface"
       - "com.mddb.version=2.0.4"
 
+  mddb-mcp:
+    build:
+      context: ./services/mddb-mcp
+      dockerfile: Dockerfile
+    container_name: mddb-mcp
+    restart: unless-stopped
+    ports:
+      - "9000:9000"  # MCP API
+    environment:
+      - MDDB_GRPC_ADDRESS=mddb:11024
+      - MDDB_REST_BASE_URL=http://mddb:11023
+      - MDDB_TRANSPORT_MODE=grpc_with_rest_fallback
+      - MCP_LISTEN_ADDRESS=0.0.0.0:9000
+    networks:
+      - mddb-network
+    depends_on:
+      mddb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.mddb.description=MDDB MCP - Model Context Protocol Server"
+      - "com.mddb.version=2.0.4"
+
 volumes:
   mddb-data:
     driver: local

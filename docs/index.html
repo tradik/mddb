@@ -28,8 +28,34 @@
     
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📝</text></svg>">
+    
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "MDDB",
+      "applicationCategory": "DatabaseApplication",
+      "operatingSystem": "Linux, macOS, Windows, FreeBSD",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "High-performance, version-controlled markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf)",
+      "softwareVersion": "2.0.4",
+      "datePublished": "2025-01-09",
+      "author": {
+        "@type": "Organization",
+        "name": "MDDB Team"
+      },
+      "license": "https://opensource.org/licenses/BSD-3-Clause",
+      "codeRepository": "https://github.com/tradik/mddb"
+    }
+    </script>
 </head>
 <body>
+    <a href="#main-content" class="skip-to-main">Skip to main content</a>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
@@ -44,14 +70,17 @@
                 <a href="#examples">Examples</a>
                 <a href="https://github.com/tradik/mddb" target="_blank" rel="noopener">GitHub</a>
             </div>
-            <button class="mobile-menu-toggle" aria-label="Toggle menu">
-                <span></span>
-                <span></span>
-                <span></span>
+            <button class="mobile-menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+                <span class="sr-only">Menu</span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
+                <span aria-hidden="true"></span>
             </button>
         </div>
     </nav>
 
+    <!-- Main Content -->
+    <main id="main-content">
     <!-- Hero Section -->
     <header class="hero">
         <div class="container">
@@ -94,6 +123,11 @@
                     <div class="feature-icon">🔌</div>
                     <h3>Dual Protocol</h3>
                     <p>HTTP/JSON for easy debugging, gRPC/Protobuf for high performance</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>MCP Integration</h3>
+                    <p>Model Context Protocol server for seamless LLM integration (Windsurf, Claude Desktop)</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-icon">🌍</div>
@@ -222,6 +256,7 @@ docker pull tradik/mddb:2.0.4</code></pre>
             <div class="release-notes">
                 <h3>What's New in v2.0.4</h3>
                 <ul>
+                    <li>🤖 <strong>MCP Server</strong> - Model Context Protocol for Windsurf & Claude Desktop</li>
                     <li>✨ Health check endpoints (<code>/health</code>, <code>/v1/health</code>)</li>
                     <li>📖 Complete OpenAPI/Swagger documentation</li>
                     <li>🐳 Comprehensive health check guide for Docker/Kubernetes</li>
@@ -279,6 +314,12 @@ docker pull tradik/mddb:2.0.4</code></pre>
                     <h3>Architecture</h3>
                     <p>System design and internals</p>
                 </a>
+                <a href="../services/mddb-mcp/README.md" class="doc-card featured">
+                    <div class="doc-icon">🤖</div>
+                    <h3>MCP Server</h3>
+                    <p>LLM integration for Windsurf & Claude</p>
+                    <span class="badge-new">New</span>
+                </a>
             </div>
         </div>
     </section>
@@ -291,6 +332,7 @@ docker pull tradik/mddb:2.0.4</code></pre>
                 <button class="example-tab active" data-example="add">Add Document</button>
                 <button class="example-tab" data-example="get">Get Document</button>
                 <button class="example-tab" data-example="search">Search</button>
+                <button class="example-tab" data-example="mcp">MCP Setup</button>
                 <button class="example-tab" data-example="health">Health Check</button>
             </div>
             <div class="example-content">
@@ -335,6 +377,28 @@ docker pull tradik/mddb:2.0.4</code></pre>
     "limit": 10
   }'</code></pre>
                 </div>
+                <div class="example-pane" id="mcp">
+                    <pre><code># 1. Build MCP stdio binary
+cd services/mddb-mcp
+make build-stdio
+
+# 2. Configure Windsurf (~/.windsurf/mcp.json)
+{
+  "mcpServers": {
+    "mddb": {
+      "command": "/path/to/mddb-mcp-stdio",
+      "env": {
+        "MDDB_GRPC_ADDRESS": "localhost:11024",
+        "MDDB_REST_BASE_URL": "http://localhost:11023",
+        "MDDB_TRANSPORT_MODE": "grpc_with_rest_fallback"
+      }
+    }
+  }
+}
+
+# 3. Restart Windsurf IDE
+# Now you can use MDDB from Windsurf AI!</code></pre>
+                </div>
                 <div class="example-pane" id="health">
                     <pre><code>curl http://localhost:11023/health
 
@@ -369,6 +433,10 @@ docker pull tradik/mddb:2.0.4</code></pre>
                     <h3>🔄 API Backend</h3>
                     <p>Lightweight backend for mobile apps and SPAs with markdown content</p>
                 </div>
+                <div class="use-case">
+                    <h3>🤖 LLM Integration</h3>
+                    <p>Connect to Windsurf, Claude Desktop, and other MCP-compatible AI tools</p>
+                </div>
             </div>
         </div>
     </section>
@@ -401,6 +469,7 @@ docker pull tradik/mddb:2.0.4</code></pre>
             </div>
         </div>
     </section>
+    </main>
 
     <!-- Footer -->
     <footer class="footer">
@@ -443,9 +512,11 @@ docker pull tradik/mddb:2.0.4</code></pre>
         </div>
     </footer>
 
-    <script>
+    <script defer>
         // Mobile menu toggle
         document.querySelector('.mobile-menu-toggle').addEventListener('click', function() {
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', !isExpanded);
             document.querySelector('.nav-links').classList.toggle('active');
             this.classList.toggle('active');
         });

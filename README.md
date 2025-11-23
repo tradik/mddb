@@ -170,6 +170,7 @@ See [Performance Tests](test/README.md) for detailed benchmarks.
 - **gRPC Reflection** - Use grpcurl for debugging
 - **CLI Client** - Full-featured command-line interface
 - **Web Admin Panel** - Modern React-based UI for browsing and managing data
+- **MCP Server** - Model Context Protocol for LLM integration (gRPC + REST fallback)
 
 ### Operations
 - **Export** - NDJSON or ZIP formats with filtering
@@ -193,10 +194,10 @@ See [Performance Tests](test/README.md) for detailed benchmarks.
 ```
 ┌─────────────────────────────────────────────────────┐
 │              Client Applications                    │
-├──────────────┬──────────────┬───────────────────────┤
-│  HTTP/JSON   │ gRPC/Protobuf│   HTTP/3 (QUIC)      │
-│  Port 11023  │  Port 11024  │   Port 11443         │
-├──────────────┴──────────────┴───────────────────────┤
+├──────────────┬──────────────┬──────────┬────────────┤
+│  HTTP/JSON   │ gRPC/Protobuf│ HTTP/3   │ MCP Server │
+│  Port 11023  │  Port 11024  │ 11443    │ Port 9000  │
+├──────────────┴──────────────┴──────────┴────────────┤
 │              MDDB Server (Go)                       │
 │  ┌─────────────────────────────────────────────┐   │
 │  │ Performance Layer (Extreme Mode)            │   │
@@ -410,6 +411,7 @@ make tidy          # Tidy Go modules
 - **[Health Check Guide](docs/HEALTHCHECK.md)** - Health checks for Docker and Kubernetes
 - **[gRPC Documentation](docs/GRPC.md)** - High-performance gRPC API guide
 - **[Web Panel Guide](docs/PANEL.md)** - Web admin interface documentation
+- **[MCP Server Guide](services/mddb-mcp/README.md)** - Model Context Protocol server for LLM integration
 - **[Bulk Import Guide](docs/BULK-IMPORT.md)** - Import markdown files from folders
 - **[Docker Guide](docs/DOCKER.md)** - Docker deployment with Alpine Linux
 - **[Usage Examples](docs/EXAMPLES.md)** - Code examples and patterns

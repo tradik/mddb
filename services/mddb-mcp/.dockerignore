@@ -1,0 +1,6 @@
+*.md
+.git
+.gitignore
+Makefile
+mddb-mcp
+*.log

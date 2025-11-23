@@ -1,0 +1,145 @@
+# MDDB MCP Server
+
+Model Context Protocol (MCP) server for MDDB - provides LLM-friendly access to MDDB markdown database.
+
+## Features
+
+- **Dual Transport**: gRPC (default) with REST fallback
+- **Full API Coverage**: All MDDB operations exposed as MCP resources and tools
+- **Configurable**: YAML config with ENV override
+- **Production Ready**: Health checks, graceful shutdown, error handling
+
+## Quick Start
+
+### Build
+
+```bash
+cd services/mddb-mcp
+
+# HTTP server mode
+go build -o mddb-mcp ./cmd/mddb-mcp
+
+# Stdio mode (for Windsurf/Claude Desktop)
+go build -o mddb-mcp-stdio ./cmd/mddb-mcp-stdio
+
+# Or build both
+make build-all
+```
+
+### Run
+
+```bash
+# With default config (config.yaml)
+./mddb-mcp
+
+# With custom config
+MDDB_MCP_CONFIG=/path/to/config.yaml ./mddb-mcp
+
+# With ENV overrides
+MDDB_GRPC_ADDRESS=mddb:11024 \
+MDDB_REST_BASE_URL=http://mddb:11023 \
+MDDB_TRANSPORT_MODE=grpc_with_rest_fallback \
+./mddb-mcp
+```
+
+## Configuration
+
+See [docs/mddb-mcp-config.md](docs/mddb-mcp-config.md) for full configuration reference.
+
+### Windsurf / Claude Desktop Setup
+
+1. Build the stdio binary:
+   ```bash
+   cd services/mddb-mcp
+   make build-stdio
+   ```
+
+2. Add to your MCP config file:
+
+   **macOS/Linux:** `~/.windsurf/mcp.json` or `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+   **Windows:** `%APPDATA%\Windsurf\mcp.json` or `%APPDATA%\Claude\claude_desktop_config.json`
+
+   ```json
+   {
+     "mcpServers": {
+       "mddb": {
+         "command": "/full/path/to/mddb-mcp-stdio",
+         "env": {
+           "MDDB_GRPC_ADDRESS": "localhost:11024",
+           "MDDB_REST_BASE_URL": "http://localhost:11023",
+           "MDDB_TRANSPORT_MODE": "grpc_with_rest_fallback"
+         }
+       }
+     }
+   }
+   ```
+
+3. Restart Windsurf/Claude Desktop
+
+See `mcp.json.example` and `mcp-docker.json.example` for more examples.
+
+### Transport Modes
+
+- `grpc_only` - Use only gRPC
+- `rest_only` - Use only HTTP/REST
+- `grpc_with_rest_fallback` - Try gRPC first, fallback to REST on error (default)
+- `rest_with_grpc_fallback` - Try REST first, fallback to gRPC on error
+
+## MCP Resources
+
+Resources are read-only endpoints for retrieving data:
+
+- `mddb://health` - MDDB server health status
+- `mddb://stats` - Server and database statistics
+- `mddb://{collection}/{key}?lang={lang}` - Get document content
+- `mddb-search://{collection}?meta.{key}={value}&limit=10` - Search documents
+
+## MCP Tools
+
+Tools are operations that can modify state or perform tasks:
+
+- `add_document` - Add or update a document
+- `search_documents` - Search with filters and sorting
+- `delete_document` - Delete a document
+- `get_stats` - Get server statistics
+- `add_documents_batch` - Batch add/update documents
+- `delete_documents_batch` - Batch delete documents
+- `export_documents` - Export documents (NDJSON/ZIP)
+- `create_backup` - Create database backup
+- `restore_backup` - Restore from backup
+
+## API Endpoints
+
+- `GET /health` - MCP server health
+- `GET /mcp/resources` - List available resources
+- `POST /mcp/resources/read` - Read a resource
+- `GET /mcp/tools` - List available tools
+- `POST /mcp/tools/call` - Call a tool
+
+## Docker
+
+```bash
+docker build -t mddb-mcp .
+docker run -p 9000:9000 \
+  -e MDDB_GRPC_ADDRESS=mddb:11024 \
+  -e MDDB_REST_BASE_URL=http://mddb:11023 \
+  mddb-mcp
+```
+
+## Development
+
+```bash
+# Run tests
+go test ./...
+
+# Format code
+go fmt ./...
+
+# Lint
+golangci-lint run
+```
+
+## License
+
+BSD-3-Clause (same as MDDB)

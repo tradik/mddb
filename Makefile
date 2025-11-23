@@ -242,10 +242,16 @@ docker-build-panel: ## 🐳 Build MDDB Panel Docker image
 	@docker build -t mddb-panel:latest -f services/mddb-panel/Dockerfile ./services/mddb-panel
 	@echo "${GREEN}✓ Docker image built: mddb-panel:latest${RESET}"
 
-docker-build-all: ## 🐳 Build all Docker images (server + panel)
+docker-build-mcp: ## 🐳 Build MDDB MCP Docker image
+	@echo "${YELLOW}🐳 Building MDDB MCP Docker image...${RESET}"
+	@docker build -t mddb-mcp:latest -f services/mddb-mcp/Dockerfile ./services/mddb-mcp
+	@echo "${GREEN}✓ Docker image built: mddb-mcp:latest${RESET}"
+
+docker-build-all: ## 🐳 Build all Docker images (server + panel + mcp)
 	@echo "${YELLOW}🐳 Building all Docker images...${RESET}"
 	@docker build -t mddb:latest -f services/mddbd/Dockerfile .
 	@docker build -t mddb-panel:latest -f services/mddb-panel/Dockerfile ./services/mddb-panel
+	@docker build -t mddb-mcp:latest -f services/mddb-mcp/Dockerfile ./services/mddb-mcp
 	@echo "${GREEN}✓ All Docker images built${RESET}"
 
 docker-build-dev: ## 🐳 Build development Docker image
@@ -260,6 +266,7 @@ docker-up: ## 🚀 Start Docker containers (production)
 	@echo "${BLUE}  HTTP API: http://localhost:11023${RESET}"
 	@echo "${BLUE}  gRPC API: localhost:11024${RESET}"
 	@echo "${BLUE}  Web Panel: http://localhost:3000${RESET}"
+	@echo "${BLUE}  MCP Server: http://localhost:9000${RESET}"
 
 docker-up-dev: ## 🔧 Start Docker containers (development with hot reload)
 	@echo "${YELLOW}🔧 Starting development containers...${RESET}"
@@ -289,7 +296,7 @@ docker-clean: ## 🧹 Clean Docker resources
 	@echo "${YELLOW}🧹 Cleaning Docker resources...${RESET}"
 	@docker compose down -v
 	@docker compose -f docker-compose.dev.yml down -v 2>/dev/null || true
-	@docker rmi mddb:latest mddb:dev mddb-panel:latest 2>/dev/null || true
+	@docker rmi mddb:latest mddb:dev mddb-panel:latest mddb-mcp:latest 2>/dev/null || true
 	@echo "${GREEN}✓ Docker resources cleaned${RESET}"
 
 docker-setup-network: ## 🌐 Create Docker network

@@ -1,0 +1,10 @@
+mcp:
+  listenAddress: "0.0.0.0:9000"
+
+mddb:
+  grpcAddress: "localhost:11024"
+  restBaseUrl: "http://localhost:11023"
+  # grpc_only | rest_only | grpc_with_rest_fallback | rest_with_grpc_fallback
+  transportMode: "grpc_with_rest_fallback"
+  timeoutSeconds: 2
+  maxRetries: 1
