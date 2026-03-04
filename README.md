@@ -50,7 +50,7 @@ make dev-start-with-ollama
 
 | Service | Port | Image | Description |
 |---------|------|-------|-------------|
-| **mddbd** | 11023 (HTTP), 11024 (gRPC) | `tradik/mddb:latest` | Database server (includes MCP) |
+| **mddbd** | 11023 (HTTP), 11024 (gRPC), 9000 (MCP) | `tradik/mddb:latest` | Database server |
 | **mddb-panel** | 3000 | `tradik/mddb:panel` | React web admin UI |
 
 ### Docker - Individual Services
@@ -58,7 +58,7 @@ make dev-start-with-ollama
 ```bash
 # MDDB Server only
 docker run -d --name mddb \
-  -p 11023:11023 -p 11024:11024 \
+  -p 11023:11023 -p 11024:11024 -p 9000:9000 \
   -v mddb-data:/data \
   tradik/mddb:latest
 
