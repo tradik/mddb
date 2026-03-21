@@ -654,6 +654,14 @@ docker pull tradik/mddb:2.8.0</code></pre>
                                     site</span></li>
                             <li><a href="chat.html">Chat Widget</a><span class="docs-badge">New</span><span
                                     class="docs-desc">Embeddable AI chatbot powered by MDDB</span></li>
+
+                            <h3 class="docs-group-title">Step-by-Step Guides</h3>
+                            <li><a href="md-viewer.html?doc=uses/youtube-transcribe.md">YouTube Transcript Analyzer</a><span
+                                    class="docs-badge">New</span><span class="docs-desc">Scan a channel, query with Claude CLI</span></li>
+                            <li><a href="md-viewer.html?doc=uses/wordpress-analyzer.md">WordPress Analyzer</a><span
+                                    class="docs-badge">New</span><span class="docs-desc">Audit content, SEO, broken links</span></li>
+                            <li><a href="md-viewer.html?doc=uses/website-chat.md">Website Chat</a><span
+                                    class="docs-badge">New</span><span class="docs-desc">Deploy AI chat with Docker + Ollama</span></li>
                         </ul>
                     </div>
                 </div>
@@ -960,6 +968,21 @@ $db->collection('cache')->setTtl('temp', 'en', 3600);</code></pre>
                         <h3>🌐 Multi-language Sites</h3>
                         <p>Store and manage content in multiple languages with the same document key</p>
                     </div>
+                    <div class="use-case">
+                        <h3>🎬 YouTube Analysis</h3>
+                        <p>Download channel transcripts, load into MDDB, query with Claude CLI via MCP.
+                            <a href="md-viewer.html?doc=uses/youtube-transcribe.md">Step-by-step guide →</a></p>
+                    </div>
+                    <div class="use-case">
+                        <h3>🔍 WordPress Auditing</h3>
+                        <p>Export WP content with wpexportjson, analyze SEO, links, and quality with AI.
+                            <a href="md-viewer.html?doc=uses/wordpress-analyzer.md">Step-by-step guide →</a></p>
+                    </div>
+                    <div class="use-case">
+                        <h3>💬 Website Chat</h3>
+                        <p>Deploy an AI chatbot on any site with Docker, Ollama, and the MDDB chat widget.
+                            <a href="md-viewer.html?doc=uses/website-chat.md">Step-by-step guide →</a></p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1081,7 +1104,7 @@ graph LR
     <script defer>
         // Single source of truth for version — change here to update everywhere
         const MDDB_VERSION = '2.8.0';
-        const MDDB_RELEASE_DATE = 'March 10, 2026';
+        const MDDB_RELEASE_DATE = 'March 19, 2026';
 
         // Replace all version references in the page
         document.querySelectorAll('[data-v]').forEach(el => {
