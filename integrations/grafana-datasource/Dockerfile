@@ -1,6 +1,6 @@
 # Grafana 13 image with the MDDB datasource plugin preinstalled.
 # Build context expects the plugin already bundled at ./dist (run `make build` first).
-FROM grafana/grafana:13.0.1
+FROM grafana/grafana:13.0.2
 
 USER root
 
