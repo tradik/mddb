@@ -26,18 +26,18 @@
   },
   "dependencies": {
     "@actions/core": "^1.11.1",
-    "@actions/glob": "^0.5.0"
+    "@actions/glob": "^0.7.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.20.0",
-    "@vercel/ncc": "^0.38.3",
+    "@vercel/ncc": "^0.44.0",
     "eslint": "^9.20.0",
     "jest": "^30.0.0",
-    "prettier": "^3.4.2",
-    "ts-jest": "^29.2.5",
+    "prettier": "^3.8.4",
+    "ts-jest": "^29.4.11",
     "typescript": "^6.0.3"
   }
 }
