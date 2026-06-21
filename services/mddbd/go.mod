@@ -5,7 +5,7 @@ go 1.26
 toolchain go1.26.4
 
 require (
-	github.com/99designs/gqlgen v0.17.91
+	github.com/99designs/gqlgen v0.17.92
 	github.com/agnivade/levenshtein v1.2.1
 	github.com/bits-and-blooms/bloom/v3 v3.7.1
 	github.com/blevesearch/snowballstem v0.9.0
@@ -18,8 +18,8 @@ require (
 	github.com/quic-go/quic-go v0.60.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/tidwall/rtree v1.10.0
-	github.com/vektah/gqlparser/v2 v2.5.34
-	go.etcd.io/bbolt v1.4.3
+	github.com/vektah/gqlparser/v2 v2.5.35
+	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.53.0
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
@@ -30,12 +30,11 @@ require (
 	github.com/bits-and-blooms/bitset v1.24.5 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/chewxy/math32 v1.11.2 // indirect
-	github.com/coder/websocket v1.8.14 // indirect
+	github.com/coder/websocket v1.8.15 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/google/renameio v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
