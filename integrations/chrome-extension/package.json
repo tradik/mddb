@@ -26,18 +26,18 @@
     "all": "npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run package"
   },
   "devDependencies": {
-    "@types/chrome": "^0.0.290",
+    "@types/chrome": "^0.2.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
     "@typescript-eslint/parser": "^8.20.0",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "eslint": "^9.20.0",
     "jest": "^30.0.0",
     "jest-environment-jsdom": "^30.0.0",
-    "prettier": "^3.4.2",
+    "prettier": "^3.9.1",
     "ts-jest": "^29.2.5",
     "typescript": "^6.0.3",
-    "undici": "^8.3.0"
+    "undici": "^8.5.0"
   }
 }
