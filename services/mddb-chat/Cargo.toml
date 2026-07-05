@@ -32,7 +32,7 @@ dashmap = "6"
 uuid = { version = "1", features = ["v4"] }
 
 # Security
-governor = "0.8"
+governor = "0.10"
 
 # Logging
 tracing = "0.1"
