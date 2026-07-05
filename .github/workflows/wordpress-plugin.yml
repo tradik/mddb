@@ -36,7 +36,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
@@ -107,7 +107,7 @@ jobs:
         working-directory: ${{ env.WORKING_DIR }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up PHP
         uses: shivammathur/setup-php@v2
