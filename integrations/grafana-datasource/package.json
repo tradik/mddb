@@ -37,7 +37,7 @@
   },
   "devDependencies": {
     "@grafana/data": "^13.1.0",
-    "@grafana/runtime": "^11.5.0",
+    "@grafana/runtime": "^13.1.0",
     "@grafana/ui": "^13.1.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
