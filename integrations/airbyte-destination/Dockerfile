@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 LABEL io.airbyte.name=airbyte/destination-mddb \
       io.airbyte.version=0.1.1 \
