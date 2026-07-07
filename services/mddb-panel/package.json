@@ -16,7 +16,7 @@
     "date-fns": "^4.4.0",
     "express": "^5.1.0",
     "graphql": "^16.9.0",
-    "http-proxy-middleware": "^3.0.3",
+    "http-proxy-middleware": "^4.2.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.23.0",
     "prismjs": "^1.30.0",
