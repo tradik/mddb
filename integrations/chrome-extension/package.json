@@ -28,14 +28,14 @@
   "devDependencies": {
     "@types/chrome": "^0.2.2",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.1.1",
     "@typescript-eslint/eslint-plugin": "^8.63.0",
     "@typescript-eslint/parser": "^8.20.0",
     "esbuild": "^0.28.1",
-    "eslint": "^10.6.0",
+    "eslint": "^10.7.0",
     "jest": "^30.0.0",
     "jest-environment-jsdom": "^30.0.0",
-    "prettier": "^3.9.4",
+    "prettier": "^3.9.5",
     "ts-jest": "^29.2.5",
     "typescript": "^6.0.3",
     "undici": "^8.7.0"
