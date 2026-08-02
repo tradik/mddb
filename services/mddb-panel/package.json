@@ -17,7 +17,7 @@
     "express": "^5.1.0",
     "http-proxy-middleware": "^4.2.0",
     "leaflet": "^1.9.4",
-    "lucide-react": "^1.27.0",
+    "lucide-react": "^1.28.0",
     "prismjs": "^1.30.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -34,16 +34,16 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^6.0.4",
+    "@vitejs/plugin-react": "^6.0.5",
     "autoprefixer": "^10.5.4",
     "eslint": "^9.39.5",
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
     "globals": "^17.8.0",
-    "postcss": "^8.5.24",
+    "postcss": "^8.5.25",
     "tailwindcss": "^4.1.13",
-    "vite": "^8.1.5"
+    "vite": "^8.2.0"
   },
   "engines": {
     "node": ">=24.3.0",
