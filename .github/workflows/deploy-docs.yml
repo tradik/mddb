@@ -51,13 +51,13 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@v1.8.20
+        uses: spagu/ssg@v1.8.21
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19 and
           # declared feeds (feeds:, RSS) from 1.8.20. The pin is also what made
           # the last mismatch obvious rather than intermittent.
-          version: 'v1.8.20'
+          version: 'v1.8.21'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'
