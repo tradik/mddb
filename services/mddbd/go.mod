@@ -13,7 +13,7 @@ require (
 	github.com/goccy/go-json v0.10.6
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/snappy v1.0.0
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.19.2
 	github.com/minio/minio-go/v7 v7.2.1
 	github.com/quic-go/quic-go v0.61.0
 	github.com/robfig/cron/v3 v3.0.1
@@ -21,7 +21,7 @@ require (
 	github.com/vektah/gqlparser/v2 v2.5.36
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.54.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
