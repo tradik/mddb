@@ -13,16 +13,16 @@ require (
 	github.com/goccy/go-json v0.10.6
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/snappy v1.0.0
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.19.2
 	github.com/minio/minio-go/v7 v7.2.1
 	github.com/quic-go/quic-go v0.61.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/tidwall/rtree v1.11.0
+	github.com/tidwall/rtree v1.11.1
 	github.com/vektah/gqlparser/v2 v2.5.36
 	go.etcd.io/bbolt v1.5.0
-	golang.org/x/crypto v0.54.0
-	google.golang.org/grpc v1.82.1
-	google.golang.org/protobuf v1.36.11
+	golang.org/x/crypto v0.55.0
+	google.golang.org/grpc v1.83.0
+	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -54,7 +54,7 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260610212136-7ab31c22f7ad // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
