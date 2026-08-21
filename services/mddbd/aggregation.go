@@ -190,8 +190,9 @@ func (s *Server) computeHistogram(bDocs *bolt.Bucket, collection, field, interva
 	prefix := []byte("doc|" + collection + "|")
 	c := bDocs.Cursor()
 	for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-		docID := string(k[len(prefix):])
-		if allowedIDs != nil && !allowedIDs[docID] {
+		// Index the map with the conversion inline: the compiler elides the
+		// string allocation for a map lookup, and docID is not needed elsewhere.
+		if allowedIDs != nil && !allowedIDs[string(k[len(prefix):])] {
 			continue
 		}
 		d, err := loadDoc(v)
@@ -382,8 +383,7 @@ func (s *Server) aggregate(req *AggregateRequest) (*AggregateResponse, error) {
 		docPrefix := []byte("doc|" + req.Collection + "|")
 		c := bDocs.Cursor()
 		for k, _ := c.Seek(docPrefix); k != nil && bytes.HasPrefix(k, docPrefix); k, _ = c.Next() {
-			docID := string(k[len(docPrefix):])
-			if allowedIDs == nil || allowedIDs[docID] {
+			if allowedIDs == nil || allowedIDs[string(k[len(docPrefix):])] {
 				resp.TotalDocs++
 			}
 		}

@@ -292,7 +292,7 @@ Access from Windows: `http://localhost:11023`
 
 ### Prerequisites
 
-- **Go 1.26+** - [Download](https://golang.org/dl/)
+- **Go 1.27+** - [Download](https://golang.org/dl/)
 - **Make** - Optional, for Makefile commands
 - **Git** - For cloning repository
 

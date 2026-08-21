@@ -1,6 +1,6 @@
 # mddb — official Go client for MDDB
 
-[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![Module](https://img.shields.io/badge/module-mddb--client-blue)](.)
 [![License](https://img.shields.io/badge/license-see%20repo-lightgrey)](../../../LICENSE)
 

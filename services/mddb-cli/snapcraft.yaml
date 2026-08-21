@@ -29,7 +29,7 @@ parts:
     source: .
     source-type: local
     build-snaps:
-      - go/1.26/stable
+      - go/1.27/stable
     build-environment:
       - CGO_ENABLED: "0"
       - GOFLAGS: "-trimpath"

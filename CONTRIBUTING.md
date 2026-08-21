@@ -7,7 +7,7 @@ security concerns to **security@tradik.com**.
 
 ## Prerequisites
 
-- [Go 1.26+](https://golang.org/dl/)
+- [Go 1.27+](https://golang.org/dl/)
 - [Make](https://www.gnu.org/software/make/)
 - [Protocol Buffers compiler](https://grpc.io/docs/protoc-installation/) (only if modifying `proto/mddb.proto`)
 - [Node.js 24+](https://nodejs.org/) (only for `mddb-panel` changes)

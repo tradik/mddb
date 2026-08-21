@@ -36,7 +36,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.27.0"
   # Disable Go workspace mode in CI so each module builds/tests in isolation.
   # This catches missing `require` entries that go.work would hide by
   # transparently resolving sibling modules. Developers get the workspace

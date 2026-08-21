@@ -17,7 +17,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: '1.26.5'
+  GO_VERSION: '1.27.0'
   DOCKER_HUB_USERNAME: tradik
   IMAGE_NAME: mddb
   GHCR_REGISTRY: ghcr.io

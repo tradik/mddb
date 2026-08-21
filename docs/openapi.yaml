@@ -7277,7 +7277,7 @@ components:
         goVersion:
           type: string
           description: Go runtime version
-          example: go1.26.5
+          example: go1.27.0
         version:
           type: string
           description: MDDB server version

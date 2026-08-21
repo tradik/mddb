@@ -1,6 +1,6 @@
 # MDDB — AI-Native Document Database
 
-[![Go Version](https://img.shields.io/badge/Go-1.26-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.27-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/tradik/mddb)](https://github.com/tradik/mddb/releases)
 [![Docker](https://img.shields.io/docker/v/tradik/mddb?label=docker)](https://hub.docker.com/r/tradik/mddb)

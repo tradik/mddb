@@ -22,7 +22,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.27.0"
   # Scan each module in isolation — mirrors the Tests workflow so we catch
   # vulnerabilities reachable from each module's declared deps, not the
   # workspace-merged graph.

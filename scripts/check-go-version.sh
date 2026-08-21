@@ -32,6 +32,7 @@ version_re='[0-9]+\.[0-9]+\.[0-9]+'
 
 declare -a sources=()  # "file:label=version" rows for reporting
 declare -A versions=() # unique version -> first source seen
+declare -a snap_pins=() # "file=major.minor" rows — snap channels pin no patch
 
 record() {
 	local file="$1" label="$2" version="$3"
@@ -62,6 +63,16 @@ while IFS= read -r match; do
 	[[ -n "${ver}" ]] && record "${file}" "FROM golang" "${ver}"
 done < <(grep -rHnE 'FROM[[:space:]]+golang:'"${version_re}" services 2>/dev/null || true)
 
+# 4) go/X.Y/stable snap channels in snapcraft.yaml. Snap channels track a
+#    major.minor track and carry no patch component, so they are collected
+#    separately and compared against the canonical version's track below —
+#    a snap built on an older Go than the rest is the same class of drift.
+while IFS= read -r match; do
+	file="${match%%:*}"
+	track="$(printf '%s' "${match#*:}" | grep -oE 'go/[0-9]+\.[0-9]+/' | grep -oE '[0-9]+\.[0-9]+')"
+	[[ -n "${track}" ]] && snap_pins+=("${file}=${track}")
+done < <(grep -rHnE 'go/[0-9]+\.[0-9]+/(stable|candidate|beta|edge)' --include='snapcraft.yaml' . 2>/dev/null || true)
+
 if [[ ${#sources[@]} -eq 0 ]]; then
 	echo "check-go-version: no Go version pins found — nothing to verify" >&2
 	exit 2
@@ -69,6 +80,9 @@ fi
 
 if [[ ${PRINT} -eq 1 ]]; then
 	printf '%s\n' "${sources[@]}" | sort
+	for pin in "${snap_pins[@]+"${snap_pins[@]}"}"; do
+		echo "${pin%%=*} (snap go track) = ${pin##*=}"
+	done
 	echo "---"
 fi
 
@@ -82,4 +96,20 @@ if [[ ${#versions[@]} -ne 1 ]]; then
 fi
 
 only_version="${!versions[*]}"
-echo "✓ Go toolchain consistent across ${#sources[@]} pins: go${only_version}"
+
+# Snap channels must sit on the same major.minor track as the pinned toolchain.
+expected_track="${only_version%.*}"
+declare -a snap_drift=()
+for pin in "${snap_pins[@]+"${snap_pins[@]}"}"; do
+	[[ "${pin##*=}" != "${expected_track}" ]] && snap_drift+=("${pin%%=*} pins go/${pin##*=} — expected go/${expected_track}")
+done
+
+if [[ ${#snap_drift[@]} -gt 0 ]]; then
+	echo "✗ Go snap channel DRIFT detected (toolchain is go${only_version}):" >&2
+	printf '  %s\n' "${snap_drift[@]}" >&2
+	echo "" >&2
+	echo "  Update the 'go/X.Y/stable' build-snap in every snapcraft.yaml." >&2
+	exit 1
+fi
+
+echo "✓ Go toolchain consistent across $(( ${#sources[@]} + ${#snap_pins[@]} )) pins: go${only_version}"

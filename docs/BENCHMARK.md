@@ -100,7 +100,7 @@ Benchmark tool for measuring MDDB document insertion throughput. Inserts documen
 ## Prerequisites
 
 - MDDB server running (default `http://localhost:7890`)
-- Go 1.26+
+- Go 1.27+
 
 ## Build
 
