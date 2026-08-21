@@ -1,4 +1,4 @@
-.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat docs-prep docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -157,10 +157,13 @@ mcp-tools-count: ## Verify docs' built-in MCP tool count matches the code (DOC-0
 	@cd services/mddbd && go test -run TestMCPToolCountDocsInSync -count=1 . && \
 		echo "✅ docs MCP tool count matches len(mcpBuiltinTools())"
 
-docs-dev: ## Start SSG docs server in watch mode on :8888
+docs-metadata: ## Write the empty docs/metadata.json SSG expects (gitignored)
+	@test -f docs/metadata.json || echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
+
+docs-dev: docs-metadata ## Start SSG docs server in watch mode on :8888
 	@ssg --config .ssg.yaml --watch --http --port 8888
 
-docs-build: ## Build static documentation site into dist/
+docs-build: docs-metadata ## Build static documentation site into dist/
 	@ssg --config .ssg.yaml --clean
 
 docs-linkcheck: docs-build ## Fail if any internal link would hit a redirect
