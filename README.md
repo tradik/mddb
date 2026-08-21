@@ -52,7 +52,8 @@ Start all services with one command:
 git clone https://github.com/tradik/mddb.git
 cd mddb
 
-# Production mode (all services)
+# Production mode (all services) — set the secrets first, see below
+cp .env.example .env && $EDITOR .env
 docker compose up -d
 
 # Development mode (with hot reload)
@@ -61,6 +62,19 @@ make dev-start
 # Development + Ollama for embeddings
 make dev-start-with-ollama
 ```
+
+> **The production compose refuses to start without credentials.** The image
+> defaults to `MDDB_AUTH_ENABLED=false`, which suits a throwaway `docker run`
+> but not `docker-compose.yml`, which runs the server read-write and publishes
+> HTTP, gRPC and MCP. So the compose file turns authentication on and reads
+> `MDDB_AUTH_JWT_SECRET` and `MDDB_AUTH_ADMIN_PASSWORD` from `.env` with no
+> fallback: leave either unset and compose stops with an error naming the
+> variable, rather than quietly starting an open database.
+>
+> Every port is published on `127.0.0.1` by default. A reverse proxy or
+> cloudflared reaches the containers over `mddb-network` and needs no published
+> port at all; to expose the stack on the host's interfaces, set
+> `MDDB_BIND_ADDR=0.0.0.0` — deliberately, and only with authentication on.
 
 > **Importing existing content:** MDDB does not automatically index bind-mounted
 > directories. Use [`scripts/load-md-folder.sh`](docs/BULK-IMPORT.md) or the ingest
