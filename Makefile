@@ -1,4 +1,4 @@
-.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -152,6 +152,12 @@ check-go-version: ## Verify Go toolchain pins are consistent (go.work/go.mod/CI/
 
 test-go-version: ## Run the Go-version-drift guard test suite
 	@bash scripts/tests/test-go-version.sh
+
+check-changelog: ## Verify the CHANGELOG has exactly one, leading [Unreleased]
+	@bash scripts/check-changelog.sh
+
+test-changelog: ## Run the CHANGELOG structure guard test suite
+	@bash scripts/tests/test-changelog.sh
 
 mcp-tools-count: ## Verify docs' built-in MCP tool count matches the code (DOC-001)
 	@cd services/mddbd && go test -run TestMCPToolCountDocsInSync -count=1 . && \

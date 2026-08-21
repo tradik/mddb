@@ -208,6 +208,15 @@ jobs:
       - name: Run guard test suite
         run: bash scripts/tests/test-go-version.sh
 
+      # DOC-014: the CHANGELOG grew a second [Unreleased] section mid-history,
+      # so recent work sat between 2025 releases and anything reading "the
+      # Unreleased section" could pick the wrong one.
+      - name: Verify CHANGELOG structure
+        run: bash scripts/check-changelog.sh
+
+      - name: Run CHANGELOG guard test suite
+        run: bash scripts/tests/test-changelog.sh
+
   clients-nodejs:
     name: Node client (lockfile + audit)
     runs-on: ubuntu-latest
