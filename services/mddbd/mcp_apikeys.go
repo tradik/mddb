@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,19 @@ import (
 // Keys persist across restarts. Managed via REST API (requires admin auth).
 
 const mcpAPIKeyBucket = "_mcp_api_keys" // #nosec G101 -- bucket name, not a credential
+
+// mcpKeySchemePrefix marks a string as an MCP API key. It is a fixed scheme
+// marker, not key material — every key starts with it.
+const mcpKeySchemePrefix = "mcp_"
+
+// keyFingerprint derives a short, non-reversible identifier for an API key so
+// operations can be correlated in logs without writing any byte of the key
+// itself there (SEC-012). Four bytes of SHA-256 identify a key among any
+// realistic number of them while revealing nothing usable to a log reader.
+func keyFingerprint(key string) string {
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:4])
+}
 
 // MCPAPIKey represents a stored MCP API key.
 type MCPAPIKey struct {
@@ -51,7 +65,7 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64) (*MCPAPIKey, strin
 	if _, err := rand.Read(b); err != nil {
 		return nil, "", fmt.Errorf("failed to generate key: %w", err)
 	}
-	key := "mcp_" + hex.EncodeToString(b)
+	key := mcpKeySchemePrefix + hex.EncodeToString(b)
 
 	apiKey := MCPAPIKey{
 		Key:       key,
@@ -73,7 +87,7 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64) (*MCPAPIKey, strin
 		return nil, "", err
 	}
 
-	log.Printf("MCP API key created: name=%s key=%s...", name, key[:12])
+	log.Printf("MCP API key created: name=%s fingerprint=%s", name, keyFingerprint(key))
 	return &apiKey, key, nil
 }
 
@@ -119,16 +133,16 @@ func (s *mcpAPIKeyStore) List() ([]MCPAPIKeySummary, error) {
 			if err := json.Unmarshal(v, &ak); err != nil {
 				return nil // skip corrupt entries
 			}
-			prefix := string(k)
-			if len(prefix) > 12 {
-				prefix = prefix[:12] + "..."
-			}
+			// SEC-012: the summary identifies a key by fingerprint. KeyPrefix
+			// keeps its shape for existing callers but now carries only the
+			// scheme marker, never the random part of the key.
 			keys = append(keys, MCPAPIKeySummary{
-				KeyPrefix: prefix,
-				Name:      ak.Name,
-				CreatedAt: ak.CreatedAt,
-				ExpiresAt: ak.ExpiresAt,
-				Disabled:  ak.Disabled,
+				KeyPrefix:   mcpKeySchemePrefix,
+				Fingerprint: keyFingerprint(string(k)),
+				Name:        ak.Name,
+				CreatedAt:   ak.CreatedAt,
+				ExpiresAt:   ak.ExpiresAt,
+				Disabled:    ak.Disabled,
 			})
 			return nil
 		})
@@ -146,7 +160,7 @@ func (s *mcpAPIKeyStore) Delete(key string) error {
 		if b.Get([]byte(key)) == nil {
 			return fmt.Errorf("key not found")
 		}
-		log.Printf("MCP API key deleted: %s...", key[:12])
+		log.Printf("MCP API key deleted: fingerprint=%s", keyFingerprint(key))
 		return b.Delete([]byte(key))
 	})
 }
@@ -190,13 +204,17 @@ func (s *mcpAPIKeyStore) Count() int {
 	return count
 }
 
-// MCPAPIKeySummary is the public representation of a key (no full key exposed).
+// MCPAPIKeySummary is the public representation of a key (no key material
+// exposed). Fingerprint is the stable identifier to display or correlate with
+// logs; KeyPrefix is retained for response-shape compatibility and carries only
+// the scheme marker (SEC-012).
 type MCPAPIKeySummary struct {
-	KeyPrefix string `json:"keyPrefix"`
-	Name      string `json:"name"`
-	CreatedAt int64  `json:"createdAt"`
-	ExpiresAt int64  `json:"expiresAt,omitempty"`
-	Disabled  bool   `json:"disabled,omitempty"`
+	KeyPrefix   string `json:"keyPrefix"`
+	Fingerprint string `json:"fingerprint"`
+	Name        string `json:"name"`
+	CreatedAt   int64  `json:"createdAt"`
+	ExpiresAt   int64  `json:"expiresAt,omitempty"`
+	Disabled    bool   `json:"disabled,omitempty"`
 }
 
 // ---- HTTP Handlers (mounted on main HTTP port, requires admin auth) ----

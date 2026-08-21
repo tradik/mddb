@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"log"
 	"os"
+	"strings"
 	"testing"
 
 	bolt "go.etcd.io/bbolt"
@@ -180,4 +183,53 @@ func TestMCPAPIKeyMiddlewareInvalidateCache(t *testing.T) {
 		t.Errorf("expected empty cache after invalidation, got %d entries", len(m.cache))
 	}
 	m.cacheMu.RUnlock()
+}
+
+// TestMCPAPIKeyNoKeyMaterialInLogs pins SEC-012: creating and deleting a key
+// must not write any part of the key's random half to the log, and the public
+// summary must identify the key by fingerprint rather than by a prefix of it.
+func TestMCPAPIKeyNoKeyMaterialInLogs(t *testing.T) {
+	var logged bytes.Buffer
+	log.SetOutput(&logged)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	store := newMCPAPIKeyStore(testDB(t))
+	_, fullKey, err := store.Create("leak-check", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := strings.TrimPrefix(fullKey, mcpKeySchemePrefix)
+
+	summaries, err := store.List()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summaries) != 1 {
+		t.Fatalf("expected 1 summary, got %d", len(summaries))
+	}
+	if summaries[0].Fingerprint != keyFingerprint(fullKey) {
+		t.Errorf("summary fingerprint %q does not match the key's", summaries[0].Fingerprint)
+	}
+	if summaries[0].KeyPrefix != mcpKeySchemePrefix {
+		t.Errorf("KeyPrefix should carry only the scheme marker, got %q", summaries[0].KeyPrefix)
+	}
+
+	if err := store.Delete(fullKey); err != nil {
+		t.Fatal(err)
+	}
+
+	out := logged.String()
+	if out == "" {
+		t.Fatal("expected the store to log key creation and deletion")
+	}
+	// Any run of the key's random half that reaches a log is a leak; the
+	// shortest prefix worth failing on is the 8 hex chars the old code wrote.
+	for _, n := range []int{len(secret), 12, 8} {
+		if n <= len(secret) && strings.Contains(out, secret[:n]) {
+			t.Errorf("log contains %d chars of key material: %q", n, out)
+		}
+	}
+	if !strings.Contains(out, keyFingerprint(fullKey)) {
+		t.Errorf("log should identify the key by fingerprint, got %q", out)
+	}
 }
