@@ -208,6 +208,33 @@ jobs:
       - name: Run guard test suite
         run: bash scripts/tests/test-go-version.sh
 
+  clients-nodejs:
+    name: Node client (lockfile + audit)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: clients/nodejs/package-lock.json
+
+      # INT-016: the client shipped without a lockfile, so its builds were not
+      # reproducible and `npm audit` refused to run at all. `npm ci` fails if
+      # the lockfile is missing or out of sync with package.json, which keeps
+      # both properties true from here on.
+      - name: Install from lockfile
+        working-directory: clients/nodejs
+        run: npm ci
+
+      - name: npm audit (production, high+)
+        working-directory: clients/nodejs
+        run: npm audit --omit=dev --audit-level=high
+
   build:
     name: Build Binaries
     runs-on: ubuntu-latest
