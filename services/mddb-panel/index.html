@@ -5,6 +5,45 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MDDB Panel - Admin Interface</title>
+
+    <meta
+      name="description"
+      content="Admin interface for MDDB: browse collections, edit markdown documents, run full-text and vector search, and watch replication."
+    />
+    <!-- The panel sits behind a login, so it should not be indexed; the tags
+         below are for link previews in chat clients, not for search. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="MDDB Panel - Admin Interface" />
+    <meta
+      property="og:description"
+      content="Browse collections, edit markdown documents and search an MDDB instance."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="MDDB Panel - Admin Interface" />
+    <meta
+      name="twitter:description"
+      content="Browse collections, edit markdown documents and search an MDDB instance."
+    />
+
+    <!-- Google Tag Manager — inert until a container is configured.
+         Set VITE_GTM_ID at build time to enable it; with the variable unset
+         Vite leaves the %VITE_GTM_ID% placeholder in place and the guard below
+         returns before any request is made, so no analytics call ever goes out
+         to a container that does not exist. -->
+    <script>
+      (function (w, d, s, l, i) {
+        if (!i || i.charAt(0) === '%' || i === 'GTM-XXXXXXX') return;
+        w[l] = w[l] || [];
+        w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var f = d.getElementsByTagName(s)[0],
+          j = d.createElement(s),
+          dl = l != 'dataLayer' ? '&l=' + l : '';
+        j.async = true;
+        j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+        f.parentNode.insertBefore(j, f);
+      })(window, document, 'script', 'dataLayer', '%VITE_GTM_ID%');
+    </script>
   </head>
   <body>
     <div id="root"></div>
