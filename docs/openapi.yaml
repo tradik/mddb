@@ -924,8 +924,33 @@ paths:
       tags:
         - MCP
       summary: Create MCP API key
-      description: Create a named API key for MCP clients (admin only). The plaintext key is returned once.
+      description: |
+        Creates a named API key for MCP clients. The full key is returned
+        **once, in this response only** — the listing exposes a fingerprint
+        rather than key material, so it cannot be recovered afterwards.
+
+        Requires admin authentication.
       operationId: createMCPKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Label identifying what the key is for.
+                  example: claude-desktop
+                expiresAt:
+                  type: integer
+                  format: int64
+                  description: Unix timestamp; omit or 0 for a key that never expires.
+                  example: 0
       responses:
         "200":
           description: Key created (plaintext returned once)
@@ -933,12 +958,40 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  key:
+                    type: string
+                    description: The full key — store it now, it is not retrievable later.
+                    example: mcp_4f3c2a1b8e7d6c5b4a39281706f5e4d3
+                  name:
+                    type: string
+                    example: claude-desktop
+                  createdAt:
+                    type: integer
+                    format: int64
+                  expiresAt:
+                    type: integer
+                    format: int64
+        "400":
+          description: Invalid request body or key name
+        "403":
+          description: Admin permission required
+        "503":
+          description: MCP API key store not initialized
     get:
       tags:
         - MCP
       summary: List MCP API keys
-      description: List MCP API keys without plaintext values (admin only).
+      description: |
+        Lists the registered MCP API keys. No key material is returned: each
+        entry carries a `fingerprint` (four bytes of SHA-256, hex) that also
+        identifies the key in the server log, while `keyPrefix` holds only the
+        `mcp_` scheme marker.
+
+        Requires admin authentication.
       operationId: listMCPKeys
+      security:
+        - BearerAuth: []
       responses:
         "200":
           description: Key list
@@ -946,12 +999,36 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MCPAPIKeySummary"
+                  total:
+                    type: integer
+                    example: 2
+        "403":
+          description: Admin permission required
+        "503":
+          description: MCP API key store not initialized
     delete:
       tags:
         - MCP
       summary: Delete MCP API key
-      description: Delete an MCP API key by hash (admin only).
+      description: |
+        Permanently removes a key, identified by its full value. The MCP auth
+        cache is invalidated, so the key stops working immediately.
+
+        Requires admin authentication.
       operationId: deleteMCPKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MCPAPIKeyRef"
       responses:
         "200":
           description: Key deleted
@@ -959,14 +1036,38 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    example: deleted
+        "400":
+          description: Invalid request body
+        "403":
+          description: Admin permission required
+        "404":
+          description: No such key
+        "503":
+          description: MCP API key store not initialized
 
   /v1/mcp/keys/disable:
     post:
       tags:
         - MCP
       summary: Disable MCP API key
-      description: Disable an MCP API key without deleting it (admin only).
+      description: |
+        Marks a key disabled without deleting it, so it stops authenticating
+        but stays visible in the listing.
+
+        Requires admin authentication.
       operationId: disableMCPKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MCPAPIKeyRef"
       responses:
         "200":
           description: Key disabled
@@ -974,6 +1075,19 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    example: disabled
+        "400":
+          description: Invalid request body
+        "403":
+          description: Admin permission required
+        "404":
+          description: No such key
+        "503":
+          description: MCP API key store not initialized
+
 
   /v1/vector-projection:
     post:
@@ -5282,6 +5396,44 @@ paths:
 
 components:
   schemas:
+    MCPAPIKeySummary:
+      type: object
+      description: |
+        Public view of an MCP API key. Carries no key material: `fingerprint`
+        is four bytes of SHA-256 over the key, and `keyPrefix` holds only the
+        scheme marker every key starts with.
+      properties:
+        keyPrefix:
+          type: string
+          description: Scheme marker only — never a slice of the key.
+          example: mcp_
+        fingerprint:
+          type: string
+          description: Stable, non-reversible identifier; matches what the server logs.
+          example: 9f2a41c7
+        name:
+          type: string
+          example: claude-desktop
+        createdAt:
+          type: integer
+          format: int64
+        expiresAt:
+          type: integer
+          format: int64
+          description: Unix timestamp; absent when the key never expires.
+        disabled:
+          type: boolean
+
+    MCPAPIKeyRef:
+      type: object
+      description: Identifies an existing key by its full value.
+      required:
+        - key
+      properties:
+        key:
+          type: string
+          example: mcp_4f3c2a1b8e7d6c5b4a39281706f5e4d3
+
     RotationJob:
       type: object
       description: Encryption re-keying job descriptor (2.9.16+).
