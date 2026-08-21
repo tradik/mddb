@@ -3,14 +3,13 @@ package main
 import (
 	"bytes"
 	"errors"
-	"log"
+	json "github.com/goccy/go-json"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/storage"
 	"net/http"
 	"strings"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 // handleDelete deletes a single document from a collection
@@ -213,6 +212,6 @@ func (s *Server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) 
 		"collection":   req.Collection,
 		"deletedCount": deletedCount,
 	}); err != nil {
-		log.Printf("Error encoding delete collection response: %v", err)
+		slog.Error("encoding delete collection response", "err", err)
 	}
 }

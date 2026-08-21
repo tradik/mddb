@@ -4,12 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
-
-	json "github.com/goccy/go-json"
 )
 
 // MCPStreamableTransport implements the Streamable HTTP transport (MCP 2025-11-25).
@@ -139,13 +138,13 @@ func (t *MCPStreamableTransport) handleGet(w http.ResponseWriter, r *http.Reques
 	w.Header().Set("X-Accel-Buffering", "no")
 	flusher.Flush()
 
-	log.Printf("MCP Streamable HTTP client connected (session=%s)", sessionID) // #nosec G706 -- sessionID is hex-encoded random bytes
+	slog.Info("MCP Streamable HTTP client connected", "sessionID", sessionID) // #nosec G706 -- sessionID is hex-encoded random bytes
 
 	ctx := r.Context()
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("MCP Streamable HTTP client disconnected (session=%s)", sessionID) // #nosec G706
+			slog.Info("MCP Streamable HTTP client disconnected", "sessionID", sessionID) // #nosec G706
 			return
 		case msg, ok := <-session.ch:
 			if !ok {
@@ -172,7 +171,7 @@ func (t *MCPStreamableTransport) handleDelete(w http.ResponseWriter, r *http.Req
 	}
 	t.mu.Unlock()
 
-	log.Printf("MCP Streamable HTTP session terminated (session=%s)", sessionID) // #nosec G706
+	slog.Info("MCP Streamable HTTP session terminated", "sessionID", sessionID) // #nosec G706
 	w.WriteHeader(http.StatusNoContent)
 }
 

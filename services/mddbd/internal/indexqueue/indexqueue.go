@@ -3,12 +3,11 @@ package indexqueue
 import (
 	"context"
 	"errors"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/storage"
 	"sync"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // ErrQueueClosed is returned by Enqueue when the queue is shutting down.
@@ -128,7 +127,7 @@ func (iq *IndexQueue) worker(id int) {
 		select {
 		case job := <-iq.queue:
 			if err := iq.processJob(job); err != nil {
-				log.Printf("Worker %d: failed to index doc %s: %v", id, job.DocID, err)
+				slog.Warn("Worker failed to index doc", "id", id, "docID", job.DocID, "err", err)
 				iq.mu.Lock()
 				iq.failed++
 				iq.mu.Unlock()

@@ -11,7 +11,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 )
@@ -63,17 +63,18 @@ func (s *Server) applyMCPAuth(next http.Handler, addr string) http.Handler {
 	d := decideMCPAuth(authEnabled, mcpKeyEnabled, isLoopbackListenAddr(addr))
 
 	if d.warnInsecure {
-		log.Printf("⚠️  SECURITY: %s (%s). Anyone who can reach it has full read/write access to the database. "+
+		slog.Warn("MCP listener is unauthenticated — anyone who can reach it has full read/write access to the database. "+
 			"Set MDDB_MCP_API_KEY_ENABLED=true, enable MDDB_AUTH_ENABLED=true, bind MCP to loopback, "+
-			"or disable MCP (MDDB_MCP_ENABLED=false).", d.reason, addr)
+			"or disable MCP (MDDB_MCP_ENABLED=false).",
+			"reason", d.reason, "addr", addr)
 	}
 
 	if d.wrapMainAuth {
 		if s.AuthManager == nil {
-			log.Printf("⚠️  SECURITY: %s, but AuthManager is nil — MCP listener on %s stays UNAUTHENTICATED.", d.reason, addr)
+			slog.Warn("MCP listener stays unauthenticated: AuthManager is nil", "reason", d.reason, "addr", addr)
 			return next
 		}
-		log.Printf("MCP: %s (listener %s)", d.reason, addr)
+		slog.Info("MCP (listener)", "reason", d.reason, "addr", addr)
 		return s.AuthManager.HTTPMiddleware(next)
 	}
 	return next

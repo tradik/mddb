@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	"mddb/internal/metrics"
@@ -64,8 +64,8 @@ func (w *EmbeddingWorker) Start(workers int) {
 		w.wg.Add(1)
 		go w.worker(i)
 	}
-	log.Printf("Embedding worker started (%d workers, buffer=%d, chunking=%v, chunkSize=%d)",
-		workers, cap(w.jobs), w.chunkEnabled, w.chunkSize)
+	slog.Info("embedding worker started",
+		"workers", workers, "buffer", cap(w.jobs), "chunking", w.chunkEnabled, "chunkSize", w.chunkSize)
 }
 
 // Stop gracefully stops the worker.
@@ -81,7 +81,7 @@ func (w *EmbeddingWorker) Enqueue(job EmbeddingJob) bool {
 	case w.jobs <- job:
 		return true
 	default:
-		log.Printf("WARNING: embedding queue full, dropping job for %s/%s", job.Collection, job.DocID)
+		slog.Warn("embedding queue full, dropping job", "collection", job.Collection, "docID", job.DocID)
 		return false
 	}
 }
@@ -140,12 +140,12 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 			if embedErr == nil {
 				break
 			}
-			log.Printf("Embedding attempt %d failed for %s/%s chunk %d: %v", attempt+1, job.Collection, job.DocID, i, embedErr)
+			slog.Warn("embedding attempt failed", "attempt", attempt+1, "collection", job.Collection, "docID", job.DocID, "i", i, "err", embedErr)
 			time.Sleep(time.Duration(attempt+1) * time.Second)
 		}
 
 		if embedErr != nil {
-			log.Printf("ERROR: failed to embed %s/%s chunk %d after 3 attempts: %v", job.Collection, job.DocID, i, embedErr)
+			slog.Error("embedding failed after all attempts", "collection", job.Collection, "docID", job.DocID, "i", i, "err", embedErr)
 			if w.metrics != nil {
 				w.metrics.IncOp("embedding", "error")
 			}
@@ -160,7 +160,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 
 	// Store all chunks in BoltDB
 	if err := w.vectorStore.PutChunks(job.Collection, job.DocID, chunkEmbeddings, w.provider.Model(), contentHash); err != nil {
-		log.Printf("ERROR: failed to store embedding for %s/%s: %v", job.Collection, job.DocID, err)
+		slog.Error("failed to store embedding", "collection", job.Collection, "docID", job.DocID, "err", err)
 		return
 	}
 

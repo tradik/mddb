@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"sync"
-	"time"
-
 	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	"log/slog"
+	"sync"
+	"time"
 )
 
 var (
@@ -216,7 +215,7 @@ func (am *AuthManager) LoadAll() error {
 // BootstrapAdmin creates initial admin user if it doesn't exist
 func (am *AuthManager) BootstrapAdmin() error {
 	if am.config.AdminUsername == "" || am.config.AdminPassword == "" {
-		log.Println("No admin credentials configured, skipping bootstrap")
+		slog.Info("No admin credentials configured, skipping bootstrap")
 		return nil
 	}
 
@@ -226,7 +225,7 @@ func (am *AuthManager) BootstrapAdmin() error {
 	am.mu.RUnlock()
 
 	if exists {
-		log.Printf("Admin user '%s' already exists", am.config.AdminUsername)
+		slog.Info("Admin user already exists", "adminUsername", am.config.AdminUsername)
 		return nil
 	}
 
@@ -249,7 +248,7 @@ func (am *AuthManager) BootstrapAdmin() error {
 		return fmt.Errorf("bootstrap admin permissions: %w", err)
 	}
 
-	log.Printf("✓ Admin user '%s' created successfully", am.config.AdminUsername)
+	slog.Info("Admin user created successfully", "adminUsername", am.config.AdminUsername)
 	return nil
 }
 
@@ -674,7 +673,7 @@ func (am *AuthManager) CreateGroup(name, description string, members []string) (
 	am.groups[name] = group
 	am.mu.Unlock()
 
-	log.Printf("Created group: %s with %d members", name, len(members))
+	slog.Info("group created", "name", name, "membersCount", len(members))
 	return group, nil
 }
 
@@ -730,7 +729,7 @@ func (am *AuthManager) UpdateGroup(name, description string, members []string) (
 		return nil, err
 	}
 
-	log.Printf("Updated group: %s (now %d members)", name, len(members)) // #nosec G706 -- internal operational log
+	slog.Info("group updated", "name", name, "membersCount", len(members)) // #nosec G706 -- internal operational log
 	return group, nil
 }
 
@@ -771,7 +770,7 @@ func (am *AuthManager) DeleteGroup(name string) error {
 	delete(am.groups, name)
 	delete(am.groupPermissions, name)
 
-	log.Printf("Deleted group: %s", name) // #nosec G706 -- internal operational log
+	slog.Info("Deleted group", "name", name) // #nosec G706 -- internal operational log
 	return nil
 }
 
@@ -821,8 +820,9 @@ func (am *AuthManager) SetGroupPermission(gp *GroupPermission) error {
 	}
 	am.mu.Unlock()
 
-	log.Printf("Set group permission: %s on %s (read=%v, write=%v, admin=%v)",
-		gp.GroupName, gp.Collection, gp.Read, gp.Write, gp.Admin)
+	slog.Info("group permission set",
+		"group", gp.GroupName, "collection", gp.Collection,
+		"read", gp.Read, "write", gp.Write, "admin", gp.Admin)
 	return nil
 }
 

@@ -1,14 +1,13 @@
 package main
 
 import (
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
 	"mddb/internal/vector"
 	"strings"
 	"sync/atomic"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // ReplicationApplier applies binlog entries from the leader to the local BoltDB and in-memory state.
@@ -65,7 +64,7 @@ func (ra *ReplicationApplier) ApplyBatch(entries []*binlog.BinlogEntry) error {
 		for _, entry := range entries {
 			if entry.Type == binlog.BinlogDeleteBucket {
 				if err := tx.DeleteBucket([]byte(entry.BucketName)); err != nil {
-					log.Printf("Replication applier: failed to delete bucket %s: %v", entry.BucketName, err)
+					slog.Warn("Replication applier failed to delete bucket", "bucketName", entry.BucketName, "err", err)
 				}
 				continue
 			}
@@ -166,7 +165,7 @@ func (ra *ReplicationApplier) applyVector(entry *binlog.BinlogEntry) {
 	case binlog.BinlogPut:
 		rec, err := vector.UnmarshalEmbeddingRecord(entry.Value)
 		if err != nil {
-			log.Printf("Replication applier: failed to unmarshal embedding: %v", err)
+			slog.Warn("Replication applier failed to unmarshal embedding", "err", err)
 			return
 		}
 		ra.server.VectorIndex.Add(collection, docID, rec.Vector)

@@ -3,23 +3,21 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
-	"os"
-	"path/filepath"
-	"sync"
-	"sync/atomic"
-	"time"
-
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-
+	"io"
+	"log/slog"
 	"mddb/internal/vector"
 	proto "mddb/proto"
+	"os"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 // ReplicationClient manages the follower's connection to the leader.
@@ -82,7 +80,7 @@ func (rc *ReplicationClient) Start() {
 	}
 	rc.wg.Add(1)
 	go rc.loop()
-	log.Printf("Replication client started: leader=%s follower=%s", rc.leaderAddr, rc.followerID)
+	slog.Info("Replication client started", "leaderAddr", rc.leaderAddr, "followerID", rc.followerID)
 }
 
 // Stop gracefully stops the replication client
@@ -95,7 +93,7 @@ func (rc *ReplicationClient) Stop() {
 	if rc.conn != nil {
 		_ = rc.conn.Close()
 	}
-	log.Println("Replication client stopped")
+	slog.Info("Replication client stopped")
 }
 
 // LagMs returns the current replication lag in milliseconds
@@ -123,13 +121,13 @@ func (rc *ReplicationClient) loop() {
 
 	for rc.running.Load() {
 		if err := rc.connect(); err != nil {
-			log.Printf("Replication: failed to connect to leader %s: %v", rc.leaderAddr, err)
+			slog.Warn("Replication failed to connect to leader", "leaderAddr", rc.leaderAddr, "err", err)
 			rc.waitRetry()
 			continue
 		}
 
 		if err := rc.replicate(); err != nil {
-			log.Printf("Replication: stream error: %v", err)
+			slog.Warn("Replication stream error", "err", err)
 			rc.disconnect()
 			rc.waitRetry()
 			continue
@@ -153,7 +151,7 @@ func (rc *ReplicationClient) connect() error {
 
 	rc.conn = conn
 	rc.client = proto.NewMDDBReplicationClient(conn)
-	log.Printf("Replication: connected to leader %s", rc.leaderAddr)
+	slog.Info("Replication connected to leader", "leaderAddr", rc.leaderAddr)
 	return nil
 }
 
@@ -193,7 +191,7 @@ func (rc *ReplicationClient) replicate() error {
 		st, ok := status.FromError(err)
 		if ok && st.Code() == codes.FailedPrecondition {
 			// LSN too old, need full snapshot
-			log.Println("Replication: LSN too old, requesting full snapshot")
+			slog.Info("replication LSN too old, requesting full snapshot")
 			if err := rc.requestSnapshot(ctx); err != nil {
 				return fmt.Errorf("snapshot failed: %w", err)
 			}
@@ -225,7 +223,7 @@ func (rc *ReplicationClient) replicate() error {
 		// Apply entry
 		binlogEntry := protoToEntry(entry)
 		if err := rc.applier.Apply(binlogEntry); err != nil {
-			log.Printf("Replication: failed to apply entry LSN=%d: %v", entry.Lsn, err)
+			slog.Warn("replication failed to apply entry", "lsn", entry.Lsn, "err", err)
 			continue // skip and continue (eventual consistency)
 		}
 
@@ -285,7 +283,7 @@ func (rc *ReplicationClient) requestSnapshot(ctx context.Context) error {
 	}
 
 	_ = tmpFile.Close()
-	log.Printf("Replication: received snapshot (%d bytes, LSN=%d)", totalReceived, snapshotLSN)
+	slog.Info("replication snapshot received", "totalReceived", totalReceived, "snapshotLSN", snapshotLSN)
 
 	// Replace the database and rebuild in-memory state atomically with respect
 	// to live readers (GO-004). The restore write lock drains in-flight
@@ -306,7 +304,7 @@ func (rc *ReplicationClient) requestSnapshot(ctx context.Context) error {
 	rc.applier.SetLastAppliedLSN(snapshotLSN)
 	rc.lastAppliedAt.Store(time.Now().Unix())
 
-	log.Printf("Replication: snapshot applied, now at LSN=%d", snapshotLSN)
+	slog.Info("replication snapshot applied", "snapshotLSN", snapshotLSN)
 	return nil
 }
 
@@ -354,14 +352,14 @@ func (rc *ReplicationClient) rebuildInMemoryState() {
 	// Reload webhooks in place.
 	if rc.server.WebhookManager != nil {
 		if err := rc.server.WebhookManager.Reload(rc.server.DB); err != nil {
-			log.Printf("Replication: webhook reload after snapshot failed: %v", err)
+			slog.Warn("Replication webhook reload after snapshot failed", "err", err)
 		}
 	}
 
 	// Reload schemas in place.
 	if rc.server.SchemaManager != nil {
 		if err := rc.server.SchemaManager.Reload(rc.server.DB); err != nil {
-			log.Printf("Replication: schema reload after snapshot failed: %v", err)
+			slog.Warn("Replication schema reload after snapshot failed", "err", err)
 		}
 	}
 
@@ -372,7 +370,7 @@ func (rc *ReplicationClient) rebuildInMemoryState() {
 		rc.server.Cache.Clear()
 	}
 
-	log.Println("Replication: in-memory state rebuilt after snapshot")
+	slog.Info("Replication in-memory state rebuilt after snapshot")
 }
 
 // ackLoop periodically sends LSN acknowledgments to the leader

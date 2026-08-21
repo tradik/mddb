@@ -58,6 +58,8 @@ EXPOSE 11023 11024 9000 11443
 # Environment variables with defaults
 ENV MDDB_ADDR=":11023" \
     MDDB_GRPC_ADDR=":11024" \
+    MDDB_LOG_FORMAT="json" \
+    MDDB_LOG_LEVEL="info" \
     MDDB_MODE="wr" \
     MDDB_PATH="/app/data/mddb.db" \
     MDDB_HTTP_ENABLED="true" \

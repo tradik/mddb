@@ -6,19 +6,17 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	json "github.com/goccy/go-json"
 	"io"
-	"log"
+	"log/slog"
+	"mddb/internal/envconf"
+	"mddb/internal/wikitext"
+	proto "mddb/proto"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
-
-	"mddb/internal/envconf"
-	"mddb/internal/wikitext"
-	proto "mddb/proto"
-
-	json "github.com/goccy/go-json"
 )
 
 // wikiImportBatchSize is the number of pages buffered before flushing to storage.
@@ -215,8 +213,9 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		if totalProcessed%wikiProgressInterval < batchSize || time.Since(lastProgress) > 30*time.Second {
 			elapsed := time.Since(start)
 			rate := float64(totalProcessed) / elapsed.Seconds()
-			log.Printf("[wiki-import] progress: %d pages (imported=%d skipped=%d failed=%d) %.0f pages/sec elapsed=%s",
-				totalProcessed, resp.Imported, resp.Skipped, resp.Failed, rate, elapsed.Round(time.Second))
+			slog.Info("wiki import progress",
+				"processed", totalProcessed, "imported", resp.Imported, "skipped", resp.Skipped,
+				"failed", resp.Failed, "pagesPerSec", rate, "elapsed", elapsed.Round(time.Second))
 			lastProgress = time.Now()
 		}
 	}
@@ -327,8 +326,9 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		resp.Errors = nil
 	}
 
-	log.Printf("[wiki-import] collection=%s imported=%d skipped=%d failed=%d duration=%dms",
-		req.Collection, resp.Imported, resp.Skipped, resp.Failed, resp.DurationMs)
+	slog.Info("wiki import finished",
+		"collection", req.Collection, "imported", resp.Imported, "skipped", resp.Skipped,
+		"failed", resp.Failed, "durationMs", resp.DurationMs)
 
 	s.Metrics.IncOp("import-wiki")
 

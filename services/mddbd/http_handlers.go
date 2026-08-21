@@ -5,9 +5,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	json "github.com/goccy/go-json"
+	bolt "go.etcd.io/bbolt"
 	"hash/crc32"
 	"io"
-	"log"
+	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
@@ -15,9 +17,6 @@ import (
 	"net/http"
 	"sort"
 	"time"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 // --- handlers
@@ -376,7 +375,7 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 	// Reset binlog after restore — forces followers to re-snapshot
 	if s.Binlog != nil {
 		if err := s.Binlog.Rotate(0); err != nil {
-			log.Printf("Warning: failed to reset binlog after restore: %v", err)
+			slog.Warn("failed to reset binlog after restore", "err", err)
 		}
 	}
 

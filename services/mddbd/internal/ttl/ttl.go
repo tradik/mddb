@@ -3,13 +3,12 @@ package ttl
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/storage"
 	"strings"
 	"time"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -188,13 +187,13 @@ func (t *TTLManager) cleanup() {
 	// Delete expired documents
 	for _, ed := range expired {
 		if err := t.reaper.DeleteDocument(ed.collection, ed.key, ed.lang); err != nil {
-			log.Printf("TTL cleanup: failed to delete %s/%s/%s: %v", ed.collection, ed.key, ed.lang, err)
+			slog.Warn("TTL cleanup failed to delete", "collection", ed.collection, "key", ed.key, "lang", ed.lang, "err", err)
 			continue
 		}
 		// Also remove TTL entries
 		docID := t.reaper.GenID(ed.collection, ed.key, ed.lang)
 		_ = t.Remove(ed.collection, docID)
-		log.Printf("TTL cleanup: expired %s/%s/%s", ed.collection, ed.key, ed.lang)
+		slog.Info("TTL cleanup expired", "collection", ed.collection, "key", ed.key, "lang", ed.lang)
 	}
 }
 

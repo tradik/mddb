@@ -4,11 +4,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
+	json "github.com/goccy/go-json"
+	"log/slog"
 	"net/http"
 	"sync"
-
-	json "github.com/goccy/go-json"
 )
 
 // MCPSSETransport implements the MCP-over-SSE transport as defined in the MCP specification.
@@ -81,13 +80,13 @@ func (t *MCPSSETransport) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	_, _ = fmt.Fprintf(w, "event: endpoint\ndata: %s\n\n", endpointURL)
 	flusher.Flush()
 
-	log.Printf("MCP-over-SSE client connected (session=%s)", sessionID)
+	slog.Info("MCP-over-SSE client connected", "sessionID", sessionID)
 
 	ctx := r.Context()
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("MCP-over-SSE client disconnected (session=%s)", sessionID)
+			slog.Info("MCP-over-SSE client disconnected", "sessionID", sessionID)
 			return
 		case msg, ok := <-session.ch:
 			if !ok {

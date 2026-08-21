@@ -2,7 +2,7 @@ package embedding
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"mddb/internal/envconf"
 	"os"
 )
@@ -34,7 +34,7 @@ func NewProvider() Provider {
 	case "openai":
 		apiKey := os.Getenv("MDDB_EMBEDDING_API_KEY")
 		if apiKey == "" {
-			log.Println("WARNING: MDDB_EMBEDDING_PROVIDER=openai but MDDB_EMBEDDING_API_KEY not set")
+			slog.Warn("MDDB_EMBEDDING_PROVIDER=openai but MDDB_EMBEDDING_API_KEY not set")
 			return nil
 		}
 		apiURL := envconf.String("MDDB_EMBEDDING_API_URL", "https://api.openai.com/v1")
@@ -51,7 +51,7 @@ func NewProvider() Provider {
 	case "voyage":
 		apiKey := os.Getenv("MDDB_EMBEDDING_API_KEY")
 		if apiKey == "" {
-			log.Println("WARNING: MDDB_EMBEDDING_PROVIDER=voyage but MDDB_EMBEDDING_API_KEY not set")
+			slog.Warn("MDDB_EMBEDDING_PROVIDER=voyage but MDDB_EMBEDDING_API_KEY not set")
 			return nil
 		}
 		apiURL := envconf.String("MDDB_EMBEDDING_API_URL", "https://api.voyageai.com/v1")
@@ -62,7 +62,7 @@ func NewProvider() Provider {
 	case "cohere":
 		apiKey := os.Getenv("MDDB_EMBEDDING_API_KEY")
 		if apiKey == "" {
-			log.Println("WARNING: MDDB_EMBEDDING_PROVIDER=cohere but MDDB_EMBEDDING_API_KEY not set")
+			slog.Warn("MDDB_EMBEDDING_PROVIDER=cohere but MDDB_EMBEDDING_API_KEY not set")
 			return nil
 		}
 		apiURL := envconf.String("MDDB_EMBEDDING_API_URL", "https://api.cohere.ai/v1")
@@ -71,7 +71,7 @@ func NewProvider() Provider {
 		return NewCohereProvider(apiKey, apiURL, model, dims)
 
 	default:
-		log.Printf("WARNING: unknown MDDB_EMBEDDING_PROVIDER=%q, embedding disabled", provider) // #nosec G706 -- internal log
+		slog.Warn("unknown MDDB_EMBEDDING_PROVIDER, embedding disabled", "provider", provider) // #nosec G706 -- internal log
 		return nil
 	}
 }

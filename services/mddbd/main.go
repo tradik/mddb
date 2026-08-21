@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"log/slog"
 	"mddb/internal/audit"
 	"mddb/internal/automationlog"
 	"mddb/internal/binlog"
@@ -15,6 +18,7 @@ import (
 	"mddb/internal/fts"
 	"mddb/internal/geo"
 	"mddb/internal/indexqueue"
+	"mddb/internal/logging"
 	"mddb/internal/metrics"
 	"mddb/internal/schema"
 	"mddb/internal/spell"
@@ -29,10 +33,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 )
 
 // VERSION is the current release version of the MDDB server.
@@ -210,6 +210,11 @@ func getOptimizedBoltOptions() *bolt.Options {
 }
 
 func main() {
+	// Install the structured logger before anything can log (GO-028).
+	// MDDB_LOG_FORMAT picks text or json, MDDB_LOG_LEVEL the threshold; both
+	// have defaults, so an unconfigured process still logs.
+	logging.Setup()
+
 	// Load server configuration (CLI flags > env vars > config file > defaults)
 	srvCfg := loadServerConfig()
 
@@ -218,11 +223,11 @@ func main() {
 
 	db, err := bolt.Open(dbPath, 0600, getOptimizedBoltOptions())
 	if err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "bolt.Open", "err", err)
 	}
 	defer func() {
 		if err := db.Close(); err != nil {
-			log.Printf("Error closing database: %v", err)
+			slog.Error("closing database", "err", err)
 		}
 	}()
 
@@ -268,47 +273,47 @@ func main() {
 		}
 		go func() {
 			if err := earlyServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("Early health server: %v", err)
+				slog.Warn("early health server stopped", "err", err)
 			}
 		}()
-		log.Printf("Health endpoint available on %s (warming up...)", srvCfg.HTTP.Addr)
+		slog.Info("health endpoint listening while the server warms up", "addr", srvCfg.HTTP.Addr)
 	}
 
 	// Initialize extreme performance features
 	if useExtreme {
-		log.Println("🚀 Extreme Performance Mode ENABLED")
+		slog.Info("Extreme Performance Mode ENABLED")
 
 		// Initialize WAL
 		wal, err := NewWAL(dbPath, SyncPeriodic)
 		if err != nil {
-			log.Fatalf("Failed to initialize WAL: %v", err)
+			logging.Fatal("Failed to initialize WAL", "err", err)
 		}
 		s.WAL = wal
-		log.Println("  ✓ WAL initialized (SyncPeriodic)")
+		slog.Info("WAL initialized (SyncPeriodic)")
 
 		// Initialize MVCC
 		s.MVCC = NewMVCC()
-		log.Println("  ✓ MVCC initialized")
+		slog.Info("MVCC initialized")
 
-		log.Println("  ✓ Lock-Free Cache enabled")
-		log.Println("  ✓ Bloom Filters enabled")
-		log.Println("  ✓ Delta Encoding enabled")
-		log.Println("  ✓ Adaptive Compression enabled (Snappy + Zstd)")
-		log.Println("  ✓ Adaptive Indexing enabled")
-		log.Println("  ✓ Async I/O enabled")
-		log.Println("  ✓ Zero-Copy I/O enabled")
-		log.Println("  ✓ Vectorized Operations (SIMD) enabled")
-		log.Println("  ✓ Distributed Sharding enabled (4 shards, 2x replication)")
+		slog.Info("Lock-Free Cache enabled")
+		slog.Info("Bloom Filters enabled")
+		slog.Info("Delta Encoding enabled")
+		slog.Info("Adaptive Compression enabled (Snappy + Zstd)")
+		slog.Info("Adaptive Indexing enabled")
+		slog.Info("Async I/O enabled")
+		slog.Info("Zero-Copy I/O enabled")
+		slog.Info("Vectorized Operations (SIMD) enabled")
+		slog.Info("Distributed Sharding enabled (4 shards, 2x replication)")
 	}
 
 	if err := s.ensureBuckets(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "ensureBuckets", "err", err)
 	}
 
 	// Initialize vector search
 	s.VectorStore = vector.NewVectorStore(db)
 	if err := s.VectorStore.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "VectorStore.EnsureBucket", "err", err)
 	}
 	s.VectorIndex = vector.NewVectorIndex()
 
@@ -319,7 +324,7 @@ func main() {
 	// parameter at query time.
 	s.GeoStore = geo.NewGeoStore(db)
 	if err := s.GeoStore.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "GeoStore.EnsureBucket", "err", err)
 	}
 	s.GeoIndex = geo.NewGeoIndex()
 	s.GeoHashIndex = geo.NewGeoHashIndex()
@@ -353,8 +358,8 @@ func main() {
 	if err == nil && defaultConfig != nil {
 		// Use stored configuration
 		s.InitializeEmbeddingFromConfig(defaultConfig)
-		log.Printf("Vector search enabled from stored config (provider=%s, model=%s, dims=%d)",
-			defaultConfig.Provider, defaultConfig.Model, defaultConfig.Dimensions)
+		slog.Info("vector search enabled", "source", "stored config",
+			"provider", defaultConfig.Provider, "model", defaultConfig.Model, "dimensions", defaultConfig.Dimensions)
 	} else {
 		// Fall back to environment variables
 		s.Embedding = embedding.NewProvider()
@@ -362,10 +367,10 @@ func main() {
 			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, 1000)
 			s.EmbeddingWorker.SetDiskOnly(s.QuantizedVecIndex, s.collectionDiskOnly)
 			s.EmbeddingWorker.Start(2)
-			log.Printf("Vector search enabled from env vars (provider=%s, model=%s, dims=%d)",
-				s.Embedding.Model(), s.Embedding.Model(), s.Embedding.Dimensions())
+			slog.Info("vector search enabled", "source", "environment",
+				"provider", s.Embedding.Model(), "model", s.Embedding.Model(), "dimensions", s.Embedding.Dimensions())
 		} else {
-			log.Println("Vector search: embedding provider not configured (set MDDB_EMBEDDING_PROVIDER or configure in panel)")
+			slog.Info("Vector search embedding provider not configured (set MDDB_EMBEDDING_PROVIDER or configure in panel)")
 		}
 	}
 
@@ -381,19 +386,19 @@ func main() {
 		start := time.Now()
 		n, err := s.GeoStore.Rebuild(s.GeoIndex, "")
 		if err != nil {
-			log.Printf("Geo index rebuild failed: %v", err)
+			slog.Warn("Geo index rebuild failed", "err", err)
 		}
 		s.GeoIndex.SetReady()
-		log.Printf("Geo R-tree loaded: %d points across %d collections in %v",
-			n, len(s.GeoIndex.Collections()), time.Since(start))
+		slog.Info("geo R-tree loaded",
+			"points", n, "collections", len(s.GeoIndex.Collections()), "elapsed", time.Since(start))
 
 		start = time.Now()
 		nh, err := s.GeoStore.RebuildHash(s.GeoHashIndex, "")
 		if err != nil {
-			log.Printf("Geohash index rebuild failed: %v", err)
+			slog.Warn("Geohash index rebuild failed", "err", err)
 		}
 		s.GeoHashIndex.SetReady()
-		log.Printf("Geohash index loaded: %d points in %v", nh, time.Since(start))
+		slog.Info("geohash index loaded", "points", nh, "elapsed", time.Since(start))
 	}()
 
 	// Initialize audit log (ISO 27001 A.8.15 / SOC 2 CC7.2)
@@ -406,11 +411,11 @@ func main() {
 	}
 	s.AuditManager = audit.NewAuditManager(db, auditEnabled, auditRetention)
 	if err := s.AuditManager.EnsureBuckets(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "AuditManager.EnsureBuckets", "err", err)
 	}
 	s.AuditManager.Start()
 	if auditEnabled {
-		log.Printf("Audit log enabled (retention %d days)", auditRetention)
+		slog.Info("Audit log enabled (retention days)", "auditRetention", auditRetention)
 
 		// Wire optional external sinks (ISO 27001 A.8.15 / SOC 2 CC7.2 —
 		// audit trail must be tamper-evident; pushing to an off-host SIEM
@@ -426,20 +431,20 @@ func main() {
 			insecure := env("MDDB_AUDIT_EXPORT_WEBHOOK_INSECURE_TLS", "") == "true"
 			we, err := audit.NewWebhookExporter(u, env("MDDB_AUDIT_EXPORT_WEBHOOK_HEADER", ""), exportBuf, insecure)
 			if err != nil {
-				log.Printf("audit webhook exporter: %v", err)
+				slog.Warn("audit webhook exporter", "err", err)
 			} else {
 				s.AuditManager.AddExporter(we)
-				log.Printf("Audit webhook exporter active → %s", u)
+				slog.Info("Audit webhook exporter active", "u", u)
 			}
 		}
 		if a := env("MDDB_AUDIT_EXPORT_SYSLOG_ADDR", ""); a != "" {
 			fac := env("MDDB_AUDIT_EXPORT_SYSLOG_FACILITY", "local0")
 			se, err := audit.NewSyslogExporter(a, fac, exportBuf)
 			if err != nil {
-				log.Printf("audit syslog exporter: %v", err)
+				slog.Warn("audit syslog exporter", "err", err)
 			} else {
 				s.AuditManager.AddExporter(se)
-				log.Printf("Audit syslog exporter active → %s (facility %s)", a, fac)
+				slog.Info("Audit syslog exporter active (facility)", "a", a, "fac", fac)
 			}
 		}
 	}
@@ -447,21 +452,21 @@ func main() {
 	// Initialize TTL manager
 	s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})
 	if err := s.TTLManager.EnsureBuckets(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "TTLManager.EnsureBuckets", "err", err)
 	}
 	s.TTLManager.StartCleanup(30 * time.Second)
-	log.Println("TTL manager started (cleanup every 30s)")
+	slog.Info("TTL manager started (cleanup every 30s)")
 
 	// Configure compression
 	compression.ConfigureCompression(srvCfg.Compression.Enabled, srvCfg.Compression.SmallThreshold, srvCfg.Compression.MediumThreshold)
 	if !srvCfg.Compression.Enabled {
-		log.Println("Document compression disabled")
+		slog.Info("Document compression disabled")
 	}
 
 	// Initialize FTS index
 	s.FTSIndex = fts.NewFTSIndex(db)
 	if err := s.FTSIndex.EnsureBuckets(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "FTSIndex.EnsureBuckets", "err", err)
 	}
 
 	// Initialize multi-language FTS support
@@ -470,48 +475,48 @@ func main() {
 		fts.RegisterDefaultLanguages(langReg)
 		s.FTSIndex.SetStemmer(fts.NewPorterStemmer())
 		s.FTSIndex.SetLangRegistry(langReg)
-		log.Printf("FTS stemming enabled — %d languages (default: %s)", len(langReg.Languages()), srvCfg.FTS.DefaultLang)
+		slog.Info("FTS stemming enabled", "languages", len(langReg.Languages()), "defaultLang", srvCfg.FTS.DefaultLang)
 	}
 
 	// Initialize synonym manager
 	s.SynonymManager = fts.NewSynonymManager(db)
 	if err := s.SynonymManager.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "SynonymManager.EnsureBucket", "err", err)
 	}
 	if err := s.SynonymManager.LoadAll(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "SynonymManager.LoadAll", "err", err)
 	}
 	if srvCfg.FTS.SynonymsEnabled {
 		s.FTSIndex.SetSynonymManager(s.SynonymManager)
-		log.Println("FTS synonyms enabled")
+		slog.Info("FTS synonyms enabled")
 	}
 
 	// Initialize stop word manager
 	s.StopWordManager = fts.NewStopWordManager(db)
 	if err := s.StopWordManager.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "StopWordManager.EnsureBucket", "err", err)
 	}
 	if err := s.StopWordManager.LoadAll(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "StopWordManager.LoadAll", "err", err)
 	}
 	s.FTSIndex.SetStopWordManager(s.StopWordManager)
 	s.StopWordManager.SetLangRegistry(langReg)
-	log.Println("Stop word manager initialized")
+	slog.Info("Stop word manager initialized")
 
 	// Initialize PMI data for PMISparse search
 	s.FTSIndex.SetPMIData(fts.NewPMIData())
 
-	log.Println("Full-text search index initialized")
+	slog.Info("Full-text search index initialized")
 
 	// Initialize webhook manager
 	s.WebhookManager = webhooks.NewWebhookManager(db)
 	if err := s.WebhookManager.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "WebhookManager.EnsureBucket", "err", err)
 	}
 	if err := s.WebhookManager.LoadAll(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "WebhookManager.LoadAll", "err", err)
 	}
-	log.Printf("Webhook manager initialized (%d hooks loaded)", len(s.WebhookManager.List()))
+	slog.Info("webhook manager initialized", "hooks", len(s.WebhookManager.List()))
 
 	// Incident detectors — reuse the WebhookManager to deliver
 	// security.* and ops.* events to whichever hooks subscribed.
@@ -525,49 +530,49 @@ func main() {
 		s.AutomationManager = NewAutomationManager(db)
 		s.AutomationManager.SetServer(s)
 		if err := s.AutomationManager.EnsureBucket(); err != nil {
-			log.Fatal(err)
+			logging.Fatal("startup step failed", "step", "AutomationManager.EnsureBucket", "err", err)
 		}
 		if err := s.AutomationManager.LoadAll(); err != nil {
-			log.Fatal(err)
+			logging.Fatal("startup step failed", "step", "AutomationManager.LoadAll", "err", err)
 		}
-		log.Printf("Automation manager initialized (%d rules loaded)", len(s.AutomationManager.List("")))
+		slog.Info("automation manager initialized", "rules", len(s.AutomationManager.List("")))
 
 		// Initialize automation log store
 		if env("MDDB_AUTOMATION_LOGS", "enable") != "disable" {
 			logTTLStr := env("MDDB_AUTOMATION_LOGS_TTL", "7d")
 			logTTL, err := automationlog.ParseDurationString(logTTLStr)
 			if err != nil {
-				log.Fatalf("Invalid MDDB_AUTOMATION_LOGS_TTL: %v", err)
+				logging.Fatal("Invalid MDDB_AUTOMATION_LOGS_TTL", "err", err)
 			}
 			s.AutomationLogStore = automationlog.NewStore(db, logTTL)
 			if err := s.AutomationLogStore.EnsureBucket(); err != nil {
-				log.Fatal(err)
+				logging.Fatal("startup step failed", "step", "AutomationLogStore.EnsureBucket", "err", err)
 			}
 			s.AutomationLogStore.StartCleanup(5 * time.Minute)
 			s.AutomationManager.SetLogStore(s.AutomationLogStore)
-			log.Printf("Automation logs enabled (TTL: %s)", logTTLStr)
+			slog.Info("Automation logs enabled (TTL)", "logTTLStr", logTTLStr)
 		}
 	}
 
 	// Initialize schema manager
 	s.SchemaManager = schema.NewSchemaManager(db)
 	if err := s.SchemaManager.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "SchemaManager.EnsureBucket", "err", err)
 	}
 	if err := s.SchemaManager.LoadAll(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "SchemaManager.LoadAll", "err", err)
 	}
-	log.Printf("Schema manager initialized (%d schemas loaded)", len(s.SchemaManager.List()))
+	slog.Info("Schema manager initialized (schemas loaded)", "listCount", len(s.SchemaManager.List()))
 
 	// Initialize collection config manager
 	s.CollectionManager = NewCollectionManager(db)
 	if err := s.CollectionManager.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "CollectionManager.EnsureBucket", "err", err)
 	}
 	if err := s.CollectionManager.LoadAll(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "CollectionManager.LoadAll", "err", err)
 	}
-	log.Printf("Collection manager initialized (%d collections configured)", len(s.CollectionManager.ListAll()))
+	slog.Info("Collection manager initialized (collections configured)", "listAllCount", len(s.CollectionManager.ListAll()))
 
 	// At-rest encryption (ISO 27001 A.8.24 / SOC 2 CC6.7). The encryptor
 	// is a no-op when MDDB_ENCRYPTION_KEY is unset; a misconfigured key
@@ -575,7 +580,7 @@ func main() {
 	// was explicitly opted in.
 	enc, err := encryption.NewEncryptor()
 	if err != nil {
-		log.Fatalf("encryption init: %v", err)
+		logging.Fatal("encryption init", "err", err)
 	}
 	s.Encryptor = enc
 	SetGlobalEncryptor(enc)
@@ -587,8 +592,8 @@ func main() {
 				encCount++
 			}
 		}
-		log.Printf("At-rest encryption enabled (%d collection(s) opted in)", encCount)
-		log.Printf("Encryption primary keyID=%d, previous=%d", enc.PrimaryKeyID(), len(enc.PreviousKeyIDs()))
+		slog.Info("At-rest encryption enabled (collection(s) opted in)", "encCount", encCount)
+		slog.Info("Encryption primary", "primaryKeyID", enc.PrimaryKeyID(), "previousKeyIDsCount", len(enc.PreviousKeyIDs()))
 		s.RotationManager = NewRotationManager(s, enc)
 	} else {
 		// If any collection is flagged as encrypted but we have no key,
@@ -596,7 +601,7 @@ func main() {
 		// collection is a silent compliance failure.
 		for name, cfg := range s.CollectionManager.ListAll() {
 			if cfg != nil && cfg.Encrypted {
-				log.Fatalf("collection %q has encrypted=true but MDDB_ENCRYPTION_KEY is not set", name)
+				logging.Fatal("collection has encrypted=true but MDDB_ENCRYPTION_KEY is not set", "name", name)
 			}
 		}
 	}
@@ -605,31 +610,31 @@ func main() {
 	// search hot path never hits disk.
 	s.CurationManager = NewCurationManager(db)
 	if err := s.CurationManager.EnsureBucket(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "CurationManager.EnsureBucket", "err", err)
 	}
 	if err := s.CurationManager.LoadAll(); err != nil {
-		log.Fatal(err)
+		logging.Fatal("startup step failed", "step", "CurationManager.LoadAll", "err", err)
 	}
-	log.Printf("Curation manager initialized (%d rules loaded)", len(s.CurationManager.ListAll()))
+	slog.Info("Curation manager initialized (rules loaded)", "listAllCount", len(s.CurationManager.ListAll()))
 
 	// Initialize temporal event tracking (disabled by default; set MDDB_TEMPORAL=true to enable)
 	if env("MDDB_TEMPORAL", "false") == "true" {
 		s.TemporalManager = temporal.NewTemporalManager(db)
 		if err := s.TemporalManager.EnsureBuckets(); err != nil {
-			log.Fatal(err)
+			logging.Fatal("startup step failed", "step", "TemporalManager.EnsureBuckets", "err", err)
 		}
 		s.TemporalManager.Start()
-		log.Println("Temporal event tracking initialized")
+		slog.Info("Temporal event tracking initialized")
 	}
 
 	// Initialize spell checker (disabled by default; set MDDB_SPELL=true to enable)
 	if env("MDDB_SPELL", "false") == "true" {
 		s.SpellManager = spell.NewSpellManager(db)
 		if err := s.SpellManager.EnsureBucket(); err != nil {
-			log.Fatal(err)
+			logging.Fatal("startup step failed", "step", "SpellManager.EnsureBucket", "err", err)
 		}
 		s.SpellManager.LoadAll() // async — sets ready flag when done
-		log.Println("Spell manager initialized (loading dictionaries in background)")
+		slog.Info("Spell manager initialized (loading dictionaries in background)")
 	}
 
 	// Initialize SSE hub (enabled by default, set MDDB_SSE_ENABLED=false to disable)
@@ -638,7 +643,7 @@ func main() {
 	sseMaxPerIP := envconf.Int("MDDB_SSE_MAX_PER_IP", 5)
 	s.SSEHub = NewSSEHub(sseEnabled, sseMaxClients, sseMaxPerIP)
 	if sseEnabled {
-		log.Printf("SSE event stream enabled (max clients: %d, max per IP: %d)", sseMaxClients, sseMaxPerIP)
+		slog.Info("SSE event stream enabled (max clients, max per IP)", "sseMaxClients", sseMaxClients, "sseMaxPerIP", sseMaxPerIP)
 	}
 
 	// Store MCP server info for handlers
@@ -652,7 +657,7 @@ func main() {
 	metricsEnabled := env("MDDB_METRICS", "true") != "false"
 	s.Metrics = metrics.NewMetrics(metricsEnabled, &serverMetricsStats{s: s})
 	if metricsEnabled {
-		log.Println("Prometheus metrics enabled (GET /metrics)")
+		slog.Info("Prometheus metrics enabled (GET /metrics)")
 	}
 
 	// Wire metrics into subsystems
@@ -673,7 +678,7 @@ func main() {
 	// Force follower to read-only mode
 	if s.ReplicationRole == "follower" {
 		s.Mode = ModeRead
-		log.Println("Replication: follower mode — forced read-only")
+		slog.Info("Replication follower mode — forced read-only")
 	}
 
 	// Initialize binlog (auto-enabled for leader, opt-in for standalone)
@@ -685,10 +690,10 @@ func main() {
 			MaxAge:  24 * time.Hour,
 		})
 		if err != nil {
-			log.Fatalf("Failed to initialize binlog: %v", err)
+			logging.Fatal("Failed to initialize binlog", "err", err)
 		}
 		s.Binlog = bl
-		log.Printf("Binlog enabled (LSN=%d)", bl.CurrentLSN())
+		slog.Info("binlog enabled", "currentLSN", bl.CurrentLSN())
 	}
 
 	// Set binlog on all subsystems
@@ -723,7 +728,7 @@ func main() {
 			s.EmbeddingWorker.Stop()
 			s.EmbeddingWorker = nil
 		}
-		log.Println("Replication: disabled TTL cleanup and embedding worker on follower")
+		slog.Info("Replication disabled TTL cleanup and embedding worker on follower")
 	}
 
 	// Initialize cron scheduler (if enabled)
@@ -731,7 +736,7 @@ func main() {
 		s.CronScheduler = NewCronScheduler(s)
 		s.CronScheduler.Start()
 		s.CronScheduler.Reload()
-		log.Println("Cron scheduler started")
+		slog.Info("Cron scheduler started")
 	}
 
 	// Initialize authentication (disabled by default)
@@ -739,13 +744,13 @@ func main() {
 	if authEnabled {
 		jwtSecret := env("MDDB_AUTH_JWT_SECRET", "")
 		if jwtSecret == "" {
-			log.Fatal("MDDB_AUTH_ENABLED=true requires MDDB_AUTH_JWT_SECRET to be set")
+			logging.Fatal("MDDB_AUTH_ENABLED=true requires MDDB_AUTH_JWT_SECRET to be set")
 		}
 
 		jwtExpiryStr := env("MDDB_AUTH_JWT_EXPIRY", "24h")
 		jwtExpiry, err := time.ParseDuration(jwtExpiryStr)
 		if err != nil {
-			log.Fatalf("Invalid MDDB_AUTH_JWT_EXPIRY: %v", err)
+			logging.Fatal("Invalid MDDB_AUTH_JWT_EXPIRY", "err", err)
 		}
 
 		s.AuthManager = NewAuthManager(db, AuthConfig{
@@ -756,16 +761,16 @@ func main() {
 		})
 
 		if err := s.AuthManager.EnsureBuckets(); err != nil {
-			log.Fatal(err)
+			logging.Fatal("startup step failed", "step", "AuthManager.EnsureBuckets", "err", err)
 		}
 		if err := s.AuthManager.LoadAll(); err != nil {
-			log.Fatal(err)
+			logging.Fatal("startup step failed", "step", "AuthManager.LoadAll", "err", err)
 		}
 		if err := s.AuthManager.BootstrapAdmin(); err != nil {
-			log.Fatal(err)
+			logging.Fatal("startup step failed", "step", "AuthManager.BootstrapAdmin", "err", err)
 		}
 
-		log.Println("✓ Authentication enabled")
+		slog.Info("Authentication enabled")
 	}
 	if s.AuthManager != nil {
 		s.AuthManager.SetServer(s)
@@ -780,7 +785,7 @@ func main() {
 
 	// Enforce ISO 27001 / SOC 2 guardrails when MDDB_PRODUCTION=true,
 	// or log a one-shot warning otherwise.
-	EnforceProductionGuards(log.Printf, log.Fatalf)
+	EnforceProductionGuards(slog.Warn, logging.Fatal)
 
 	// MCP stdio mode — replaces normal HTTP/gRPC operation
 	if srvCfg.MCP.Stdio {
@@ -789,19 +794,19 @@ func main() {
 	}
 
 	// Log protocol configuration
-	log.Printf("Protocol config: HTTP=%v gRPC=%v MCP=%v HTTP3=%v", srvCfg.HTTP.Enabled, srvCfg.GRPC.Enabled, srvCfg.MCP.Enabled, srvCfg.HTTP3.Enabled)
+	slog.Info("Protocol config HTTP MCP HTTP3", "enabled", srvCfg.HTTP.Enabled, "enabled2", srvCfg.GRPC.Enabled, "enabled3", srvCfg.MCP.Enabled, "enabled4", srvCfg.HTTP3.Enabled)
 	// Log per-protocol mode overrides
 	if srvCfg.HTTP.Mode != "" {
-		log.Printf("Per-protocol mode: API=%s (MDDB_API_MODE)", srvCfg.HTTP.Mode)
+		slog.Info("Per-protocol mode API (MDDB_API_MODE)", "mode", srvCfg.HTTP.Mode)
 	}
 	if srvCfg.GRPC.Mode != "" {
-		log.Printf("Per-protocol mode: gRPC=%s (MDDB_GRPC_MODE)", srvCfg.GRPC.Mode)
+		slog.Info("Per-protocol mode (MDDB_GRPC_MODE)", "mode", srvCfg.GRPC.Mode)
 	}
 	if srvCfg.MCP.Mode != "" {
-		log.Printf("Per-protocol mode: MCP=%s (MDDB_MCP_MODE)", srvCfg.MCP.Mode)
+		slog.Info("Per-protocol mode MCP (MDDB_MCP_MODE)", "mode", srvCfg.MCP.Mode)
 	}
 	if srvCfg.HTTP3.Mode != "" {
-		log.Printf("Per-protocol mode: HTTP3=%s (MDDB_HTTP3_MODE)", srvCfg.HTTP3.Mode)
+		slog.Info("Per-protocol mode HTTP3 (MDDB_HTTP3_MODE)", "mode", srvCfg.HTTP3.Mode)
 	}
 
 	mux := http.NewServeMux()
@@ -908,7 +913,7 @@ func main() {
 	// pprof profiling endpoints (disabled by default, set MDDB_PPROF_ENABLED=true)
 	if env("MDDB_PPROF_ENABLED", "false") == "true" {
 		registerPprof(mux)
-		log.Println("pprof profiling endpoints enabled at /debug/pprof/")
+		slog.Info("pprof profiling endpoints enabled at /debug/pprof")
 	}
 
 	// Replication status endpoint
@@ -949,12 +954,12 @@ func main() {
 		}
 
 		mux.Handle("/graphql", graphqlHandler)
-		log.Printf("GraphQL endpoint enabled at /graphql")
+		slog.Info("GraphQL endpoint enabled at /graphql")
 
 		// GraphQL Playground (development tool)
 		if env("MDDB_GRAPHQL_PLAYGROUND", "true") == "true" {
 			mux.Handle("/playground", newGraphQLPlaygroundHandler("/graphql"))
-			log.Printf("GraphQL Playground enabled at /playground")
+			slog.Info("GraphQL Playground enabled at /playground")
 		}
 	}
 
@@ -985,6 +990,12 @@ func main() {
 	// middleware is shielded — a crash in auth/rate-limit/etc.
 	// becomes an ops.panic_recovered event, not a process kill.
 	handler = PanicRecoveryMiddleware(s.WebhookManager, handler)
+	// GO-028: one line per request, off unless asked for. It wraps outside
+	// panic recovery so a recovered panic still reports its 500.
+	if envconf.String("MDDB_ACCESS_LOG", "false") == "true" {
+		handler = withAccessLog(handler)
+		slog.Info("access logging enabled")
+	}
 	if panelMode != "external" {
 		handler = withCORS(handler)
 		// SEC-008: a wildcard CORS policy lets any website read responses from a
@@ -992,16 +1003,18 @@ func main() {
 		// deployments.
 		if envCORSConfig().wildcard {
 			if s.AuthManager != nil && s.AuthManager.enabled {
-				log.Printf("⚠️  SECURITY (SEC-008): CORS is wildcard (*) with auth enabled — " +
-					"any origin can attempt credentialed cross-origin reads. Set MDDB_CORS_ORIGINS to an allowlist.")
+				slog.Warn("CORS is wildcard (*) with auth enabled — any origin can attempt "+
+					"credentialed cross-origin reads. Set MDDB_CORS_ORIGINS to an allowlist.",
+					"finding", "SEC-008")
 			} else {
-				log.Printf("⚠️  SECURITY (SEC-008): CORS is wildcard (*) — any website can read this instance " +
-					"from a user's browser. Set MDDB_CORS_ORIGINS to an allowlist for non-public deployments.")
+				slog.Warn("CORS is wildcard (*) — any website can read this instance from a user's "+
+					"browser. Set MDDB_CORS_ORIGINS to an allowlist for non-public deployments.",
+					"finding", "SEC-008")
 			}
 		}
 	}
 	if panelMode == "external" {
-		log.Printf("Panel mode: external (CORS disabled, panel proxies requests)")
+		slog.Info("Panel mode external (CORS disabled, panel proxies requests)")
 	}
 
 	// Shut down early health server before starting the main one
@@ -1017,7 +1030,7 @@ func main() {
 
 	// Mark server as ready — health check will now return "healthy" instead of "warming_up"
 	s.Ready = true
-	log.Println("Server initialization complete — ready to serve")
+	slog.Info("Server initialization complete — ready to serve")
 
 	// Start HTTP server (with optional TLS). httpAddr may be a TCP host:port
 	// or a Unix Domain Socket (unix:/path/to/sock) — see listen_addr.go.
@@ -1033,18 +1046,18 @@ func main() {
 			}
 			lis, err := openListener(httpAddr)
 			if err != nil {
-				log.Fatal(err)
+				logging.Fatal("startup step failed", "step", "openListener", "err", err)
 			}
 			defer func() { _ = closeListener(lis, httpAddr) }()
 			tlsOn := srvCfg.TLS.Enabled && srvCfg.TLS.CertFile != "" && srvCfg.TLS.KeyFile != ""
 			if tlsOn && isUnixAddr(httpAddr) {
-				log.Printf("mddb: TLS ignored on UDS listener %s (filesystem perms authenticate the peer)", httpAddr)
+				slog.Info("mddb TLS ignored on UDS listener (filesystem perms authenticate the peer)", "httpAddr", httpAddr)
 				tlsOn = false
 			}
 			if tlsOn {
 				tlsCfg, terr := buildServerTLSConfig(srvCfg.TLS)
 				if terr != nil {
-					log.Fatalf("TLS config: %v", terr)
+					logging.Fatal("TLS config", "terr", terr)
 				}
 				server.TLSConfig = tlsCfg
 				mtls := ""
@@ -1055,19 +1068,19 @@ func main() {
 					}
 					mtls = fmt.Sprintf(", mtls=on (clientAuth=%s)", mode)
 				}
-				log.Printf("mddb HTTPS listening on %s (mode=%s, db=%s, tls=on%s)", httpAddr, s.Mode, dbPath, mtls)
+				slog.Info("mddb HTTPS listening (,, tls=on)", "httpAddr", httpAddr, "mode", s.Mode, "dbPath", dbPath, "mtls", mtls)
 				if err := server.ServeTLS(lis, "", ""); err != nil && err != http.ErrServerClosed {
-					log.Fatal(err)
+					logging.Fatal("startup step failed", "step", "server.ServeTLS", "err", err)
 				}
 			} else {
-				log.Printf("mddb HTTP listening on %s (mode=%s, db=%s)", httpAddr, s.Mode, dbPath)
+				slog.Info("mddb HTTP listening", "httpAddr", httpAddr, "mode", s.Mode, "dbPath", dbPath)
 				if err := server.Serve(lis); err != nil && err != http.ErrServerClosed {
-					log.Fatal(err)
+					logging.Fatal("startup step failed", "step", "server.Serve", "err", err)
 				}
 			}
 		}()
 	} else {
-		log.Println("HTTP server disabled")
+		slog.Info("HTTP server disabled")
 	}
 
 	// Start MCP HTTP server on its own port
@@ -1086,13 +1099,13 @@ func main() {
 			mcpSSE := NewMCPSSETransport(mcpSSEHandler)
 			mcpMux.HandleFunc("/sse", mcpSSE.HandleSSE)
 			mcpMux.HandleFunc("/message", mcpSSE.HandleMessage)
-			log.Println("MCP-over-SSE transport enabled at /sse + /message (legacy)")
+			slog.Info("MCP-over-SSE transport enabled at /sse + /message (legacy)")
 
 			// Streamable HTTP transport (2025-11-25 spec)
 			mcpStreamableHandler := NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(), srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode)
 			mcpStreamable := NewMCPStreamableTransport(mcpStreamableHandler)
 			mcpMux.HandleFunc("/mcp", mcpStreamable.Handle)
-			log.Println("MCP Streamable HTTP transport enabled at /mcp")
+			slog.Info("MCP Streamable HTTP transport enabled at /mcp")
 
 			// MCP middleware chain: CORS → API Key Auth → Rate Limit → Request Logging → JSON → Routes
 			var mcpHandler http.Handler = mcpMux
@@ -1120,7 +1133,7 @@ func main() {
 				mcpHandler = withCORS(mcpHandler)
 			}
 
-			log.Printf("mddb MCP HTTP listening on %s", srvCfg.MCP.Addr)
+			slog.Info("mddb MCP HTTP listening", "addr", srvCfg.MCP.Addr)
 			server := &http.Server{
 				Addr:              srvCfg.MCP.Addr,
 				Handler:           mcpHandler,
@@ -1130,24 +1143,24 @@ func main() {
 				IdleTimeout:       120 * time.Second,
 			}
 			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatal(err)
+				logging.Fatal("startup step failed", "step", "server.ListenAndServe", "err", err)
 			}
 		}()
 	} else {
-		log.Println("MCP server disabled")
+		slog.Info("MCP server disabled")
 	}
 
 	// Start HTTP/3 server
 	if srvCfg.HTTP3.Enabled {
 		go func() {
-			log.Printf("mddb HTTP/3 listening on %s", srvCfg.HTTP3.Addr)
+			slog.Info("mddb HTTP/3 listening", "addr", srvCfg.HTTP3.Addr)
 			h3Server, err := NewHTTP3Server(srvCfg.HTTP3.Addr, HTTP3Middleware(handler))
 			if err != nil {
-				log.Printf("WARNING: Failed to start HTTP/3 server: %v", err)
+				slog.Warn("Failed to start HTTP/3 server", "err", err)
 				return
 			}
 			if err := h3Server.Start(); err != nil {
-				log.Printf("WARNING: HTTP/3 server error: %v", err)
+				slog.Warn("HTTP/3 server error", "err", err)
 			}
 		}()
 	}
@@ -1157,7 +1170,7 @@ func main() {
 	if s.ReplicationRole == "follower" {
 		leaderAddr := env("MDDB_REPLICATION_LEADER_ADDR", "")
 		if leaderAddr == "" {
-			log.Fatal("MDDB_REPLICATION_ROLE=follower requires MDDB_REPLICATION_LEADER_ADDR")
+			logging.Fatal("MDDB_REPLICATION_ROLE=follower requires MDDB_REPLICATION_LEADER_ADDR")
 		}
 		replClient = NewReplicationClient(s, ReplicationClientConfig{
 			LeaderAddr: leaderAddr,
@@ -1166,7 +1179,7 @@ func main() {
 		s.replClient = replClient
 		replClient.Start()
 		defer replClient.Stop()
-		log.Printf("Replication client started (leader=%s, follower=%s)", leaderAddr, s.NodeID)
+		slog.Info("Replication client started", "leaderAddr", leaderAddr, "nodeID", s.NodeID)
 
 		// Monitor replication lag and fire ops.replication_lag_high
 		// when it crosses the threshold.
@@ -1176,7 +1189,7 @@ func main() {
 	}
 
 	if s.ReplicationRole == "leader" {
-		log.Printf("Replication leader started (node=%s, binlog LSN=%d)", s.NodeID, s.Binlog.CurrentLSN())
+		slog.Info("replication leader started", "nodeID", s.NodeID, "currentLSN", s.Binlog.CurrentLSN())
 	}
 
 	// Close binlog on shutdown
@@ -1228,7 +1241,7 @@ func main() {
 		if !isUnixAddr(grpcAddr) {
 			tlsCfg, terr := buildServerTLSConfig(srvCfg.TLS)
 			if terr != nil {
-				log.Fatalf("gRPC TLS config: %v", terr)
+				logging.Fatal("gRPC TLS config", "terr", terr)
 			}
 			if tlsCfg != nil {
 				grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(tlsCfg)))
@@ -1243,20 +1256,20 @@ func main() {
 			}
 		}
 		go func() {
-			log.Printf("mddb gRPC listening on %s (mode=%s, db=%s%s)", grpcAddr, s.Mode, dbPath, grpcTLSLog)
+			slog.Info("mddb gRPC listening", "grpcAddr", grpcAddr, "mode", s.Mode, "dbPath", dbPath, "grpcTLSLog", grpcTLSLog)
 			if err := startGRPCServer(s, grpcAddr, grpcOpts...); err != nil {
-				log.Fatal(err)
+				logging.Fatal("startup step failed", "step", "startGRPCServer", "err", err)
 			}
 		}()
 	} else {
-		log.Println("gRPC server disabled")
+		slog.Info("gRPC server disabled")
 	}
 
 	// Block until signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigCh
-	log.Printf("Received %s, shutting down...", sig)
+	slog.Info("Received, shutting down...", "sig", sig)
 
 	if s.LockFreeCache != nil {
 		s.LockFreeCache.Close()

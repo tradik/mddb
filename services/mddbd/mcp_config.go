@@ -2,11 +2,10 @@ package main
 
 import (
 	"errors"
-	"log"
+	"gopkg.in/yaml.v3"
+	"log/slog"
 	"os"
 	"path/filepath"
-
-	"gopkg.in/yaml.v3"
 )
 
 // MCPFileConfig is the YAML file structure for custom tools.
@@ -23,17 +22,17 @@ func loadMCPCustomTools() []MCPCustomToolConfig {
 
 	cfg, err := loadMCPConfig(path)
 	if err != nil {
-		log.Printf("WARNING: failed to load MCP config from %s: %v", path, err) // #nosec G706 -- internal log
+		slog.Warn("failed to load MCP config", "path", path, "err", err) // #nosec G706 -- internal log
 		return nil
 	}
 
 	if err := validateMCPCustomTools(cfg.CustomTools); err != nil {
-		log.Printf("WARNING: invalid MCP custom tools: %v", err)
+		slog.Warn("invalid MCP custom tools", "err", err)
 		return nil
 	}
 
 	if len(cfg.CustomTools) > 0 {
-		log.Printf("MCP: loaded %d custom tools from %s", len(cfg.CustomTools), path) // #nosec G706 -- internal log
+		slog.Info("MCP loaded custom tools", "customToolsCount", len(cfg.CustomTools), "path", path) // #nosec G706 -- internal log
 	}
 
 	return cfg.CustomTools

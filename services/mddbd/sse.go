@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	json "github.com/goccy/go-json"
+	"log/slog"
 	"net"
 	"net/http"
 	"sync"
 	"time"
-
-	json "github.com/goccy/go-json"
 )
 
 // SSEHub manages Server-Sent Events connections and broadcasts document change events.
@@ -274,7 +273,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 		collection, mode, username)
 	flusher.Flush()
 
-	log.Printf("SSE client connected (collection=%q, mode=%s, user=%q, total=%d)", collection, mode, username, h.ClientCount()) // #nosec G706 -- values sanitized with %q
+	slog.Info("SSE client connected (,,,)", "collection", collection, "mode", mode, "username", username, "clientCount", h.ClientCount()) // #nosec G706 -- values sanitized with %q
 
 	// Keep-alive ticker
 	ticker := time.NewTicker(h.keepAlive)
@@ -284,7 +283,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("SSE client disconnected (total=%d)", h.ClientCount()-1)
+			slog.Info("SSE client disconnected", "clientCount", h.ClientCount()-1)
 			return
 		case msg, ok := <-client.ch:
 			if !ok {

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"os"
 	"sync"
 )
@@ -404,7 +405,7 @@ func (s *Server) runMCPStdio() {
 
 		resp, err := handler.HandleJSON(line)
 		if err != nil {
-			log.Printf("MCP handler error: %v", err)
+			slog.Warn("MCP handler error", "err", err)
 			continue
 		}
 
@@ -418,6 +419,6 @@ func (s *Server) runMCPStdio() {
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Printf("MCP stdio scanner error: %v", err)
+		slog.Warn("MCP stdio scanner error", "err", err)
 	}
 }

@@ -1,12 +1,11 @@
 package vector
 
 import (
-	"log"
+	"github.com/coder/hnsw"
+	"log/slog"
 	"sort"
 	"sync"
 	"sync/atomic"
-
-	"github.com/coder/hnsw"
 )
 
 // HNSWIndex implements VectorSearcher using Hierarchical Navigable Small World graphs.
@@ -79,7 +78,7 @@ func (h *HNSWIndex) Add(collection, docID string, vector []float32) {
 	defer func() {
 		if r := recover(); r != nil {
 			// Log but don't crash — flat index still works as fallback
-			log.Printf("HNSW Add recovered from panic for %s/%s: %v", collection, docID, r)
+			slog.Info("HNSW Add recovered from panic", "collection", collection, "docID", docID, "r", r)
 		}
 	}()
 	node := hnsw.MakeNode(docID, vector)

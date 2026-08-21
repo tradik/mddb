@@ -4,18 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	json "github.com/goccy/go-json"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
+	"mddb/internal/httpclient"
+	proto "mddb/proto"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"mddb/internal/httpclient"
-	proto "mddb/proto"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 var bucketBulkJobs = []byte("bulk_jobs")
@@ -98,7 +96,7 @@ func (m *BulkIngestManager) Start() {
 	m.recoverOrphans()
 	m.wg.Add(1)
 	go m.worker()
-	log.Printf("Bulk ingest worker started (queue buffer=%d)", cap(m.queue))
+	slog.Info("Bulk ingest worker started (queue)", "cap", cap(m.queue))
 }
 
 // Stop waits for the in-flight job to complete and then returns. Queued jobs
@@ -342,7 +340,7 @@ func (m *BulkIngestManager) recoverOrphans() {
 		_ = m.transitionStatus(id, BulkJobFailed, "server restarted mid-job", 0)
 	}
 	if len(orphans) > 0 {
-		log.Printf("Bulk ingest: marked %d orphan jobs as failed", len(orphans))
+		slog.Info("Bulk ingest marked orphan jobs as failed", "orphansCount", len(orphans))
 	}
 }
 
@@ -352,12 +350,12 @@ func (m *BulkIngestManager) recoverOrphans() {
 func (m *BulkIngestManager) fireCallback(job *BulkIngestJob) {
 	payload, err := json.Marshal(job)
 	if err != nil {
-		log.Printf("bulk ingest callback: marshal failed for %s: %v", job.ID, err)
+		slog.Warn("bulk ingest callback marshal failed", "iD", job.ID, "err", err)
 		return
 	}
 	req, err := http.NewRequest(http.MethodPost, job.CallbackURL, bytes.NewReader(payload))
 	if err != nil {
-		log.Printf("bulk ingest callback: bad URL %s: %v", job.CallbackURL, err)
+		slog.Warn("bulk ingest callback bad URL", "callbackURL", job.CallbackURL, "err", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -365,7 +363,7 @@ func (m *BulkIngestManager) fireCallback(job *BulkIngestJob) {
 	// SEC-004: use the SSRF-guarded pooled client (callback URL is user-supplied).
 	resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req)
 	if err != nil {
-		log.Printf("bulk ingest callback: POST to %s failed: %v", job.CallbackURL, err)
+		slog.Warn("bulk ingest callback POST failed", "callbackURL", job.CallbackURL, "err", err)
 		return
 	}
 	httpclient.DrainAndClose(resp.Body)

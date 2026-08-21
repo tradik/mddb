@@ -452,6 +452,33 @@ Clients with native UDS support:
 
 ---
 
+## Logging
+
+The operational log is structured. `text` is the readable default for a
+terminal; `json` emits one object per line — `time` (RFC 3339), `level`, `msg`
+and the event's own fields — which is what a collector wants, so the container
+image sets it. Severity lives in the `level` field, never in the message, so
+`level=error` is a filter rather than a regular expression over prose.
+
+This is separate from the **audit trail**, which has its own retention,
+RFC 5424 syslog export and SIEM webhooks — see
+[SECURITY.md](SECURITY.md) and the `MDDB_AUDIT_*` variables.
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_LOG_FORMAT` | `text` (`json` in the Docker image) | string | Output encoding: `text` or `json` |
+| `MDDB_LOG_LEVEL` | `info` | string | Minimum level emitted: `debug`, `info`, `warn`, `error` |
+| `MDDB_ACCESS_LOG` | `false` | bool | One line per HTTP request: method, path, status, bytes, elapsed, remote address. The query string is deliberately omitted — search endpoints carry user content there |
+
+Access log lines take their level from the status: 5xx is `error`, 4xx is
+`warn`, everything else `info`.
+
+```json
+{"time":"2026-08-21T14:03:11.412Z","level":"ERROR","msg":"embedding failed after all attempts","collection":"docs","docID":"intro","chunk":2,"err":"context deadline exceeded"}
+```
+
+---
+
 ## Profiling
 
 | Env Var | Default | Type | Description |

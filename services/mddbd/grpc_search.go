@@ -4,17 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"log/slog"
 	"mddb/internal/fts"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	proto "mddb/proto"
 	"strings"
 	"time"
-
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // VectorSearch implements the VectorSearch RPC
@@ -674,7 +673,7 @@ func (g *GRPCServer) FTSReindex(ctx context.Context, req *proto.FTSReindexReques
 	for _, d := range docs {
 		if err := g.server.FTSIndex.IndexWithLang(req.Collection, d.ID, d.ContentMD, d.Lang); err != nil {
 			failed++
-			log.Printf("fts reindex %s/%s: %v", req.Collection, d.ID, err)
+			slog.Warn("FTS reindex failed", "collection", req.Collection, "iD", d.ID, "err", err)
 			continue
 		}
 		_ = g.server.FTSIndex.IndexPositionsWithLang(req.Collection, d.ID, d.ContentMD, d.Lang)

@@ -4,21 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
-	"os"
-	"strings"
-	"time"
-
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
-
+	"log/slog"
 	"mddb/internal/cache"
 	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	proto "mddb/proto"
+	"os"
+	"strings"
+	"time"
 )
 
 // GRPCServer implements the MDDB gRPC service
@@ -101,9 +99,10 @@ func startGRPCServer(s *Server, addr string, opts ...grpc.ServerOption) error {
 		authOn := os.Getenv("MDDB_AUTH_ENABLED") == "true"
 		hasMTLS := s.Config.TLS.ClientCAFile != ""
 		if s.ReplicationRole == "leader" && !hasSecret && !authOn && !hasMTLS {
-			log.Printf("⚠️  SECURITY (SEC-001): replication leader has NO auth, MDDB_REPLICATION_SECRET, or mTLS. " +
-				"Snapshot/binlog requests will be refused. Set MDDB_REPLICATION_SECRET, enable MDDB_AUTH_ENABLED, " +
-				"or configure mTLS (TLS client CA) before followers can sync.")
+			slog.Warn("replication leader has no auth, MDDB_REPLICATION_SECRET, or mTLS. "+
+				"Snapshot/binlog requests will be refused. Set MDDB_REPLICATION_SECRET, enable "+
+				"MDDB_AUTH_ENABLED, or configure mTLS (TLS client CA) before followers can sync.",
+				"finding", "SEC-001")
 		}
 	}
 

@@ -5,7 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	json "github.com/goccy/go-json"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/envconf"
 	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
@@ -13,9 +15,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 // VectorSearchRequest represents an HTTP vector search request.
@@ -68,7 +67,7 @@ func (s *Server) loadVectorIndex() {
 	// Get all collections with vectors
 	counts, err := s.VectorStore.CountByCollection()
 	if err != nil {
-		log.Printf("ERROR: failed to count vector collections: %v", err)
+		slog.Error("failed to count vector collections", "err", err)
 		s.VectorIndex.SetReady()
 		for _, searcher := range s.VectorSearchers {
 			searcher.SetReady()
@@ -80,7 +79,7 @@ func (s *Server) loadVectorIndex() {
 	for collection, count := range counts {
 		records, err := s.VectorStore.LoadCollection(collection)
 		if err != nil {
-			log.Printf("ERROR: failed to load vectors for collection %q: %v", collection, err)
+			slog.Error("failed to load vectors for collection", "collection", collection, "err", err)
 			continue
 		}
 
@@ -125,8 +124,9 @@ func (s *Server) loadVectorIndex() {
 	for _, searcher := range s.VectorSearchers {
 		searcher.SetReady()
 	}
-	log.Printf("Vector index loaded: %d documents across %d collections in %v (algorithms: flat, hnsw, ivf, pq)",
-		totalLoaded, len(counts), time.Since(start))
+	slog.Info("vector index loaded",
+		"documents", totalLoaded, "collections", len(counts), "elapsed", time.Since(start),
+		"algorithms", "flat, hnsw, ivf, pq")
 }
 
 // handleVectorSearch handles POST /v1/vector-search

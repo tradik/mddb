@@ -6,11 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"net/http"
 	"time"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // MCP API Key management — stores keys in internal BoltDB bucket "_mcp_api_keys".
@@ -87,7 +86,7 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64) (*MCPAPIKey, strin
 		return nil, "", err
 	}
 
-	log.Printf("MCP API key created: name=%s fingerprint=%s", name, keyFingerprint(key))
+	slog.Info("MCP API key created", "name", name, "keyFingerprint", keyFingerprint(key))
 	return &apiKey, key, nil
 }
 
@@ -160,7 +159,7 @@ func (s *mcpAPIKeyStore) Delete(key string) error {
 		if b.Get([]byte(key)) == nil {
 			return fmt.Errorf("key not found")
 		}
-		log.Printf("MCP API key deleted: fingerprint=%s", keyFingerprint(key))
+		slog.Info("MCP API key deleted", "keyFingerprint", keyFingerprint(key))
 		return b.Delete([]byte(key))
 	})
 }
@@ -185,7 +184,7 @@ func (s *mcpAPIKeyStore) Disable(key string) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("MCP API key disabled: name=%s", ak.Name)
+		slog.Info("MCP API key disabled", "name", ak.Name)
 		return b.Put([]byte(key), updated)
 	})
 }

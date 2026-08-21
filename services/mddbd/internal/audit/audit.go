@@ -3,13 +3,12 @@ package audit
 import (
 	"encoding/binary"
 	"errors"
-	"log"
+	json "github.com/goccy/go-json"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 var bucketAudit = []byte("audit")
@@ -171,7 +170,7 @@ func (a *AuditManager) writer() {
 			return
 		}
 		if err := a.flushBatch(batch); err != nil {
-			log.Printf("audit: flush failed: %v", err)
+			slog.Warn("audit flush failed", "err", err)
 		}
 		batch = batch[:0]
 	}
@@ -249,7 +248,7 @@ func (a *AuditManager) trimmer() {
 func (a *AuditManager) trimOnce() {
 	cutoff := time.Now().Add(-time.Duration(a.retentionDays) * 24 * time.Hour).UnixNano()
 	if err := a.PurgeOlderThan(cutoff); err != nil {
-		log.Printf("audit: trim failed: %v", err)
+		slog.Warn("audit trim failed", "err", err)
 	}
 }
 

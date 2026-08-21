@@ -4,21 +4,19 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
-	"io"
-	"log"
-	"os"
-	"sync"
-	"time"
-
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
-
+	"io"
+	"log/slog"
 	"mddb/internal/binlog"
 	proto "mddb/proto"
+	"os"
+	"sync"
+	"time"
 )
 
 // authorizeReplication gates the snapshot / binlog streams (SEC-001). Without
@@ -103,7 +101,7 @@ func (rs *ReplicationServer) RequestSnapshot(req *proto.SnapshotRequest, stream 
 		return status.Error(codes.InvalidArgument, "follower_id is required")
 	}
 
-	log.Printf("Replication: follower %s requested snapshot", followerID)
+	slog.Info("Replication follower requested snapshot", "followerID", followerID)
 
 	// Record the LSN at snapshot time
 	snapshotLSN := rs.server.Binlog.CurrentLSN()
@@ -149,11 +147,11 @@ func (rs *ReplicationServer) RequestSnapshot(req *proto.SnapshotRequest, stream 
 	})
 
 	if err != nil {
-		log.Printf("Replication: snapshot to %s failed: %v", followerID, err)
+		slog.Warn("Replication snapshot failed", "followerID", followerID, "err", err)
 		return status.Error(codes.Internal, err.Error())
 	}
 
-	log.Printf("Replication: snapshot to %s completed (LSN=%d)", followerID, snapshotLSN)
+	slog.Info("replication snapshot completed", "followerID", followerID, "snapshotLSN", snapshotLSN)
 	return nil
 }
 
@@ -191,10 +189,10 @@ func (rs *ReplicationServer) StreamBinlog(req *proto.StreamBinlogRequest, stream
 		rs.mu.Lock()
 		delete(rs.followers, followerID)
 		rs.mu.Unlock()
-		log.Printf("Replication: follower %s disconnected from binlog stream", followerID)
+		slog.Info("Replication follower disconnected from binlog stream", "followerID", followerID)
 	}()
 
-	log.Printf("Replication: follower %s streaming binlog from LSN=%d", followerID, fromLSN)
+	slog.Info("replication follower streaming binlog", "followerID", followerID, "fromLSN", fromLSN)
 
 	// 1. Send historical entries from binlog file
 	entries, err := rs.server.Binlog.ReadFrom(fromLSN)
