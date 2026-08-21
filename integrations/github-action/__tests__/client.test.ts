@@ -57,15 +57,31 @@ describe('MddbClient.addDocument', () => {
     expect(JSON.parse(String(init?.body))).toEqual(doc);
   });
 
-  it('attaches a permissive https agent when verifySsl is false', async () => {
+  // INT-013: this used to assert `init.agent`, which global fetch (undici)
+  // ignores — the test passed while verify-ssl:false did nothing. The option
+  // undici actually reads is `dispatcher`, and `agent` must not come back.
+  it('passes an undici dispatcher when verifySsl is false', async () => {
     const { fetchImpl, calls } = makeFetch([{ status: 200 }]);
     const client = new MddbClient(clientOpts({ verifySsl: false, fetchImpl }));
     await client.addDocument(doc);
     const init = calls[0][1] as RequestInit & {
-      agent?: { options?: { rejectUnauthorized?: boolean } };
+      dispatcher?: unknown;
+      agent?: unknown;
     };
-    expect(init.agent).toBeDefined();
-    expect(init.agent?.options?.rejectUnauthorized).toBe(false);
+    expect(init.dispatcher).toBeDefined();
+    // Duck-typed rather than instanceof: undici is ESM-only, and importing it
+    // into the Jest (CJS) test context is more trouble than the assertion is
+    // worth. A dispatcher is what undici's fetch calls dispatch() on.
+    expect(typeof (init.dispatcher as { dispatch?: unknown }).dispatch).toBe('function');
+    expect(init.agent).toBeUndefined();
+  });
+
+  it('passes no dispatcher when verifySsl is true', async () => {
+    const { fetchImpl, calls } = makeFetch([{ status: 200 }]);
+    const client = new MddbClient(clientOpts({ verifySsl: true, fetchImpl }));
+    await client.addDocument(doc);
+    const init = calls[0][1] as RequestInit & { dispatcher?: unknown };
+    expect(init.dispatcher).toBeUndefined();
   });
 
   it('skips Authorization header when no api key is configured', async () => {

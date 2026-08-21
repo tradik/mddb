@@ -27,7 +27,8 @@
   },
   "dependencies": {
     "@actions/core": "^3.0.1",
-    "@actions/glob": "^0.7.0"
+    "@actions/glob": "^0.7.0",
+    "undici": "^8.10.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
