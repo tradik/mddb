@@ -153,7 +153,7 @@ services:
 
   # Ollama (Optional - use profile "with-ollama" if no local Ollama)
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.32.15
     container_name: mddb-ollama
     ports:
       - "11434:11434"

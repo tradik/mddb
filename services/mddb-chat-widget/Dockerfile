@@ -1,5 +1,5 @@
 # Build stage
-FROM node:26-alpine AS builder
+FROM node:26.7-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ RUN npm run build
 # Runtime stage — serve static files via the unprivileged nginx image.
 # OPS-006: nginxinc/nginx-unprivileged runs as uid 101 (non-root) and listens
 # on 8080 by default, so the container needs no root.
-FROM nginxinc/nginx-unprivileged:alpine
+FROM nginxinc/nginx-unprivileged:1.31.4-alpine3.24
 
 COPY --from=builder /app/dist/ /usr/share/nginx/html/
 
