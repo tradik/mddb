@@ -38,6 +38,10 @@ type StatsProvider interface {
 	VectorIndexReady() bool
 	EmbeddingConfigured() bool
 	EmbeddingQueueSize() (size int, present bool)
+	// EmbeddingCacheStats reports the embedding cache (RAG-003); present is
+	// false when caching is disabled, so a disabled cache emits no metric
+	// rather than a permanent zero that reads as "never hits".
+	EmbeddingCacheStats() (hits, misses uint64, size int, present bool)
 	ReplicationRole() string
 	BinlogStats() (s BinlogStatsView, present bool)
 	DBStats() DBStats
@@ -336,6 +340,21 @@ func (m *Metrics) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		writef(&buf, "# HELP mddb_embedding_queue_size Current number of pending embedding jobs.\n")
 		writef(&buf, "# TYPE mddb_embedding_queue_size gauge\n")
 		writef(&buf, "mddb_embedding_queue_size %d\n\n", qsize)
+	}
+
+	// Embedding cache (RAG-003)
+	if hits, misses, size, ok := m.stats.EmbeddingCacheStats(); ok {
+		writef(&buf, "# HELP mddb_embedding_cache_hits_total Embedding requests served from cache.\n")
+		writef(&buf, "# TYPE mddb_embedding_cache_hits_total counter\n")
+		writef(&buf, "mddb_embedding_cache_hits_total %d\n\n", hits)
+
+		writef(&buf, "# HELP mddb_embedding_cache_misses_total Embedding requests that reached the provider.\n")
+		writef(&buf, "# TYPE mddb_embedding_cache_misses_total counter\n")
+		writef(&buf, "mddb_embedding_cache_misses_total %d\n\n", misses)
+
+		writef(&buf, "# HELP mddb_embedding_cache_size Embeddings currently held in cache.\n")
+		writef(&buf, "# TYPE mddb_embedding_cache_size gauge\n")
+		writef(&buf, "mddb_embedding_cache_size %d\n\n", size)
 	}
 
 	// --- Webhooks & schemas ---

@@ -18,6 +18,11 @@ import (
 type ChunkEmbedding struct {
 	ChunkIndex int
 	Vector     []float32
+	// ChunkHash identifies this chunk's text (RAG-003). Stored so a reindex
+	// can reuse the vector of a chunk whose content did not change — editing
+	// one paragraph of a fifty-chunk document used to re-embed all fifty,
+	// because the document hash changed.
+	ChunkHash string
 }
 
 // EmbeddingRecord stores a document's embedding vector alongside metadata.
@@ -28,6 +33,10 @@ type EmbeddingRecord struct {
 	Dimensions  int       `json:"dimensions"`
 	CreatedAt   int64     `json:"createdAt"`
 	ContentHash string    `json:"contentHash"`
+	// ChunkHash is this chunk's own content hash (RAG-003), as opposed to
+	// ContentHash which covers the whole document. Empty on records written
+	// before v2.12.0, which simply means no per-chunk reuse for them.
+	ChunkHash string `json:"chunkHash,omitempty"`
 }
 
 // VectorStore handles persistence of embedding vectors in BoltDB.
@@ -109,6 +118,7 @@ func (vs *VectorStore) PutChunksQuantized(collection, docID string, chunks []Chu
 				Dimensions:  len(chunk.Vector),
 				CreatedAt:   now,
 				ContentHash: contentHash,
+				ChunkHash:   chunk.ChunkHash,
 			}
 			data := marshalEmbeddingRecordQuantized(rec, qt)
 
@@ -169,6 +179,7 @@ func (vs *VectorStore) PutChunks(collection, docID string, chunks []ChunkEmbeddi
 				Dimensions:  len(chunk.Vector),
 				CreatedAt:   now,
 				ContentHash: contentHash,
+				ChunkHash:   chunk.ChunkHash,
 			})
 
 			if err := b.Put(chunkKey, data); err != nil {
@@ -501,12 +512,15 @@ func marshalEmbeddingRecordQuantized(rec *EmbeddingRecord, qt QuantizationType) 
 	hashBytes := []byte(rec.ContentHash)
 	docIDBytes := []byte(rec.DocID)
 
+	chunkHashBytes := []byte(rec.ChunkHash)
+
 	size := 1 + 1 + // version + quantType
 		4 + len(modelBytes) + // model
 		4 + len(qvData) + // quantized vector data (length-prefixed)
 		8 + // created_at
 		4 + len(hashBytes) + // content hash
-		4 + len(docIDBytes) // docID
+		4 + len(docIDBytes) + // docID
+		4 + len(chunkHashBytes) // chunk hash (v2.12.0+, RAG-003)
 
 	buf := make([]byte, size)
 	offset := 0
@@ -552,6 +566,13 @@ func marshalEmbeddingRecordQuantized(rec *EmbeddingRecord, qt QuantizationType) 
 	binary.LittleEndian.PutUint32(buf[offset:], uint32(len(docIDBytes))) // #nosec G115
 	offset += 4
 	copy(buf[offset:], docIDBytes)
+	offset += len(docIDBytes)
+
+	// chunk hash (RAG-003), appended past every field the v2 format had —
+	// same forward/backward compatibility argument as the float32 record.
+	binary.LittleEndian.PutUint32(buf[offset:], uint32(len(chunkHashBytes))) // #nosec G115
+	offset += 4
+	copy(buf[offset:], chunkHashBytes)
 
 	return buf
 }
@@ -622,6 +643,16 @@ func unmarshalEmbeddingRecordQuantized(data []byte) (*EmbeddingRecord, *Quantize
 		return nil, nil, fmt.Errorf("invalid docID data")
 	}
 	rec.DocID = string(data[offset : offset+docIDLen])
+	offset += docIDLen
+
+	// chunk hash (RAG-003), absent before v2.12.0.
+	if offset+4 <= len(data) {
+		chunkHashLen := int(binary.LittleEndian.Uint32(data[offset:]))
+		offset += 4
+		if chunkHashLen > 0 && offset+chunkHashLen <= len(data) {
+			rec.ChunkHash = string(data[offset : offset+chunkHashLen])
+		}
+	}
 
 	return rec, qv, nil
 }
@@ -639,12 +670,15 @@ func MarshalEmbeddingRecord(rec *EmbeddingRecord) []byte {
 	hashBytes := []byte(rec.ContentHash)
 	docIDBytes := []byte(rec.DocID)
 
+	chunkHashBytes := []byte(rec.ChunkHash)
+
 	size := 4 + len(modelBytes) + // model
 		4 + // dimensions
 		4*len(rec.Vector) + // vectors
 		8 + // created_at
 		4 + len(hashBytes) + // content hash
-		4 + len(docIDBytes) // docID
+		4 + len(docIDBytes) + // docID
+		4 + len(chunkHashBytes) // chunk hash (v2.12.0+, RAG-003)
 
 	buf := make([]byte, size)
 	offset := 0
@@ -679,6 +713,16 @@ func MarshalEmbeddingRecord(rec *EmbeddingRecord) []byte {
 	binary.LittleEndian.PutUint32(buf[offset:], uint32(len(docIDBytes))) // #nosec G115 -- docID length always small
 	offset += 4
 	copy(buf[offset:], docIDBytes)
+	offset += len(docIDBytes)
+
+	// chunk hash (RAG-003). Appended after every field the original format
+	// had, and the reader stops at docID when nothing follows — so a new
+	// reader handles an old record and an old reader ignores this trailing
+	// field. That is what makes the change safe for a database in place and
+	// for a replica still running the previous version.
+	binary.LittleEndian.PutUint32(buf[offset:], uint32(len(chunkHashBytes))) // #nosec G115 -- hash length always small
+	offset += 4
+	copy(buf[offset:], chunkHashBytes)
 
 	return buf
 }
@@ -743,6 +787,17 @@ func UnmarshalEmbeddingRecord(data []byte) (*EmbeddingRecord, error) {
 		return nil, fmt.Errorf("invalid docID data")
 	}
 	rec.DocID = string(data[offset : offset+docIDLen])
+	offset += docIDLen
+
+	// chunk hash (RAG-003), absent in records written before v2.12.0 — an
+	// empty hash simply means this chunk cannot be reused on reindex.
+	if offset+4 <= len(data) {
+		chunkHashLen := int(binary.LittleEndian.Uint32(data[offset:]))
+		offset += 4
+		if chunkHashLen > 0 && offset+chunkHashLen <= len(data) {
+			rec.ChunkHash = string(data[offset : offset+chunkHashLen])
+		}
+	}
 
 	return rec, nil
 }
@@ -759,4 +814,44 @@ func SplitKey(key []byte) []string {
 	}
 	parts = append(parts, string(key[start:]))
 	return parts
+}
+
+// ChunkVectorsByHash returns a document's stored chunk vectors keyed by their
+// content hash (RAG-003).
+//
+// Keyed by hash rather than by index because a chunk that keeps its text but
+// moves — anything inserted above it shifts every index below — is still the
+// same chunk and its vector is still correct. Index-keyed reuse would miss
+// exactly the common edit.
+//
+// Chunks written before v2.12.0 carry no hash and are skipped, so an old
+// database degrades to today's behaviour rather than reusing the wrong vector.
+func (vs *VectorStore) ChunkVectorsByHash(collection, docID string) map[string][]float32 {
+	prefix := []byte("vec|" + collection + "|" + docID + "#")
+	out := make(map[string][]float32)
+
+	_ = vs.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(vs.bucketName)
+		if b == nil {
+			return nil
+		}
+		c := b.Cursor()
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			var rec *EmbeddingRecord
+			var err error
+			if isQuantizedRecord(v) {
+				// A quantized record's vector is dequantized on read, so
+				// reusing it would silently replace a full-precision vector
+				// with a lossy one. Not reusable.
+				continue
+			}
+			rec, err = UnmarshalEmbeddingRecord(v)
+			if err != nil || rec == nil || rec.ChunkHash == "" || len(rec.Vector) == 0 {
+				continue
+			}
+			out[rec.ChunkHash] = rec.Vector
+		}
+		return nil
+	})
+	return out
 }

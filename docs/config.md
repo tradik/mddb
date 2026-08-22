@@ -352,6 +352,8 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 | `MDDB_EMBEDDING_DIMENSIONS` | *(see below)* | int | Vector dimensionality |
 | `MDDB_EMBEDDING_CHUNK_ENABLED` | `true` | bool | Enable text chunking before embedding |
 | `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters |
+| `MDDB_EMBEDDING_CACHE_SIZE` | `1024` | int | (v2.12.0+) Embeddings held in the query cache; `0` disables caching and restores the pre-2.12.0 path exactly |
+| `MDDB_EMBEDDING_CACHE_TTL` | `3600` | int | (v2.12.0+) Cache entry lifetime in seconds |
 
 ### Provider Defaults
 

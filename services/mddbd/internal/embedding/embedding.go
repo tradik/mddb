@@ -3,8 +3,10 @@ package embedding
 import (
 	"context"
 	"log/slog"
-	"mddb/internal/envconf"
 	"os"
+	"time"
+
+	"mddb/internal/envconf"
 )
 
 // Provider generates embedding vectors from text.
@@ -24,7 +26,20 @@ type Provider interface {
 
 // NewProvider creates an embedding provider based on configuration.
 // Returns nil if embedding is disabled (provider = "none" or empty).
+//
+// The result is wrapped in an embedding cache unless
+// MDDB_EMBEDDING_CACHE_SIZE=0 (RAG-003) — one place, so no call site has to
+// know whether caching is on.
 func NewProvider() Provider {
+	return NewCachingProvider(
+		newBareProvider(),
+		envconf.Int("MDDB_EMBEDDING_CACHE_SIZE", DefaultCacheSize),
+		time.Duration(envconf.Int("MDDB_EMBEDDING_CACHE_TTL", int(DefaultCacheTTL.Seconds())))*time.Second,
+	)
+}
+
+// newBareProvider builds the configured provider without any decoration.
+func newBareProvider() Provider {
 	provider := os.Getenv("MDDB_EMBEDDING_PROVIDER")
 	if provider == "" || provider == "none" {
 		return nil

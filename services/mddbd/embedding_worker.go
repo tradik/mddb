@@ -133,9 +133,30 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		return
 	}
 
+	// RAG-003: reuse the vectors of chunks whose text did not change.
+	//
+	// The document-level check above only helps when nothing changed at all.
+	// Editing one paragraph of a fifty-chunk document changed the document
+	// hash and re-embedded all fifty — at full provider cost — even though
+	// forty-nine were identical. Keyed by chunk hash, so a chunk that merely
+	// shifted position is still recognised.
+	reusable := w.vectorStore.ChunkVectorsByHash(job.Collection, job.DocID)
+
 	// Generate embedding for each chunk
 	var chunkEmbeddings []vec.ChunkEmbedding
+	var reusedCount int
 	for i, chunk := range chunks {
+		chunkHash := vec.ContentHash(chunk)
+		if cached, ok := reusable[chunkHash]; ok {
+			chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{
+				ChunkIndex: i,
+				Vector:     cached,
+				ChunkHash:  chunkHash,
+			})
+			reusedCount++
+			continue
+		}
+
 		var vector []float32
 		var embedErr error
 		for attempt := 0; attempt < 3; attempt++ {
@@ -160,7 +181,14 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{
 			ChunkIndex: i,
 			Vector:     vector,
+			ChunkHash:  chunkHash,
 		})
+	}
+
+	if reusedCount > 0 {
+		slog.Debug("reused unchanged chunk embeddings",
+			"collection", job.Collection, "docID", job.DocID,
+			"reused", reusedCount, "embedded", len(chunks)-reusedCount)
 	}
 
 	// Store all chunks in BoltDB

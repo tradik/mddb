@@ -10,13 +10,17 @@ import (
 // "0"/"follower"/"default"/absent branches.
 type altStats struct{ role string }
 
-func (altStats) Mode() string                         { return "ro" }
-func (altStats) VectorIndexReady() bool               { return false }
-func (altStats) EmbeddingConfigured() bool            { return false }
-func (altStats) EmbeddingQueueSize() (int, bool)      { return 0, false }
-func (s altStats) ReplicationRole() string            { return s.role }
-func (altStats) BinlogStats() (BinlogStatsView, bool) { return BinlogStatsView{}, false }
-func (altStats) DBStats() DBStats                     { return DBStats{} }
+func (altStats) Mode() string                    { return "ro" }
+func (altStats) VectorIndexReady() bool          { return false }
+func (altStats) EmbeddingConfigured() bool       { return false }
+func (altStats) EmbeddingQueueSize() (int, bool) { return 0, false }
+
+// Caching disabled: the metric must be absent, not a zero that reads as
+// "the cache never hits".
+func (altStats) EmbeddingCacheStats() (uint64, uint64, int, bool) { return 0, 0, 0, false }
+func (s altStats) ReplicationRole() string                        { return s.role }
+func (altStats) BinlogStats() (BinlogStatsView, bool)             { return BinlogStatsView{}, false }
+func (altStats) DBStats() DBStats                                 { return DBStats{} }
 
 func TestHandleMetricsAltBranches(t *testing.T) {
 	for _, role := range []string{"follower", "standalone"} { // follower -> 2, other -> default 0

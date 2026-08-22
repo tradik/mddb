@@ -27,6 +27,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidateDocumentResponse` gains field 3 (`warnings`), which is
   wire-compatible: older clients ignore it.
 
+- **Embedding cache (RAG-003)** — every vector, hybrid and memory-recall query
+  called the embedding provider with no cache at all: a network round trip and a
+  token charge even for a query asked seconds ago, and MCP agents repeat the same
+  phrase in a loop. Embeddings are now memoised by `(model, text)` in an LRU with
+  a TTL (`MDDB_EMBEDDING_CACHE_SIZE`, default 1024; `MDDB_EMBEDDING_CACHE_TTL`,
+  default 1h). It is a decorator around the existing `Provider` interface, so no
+  provider and no call site changed, and `MDDB_EMBEDDING_CACHE_SIZE=0` returns
+  the bare provider — "disabled" is the old code path, not a cache that always
+  misses. `EmbedBatch` asks the provider only for the texts it does not hold.
+  Hit/miss/size counters appear in `/metrics` as
+  `mddb_embedding_cache_{hits_total,misses_total,size}`.
+
+  Reindexing also reuses vectors per chunk. The worker already skipped a
+  document whose content was unchanged, but editing one paragraph of a
+  fifty-chunk document changed the document hash and re-embedded all fifty at
+  full provider cost. Each chunk's own hash is now stored with its vector, and
+  reuse is keyed by that hash rather than by chunk index — so a chunk that keeps
+  its text but shifts position, which is what any insertion above it causes, is
+  still recognised. Quantized vectors are excluded from reuse: they are lossy on
+  read, and reusing one would silently replace a full-precision vector with a
+  degraded copy.
+
 - **Per-collection retrieval profiles (RAG-001)** — retrieval settings now live
   next to the data instead of being repeated by every client. Search type, topK,
   granularity, hybrid strategy and a context token budget go in
@@ -166,6 +188,13 @@ Separately, symbols (`defines`/`uses`/`imports`) are extracted on write, so
 documents stored before this release have none and the connection graph will
 report them as orphans. Re-save or bulk re-ingest a code collection to populate
 it — reading is unaffected either way.
+
+The stored vector format gained a trailing per-chunk hash field. No migration
+is needed and none is offered: a 2.12.0 server reads pre-2.12.0 records (they
+simply have no per-chunk reuse), and an older server or replica reading a
+2.12.0 record ignores the trailing field, which the previous format already
+did. Both directions are pinned by tests, because getting this wrong would
+corrupt a database in place.
 
 Also worth knowing: heavy queries can return `503` with `Retry-After` under
 load, where they previously all ran and risked exhausting memory

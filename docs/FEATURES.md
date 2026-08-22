@@ -61,6 +61,7 @@ Complete list of MDDB features organized by category.
 - **Background Indexing** - Non-blocking embedding generation
 - **Automatic Fallback** - Falls back to flat if ANN index not ready
 - **Embedding Chunking** - Auto-split long documents into paragraph-based chunks before embedding with sentence and hard-split fallbacks. Multi-key chunk storage with deduplication in search results. Configurable via `MDDB_EMBEDDING_CHUNK_SIZE` and `MDDB_EMBEDDING_CHUNK_ENABLED`.
+- **Embedding Cache** - Repeated queries are served from memory instead of the provider, and a reindex reuses the vectors of chunks whose text did not change — editing one paragraph of a fifty-chunk document no longer re-embeds all fifty. Hit/miss counters in `/metrics`; `MDDB_EMBEDDING_CACHE_SIZE=0` disables it.
 
 #### Full-Text Search
 - **Built-in Inverted Index** - No external search-engine dependency
@@ -465,6 +466,8 @@ Enable with `MDDB_EXTREME=true`:
 - `MDDB_WEBHOOKS` - Enable/disable webhooks (default: false)
 - `MDDB_EMBEDDING_CHUNK_ENABLED` - Enable/disable embedding chunking (default: true)
 - `MDDB_EMBEDDING_CHUNK_SIZE` - Maximum chunk size in characters (default: 1500)
+- `MDDB_EMBEDDING_CACHE_SIZE` - Embeddings held in the query cache (default: 1024; `0` disables)
+- `MDDB_EMBEDDING_CACHE_TTL` - Cache entry lifetime in seconds (default: 3600)
 - `MDDB_PANEL_MODE` - Panel mode: internal (CORS) or external (reverse proxy)
 
 ### CLI Flags
