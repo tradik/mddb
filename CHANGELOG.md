@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **HTTP routes extracted from `main()` and tested (TEST-002)** — 107 route
+  registrations lived inside a 1089-line `main()`, where nothing could reach
+  them: the file carried the entire public surface of the server at 0.7%
+  coverage. `registerRoutes` is now a list in its own file, at 96%, and the
+  tests assert what a deployment actually exposes: that every endpoint the
+  server advertises is wired, that auth routes appear only when auth is on,
+  that write endpoints refuse in read-only mode, that health answers on both
+  its paths without auth, that pprof stays off unless asked for, and that
+  registering twice does not panic the process on boot.
+
+
 - **Per-area coverage floors (TEST-002)** — `go test ./...` reported one number
   for a package of 150 files, and that number looked healthy while the surfaces
   handling file uploads, 80 MCP tools and automation triggers sat at 22% between
@@ -221,6 +232,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing code collection to populate it.
 
 ### Fixed
+
+- **`/v1/endpoints` advertised endpoints the server does not serve.** The
+  automation routes are registered only when automations are enabled
+  (`MDDB_AUTOMATIONS`), but the catalogue listed them unconditionally — a client
+  reading `/v1/endpoints` to discover capabilities was sent to a 404 with no
+  explanation. The catalogue now reflects the running server, and the temporal
+  and spell-correction endpoints, which it had simply omitted, are listed when
+  they are served. Found by the first test ever written against the route table
+  (TEST-002).
+
 
 - **`SchemaManager.Validate` and `Metrics.IncOp` panicked on a nil receiver.**
   Half the call sites guarded the nil and half did not — five schema call sites

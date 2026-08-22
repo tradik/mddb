@@ -11,11 +11,11 @@ import (
 // DOC-010: /v1/mcp/keys and /v1/mcp/keys/disable were served and documented in
 // docs/MCP.md with curl examples, yet absent from docs/openapi.yaml — so every
 // generated client silently lacked MCP key management. This guard compares the
-// routes main.go registers against the paths the spec declares, and fails on
+// routes the server registers against the paths the spec declares, and fails on
 // anything served but undocumented.
 
 var (
-	// mux.HandleFunc("/v1/...", ...) — the literal route patterns in main.go.
+	// mux.HandleFunc("/v1/...", ...) — the literal route patterns in routes.go.
 	routeRe = regexp.MustCompile(`mux\.HandleFunc\("(/v1/[^"]*)"`)
 	// Top-level "  /path:" entries under openapi.yaml's paths: section.
 	specPathRe = regexp.MustCompile(`(?m)^  (/v1/[^:]*):`)
@@ -27,9 +27,12 @@ var (
 var routesExemptFromSpec = map[string]bool{}
 
 func TestServedRoutesAreDocumentedInOpenAPI(t *testing.T) {
-	main, err := os.ReadFile("main.go")
+	// routes.go, not main.go: the registrations were extracted there in
+	// TEST-002 so they could be tested. This guard failed loudly on the move
+	// rather than passing on zero routes, which is what it was built for.
+	main, err := os.ReadFile("routes.go")
 	if err != nil {
-		t.Fatalf("read main.go: %v", err)
+		t.Fatalf("read routes.go: %v", err)
 	}
 	spec, err := os.ReadFile("../../docs/openapi.yaml")
 	if err != nil {
@@ -66,7 +69,7 @@ func TestServedRoutesAreDocumentedInOpenAPI(t *testing.T) {
 		served[strings.TrimSuffix(m[1], "/")] = true
 	}
 	if len(served) == 0 {
-		t.Fatal("found no mux.HandleFunc /v1 routes in main.go — the guard regex may be stale")
+		t.Fatal("found no mux.HandleFunc /v1 routes in routes.go — the guard regex may be stale")
 	}
 
 	var missing []string
