@@ -1,3 +1,10 @@
+// Format converters and the byte helpers they use.
+//
+// Renamed from coverage_boost2_test.go (TEST-002): the old name said these
+// existed to move a number, and a name that describes its own motive rather
+// than its subject invites more of the same. The tests themselves were fine —
+// 122 of the 133 across the three files carried real assertions. The eleven
+// that did not were given them and moved to lifecycle_and_wiring_test.go.
 package main
 
 import (

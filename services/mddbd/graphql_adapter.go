@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	gql "mddb/graphql"
@@ -164,6 +165,10 @@ func mcpVectorStatsToGQL(s *MCPVectorStatsResponse) *gql.VectorStats {
 			EmbeddedDocuments: c.EmbeddedDocuments,
 		})
 	}
+	// Sorted, because these come from map iteration: the same query returned
+	// its collections in a different order every time, which makes a UI list
+	// jump on refresh and any diff of two responses meaningless (TEST-002).
+	sort.Slice(cols, func(i, j int) bool { return cols[i].Collection < cols[j].Collection })
 	provider := s.Provider
 	model := s.Model
 	dims := s.Dimensions

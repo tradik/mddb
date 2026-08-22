@@ -1,3 +1,8 @@
+// Full-text search internals: tokenising, stemming, synonyms, stop words and
+// the scoring helpers underneath the public search API.
+//
+// Renamed from coverage_boost3_test.go (TEST-002). See the note in
+// document_converters_helpers_test.go for why.
 package main
 
 import (
@@ -235,11 +240,6 @@ func TestMemoryBackendStats(t *testing.T) {
 // keybuilder.go: Reset
 // ---------------------------------------------------------------------------
 
-func TestKeyBuilderReset(t *testing.T) {
-	kb := &KeyBuilder{}
-	kb.Reset() // no-op, should not panic
-}
-
 // ---------------------------------------------------------------------------
 // binlog_entry.go: binlog.BinlogOps.Len
 // ---------------------------------------------------------------------------
@@ -262,12 +262,6 @@ func TestBinlogOpsLen(t *testing.T) {
 // ---------------------------------------------------------------------------
 // compression.go: compression.ConfigureCompression
 // ---------------------------------------------------------------------------
-
-func TestConfigureCompression(t *testing.T) {
-	// Just ensure no panics and it sets values
-	compression.ConfigureCompression(true, 256, 4096)
-	compression.ConfigureCompression(false, 0, 0)
-}
 
 // ---------------------------------------------------------------------------
 // fts_positions.go: RemovePositions
@@ -296,23 +290,9 @@ func TestRemovePositions(t *testing.T) {
 // fts_synonyms.go: SetBinlog
 // ---------------------------------------------------------------------------
 
-func TestSynonymManagerSetBinlog(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	sm := fts.NewSynonymManager(db)
-	sm.SetBinlog(nil) // no-op
-}
-
 // ---------------------------------------------------------------------------
 // fts_stopwords.go: SetBinlog
 // ---------------------------------------------------------------------------
-
-func TestStopWordManagerSetBinlog(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	swm := fts.NewStopWordManager(db)
-	swm.SetBinlog(nil)
-}
 
 // ---------------------------------------------------------------------------
 // fts_stopwords.go: LoadAll (partial coverage → boost)
@@ -398,15 +378,6 @@ func TestFTSSearchLimitCB3(t *testing.T) {
 // ---------------------------------------------------------------------------
 // storage_backend.go: Default, CreateBackend (if possible)
 // ---------------------------------------------------------------------------
-
-func TestBackendRegistryDefault(t *testing.T) {
-	registry := &BackendRegistry{}
-	def := registry.Default()
-	if def == nil {
-		// nil is acceptable for empty registry
-		return
-	}
-}
 
 // ---------------------------------------------------------------------------
 // More FTS coverage: Search, Remove, Index edge cases
@@ -1185,19 +1156,6 @@ func TestFTSIndexFieldsWithLang(t *testing.T) {
 	}
 }
 
-func TestFTSSearchSingleChar(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	idx := fts.NewFTSIndex(db)
-	idx.SetStemmer(fts.NewPorterStemmer())
-	_ = idx.EnsureBuckets()
-
-	_ = idx.Index("col", "d1", "a short document")
-	// Single char queries should be handled gracefully
-	results, _ := idx.Search("col", "a", 10)
-	_ = results
-}
-
 func TestSearchBooleanMultipleOR(t *testing.T) {
 	db := openTestDB(t)
 	defer func() { _ = db.Close() }()
@@ -1250,17 +1208,6 @@ func TestFTSSynonymExpansionInSearch(t *testing.T) {
 // ---------------------------------------------------------------------------
 // More coverage: FTS BM25F fuzzy, synonym loading
 // ---------------------------------------------------------------------------
-
-func TestFTSSynonymLoadDefaults(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	sm := fts.NewSynonymManager(db)
-	_ = sm.EnsureBucket()
-	_ = sm.LoadDefaults("col")
-	// Should have loaded default synonyms
-	syns := sm.Get("col", "happy")
-	_ = syns // may or may not have defaults
-}
 
 func TestFTSSynonymExpandMultiple(t *testing.T) {
 	db := openTestDB(t)

@@ -30,7 +30,7 @@ AREAS=(
   "mcp_tools.go:49"
   "mcp_custom_tools.go:80"
   "mcp_direct_client.go:73"
-  "graphql_adapter.go:75"
+  "graphql_adapter.go:92"
   "routes.go:95"
   "main.go:0"
 )

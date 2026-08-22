@@ -244,6 +244,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Consistent hashing sent four times more keys to one shard than another.**
+  Virtual nodes were hashed as `"<shard>-<index>"`, so every replica of one
+  shard shared a prefix and FNV-1a placed them in long contiguous arcs — at the
+  production settings of 4 shards and 150 replicas, one shard owned a run of
+  **50 consecutive ring positions**, and key distribution ran from 39.6% to
+  160.8% of an even share. Swapping the two fields interleaves them: the longest
+  run drops to 5 and the spread to 91–111%. Found by giving an assertion to a
+  test that had computed the answer and thrown it away.
+
+- **GraphQL `vectorStats` returned its collections in a different order every
+  time**, because they came from map iteration with no sort. A UI list jumped on
+  refresh and any diff of two responses was meaningless.
+
+
 - **MCP boolean arguments sent as strings were silently ignored.** `mcpGetBool`
   accepted only a real JSON bool, so an agent sending `"lines": "true"` — which
   LLM clients do emit — got `false` and no indication why. The repository

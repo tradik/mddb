@@ -1,7 +1,11 @@
+// Server-level helpers that have no larger home of their own: key building,
+// sharding, caching, id generation and the small utilities the handlers share.
+//
+// Renamed from coverage_boost_test.go (TEST-002). See the note in
+// document_converters_helpers_test.go for why.
 package main
 
 import (
-	"mddb/internal/automationlog"
 	"mddb/internal/binlog"
 	"mddb/internal/fts"
 	"mddb/internal/vector"
@@ -344,30 +348,6 @@ func TestAsyncIOWaitAllNoPending(t *testing.T) {
 //     BloomFilter, binlog.BinlogEntryType.String, etc.
 // ---------------------------------------------------------------------------
 
-func TestFTSSetSynonymManager(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	idx := fts.NewFTSIndex(db)
-	sm := fts.NewSynonymManager(db)
-	idx.SetSynonymManager(sm)
-}
-
-func TestFTSSetStopWordManager(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	idx := fts.NewFTSIndex(db)
-	swm := fts.NewStopWordManager(db)
-	idx.SetStopWordManager(swm)
-}
-
-func TestAutomationManagerSetLogStore(t *testing.T) {
-	db := openTestDB(t)
-	defer func() { _ = db.Close() }()
-	am := NewAutomationManager(db)
-	ls := automationlog.NewStore(db, 24*time.Hour)
-	am.SetLogStore(ls)
-}
-
 func TestCollectionManagerLoadAll(t *testing.T) {
 	db := openTestDB(t)
 	defer func() { _ = db.Close() }()
@@ -556,19 +536,6 @@ func TestShardClusterDistribution(t *testing.T) {
 	if len(counts) < 2 {
 		t.Errorf("poor distribution: only %d shards used out of 4", len(counts))
 	}
-}
-
-func TestConsistentHashRemoveNode(t *testing.T) {
-	ch := NewConsistentHash(100)
-	ch.Add(1, 1)
-	ch.Add(2, 1)
-	ch.Add(3, 1)
-
-	before := ch.Get("test-key")
-	ch.Remove(2)
-	after := ch.Get("test-key")
-	_ = before
-	_ = after
 }
 
 func TestZeroCopyManagerStreamCopyCovBoost(t *testing.T) {
