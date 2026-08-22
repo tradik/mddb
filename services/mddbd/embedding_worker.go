@@ -17,6 +17,11 @@ type EmbeddingJob struct {
 	Collection string
 	DocID      string
 	ContentMD  string
+	// ChunkMode must match what retrieval uses to re-derive the passage
+	// (CODE-003). Chunks are not stored, only their index — so if the two
+	// disagree, chunk 3 at read time is not chunk 3 at write time and every
+	// passage is wrong.
+	ChunkMode ChunkMode
 }
 
 // EmbeddingWorker processes embedding jobs asynchronously.
@@ -119,7 +124,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	// Split into chunks if enabled
 	var chunks []string
 	if w.chunkEnabled {
-		chunks = ChunkText(job.ContentMD, w.chunkSize)
+		chunks = chunkTextsMode(job.ContentMD, w.chunkSize, job.ChunkMode)
 	} else {
 		chunks = []string{job.ContentMD}
 	}

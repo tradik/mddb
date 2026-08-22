@@ -150,6 +150,7 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 				Collection: collection,
 				DocID:      p.DocID,
 				ContentMD:  p.Doc.ContentMD,
+				ChunkMode:  ChunkModeFor(&p.Doc),
 			})
 		}
 

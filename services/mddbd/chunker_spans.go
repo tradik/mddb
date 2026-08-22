@@ -53,6 +53,39 @@ func splitParagraphSpans(text string) []paragraphSpan {
 	return out
 }
 
+// ChunkMode selects how text is segmented.
+type ChunkMode string
+
+const (
+	// ChunkModeProse splits on paragraphs with a sentence fallback — right for
+	// markdown, wrong for source.
+	ChunkModeProse ChunkMode = "prose"
+	// ChunkModeCode splits only where brackets are balanced, so a chunk is a
+	// whole rule or function rather than part of one (CODE-003).
+	ChunkModeCode ChunkMode = "code"
+)
+
+// ChunkSpansMode segments text according to mode, reporting each chunk's
+// position. The two modes share ChunkSpan so callers — and the line ranges
+// built on top of them (CODE-002) — need no special case.
+func ChunkSpansMode(text string, maxChars int, mode ChunkMode) []ChunkSpan {
+	if mode == ChunkModeCode {
+		return ChunkSpansCode(text, maxChars)
+	}
+	return ChunkSpans(text, maxChars)
+}
+
+// chunkTextsMode returns just the chunk texts for a mode, for callers that do
+// not need positions.
+func chunkTextsMode(text string, maxChars int, mode ChunkMode) []string {
+	spans := ChunkSpansMode(text, maxChars, mode)
+	out := make([]string, len(spans))
+	for i, s := range spans {
+		out[i] = s.Text
+	}
+	return out
+}
+
 // ChunkSpans splits text the same way ChunkText does, and reports where each
 // chunk sits in the original.
 //

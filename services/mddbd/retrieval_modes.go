@@ -68,8 +68,8 @@ func splitChunkKey(key string) (docID string, chunkIndex int) {
 // chunkPassage re-derives the chunk (or window of chunks) text from the
 // parent document's content. windowSize is the number of neighboring chunks
 // included on each side; 0 returns just the matching chunk.
-func chunkPassage(contentMD string, chunkIndex, windowSize int) string {
-	text, _, _ := chunkPassageWithLines(contentMD, chunkIndex, windowSize)
+func chunkPassage(contentMD string, chunkIndex, windowSize int, mode ChunkMode) string {
+	text, _, _ := chunkPassageWithLines(contentMD, chunkIndex, windowSize, mode)
 	return text
 }
 
@@ -80,9 +80,9 @@ func chunkPassage(contentMD string, chunkIndex, windowSize int) string {
 // 41-58" is a neighbourhood, where a document name and a chunk index mean
 // reading the file to find out where the chunk was. Both come from the same
 // segmentation, so the text and its range can never disagree.
-func chunkPassageWithLines(contentMD string, chunkIndex, windowSize int) (text string, startLine, endLine int) {
+func chunkPassageWithLines(contentMD string, chunkIndex, windowSize int, mode ChunkMode) (text string, startLine, endLine int) {
 	chunkSize := envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500)
-	spans := ChunkSpans(contentMD, chunkSize)
+	spans := ChunkSpansMode(contentMD, chunkSize, mode)
 	if len(spans) == 0 {
 		return "", 0, 0
 	}

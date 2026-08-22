@@ -158,7 +158,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 				idx := chunkIndex
 				item.ChunkIndex = &idx
 				item.ChunkText, item.StartLine, item.EndLine =
-					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize)
+					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize, ChunkModeFor(&doc))
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""
@@ -196,6 +196,10 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 	type docEntry struct {
 		ID        string
 		ContentMD string
+		// Mode has to travel with the document: reindexing must segment it
+		// exactly as the embedding worker did, or the stored chunk indices
+		// stop pointing at the passages they named (CODE-003).
+		Mode ChunkMode
 	}
 	var docs []docEntry
 
@@ -211,7 +215,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 			if err != nil {
 				continue
 			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: ChunkModeFor(d)})
 		}
 		return nil
 	})
@@ -244,7 +248,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 		chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
 		var chunks []string
 		if chunkEnabled {
-			chunks = ChunkText(d.ContentMD, chunkSize)
+			chunks = chunkTextsMode(d.ContentMD, chunkSize, d.Mode)
 		} else {
 			chunks = []string{d.ContentMD}
 		}

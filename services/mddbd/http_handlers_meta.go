@@ -210,6 +210,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 			Collection: collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,
+			ChunkMode:  ChunkModeFor(&saved),
 		})
 	}
 

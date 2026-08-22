@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrading to 2.12.0
 
-This release makes five changes that need action or attention. They are why
+This release makes six changes that need action or attention. They are why
 this is 2.12.0 and not a patch.
 
 **1. The production compose refuses to start without secrets.** `docker
@@ -41,6 +41,13 @@ Anything matching on `keyPrefix` should move to `fingerprint`.
 against 13, so 13-only APIs would have failed at runtime on the version it
 claimed to support. Both now say 13.
 
+**6. Re-embed collections holding source.** Code documents are now chunked on
+bracket depth rather than on paragraphs, and chunks are re-derived rather than
+stored — so a document embedded before this release and read after it returns
+the wrong passage. Run `vector_reindex` on any collection holding source. Prose
+collections are untouched: their segmentation is byte-for-byte unchanged, which
+a test pins.
+
 Also worth knowing: heavy queries can return `503` with `Retry-After` under
 load, where they previously all ran and risked exhausting memory
 (`MDDB_SEARCH_MAX_CONCURRENT`); the Go client module now requires Go 1.27; and
@@ -58,6 +65,8 @@ grace period — set the same if you run the image directly.
 - **The extension gives back host permissions it no longer uses** — saving settings requested access to the new server origin and never revoked the old one, so with `optional_host_permissions` covering all of http and https, every address a user had ever typed stayed granted. The revocation compares against the origin currently held rather than the one read at startup, so a second save in the same session cannot leave the first save's grant behind.
 
 ### Changed
+- **Code is chunked where code ends, not where a sentence does** — embedding chunks are what a vector search returns, and the prose chunker falls back to sentence boundaries, where a period inside `url(a.png)` is not one. A split there leaves half a declaration in each chunk: a passage that reads as nothing and embeds as noise. Source now splits only where `{}`, `()` and `[]` are balanced, with braces inside strings and comments ignored, so one chunk is roughly one rule or one function. Where a construct is larger than the chunk budget, the budget yields — an oversized chunk costs tokens, a meaningless one costs the answer — and only a minified single line is cut by size, and even then after the last balanced `}` within budget. The mode follows the document's kind, with `MDDB_EMBEDDING_CHUNK_MODE` to force it for collections ingested without the convention. Prose segmentation is unchanged byte for byte, which a test pins; collections holding source need re-embedding, since chunks are re-derived rather than stored.
+
 - **Search results say where, not just which file** (issue #192) — a hit named the document and left an agent to read it to find the place, which is how a one-line CSS change came to cost thousands of tokens. Every highlight now carries the 1-based line range it occupies, and so does every chunk in `chunk` and `window` retrieval modes, widened with the window. The answer becomes `css/style.css:158-163` plus the fragment: under 800 bytes for a 164-line stylesheet, against roughly 20 000 tokens for the same search returning whole documents. Nothing is stored for this — the ranges are derived from content on the way out, so existing indexes need no migration. Two gaps only showed up against a running server: the MCP `full_text_search` tool did not accept `highlight` at all, so the lines reached REST but not the surface the issue is about; and a `fields` projection discarded the highlights, which is precisely the combination that makes the pattern work — do not send the body, say where to look. Both are fixed, and fragments are now extracted before the body is dropped rather than after.
 
 - **Source code is searchable as source, not as prose** — storing a stylesheet or a script needed no new document type, table or endpoint, only a convention on the flat meta map every transport already carries: `kind: ["code"]`, with `language` and `path` alongside it. What changes is tokenisation. The prose tokeniser stems (`classes` becomes `class`), drops stop words — which in a language are its keywords — and splits on every punctuation mark, leaving `.hero-banner` findable only as two unrelated words. The code tokeniser keeps the whole identifier and emits its parts across camelCase, snake_case and kebab-case, holding acronyms together (`XMLHttpRequest` gives `xml`, `http`, `request`, not letters), and keeps single characters and digits because `a` is a selector and `h2` is a name. Because both the whole name and its parts are indexed, a code collection answers ordinary queries: nothing else in the search path had to change and no prose collection needs reindexing. The convention is optional — a document whose key or path ends in a known source extension is treated as code with no meta at all, so a theme ingested by an existing tool works as it stands, while an explicit `kind` always wins in both directions.

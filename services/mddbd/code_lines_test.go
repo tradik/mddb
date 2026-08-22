@@ -132,7 +132,7 @@ func TestChunkPassageReportsItsLines(t *testing.T) {
 	}
 
 	for i := range spans {
-		text, startLine, endLine := chunkPassageWithLines(css, i, 0)
+		text, startLine, endLine := chunkPassageWithLines(css, i, 0, ChunkModeProse)
 		if text == "" {
 			t.Errorf("chunk %d has no text", i)
 		}
@@ -152,8 +152,8 @@ func TestWindowedPassageWidensTheLineRange(t *testing.T) {
 	t.Setenv("MDDB_EMBEDDING_CHUNK_SIZE", "300")
 	css, _ := themeStylesheet()
 
-	_, narrowStart, narrowEnd := chunkPassageWithLines(css, 2, 0)
-	_, wideStart, wideEnd := chunkPassageWithLines(css, 2, 1)
+	_, narrowStart, narrowEnd := chunkPassageWithLines(css, 2, 0, ChunkModeProse)
+	_, wideStart, wideEnd := chunkPassageWithLines(css, 2, 1, ChunkModeProse)
 
 	if wideStart > narrowStart {
 		t.Errorf("a window should start no later than the chunk: %d vs %d", wideStart, narrowStart)
@@ -167,7 +167,7 @@ func TestWindowedPassageWidensTheLineRange(t *testing.T) {
 }
 
 func TestChunkPassageOnEmptyContent(t *testing.T) {
-	text, start, end := chunkPassageWithLines("", 0, 0)
+	text, start, end := chunkPassageWithLines("", 0, 0, ChunkModeProse)
 	if text != "" || start != 0 || end != 0 {
 		t.Errorf("empty content gave %q %d-%d", text, start, end)
 	}
@@ -179,10 +179,10 @@ func TestChunkPassageOnEmptyContent(t *testing.T) {
 func TestChunkPassageClampsTheIndex(t *testing.T) {
 	t.Setenv("MDDB_EMBEDDING_CHUNK_SIZE", "300")
 	css, _ := themeStylesheet()
-	if _, s, e := chunkPassageWithLines(css, 9999, 0); s == 0 || e < s {
+	if _, s, e := chunkPassageWithLines(css, 9999, 0, ChunkModeProse); s == 0 || e < s {
 		t.Errorf("an out-of-range index gave lines %d-%d", s, e)
 	}
-	if _, s, e := chunkPassageWithLines(css, -3, 0); s != 1 || e < s {
+	if _, s, e := chunkPassageWithLines(css, -3, 0, ChunkModeProse); s != 1 || e < s {
 		t.Errorf("a negative index should clamp to the first chunk, got %d-%d", s, e)
 	}
 }

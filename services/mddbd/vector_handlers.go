@@ -302,7 +302,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 				idx := chunkIndex
 				item.ChunkIndex = &idx
 				item.ChunkText, item.StartLine, item.EndLine =
-					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize)
+					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize, ChunkModeFor(&doc))
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""
@@ -378,6 +378,10 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 	type docEntry struct {
 		ID        string
 		ContentMD string
+		// Mode has to travel with the document: reindexing must segment it
+		// exactly as the embedding worker did, or the stored chunk indices
+		// stop pointing at the passages they named (CODE-003).
+		Mode ChunkMode
 	}
 	var docs []docEntry
 
@@ -393,7 +397,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: ChunkModeFor(d)})
 		}
 		return nil
 	})
@@ -426,7 +430,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 		// Split into chunks
 		var chunks []string
 		if chunkEnabled {
-			chunks = ChunkText(d.ContentMD, chunkSize)
+			chunks = chunkTextsMode(d.ContentMD, chunkSize, d.Mode)
 		} else {
 			chunks = []string{d.ContentMD}
 		}

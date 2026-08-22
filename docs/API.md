@@ -3341,6 +3341,36 @@ Vector and hybrid hits carry the same information: in `chunk` and `window`
 retrieval modes each result reports `startLine`/`endLine` for the passage it
 matched, widened along with the passage when a window is requested.
 
+### Chunking
+
+Embedding chunks are the unit a vector search returns, and the prose chunker
+splits on paragraphs with a sentence fallback. A period inside `url(a.png)` is
+not the end of a sentence, so a split there leaves half a declaration in each
+chunk — a passage that reads as nothing and embeds as noise.
+
+Code documents are segmented on bracket depth instead: a chunk may only end
+where `{}`, `()` and `[]` are balanced, so one chunk is roughly one CSS rule or
+one function. Braces inside strings and comments do not count.
+
+| Source | Boundary preferred |
+|---|---|
+| Blank line at depth zero | A rule or function just ended — the cleanest cut |
+| Any line end at depth zero | Over budget, but the construct closed |
+| A construct larger than the budget | **Kept whole and oversized** — half a function is worth nothing |
+| A minified single line | Cut after the last balanced `}` within budget |
+
+Mode selection follows the document: `kind: ["code"]` (or a known source
+extension) chunks as code, anything else as prose.
+`MDDB_EMBEDDING_CHUNK_MODE=code|prose` overrides it for a whole server, for
+collections whose documents were ingested without the convention.
+
+> **Re-embed code collections after upgrading.** Chunks are re-derived rather
+> than stored — only the index is kept — so a document embedded under prose
+> chunking and read under code chunking will return the wrong passage. Run
+> `vector_reindex` (or `POST /v1/vector-reindex`) on any collection holding
+> source. Prose collections are unaffected: their segmentation is unchanged,
+> byte for byte.
+
 ### Why the tokeniser differs
 
 The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,

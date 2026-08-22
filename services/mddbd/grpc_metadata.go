@@ -356,6 +356,7 @@ func (g *GRPCServer) UpdateDocument(ctx context.Context, req *proto.UpdateDocume
 			Collection: req.Collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,
+			ChunkMode:  ChunkModeFor(&saved),
 		})
 	}
 

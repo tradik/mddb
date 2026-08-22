@@ -4,6 +4,8 @@ import (
 	"path"
 	"strings"
 
+	"mddb/internal/envconf"
+
 	"mddb/internal/fts"
 	"mddb/internal/storage"
 )
@@ -91,4 +93,23 @@ func CodeLanguage(doc *storage.Doc) string {
 		source = doc.Key
 	}
 	return InferCodeLanguage(source)
+}
+
+// ChunkModeFor reports how a document's content should be segmented.
+//
+// Precedence: the collection override first — an operator who set
+// MDDB_EMBEDDING_CHUNK_MODE meant it — then the document's own kind, then
+// prose. The override exists because a collection may hold source whose
+// documents were ingested without the convention.
+func ChunkModeFor(doc *storage.Doc) ChunkMode {
+	switch strings.ToLower(envconf.String("MDDB_EMBEDDING_CHUNK_MODE", "")) {
+	case string(ChunkModeCode):
+		return ChunkModeCode
+	case string(ChunkModeProse):
+		return ChunkModeProse
+	}
+	if DocumentKind(doc) == fts.KindCode {
+		return ChunkModeCode
+	}
+	return ChunkModeProse
 }

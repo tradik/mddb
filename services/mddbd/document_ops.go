@@ -185,6 +185,7 @@ func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew b
 			Collection: collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,
+			ChunkMode:  ChunkModeFor(&saved),
 		})
 	}
 
