@@ -89,6 +89,9 @@ func (s *stubServer) VectorReindex(_ context.Context, _ string, _ *bool) (*Vecto
 func (s *stubServer) FullTextSearch(_ context.Context, _ FTSInput) (*FTSResponse, error) {
 	return nil, errors.New("not implemented")
 }
+func (s *stubServer) CodeGraph(_ context.Context, _ CodeGraphInput) (*CodeGraph, error) {
+	return nil, errors.New("not implemented")
+}
 func (s *stubServer) GetStats(_ context.Context) (*Stats, error) {
 	return nil, errors.New("not implemented")
 }

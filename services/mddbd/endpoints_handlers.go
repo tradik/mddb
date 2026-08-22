@@ -98,6 +98,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 		{Method: "POST", Path: "/v1/import-url", Description: "Import markdown from URL", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/set-ttl", Description: "Set document time-to-live", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/fts", Description: "Full-text search (with in-graph metadata filtering)", RequiresAuth: authEnabled},
+		{Method: "GET/POST", Path: "/v1/code-graph", Description: "Code connection graph: which documents define, use or import a symbol", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/hybrid-search", Description: "Hybrid sparse+dense search (FTS + vector)", RequiresAuth: authEnabled},
 		{Method: "GET/POST/DELETE", Path: "/v1/synonyms", Description: "Manage FTS synonyms", RequiresAuth: authEnabled},
 		{Method: "GET/POST/DELETE", Path: "/v1/stopwords", Description: "Manage FTS stop words", RequiresAuth: authEnabled},

@@ -73,7 +73,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 79 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 80 built-in tools (only custom tools exposed) |
 
 ### API Key Authentication
 
@@ -222,7 +222,7 @@ prose; code lines are short, so it covers about fifteen lines of CSS.
 
 ## Built-in Tool Catalog
 
-All 79 built-in tools, grouped by area. Tool inputs are self-describing via
+All 80 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -371,6 +371,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `restore_backup` | Restore the MDDB database from a backup file. |
 | `update_document` | Partially update a document. |
 | `get_document_meta` | Get document metadata without content. |
+| `code_graph` | Code connection graph: what a document depends on and what depends on it (which stylesheet declares a selector, which pages load a script). |
 | `delete_collection` | Delete an entire collection and all its documents, revisions, and metadata indices. |
 | `get_collection_config` | Get configuration attributes for a collection (type, description, icon, color, custom metadata). |
 | `set_collection_config` | Set or update configuration attributes for a collection. |

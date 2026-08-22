@@ -8,6 +8,7 @@ import (
 	"mddb/internal/envconf"
 
 	"mddb/internal/fts"
+	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 )
 
@@ -146,8 +147,9 @@ func EnrichCodeSymbols(doc *storage.Doc) {
 		return
 	}
 
+	language := CodeLanguage(doc)
 	syms := codeintel.ExtractWithLimit(
-		CodeLanguage(doc),
+		language,
 		doc.ContentMD,
 		envconf.Int("MDDB_CODE_MAX_SYMBOLS", codeintel.DefaultMaxSymbols),
 	)
@@ -162,7 +164,7 @@ func EnrichCodeSymbols(doc *storage.Doc) {
 	for key, vals := range map[string][]string{
 		MetaKeyDefines: syms.Defines,
 		MetaKeyUses:    syms.Uses,
-		MetaKeyImports: syms.Imports,
+		MetaKeyImports: resolveImportPaths(doc.Key, language, syms.Imports),
 	} {
 		if len(vals) > 0 {
 			doc.Meta[key] = vals
@@ -177,4 +179,66 @@ func clearSymbolMeta(doc *storage.Doc) {
 	delete(doc.Meta, MetaKeyDefines)
 	delete(doc.Meta, MetaKeyUses)
 	delete(doc.Meta, MetaKeyImports)
+}
+
+// resolveImportPaths rewrites raw import specifiers into collection-relative
+// document keys.
+//
+// `./render.js` inside `assets/app.js` means `assets/render.js`, and that is
+// the form the graph needs: an edge between two documents must be answerable
+// from the metadata index alone, so the value stored has to equal the key of
+// the document it points at. Storing the raw specifier would mean resolving
+// paths at query time against every candidate directory.
+//
+// Resolution is lexical — an extension-less specifier stays extension-less and
+// the graph resolver tries the code extensions when it looks the target up.
+func resolveImportPaths(fromKey, language string, specs []string) []string {
+	if len(specs) == 0 {
+		return nil
+	}
+	dir := path.Dir(fromKey)
+	if dir == "." || dir == "/" {
+		dir = ""
+	}
+	bareIsRelative := !isModuleLanguage(language)
+	out := make([]string, 0, len(specs))
+	for _, spec := range specs {
+		out = append(out, resolveImportPath(dir, spec, bareIsRelative))
+	}
+	return sliceutil.Unique(out)
+}
+
+// isModuleLanguage reports whether a bare specifier names a package rather than
+// a sibling file.
+//
+// This is the one place the languages genuinely disagree. In HTML and CSS,
+// `href="style.css"` and `@import "reset.css"` are relative to the document —
+// resolving them is what makes `<link>` and `@import` produce edges at all. In
+// JavaScript, a bare `import "lodash"` names a package that is not a document
+// in this collection, and rewriting it to `theme/lodash` would invent an edge.
+func isModuleLanguage(language string) bool {
+	switch language {
+	case "javascript", "typescript", "jsx", "tsx":
+		return true
+	default:
+		return false
+	}
+}
+
+func resolveImportPath(dir, spec string, bareIsRelative bool) string {
+	// An absolute specifier is collection-relative in every language.
+	if strings.HasPrefix(spec, "/") {
+		return path.Clean(strings.TrimPrefix(spec, "/"))
+	}
+	explicitlyRelative := strings.HasPrefix(spec, "./") || strings.HasPrefix(spec, "../")
+	if !explicitlyRelative && !bareIsRelative {
+		return path.Clean(spec)
+	}
+	if dir == "" {
+		return path.Clean(spec)
+	}
+	// path.Clean keeps a leading "../" when the specifier escapes the
+	// collection root; that document cannot exist here, but recording it
+	// truthfully beats silently pointing the edge somewhere else.
+	return path.Clean(dir + "/" + spec)
 }

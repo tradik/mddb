@@ -3525,6 +3525,130 @@ paths:
                   hasMore:
                     type: boolean
 
+  /v1/code-graph:
+    get:
+      tags:
+        - Search
+      summary: Code connection graph for one document
+      description: >
+        Answers the relational questions full-text search cannot: what breaks if
+        this selector changes, which pages load this script, what does nothing
+        reference any more. Edges are derived at query time from the
+        `defines`/`uses`/`imports` metadata of code documents through the
+        metadata index — nothing is stored, so a reindex reproduces the graph
+        exactly. Resolution stays inside one collection.
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Collection name
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Document key, e.g. `theme/style.css`
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [ in, out, both ]
+            default: both
+          description: >
+            `in` = what depends on this document, `out` = what it depends on.
+        - name: depth
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3
+            default: 1
+          description: Hops to follow. Values above the maximum are clamped, not rejected.
+        - name: maxDegree
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+          description: >
+            Maximum neighbours per node. A selector such as `.title` appears in
+            nearly every template, so an unbounded walk returns the whole theme.
+        - name: lines
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: >
+            Include the first line each edge's symbol appears on, both sides.
+            Off by default: it is the only part of a traversal that reads
+            document content.
+      responses:
+        "200":
+          description: The graph around the requested document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeGraphResponse"
+        "400":
+          description: Missing collection/key, or an unknown direction
+        "404":
+          description: No such document in the collection
+    post:
+      tags:
+        - Search
+      summary: Code connection graph for one document (JSON body)
+      description: >
+        Identical to the GET form. Accepts a JSON body for keys containing
+        characters awkward in a query string.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ collection, key ]
+              properties:
+                collection:
+                  type: string
+                key:
+                  type: string
+                direction:
+                  type: string
+                  enum: [ in, out, both ]
+                  default: both
+                depth:
+                  type: integer
+                  minimum: 1
+                  maximum: 3
+                  default: 1
+                maxDegree:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 100
+                lines:
+                  type: boolean
+                  default: false
+                  description: Include first-occurrence line numbers for each edge.
+              example:
+                collection: theme
+                key: theme/style.css
+                direction: in
+                depth: 2
+      responses:
+        "200":
+          description: The graph around the requested document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeGraphResponse"
+        "400":
+          description: Missing collection/key, or an unknown direction
+        "404":
+          description: No such document in the collection
   /v1/meta-keys:
     get:
       tags:
@@ -5414,6 +5538,98 @@ paths:
 
 components:
   schemas:
+    CodeGraphResponse:
+      type: object
+      description: >
+        One traversal of the code connection graph. Nodes and edges are sorted,
+        so two responses can be diffed to see what a change did.
+      properties:
+        collection:
+          type: string
+        root:
+          type: string
+          description: The key the traversal started from
+        direction:
+          type: string
+          enum: [ in, out, both ]
+        depth:
+          type: integer
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              docId:
+                type: string
+              lang:
+                type: string
+              language:
+                type: string
+                description: Source language, e.g. `css`, `javascript`, `html`
+              depth:
+                type: integer
+                description: Hops from the root, by the shortest path
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: string
+              to:
+                type: string
+              kind:
+                type: string
+                enum: [ uses-selector, imports ]
+              symbol:
+                type: string
+                description: >
+                  The selector or path that justifies this edge. Without it the
+                  answer is only "these files are related", which is not
+                  actionable.
+              direction:
+                type: string
+                enum: [ in, out ]
+              lines:
+                type: object
+                description: >
+                  Present only when `lines` was requested. A symbol usually
+                  occurs more than once, so these are the first occurrence — a
+                  place to jump to, not a complete answer. Zero means the symbol
+                  is not literal text in that file.
+                properties:
+                  fromLine:
+                    type: integer
+                  toLine:
+                    type: integer
+        truncated:
+          type: boolean
+          description: >
+            A depth or degree limit cut the walk short, so "nothing else depends
+            on this" cannot be read from a truncated result.
+      example:
+        collection: theme
+        root: theme/style.css
+        direction: in
+        depth: 1
+        nodes:
+          - key: theme/style.css
+            docId: rng|doc-0001|en
+            language: css
+            depth: 0
+          - key: theme/index.html
+            docId: rng|doc-0002|en
+            language: html
+            depth: 1
+        edges:
+          - from: theme/index.html
+            to: theme/style.css
+            kind: uses-selector
+            symbol: .hero-banner
+            direction: in
+        truncated: false
     MCPAPIKeySummary:
       type: object
       description: |

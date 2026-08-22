@@ -182,8 +182,10 @@ func TestEnrichCodeSymbolsFillsMeta(t *testing.T) {
 	if got := doc.Meta[MetaKeyDefines]; len(got) == 0 || got[0] != ".hero-banner" {
 		t.Errorf("defines = %v, want .hero-banner", got)
 	}
-	if got := doc.Meta[MetaKeyImports]; len(got) == 0 || got[0] != "reset.css" {
-		t.Errorf("imports = %v, want reset.css", got)
+	// Stored resolved against the document's own key, so the graph can match
+	// it against a document key without re-resolving paths at query time.
+	if got := doc.Meta[MetaKeyImports]; len(got) == 0 || got[0] != "theme/reset.css" {
+		t.Errorf("imports = %v, want theme/reset.css", got)
 	}
 }
 

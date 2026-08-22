@@ -437,6 +437,29 @@ func mcpBuiltinToolsCore() []MCPTool {
 			},
 		},
 		{
+			Name: "code_graph",
+			Description: "Code connection graph. Answers what a document depends on and what depends on it: " +
+				"which stylesheet declares a selector a template applies, which pages load a script, " +
+				"what breaks if this file changes. Edges are derived from the defines/uses/imports " +
+				"metadata of code documents, resolved within one collection.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"collection": map[string]interface{}{"type": "string", "description": "Collection name"},
+					"key":        map[string]interface{}{"type": "string", "description": "Document key, e.g. theme/style.css"},
+					"direction": map[string]interface{}{
+						"type":        "string",
+						"enum":        []string{"in", "out", "both"},
+						"description": "in = what depends on this document, out = what it depends on, both (default)",
+					},
+					"depth":      map[string]interface{}{"type": "integer", "description": "Hops to follow, 1-3 (default: 1)"},
+					"max_degree": map[string]interface{}{"type": "integer", "description": "Maximum neighbours per node, 1-100 (default: 100)"},
+					"lines":      map[string]interface{}{"type": "boolean", "description": "Include the first line each edge's symbol appears on, both sides (reads document content; default: false)"},
+				},
+				"required": []string{"collection", "key"},
+			},
+		},
+		{
 			Name:        "classify_document",
 			Description: "Zero-shot document classification. Given candidate labels and either a document reference or raw text, ranks labels by semantic similarity using embeddings. No training data required.",
 			InputSchema: map[string]interface{}{

@@ -778,6 +778,7 @@ type MCPClient interface {
 	ValidateDocument(ctx context.Context, req *MCPValidateRequest) (*MCPValidateResponse, error)
 	UpdateDocument(ctx context.Context, req *MCPUpdateDocumentRequest) (*MCPDocument, error)
 	GetDocumentMeta(ctx context.Context, req *MCPGetDocMetaRequest) (*MCPDocMetaResponse, error)
+	CodeGraph(ctx context.Context, req *MCPCodeGraphRequest) (*GraphResult, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)
 	// Synonyms
 	ListSynonyms(ctx context.Context, collection string) (*MCPSynonymListResponse, error)
@@ -833,4 +834,14 @@ func docToMCPDocument(d storage.Doc) MCPDocument {
 		AddedAt:   time.Unix(d.AddedAt, 0),
 		UpdatedAt: time.Unix(d.UpdatedAt, 0),
 	}
+}
+
+// MCPCodeGraphRequest is one code-graph traversal over MCP (CODE-005).
+type MCPCodeGraphRequest struct {
+	Collection string `json:"collection"`
+	Key        string `json:"key"`
+	Direction  string `json:"direction"`
+	Depth      int    `json:"depth"`
+	MaxDegree  int    `json:"max_degree"`
+	Lines      bool   `json:"lines"`
 }

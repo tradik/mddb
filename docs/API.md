@@ -3424,6 +3424,80 @@ Three deliberate limits:
 Only new writes are enriched. Re-save (or bulk re-ingest) an existing code
 collection to populate symbols for documents stored before this version.
 
+### The connection graph
+
+Symbols answer "which file declares this". The graph answers the questions that
+follow: **what breaks if I change `.hero-banner`, which pages load
+`checkout.js`, what does nothing reference any more.**
+
+Nothing is stored. Edges are derived at query time from the `defines`/`uses`/
+`imports` meta through the same metadata index — `uses` on one side matched
+against `defines` on the other, an import path matched against a document key.
+That is deliberate: an edge is a statement about two documents, and storing it
+means one copy per side, which drift apart the moment someone edits only one of
+them. Deriving makes a reindex reproduce the graph exactly.
+
+```bash
+# What breaks if this stylesheet changes?
+curl -s "$MDDB/v1/code-graph?collection=theme&key=theme/style.css&direction=in"
+
+# What does this page pull in, two hops out?
+curl -s "$MDDB/v1/code-graph?collection=theme&key=theme/index.html&direction=out&depth=2"
+```
+
+```json
+{
+  "root": "theme/style.css",
+  "nodes": [
+    { "key": "theme/style.css",  "language": "css",  "depth": 0 },
+    { "key": "theme/index.html", "language": "html", "depth": 1 }
+  ],
+  "edges": [
+    { "from": "theme/index.html", "to": "theme/style.css",
+      "kind": "uses-selector", "symbol": ".hero-banner", "direction": "in" }
+  ],
+  "truncated": false
+}
+```
+
+Every edge carries **the symbol that justifies it**. Without it the answer is
+only "these two files are related", which is not actionable; with it, the caller
+knows what to look at. Add `&lines=true` to get the first line the symbol
+appears on for both sides — off by default, because it is the only part of a
+traversal that reads document content.
+
+Two kinds of edge:
+
+| Kind | Meaning | Derived from |
+|---|---|---|
+| `uses-selector` | A template applies a class or id a stylesheet declares | `uses` ↔ `defines` |
+| `imports` | A document pulls another in by path | `imports` ↔ document key |
+
+Import paths are resolved against the referring document when it is stored, so
+`href="style.css"` inside `theme/index.html` is recorded as `theme/style.css`
+and matches a key directly. One language-specific rule: in HTML and CSS a bare
+path is relative to the document — which is what makes `<link>` and `@import`
+produce edges at all — while in JavaScript a bare `import "lodash"` names a
+package, and rewriting it to `theme/lodash` would invent an edge to a document
+that will never exist.
+
+Three limits, and one of them is reported back:
+
+- **Depth 1–3**, default 1. A value above the maximum is clamped, not rejected.
+- **At most 100 neighbours per node.** A selector such as `.title` appears in
+  nearly every template, so an unbounded walk of a real theme returns the theme.
+- **`truncated`** says whether a limit cut the walk short. "Nothing depends on
+  this" is only safe to act on when `truncated` is `false` — which is exactly
+  the answer you need before deleting a file.
+
+Resolution stays inside one collection: a theme is a collection, and a selector
+shared with an unrelated collection is a coincidence, not a dependency.
+
+The same traversal is available through all three surfaces — `GET`/`POST
+/v1/code-graph`, the `code_graph` MCP tool (annotated read-only), and the
+`codeGraph` GraphQL query — and a test pins that they agree, so they cannot
+drift apart in what the graph says.
+
 ### Why the tokeniser differs
 
 The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,

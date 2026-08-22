@@ -41,6 +41,7 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"get_stats":               readOnly(),
 	"search_documents":        readOnly(),
 	"get_document_meta":       readOnly(),
+	"code_graph":              readOnly(),
 	"vector_stats":            readOnly(),
 	"fts_languages":           readOnly(),
 	"list_webhooks":           readOnly(),

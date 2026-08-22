@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Code connection graph (CODE-005)** — answers the relational questions
+  full-text search cannot: what breaks if `.hero-banner` changes, which pages
+  load `checkout.js`, what does nothing reference any more. Available as
+  `GET`/`POST /v1/code-graph`, the `code_graph` MCP tool (annotated read-only)
+  and the `codeGraph` GraphQL query; a test pins that the three agree, so they
+  cannot drift apart. No edges are stored — they are derived at query time from
+  the `defines`/`uses`/`imports` meta through the metadata index that already
+  backs `meta.*` filters. An edge is a statement about two documents, and
+  storing it means one copy per side that drift apart when someone edits only
+  one; deriving makes a reindex reproduce the graph exactly. Every edge carries
+  the symbol that justifies it, because "these two files are related" is not
+  actionable. Bounded by design: depth 1–3, at most 100 neighbours per node,
+  and a `truncated` flag — "nothing depends on this" is only safe to act on when
+  the walk was complete. Optional `lines=true` returns the first line each
+  symbol appears on, reusing the line index from CODE-002.
+
 - **Code symbols in meta (CODE-004)** — every code document now records what it
   `defines`, `uses` and `imports`, extracted from its own content on each save.
   Full-text search cannot tell a declaration from a mention, so searching a

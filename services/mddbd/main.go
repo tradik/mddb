@@ -874,6 +874,7 @@ func main() {
 	mux.HandleFunc("/v1/fts-languages", s.handleFTSLanguages)
 	mux.HandleFunc("/v1/autocomplete", s.handleAutocomplete)
 	mux.HandleFunc("/v1/meta-keys", s.handleMetaKeys)
+	mux.HandleFunc("/v1/code-graph", s.withSearchLimit(s.handleCodeGraph))
 	mux.HandleFunc("/v1/checksum", s.handleChecksum)
 	mux.HandleFunc("/v1/update", s.guardWrite(s.handleUpdate))
 	mux.HandleFunc("/v1/doc-meta", s.handleDocMeta)

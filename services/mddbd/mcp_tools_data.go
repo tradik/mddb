@@ -543,6 +543,23 @@ func (s *MCPToolServer) toolGetDocumentMeta(ctx context.Context, args map[string
 	return string(data), nil
 }
 
+func (s *MCPToolServer) toolCodeGraph(ctx context.Context, args map[string]interface{}) (string, error) {
+	resp, err := s.client.CodeGraph(ctx, &MCPCodeGraphRequest{
+		Collection: mcpGetString(args, "collection"),
+		Key:        mcpGetString(args, "key"),
+		Direction:  mcpGetString(args, "direction"),
+		Depth:      mcpGetInt(args, "depth"),
+		MaxDegree:  mcpGetInt(args, "max_degree"),
+		Lines:      mcpGetBool(args, "lines"),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return string(data), nil
+}
+
 func (s *MCPToolServer) toolClassifyDocument(ctx context.Context, args map[string]interface{}) (string, error) {
 	req := &MCPClassifyRequest{
 		Collection: mcpGetString(args, "collection"),
