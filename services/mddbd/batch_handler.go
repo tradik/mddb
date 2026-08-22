@@ -197,7 +197,11 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 				DocID:   p.DocID,
 				Content: p.Doc.ContentMD,
 				Lang:    p.Doc.Lang,
-				Fields:  fields,
+				// CODE-001: source is tokenised differently from prose. The
+				// kind comes from meta, or from the key's extension when meta
+				// does not say.
+				Kind:   DocumentKind(&p.Doc),
+				Fields: fields,
 			})
 		}
 

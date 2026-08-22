@@ -3274,6 +3274,59 @@ curl "http://localhost:11023/v1/auth/group-permissions?group=editors"
 
 ---
 
+## Code Documents
+
+MDDB stores source the same way it stores prose: one document per file, with no
+new type, table or endpoint. What changes is how the text is tokenised, and
+that is decided by a convention on the ordinary flat `meta` map.
+
+| Meta key | Value | Effect |
+|---|---|---|
+| `kind` | `code` | Index with the source-aware tokeniser |
+| `language` | `css`, `html`, `javascript`, … | The source language; inferred from the extension when absent |
+| `path` | `css/style.css` | The original path, when the document key is a slug |
+
+```json
+{
+  "collection": "theme",
+  "key": "css/style.css",
+  "lang": "en",
+  "contentMd": ".hero-banner { background: url(hero.png); }",
+  "meta": { "kind": ["code"], "language": ["css"] }
+}
+```
+
+**The convention is optional.** A document whose key or `path` ends in a known
+source extension (`.css`, `.html`, `.js`, `.ts`, `.go`, `.py`, …) is treated as
+code without any meta at all, so a theme ingested by an existing tool indexes
+usefully as it stands. An explicit `kind` always wins, in both directions: set
+`kind: ["prose"]` on a `.css` document and it is tokenised as prose.
+
+### Why the tokeniser differs
+
+The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,
+`class` — the keywords of the language being searched) and splits on every
+punctuation mark, which leaves `.hero-banner` findable only as two unrelated
+words. The code tokeniser keeps the whole identifier **and** emits its parts,
+across camelCase, snake_case and kebab-case:
+
+| In the source | Indexed as |
+|---|---|
+| `.hero-banner` | `hero-banner`, `hero`, `banner` |
+| `checkoutHandler` | `checkouthandler`, `checkout`, `handler` |
+| `XMLHttpRequest` | `xmlhttprequest`, `xml`, `http`, `request` |
+| `MAX_RETRY_COUNT` | `max_retry_count`, `max`, `retry`, `count` |
+
+Because both the whole name and its parts are indexed, a code collection is
+searchable with ordinary queries — nothing in the search path needs to know the
+collection holds source. The one asymmetry is stemming on the query side: a
+search for `classes` stems to `class` and will not match an unstemmed `classes`
+in a code index. Searching source for an English plural is rare enough to
+accept; searching it for `class` finds every declaration.
+
+Single characters and digits are kept, unlike in prose: `a` is a real selector
+and `h2` and `utf8` are real names.
+
 ## Error Handling
 
 ### Error Response Format

@@ -24,6 +24,12 @@ type BulkDoc struct {
 	DocID   string
 	Content string
 	Lang    string
+	// Kind selects the tokeniser. "code" uses the source-aware one (CODE-001),
+	// which keeps identifiers whole, emits their parts, and neither stems nor
+	// drops keywords; anything else is prose. It comes from the document's
+	// meta["kind"], so the convention lives in the data rather than in a new
+	// document type.
+	Kind string
 	// Fields are the named, separately-searchable texts (content plus
 	// meta.<key>); nil skips field indexing for this document.
 	Fields map[string]string
@@ -53,14 +59,26 @@ func (f *FTSIndex) IndexDocs(collection string, docs []BulkDoc) error {
 	batch := make([]prepared, 0, len(docs))
 	for _, d := range docs {
 		p := prepared{docID: d.DocID}
+		isCode := d.Kind == KindCode
 		if d.Content != "" {
-			p.terms = f.TokenizeLang(d.Content, d.Lang)
-			p.positions = f.TokenizePositionsLang(d.Content, d.Lang)
+			if isCode {
+				p.terms = TokenizeCode(d.Content)
+				p.positions = f.TokenizePositionsCode(d.Content)
+			} else {
+				p.terms = f.TokenizeLang(d.Content, d.Lang)
+				p.positions = f.TokenizePositionsLang(d.Content, d.Lang)
+			}
 		}
 		if len(d.Fields) > 0 {
 			p.fields = make(map[string]map[string]int, len(d.Fields))
 			for field, text := range d.Fields {
-				if tokens := f.TokenizeLang(text, d.Lang); len(tokens) > 0 {
+				var tokens map[string]int
+				if isCode {
+					tokens = TokenizeCode(text)
+				} else {
+					tokens = f.TokenizeLang(text, d.Lang)
+				}
+				if len(tokens) > 0 {
 					p.fields[field] = tokens
 				}
 			}
