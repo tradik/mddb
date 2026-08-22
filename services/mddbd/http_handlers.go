@@ -480,8 +480,19 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// GO-032: an operator checking health should see whether acknowledged
+	// writes will actually survive, not only that the process is up.
+	body := map[string]any{
+		"status":      "healthy",
+		"mode":        string(s.Mode),
+		"persistence": s.Persistence,
+		"durable":     s.Persistence.Durable(),
+	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	_, _ = w.Write([]byte(`{"status":"healthy","mode":"` + string(s.Mode) + `"}`))
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		slog.Debug("writing the health response failed", "err", err)
+	}
 }
 
 // handleComplianceStatus returns the ISO 27001 / SOC 2 production-guard

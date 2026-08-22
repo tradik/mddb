@@ -65,6 +65,7 @@ type Server struct {
 	BucketNames         BucketNames
 	Cache               *cache.DocumentCache   // Read-through cache (legacy)
 	SearchCache         *cache.SearchCache     // Opt-in per-request search-result cache (GO-031)
+	Persistence         PersistenceStatus      // What the data directory can promise (GO-032)
 	LockFreeCache       *cache.LockFreeCache   // Lock-free cache (extreme performance)
 	IndexQueue          *indexqueue.IndexQueue // Async metadata indexing
 	WAL                 *WAL                   // Write-Ahead Log
@@ -222,6 +223,13 @@ func main() {
 	dbPath := srvCfg.Database.Path
 	mode := srvCfg.Database.Mode
 
+	// GO-032: say plainly what durability this data directory can offer before
+	// accepting a single write. bbolt fsyncs every commit, but that promise is
+	// only worth what the storage under it is worth — a container started
+	// without a volume acknowledges writes and loses them on removal.
+	persistence := CheckPersistence(dbPath)
+	logPersistenceStatus(persistence, slog.Warn)
+
 	db, err := bolt.Open(dbPath, 0600, getOptimizedBoltOptions())
 	if err != nil {
 		logging.Fatal("startup step failed", "step", "bolt.Open", "err", err)
@@ -248,6 +256,7 @@ func main() {
 		},
 		Cache:         cache.NewDocumentCache(1000, 300),  // 1000 docs, 5min TTL
 		SearchCache:   newSearchCache(),                   // opt-in per request (GO-031)
+		Persistence:   persistence,                        // GO-032
 		LockFreeCache: cache.NewLockFreeCache(10000, 300), // 10k docs, 5min TTL (lock-free)
 		IndexQueue:    indexqueue.NewIndexQueue(nil, 4),   // 4 workers (store wired below)
 		BloomFilters:  NewBloomFilterManager(),            // Bloom filters
@@ -291,7 +300,11 @@ func main() {
 			logging.Fatal("Failed to initialize WAL", "err", err)
 		}
 		s.WAL = wal
-		slog.Info("WAL initialized (SyncPeriodic)")
+		// Honest wording: this WAL is allocated but nothing writes to it, and
+		// bbolt already fsyncs every commit, so durability comes from bbolt —
+		// not from here. Saying "WAL initialized" implied a guarantee this
+		// subsystem does not provide (GO-032).
+		slog.Info("WAL file allocated (not in the write path; durability comes from bbolt's per-commit fsync)")
 
 		// Initialize MVCC
 		s.MVCC = NewMVCC()
