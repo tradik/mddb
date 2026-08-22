@@ -143,8 +143,12 @@ func mcpDocToGQL(d *MCPDocument) *gql.Document {
 		Lang:      d.Lang,
 		Meta:      gql.MapMetaToGraphQL(d.Meta),
 		ContentMd: d.ContentMD,
-		AddedAt:   d.AddedAt.Unix(),
-		UpdatedAt: d.UpdatedAt.Unix(),
+		// gql.TimeToInt64 rather than .Unix(): a document with no timestamp —
+		// a legacy record written before they existed — has the zero time,
+		// and time.Time{}.Unix() is -62135596800. A client sorting by
+		// addedAt would put those first, dated the year 1.
+		AddedAt:   gql.TimeToInt64(d.AddedAt),
+		UpdatedAt: gql.TimeToInt64(d.UpdatedAt),
 	}
 	if out.ID == "" {
 		out.ID = fmt.Sprintf("%s|%s", d.Key, d.Lang)

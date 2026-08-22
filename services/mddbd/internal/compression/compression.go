@@ -173,36 +173,3 @@ func DecompressDoc(data []byte) ([]byte, error) {
 		return data, nil
 	}
 }
-
-// CompressionStats returns compression statistics
-type CompressionStats struct {
-	OriginalSize   int
-	CompressedSize int
-	Ratio          float64
-	Method         string
-}
-
-// GetCompressionStats analyzes compression for data
-func GetCompressionStats(data []byte) CompressionStats {
-	compressed := CompressDoc(data)
-
-	method := "none"
-	switch compressed[0] {
-	case FlagSnappy:
-		method = "snappy"
-	case FlagZstd:
-		method = "zstd"
-	}
-
-	ratio := 1.0
-	if len(data) > 0 {
-		ratio = float64(len(compressed)) / float64(len(data))
-	}
-
-	return CompressionStats{
-		OriginalSize:   len(data),
-		CompressedSize: len(compressed),
-		Ratio:          ratio,
-		Method:         method,
-	}
-}

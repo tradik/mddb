@@ -5,7 +5,6 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
-	"unsafe"
 )
 
 // AsyncIO provides async I/O operations
@@ -237,30 +236,4 @@ type ReadRequest struct {
 type ReadResult struct {
 	Data  []byte
 	Error error
-}
-
-// DirectIO enables direct I/O (bypass page cache)
-func DirectIO(file *os.File) error {
-	// Direct I/O is platform-specific
-	// On Linux, would use O_DIRECT flag
-	// On macOS, would use F_NOCACHE fcntl
-	// For now, return nil (feature not available on all platforms)
-	return nil
-}
-
-// AlignedBuffer creates a buffer aligned for direct I/O
-func AlignedBuffer(size int) []byte {
-	// Align to 4KB page boundary
-	const alignment = 4096
-
-	// Allocate extra space for alignment
-	buf := make([]byte, size+alignment)
-
-	// Calculate aligned offset
-	// #nosec G103 -- Required for memory alignment
-	addr := uintptr(unsafe.Pointer(&buf[0]))
-	offset := int(alignment - (addr % alignment))
-
-	// Return aligned slice
-	return buf[offset : offset+size]
 }

@@ -9,6 +9,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`/v1/export` no longer calls itself over HTTP (GO-021)** — the handler
+  answered by POSTing to its own `/v1/search` on
+  `localhost:$MDDB_ADDR`, a full round-trip through the stack to reach a
+  database it already had open. It broke whenever the server was not reachable
+  at that guessed address — TLS, a unix socket, a different interface — and it
+  did not check whether the request succeeded: `res, _ :=` followed by
+  `res.Body.Close()` dereferenced a nil response and took the process down.
+  Both formats now run the query in-process through the direct client, and
+  NDJSON streams to the client instead of being built in memory first.
+
+
+- **MCP progress notifications are delivered (GO-021)** — the sender, the token
+  extractor and the transport's notification writer all existed and nothing
+  connected them, so a `vector_reindex` over a large collection was
+  indistinguishable from a hung call. The stdio and Streamable HTTP transports
+  now supply a delivery function, the handler supplies the client's progress
+  token, and the reindex reports as it embeds. A client that sent no token
+  still receives nothing, which is what the spec asks for.
+
+
+- **MCP log messages are delivered (GO-021)** — `logging/setLevel` was
+  accepted, validated and stored, and then never consulted: a client that set
+  the level to `debug` received exactly as much as one that set it to
+  `emergency`, namely nothing. Failing tool calls now reach the client's log at
+  error level, filtered by the level it asked for. Logging and progress are
+  separate subscriptions, so raising the log level works without a progress
+  token.
+
+
+- **Open MCP sessions are visible in `/health` (GO-021)** — both transports
+  counted their sessions and nothing ever read the count. A session a client
+  abandoned without closing lives until it times out, so `mcpSessions` is how
+  that leak becomes visible. The field is absent when MCP is disabled: an
+  absent field says "not running" where a zero would say "idle".
+
+
 - **Drift guards over the MCP tool table (TEST-002)** — tests now assert that
   every one of the 80 advertised tools is reachable through the dispatcher and
   that every dispatched name is advertised, in both directions. A tool present
@@ -242,7 +278,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behaviour cannot differ by transport. Only new writes are enriched; re-save an
   existing code collection to populate it.
 
+### Removed
+
+- **Dead helpers and unfinished stubs (GO-020, GO-021)** — the dead-function
+  count in `services/mddbd` went from 83 to 9, and the nine that remain are
+  test-facing helpers, each now carrying a comment saying why it stays.
+  Removed: `DirectIO`, a stub that returned nil without enabling anything, so a
+  caller asking for unbuffered I/O silently got buffered I/O, plus
+  `AlignedBuffer` which existed only to feed it; `graphql/scalars.go`, written
+  for a gqlgen configuration this project did not adopt — `gqlgen.yml` maps
+  `Time` to `graphql.Int64`, so the generated code never referenced these;
+  `ComposeSystemPrompt`, a Go twin of `mddb-chat`'s Rust
+  `compose_system_prompt`, which is where prompts are actually composed and
+  where the tests for it already live; `rtfToText`, an alias for
+  `rtfToMarkdown`; `NewMCPHandler`, superseded by `NewMCPHandlerWithConfig`;
+  `GetCompressionStats`, which recompressed data to report a ratio nothing
+  read; and `mustJSON`, whose only caller was the loopback POST that
+  `/v1/export` no longer makes.
+
+
 ### Fixed
+
+- **Pooled buffers were never actually pooled (GO-020)** — `NewZeroCopyReader`
+  and `NewZeroCopyWriter` each built a private `BufferPool`, so every buffer was
+  returned to a pool that became garbage with the reader or writer that owned
+  it. Every call allocated a fresh buffer and the pooling was decorative. Pools
+  are now shared per buffer size. `BufferPool` itself stored `*[]byte` in `Put`
+  and asserted `[]byte` in `Get`, so the first reuse would have panicked —
+  nothing had ever reused a buffer, which is the only reason that was not in
+  production.
+
+
+- **`ZeroCopyReader` dropped data that arrived with an error (GO-020)** — a
+  reader is allowed to return bytes together with `io.EOF`, and this one
+  returned `(0, err)` in that case, discarding the last bytes of the stream,
+  where a truncation is hardest to notice. It now hands the buffered data over
+  before reporting the error. Backup and restore read through it, so the defect
+  would have silently truncated copies.
+
+
+- **GraphQL dated undated documents to the year 1 (GO-021)** — the adapter
+  called `.Unix()` on the timestamp directly, and `time.Time{}.Unix()` is
+  -62135596800. A legacy document written before timestamps existed sorted
+  ahead of every real one. `gql.TimeToInt64`, written to guard exactly this and
+  never called, is now used.
+
+
+- **RTF ignored the `textOnly` ingest option in its documentation (RAG-004)** —
+  the flag's comment listed rtf among the formats it changes, while the handler
+  had no text-only branch for it. RTF control words carry no structure to
+  rebuild, so the conversion already returns plain text; the documentation now
+  says which formats the flag actually changes.
+
 
 - **`storageBackend` was accepted, validated, documented — and ignored
   (GO-021).** A collection configured for `memory` or `s3` had its documents

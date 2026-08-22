@@ -260,3 +260,24 @@ func TestOptionalValueHelpersPassThroughRealValues(t *testing.T) {
 }
 
 var _ = gql.Claims{}
+
+// GO-021: gql.TimeToInt64 was written to guard the zero time and never called.
+// The adapter used .Unix() directly, which reports a document with no timestamp
+// as the year 1 — a value that sorts before every real one.
+func TestDocumentsWithoutTimestampsReportZeroNotTheYearOne(t *testing.T) {
+	gd := mcpDocToGQL(&MCPDocument{Key: "legacy", Lang: "en", ContentMD: "old"})
+
+	if gd.AddedAt != 0 {
+		t.Errorf("addedAt = %d, want 0 for a document that never had one", gd.AddedAt)
+	}
+	if gd.UpdatedAt != 0 {
+		t.Errorf("updatedAt = %d, want 0", gd.UpdatedAt)
+	}
+
+	// A real timestamp still travels unchanged.
+	now := time.Now().Truncate(time.Second)
+	dated := mcpDocToGQL(&MCPDocument{Key: "current", AddedAt: now, UpdatedAt: now})
+	if dated.AddedAt != now.Unix() {
+		t.Errorf("addedAt = %d, want %d", dated.AddedAt, now.Unix())
+	}
+}

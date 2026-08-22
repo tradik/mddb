@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"unicode/utf8"
 )
 
@@ -60,25 +59,4 @@ func (s *Server) ResponsePrompt(collection, query string) string {
 		"collection": collection,
 		"query":      query,
 	})
-}
-
-// ComposeSystemPrompt joins an operator's own instruction with the collection's.
-//
-// Order matters and is deliberate: the operator's prompt is policy — who the
-// assistant is, what it may say — while the collection's is about the shape of
-// its data. Policy first, so a collection cannot talk its way past it by
-// starting with "ignore your previous instructions"; a later line arguing with
-// an earlier one is a much weaker position than the reverse.
-func ComposeSystemPrompt(operatorPrompt, collectionPrompt string) string {
-	operatorPrompt = strings.TrimSpace(operatorPrompt)
-	collectionPrompt = strings.TrimSpace(collectionPrompt)
-
-	switch {
-	case collectionPrompt == "":
-		return operatorPrompt
-	case operatorPrompt == "":
-		return collectionPrompt
-	default:
-		return operatorPrompt + "\n\n" + collectionPrompt
-	}
 }

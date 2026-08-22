@@ -68,6 +68,11 @@ func splitChunkKey(key string) (docID string, chunkIndex int) {
 // chunkPassage re-derives the chunk (or window of chunks) text from the
 // parent document's content. windowSize is the number of neighboring chunks
 // included on each side; 0 returns just the matching chunk.
+//
+// Superseded in production by chunkPassageWithLines (CODE-002), which every
+// caller uses because a hit without its line range is a worse answer. Kept as
+// the text-only form the segmentation tests assert against, where the line
+// numbers would be noise.
 func chunkPassage(contentMD string, chunkIndex, windowSize int, mode ChunkMode) string {
 	text, _, _ := chunkPassageWithLines(contentMD, chunkIndex, windowSize, mode)
 	return text

@@ -263,41 +263,63 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Reużyj /search
-	sr := SearchRequest{Collection: req.Collection, FilterMeta: req.FilterMeta, Limit: 1 << 30}
-	buf := new(bytes.Buffer)
+	// GO-021: this used to HTTP-POST to its own /v1/search on
+	// localhost:MDDB_ADDR — a loopback round-trip through the whole stack to
+	// reach data the handler already has open. It broke whenever the server
+	// was not reachable at that guessed address (TLS, a unix socket, a
+	// different interface), and it did not check whether the request
+	// succeeded: `res, _ :=` followed by `res.Body.Close()` panicked on a nil
+	// response and took the server down with it. The direct client runs the
+	// same query in-process.
+	client := NewDirectClient(s)
+	exportReq := &MCPExportRequest{
+		Collection: req.Collection,
+		FilterMeta: req.FilterMeta,
+		Format:     req.Format,
+	}
 
 	switch req.Format {
 	case "ndjson":
-		// stream NDJSON
-		res, _ := http.Post("http://localhost"+env("MDDB_ADDR", ":11023")+"/v1/search", "application/json", bytes.NewReader(mustJSON(sr)))
-		defer func() { _ = res.Body.Close() }()
-		var docs []storage.Doc
-		_ = json.NewDecoder(res.Body).Decode(&docs)
-		for _, d := range docs {
-			b, _ := json.Marshal(d)
-			buf.Write(b)
-			buf.WriteByte('\n')
+		stream, err := client.Export(r.Context(), exportReq)
+		if err != nil {
+			bad(w, err)
+			return
 		}
+		defer func() { _ = stream.Close() }()
+
 		w.Header().Set("Content-Type", "application/x-ndjson")
-		_, _ = w.Write(buf.Bytes())
+		// Streamed straight to the client: a large collection no longer has
+		// to exist in memory twice before the first byte leaves.
+		if _, err := io.Copy(w, stream); err != nil {
+			// The status line is long gone by now, so the only honest signal
+			// left is to log it and let the truncated body speak.
+			slog.Warn("streaming an export failed", "collection", req.Collection, "err", err)
+		}
 
 	case "zip":
-		// pack contentMd as files {key}.{lang}.md
-		res, _ := http.Post("http://localhost"+env("MDDB_ADDR", ":11023")+"/v1/search", "application/json", bytes.NewReader(mustJSON(sr)))
-		defer func() { _ = res.Body.Close() }()
-		var docs []storage.Doc
-		_ = json.NewDecoder(res.Body).Decode(&docs)
-		var z bytes.Buffer
-		zw := zip.NewWriter(&z)
+		docs, err := client.collectExportDocs(exportReq)
+		if err != nil {
+			bad(w, err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/zip")
+		zw := zip.NewWriter(w)
 		for _, d := range docs {
 			name := fmt.Sprintf("%s.%s.md", safe(d.Key), safe(d.Lang))
-			f, _ := zw.Create(name)
-			_, _ = io.WriteString(f, d.ContentMD)
+			f, err := zw.Create(name)
+			if err != nil {
+				slog.Warn("creating a zip entry failed", "name", name, "err", err)
+				break
+			}
+			if _, err := io.WriteString(f, d.ContentMD); err != nil {
+				slog.Warn("writing a zip entry failed", "name", name, "err", err)
+				break
+			}
 		}
-		_ = zw.Close()
-		w.Header().Set("Content-Type", "application/zip")
-		_, _ = w.Write(z.Bytes())
+		if err := zw.Close(); err != nil {
+			slog.Warn("closing the export archive failed", "collection", req.Collection, "err", err)
+		}
 
 	default:
 		http.Error(w, `{"error":"unsupported format"}`, 400)
@@ -496,11 +518,33 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		"persistence": s.Persistence,
 		"durable":     s.Persistence.Durable(),
 	}
+	// GO-021: an MCP session a client abandoned without closing lives until it
+	// times out, so a count that only ever grows is the first sign of a leak.
+	if sessions := s.mcpSessionCounts(); sessions != nil {
+		body["mcpSessions"] = sessions
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		slog.Debug("writing the health response failed", "err", err)
 	}
+}
+
+// mcpSessionCounts reports open sessions per MCP transport, or nil when MCP is
+// disabled — an absent field says "not running" where a zero would say "idle".
+func (s *Server) mcpSessionCounts() map[string]int {
+	if s == nil || (s.mcpSSE == nil && s.mcpStreamable == nil) {
+		return nil
+	}
+	counts := map[string]int{}
+	if s.mcpSSE != nil {
+		counts["sse"] = s.mcpSSE.SessionCount()
+	}
+	if s.mcpStreamable != nil {
+		counts["streamable"] = s.mcpStreamable.SessionCount()
+	}
+	return counts
 }
 
 // handleComplianceStatus returns the ISO 27001 / SOC 2 production-guard

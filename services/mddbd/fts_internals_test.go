@@ -855,14 +855,6 @@ func TestCompressDecompress(t *testing.T) {
 	}
 }
 
-func TestGetCompressionStats(t *testing.T) {
-	data := []byte("hello world test data for compression stats analysis")
-	stats := compression.GetCompressionStats(data)
-	if stats.OriginalSize != len(data) {
-		t.Errorf("expected OriginalSize=%d, got %d", len(data), stats.OriginalSize)
-	}
-}
-
 // ---------------------------------------------------------------------------
 // More coverage: delta encoder, bloom filter rebuild path, vector store
 // ---------------------------------------------------------------------------

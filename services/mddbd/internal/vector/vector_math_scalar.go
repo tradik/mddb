@@ -5,6 +5,10 @@ package vector
 import "math"
 
 // vectorMathTier returns the active SIMD acceleration tier.
+//
+// Read only by tests and benchmarks: they run the same vectors through this
+// file and through vector_math_arm64.go and require identical results, so the
+// tier has to be reportable to say which half ran.
 func vectorMathTier() string { return "scalar" }
 
 // CosineSimilarity computes cosine similarity between two vectors.
@@ -70,6 +74,12 @@ func euclideanDistSq(a, b []float32) float64 {
 
 // batchCosineSim computes cosine similarity of query against count vectors
 // packed contiguously in matrix (row-major, dims per row). Results written to out.
+//
+// The batch kernel is what SIMD accelerates, and the search path does not use
+// it: vector_index.go calls CosineSimilarity one vector at a time. Wiring it in
+// is a measured change rather than a rename — see SRCH-009. It is exercised
+// here so the scalar and accelerated kernels cannot drift apart in the
+// meantime.
 func batchCosineSim(query []float32, matrix []float32, dims, count int, out []float32) {
 	for i := 0; i < count; i++ {
 		off := i * dims

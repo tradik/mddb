@@ -114,8 +114,8 @@ func TestMCPHandlerSetLogLevel(t *testing.T) {
 		t.Errorf("unexpected error: %v", resp["error"])
 	}
 
-	if h.GetLogLevel() != MCPLogDebug {
-		t.Errorf("expected debug, got %s", h.GetLogLevel())
+	if h.logLevel != MCPLogDebug {
+		t.Errorf("expected debug, got %s", h.logLevel)
 	}
 }
 

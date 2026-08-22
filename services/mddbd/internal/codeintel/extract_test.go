@@ -55,7 +55,7 @@ func TestExtractCSS(t *testing.T) {
 
 @import url("reset.css");
 `
-	s := Extract("css", css)
+	s := extract("css", css)
 
 	hasAll(t, s.Defines, ".hero-banner", ".title", "#nav", ".item", "--brand")
 	// A commented-out rule is not a declaration.
@@ -68,7 +68,7 @@ func TestExtractCSS(t *testing.T) {
 }
 
 func TestExtractCSSIgnoresDataURIs(t *testing.T) {
-	s := Extract("css", `.icon { background: url(data:image/png;base64,AAAA); }`)
+	s := extract("css", `.icon { background: url(data:image/png;base64,AAAA); }`)
 	for _, u := range s.Uses {
 		if strings.HasPrefix(u, "data:") {
 			t.Errorf("a data URI is not a link to anything: %q", u)
@@ -88,7 +88,7 @@ const handleClick = (e) => {};
 let boot = async function () {};
 const notAFunction = 42;
 `
-	s := Extract("javascript", js)
+	s := extract("javascript", js)
 
 	hasAll(t, s.Defines, "mountWidget", "WidgetController", "handleClick", "boot")
 	// A plain value is not a declaration worth indexing as a symbol.
@@ -110,7 +110,7 @@ func TestExtractHTML(t *testing.T) {
   <button onclick="handleClick(event)">go</button>
 </section>
 `
-	s := Extract("html", html)
+	s := extract("html", html)
 
 	hasAll(t, s.Defines, "#hero")
 	hasNone(t, s.Defines, "#commented")
@@ -125,9 +125,9 @@ func TestExtractHTML(t *testing.T) {
 // same input must produce the same bytes.
 func TestExtractionIsDeterministic(t *testing.T) {
 	css := `.z {} .a {} .m {} .a {} #q {} --dup: 1;`
-	first := Extract("css", css)
+	first := extract("css", css)
 	for range 20 {
-		again := Extract("css", css)
+		again := extract("css", css)
 		if joined(again.Defines) != joined(first.Defines) {
 			t.Fatalf("extraction is not reproducible:\n %s\n %s", joined(first.Defines), joined(again.Defines))
 		}
@@ -164,7 +164,7 @@ func TestExtractionIsCapped(t *testing.T) {
 // nothing rather than a guess.
 func TestUnknownLanguageYieldsNothing(t *testing.T) {
 	for _, lang := range []string{"", "markdown", "csv", "python", "unknown"} {
-		if s := Extract(lang, ".a { color: red }\nfunction f() {}"); !s.Empty() {
+		if s := extract(lang, ".a { color: red }\nfunction f() {}"); !s.Empty() {
 			t.Errorf("language %q produced symbols: %+v", lang, s)
 		}
 	}
@@ -172,7 +172,7 @@ func TestUnknownLanguageYieldsNothing(t *testing.T) {
 
 func TestEmptyContent(t *testing.T) {
 	for _, lang := range []string{"css", "javascript", "html"} {
-		if s := Extract(lang, ""); !s.Empty() {
+		if s := extract(lang, ""); !s.Empty() {
 			t.Errorf("%s: empty content produced %+v", lang, s)
 		}
 	}
@@ -203,8 +203,8 @@ func TestHostileInput(t *testing.T) {
 // A stylesheet from the issue #192 case: the selector must be findable as a
 // declaration, distinct from documents that merely apply it.
 func TestThemeCaseSeparatesDefinitionFromUse(t *testing.T) {
-	css := Extract("css", `.hero-banner { background: url(hero.png); }`)
-	html := Extract("html", `<section class="hero-banner"></section>`)
+	css := extract("css", `.hero-banner { background: url(hero.png); }`)
+	html := extract("html", `<section class="hero-banner"></section>`)
 
 	hasAll(t, css.Defines, ".hero-banner")
 	hasNone(t, css.Uses, ".hero-banner")
@@ -215,14 +215,14 @@ func TestThemeCaseSeparatesDefinitionFromUse(t *testing.T) {
 
 func TestScssAndLessUseTheCSSExtractor(t *testing.T) {
 	for _, lang := range []string{"scss", "sass", "less"} {
-		if s := Extract(lang, ".nested { .inner { color: red } }"); len(s.Defines) == 0 {
+		if s := extract(lang, ".nested { .inner { color: red } }"); len(s.Defines) == 0 {
 			t.Errorf("%s produced no symbols", lang)
 		}
 	}
 }
 
 func TestTypeScriptUsesTheJSExtractor(t *testing.T) {
-	s := Extract("typescript", `import type { X } from "./types";
+	s := extract("typescript", `import type { X } from "./types";
 export function convert(v: X): string { return ""; }`)
 	hasAll(t, s.Defines, "convert")
 	hasAll(t, s.Imports, "./types")
@@ -241,7 +241,7 @@ func TestNonPositiveLimitFallsBackToDefault(t *testing.T) {
 // At-rules and empty selector slots come from ordinary stylesheets; neither is
 // a symbol anyone would search for.
 func TestAtRulesAndBlankSelectorsAreSkipped(t *testing.T) {
-	s := Extract("css", `@media (min-width: 40em) { .responsive { color: red } }
+	s := extract("css", `@media (min-width: 40em) { .responsive { color: red } }
 , .after-blank {}
 @keyframes spin { from {} to {} }`)
 
@@ -262,7 +262,7 @@ func TestSelectorsFoundRegardlessOfLayout(t *testing.T) {
 		"scss nesting": `.wrap { .a { color: red } .hero-banner { #nav { color: red } } }`,
 	}
 	for name, css := range cases {
-		s := Extract("css", css)
+		s := extract("css", css)
 		hasAll(t, s.Defines, ".a", ".hero-banner", "#nav")
 		if t.Failed() {
 			t.Fatalf("layout %q lost selectors", name)
@@ -283,11 +283,17 @@ func TestMinifiedStylesheetFindsEveryRule(t *testing.T) {
 
 // A brace inside a declaration value is not the start of a rule.
 func TestQuotedBraceIsNotASelector(t *testing.T) {
-	s := Extract("css", `.real { content: "{"; }`)
+	s := extract("css", `.real { content: "{"; }`)
 	hasAll(t, s.Defines, ".real")
 	for _, d := range s.Defines {
 		if strings.Contains(d, "content") {
 			t.Errorf("a declaration was recorded as a selector: %q", d)
 		}
 	}
+}
+
+// extract is ExtractWithLimit at the default cap — the shape every server path
+// uses when no per-request limit applies.
+func extract(language, content string) Symbols {
+	return ExtractWithLimit(language, content, 0)
 }

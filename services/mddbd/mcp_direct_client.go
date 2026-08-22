@@ -428,9 +428,12 @@ func (c *DirectClient) DeleteCollection(ctx context.Context, req *MCPDeleteColle
 	return &MCPDeleteCollectionResponse{Deleted: deletedCount}, nil
 }
 
-// Export exports documents from a collection via the direct client.
-func (c *DirectClient) Export(ctx context.Context, req *MCPExportRequest) (io.ReadCloser, error) {
-	// Collect matching documents
+// collectExportDocs reads every document an export request selects.
+//
+// Separate from Export because the HTTP handler's zip format needs the same
+// selection and must not re-derive it: the two used to disagree about what
+// "filterMeta" means because each wrote its own query.
+func (c *DirectClient) collectExportDocs(req *MCPExportRequest) ([]storage.Doc, error) {
 	var docs []storage.Doc
 
 	err := c.server.DBView(func(tx *bolt.Tx) error {
@@ -479,17 +482,58 @@ func (c *DirectClient) Export(ctx context.Context, req *MCPExportRequest) (io.Re
 	if err != nil {
 		return nil, err
 	}
+	return docs, nil
+}
 
-	// Build NDJSON stream
-	var buf bytes.Buffer
-	for _, d := range docs {
-		b, _ := json.Marshal(d)
-		buf.Write(b)
-		buf.WriteByte('\n')
+// Export streams a collection as NDJSON.
+func (c *DirectClient) Export(ctx context.Context, req *MCPExportRequest) (io.ReadCloser, error) {
+	docs, err := c.collectExportDocs(req)
+	if err != nil {
+		return nil, err
 	}
 
-	return io.NopCloser(&buf), nil
+	// Stream NDJSON rather than materialising it (GO-021).
+	//
+	// This used to marshal every document into one bytes.Buffer and hand back
+	// a reader over it, so exporting a large collection built the entire
+	// export in memory before the caller received a single byte — twice the
+	// corpus, since the documents were already collected above. A pipe lets
+	// the caller consume while the encoder writes, and the pooled writer
+	// keeps the encoder from allocating a fresh buffer per document.
+	pr, pw := io.Pipe()
+	go func() {
+		zw := NewZeroCopyWriter(pw, exportBufferSize)
+		var writeErr error
+		for i := range docs {
+			b, err := json.Marshal(docs[i])
+			if err != nil {
+				// One unserialisable document must not silently truncate
+				// the export into something that looks complete.
+				writeErr = fmt.Errorf("document %q: %w", docs[i].ID, err)
+				break
+			}
+			if _, err := zw.Write(append(b, '\n')); err != nil {
+				writeErr = err
+				break
+			}
+		}
+		// Close flushes the tail and returns the pooled buffer; its error
+		// only matters when nothing has failed already.
+		if cerr := zw.Close(); writeErr == nil {
+			writeErr = cerr
+		}
+		// Closing with an error propagates it to the reader, so a caller
+		// cannot mistake a failed export for a short one.
+		_ = pw.CloseWithError(writeErr)
+	}()
+
+	return pr, nil
 }
+
+// exportBufferSize is how much export output is buffered before a write
+// reaches the pipe. 64 KiB is large enough that a document rarely spans two
+// flushes and small enough that a slow consumer does not pin much memory.
+const exportBufferSize = 64 << 10
 
 // Backup creates a database backup via the direct client.
 func (c *DirectClient) Backup(ctx context.Context, req *MCPBackupRequest) (*MCPBackupResponse, error) {

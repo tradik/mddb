@@ -476,3 +476,76 @@ func countRevisions(t *testing.T, srv *Server, collection, docID string) int {
 	}
 	return count
 }
+
+// GO-021: export used to marshal the whole collection into one buffer before
+// returning a reader over it, so a large export built the entire result in
+// memory — twice the corpus — before the caller saw a byte.
+func TestExportStreamsRatherThanBuffering(t *testing.T) {
+	client, srv, cleanup := directClientServer(t)
+	defer cleanup()
+
+	// Enough documents that a buffered implementation would have to finish
+	// all of them before the first read returns.
+	keys := make([]string, 0, 50)
+	for i := range 50 {
+		keys = append(keys, fmt.Sprintf("doc-%02d", i))
+	}
+	seedDocs(t, srv, "docs", keys...)
+
+	rc, err := client.Export(context.Background(), &MCPExportRequest{
+		Collection: "docs", Format: "jsonl",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rc.Close() }()
+
+	// Reading one line must work without draining the rest, which a
+	// NopCloser over a finished buffer would also satisfy — what this really
+	// pins is that closing early does not deadlock the writer goroutine.
+	line := make([]byte, 64)
+	if _, err := rc.Read(line); err != nil {
+		t.Fatalf("reading the first bytes failed: %v", err)
+	}
+
+	rest, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("draining the export failed: %v", err)
+	}
+	if !strings.Contains(string(line)+string(rest), "doc-49") {
+		t.Error("the export is missing its last document")
+	}
+}
+
+// Closing early must not leave the writer goroutine blocked on a pipe nobody
+// reads — that is a goroutine leak per abandoned export.
+func TestAbandonedExportDoesNotBlockTheWriter(t *testing.T) {
+	client, srv, cleanup := directClientServer(t)
+	defer cleanup()
+
+	keys := make([]string, 0, 200)
+	for i := range 200 {
+		keys = append(keys, fmt.Sprintf("doc-%03d", i))
+	}
+	seedDocs(t, srv, "docs", keys...)
+
+	rc, err := client.Export(context.Background(), &MCPExportRequest{
+		Collection: "docs", Format: "jsonl",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Read a little, then walk away.
+	buf := make([]byte, 32)
+	if _, err := rc.Read(buf); err != nil {
+		t.Fatal(err)
+	}
+	if err := rc.Close(); err != nil {
+		t.Errorf("closing an export early errored: %v", err)
+	}
+
+	// A second close must also be safe: handlers close in defer as well as
+	// on the error path.
+	_ = rc.Close()
+}

@@ -236,15 +236,6 @@ func TestDocxAndOdtToTextRejectInvalidContainers(t *testing.T) {
 	}
 }
 
-// RTF never built Markdown structure, so its text-only path is the same
-// function under a uniform name rather than a second implementation.
-func TestRTFToTextMatchesTheDefaultPath(t *testing.T) {
-	rtf := []byte(`{\rtf1\ansi Hello world}`)
-	if rtfToText(rtf) != rtfToMarkdown(rtf) {
-		t.Error("the RTF text-only path diverged from the default one")
-	}
-}
-
 // Real containers, because a docx is a zip and the failure modes that matter —
 // a missing entry, an unreadable archive — only exist at that layer.
 

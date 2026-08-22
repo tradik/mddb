@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 )
 
 func TestZeroCopyManagerNew(t *testing.T) {
@@ -508,4 +510,121 @@ func TestZeroCopyWriterFlushOnFullBuffer(t *testing.T) {
 	}
 
 	_ = zcw.Close()
+}
+
+// GO-020. Two defects hid behind the fact that nothing used these: every
+// reader and writer built its own pool, so no buffer was ever reused, and the
+// reader dropped data that arrived together with an error.
+
+func TestBufferPoolIsSharedBetweenReaders(t *testing.T) {
+	const size = 4096
+
+	a := NewZeroCopyReader(strings.NewReader("first"), size)
+	b := NewZeroCopyReader(strings.NewReader("second"), size)
+
+	if a.bufferPool != b.bufferPool {
+		t.Error("two readers of the same size hold different pools, so no buffer is ever reused")
+	}
+
+	w := NewZeroCopyWriter(io.Discard, size)
+	if w.bufferPool != a.bufferPool {
+		t.Error("a writer and a reader of the same size hold different pools")
+	}
+
+	if NewZeroCopyReader(strings.NewReader(""), size*2).bufferPool == a.bufferPool {
+		t.Error("readers of different sizes share one pool, so Get would return the wrong length")
+	}
+}
+
+func TestPooledBufferIsActuallyReused(t *testing.T) {
+	const size = 8192
+	pool := bufferPoolFor(size)
+
+	first := pool.Get()
+	first[0] = 0x7f
+	pool.Put(first)
+
+	// sync.Pool may drop entries, so this asserts the mechanism works rather
+	// than that a specific buffer comes back.
+	second := pool.Get()
+	if len(second) != size {
+		t.Fatalf("Get returned %d bytes, want %d", len(second), size)
+	}
+	pool.Put(second)
+
+	// A buffer of the wrong size must not enter the pool: a later Get would
+	// hand a caller less than it asked for.
+	pool.Put(make([]byte, size/2))
+	if got := pool.Get(); len(got) != size {
+		t.Errorf("a short buffer was pooled and came back: %d bytes", len(got))
+	}
+}
+
+// A reader that returns data and io.EOF in one call is allowed to, and used to
+// have its last bytes discarded here.
+type dataWithEOFReader struct {
+	data []byte
+	done bool
+}
+
+func (r *dataWithEOFReader) Read(p []byte) (int, error) {
+	if r.done {
+		return 0, io.EOF
+	}
+	r.done = true
+	return copy(p, r.data), io.EOF
+}
+
+func TestReaderKeepsDataThatArrivesWithEOF(t *testing.T) {
+	const payload = "the last bytes of the stream"
+
+	zr := NewZeroCopyReader(&dataWithEOFReader{data: []byte(payload)}, 4096)
+	defer func() { _ = zr.Close() }()
+
+	got, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if string(got) != payload {
+		t.Errorf("read %q, want %q", got, payload)
+	}
+}
+
+func TestReaderSurfacesARealError(t *testing.T) {
+	want := errors.New("disk is on fire")
+	zr := NewZeroCopyReader(iotest.ErrReader(want), 4096)
+	defer func() { _ = zr.Close() }()
+
+	if _, err := io.ReadAll(zr); !errors.Is(err, want) {
+		t.Errorf("err = %v, want %v", err, want)
+	}
+}
+
+// copyFile reads through the pooled reader; a copy that loses its tail would
+// corrupt every backup.
+func TestCopyFileIsByteExactAcrossBufferBoundaries(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "src.bin")
+	dst := filepath.Join(dir, "dst.bin")
+
+	// Deliberately not a multiple of the buffer size.
+	payload := make([]byte, copyBufferSize*2+1237)
+	for i := range payload {
+		payload[i] = byte(i * 7)
+	}
+	if err := os.WriteFile(src, payload, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copyFile(src, dst); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := os.ReadFile(dst) // #nosec G304 -- test-controlled path
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Errorf("the copy is %d bytes, the source is %d", len(got), len(payload))
+	}
 }

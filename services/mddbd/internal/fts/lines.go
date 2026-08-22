@@ -64,6 +64,19 @@ func (li *LineIndex) LineAt(offset int) int {
 // An end offset that lands exactly on a line start belongs to the previous
 // line: a fragment ending at the newline covers the line it ended, not the one
 // that has not started yet.
+// Lines reports how many lines the indexed content has.
+//
+// No production caller needs this — the server maps offsets to lines, never the
+// other way round. It stays because TestChunkSpansCoverEveryLine asserts that no
+// chunk ends past the last line, and computing the bound inside the test would
+// mean reimplementing the thing under test.
+func (li *LineIndex) Lines() int {
+	if li == nil {
+		return 0
+	}
+	return len(li.starts)
+}
+
 func (li *LineIndex) Range(startOffset, endOffset int) (startLine, endLine int) {
 	if li == nil {
 		return 0, 0
@@ -77,12 +90,4 @@ func (li *LineIndex) Range(startOffset, endOffset int) (startLine, endLine int) 
 		endLine = startLine
 	}
 	return startLine, endLine
-}
-
-// Lines reports how many lines the content has.
-func (li *LineIndex) Lines() int {
-	if li == nil {
-		return 0
-	}
-	return len(li.starts)
 }

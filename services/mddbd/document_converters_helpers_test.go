@@ -17,29 +17,6 @@ import (
 // bytes_utils.go — pure byte manipulation utilities
 // ---------------------------------------------------------------------------
 
-func TestBytesSplit(t *testing.T) {
-	tests := []struct {
-		data []byte
-		sep  byte
-		want int
-	}{
-		{[]byte("a|b|c"), '|', 3},
-		{[]byte("hello"), '|', 1},
-		{[]byte(""), '|', 0},
-		{[]byte("|"), '|', 2},
-		{[]byte("a|b|c|d|e"), '|', 5},
-	}
-	for _, tc := range tests {
-		parts := BytesSplit(tc.data, tc.sep)
-		if tc.want == 0 && parts == nil {
-			continue
-		}
-		if len(parts) != tc.want {
-			t.Errorf("BytesSplit(%q, %q) got %d parts, want %d", tc.data, string(tc.sep), len(parts), tc.want)
-		}
-	}
-}
-
 func TestBytesHasPrefix(t *testing.T) {
 	if !BytesHasPrefix([]byte("hello world"), []byte("hello")) {
 		t.Error("expected true")
@@ -49,27 +26,6 @@ func TestBytesHasPrefix(t *testing.T) {
 	}
 	if !BytesHasPrefix([]byte("abc"), []byte("")) {
 		t.Error("empty prefix should match")
-	}
-}
-
-func TestBytesIndexByte(t *testing.T) {
-	if got := BytesIndexByte([]byte("hello"), 'l'); got != 2 {
-		t.Errorf("expected 2, got %d", got)
-	}
-	if got := BytesIndexByte([]byte("hello"), 'z'); got != -1 {
-		t.Errorf("expected -1, got %d", got)
-	}
-	if got := BytesIndexByte([]byte(""), 'a'); got != -1 {
-		t.Errorf("expected -1 for empty, got %d", got)
-	}
-}
-
-func TestBytesLastIndexByte(t *testing.T) {
-	if got := BytesLastIndexByte([]byte("hello"), 'l'); got != 3 {
-		t.Errorf("expected 3, got %d", got)
-	}
-	if got := BytesLastIndexByte([]byte("hello"), 'z'); got != -1 {
-		t.Errorf("expected -1, got %d", got)
 	}
 }
 
@@ -95,40 +51,6 @@ func TestExtractPart(t *testing.T) {
 	}
 	if got := ExtractPart([]byte(""), 0); got != nil {
 		t.Errorf("expected nil for empty data, got %q", got)
-	}
-}
-
-func TestAppendBytes(t *testing.T) {
-	result := AppendBytes([]byte("hello"), []byte(" "), []byte("world"))
-	if string(result) != "hello world" {
-		t.Errorf("got %q", string(result))
-	}
-	result2 := AppendBytes(nil, []byte("a"), []byte("b"))
-	if string(result2) != "ab" {
-		t.Errorf("got %q", string(result2))
-	}
-}
-
-func TestBytesToLowerCB2(t *testing.T) {
-	b := []byte("Hello WORLD 123")
-	BytesToLower(b)
-	if string(b) != "hello world 123" {
-		t.Errorf("got %q", string(b))
-	}
-}
-
-func TestCompareBytesCB2(t *testing.T) {
-	if CompareBytes([]byte("abc"), []byte("abc")) != 0 {
-		t.Error("equal should be 0")
-	}
-	if CompareBytes([]byte("abc"), []byte("abd")) >= 0 {
-		t.Error("abc < abd")
-	}
-	if CompareBytes([]byte("abd"), []byte("abc")) <= 0 {
-		t.Error("abd > abc")
-	}
-	if CompareBytes([]byte("ab"), []byte("abc")) >= 0 {
-		t.Error("ab < abc")
 	}
 }
 

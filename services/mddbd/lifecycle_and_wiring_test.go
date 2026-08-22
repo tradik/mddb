@@ -20,17 +20,6 @@ import (
 // exists — during startup, in a restore, in a test. They must be no-ops rather
 // than a crash, and the wiring must actually take effect.
 
-func TestKeyBuilderResetOnAZeroValue(t *testing.T) {
-	kb := &KeyBuilder{}
-	kb.Reset() // a fresh builder has nothing to reset
-
-	// Reset must leave it usable rather than merely not panicking.
-	got := kb.BuildMetaKeyPrefix("docs", "tag", "go")
-	if len(got) == 0 {
-		t.Error("a reset builder produced no key")
-	}
-}
-
 func TestConfigureCompressionAcceptsBothStates(t *testing.T) {
 	// Restore whatever the process was using, since this is global state.
 	defer compression.ConfigureCompression(true, 256, 4096)

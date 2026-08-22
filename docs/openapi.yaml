@@ -174,6 +174,31 @@ paths:
                     type: string
                     enum: [ read, write, wr ]
                     example: wr
+                  persistence:
+                    $ref: "#/components/schemas/PersistenceStatus"
+                  durable:
+                    type: boolean
+                    description: >-
+                      Whether an acknowledged write can be expected to survive a
+                      restart of the process and its container (GO-032). False
+                      means the data directory is read-only or ephemeral.
+                    example: true
+                  mcpSessions:
+                    type: object
+                    description: >-
+                      Open MCP sessions per transport (GO-021). Absent when the
+                      MCP server is disabled — an absent field says "not
+                      running" where a zero would say "idle". A count that only
+                      grows is how a session leak becomes visible.
+                    properties:
+                      sse:
+                        type: integer
+                        description: Sessions on the legacy MCP-over-SSE transport
+                        example: 0
+                      streamable:
+                        type: integer
+                        description: Sessions on the Streamable HTTP transport
+                        example: 2
         "503":
           description: Service is unhealthy
           content:
@@ -203,6 +228,31 @@ paths:
                     type: string
                     enum: [ read, write, wr ]
                     example: wr
+                  persistence:
+                    $ref: "#/components/schemas/PersistenceStatus"
+                  durable:
+                    type: boolean
+                    description: >-
+                      Whether an acknowledged write can be expected to survive a
+                      restart of the process and its container (GO-032). False
+                      means the data directory is read-only or ephemeral.
+                    example: true
+                  mcpSessions:
+                    type: object
+                    description: >-
+                      Open MCP sessions per transport (GO-021). Absent when the
+                      MCP server is disabled — an absent field says "not
+                      running" where a zero would say "idle". A count that only
+                      grows is how a session leak becomes visible.
+                    properties:
+                      sse:
+                        type: integer
+                        description: Sessions on the legacy MCP-over-SSE transport
+                        example: 0
+                      streamable:
+                        type: integer
+                        description: Sessions on the Streamable HTTP transport
+                        example: 2
         "503":
           description: Service is unhealthy
           content:
@@ -7584,6 +7634,47 @@ components:
           type: integer
           format: int64
       required: [ collection, query ]
+
+    PersistenceStatus:
+      type: object
+      description: >-
+        What the data directory can promise about durability (GO-032). Reported
+        by /health so an operator sees whether acknowledged writes will survive,
+        not only that the process is up.
+      properties:
+        path:
+          type: string
+          description: The data directory the server writes to
+          example: /var/lib/mddb
+        filesystem:
+          type: string
+          description: Detected filesystem type, when it could be determined
+          example: ext4
+        ephemeral:
+          type: boolean
+          description: >-
+            True when the directory lives on storage that does not survive a
+            container restart (tmpfs, overlayfs upper layer).
+          example: false
+        writable:
+          type: boolean
+          example: true
+        freeBytes:
+          type: integer
+          format: int64
+          description: Free space on the filesystem holding the data directory
+          example: 21474836480
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                example: EPHEMERAL_FS
+              detail:
+                type: string
+                example: data directory is on tmpfs; writes will not survive a restart
 
     ErrorResponse:
       type: object

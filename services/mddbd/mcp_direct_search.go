@@ -228,7 +228,20 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 	embedded, skipped, failed := 0, 0, 0
 	var errs []string
 
-	for _, d := range docs {
+	// GO-021: reindexing a large collection embeds every document, one
+	// network call at a time. Without progress it is indistinguishable from a
+	// hung call, which is when someone kills it half-finished. Reported every
+	// few documents rather than every one — a notification per document would
+	// be more traffic than the work.
+	const progressEvery = 25
+	ReportProgress(ctx, 0, len(docs), "starting reindex")
+
+	for i, d := range docs {
+		if (i+1)%progressEvery == 0 {
+			ReportProgress(ctx, i+1, len(docs),
+				fmt.Sprintf("embedded %d, skipped %d", embedded, skipped))
+		}
+
 		if d.ContentMD == "" {
 			skipped++
 			continue
@@ -307,6 +320,8 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 			}
 		}
 	}
+
+	ReportProgress(ctx, len(docs), len(docs), "reindex complete")
 
 	return &MCPVectorReindexResponse{
 		Embedded: embedded,

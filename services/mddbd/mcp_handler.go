@@ -24,16 +24,12 @@ type MCPHandler struct {
 
 	mu       sync.RWMutex
 	logLevel MCPLogLevel // minimum log level from client
-}
-
-// NewMCPHandler creates a new MCP handler.
-func NewMCPHandler(client MCPClient, customTools []MCPCustomToolConfig) *MCPHandler {
-	return &MCPHandler{
-		client:      client,
-		customTools: customTools,
-		serverInfo:  MCPServerInfo{Name: "mddbd"},
-		logLevel:    MCPLogWarning,
-	}
+	// notify and progressToken belong to the request in flight, set by
+	// HandleWithNotifier for transports that can deliver a notification
+	// before the response (GO-021). Both nil for a plain POST, which has
+	// nowhere to put one.
+	notify        func(map[string]interface{})
+	progressToken interface{}
 }
 
 // NewMCPHandlerWithConfig creates a new MCP handler with custom server info, instructions, and access mode.
@@ -271,9 +267,18 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 	name, _ := params["name"].(string)
 	args, _ := params["arguments"].(map[string]interface{})
 
+	// GO-021: a tool long enough to be worth reporting on can now find a
+	// progress sender in its context. Nil for callers that did not ask.
+	ctx = withProgressSender(ctx, h.progressSender())
+
 	ts := &MCPToolServer{client: h.client, customTools: h.customTools, globalMode: h.globalMode, mode: h.mode}
 	result, err := ts.mcpCallTool(ctx, name, args)
 	if err != nil {
+		// The client sees the failure in the result either way; this is the
+		// copy that reaches its log, where a run of failing calls is visible
+		// as a pattern rather than one error at a time.
+		h.logToClient(MCPLogError, "tools/call", name+": "+err.Error())
+
 		return map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
@@ -364,21 +369,15 @@ func (h *MCPHandler) handleSetLogLevel(req map[string]interface{}) map[string]in
 	return map[string]interface{}{}
 }
 
-// GetLogLevel returns the current minimum log level.
-func (h *MCPHandler) GetLogLevel() MCPLogLevel {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	return h.logLevel
-}
-
-// HandleJSON processes JSON request and returns JSON response.
-func (h *MCPHandler) HandleJSON(reqJSON []byte) ([]byte, error) {
+// HandleJSONWithNotifier is HandleJSON for a transport that can deliver
+// notifications while the request is still running.
+func (h *MCPHandler) HandleJSONWithNotifier(reqJSON []byte, notify func(map[string]interface{})) ([]byte, error) {
 	var req map[string]interface{}
 	if err := json.Unmarshal(reqJSON, &req); err != nil {
 		return nil, err
 	}
 
-	resp := h.Handle(req)
+	resp := h.HandleWithNotifier(req, notify)
 	if resp == nil {
 		// Notification — no response
 		return nil, nil
@@ -397,13 +396,26 @@ func (s *Server) runMCPStdio() {
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 4*1024*1024), 4*1024*1024) // 4MB buffer
 
+	// GO-021: stdio can deliver notifications mid-request because the loop
+	// handles one request at a time on one goroutine — anything written during
+	// Handle is already ordered before the response that follows it.
+	notify := func(n map[string]interface{}) {
+		data, err := json.Marshal(n)
+		if err != nil {
+			slog.Warn("MCP notification could not be encoded", "err", err)
+			return
+		}
+		_, _ = os.Stdout.Write(data)
+		_, _ = os.Stdout.Write([]byte("\n"))
+	}
+
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}
 
-		resp, err := handler.HandleJSON(line)
+		resp, err := handler.HandleJSONWithNotifier(line, notify)
 		if err != nil {
 			slog.Warn("MCP handler error", "err", err)
 			continue

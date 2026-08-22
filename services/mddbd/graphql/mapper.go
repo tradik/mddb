@@ -37,11 +37,3 @@ func TimeToInt64(t time.Time) int64 {
 	}
 	return t.Unix()
 }
-
-// Int64ToTime converts Unix timestamp to time.Time
-func Int64ToTime(ts int64) time.Time {
-	if ts == 0 {
-		return time.Time{}
-	}
-	return time.Unix(ts, 0)
-}

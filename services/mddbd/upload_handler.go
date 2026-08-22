@@ -254,6 +254,10 @@ func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang,
 		}
 		converted = true
 	case "rtf":
+		// No text-only variant, for the same reason as pdf: RTF control words
+		// carry no structure worth rebuilding, so rtfToMarkdown already
+		// returns plain text and a second name would promise a speedup that
+		// does not exist.
 		contentMD = rtfToMarkdown(data)
 		converted = true
 	default:

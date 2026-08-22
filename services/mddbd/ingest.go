@@ -50,8 +50,9 @@ type IngestOptionsHTTP struct {
 	// keeps every step, "fast" trades parsing fidelity and bookkeeping for
 	// throughput. An explicitly-set flag always overrides the preset.
 	Profile string `json:"profile,omitempty"`
-	// TextOnly extracts plain text from heavy formats (html, pdf, docx, odt,
-	// rtf) instead of rebuilding their structure as Markdown. Implied by
+	// TextOnly extracts plain text from heavy formats instead of rebuilding
+	// their structure as Markdown. It changes html, docx and odt; pdf and rtf
+	// build no structure to begin with, so they are unaffected. Implied by
 	// profile "fast".
 	TextOnly bool `json:"textOnly,omitempty"`
 }

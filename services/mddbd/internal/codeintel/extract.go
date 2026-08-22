@@ -78,15 +78,6 @@ var (
 	htmlCommentRe  = regexp.MustCompile(`(?s)<!--.*?-->`)
 )
 
-// Extract finds the symbols in content for the given language.
-//
-// An unknown language yields nothing rather than a guess: reporting selectors
-// from a file that is not CSS would put noise into the graph, and a wrong edge
-// is worse than a missing one.
-func Extract(language, content string) Symbols {
-	return ExtractWithLimit(language, content, DefaultMaxSymbols)
-}
-
 // ExtractWithLimit is Extract with an explicit cap per list.
 func ExtractWithLimit(language, content string, max int) Symbols {
 	if max <= 0 {

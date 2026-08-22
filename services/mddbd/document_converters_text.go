@@ -157,15 +157,6 @@ func odtXMLToText(xmlDoc string) string {
 	return collapseBlankLines(decodeCommonEntities(s))
 }
 
-// rtfToText reuses the RTF reader, which already yields plain text.
-//
-// Unlike html and docx, the RTF path never built Markdown structure — so this
-// is a rename, kept for a uniform call site rather than a separate
-// implementation nobody would remember to keep in step.
-func rtfToText(data []byte) string {
-	return rtfToMarkdown(data)
-}
-
 // readZipEntry opens one file inside a zip container.
 //
 // Both docx and odt are zips with a single interesting entry; the default

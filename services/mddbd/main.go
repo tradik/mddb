@@ -126,6 +126,13 @@ type Server struct {
 	MCPInstructions string                    // System prompt for LLM — how to use this server
 	mcpKeyStore     *mcpAPIKeyStore           // BoltDB-backed MCP API key store
 	mcpAuth         *MCPAPIKeyMiddleware      // MCP API key middleware (for cache invalidation)
+	// GO-021: both MCP transports count their open sessions and nothing ever
+	// asked. A session that a client abandoned without closing stays until it
+	// times out, so the count is how an operator sees leaks accumulating.
+	// Assigned once before the listener goroutine starts, so /health can read
+	// them without synchronisation.
+	mcpSSE        *MCPSSETransport
+	mcpStreamable *MCPStreamableTransport
 	// Replication
 	Binlog          *binlog.Binlog     // Binary replication log
 	ReplicationRole string             // "leader", "follower", or "" (standalone)
@@ -982,6 +989,14 @@ func main() {
 
 	// Start MCP HTTP server on its own port
 	if srvCfg.MCP.Enabled {
+		// Built before the goroutine so /health can read their session counts
+		// without racing the listener's startup.
+		mcpSSE := NewMCPSSETransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
+			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode))
+		mcpStreamable := NewMCPStreamableTransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
+			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode))
+		s.mcpSSE, s.mcpStreamable = mcpSSE, mcpStreamable
+
 		go func() {
 			mcpMux := http.NewServeMux()
 			mcpSrv := s.newMCPHTTPServer()
@@ -992,15 +1007,11 @@ func main() {
 			mcpMux.HandleFunc("/events", s.handleSSE)
 
 			// MCP-over-SSE transport (legacy, 2024-11-05 spec)
-			mcpSSEHandler := NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(), srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode)
-			mcpSSE := NewMCPSSETransport(mcpSSEHandler)
 			mcpMux.HandleFunc("/sse", mcpSSE.HandleSSE)
 			mcpMux.HandleFunc("/message", mcpSSE.HandleMessage)
 			slog.Info("MCP-over-SSE transport enabled at /sse + /message (legacy)")
 
 			// Streamable HTTP transport (2025-11-25 spec)
-			mcpStreamableHandler := NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(), srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode)
-			mcpStreamable := NewMCPStreamableTransport(mcpStreamableHandler)
 			mcpMux.HandleFunc("/mcp", mcpStreamable.Handle)
 			slog.Info("MCP Streamable HTTP transport enabled at /mcp")
 

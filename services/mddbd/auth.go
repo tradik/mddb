@@ -175,6 +175,11 @@ func GetClaimsFromContext(ctx context.Context) (*JWTClaims, bool) {
 // ---- JWT generation and validation ----
 
 // GenerateJWT generates a JWT token for a global (non-tenant) user.
+//
+// No production caller: every issuing path knows its tenant and calls
+// GenerateTenantJWT directly, passing "" for global users. This alias stays
+// because it is the only way to mint a token with Admin set — the tenant form
+// strips it — which is what the auth tests need to exercise admin-only paths.
 func GenerateJWT(username string, isAdmin bool, secret string, expiry time.Duration) (string, error) {
 	return GenerateTenantJWT(username, "", isAdmin, secret, expiry)
 }

@@ -74,33 +74,6 @@ func TestResponsePromptValidation(t *testing.T) {
 	}
 }
 
-// Policy first: a collection cannot talk its way past the operator's
-// instruction by opening with one of its own.
-func TestComposeSystemPromptOrdersPolicyFirst(t *testing.T) {
-	got := ComposeSystemPrompt("You are terse.", "Answer in numbered steps.")
-	if got != "You are terse.\n\nAnswer in numbered steps." {
-		t.Errorf("composed = %q", got)
-	}
-	if strings.Index(got, "terse") > strings.Index(got, "numbered") {
-		t.Error("the collection prompt came before the operator's")
-	}
-}
-
-func TestComposeSystemPromptWithOneSideEmpty(t *testing.T) {
-	cases := map[string][3]string{
-		"no collection prompt": {"operator", "", "operator"},
-		"whitespace only":      {"operator", "  \n ", "operator"},
-		"no operator prompt":   {"", "collection", "collection"},
-		"neither":              {"", "", ""},
-		"whitespace trimmed":   {"  operator  ", " collection ", "operator\n\ncollection"},
-	}
-	for name, c := range cases {
-		if got := ComposeSystemPrompt(c[0], c[1]); got != c[2] {
-			t.Errorf("%s: got %q, want %q", name, got, c[2])
-		}
-	}
-}
-
 // --- REST ---
 
 func TestRESTStoresAndValidatesTheResponsePrompt(t *testing.T) {
