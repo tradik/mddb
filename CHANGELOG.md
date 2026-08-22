@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Upgrading to 2.12.0
+
+This release makes five changes that need action or attention. They are why
+this is 2.12.0 and not a patch.
+
+**1. The production compose refuses to start without secrets.** `docker
+compose up` now stops with an error naming `MDDB_AUTH_JWT_SECRET` or
+`MDDB_AUTH_ADMIN_PASSWORD` if either is unset. Copy `.env.example` to `.env`
+and set them. This is deliberate: the previous behaviour was to start an open,
+writable database with an unauthenticated MCP endpoint.
+
+**2. Published ports moved to loopback.** Every service now publishes on
+`${MDDB_BIND_ADDR:-127.0.0.1}`. A reverse proxy or cloudflared reaches the
+containers over `mddb-network` and needs no published port; if you were
+reaching MDDB from another host, set `MDDB_BIND_ADDR=0.0.0.0` — deliberately,
+and with authentication on.
+
+**3. The log format changed completely.** The operational log is now
+structured (`log/slog`): severity is a `level` field rather than a prefix in
+the message, timestamps are RFC 3339, and message texts were rewritten. Any
+alert, grep or Loki query matching the old text will stop matching.
+`MDDB_LOG_FORMAT=json` is the default in the Docker image.
+
+**4. `keyPrefix` in `/v1/mcp/keys` no longer carries key material.** It used to
+return `mcp_` plus the first eight characters of the key — 32 bits of the
+secret, in an API response and in the log. It now returns the scheme marker
+alone, and a new `fingerprint` field (four bytes of SHA-256) identifies a key.
+Anything matching on `keyPrefix` should move to `fingerprint`.
+
+**5. The Grafana datasource now requires Grafana 13.** `peerDependencies` and
+`grafanaDependency` said 11 while the plugin was compiled and type-checked
+against 13, so 13-only APIs would have failed at runtime on the version it
+claimed to support. Both now say 13.
+
+Also worth knowing: heavy queries can return `503` with `Retry-After` under
+load, where they previously all ran and risked exhausting memory
+(`MDDB_SEARCH_MAX_CONCURRENT`); the Go client module now requires Go 1.27; and
+graceful shutdown drains its queues, so both compose files allow a 20s stop
+grace period — set the same if you run the image directly.
+
 ### Security
 - **The server says when its storage cannot keep what it accepts** — bbolt fsyncs every commit, so an acknowledged write survives a crash; verified rather than assumed, by writing over REST, sending `kill -9` with no shutdown hooks, and finding the document and its full-text index intact after restart. But that promise is only worth what the storage under it is worth, and a container started without a volume writes to its own overlay layer: accepted, fsynced, gone when the container is removed. The data directory is now checked before the first write is accepted — for ephemeral filesystems (tmpfs, ramfs, overlay), for real writability (by creating a file, since a read-only mount or a user mismatch looks writable in the mode bits) and for free space against `MDDB_DISK_MIN_FREE` — and each finding is logged as a WARN carrying a code, so a collector can alert on `ephemeral_storage` rather than on prose. `GET /health` reports the same as `persistence` plus a computed `durable`, and `docs/DEPLOYMENT.md` now states per surface what is guaranteed and what is not — async bulk jobs and embeddings are queued, not written, and say so.
 - **The extreme-mode log stopped promising a durability mode that does not exist** — it announced "WAL initialized (SyncPeriodic)", but nothing in the tree writes to that WAL: it opens a file, starts a flusher goroutine and receives nothing, while durability actually comes from bbolt's per-commit fsync. The line now says what is true. Whether the subsystem should be wired up or removed is a separate decision — a write-ahead log in front of a store that already fsyncs adds cost rather than a guarantee.
@@ -18,6 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The extension gives back host permissions it no longer uses** — saving settings requested access to the new server origin and never revoked the old one, so with `optional_host_permissions` covering all of http and https, every address a user had ever typed stayed granted. The revocation compares against the origin currently held rather than the one read at startup, so a second save in the same session cannot leave the first save's grant behind.
 
 ### Changed
+- **Release notes come from the changelog** — every tag published the same hand-written text, with benchmark figures from one historical measurement ("29,810 docs/sec", "5.75x faster than MongoDB") that no longer described anything in particular. `scripts/release-notes.py` extracts the section for the version being tagged and adds the installation block, which is the one part that genuinely repeats. The same stale figures are gone from the deb and rpm package descriptions. The generator refuses a version the tree does not declare: falling back to `[Unreleased]` is only safe for the version `const VERSION` reports, or a typo in a tag would publish this release's notes under a version nobody built.
+- **The release version cannot drift again** — it is written in eight places by hand, and one of them (`.ssg.yaml`, which the documentation site reads) was not even on the list this was thought to cover. `scripts/check-version.sh` collects all eight and fails if they disagree, with a test suite covering the exact shape this went wrong in before: one source left behind during a bump. The git tag is deliberately not checked, since it is created after the guard passes; instead the guard reports whether the CHANGELOG section for this version is still under `[Unreleased]` or dated and ready to tag.
+
 - **Agent instructions ship with the tools** — an agent connecting over MCP gets 79 tool schemas and no idea which one fits a question, or that asking for a projection instead of whole documents changes the cost by more than an order of magnitude. Measured through MCP: the same `full_text_search` over five 12 KB documents returns ~19 700 tokens by default and ~327 with `fields: ["key"]`. `integrations/agent-instructions/` now carries that guidance — a decision tree for choosing between full-text, semantic and hybrid search, the parameters that cut tokens, the anti-patterns (starting with fetching a whole document to change one line of it, the issue #192 case) and the `memory_*` working loop. One source, `AGENTS.md`, generates the Claude Code skill, the Cursor rule and the Windsurf rule, because four hand-maintained copies drift on the first edit. Two guards keep it honest: CI fails if a variant was edited instead of the source, and a test fails if the instructions name a tool the code does not define — which it did immediately, on a tool name that never existed.
 
 - **Shutdown drains what it accepted** — seven subsystems shipped a `Stop`, `Close` or `Shutdown` that nothing ever called: the WAL, the bulk-ingest worker, the cron scheduler, the index queue, the temporal manager, MVCC and the HTTP/3 listener, whose handle only ever existed as a local inside a goroutine and so could not be closed at all. At process exit the kernel reclaims goroutines and descriptors either way — the cost was what those subsystems were still holding: queued index jobs, an in-flight bulk job, a buffered WAL write, all abandoned rather than finished. One ordered sequence replaces the scattered closes, in the reverse of the dependency order: stop accepting work, drain the queues, stop the periodic workers, close what the queues were writing to, caches last. It runs under `MDDB_SHUTDOWN_TIMEOUT_SEC`, and a step that wedges is named in the log rather than holding the process open until the operator's SIGKILL. A test starts, exercises and stops the subsystems three times and fails if goroutines are left behind — verified by removing one step and watching it catch the leak.

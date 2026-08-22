@@ -217,6 +217,15 @@ jobs:
       - name: Run CHANGELOG guard test suite
         run: bash scripts/tests/test-changelog.sh
 
+      # DOC-011: the release version is written in eight places by hand and has
+      # drifted before — the CHANGELOG once described a version the binary did
+      # not report and no tag existed for.
+      - name: Verify the release version is consistent
+        run: bash scripts/check-version.sh --print
+
+      - name: Run release-version guard test suite
+        run: bash scripts/tests/test-version.sh
+
       # INT-018: the per-tool instruction files are generated from AGENTS.md.
       # Editing a copy instead of the source is how four of them drift apart.
       - name: Verify agent instructions are generated from their source

@@ -176,7 +176,7 @@ jobs:
            markdown documents with rich metadata, full revision history,
            and dual protocol support (HTTP/JSON + gRPC/Protobuf).
            .
-           Performance: 29,810 docs/sec with 29 advanced optimizations.
+           Full-text, vector and hybrid search, with an MCP server built in.
           Homepage: https://github.com/tradik/mddb
           EOF
           
@@ -238,7 +238,7 @@ jobs:
           markdown documents with rich metadata, full revision history,
           and dual protocol support (HTTP/JSON + gRPC/Protobuf).
           
-          Performance: 29,810 docs/sec with 29 advanced optimizations.
+          Full-text, vector and hybrid search, with an MCP server built in.
 
           %prep
           %setup -q
@@ -573,74 +573,15 @@ jobs:
           path: release-artifacts
           pattern: md*
 
+      # OPS-011: notes come from CHANGELOG.md, so they describe the release
+      # they are attached to. The previous step published the same hand-written
+      # text for every tag, carrying benchmark figures from one historical
+      # measurement.
       - name: Create release notes
         run: |
-          cat > release-notes.md << 'EOF'
-          # MDDB ${{ steps.version.outputs.VERSION }} - Ultra Performance Release
-
-          ## 🚀 Performance Highlights
-
-          **MDDB is now 37.4x faster than baseline!**
-
-          - **29,810 docs/sec** throughput
-          - **34µs** average latency
-          - **5.75x faster** than MongoDB
-          - **6.89x faster** than PostgreSQL
-          - **24.54x faster** than MySQL
-          - **95.43x faster** than CouchDB
-
-          ## 📦 Installation
-
-          ### Ubuntu/Debian
-          ```bash
-          # Server
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          sudo dpkg -i mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          
-          # Client
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          sudo dpkg -i mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          ```
-
-          ### RHEL/CentOS/Fedora
-          ```bash
-          # Server
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          sudo rpm -i mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          
-          # Client
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          sudo rpm -i mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          ```
-
-          ### macOS (Homebrew)
-          ```bash
-          # Intel
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz
-          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz
-          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64/mddbd /usr/local/bin/
-          
-          # Apple Silicon
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz
-          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz
-          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64/mddbd /usr/local/bin/
-          ```
-
-          ### FreeBSD
-          ```bash
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz
-          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz
-          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64/mddbd /usr/local/bin/
-          ```
-
-          ## ✨ What's New
-
-          See [CHANGELOG.md](https://github.com/tradik/mddb/blob/main/CHANGELOG.md) for full details.
-
-          ## 📊 Benchmarks
-
-          All benchmarks available in the repository under `test/`.
-          EOF
+          python3 scripts/release-notes.py "${{ steps.version.outputs.VERSION }}" > release-notes.md
+          echo "--- release notes ---"
+          head -40 release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3

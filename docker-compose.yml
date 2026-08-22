@@ -35,7 +35,7 @@ x-deploy-small: &deploy-small
 
 services:
   mddb:
-    image: tradik/mddb:${MDDB_VERSION:-2.11.5}
+    image: tradik/mddb:${MDDB_VERSION:-2.12.0}
     container_name: mddb-server
     restart: unless-stopped
     ports:
@@ -85,7 +85,7 @@ services:
       start_period: 10s
     labels:
       - "com.mddb.description=MDDB - High-Performance Markdown Database"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
       - "com.mddb.performance=optimized"
 
   mddb-panel:
@@ -107,7 +107,7 @@ services:
         condition: service_healthy
     labels:
       - "com.mddb.description=MDDB Panel - Web Admin Interface"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
 
   # MCP is built into the mddb server — runs on port 9000 by default
   # For stdio mode, use: docker run -i --rm -e MDDB_MCP_STDIO=true tradik/mddb:latest
@@ -137,7 +137,7 @@ services:
         condition: service_healthy
     labels:
       - "com.mddb.description=MDDB Chat - AI Chat Support"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
 
   mddb-chat-widget:
     build:
@@ -153,7 +153,7 @@ services:
     deploy: *deploy-small
     labels:
       - "com.mddb.description=MDDB Chat Widget - Embeddable JS chatbox"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
 
 volumes:
   mddb-data:

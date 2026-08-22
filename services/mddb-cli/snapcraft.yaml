@@ -1,6 +1,6 @@
 name: mddb-cli
 title: MDDB CLI
-version: "2.11.4"
+version: "2.12.0"
 summary: Command-line client for MDDB Markdown Database
 description: |
   mddb is the official command-line interface for MDDB (Markdown Database).

@@ -49,7 +49,7 @@ fingerprint: true
 # version strings baked into the HTML at build time (no client-side JS).
 # Updated by the release version sweep alongside Makefile/main.go.
 variables:
-  mddbVersion: "2.11.4"
+  mddbVersion: "2.12.0"
   mddbReleaseDate: "31 July 2026"
   mcpTools: "79"
   mddbBinarySize: "~26MB"
