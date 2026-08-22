@@ -1,0 +1,94 @@
+name: Fuzz (nightly)
+
+# TEST-003. The PR job replays the saved corpus and spends 20s per target
+# looking for new inputs — enough to catch a regression, not enough to find
+# anything deep. This job does the finding.
+#
+# A crasher found here is not automatically a failure to ignore: `go test`
+# writes it to testdata/fuzz, where it becomes a permanent regression case for
+# every future run. The artifact upload below is what makes that possible when
+# the finding happens on CI rather than on a developer's machine.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # After the vulnerability scan, so a night's failures arrive together.
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'Budget per target (Go duration, e.g. 10m)'
+        required: false
+        default: '10m'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GO_VERSION: "1.27.0"
+  GOWORK: "off"
+
+jobs:
+  fuzz:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      # One target's crash must not cancel the others: each explores a
+      # different decoder, and a night that tests only the fastest-failing one
+      # is a night wasted.
+      fail-fast: false
+      matrix:
+        include:
+          - dir: ./internal/fts/
+            target: FuzzParseQueryExpression
+          - dir: ./internal/fts/
+            target: FuzzQueryExpressionPrintReparses
+          - dir: ./internal/vector/
+            target: FuzzUnmarshalEmbeddingRecord
+          - dir: ./internal/vector/
+            target: FuzzUnmarshalEmbeddingRecordQuantized
+          - dir: ./internal/vector/
+            target: FuzzEmbeddingRecordRoundTrip
+          - dir: ./internal/binlog/
+            target: FuzzUnmarshalBinlogEntry
+          - dir: ./internal/binlog/
+            target: FuzzBinlogEntryRoundTrip
+          - dir: ./internal/binlog/
+            target: FuzzBinlogStream
+          - dir: ./internal/compression/
+            target: FuzzDecompressDoc
+          - dir: ./internal/compression/
+            target: FuzzCompressRoundTrip
+          - dir: ./
+            target: FuzzLoadDoc
+          - dir: ./
+            target: FuzzDocRoundTrip
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/mddbd/go.sum
+
+      - name: Fuzz ${{ matrix.target }}
+        working-directory: services/mddbd
+        run: |
+          go test -run='^$' \
+            -fuzz='^${{ matrix.target }}$' \
+            -fuzztime='${{ inputs.fuzztime || '10m' }}' \
+            ${{ matrix.dir }}
+
+      # A crasher found on CI is worthless unless it comes back to the
+      # repository — otherwise the next run rediscovers it from scratch.
+      - name: Upload crashers
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crasher-${{ matrix.target }}
+          path: services/mddbd/**/testdata/fuzz/**
+          if-no-files-found: ignore
+          retention-days: 30

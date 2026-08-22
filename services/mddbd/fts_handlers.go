@@ -237,6 +237,10 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		var expr fts.QueryExpr
 		expr, err = fts.ParseQueryExpression(req.Query)
 		if err != nil {
+			// Includes ErrEmptyQueryExpression: a whitespace-only expression
+			// query passes the earlier non-empty check but means nothing, and
+			// used to return an empty result set as though it had been asked
+			// a real question (TEST-003).
 			bad(w, err)
 			return
 		}

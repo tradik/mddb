@@ -1,6 +1,7 @@
 package fts
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"unicode"
@@ -225,10 +226,22 @@ type parser struct {
 // precedence (NOT > AND > OR) and parenthesized grouping. Adjacent terms
 // without an explicit operator are joined with AND (Lucene-style default).
 // Returns nil on empty input.
+// ErrEmptyQueryExpression is returned for a query that is empty once trimmed.
+//
+// It exists because the function used to return (nil, nil) there, which is a
+// trap: a caller writing the obvious `expr, err := Parse(...); if err != nil`
+// then dereferences a nil expression. The one caller in this repository
+// happened to guard it; the next one would not. Found by FuzzParseQueryExpression.
+var ErrEmptyQueryExpression = errors.New("empty query expression")
+
+// ParseQueryExpression parses a boolean query expression.
+//
+// It returns either a non-nil expression and a nil error, or a nil expression
+// and a non-nil error — never both nil.
 func ParseQueryExpression(q string) (QueryExpr, error) {
 	q = strings.TrimSpace(q)
 	if q == "" {
-		return nil, nil
+		return nil, ErrEmptyQueryExpression
 	}
 	p := &parser{tokens: tokenize(q)}
 	expr, err := p.parseOr()

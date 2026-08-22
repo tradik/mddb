@@ -88,6 +88,25 @@ jobs:
           go build ./...
           go test ./...
 
+      # TEST-003: every saved crasher is replayed on every run — that is what
+      # `go test` does with testdata/fuzz corpora, so a bug found once can
+      # never come back silently. The short fuzz budget below looks for new
+      # ones; it is deliberately small so a PR is not held up by luck.
+      - name: Run fuzz corpus (regressions)
+        working-directory: services/mddbd
+        run: go test -run 'Fuzz' ./...
+
+      - name: Fuzz (short budget, new inputs)
+        working-directory: services/mddbd
+        run: |
+          set -e
+          # One target per package, 20s each. Nightly runs the long budgets.
+          go test -run='^$' -fuzz='^FuzzParseQueryExpression$'    -fuzztime=20s ./internal/fts/
+          go test -run='^$' -fuzz='^FuzzUnmarshalEmbeddingRecord$' -fuzztime=20s ./internal/vector/
+          go test -run='^$' -fuzz='^FuzzUnmarshalBinlogEntry$'     -fuzztime=20s ./internal/binlog/
+          go test -run='^$' -fuzz='^FuzzDecompressDoc$'            -fuzztime=20s ./internal/compression/
+          go test -run='^$' -fuzz='^FuzzLoadDoc$'                  -fuzztime=20s ./
+
       - name: Upload coverage
         uses: codecov/codecov-action@v7
         with:

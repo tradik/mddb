@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fuzz testing (TEST-003)** — the repository had no fuzz target at all. There
+  are now 12, over the parsers and decoders that read bytes MDDB did not write:
+  the FTS query expression parser, both embedding-record encodings, the
+  replication binlog entry and stream, the document compression codec, and
+  `loadDoc`. Each asserts the same narrow property — an input either decodes or
+  returns a typed error, never a panic and never a nil result with a nil error.
+  Round-trip targets additionally pin that what one side writes, the other
+  reads back unchanged.
+
+  Saved crashers live in `testdata/fuzz` and are replayed by `go test` on every
+  run, so a bug found once cannot come back quietly. CI spends 20 seconds per
+  target on pull requests and a nightly job spends ten minutes on each of the
+  twelve, uploading any new crasher as an artifact so a CI finding reaches the
+  repository instead of being rediscovered from scratch.
+
+  Four bugs surfaced within the first hour; they are listed under Fixed.
+
+
 - **Metadata lint for lost structure (DOC-012, issue #187)** — `ValidateDocument`
   now returns a `warnings` list alongside `errors` on all four surfaces (REST,
   gRPC, GraphQL, MCP) when a metadata value looks like Go's `%v` rendering of a
@@ -163,6 +181,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing code collection to populate it.
 
 ### Fixed
+
+- **Decompressing a document had no size limit.** A snappy payload states its
+  own decompressed length, and nothing checked it: **five bytes can claim two
+  gigabytes**, which the runtime then tries to allocate. zstd was unbounded the
+  same way. These bytes are not always ours — a follower decodes what a leader
+  replicated, and `loadDoc` reads whatever is in the database file, including
+  one restored from someone else's backup. Both codecs now refuse anything over
+  `MaxDecompressedSize` (256 MB, against a 100 MB upload cap), snappy by
+  checking the claim before allocating and zstd through `WithDecoderMaxMemory`.
+  Found by the new fuzz targets — the run took the developer's machine down
+  with it.
+
+- **`loadDoc` panicked on malformed stored documents.** `github.com/goccy/go-json`
+  v0.10.6 raises an index-out-of-range inside its struct decoder rather than
+  returning an error, and the fault depends on the state a previous decode left
+  behind — 1040 panics in 20000 decodes of a mixed sequence, and none when any
+  single input was replayed alone, which is why no offending document could be
+  isolated. The legacy JSON branch of `loadDoc` now uses `encoding/json`, which
+  rejects the same bytes cleanly. That branch reads pre-protobuf documents and
+  is not the throughput path, so the speed goccy was chosen for is not what was
+  at stake. The remaining 72 files using goccy are triaged in GO-037.
+
+- **Truncated embedding records panicked both decoders.** Each length prefix was
+  read before checking that four bytes remained, so a record cut short — by a
+  crash mid-write, a partial network read, a corrupt file — took the process
+  down instead of being rejected. Both formats now decode through a
+  bounds-checked reader, and a claimed dimension count is capped before it
+  reaches `make()`, closing an integer overflow in the old byte-count check.
+
+- **`ParseQueryExpression("")` returned `(nil, nil)`** — neither an expression
+  nor an error, so the obvious caller dereferences nil. The one existing caller
+  guarded it; the next would not. It returns `ErrEmptyQueryExpression` now, and
+  a whitespace-only `mode=expression` query gets a `400` instead of silently
+  returning an empty result set as though it had been asked a real question.
+
 
 - **gRPC `SetCollectionConfig` erased every field it could not express.**
   `CollectionConfigProto` carries 7 of `CollectionConfig`'s ~15 fields, and the

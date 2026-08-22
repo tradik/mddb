@@ -2,6 +2,7 @@ package compression
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/golang/snappy"
 	"github.com/klauspost/compress/zstd"
@@ -43,12 +44,33 @@ func init() {
 		panic(err)
 	}
 
-	// Initialize zstd decoder
-	zstdDecoder, err = zstd.NewReader(nil)
+	// Initialize zstd decoder with a memory ceiling (TEST-003).
+	//
+	// DecodeAll with a nil destination allocates whatever the stream asks
+	// for, and a zstd bomb is a few kilobytes claiming gigabytes. These
+	// bytes are not always ours: a follower decodes what a leader replicated,
+	// and loadDoc decodes whatever sits in the database file — including a
+	// file restored from a backup someone else produced.
+	zstdDecoder, err = zstd.NewReader(nil, zstd.WithDecoderMaxMemory(MaxDecompressedSize))
 	if err != nil {
 		panic(err)
 	}
 }
+
+// MaxDecompressedSize caps what a single document may expand to.
+//
+// A compressed payload states its own decompressed size, and nothing checked
+// it: five bytes of snappy header can claim two gigabytes, which the runtime
+// then tries to allocate. Uploads are capped at 100 MB, so 256 MB leaves ample
+// room for any real document while keeping a crafted one from exhausting the
+// process.
+//
+// This matters most on the replication path, where a follower decodes bytes a
+// different machine produced.
+const MaxDecompressedSize = 256 << 20
+
+// ErrDecompressedTooLarge reports a payload whose claimed size exceeds the cap.
+var ErrDecompressedTooLarge = errors.New("decompressed size over limit")
 
 // CompressDoc compresses document data with adaptive compression levels
 func CompressDoc(data []byte) []byte {
@@ -121,6 +143,18 @@ func DecompressDoc(data []byte) ([]byte, error) {
 		return payload, nil
 
 	case FlagSnappy:
+		// snappy.Decode allocates from a length prefix in the payload before
+		// reading any of it: five bytes can claim two gigabytes. DecodedLen
+		// reports that claim without allocating, which is the only cheap
+		// place to refuse it.
+		claimed, err := snappy.DecodedLen(payload)
+		if err != nil {
+			return nil, err
+		}
+		if claimed < 0 || uint64(claimed) > MaxDecompressedSize { // #nosec G115 -- negative rejected on the same line
+			return nil, fmt.Errorf("%w: snappy payload claims %d bytes, limit is %d",
+				ErrDecompressedTooLarge, claimed, MaxDecompressedSize)
+		}
 		decompressed, err := snappy.Decode(nil, payload)
 		if err != nil {
 			return nil, err

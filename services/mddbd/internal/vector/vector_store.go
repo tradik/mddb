@@ -580,33 +580,24 @@ func marshalEmbeddingRecordQuantized(rec *EmbeddingRecord, qt QuantizationType) 
 // unmarshalEmbeddingRecordQuantized deserializes a v2 quantized embedding record.
 // Returns the EmbeddingRecord (with dequantized float32 vector) and the raw QuantizedVector.
 func unmarshalEmbeddingRecordQuantized(data []byte) (*EmbeddingRecord, *QuantizedVector, error) {
-	if len(data) < 14 {
-		return nil, nil, fmt.Errorf("quantized embedding record too short")
-	}
-
-	offset := 2 // skip version + quantType bytes
+	// Bounds-checked like the float32 decoder (TEST-003): each length prefix
+	// used to be read before checking that four bytes remained.
+	r := newRecordReader(data)
 	rec := &EmbeddingRecord{}
 
-	// model
-	modelLen := int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-	if offset+modelLen > len(data) {
-		return nil, nil, fmt.Errorf("invalid model length")
-	}
-	rec.Model = string(data[offset : offset+modelLen])
-	offset += modelLen
+	r.skip(2) // version + quantType bytes
+	rec.Model = r.lenPrefixedString("model")
 
-	// quantized vector data
-	qvDataLen := int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-	if offset+qvDataLen > len(data) {
-		return nil, nil, fmt.Errorf("invalid quantized vector data")
+	qvLen := int(r.uint32())
+	qvData := r.bytes(qvLen)
+	if r.err != nil {
+		return nil, nil, r.err
 	}
-	qv, err := UnmarshalQuantizedVector(data[offset : offset+qvDataLen])
+
+	qv, err := UnmarshalQuantizedVector(qvData)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal quantized vector: %w", err)
 	}
-	offset += qvDataLen
 
 	rec.Dimensions = qv.Dims
 	rec.Vector = DequantizeToFloat32(qv)
@@ -614,43 +605,19 @@ func unmarshalEmbeddingRecordQuantized(data []byte) (*EmbeddingRecord, *Quantize
 		return nil, nil, fmt.Errorf("failed to dequantize vector: data length mismatch")
 	}
 
-	// created_at
-	if offset+8 > len(data) {
-		return nil, nil, fmt.Errorf("invalid created_at")
-	}
-	rec.CreatedAt = int64(binary.LittleEndian.Uint64(data[offset:])) // #nosec G115
-	offset += 8
+	rec.CreatedAt = int64(r.uint64()) // #nosec G115 -- timestamp within int64 range
+	rec.ContentHash = r.lenPrefixedString("content hash")
+	rec.DocID = r.lenPrefixedString("docID")
 
-	// content hash
-	if offset+4 > len(data) {
-		return nil, nil, fmt.Errorf("invalid hash length")
+	if r.err != nil {
+		return nil, nil, r.err
 	}
-	hashLen := int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-	if offset+hashLen > len(data) {
-		return nil, nil, fmt.Errorf("invalid hash data")
-	}
-	rec.ContentHash = string(data[offset : offset+hashLen])
-	offset += hashLen
-
-	// docID
-	if offset+4 > len(data) {
-		return nil, nil, fmt.Errorf("invalid docID length")
-	}
-	docIDLen := int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-	if offset+docIDLen > len(data) {
-		return nil, nil, fmt.Errorf("invalid docID data")
-	}
-	rec.DocID = string(data[offset : offset+docIDLen])
-	offset += docIDLen
 
 	// chunk hash (RAG-003), absent before v2.12.0.
-	if offset+4 <= len(data) {
-		chunkHashLen := int(binary.LittleEndian.Uint32(data[offset:]))
-		offset += 4
-		if chunkHashLen > 0 && offset+chunkHashLen <= len(data) {
-			rec.ChunkHash = string(data[offset : offset+chunkHashLen])
+	if r.remaining() >= 4 {
+		rec.ChunkHash = r.lenPrefixedString("chunk hash")
+		if r.err != nil {
+			rec.ChunkHash = ""
 		}
 	}
 
@@ -728,74 +695,33 @@ func MarshalEmbeddingRecord(rec *EmbeddingRecord) []byte {
 }
 
 func UnmarshalEmbeddingRecord(data []byte) (*EmbeddingRecord, error) {
-	if len(data) < 12 {
-		return nil, fmt.Errorf("embedding record too short")
-	}
-
-	offset := 0
+	// Every field is read through a bounds-checked reader (TEST-003). The
+	// previous version read each length prefix before checking that four
+	// bytes were there, which panicked on a truncated record — and these
+	// bytes arrive from the replication binlog, so the panic was a follower
+	// going down rather than an entry being rejected.
+	r := newRecordReader(data)
 	rec := &EmbeddingRecord{}
 
-	// model
-	modelLen := int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-	if offset+modelLen > len(data) {
-		return nil, fmt.Errorf("invalid model length")
-	}
-	rec.Model = string(data[offset : offset+modelLen])
-	offset += modelLen
+	rec.Model = r.lenPrefixedString("model")
+	rec.Dimensions = int(r.uint32())
+	rec.Vector = r.float32s(rec.Dimensions)
+	rec.CreatedAt = int64(r.uint64()) // #nosec G115 -- timestamp within int64 range
+	rec.ContentHash = r.lenPrefixedString("content hash")
+	rec.DocID = r.lenPrefixedString("docID")
 
-	// dimensions
-	rec.Dimensions = int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-
-	// vectors
-	if offset+rec.Dimensions*4 > len(data) {
-		return nil, fmt.Errorf("invalid vector data")
+	if r.err != nil {
+		return nil, r.err
 	}
-	rec.Vector = make([]float32, rec.Dimensions)
-	for i := 0; i < rec.Dimensions; i++ {
-		rec.Vector[i] = math.Float32frombits(binary.LittleEndian.Uint32(data[offset:]))
-		offset += 4
-	}
-
-	// created_at
-	if offset+8 > len(data) {
-		return nil, fmt.Errorf("invalid created_at")
-	}
-	rec.CreatedAt = int64(binary.LittleEndian.Uint64(data[offset:])) // #nosec G115 -- timestamp within int64 range
-	offset += 8
-
-	// content hash
-	if offset+4 > len(data) {
-		return nil, fmt.Errorf("invalid hash length")
-	}
-	hashLen := int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-	if offset+hashLen > len(data) {
-		return nil, fmt.Errorf("invalid hash data")
-	}
-	rec.ContentHash = string(data[offset : offset+hashLen])
-	offset += hashLen
-
-	// docID
-	if offset+4 > len(data) {
-		return nil, fmt.Errorf("invalid docID length")
-	}
-	docIDLen := int(binary.LittleEndian.Uint32(data[offset:]))
-	offset += 4
-	if offset+docIDLen > len(data) {
-		return nil, fmt.Errorf("invalid docID data")
-	}
-	rec.DocID = string(data[offset : offset+docIDLen])
-	offset += docIDLen
 
 	// chunk hash (RAG-003), absent in records written before v2.12.0 — an
 	// empty hash simply means this chunk cannot be reused on reindex.
-	if offset+4 <= len(data) {
-		chunkHashLen := int(binary.LittleEndian.Uint32(data[offset:]))
-		offset += 4
-		if chunkHashLen > 0 && offset+chunkHashLen <= len(data) {
-			rec.ChunkHash = string(data[offset : offset+chunkHashLen])
+	if r.remaining() >= 4 {
+		rec.ChunkHash = r.lenPrefixedString("chunk hash")
+		if r.err != nil {
+			// A malformed trailing field must not condemn a record whose
+			// vector decoded perfectly well.
+			rec.ChunkHash = ""
 		}
 	}
 

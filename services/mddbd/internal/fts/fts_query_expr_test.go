@@ -1,6 +1,7 @@
 package fts
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -61,10 +62,19 @@ func TestParseQueryExpression_Errors(t *testing.T) {
 	}
 }
 
-func TestParseQueryExpression_EmptyReturnsNil(t *testing.T) {
-	expr, err := ParseQueryExpression("   ")
-	if err != nil || expr != nil {
-		t.Errorf("expected (nil, nil), got (%v, %v)", expr, err)
+func TestParseQueryExpression_EmptyIsAnError(t *testing.T) {
+	// This used to return (nil, nil), which is a trap: a caller writing the
+	// obvious error check then dereferences a nil expression. Changed to a
+	// typed error after FuzzParseQueryExpression flagged the contract
+	// (TEST-003).
+	for _, q := range []string{"", "   ", "\t\n "} {
+		expr, err := ParseQueryExpression(q)
+		if !errors.Is(err, ErrEmptyQueryExpression) {
+			t.Errorf("ParseQueryExpression(%q) error = %v, want ErrEmptyQueryExpression", q, err)
+		}
+		if expr != nil {
+			t.Errorf("ParseQueryExpression(%q) returned an expression alongside the error: %v", q, expr)
+		}
 	}
 }
 
