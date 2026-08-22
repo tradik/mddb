@@ -172,6 +172,28 @@ Logs are written to stderr in JSON format:
 {"timestamp":"2026-03-26T10:30:00Z","method":"POST","path":"/mcp","status":200,"duration_ms":45,"client_ip":"1.2.3.4","key_name":"claude-prod","session_id":"abc123","user_agent":"claude-code/1.0"}
 ```
 
+## Agent Instructions
+
+The tool schemas say what each tool accepts; they do not say which one fits a
+question, or that asking for a projection instead of whole documents changes
+the cost by more than an order of magnitude. Measured on this engine, the same
+`full_text_search` over five 12 KB documents returns ~19 700 tokens by default
+and ~327 with `fields: ["key"]`.
+
+[`integrations/agent-instructions/`](../integrations/agent-instructions/) ships
+that guidance in the formats agents read:
+
+| File | For |
+|---|---|
+| `AGENTS.md` | Paste into a project; the source every other variant is generated from |
+| `claude-code/SKILL.md` | Claude Code skill |
+| `cursor/mddb.mdc` | Cursor rule |
+| `windsurf/mddb.md` | Windsurf rule |
+
+Edit `AGENTS.md` and run `make agent-instructions`; CI fails if a variant was
+edited directly, and a test fails if the instructions name a tool that no
+longer exists.
+
 ## Built-in Tool Catalog
 
 All 79 built-in tools, grouped by area. Tool inputs are self-describing via

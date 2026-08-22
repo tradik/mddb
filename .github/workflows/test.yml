@@ -217,6 +217,11 @@ jobs:
       - name: Run CHANGELOG guard test suite
         run: bash scripts/tests/test-changelog.sh
 
+      # INT-018: the per-tool instruction files are generated from AGENTS.md.
+      # Editing a copy instead of the source is how four of them drift apart.
+      - name: Verify agent instructions are generated from their source
+        run: python3 scripts/gen-agent-instructions.py --check
+
   clients-nodejs:
     name: Node client (lockfile + audit)
     runs-on: ubuntu-latest
