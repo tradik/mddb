@@ -9604,7 +9604,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "includeContent"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "includeContent", "oversample"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9660,6 +9660,13 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.IncludeContent = data
+		case "oversample":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oversample"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Oversample = data
 		}
 	}
 	return it, nil

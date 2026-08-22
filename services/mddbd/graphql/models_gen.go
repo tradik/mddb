@@ -309,6 +309,10 @@ type VectorSearchInput struct {
 	Threshold      *float64     `json:"threshold,omitempty"`
 	FilterMeta     []*MetaInput `json:"filterMeta,omitempty"`
 	IncludeContent *bool        `json:"includeContent,omitempty"`
+	// Recall/latency knob (SRCH-005): candidates fetched per requested result
+	// before deduplication trims them. 1.0-10.0; omit to use the collection's
+	// retrieval profile, then MDDB's default of 3.0.
+	Oversample *float64 `json:"oversample,omitempty"`
 }
 
 type VectorSearchResponse struct {

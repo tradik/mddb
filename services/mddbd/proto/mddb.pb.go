@@ -1650,6 +1650,7 @@ type VectorSearchRequest struct {
 	FilterMeta     map[string]*MetaValues `protobuf:"bytes,6,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // optional metadata pre-filter
 	IncludeContent bool                   `protobuf:"varint,7,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`                                                              // include full content_md in results
 	Algorithm      string                 `protobuf:"bytes,8,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                                                                               // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
+	Oversample     float64                `protobuf:"fixed64,9,opt,name=oversample,proto3" json:"oversample,omitempty"`                                                                                           // (SRCH-005) candidates per result before dedup; 1.0-10.0, 0 = collection profile then default
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1738,6 +1739,13 @@ func (x *VectorSearchRequest) GetAlgorithm() string {
 		return x.Algorithm
 	}
 	return ""
+}
+
+func (x *VectorSearchRequest) GetOversample() float64 {
+	if x != nil {
+		return x.Oversample
+	}
+	return 0
 }
 
 // Vector search result
@@ -6723,8 +6731,9 @@ type RetrievalProfileProto struct {
 	HybridAlpha       float64                `protobuf:"fixed64,5,opt,name=hybrid_alpha,json=hybridAlpha,proto3" json:"hybrid_alpha,omitempty"`        // 0.0-1.0; see hybrid_alpha_set
 	// hybrid_alpha 0.0 is a meaningful weight (pure keyword), so it cannot
 	// double as "unset" — this says whether the value above was configured.
-	HybridAlphaSet     bool  `protobuf:"varint,6,opt,name=hybrid_alpha_set,json=hybridAlphaSet,proto3" json:"hybrid_alpha_set,omitempty"`
-	ContextTokenBudget int32 `protobuf:"varint,7,opt,name=context_token_budget,json=contextTokenBudget,proto3" json:"context_token_budget,omitempty"` // cap on total returned context, in tokens
+	HybridAlphaSet     bool    `protobuf:"varint,6,opt,name=hybrid_alpha_set,json=hybridAlphaSet,proto3" json:"hybrid_alpha_set,omitempty"`
+	ContextTokenBudget int32   `protobuf:"varint,7,opt,name=context_token_budget,json=contextTokenBudget,proto3" json:"context_token_budget,omitempty"` // cap on total returned context, in tokens
+	Oversample         float64 `protobuf:"fixed64,8,opt,name=oversample,proto3" json:"oversample,omitempty"`                                            // (SRCH-005) candidates per result before dedup/merge/rescore; 1.0-10.0
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -6804,6 +6813,13 @@ func (x *RetrievalProfileProto) GetHybridAlphaSet() bool {
 func (x *RetrievalProfileProto) GetContextTokenBudget() int32 {
 	if x != nil {
 		return x.ContextTokenBudget
+	}
+	return 0
+}
+
+func (x *RetrievalProfileProto) GetOversample() float64 {
+	if x != nil {
+		return x.Oversample
 	}
 	return 0
 }
@@ -11434,7 +11450,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\aupdated\x18\x01 \x01(\x05R\aupdated\x12\x1b\n" +
 	"\tnot_found\x18\x02 \x01(\x05R\bnotFound\x12\x16\n" +
 	"\x06failed\x18\x03 \x01(\x05R\x06failed\x12\x16\n" +
-	"\x06errors\x18\x04 \x03(\tR\x06errors\"\x85\x03\n" +
+	"\x06errors\x18\x04 \x03(\tR\x06errors\"\xa5\x03\n" +
 	"\x13VectorSearchRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -11446,7 +11462,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\vfilter_meta\x18\x06 \x03(\v2).mddb.VectorSearchRequest.FilterMetaEntryR\n" +
 	"filterMeta\x12'\n" +
 	"\x0finclude_content\x18\a \x01(\bR\x0eincludeContent\x12\x1c\n" +
-	"\talgorithm\x18\b \x01(\tR\talgorithm\x1aO\n" +
+	"\talgorithm\x18\b \x01(\tR\talgorithm\x12\x1e\n" +
+	"\n" +
+	"oversample\x18\t \x01(\x01R\n" +
+	"oversample\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"j\n" +
@@ -11929,7 +11948,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1f\n" +
 	"\vnext_cursor\x18\x03 \x01(\tR\n" +
 	"nextCursor\x12\x19\n" +
-	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\xab\x02\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\xcb\x02\n" +
 	"\x15RetrievalProfileProto\x12.\n" +
 	"\x13default_search_type\x18\x01 \x01(\tR\x11defaultSearchType\x12\x13\n" +
 	"\x05top_k\x18\x02 \x01(\x05R\x04topK\x12%\n" +
@@ -11937,7 +11956,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\x0fhybrid_strategy\x18\x04 \x01(\tR\x0ehybridStrategy\x12!\n" +
 	"\fhybrid_alpha\x18\x05 \x01(\x01R\vhybridAlpha\x12(\n" +
 	"\x10hybrid_alpha_set\x18\x06 \x01(\bR\x0ehybridAlphaSet\x120\n" +
-	"\x14context_token_budget\x18\a \x01(\x05R\x12contextTokenBudget\"\x8d\x03\n" +
+	"\x14context_token_budget\x18\a \x01(\x05R\x12contextTokenBudget\x12\x1e\n" +
+	"\n" +
+	"oversample\x18\b \x01(\x01R\n" +
+	"oversample\"\x8d\x03\n" +
 	"\x15CollectionConfigProto\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x12\n" +

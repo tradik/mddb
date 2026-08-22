@@ -71,6 +71,10 @@ type RetrievalProfileDef struct {
 	// budget to one model family, and the point is a guard rail, not
 	// accounting.
 	ContextTokenBudget int `json:"contextTokenBudget,omitempty"`
+	// Oversample is the recall/latency knob (SRCH-005): how many candidates
+	// the index is asked for per requested result, before deduplication,
+	// merging or rescoring trims them. 0 = unset.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -107,6 +111,9 @@ func (p *RetrievalProfileDef) Validate() error {
 	}
 	if p.HybridAlphaSet && (p.HybridAlpha < 0 || p.HybridAlpha > 1) {
 		return errors.New("invalid retrieval.hybridAlpha: must be between 0.0 and 1.0")
+	}
+	if err := ValidateOversample(p.Oversample); err != nil {
+		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if p.ContextTokenBudget < 0 || p.ContextTokenBudget > maxProfileContextTokenBudget {
 		return fmt.Errorf("invalid retrieval.contextTokenBudget %d: must be between 0 (unset) and %d",
@@ -198,6 +205,7 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		return nil
 	}
 	return &RetrievalProfileDef{
+		Oversample:         p.Oversample,
 		DefaultSearchType:  p.DefaultSearchType,
 		TopK:               int(p.TopK),
 		RetrievalMode:      p.RetrievalMode,
@@ -216,6 +224,7 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		return nil
 	}
 	return &proto.RetrievalProfileProto{
+		Oversample:         p.Oversample,
 		DefaultSearchType:  p.DefaultSearchType,
 		TopK:               safeInt32(p.TopK),
 		RetrievalMode:      p.RetrievalMode,

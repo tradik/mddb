@@ -41,6 +41,11 @@ type HybridSearchRequest struct {
 	// Faceted search (v2.9.14+): per-key value counts aggregated over matched documents.
 	FacetBy        []string `json:"facetBy,omitempty"`
 	FacetMaxValues int      `json:"facetMaxValues,omitempty"` // 0 = unlimited
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication, merging or
+	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
+	// the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // HybridGeoFilter restricts hybrid search to docs within radius of a point.
@@ -92,6 +97,12 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Collection == "" || req.Query == "" {
 		bad(w, errors.New("missing required fields: collection, query"))
+		return
+	}
+	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
+	// number is the problem.
+	if err := ValidateOversample(req.Oversample); err != nil {
+		unprocessable(w, err)
 		return
 	}
 
@@ -347,11 +358,9 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 		}
 	}
 
-	// Oversample: get more results for better merging
-	searchLimit := req.TopK * 3
-	if searchLimit < 50 {
-		searchLimit = 50
-	}
+	// Oversample: get more results for better merging (SRCH-005). A higher
+	// factor gives the fusion more to work with on both sides.
+	searchLimit := OversampledTopK(req.TopK, s.ResolveOversample(req.Collection, req.Oversample), 50)
 
 	tokens := s.FTSIndex.TokenizeQueryLang(req.Collection, req.Query, req.Lang)
 
@@ -427,10 +436,7 @@ func (s *Server) runVectorSearch(ctx context.Context, req HybridSearchRequest) (
 		return nil, fmt.Errorf("embedding failed: %w", err)
 	}
 
-	searchTopK := req.TopK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	searchTopK := OversampledTopK(req.TopK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	metric := vector.ResolveSimilarity(req.DistanceMetric)
 

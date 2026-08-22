@@ -32,6 +32,10 @@ type VectorSearchRequest struct {
 	WindowSize     int                 `json:"windowSize"`     // neighbor chunks per side in "window" mode (default 1)
 	MMR            bool                `json:"mmr"`            // diversify results via Maximal Marginal Relevance
 	MMRLambda      float64             `json:"mmrLambda"`      // relevance/diversity balance, 0..1 (default 0.5)
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication trims them.
+	// 1.0-10.0; 0 = use the collection profile, then the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -153,6 +157,12 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, errors.New("either query or queryVector is required"))
 		return
 	}
+	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
+	// number is the problem.
+	if err := ValidateOversample(req.Oversample); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	if !validRetrievalMode(req.RetrievalMode) {
 		bad(w, errors.New("unknown retrievalMode: "+req.RetrievalMode+", available: parent, chunk, window"))
 		return
@@ -213,11 +223,10 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		metricName = "cosine"
 	}
 
-	// Oversample for chunk deduplication: search for more results, then deduplicate
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample for chunk deduplication: search for more results, then
+	// deduplicate. SRCH-005 makes the multiplier a request parameter — it was
+	// the fixed `topK * 3` here and in four other places.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	// Search: with or without metadata filter
 	var results []vec.VectorResult

@@ -220,6 +220,11 @@ type MCPVectorSearchRequest struct {
 	WindowSize     int                 `json:"windowSize,omitempty"`    // neighbor chunks per side in "window" mode
 	MMR            bool                `json:"mmr,omitempty"`           // diversify results via Maximal Marginal Relevance
 	MMRLambda      float64             `json:"mmrLambda,omitempty"`     // relevance/diversity balance, 0..1 (default 0.5)
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication, merging or
+	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
+	// the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -380,6 +385,11 @@ type MCPHybridSearchRequest struct {
 	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`
 	Boost           map[string]float64  `json:"boost,omitempty"`
 	Sort            string              `json:"sort,omitempty"` // "combined" (default) or "distance"
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication, merging or
+	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
+	// the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -661,6 +671,8 @@ type MCPCrossSearchRequest struct {
 	DistanceMetric    string              `json:"distanceMetric"`
 	FilterMeta        map[string][]string `json:"filterMeta"`
 	IncludeContent    bool                `json:"includeContent"`
+	// Oversample is the recall/latency knob (SRCH-005).
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // MCPCrossSearchResponse is the response for cross_search.

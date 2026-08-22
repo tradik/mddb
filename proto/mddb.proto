@@ -416,6 +416,7 @@ message VectorSearchRequest {
   map<string, MetaValues> filter_meta = 6;       // optional metadata pre-filter
   bool include_content = 7;                      // include full content_md in results
   string algorithm = 8;                          // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
+  double oversample = 9;                         // (SRCH-005) candidates per result before dedup; 1.0-10.0, 0 = collection profile then default
 }
 
 // Vector search result
@@ -981,6 +982,7 @@ message RetrievalProfileProto {
   // double as "unset" — this says whether the value above was configured.
   bool hybrid_alpha_set = 6;
   int32 context_token_budget = 7;   // cap on total returned context, in tokens
+  double oversample = 8;            // (SRCH-005) candidates per result before dedup/merge/rescore; 1.0-10.0
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.

@@ -376,10 +376,10 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		metricName = "cosine"
 	}
 
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample per collection for better merging (SRCH-005). No single
+	// collection profile can own the factor across targets, so only the
+	// request parameter and the default apply.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
 	// Search each target collection
 	type taggedResult struct {

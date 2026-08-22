@@ -27,6 +27,11 @@ type CrossSearchRequest struct {
 	DistanceMetric    string              `json:"distanceMetric"`
 	FilterMeta        map[string][]string `json:"filterMeta"`
 	IncludeContent    bool                `json:"includeContent"`
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication, merging or
+	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
+	// the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // CrossSearchResultItem represents a single cross-collection search result.
@@ -59,6 +64,12 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.TargetCollections) == 0 {
 		bad(w, errors.New("missing targetCollections"))
+		return
+	}
+	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
+	// number is the problem.
+	if err := ValidateOversample(req.Oversample); err != nil {
+		unprocessable(w, err)
 		return
 	}
 	if req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocID == "" {
@@ -143,11 +154,11 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		metricName = "cosine"
 	}
 
-	// Oversample per collection for better merging
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample per collection for better merging (SRCH-005). Resolved
+	// against no collection: a cross-collection search has no single profile
+	// that could own the factor, so only the request parameter and the
+	// default apply.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
 	// Search each target collection and collect results
 	type taggedResult struct {

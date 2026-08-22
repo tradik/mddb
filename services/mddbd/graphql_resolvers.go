@@ -297,12 +297,21 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 	if err := a.CheckPermission(ctx, input.Collection, int(PermRead)); err != nil {
 		return nil, err
 	}
+	// SRCH-005: out of range is refused rather than clamped — silently
+	// halving a caller's recall setting is worse than telling them it was
+	// impossible.
+	oversample := derefFloat64(input.Oversample, 0)
+	if err := ValidateOversample(oversample); err != nil {
+		return nil, err
+	}
+
 	req := &MCPVectorSearchRequest{
 		Collection:     input.Collection,
 		FilterMeta:     gql.MapMetaInputToInternal(input.FilterMeta),
 		TopK:           derefInt(input.TopK, 5),
 		Threshold:      derefFloat64(input.Threshold, 0),
 		IncludeContent: derefBool(input.IncludeContent, false),
+		Oversample:     oversample,
 	}
 	if input.Query != nil {
 		req.Query = *input.Query

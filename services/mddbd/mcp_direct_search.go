@@ -65,11 +65,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	// RAG-001: request > collection profile > historical default.
 	topK := c.server.ResolveTopK(req.Collection, req.TopK, 5)
 
-	// Oversample for chunk deduplication
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample for chunk deduplication (SRCH-005).
+	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
@@ -662,6 +659,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		FilterMeta:      req.FilterMeta,
 		Boost:           req.Boost,
 		Sort:            req.Sort,
+		Oversample:      req.Oversample,
 		IncludeContent:  true,
 	}
 

@@ -2325,6 +2325,7 @@ curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d 
 | `retrievalMode` | string | `parent` (whole document) \| `chunk` (matching passage) \| `window` (passage with neighbours) |
 | `hybridStrategy` | string | `alpha` \| `rrf` |
 | `hybridAlpha` | number | 0 = keyword only, 1 = semantic only. Requires `hybridAlphaSet: true`, because 0.0 is a real weight and cannot double as "unset". |
+| `oversample` | number | 1.0–10.0. Candidates fetched per requested result before deduplication or merging — see [SEARCH.md](SEARCH.md#oversampling-v2120) for measured effect |
 | `contextTokenBudget` | integer | Cap on total returned context, in tokens |
 
 **The context budget drops results, it does not truncate them.** Half a document

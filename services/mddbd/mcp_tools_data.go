@@ -212,6 +212,7 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		DistanceMetric: mcpGetString(args, "distance_metric"),
 		RetrievalMode:  mcpGetString(args, "retrieval_mode"),
 		WindowSize:     mcpGetInt(args, "window_size"),
+		Oversample:     mcpGetFloat(args, "oversample"),
 	}
 	if mmr, ok := args["mmr"].(bool); ok {
 		req.MMR = mmr
@@ -368,6 +369,7 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		Strategy:        mcpGetString(args, "strategy"),
 		RRFK:            mcpGetInt(args, "rrf_k"),
 		Fuzzy:           mcpGetInt(args, "fuzzy"),
+		Oversample:      mcpGetFloat(args, "oversample"),
 		DistanceMetric:  mcpGetString(args, "distance_metric"),
 		FilterMeta:      mcpGetMetaMap(args, "filter_meta"),
 		Boost:           mcpGetFloat64Map(args, "boost"),

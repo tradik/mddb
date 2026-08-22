@@ -25,6 +25,12 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		}
 	}
 
+	// SRCH-005: InvalidArgument is the gRPC equivalent of the REST 422 —
+	// the message parsed, the number is out of range.
+	if err := ValidateOversample(req.Oversample); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	if req.Collection == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
 	}
@@ -72,11 +78,8 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		filterMeta[k] = v.Values
 	}
 
-	// Oversample for chunk deduplication
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample for chunk deduplication (SRCH-005).
+	searchTopK := OversampledTopK(topK, g.server.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	var results []vec.VectorResult
 	if len(filterMeta) > 0 {

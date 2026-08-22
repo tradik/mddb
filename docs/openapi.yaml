@@ -6440,6 +6440,16 @@ components:
       required:
         - collection
       properties:
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (v2.12.0+) Recall/latency knob: candidates fetched per requested
+            result before deduplication, merging or rescoring trims them.
+            Omitted, uses the collection's retrieval profile then MDDB's default
+            of 3.0. Out of range returns 422 rather than clamping. See
+            SEARCH.md#oversampling-v2120 for measured effect.
         collection:
           type: string
           description: Collection name to search
@@ -7284,6 +7294,16 @@ components:
         - collection
         - query
       properties:
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (v2.12.0+) Recall/latency knob: candidates fetched per requested
+            result before deduplication, merging or rescoring trims them.
+            Omitted, uses the collection's retrieval profile then MDDB's default
+            of 3.0. Out of range returns 422 rather than clamping. See
+            SEARCH.md#oversampling-v2120 for measured effect.
         collection:
           type: string
           description: Collection name to search
@@ -8521,6 +8541,14 @@ components:
         hybridAlphaSet:
           type: boolean
           description: Whether hybridAlpha was configured.
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (SRCH-005) Default recall/latency knob for this collection:
+            candidates fetched per requested result before deduplication,
+            merging or rescoring. A request parameter overrides it.
         contextTokenBudget:
           type: integer
           minimum: 0
@@ -8772,6 +8800,16 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (v2.12.0+) Recall/latency knob: candidates fetched per requested
+            result before deduplication, merging or rescoring trims them.
+            Omitted, uses the collection's retrieval profile then MDDB's default
+            of 3.0. Out of range returns 422 rather than clamping. See
+            SEARCH.md#oversampling-v2120 for measured effect.
         sourceCollection:
           type: string
           description: Collection containing the source document (for document-as-query)

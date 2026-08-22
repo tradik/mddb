@@ -809,6 +809,78 @@ curl -X POST http://localhost:11023/v1/vector-search \
   applies across chunks, in `parent` mode across documents.
 - Also available on the `semantic_search` MCP tool (`mmr`, `mmr_lambda`).
 
+## Oversampling (v2.12.0+)
+
+Every search that post-processes its results — deduplicating chunks of one
+document, merging two rankings, rescoring quantized candidates — asks the index
+for more than it will return, then trims. That multiplier was the literal
+`topK * 3` in five places, so the recall/latency trade-off was fixed at whatever
+those constants said.
+
+`oversample` exposes it: how many candidates to fetch per requested result.
+
+```bash
+# A navigational lookup: cheapest path to the obvious answer.
+curl -X POST "$MDDB/v1/vector-search" -d '{"collection":"docs","query":"pricing","oversample":1}'
+
+# A question worth getting right: cast a wider net before deduplication.
+curl -X POST "$MDDB/v1/vector-search" -d '{"collection":"docs","query":"why did the migration fail","oversample":10}'
+```
+
+Range 1.0–10.0. Omitted, it uses the collection's `retrieval.oversample`
+profile, then MDDB's default of 3.0 — the constant the code has always used, so
+an unset parameter reproduces earlier results exactly. Out of range is a `422`
+(gRPC `InvalidArgument`), never a silent clamp: quietly halving a caller's
+recall setting is worse than telling them it was impossible.
+
+### What it actually buys, measured
+
+2,500 documents of 5 chunks each, `topK=10`, flat index:
+
+| `oversample` | Candidates fetched | Distinct documents returned | Latency |
+|---:|---:|---:|---:|
+| 1× | 20 | 5 | 1.75 ms |
+| 3× (default) | 30 | 9 | 1.74 ms |
+| 10× | 100 | 10 | 1.77 ms |
+
+Two things worth reading twice.
+
+**At 1× you get half the documents you asked for.** With chunk-level indexing,
+several chunks of the same document occupy the top of the ranking, and
+deduplication collapses them into one result. Without spare candidates there is
+nothing left to fill the gap — `topK=10` returns 5 documents. This is why the
+default is 3 and not 1.
+
+**On a flat index the latency cost is about 1%.** A flat search scans every
+vector regardless; `topK` only sizes the result heap. So raising `oversample`
+there is nearly free, and there is little reason to leave it low. The trade-off
+becomes real on approximate indexes — HNSW, IVF, and the quantized ones — where
+the candidate count drives graph traversal and rescoring work. Measure on the
+index you actually run.
+
+### Per-collection default
+
+A collection whose documents are long and heavily chunked wants a higher factor
+than one holding short notes. Set it once instead of on every query:
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -d '{
+  "collection": "handbook",
+  "retrieval": { "oversample": 6 }
+}'
+```
+
+Precedence is the same as every other retrieval setting: request parameter >
+collection profile > default.
+
+### What is not exposed
+
+HNSW's `efSearch` stays a build-time parameter. It lives on the graph object
+shared by every concurrent search, so setting it per query would have one
+request silently change another's beam width — a data race producing wrong
+results rather than a crash. Raising `oversample` moves HNSW recall through the
+requested neighbour count instead, which is per-call and safe.
+
 ## Hybrid Search (v2.6.5+)
 
 Hybrid search combines FTS (keyword) and vector (semantic) search into a single query, producing results ranked by a fused score. This gives you the best of both worlds: exact keyword matching plus semantic understanding.

@@ -459,6 +459,15 @@ func bad(w http.ResponseWriter, err error) {
 	_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error()) // #nosec G705 -- response write to http.ResponseWriter
 }
 
+// unprocessable reports a request that parsed correctly but asks for something
+// outside what the server will do — an out-of-range tuning parameter, not a
+// malformed body. The distinction matters to a caller deciding whether to fix
+// its serialisation or its numbers (SRCH-005).
+func unprocessable(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error()) // #nosec G705 -- response write to http.ResponseWriter
+}
+
 // handleHealth returns a simple health check response
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	// Check if server has finished initialization

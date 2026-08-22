@@ -27,6 +27,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidateDocumentResponse` gains field 3 (`warnings`), which is
   wire-compatible: older clients ignore it.
 
+- **`oversample` as a request parameter (SRCH-005)** — every search that
+  post-processes its results asks the index for more than it returns, and that
+  multiplier was the literal `topK * 3` in five separate places, so the
+  recall/latency trade-off every comparable engine exposes was fixed at whatever
+  those constants said. It is now a parameter on vector, hybrid and
+  cross-search across REST, gRPC, MCP and GraphQL, with a per-collection default
+  in the retrieval profile and the usual precedence — request > profile >
+  default. Range 1.0–10.0; out of range returns `422` (gRPC `InvalidArgument`)
+  rather than clamping, because quietly halving a caller's recall setting is
+  worse than telling them it was impossible. Unset reproduces earlier results
+  exactly: the default is the constant the code already used.
+
+  Measured on 2,500 five-chunk documents at `topK=10`: **at 1× a chunked
+  collection returns 5 of the 10 documents you asked for**, because several
+  chunks of one document fill the top of the ranking and deduplication collapses
+  them with nothing left to fill the gap. At 3× it returns 9, at 10× all 10 —
+  and on a flat index the latency difference across that whole range is about
+  1%, since a flat search scans every vector regardless. The cost becomes real
+  on approximate indexes, where the candidate count drives traversal.
+
+  HNSW's `efSearch` is deliberately not exposed per query: it lives on the graph
+  object shared by every concurrent search, so setting it per request would have
+  one query silently change another's beam width — a data race producing wrong
+  results rather than a crash.
+
 - **Named `fast` ingest profile (RAG-004)** — MDDB could always ingest faster by
   skipping steps, but only as separate flags a caller had to discover one at a
   time, and the wiki importer made the same choice a third way with a `skipFts`
