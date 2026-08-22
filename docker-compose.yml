@@ -46,6 +46,11 @@ services:
       - "${MDDB_BIND_ADDR:-127.0.0.1}:11024:11024" # gRPC API
       - "${MDDB_BIND_ADDR:-127.0.0.1}:9000:9000" # MCP
       - "${MDDB_BIND_ADDR:-127.0.0.1}:11443:11443" # HTTP/3 (extreme mode)
+    # GO-034: the ordered shutdown drains the queues and has a 15s budget
+    # (MDDB_SHUTDOWN_TIMEOUT_SEC). Docker's default grace period is 10s, which
+    # would SIGKILL the server mid-drain — the very thing the drain exists to
+    # avoid. Give it room to finish and still stop promptly.
+    stop_grace_period: 20s
     volumes:
       - mddb-data:/data
       - ./backups:/backups

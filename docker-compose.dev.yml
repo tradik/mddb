@@ -44,6 +44,8 @@ services:
       - "11023:11023"  # HTTP API
       - "11024:11024"  # gRPC
       - "9000:9000"    # MCP
+    # GO-034: room for the ordered shutdown to drain (see docker-compose.yml).
+    stop_grace_period: 20s
     volumes:
       - ./services/mddbd:/app
       - mddb-data:/data
