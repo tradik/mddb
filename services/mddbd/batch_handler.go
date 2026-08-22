@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
+	"mddb/internal/fts"
 	"mddb/internal/temporal"
 	proto "mddb/proto"
 
@@ -130,6 +132,13 @@ func (s *Server) processBatchWithDocs(ctx context.Context, collection string, pr
 // firePostBatchHooks fires embedding, FTS, webhook, TTL, and automation hooks
 // for all successfully processed documents after batch commit.
 func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc, opts postBatchOptions) {
+	// Every document's FTS work is gathered and written in one transaction
+	// after the loop. Indexing a document touches three indexes, and each
+	// entry point opens its own BoltDB commit, so doing it per document cost
+	// 3N commits per batch — measured at 238 docs/s against 46k docs/s for the
+	// same writes without indexing.
+	var ftsBatch []fts.BulkDoc
+
 	for _, p := range processed {
 		if p.Error != nil {
 			continue
@@ -175,17 +184,21 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 			s.TemporalManager.RecordAsync(collection, p.DocID, et, "")
 		}
 
-		// FTS indexing (language-aware)
+		// FTS indexing is collected here and written once for the whole batch
+		// below (GO-027) — see indexBatchFTS.
 		if !opts.SkipFTS && s.FTSIndex != nil && p.Doc.ContentMD != "" {
-			_ = s.FTSIndex.IndexWithLang(collection, p.DocID, p.Doc.ContentMD, p.Doc.Lang)
-			_ = s.FTSIndex.IndexPositionsWithLang(collection, p.DocID, p.Doc.ContentMD, p.Doc.Lang)
 			fields := map[string]string{"content": p.Doc.ContentMD}
 			for k, vals := range p.Doc.Meta {
 				if len(vals) > 0 {
 					fields["meta."+k] = strings.Join(vals, " ")
 				}
 			}
-			_ = s.FTSIndex.IndexFieldsWithLang(collection, p.DocID, fields, p.Doc.Lang)
+			ftsBatch = append(ftsBatch, fts.BulkDoc{
+				DocID:   p.DocID,
+				Content: p.Doc.ContentMD,
+				Lang:    p.Doc.Lang,
+				Fields:  fields,
+			})
 		}
 
 		// Webhooks + SSE
@@ -210,5 +223,34 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 			}
 			go s.AutomationManager.EvaluateTriggers(collection, p.Doc, triggerEvent)
 		}
+	}
+
+	s.indexBatchFTS(collection, ftsBatch)
+}
+
+// indexBatchFTS writes a batch's full-text entries in one transaction, falling
+// back to per-document indexing if that fails.
+//
+// The batch is atomic, so one unindexable document would otherwise take the
+// rest of the batch down with it. The per-document path was the behaviour
+// before batching — it swallowed individual failures — so the fallback keeps
+// that contract while the fast path handles the normal case.
+func (s *Server) indexBatchFTS(collection string, batch []fts.BulkDoc) {
+	if len(batch) == 0 || s.FTSIndex == nil {
+		return
+	}
+	if err := s.FTSIndex.IndexDocs(collection, batch); err == nil {
+		return
+	} else {
+		slog.Warn("batch FTS indexing failed, retrying per document",
+			"collection", collection, "documents", len(batch), "err", err)
+	}
+	for _, d := range batch {
+		if err := s.FTSIndex.IndexWithLang(collection, d.DocID, d.Content, d.Lang); err != nil {
+			slog.Warn("FTS indexing failed", "collection", collection, "docID", d.DocID, "err", err)
+			continue
+		}
+		_ = s.FTSIndex.IndexPositionsWithLang(collection, d.DocID, d.Content, d.Lang)
+		_ = s.FTSIndex.IndexFieldsWithLang(collection, d.DocID, d.Fields, d.Lang)
 	}
 }
