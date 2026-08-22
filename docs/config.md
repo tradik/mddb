@@ -48,6 +48,8 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_OUTBOUND_ALLOW_PRIVATE` | `"false"` | bool | Allow outbound HTTP requests to private/loopback IP ranges (disabled by default to block SSRF pivoting) |
 | `MDDB_WIKI_MAX_PAGES` | `500000` | int | Maximum pages processed by a single `/v1/import-wiki` run (DoS guard) |
 | `MDDB_WIKI_MAX_DECOMPRESSED_BYTES` | `4294967296` (4 GiB) | int | Maximum decompressed XML volume for a wiki import (zip-bomb guard) |
+| `MDDB_SEARCH_MAX_CONCURRENT` | CPU count | int | Maximum heavy queries (FTS, vector, hybrid, aggregate) running at once. Further queries queue, then receive `503` with `Retry-After`. `0` disables the limit |
+| `MDDB_SEARCH_QUEUE_TIMEOUT_MS` | `2000` | int | How long a query waits for a slot before the `503` |
 | `MDDB_SEARCH_CACHE_SIZE` | `500` | int | Maximum cached search responses; `0` disables the cache regardless of what a request asks for. Caching is opt-in per request via `cacheTtl` — see [SEARCH.md](SEARCH.md#result-caching) |
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |

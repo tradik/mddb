@@ -66,6 +66,7 @@ type Server struct {
 	Cache               *cache.DocumentCache   // Read-through cache (legacy)
 	SearchCache         *cache.SearchCache     // Opt-in per-request search-result cache (GO-031)
 	Persistence         PersistenceStatus      // What the data directory can promise (GO-032)
+	SearchLimiter       *SearchLimiter         // Bounds concurrent heavy queries (GO-033)
 	LockFreeCache       *cache.LockFreeCache   // Lock-free cache (extreme performance)
 	IndexQueue          *indexqueue.IndexQueue // Async metadata indexing
 	WAL                 *WAL                   // Write-Ahead Log
@@ -257,6 +258,7 @@ func main() {
 		Cache:         cache.NewDocumentCache(1000, 300),  // 1000 docs, 5min TTL
 		SearchCache:   newSearchCache(),                   // opt-in per request (GO-031)
 		Persistence:   persistence,                        // GO-032
+		SearchLimiter: newSearchLimiter(),                 // GO-033
 		LockFreeCache: cache.NewLockFreeCache(10000, 300), // 10k docs, 5min TTL (lock-free)
 		IndexQueue:    indexqueue.NewIndexQueue(nil, 4),   // 4 workers (store wired below)
 		BloomFilters:  NewBloomFilterManager(),            // Bloom filters
@@ -844,7 +846,10 @@ func main() {
 	mux.HandleFunc("/v1/delete-batch", s.guardWrite(s.handleDeleteBatch))
 	mux.HandleFunc("/v1/delete-collection", s.guardWrite(s.handleDeleteCollection))
 	mux.HandleFunc("/v1/stats", s.handleStats)
-	mux.HandleFunc("/v1/vector-search", s.handleVectorSearch)
+	// GO-033: the four query paths that hold working memory for the length of
+	// the request queue behind a semaphore, so a burst becomes a 503 a client
+	// can retry rather than an OOM that takes every other request with it.
+	mux.HandleFunc("/v1/vector-search", s.withSearchLimit(s.handleVectorSearch))
 	mux.HandleFunc("/v1/vector-reindex", s.guardWrite(s.handleVectorReindex))
 	mux.HandleFunc("/v1/vector-stats", s.handleVectorStats)
 	mux.HandleFunc("/v1/vector-projection", s.handleVectorProjection)
@@ -862,7 +867,7 @@ func main() {
 	mux.HandleFunc("/v1/import-url", s.guardWrite(s.handleImportURL))
 	mux.HandleFunc("/v1/import-wiki", s.guardWrite(s.handleWikiImport))
 	mux.HandleFunc("/v1/set-ttl", s.guardWrite(s.handleSetTTL))
-	mux.HandleFunc("/v1/fts", s.handleFTS)
+	mux.HandleFunc("/v1/fts", s.withSearchLimit(s.handleFTS))
 	mux.HandleFunc("/v1/fts-reindex", s.guardWrite(s.handleFTSReindex))
 	mux.HandleFunc("/v1/fts-languages", s.handleFTSLanguages)
 	mux.HandleFunc("/v1/autocomplete", s.handleAutocomplete)
@@ -871,7 +876,7 @@ func main() {
 	mux.HandleFunc("/v1/update", s.guardWrite(s.handleUpdate))
 	mux.HandleFunc("/v1/doc-meta", s.handleDocMeta)
 	mux.HandleFunc("/v1/classify", s.handleClassify)
-	mux.HandleFunc("/v1/hybrid-search", s.handleHybridSearch)
+	mux.HandleFunc("/v1/hybrid-search", s.withSearchLimit(s.handleHybridSearch))
 	mux.HandleFunc("/v1/synonyms", s.handleSynonyms)
 	mux.HandleFunc("/v1/stopwords", s.handleStopWords)
 	mux.HandleFunc("/v1/audit", s.handleAudit)
@@ -910,7 +915,7 @@ func main() {
 
 	mux.HandleFunc("/v1/cross-search", s.handleCrossSearch)
 	mux.HandleFunc("/v1/find-duplicates", s.handleFindDuplicates)
-	mux.HandleFunc("/v1/aggregate", s.handleAggregate)
+	mux.HandleFunc("/v1/aggregate", s.withSearchLimit(s.handleAggregate))
 	// Temporal event tracking
 	if s.TemporalManager != nil {
 		mux.HandleFunc("/v1/temporal/query", s.handleTemporalQuery)

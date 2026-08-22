@@ -3,7 +3,6 @@ package main
 import (
 	"mddb/internal/fts"
 	"mddb/internal/storage"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -27,11 +26,17 @@ func (s *Server) SearchRange(collection string, ranges []RangeFilter, limit int)
 		return nil, nil
 	}
 
-	type docScore struct {
-		id    string
-		score float64
+	// The cursor walks "doc|<collection>|<docID>" keys in byte order, which is
+	// docID ascending — the very order the results are returned in. So matches
+	// can be appended as they are found and the scan stopped once the caller's
+	// limit is reached, instead of collecting every match, sorting the lot and
+	// throwing most of it away (GO-033). Peak allocation becomes O(limit)
+	// rather than O(matches): before this, returning 50 results from a 10k
+	// collection allocated the same 12.5 MB as returning 500.
+	var results []fts.FTSResult
+	if limit > 0 {
+		results = make([]fts.FTSResult, 0, limit)
 	}
-	scores := make(map[string]*docScore)
 
 	err := s.DBView(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
@@ -67,29 +72,21 @@ func (s *Server) SearchRange(collection string, ranges []RangeFilter, limit int)
 			}
 
 			if match {
-				docID := string(k[len(prefix):])
-				scores[docID] = &docScore{id: docID, score: 1.0}
+				results = append(results, fts.FTSResult{
+					DocID: string(k[len(prefix):]),
+					Score: 1.0,
+				})
+				if limit > 0 && len(results) == limit {
+					// Every later key sorts after this one, so nothing beyond
+					// here could displace a result already collected.
+					return nil
+				}
 			}
 		}
 		return nil
 	})
 	if err != nil {
 		return nil, err
-	}
-
-	results := make([]fts.FTSResult, 0, len(scores))
-	for _, ds := range scores {
-		results = append(results, fts.FTSResult{
-			DocID: ds.id,
-			Score: ds.score,
-		})
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].DocID < results[j].DocID
-	})
-	if limit > 0 && len(results) > limit {
-		results = results[:limit]
 	}
 	return results, nil
 }
