@@ -202,6 +202,9 @@ func (bd *BatchDeleter) commitDelete(collection string, deleted []*DeletedDoc) *
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
 	} else {
 		bo.FlushTo(bd.server.Binlog)
+		// Once per batch rather than per document: the generation counter
+		// makes one bump enough for the whole collection (GO-031).
+		bd.server.invalidateSearchCache(collection)
 	}
 
 	return resp

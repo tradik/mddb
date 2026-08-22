@@ -64,6 +64,7 @@ type Server struct {
 	Hooks               Hooks        // optional extensions
 	BucketNames         BucketNames
 	Cache               *cache.DocumentCache   // Read-through cache (legacy)
+	SearchCache         *cache.SearchCache     // Opt-in per-request search-result cache (GO-031)
 	LockFreeCache       *cache.LockFreeCache   // Lock-free cache (extreme performance)
 	IndexQueue          *indexqueue.IndexQueue // Async metadata indexing
 	WAL                 *WAL                   // Write-Ahead Log
@@ -246,6 +247,7 @@ func main() {
 			ByKey:   []byte("bykey"),
 		},
 		Cache:         cache.NewDocumentCache(1000, 300),  // 1000 docs, 5min TTL
+		SearchCache:   newSearchCache(),                   // opt-in per request (GO-031)
 		LockFreeCache: cache.NewLockFreeCache(10000, 300), // 10k docs, 5min TTL (lock-free)
 		IndexQueue:    indexqueue.NewIndexQueue(nil, 4),   // 4 workers (store wired below)
 		BloomFilters:  NewBloomFilterManager(),            // Bloom filters

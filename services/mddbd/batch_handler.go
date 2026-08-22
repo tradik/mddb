@@ -226,6 +226,8 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 	}
 
 	s.indexBatchFTS(collection, ftsBatch)
+	// The batch changed the collection's contents (GO-031).
+	s.invalidateSearchCache(collection)
 }
 
 // indexBatchFTS writes a batch's full-text entries in one transaction, falling

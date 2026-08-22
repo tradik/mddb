@@ -510,6 +510,39 @@ curl -X POST http://localhost:11023/v1/fts \
 }
 ```
 
+## Result Caching
+
+Agents repeat identical queries in loops, and a repeated search redoes the full
+scoring pass for a result set that has not changed. Add `cacheTtl` (seconds) to
+a full-text search request to reuse a recent answer:
+
+```bash
+curl -X POST http://localhost:11023/v1/fts \
+  -H 'Content-Type: application/json' \
+  -d '{"collection":"docs","query":"golang","cacheTtl":60}'
+```
+
+The response carries `X-MDDB-Cache: hit` or `miss`.
+
+Caching is **opt-in per request**. A search without `cacheTtl` is neither
+served from the cache nor stored in it, so the default behaviour and the
+default freshness are exactly what they were — there is no silent staleness to
+reason about. The caller decides how stale an answer may be, per query.
+
+Two requests share an entry when they ask the same question of the same
+collection: the key covers the whole request except `cacheTtl` itself, so a
+caller willing to hold an answer for ten minutes and one willing to hold it for
+ten seconds still share one.
+
+**Writing to a collection invalidates its cached results immediately** — adds,
+updates, deletes, batch operations and FTS reindexing all do. Invalidation is a
+per-collection counter mixed into the key, so it costs nothing on the write
+path and never serves a result set from before your write.
+
+`cacheTtl` is capped at 3600 seconds. `MDDB_SEARCH_CACHE_SIZE=0` disables the
+cache for the whole server whatever requests ask for; see
+[config.md](config.md#logging).
+
 ## Vector Search
 
 Vector search embeds the query text into a high-dimensional vector and finds documents with the most similar embeddings using cosine similarity. Similarity computation is hardware-accelerated on ARM64 via NEON (all ARM64) and SME (Apple M4+) SIMD instructions, with automatic runtime detection and fallback to scalar Go on other platforms. Search is parallelized across multiple goroutines for collections above 2048 vectors (~2.5x speedup on 50K collections).

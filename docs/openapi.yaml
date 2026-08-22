@@ -6574,6 +6574,22 @@ components:
           description: (v2.9.15+) Cap per-key bucket count; 0 = unlimited
           default: 0
 
+        cacheTtl:
+          type: integer
+          description: |
+            Serve this search from the result cache when a matching response is
+            no older than this many seconds, and store the response for that
+            long. Omitted or 0 means no caching at all — neither served nor
+            stored — so a request that says nothing keeps the default
+            behaviour and the default freshness.
+
+            Writes to the collection invalidate its cached results
+            immediately. The response carries `X-MDDB-Cache: hit|miss`.
+            Capped at 3600; `MDDB_SEARCH_CACHE_SIZE=0` disables the cache
+            server-wide.
+          minimum: 0
+          maximum: 3600
+          example: 60
     Highlight:
       type: object
       properties:

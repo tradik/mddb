@@ -174,6 +174,11 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 // must happen inside the write transaction (see addDocument / the batch
 // commits) so a crash can never leave a doc without its revision.
 func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew bool) {
+	// A write changes what a search returns, so cached result sets for this
+	// collection must stop being reachable (GO-031). This is the shared
+	// pipeline for every write transport, so one call covers them all.
+	s.invalidateSearchCache(collection)
+
 	// Trigger async embedding
 	if s.EmbeddingWorker != nil && saved.ContentMD != "" {
 		s.EmbeddingWorker.Enqueue(EmbeddingJob{
@@ -350,6 +355,7 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 	if s.Cache != nil {
 		s.Cache.Delete(cacheKey)
 	}
+	s.invalidateSearchCache(collection)
 	if s.LockFreeCache != nil {
 		s.LockFreeCache.Delete(cacheKey)
 	}

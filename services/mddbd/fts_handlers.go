@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"mddb/internal/fts"
 	"mddb/internal/spell"
 	"mddb/internal/storage"
@@ -39,6 +40,11 @@ type FTSSearchRequest struct {
 	// aggregated over the matched documents. Cardinality per key is capped by FacetMaxValues.
 	FacetBy        []string `json:"facetBy,omitempty"`
 	FacetMaxValues int      `json:"facetMaxValues,omitempty"` // 0 = unlimited
+	// CacheTTL opts this request into the search-result cache for the given
+	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
+	// caller that says nothing keeps today's behaviour and today's freshness.
+	// Capped at searchCacheMaxTTL.
+	CacheTTL int `json:"cacheTtl,omitempty"`
 }
 
 // FTSSearchResponse is the HTTP response for full-text search.
@@ -86,6 +92,25 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	if s.FTSIndex == nil {
 		bad(w, fmt.Errorf("full-text search not initialized"))
 		return
+	}
+
+	// GO-031: opt-in result cache. The key covers the whole request, so two
+	// callers only share an entry when they asked the same question of the
+	// same collection at the same index generation.
+	cacheKey, cacheTTL := s.searchCacheLookup(&req)
+	if cacheKey != "" {
+		if cached, hit := s.SearchCache.Get(cacheKey); hit {
+			w.Header().Set("X-MDDB-Cache", "hit")
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write(cached); err != nil {
+				slog.Debug("writing a cached search response failed", "err", err)
+			}
+			if s.Metrics != nil {
+				s.Metrics.IncOp("fts_search", "cache_hit")
+			}
+			return
+		}
+		w.Header().Set("X-MDDB-Cache", "miss")
 	}
 
 	// Spell-correct the query when enabled for this collection
@@ -353,6 +378,17 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp.SpellCorrected = spellCorrected
+
+	if cacheKey != "" {
+		if body, err := json.Marshal(resp); err == nil {
+			s.SearchCache.Set(cacheKey, body, int64(cacheTTL))
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write(body); err != nil {
+				slog.Debug("writing a search response failed", "err", err)
+			}
+			return
+		}
+	}
 	ok(w, resp)
 }
 
@@ -368,6 +404,9 @@ func (s *Server) handleFTSReindex(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
+	// Reindexing changes scores and can change the result set, so cached
+	// responses for this collection stop being valid (GO-031).
+	defer s.invalidateSearchCache(req.Collection)
 	if req.Collection == "" {
 		bad(w, fmt.Errorf("missing required field: collection"))
 		return
