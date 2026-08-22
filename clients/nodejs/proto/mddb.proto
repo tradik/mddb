@@ -966,6 +966,28 @@ message GetAutomationLogsResponse {
 
 // --- Collection Config ---
 
+// RetrievalProfileProto is a collection's retrieval defaults (RAG-001).
+//
+// Every field is optional and an unset field means "not configured", so the
+// caller's request parameter or MDDB's global default applies. Precedence is
+// fixed: request parameter > collection profile > global default.
+message RetrievalProfileProto {
+  string default_search_type = 1;   // fts|vector|hybrid
+  int32 top_k = 2;
+  string retrieval_mode = 3;        // parent|chunk|window
+  string hybrid_strategy = 4;       // alpha|rrf
+  double hybrid_alpha = 5;          // 0.0-1.0; see hybrid_alpha_set
+  // hybrid_alpha 0.0 is a meaningful weight (pure keyword), so it cannot
+  // double as "unset" — this says whether the value above was configured.
+  bool hybrid_alpha_set = 6;
+  int32 context_token_budget = 7;   // cap on total returned context, in tokens
+}
+
+// NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.
+// storage_backend, storage_config, quantization, disk_only_vectors, encrypted,
+// track_access, track_hot, spell_correct, spell_lang and wordpress exist over
+// REST and are invisible over gRPC — a gRPC client cannot read or write them.
+// Tracked separately; retrieval is added here because RAG-001 needs it.
 message CollectionConfigProto {
   string type = 1;
   string description = 2;
@@ -973,6 +995,7 @@ message CollectionConfigProto {
   string color = 4;
   map<string, string> custom_meta = 5;
   int32 max_revisions = 6;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
+  RetrievalProfileProto retrieval = 7;           // (v2.12.0+) per-collection retrieval defaults
 }
 
 message GetCollectionConfigRequest {
@@ -993,6 +1016,7 @@ message SetCollectionConfigRequest {
   string color = 5;
   map<string, string> custom_meta = 6;
   int32 max_revisions = 7;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
+  RetrievalProfileProto retrieval = 8;           // (v2.12.0+) per-collection retrieval defaults
 }
 
 message SetCollectionConfigResponse {

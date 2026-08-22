@@ -6,8 +6,12 @@ cors_origins = ["*"]
 [mddb]
 grpc_addr = "http://localhost:11024"
 default_collection = "docs"
-search_top_k = 5
-search_type = "hybrid"  # "hybrid", "vector", "fts"
+# Retrieval settings. Leave these commented out to use whatever the collection
+# says (its retrieval profile, set in the panel or over the API) — that is the
+# point of RAG-001: search settings live next to the data, not in every client.
+# Uncomment only to override a specific collection's profile from here.
+# search_top_k = 5
+# search_type = "hybrid"  # "hybrid", "vector", "fts"
 # Credentials used to authenticate to mddbd. Leave EMPTY here and supply them
 # via env (SEC-007): MDDB_CHAT_AUTH_USERNAME / MDDB_CHAT_AUTH_PASSWORD override
 # these when blank. Never commit real passwords — config.toml is gitignored.

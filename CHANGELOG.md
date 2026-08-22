@@ -27,6 +27,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidateDocumentResponse` gains field 3 (`warnings`), which is
   wire-compatible: older clients ignore it.
 
+- **Per-collection retrieval profiles (RAG-001)** — retrieval settings now live
+  next to the data instead of being repeated by every client. Search type, topK,
+  granularity, hybrid strategy and a context token budget go in
+  `CollectionConfig.retrieval`, over REST, gRPC, the panel and mddb-chat.
+  Precedence is fixed everywhere — **explicit request parameter > collection
+  profile > MDDB's default for that endpoint** — so a caller passing its own
+  values notices nothing, and a collection without a profile behaves exactly as
+  before, which a regression test pins. This replaces defaults that were
+  scattered as constants across a dozen files with different numbers per path:
+  FTS returned 50 results, vector 5, hybrid 10, memory recall 10, and a caller
+  had to know MDDB's internals to get consistent behaviour. `contextTokenBudget`
+  caps the total context a search returns so a RAG caller cannot be handed more
+  than its model holds; it drops results from the tail rather than truncating
+  documents, because half a document still costs tokens and no longer says
+  anything reliable, and responses set `contextTruncated` when it applied.
+  Cross-collection search is deliberately excluded: it has no single collection
+  whose profile could own topK.
+
 - **Code connection graph (CODE-005)** — answers the relational questions
   full-text search cannot: what breaks if `.hero-banner` changes, which pages
   load `checkout.js`, what does nothing reference any more. Available as
@@ -62,6 +80,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing code collection to populate it.
 
 ### Fixed
+
+- **gRPC `SetCollectionConfig` erased every field it could not express.**
+  `CollectionConfigProto` carries 7 of `CollectionConfig`'s ~15 fields, and the
+  handler built a fresh struct from them, so a gRPC client updating a
+  description silently cleared `storageBackend`, `storageConfig`,
+  `quantization`, `diskOnlyVectors`, `trackAccess`, `trackHot`, `spellCorrect`,
+  `spellLang` and — worst — `encrypted`, whose `false` value is pushed straight
+  into the encryptor, so the next document written to an encrypted collection
+  was plaintext. The handler now merges into the stored config: a field a client
+  omits means "leave it alone", not "clear it".
+
+- **The panel's tracking and spell-correction toggles did nothing, and every
+  config save cleared them.** `trackAccess`, `trackHot`, `spellCorrect` and
+  `spellLang` exist in `CollectionConfig` and are read on every request, but were
+  missing from `SetCollectionConfigRequest` — so the panel sent values the REST
+  handler ignored, and because `PUT` replaces the stored config, each save also
+  wiped whatever had been set by other means. All four are now part of the
+  request.
 
 - **The protobuf plugin pin had drifted from its runtime.** `buf.gen.yaml`
   generated code with `protocolbuffers/go` v1.36.11 while `go.mod` linked

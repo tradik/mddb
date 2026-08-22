@@ -49,6 +49,10 @@ type CollectionConfig struct {
 	// mddb-sync plugin with "Remote publishing" enabled; APIKey is that
 	// plugin's publish key (sent as Authorization: Bearer).
 	WordPress *WordPressTargetConfig `json:"wordpress,omitempty"`
+	// Retrieval settings for this collection (RAG-001). nil = today's
+	// behaviour: every search path keeps its own historical default. See
+	// retrieval_profile.go for the precedence rule.
+	Retrieval *RetrievalProfileDef `json:"retrieval,omitempty"`
 }
 
 // WordPressTargetConfig holds the outbound publishing endpoint for a collection.
@@ -223,6 +227,15 @@ type SetCollectionConfigRequest struct {
 	MaxRevisions    int                    `json:"maxRevisions,omitempty"`    // keep last N revisions per doc (0 = unlimited)
 	Encrypted       bool                   `json:"encrypted,omitempty"`       // opt collection into AES-256-GCM at-rest encryption
 	WordPress       *WordPressTargetConfig `json:"wordpress,omitempty"`       // outbound publishing target (mddb-sync plugin)
+	Retrieval       *RetrievalProfileDef   `json:"retrieval,omitempty"`       // per-collection retrieval defaults (RAG-001)
+	// Temporal tracking and spell correction. These live in CollectionConfig
+	// and are read on every request, but were missing here — so the panel's
+	// toggles sent values the handler ignored, and every config save silently
+	// cleared whatever had been set by other means.
+	TrackAccess  bool   `json:"trackAccess,omitempty"`
+	TrackHot     bool   `json:"trackHot,omitempty"`
+	SpellCorrect bool   `json:"spellCorrect,omitempty"`
+	SpellLang    string `json:"spellLang,omitempty"`
 }
 
 func (s *Server) handleCollectionConfig(w http.ResponseWriter, r *http.Request) {
@@ -329,6 +342,13 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// RAG-001: a profile is stored data, so a value that cannot mean anything
+	// is refused here rather than surfacing as a strange result months later.
+	if err := req.Retrieval.Validate(); err != nil {
+		bad(w, err)
+		return
+	}
+
 	cfg := &CollectionConfig{
 		Type:            req.Type,
 		Description:     req.Description,
@@ -342,6 +362,11 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		MaxRevisions:    req.MaxRevisions,
 		Encrypted:       req.Encrypted,
 		WordPress:       req.WordPress,
+		Retrieval:       req.Retrieval,
+		TrackAccess:     req.TrackAccess,
+		TrackHot:        req.TrackHot,
+		SpellCorrect:    req.SpellCorrect,
+		SpellLang:       req.SpellLang,
 	}
 	if err := s.CollectionManager.Set(req.Collection, cfg); err != nil {
 		bad(w, err)

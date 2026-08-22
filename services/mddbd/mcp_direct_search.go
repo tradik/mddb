@@ -62,10 +62,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		return nil, errors.New("no embedding provider configured and no queryVector provided")
 	}
 
-	topK := req.TopK
-	if topK <= 0 {
-		topK = 5
-	}
+	// RAG-001: request > collection profile > historical default.
+	topK := c.server.ResolveTopK(req.Collection, req.TopK, 5)
 
 	// Oversample for chunk deduplication
 	searchTopK := topK * 3
@@ -460,10 +458,8 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		return nil, errors.New("full-text search not initialized")
 	}
 
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 50
-	}
+	// RAG-001: request > collection profile > historical default.
+	limit := c.server.ResolveTopK(req.Collection, req.Limit, 50)
 	algo := req.Algorithm
 	if algo == "" {
 		algo = "tfidf"
@@ -673,10 +669,8 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		return nil, err
 	}
 
-	// Defaults
-	if httpReq.TopK <= 0 {
-		httpReq.TopK = 10
-	}
+	// Defaults. RAG-001: request > collection profile > historical default.
+	httpReq.TopK = c.server.ResolveTopK(httpReq.Collection, httpReq.TopK, 10)
 	if httpReq.Strategy == "" {
 		httpReq.Strategy = "alpha"
 	}

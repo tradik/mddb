@@ -63,10 +63,8 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		return nil, status.Error(codes.FailedPrecondition, "no embedding provider configured")
 	}
 
-	topK := int(req.TopK)
-	if topK <= 0 {
-		topK = 5
-	}
+	// RAG-001: request > collection profile > historical default.
+	topK := g.server.ResolveTopK(req.Collection, int(req.TopK), 5)
 
 	// Convert proto filter
 	filterMeta := make(map[string][]string)
@@ -465,10 +463,8 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 		return nil, status.Error(codes.FailedPrecondition, "full-text search not initialized")
 	}
 
-	limit := int(req.Limit)
-	if limit <= 0 {
-		limit = 50
-	}
+	// RAG-001: request > collection profile > historical default.
+	limit := g.server.ResolveTopK(req.Collection, int(req.Limit), 50)
 
 	algo := req.Algorithm
 	if algo == "" {
@@ -733,11 +729,8 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, query")
 	}
 
-	// Defaults
-	topK := int(req.TopK)
-	if topK <= 0 {
-		topK = 10
-	}
+	// Defaults. RAG-001: request > collection profile > historical default.
+	topK := g.server.ResolveTopK(req.Collection, int(req.TopK), 10)
 	algo := req.Algorithm
 	if algo == "" {
 		algo = "bm25"

@@ -13,6 +13,10 @@ pub struct MddbClient {
     client: proto::mddb_client::MddbClient<Channel>,
     config: MddbConfig,
     auth_token: Option<String>,
+    /// Per-collection retrieval profiles (RAG-001). A cached `None` means the
+    /// collection has no profile, which is worth remembering too — otherwise
+    /// every search on an unconfigured collection asks again.
+    profile_cache: std::collections::HashMap<String, Option<proto::RetrievalProfileProto>>,
 }
 
 impl MddbClient {
@@ -25,6 +29,7 @@ impl MddbClient {
             client,
             config,
             auth_token: None,
+            profile_cache: std::collections::HashMap::new(),
         };
 
         this.login().await?;
@@ -205,14 +210,74 @@ impl MddbClient {
         Ok(results)
     }
 
-    /// Search using the configured search type
+    /// Fetch a collection's retrieval profile, caching the answer.
+    ///
+    /// RAG-001 put retrieval settings next to the data so every client does not
+    /// have to carry them. Cached per collection: the profile changes when an
+    /// operator edits it, not per request, and a config lookup on every search
+    /// would double the round trips for a value that almost never moves.
+    ///
+    /// A failure here is not an error worth surfacing — the caller still has
+    /// the TOML and the built-in defaults, and a chat that stops answering
+    /// because a config lookup failed is worse than one using its own numbers.
+    async fn retrieval_profile(
+        &mut self,
+        collection: &str,
+    ) -> Option<proto::RetrievalProfileProto> {
+        if let Some(cached) = self.profile_cache.get(collection) {
+            return cached.clone();
+        }
+
+        let request = self.auth_request(proto::GetCollectionConfigRequest {
+            collection: collection.to_string(),
+        });
+        let profile = match self.client.get_collection_config(request).await {
+            Ok(response) => response.into_inner().config.and_then(|c| c.retrieval),
+            Err(e) => {
+                tracing::debug!("collection config lookup failed for {collection}: {e}");
+                None
+            }
+        };
+
+        self.profile_cache
+            .insert(collection.to_string(), profile.clone());
+        profile
+    }
+
+    /// Search using the configured search type.
+    ///
+    /// Precedence, matching the server's own rule: an explicit TOML setting
+    /// wins, then the collection's retrieval profile, then the built-in
+    /// default.
     pub async fn search(
         &mut self,
         query: &str,
         collection: &str,
     ) -> Result<Vec<SearchResult>, AppError> {
-        let top_k = self.config.search_top_k;
-        match self.config.search_type.as_str() {
+        let profile = if self.config.search_top_k.is_none() || self.config.search_type.is_none() {
+            self.retrieval_profile(collection).await
+        } else {
+            None
+        };
+
+        let top_k = self.config.search_top_k.unwrap_or_else(|| {
+            profile
+                .as_ref()
+                .map(|p| p.top_k)
+                .filter(|k| *k > 0)
+                .map(|k| k as u32)
+                .unwrap_or(crate::config::FALLBACK_SEARCH_TOP_K)
+        });
+
+        let search_type = self.config.search_type.clone().unwrap_or_else(|| {
+            profile
+                .as_ref()
+                .map(|p| p.default_search_type.clone())
+                .filter(|t| !t.is_empty())
+                .unwrap_or_else(|| crate::config::FALLBACK_SEARCH_TYPE.to_string())
+        });
+
+        match search_type.as_str() {
             "hybrid" => self.hybrid_search(query, collection, top_k).await,
             "vector" => self.vector_search(query, collection, top_k).await,
             "fts" => self.fts_search(query, collection, top_k).await,

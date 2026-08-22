@@ -31,10 +31,14 @@ pub struct MddbConfig {
     pub grpc_addr: String,
     #[serde(default = "default_collection")]
     pub default_collection: String,
-    #[serde(default = "default_search_top_k")]
-    pub search_top_k: u32,
-    #[serde(default = "default_search_type")]
-    pub search_type: String,
+    // RAG-001: absent in the TOML means "let the collection decide". The
+    // serde defaults used to fill these in, which made a value the operator
+    // never wrote indistinguishable from one they did — so a collection
+    // profile could never take effect.
+    #[serde(default)]
+    pub search_top_k: Option<u32>,
+    #[serde(default)]
+    pub search_type: Option<String>,
     #[serde(default)]
     pub auth_username: String,
     #[serde(default)]
@@ -162,8 +166,10 @@ fn default_port() -> u16 { 11030 }
 fn default_cors_origins() -> Vec<String> { vec!["*".to_string()] }
 fn default_grpc_addr() -> String { "http://localhost:11024".to_string() }
 fn default_collection() -> String { "docs".to_string() }
-fn default_search_top_k() -> u32 { 5 }
-fn default_search_type() -> String { "hybrid".to_string() }
+/// Built-in fallbacks, used only when neither the TOML nor the collection's
+/// retrieval profile says anything.
+pub const FALLBACK_SEARCH_TOP_K: u32 = 5;
+pub const FALLBACK_SEARCH_TYPE: &str = "hybrid";
 fn default_llm_provider() -> String { "openai".to_string() }
 fn default_max_tokens() -> u32 { 1024 }
 fn default_temperature() -> f32 { 0.7 }

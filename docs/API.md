@@ -2238,6 +2238,56 @@ Set or update collection configuration including storage backend.
 | `storageBackend` | string | No | Storage backend: `boltdb` (default), `memory`, `s3` |
 | `storageConfig` | object | No | Backend-specific settings (required for `s3`) |
 | `maxRevisions` | integer | No | (v2.9.14+) Revision retention cap. `0` (default) = unlimited; `N > 0` keeps only the newest N revisions per document. Older entries are trimmed inside the same transaction as every write. |
+| `retrieval` | object | No | (v2.12.0+) Per-collection retrieval defaults — see below |
+| `trackAccess` | boolean | No | Record per-read access events for temporal analytics |
+| `trackHot` | boolean | No | Maintain a hot-documents leaderboard |
+| `spellCorrect` | boolean | No | Auto-correct FTS queries using the spell checker |
+| `spellLang` | string | No | Override language for spell correction |
+
+##### Retrieval defaults (v2.12.0+)
+
+Retrieval settings used to be constants scattered across MDDB's internals — FTS
+returned 50 results, vector 5, hybrid 10, memory recall 10 — so a caller had to
+know those numbers to get consistent behaviour, and a collection of prose could
+not be tuned differently from a collection of source.
+
+They now live next to the data. **Precedence is fixed everywhere: an explicit
+request parameter wins, then this profile, then MDDB's default for that
+endpoint.** A collection without a profile behaves exactly as before.
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d '{
+  "collection": "handbook",
+  "retrieval": {
+    "defaultSearchType": "hybrid",
+    "topK": 40,
+    "retrievalMode": "chunk",
+    "contextTokenBudget": 8000
+  }
+}'
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `defaultSearchType` | string | `fts` \| `vector` \| `hybrid`. Read by clients (mddb-chat, MCP agents) to pick an endpoint; the server does not reroute a request because of it. |
+| `topK` | integer | Results per search, 1–1000 |
+| `retrievalMode` | string | `parent` (whole document) \| `chunk` (matching passage) \| `window` (passage with neighbours) |
+| `hybridStrategy` | string | `alpha` \| `rrf` |
+| `hybridAlpha` | number | 0 = keyword only, 1 = semantic only. Requires `hybridAlphaSet: true`, because 0.0 is a real weight and cannot double as "unset". |
+| `contextTokenBudget` | integer | Cap on total returned context, in tokens |
+
+**The context budget drops results, it does not truncate them.** Half a document
+still costs tokens and no longer says anything reliable, so the budget trims the
+tail of an already-ranked list and the response sets `contextTruncated: true`.
+The first result is always kept, even when it alone exceeds the budget —
+returning nothing would read as "no matches" rather than as a budget too small
+for the corpus. Token counts are approximated as bytes÷4; a real tokeniser would
+tie the budget to one model family, and this is a guard rail, not accounting.
+
+Applies to `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`, `/v1/search` and
+`/v1/memory/recall`, over REST, gRPC and MCP alike. Cross-collection search is
+deliberately excluded: it has no single collection whose profile could own
+`topK`, and picking one of N arbitrarily would be worse than a fixed default.
 
 **storageConfig fields (for S3):**
 | Field | Type | Required | Description |

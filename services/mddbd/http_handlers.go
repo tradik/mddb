@@ -126,9 +126,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
-	if req.Limit <= 0 {
-		req.Limit = 50
-	}
+	// RAG-001: request > collection profile > this path's historical default.
+	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
 
 	// Check read permission
 	if s.AuthManager != nil {

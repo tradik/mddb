@@ -75,8 +75,11 @@ type HybridSearchResponse struct {
 	FTSAlgorithm    string                   `json:"ftsAlgorithm"`
 	VectorAlgorithm string                   `json:"vectorAlgorithm"`
 	DistanceMetric  string                   `json:"distanceMetric"`
-	Stats           *SearchStats             `json:"searchStats,omitempty"`
-	Facets          FacetResult              `json:"facets,omitempty"` // populated when request.facetBy is set (v2.9.14+)
+	// ContextTruncated reports that the collection's contextTokenBudget
+	// dropped results from the tail (RAG-001).
+	ContextTruncated bool         `json:"contextTruncated,omitempty"`
+	Stats            *SearchStats `json:"searchStats,omitempty"`
+	Facets           FacetResult  `json:"facets,omitempty"` // populated when request.facetBy is set (v2.9.14+)
 }
 
 // handleHybridSearch handles POST /v1/hybrid-search
@@ -92,21 +95,22 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Defaults
-	if req.TopK <= 0 {
-		req.TopK = 10
-	}
+	// Defaults. RAG-001 inserts the collection profile between the request
+	// and each historical default, so a collection without one is unchanged.
+	req.TopK = s.ResolveTopK(req.Collection, req.TopK, 10)
 	if req.Algorithm == "" {
 		req.Algorithm = "bm25"
 	}
 	if req.VectorAlgorithm == "" {
 		req.VectorAlgorithm = "flat"
 	}
-	if req.Strategy == "" {
-		req.Strategy = "alpha"
-	}
+	req.Strategy = s.ResolveHybridStrategy(req.Collection, req.Strategy, "alpha")
 	if req.Strategy == "alpha" && req.Alpha == 0 {
-		req.Alpha = 0.5
+		// The request cannot distinguish "alpha omitted" from "alpha 0"
+		// (see SRCH-007), so the profile slots in exactly where the
+		// hardcoded 0.5 sat — no behaviour change for a collection
+		// without one.
+		req.Alpha = s.ResolveHybridAlpha(req.Collection, 0, false, 0.5)
 	}
 	if req.RRFK <= 0 {
 		req.RRFK = 60
@@ -262,6 +266,12 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	if req.TopK > 0 && len(items) > req.TopK {
 		items = items[:req.TopK]
 	}
+
+	// RAG-001: cap the total context this collection hands back, after topK
+	// so the budget trims the tail of an already-ranked list.
+	items, contextTruncated := applyContextBudget(s, req.Collection, items,
+		func(it HybridSearchResultItem) int { return approxTokens(it.Document.ContentMD) })
+
 	resp := HybridSearchResponse{
 		Results:         items,
 		Total:           len(items),
@@ -276,6 +286,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	if req.Strategy == "rrf" {
 		resp.RRFK = req.RRFK
 	}
+	resp.ContextTruncated = contextTruncated
 
 	if len(req.FacetBy) > 0 && len(items) > 0 {
 		docs := make([]storage.Doc, len(items))

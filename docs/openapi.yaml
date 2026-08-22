@@ -4698,6 +4698,20 @@ paths:
                   description: Custom key-value metadata for the collection
                 wordpress:
                   $ref: "#/components/schemas/WordPressTargetConfig"
+                retrieval:
+                  $ref: "#/components/schemas/RetrievalProfile"
+                trackAccess:
+                  type: boolean
+                  description: Record per-read access events for temporal analytics
+                trackHot:
+                  type: boolean
+                  description: Maintain a hot-documents leaderboard for this collection
+                spellCorrect:
+                  type: boolean
+                  description: Auto-correct FTS queries using the spell checker
+                spellLang:
+                  type: string
+                  description: Override language for spell correction
                 storageBackend:
                   type: string
                   enum: [ boltdb, memory, s3 ]
@@ -8436,6 +8450,63 @@ components:
             category: [ blog ]
             author: [ John Doe ]
 
+    RetrievalProfile:
+      type: object
+      description: >
+        (v2.12.0+) Per-collection retrieval defaults. Every field is optional;
+        an unset field means "not configured". Precedence is fixed everywhere:
+        an explicit request parameter wins, then this profile, then MDDB's own
+        default for that endpoint — so a collection without a profile behaves
+        exactly as it did before this existed.
+      properties:
+        defaultSearchType:
+          type: string
+          enum: [ fts, vector, hybrid ]
+          description: >
+            Which search this collection expects. Consumed by clients reading
+            the config (mddb-chat, MCP agents); the server does not reroute a
+            request to a different endpoint because of it.
+        topK:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Results per search. 0 = unset.
+        retrievalMode:
+          type: string
+          enum: [ parent, chunk, window ]
+          description: Granularity — whole document, matching passage, or passage with neighbours.
+        hybridStrategy:
+          type: string
+          enum: [ alpha, rrf ]
+          description: Hybrid fusion strategy.
+        hybridAlpha:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >
+            Keyword-to-semantic weight: 0 = keyword only, 1 = semantic only.
+            Requires hybridAlphaSet, because 0.0 is a meaningful weight and
+            cannot double as "unset".
+        hybridAlphaSet:
+          type: boolean
+          description: Whether hybridAlpha was configured.
+        contextTokenBudget:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          description: >
+            Cap on the total context a search returns, so a RAG caller cannot be
+            handed more than its model holds. Results are dropped from the tail,
+            never truncated mid-document — half a document still costs tokens and
+            no longer says anything reliable. Approximated as bytes/4 rather than
+            tokenised: a real tokeniser would tie the budget to one model family.
+            Responses set `contextTruncated` when this applied. 0 = no cap.
+      example:
+        defaultSearchType: hybrid
+        topK: 40
+        retrievalMode: chunk
+        contextTokenBudget: 8000
+
     CollectionConfig:
       type: object
       properties:
@@ -8498,6 +8569,8 @@ components:
             When `> 0`, older revisions are trimmed synchronously on every write so
             history stays capped even under high write-churn.
           default: 0
+        retrieval:
+          $ref: "#/components/schemas/RetrievalProfile"
           example: 20
         wordpress:
           $ref: "#/components/schemas/WordPressTargetConfig"

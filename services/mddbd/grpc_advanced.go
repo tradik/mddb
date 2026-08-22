@@ -337,6 +337,7 @@ func (g *GRPCServer) GetCollectionConfig(ctx context.Context, req *proto.GetColl
 			Color:        cfg.Color,
 			CustomMeta:   cfg.CustomMeta,
 			MaxRevisions: safeInt32(cfg.MaxRevisions),
+			Retrieval:    retrievalProfileToProto(cfg.Retrieval),
 		}
 	}
 	return resp, nil
@@ -361,14 +362,40 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	if req.MaxRevisions < 0 {
 		return nil, status.Error(codes.InvalidArgument, "max_revisions must be >= 0")
 	}
-	cfg := &CollectionConfig{
-		Type:         req.Type,
-		Description:  req.Description,
-		Icon:         req.Icon,
-		Color:        req.Color,
-		CustomMeta:   req.CustomMeta,
-		MaxRevisions: int(req.MaxRevisions),
+	// Merge into the stored config rather than replacing it.
+	//
+	// CollectionConfigProto carries 7 of CollectionConfig's ~15 fields, and
+	// CollectionManager.Set writes whatever struct it is handed. Building a
+	// fresh struct here therefore erased everything gRPC cannot express — a
+	// client updating an icon silently cleared storageBackend, quantization
+	// and, worst of all, Encrypted, whose false value is pushed straight into
+	// the encryptor, so the next document in an encrypted collection was
+	// written as plaintext.
+	//
+	// Preserving the unrepresented fields is not a workaround for the proto
+	// gap: even once the proto carries everything, a client that omits a
+	// field means "leave it alone", not "clear it".
+	cfg := &CollectionConfig{}
+	if existing, found := g.server.CollectionManager.Get(req.Collection); found && existing != nil {
+		*cfg = *existing
 	}
+	cfg.Type = req.Type
+	cfg.Description = req.Description
+	cfg.Icon = req.Icon
+	cfg.Color = req.Color
+	cfg.CustomMeta = req.CustomMeta
+	cfg.MaxRevisions = int(req.MaxRevisions)
+
+	// RAG-001: a nil retrieval block means "not sent", which leaves any
+	// profile configured over REST in place.
+	if req.Retrieval != nil {
+		profile := retrievalProfileFromProto(req.Retrieval)
+		if err := profile.Validate(); err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		cfg.Retrieval = profile
+	}
+
 	if err := g.server.CollectionManager.Set(req.Collection, cfg); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -401,6 +428,7 @@ func (g *GRPCServer) ListCollectionConfigs(ctx context.Context, req *proto.ListC
 				Color:        cfg.Color,
 				CustomMeta:   cfg.CustomMeta,
 				MaxRevisions: safeInt32(cfg.MaxRevisions),
+				Retrieval:    retrievalProfileToProto(cfg.Retrieval),
 			},
 		})
 	}
@@ -470,6 +498,9 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 		return nil, status.Error(codes.FailedPrecondition, "no embedding provider configured")
 	}
 
+	// RAG-001 deliberately does not apply here: a cross-collection search
+	// has no single collection whose profile could own topK, and picking
+	// one of N arbitrarily would be worse than the fixed default.
 	topK := int(req.TopK)
 	if topK <= 0 {
 		topK = 10

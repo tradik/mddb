@@ -61,6 +61,10 @@ type FTSSearchResponse struct {
 	Stats          *SearchStats               `json:"searchStats,omitempty"`
 	SpellCorrected *spell.SpellCorrectionInfo `json:"spellCorrected,omitempty"`
 	Facets         FacetResult                `json:"facets,omitempty"` // populated when request.facetBy is set (v2.9.14+)
+	// ContextTruncated reports that the collection's contextTokenBudget
+	// dropped results from the tail (RAG-001). Without it, a caller cannot
+	// tell a short result list from a capped one.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
 }
 
 // FTSResultWithDoc includes the full document in the result.
@@ -85,9 +89,8 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		bad(w, fmt.Errorf("missing required fields: collection, query"))
 		return
 	}
-	if req.Limit <= 0 {
-		req.Limit = 50
-	}
+	// RAG-001: request > collection profile > this path's historical default.
+	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
 
 	if s.FTSIndex == nil {
 		bad(w, fmt.Errorf("full-text search not initialized"))
@@ -354,6 +357,15 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	if req.Limit > 0 && len(resp.Results) > req.Limit {
 		resp.Results = resp.Results[:req.Limit]
 	}
+
+	// RAG-001: cap the total context this collection hands back. Applied
+	// before Total and facets so both describe what the caller actually
+	// receives — a count that includes dropped results is worse than no count.
+	var contextTruncated bool
+	resp.Results, contextTruncated = applyContextBudget(s, req.Collection, resp.Results,
+		func(r FTSResultWithDoc) int { return approxTokens(r.Document.ContentMD) })
+	resp.ContextTruncated = contextTruncated
+
 	resp.Total = len(resp.Results)
 
 	if len(req.FacetBy) > 0 && len(resp.Results) > 0 {

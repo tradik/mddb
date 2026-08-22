@@ -57,6 +57,9 @@ type VectorSearchResponseHTTP struct {
 	Algorithm      string                   `json:"algorithm"`
 	DistanceMetric string                   `json:"distanceMetric"`
 	Stats          *SearchStats             `json:"searchStats,omitempty"`
+	// ContextTruncated reports that the collection's contextTokenBudget
+	// dropped results from the tail (RAG-001).
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -200,10 +203,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	topK := req.TopK
-	if topK <= 0 {
-		topK = 5
-	}
+	// RAG-001: request > collection profile > this path's historical default.
+	topK := s.ResolveTopK(req.Collection, req.TopK, 5)
 
 	// Resolve distance metric
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
@@ -313,11 +314,24 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
+	// RAG-001: cap the total context this collection hands back. In chunk and
+	// window modes the passage is what the caller receives, so that is what
+	// counts against the budget — charging the whole parent document would
+	// make the cap meaningless for exactly the modes RAG uses.
+	items, contextTruncated := applyContextBudget(s, req.Collection, items,
+		func(it VectorSearchResultItem) int {
+			if it.ChunkText != "" {
+				return approxTokens(it.ChunkText)
+			}
+			return approxTokens(it.Document.ContentMD)
+		})
+
 	resp := VectorSearchResponseHTTP{
-		Results:        items,
-		Total:          len(items),
-		Algorithm:      algo,
-		DistanceMetric: metricName,
+		Results:          items,
+		Total:            len(items),
+		Algorithm:        algo,
+		DistanceMetric:   metricName,
+		ContextTruncated: contextTruncated,
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()
