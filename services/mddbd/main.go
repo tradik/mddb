@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
@@ -67,6 +68,7 @@ type Server struct {
 	SearchCache         *cache.SearchCache     // Opt-in per-request search-result cache (GO-031)
 	Persistence         PersistenceStatus      // What the data directory can promise (GO-032)
 	SearchLimiter       *SearchLimiter         // Bounds concurrent heavy queries (GO-033)
+	HTTP3               *HTTP3Server           // Held so shutdown can close the listener (GO-034)
 	LockFreeCache       *cache.LockFreeCache   // Lock-free cache (extreme performance)
 	IndexQueue          *indexqueue.IndexQueue // Async metadata indexing
 	WAL                 *WAL                   // Write-Ahead Log
@@ -1179,6 +1181,9 @@ func main() {
 				slog.Warn("Failed to start HTTP/3 server", "err", err)
 				return
 			}
+			// Kept on the server so shutdown can close the listener; it was
+			// a local until now, which made the UDP socket unclosable (GO-034).
+			s.HTTP3 = h3Server
 			if err := h3Server.Start(); err != nil {
 				slog.Warn("HTTP/3 server error", "err", err)
 			}
@@ -1291,17 +1296,12 @@ func main() {
 	sig := <-sigCh
 	slog.Info("Received, shutting down...", "sig", sig)
 
-	if s.LockFreeCache != nil {
-		s.LockFreeCache.Close()
-	}
-	// Stop the cache.DocumentCache cleanup goroutine (GO-006).
-	if s.Cache != nil {
-		s.Cache.Close()
-	}
-	// Stop the adaptive-index optimization worker goroutine (GO-007).
-	if s.AdaptiveIndex != nil {
-		s.AdaptiveIndex.Close()
-	}
+	// GO-034: one ordered sequence rather than a handful of ad-hoc Closes.
+	// Seven subsystems had a Stop or Close that nothing called, so their
+	// queues were abandoned rather than drained on the way out.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout())
+	defer cancel()
+	s.Shutdown(shutdownCtx)
 }
 
 // --- helpers / buckets

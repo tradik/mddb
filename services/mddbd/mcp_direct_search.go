@@ -373,7 +373,7 @@ func (c *DirectClient) ImportURL(ctx context.Context, req *MCPImportURLRequest) 
 		}
 	}
 
-	content, err := fetchURL(req.URL)
+	content, err := fetchURL(ctx, req.URL)
 	if err != nil {
 		return nil, err
 	}

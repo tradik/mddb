@@ -366,7 +366,7 @@ func (g *GRPCServer) ImportURL(ctx context.Context, req *proto.ImportURLRequest)
 		}
 	}
 
-	content, err := fetchURL(req.Url)
+	content, err := fetchURL(ctx, req.Url)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "fetch failed: "+err.Error())
 	}

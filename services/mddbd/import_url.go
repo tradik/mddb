@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"io"
 	"mddb/internal/httpclient"
@@ -44,7 +45,7 @@ func (s *Server) handleImportURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch content from URL
-	content, err := fetchURL(req.URL)
+	content, err := fetchURL(r.Context(), req.URL)
 	if err != nil {
 		bad(w, err)
 		return
@@ -75,8 +76,15 @@ func (s *Server) handleImportURL(w http.ResponseWriter, r *http.Request) {
 // fetchURL downloads content from a URL with safety limits. The pooled client
 // uses an SSRF-safe dialer (SEC-004) that rejects private/loopback/link-local
 // destinations and re-validates redirects.
-func fetchURL(rawURL string) (string, error) {
-	resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Get(rawURL) // #nosec G107 -- SSRF-guarded by httpclient.SafeDialContext
+func fetchURL(ctx context.Context, rawURL string) (string, error) {
+	// GO-034: carried through the request's context, so an import from a slow
+	// or hostile host is abandoned when the caller gives up rather than
+	// holding the connection for the full client timeout.
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req) // #nosec G107 -- SSRF-guarded by httpclient.SafeDialContext
 	if err != nil {
 		return "", err
 	}
