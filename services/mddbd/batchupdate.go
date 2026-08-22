@@ -148,13 +148,34 @@ func (bu *BatchUpdater) processDocument(collection string, updateDoc *proto.Upda
 
 	result.Existing = existing
 
-	// Prepare updated document
+	// Prepare updated document.
+	//
+	// An omitted field means "leave it alone", not "clear it" (TEST-002).
+	// This used to assign both unconditionally, so an agent updating tags on
+	// a hundred documents erased the content of all of them, and one updating
+	// content erased their metadata. The single-document path already
+	// distinguishes the two by taking pointers; the batch types cannot, so
+	// empty is read as absent.
+	//
+	// The cost is that a batch cannot deliberately blank a field. Clearing is
+	// rare, deliberate and available on the single-document endpoint —
+	// silently destroying content that nobody asked to change is not a
+	// trade worth keeping.
+	content := existing.ContentMD
+	if updateDoc.ContentMd != "" {
+		content = updateDoc.ContentMd
+	}
+	effectiveMeta := existing.Meta
+	if len(meta) > 0 {
+		effectiveMeta = meta
+	}
+
 	doc := storage.Doc{
 		ID:        docID,
 		Key:       updateDoc.Key,
 		Lang:      updateDoc.Lang,
-		Meta:      meta,
-		ContentMD: updateDoc.ContentMd,
+		Meta:      effectiveMeta,
+		ContentMD: content,
 		AddedAt:   existing.AddedAt,
 		UpdatedAt: now,
 	}

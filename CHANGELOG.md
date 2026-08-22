@@ -233,6 +233,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Batch update erased the field you did not send.** `UpdateBatch` assigned
+  content and metadata unconditionally, so empty meant "clear it": an agent
+  updating tags across a hundred documents wiped the content of all of them,
+  and one updating content wiped their metadata. The single-document path
+  already distinguishes absent from empty by taking pointers; the batch types
+  cannot, so an empty value is now read as absent. A batch can no longer blank
+  a field deliberately — that is rare, and available on the single-document
+  endpoint. Silently destroying content nobody asked to change is not a trade
+  worth keeping. Found by the first test written against the batch path
+  (TEST-002).
+
+- **The custom-tool guard restated all 80 built-in names by hand.** A second
+  source of truth that happened to be in step, and would have drifted the first
+  time someone added a tool and forgot that file — letting a custom tool shadow
+  a built-in, which is a silent capability swap for any agent calling it. The
+  list is derived from the tool table now.
+
+
 - **`/v1/endpoints` advertised endpoints the server does not serve.** The
   automation routes are registered only when automations are enabled
   (`MDDB_AUTOMATIONS`), but the catalogue listed them unconditionally — a client
