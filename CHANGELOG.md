@@ -244,6 +244,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`storageBackend` was accepted, validated, documented — and ignored
+  (GO-021).** A collection configured for `memory` or `s3` had its documents
+  written to the local database like every other, while the API returned 200 and
+  `docs/API.md` and `openapi.yaml` both described it as working. An operator who
+  pointed a collection at S3, supplied credentials, saw success and then treated
+  the node's disk as disposable would have lost their data.
+
+  The cause was structural: the registry that routes collections to backends
+  takes a fallback backend, and no BoltDB implementation of the interface
+  existed — so the registry could never be constructed and `CreateBackend` had
+  no callers at all. The memory and S3 backends themselves were real and
+  complete.
+
+  Document bodies now go where the configuration says. Indexes, revisions and
+  the binlog stay local in every configuration, because they are written in one
+  transaction a remote store cannot join — that split is documented rather than
+  papered over. Bodies are written to the backend **before** the transaction
+  indexing them commits, so a crash between the two leaves an unreferenced
+  object rather than an index entry pointing at nothing. A backend that cannot
+  be reached is refused when configured, and one that fails later causes writes
+  to error instead of quietly landing on local disk.
+
+  Documents written under an earlier version are in the local database and will
+  be read from there until rewritten.
+
+
 - **Consistent hashing sent four times more keys to one shard than another.**
   Virtual nodes were hashed as `"<shard>-<index>"`, so every replica of one
   shard shared a prefix and FNV-1a placed them in long contiguous arcs — at the
@@ -410,7 +436,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrading to 2.12.0
 
-This release makes six changes that need action or attention. They are why
+This release makes seven changes that need action or attention. They are why
 this is 2.12.0 and not a patch.
 
 **1. The production compose refuses to start without secrets.** `docker
@@ -441,6 +467,15 @@ Anything matching on `keyPrefix` should move to `fingerprint`.
 `grafanaDependency` said 11 while the plugin was compiled and type-checked
 against 13, so 13-only APIs would have failed at runtime on the version it
 claimed to support. Both now say 13.
+
+**7. `storageBackend` now does what it said.** If any collection is configured
+with `memory` or `s3`, its documents were being written to the local database
+anyway — the setting was ignored before this release. From 2.12.0 the setting is
+honoured, so those collections start writing to the configured backend while
+their existing documents remain in the local file. Either rewrite them, or set
+the collection back to `boltdb` if the earlier behaviour was what you actually
+wanted. A collection whose backend cannot be reached now refuses writes rather
+than falling back to local disk.
 
 **6. Re-embed collections holding source, and re-save them for the graph.**
 Code documents are now chunked on bracket depth rather than on paragraphs, and

@@ -86,6 +86,16 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 		}
 		cachedBuf = buf
 		docKey := storage.DocKey(collection, docID)
+
+		// GO-021: an external backend receives the payload before this
+		// transaction commits, so a crash in between leaves an unreferenced
+		// object rather than an index entry pointing at nothing. The bucket
+		// write below still happens for every collection — it is the storage
+		// for BoltDB-backed ones and the local index for the rest.
+		if err := s.putDocPayload(collection, docID, buf); err != nil {
+			return err
+		}
+
 		if err := bDocs.Put(docKey, buf); err != nil {
 			return err
 		}
@@ -289,6 +299,12 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 		deletedDoc = doc
 
 		docKey := storage.DocKey(collection, docID)
+		// GO-021: the payload leaves the backend as well, or a delete
+		// removes the index and leaves the data the caller believes is gone.
+		if err := s.deleteDocPayload(collection, docID); err != nil {
+			return err
+		}
+
 		if err := bDocs.Delete(docKey); err != nil {
 			return err
 		}

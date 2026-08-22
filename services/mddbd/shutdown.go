@@ -62,6 +62,11 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	// 4. Flush and close what the drained queues were writing to.
 	add("wal", s.WAL != nil, func() { _ = s.WAL.Close() })
 
+	//    Storage backends come here too (GO-021): the queues above may still
+	//    have been writing document payloads to them, and closing an S3
+	//    client mid-write would abort an upload the indexes already record.
+	add("storage-backends", s.Backends != nil, s.CloseStorageBackends)
+
 	// 5. Caches last: they hold no durable state, but readers may still be in
 	//    flight until the steps above return.
 	add("lockfree-cache", s.LockFreeCache != nil, func() { s.LockFreeCache.Close() })

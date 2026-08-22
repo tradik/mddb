@@ -383,6 +383,15 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		SpellLang:       req.SpellLang,
 		ResponsePrompt:  req.ResponsePrompt,
 	}
+	// GO-021: create or drop the storage backend this config asks for, before
+	// storing it — a config that names a backend which cannot be reached
+	// should be refused rather than accepted and silently ignored, which is
+	// what this whole change exists to stop.
+	if err := s.ApplyStorageBackend(req.Collection, cfg); err != nil {
+		bad(w, err)
+		return
+	}
+
 	if err := s.CollectionManager.Set(req.Collection, cfg); err != nil {
 		bad(w, err)
 		return

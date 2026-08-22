@@ -8609,9 +8609,15 @@ components:
         storageBackend:
           type: string
           enum: [ boltdb, memory, s3 ]
-          description: "Storage backend for this collection (default: boltdb). Use
-            'memory' for ephemeral data or 's3' for S3-compatible object
-            storage."
+          description: >
+            (Honoured from v2.12.0; accepted and ignored before that.) Where
+            this collection's document *bodies* are stored. The metadata index,
+            revisions, search indexes and replication binlog stay in the
+            server's own database in every configuration — they are written in
+            one transaction that a remote object store cannot join. A backend
+            that cannot be reached is refused at configuration time, and writes
+            to a collection whose backend fails later error rather than falling
+            back to local disk.
           example: boltdb
         storageConfig:
           $ref: "#/components/schemas/StorageConfigDef"

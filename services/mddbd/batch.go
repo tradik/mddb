@@ -193,6 +193,10 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 	resp := &proto.AddBatchResponse{}
 	committed := make([]*ProcessedDoc, 0, len(processed))
 
+	// GO-021: payloads reach an external backend before the transaction that
+	// indexes them opens.
+	pushBatchPayloads(bp.server, collection, processed)
+
 	var bo binlog.BinlogOps
 	// Single transaction for all documents
 	err := bp.server.DBUpdate(func(tx *bolt.Tx) error {

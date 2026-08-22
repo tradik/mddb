@@ -94,34 +94,38 @@ type Server struct {
 	GeoIndex     *geo.GeoIndex     // In-memory R-tree geo index (default)
 	GeoHashIndex *geo.GeoHashIndex // Alternative geohash-prefix index
 	// New features
-	TTLManager         *ttl.TTLManager           // Document TTL / auto-expiry
-	FTSIndex           *fts.FTSIndex             // Full-text search index
-	WebhookManager     *webhooks.WebhookManager  // Webhook subscriptions and delivery
-	SchemaManager      *schema.SchemaManager     // Per-collection metadata schema validation
-	Metrics            *metrics.Metrics          // Prometheus-compatible telemetry
-	AuthManager        *AuthManager              // Authentication and authorization
-	AuditManager       *audit.AuditManager       // Audit log (ISO 27001 A.8.15, SOC 2 CC7.2)
-	RateLimiter        *RateLimiter              // Cross-transport rate limiter (ISO 27001 A.5.30, SOC 2 CC6.6)
-	Encryptor          *encryption.Encryptor     // At-rest AES-256-GCM encryption (ISO 27001 A.8.24, SOC 2 CC6.7)
-	RotationManager    *RotationManager          // Background re-encryption after key rotation
-	AuthFailureTracker *AuthFailureTracker       // Sliding-window auth failure counter → security.auth_failure_burst
-	LagMonitor         *ReplicationLagMonitor    // Periodic replication-lag → ops.replication_lag_high
-	DiskMonitor        *DiskUsageMonitor         // Periodic disk-usage → ops.disk_usage_high
-	SynonymManager     *fts.SynonymManager       // Synonym dictionaries for FTS
-	StopWordManager    *fts.StopWordManager      // Per-collection custom stop words for FTS
-	AutomationManager  *AutomationManager        // Automation: triggers, crons, webhook targets
-	AutomationLogStore *automationlog.Store      // Automation execution logs
-	CronScheduler      *CronScheduler            // Cron scheduler for automation
-	CollectionManager  *CollectionManager        // Per-collection attributes (type, description, icon, etc.)
-	CurationManager    *CurationManager          // FTS/Hybrid curation rules: pinned + hidden results per query
-	TemporalManager    *temporal.TemporalManager // Document lifecycle event tracking (create/update/access)
-	SpellManager       *spell.SpellManager       // Spell correction for FTS queries and document content
-	SSEHub             *SSEHub                   // Server-Sent Events for real-time document change notifications
-	BulkIngest         *BulkIngestManager        // Async bulk ingest job manager
-	MCPInfo            MCPServerInfo             // Customizable MCP server profile
-	MCPInstructions    string                    // System prompt for LLM — how to use this server
-	mcpKeyStore        *mcpAPIKeyStore           // BoltDB-backed MCP API key store
-	mcpAuth            *MCPAPIKeyMiddleware      // MCP API key middleware (for cache invalidation)
+	TTLManager         *ttl.TTLManager          // Document TTL / auto-expiry
+	FTSIndex           *fts.FTSIndex            // Full-text search index
+	WebhookManager     *webhooks.WebhookManager // Webhook subscriptions and delivery
+	SchemaManager      *schema.SchemaManager    // Per-collection metadata schema validation
+	Metrics            *metrics.Metrics         // Prometheus-compatible telemetry
+	AuthManager        *AuthManager             // Authentication and authorization
+	AuditManager       *audit.AuditManager      // Audit log (ISO 27001 A.8.15, SOC 2 CC7.2)
+	RateLimiter        *RateLimiter             // Cross-transport rate limiter (ISO 27001 A.5.30, SOC 2 CC6.6)
+	Encryptor          *encryption.Encryptor    // At-rest AES-256-GCM encryption (ISO 27001 A.8.24, SOC 2 CC6.7)
+	RotationManager    *RotationManager         // Background re-encryption after key rotation
+	AuthFailureTracker *AuthFailureTracker      // Sliding-window auth failure counter → security.auth_failure_burst
+	LagMonitor         *ReplicationLagMonitor   // Periodic replication-lag → ops.replication_lag_high
+	DiskMonitor        *DiskUsageMonitor        // Periodic disk-usage → ops.disk_usage_high
+	SynonymManager     *fts.SynonymManager      // Synonym dictionaries for FTS
+	StopWordManager    *fts.StopWordManager     // Per-collection custom stop words for FTS
+	AutomationManager  *AutomationManager       // Automation: triggers, crons, webhook targets
+	AutomationLogStore *automationlog.Store     // Automation execution logs
+	CronScheduler      *CronScheduler           // Cron scheduler for automation
+	CollectionManager  *CollectionManager       // Per-collection attributes (type, description, icon, etc.)
+	// Backends routes document payloads to a per-collection storage backend
+	// (GO-021). nil until InitStorageBackends runs; a nil registry means every
+	// collection uses BoltDB, which is what the server did before.
+	Backends        *BackendRegistry
+	CurationManager *CurationManager          // FTS/Hybrid curation rules: pinned + hidden results per query
+	TemporalManager *temporal.TemporalManager // Document lifecycle event tracking (create/update/access)
+	SpellManager    *spell.SpellManager       // Spell correction for FTS queries and document content
+	SSEHub          *SSEHub                   // Server-Sent Events for real-time document change notifications
+	BulkIngest      *BulkIngestManager        // Async bulk ingest job manager
+	MCPInfo         MCPServerInfo             // Customizable MCP server profile
+	MCPInstructions string                    // System prompt for LLM — how to use this server
+	mcpKeyStore     *mcpAPIKeyStore           // BoltDB-backed MCP API key store
+	mcpAuth         *MCPAPIKeyMiddleware      // MCP API key middleware (for cache invalidation)
 	// Replication
 	Binlog          *binlog.Binlog     // Binary replication log
 	ReplicationRole string             // "leader", "follower", or "" (standalone)
@@ -591,6 +595,11 @@ func main() {
 	if err := s.CollectionManager.LoadAll(); err != nil {
 		logging.Fatal("startup step failed", "step", "CollectionManager.LoadAll", "err", err)
 	}
+
+	// GO-021: build the per-collection storage backends the configs ask for.
+	// Until this ran, `storageBackend: "s3"` was accepted, validated and
+	// ignored — every document went to the local file regardless.
+	s.InitStorageBackends()
 	slog.Info("Collection manager initialized (collections configured)", "listAllCount", len(s.CollectionManager.ListAll()))
 
 	// At-rest encryption (ISO 27001 A.8.24 / SOC 2 CC6.7). The encryptor

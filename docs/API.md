@@ -2285,7 +2285,7 @@ Set or update collection configuration including storage backend.
 | `icon` | string | No | Emoji icon |
 | `color` | string | No | Hex color code |
 | `customMeta` | object | No | Custom key-value metadata |
-| `storageBackend` | string | No | Storage backend: `boltdb` (default), `memory`, `s3` |
+| `storageBackend` | string | No | Where this collection's document bodies are stored: `boltdb` (default), `memory`, `s3` — see below |
 | `storageConfig` | object | No | Backend-specific settings (required for `s3`) |
 | `maxRevisions` | integer | No | (v2.9.14+) Revision retention cap. `0` (default) = unlimited; `N > 0` keeps only the newest N revisions per document. Older entries are trimmed inside the same transaction as every write. |
 | `retrieval` | object | No | (v2.12.0+) Per-collection retrieval defaults — see below |
@@ -2294,6 +2294,59 @@ Set or update collection configuration including storage backend.
 | `trackHot` | boolean | No | Maintain a hot-documents leaderboard |
 | `spellCorrect` | boolean | No | Auto-correct FTS queries using the spell checker |
 | `spellLang` | string | No | Override language for spell correction |
+
+##### Storage backends (v2.12.0+)
+
+A collection can keep its **document bodies** somewhere other than the server's
+own database file:
+
+| Backend | Holds documents in | Use for |
+|---|---|---|
+| `boltdb` (default) | The server's database file | Everything, unless you have a reason not to |
+| `memory` | Process memory, lost on restart | Scratch collections, tests, caches you can rebuild |
+| `s3` | Any S3-compatible object store | Large corpora whose bodies should not live on the node's disk |
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d '{
+  "collection": "archive",
+  "storageBackend": "s3",
+  "storageConfig": {
+    "endpoint": "s3.example.com",
+    "bucket": "mddb-archive",
+    "region": "eu-central-1",
+    "accessKey": "...", "secretKey": "..."
+  }
+}'
+```
+
+**What moves and what does not.** The backend holds document bodies. The
+metadata index, revisions, the full-text and vector indexes, and the replication
+binlog stay in the server's database in every configuration. That is not a
+limitation to be lifted later: those are written inside a single transaction
+alongside each other, and a remote object store cannot join it. Splitting them
+would trade a correctness guarantee for a storage location.
+
+So an `s3` collection still needs its local database, and that database still
+needs to survive — it holds everything needed to find a document, just not the
+document.
+
+**Ordering, and what a crash leaves behind.** A body is written to the backend
+before the transaction that indexes it commits. The two cannot be atomic, so the
+failure is chosen deliberately: a crash in between leaves an object nothing
+references — wasted space, harmless to readers — rather than an index entry
+pointing at a document that is not there, which is what people experience as
+data loss.
+
+**A backend that cannot be reached refuses writes.** Configuring an unreachable
+S3 endpoint is rejected at configuration time, and a backend that fails later
+causes writes to that collection to error rather than falling back to local
+disk. Silently writing elsewhere is how an operator loses data they believed was
+in object storage.
+
+> Before v2.12.0 this setting was accepted, validated and **ignored** — every
+> document went to the local database regardless. If you set `memory` or `s3` on
+> an earlier version, your documents are in the local file, and the collection
+> will keep reading them from there until they are rewritten.
 
 ##### Retrieval defaults (v2.12.0+)
 

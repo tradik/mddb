@@ -201,6 +201,10 @@ func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*Proc
 
 	// bo records ops for trimRevisions; the extreme path does not flush a
 	// binlog, but the trim deletes are durable in-transaction regardless.
+	// GO-021: payloads reach an external backend before the transaction that
+	// indexes them opens.
+	pushBatchPayloads(fbp.server, collection, processed)
+
 	var bo binlog.BinlogOps
 
 	err := fbp.server.DBUpdate(func(tx *bolt.Tx) error {
