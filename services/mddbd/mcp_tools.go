@@ -231,8 +231,14 @@ func mcpGetString(m map[string]interface{}, key string) string {
 }
 
 func mcpGetInt(m map[string]interface{}, key string) int {
-	if v, ok := m[key].(float64); ok {
+	switch v := m[key].(type) {
+	case float64:
+		// JSON has no integers; every number arrives this way.
 		return int(v)
+	case int:
+		// Not from JSON, but from an internal caller or a YAML default,
+		// where returning 0 would silently discard the value.
+		return v
 	}
 	return 0
 }
@@ -245,10 +251,15 @@ func mcpGetFloat(m map[string]interface{}, key string) float64 {
 }
 
 func mcpGetBool(m map[string]interface{}, key string) bool {
-	if v, ok := m[key].(bool); ok {
-		return v
-	}
-	return false
+	// Delegates to mcpCoerceBool, which already tolerates the string and
+	// numeric spellings some LLM clients emit instead of a JSON bool.
+	//
+	// That helper was written because "silently ignoring a stringified bool
+	// would be a footgun" — and this function, used for saveRevision,
+	// highlight and lines, had exactly that footgun. An agent sending
+	// "lines": "true" got false and no indication why (TEST-002).
+	val, _ := mcpCoerceBool(m[key])
+	return val
 }
 
 // mcpCoerceBool interprets a JSON value as a boolean, tolerating the string
@@ -310,10 +321,14 @@ func mcpGetMetaMap(m map[string]interface{}, key string) map[string][]string {
 			case string:
 				result[k] = []string{val}
 			case []interface{}:
-				strs := make([]string, len(val))
-				for i, item := range val {
+				// Non-strings are skipped rather than left as empty
+				// entries: an empty metadata value is indexed and
+				// searchable, so blanking one invents a value the caller
+				// never wrote (TEST-002).
+				strs := make([]string, 0, len(val))
+				for _, item := range val {
 					if s, ok := item.(string); ok {
-						strs[i] = s
+						strs = append(strs, s)
 					}
 				}
 				result[k] = strs

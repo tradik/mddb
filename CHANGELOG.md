@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Drift guards over the MCP tool table (TEST-002)** — tests now assert that
+  every one of the 80 advertised tools is reachable through the dispatcher and
+  that every dispatched name is advertised, in both directions. A tool present
+  in one list and missing from the other exists for discovery and not for
+  calling, or is dead code left by a rename. The read-only classification is
+  checked the same way: every tool must be annotated, writers must be refused
+  on a read-only server, readers must not be, and the MCP-only override must
+  still refuse writes on a writable one — that override is what hands an agent
+  a database it cannot damage.
+
+
 - **HTTP routes extracted from `main()` and tested (TEST-002)** — 107 route
   registrations lived inside a 1089-line `main()`, where nothing could reach
   them: the file carried the entire public surface of the server at 0.7%
@@ -232,6 +243,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing code collection to populate it.
 
 ### Fixed
+
+- **MCP boolean arguments sent as strings were silently ignored.** `mcpGetBool`
+  accepted only a real JSON bool, so an agent sending `"lines": "true"` — which
+  LLM clients do emit — got `false` and no indication why. The repository
+  already contained `mcpCoerceBool`, written to tolerate exactly those
+  spellings, with a comment calling the strict behaviour "a footgun"; the two
+  decisions sat in the same file contradicting each other, and one of them was
+  also pinned by a test. `mcpGetBool` delegates to it now, fixing
+  `saveRevision`, `highlight` and `lines` together.
+
+- **A non-string inside an MCP metadata array became an empty value.** It was
+  kept as `""` rather than dropped, and an empty metadata value is indexed and
+  searchable — so `["a", 1, "c"]` invented a phantom nobody wrote. Non-strings
+  are skipped now.
+
+- **`mcpGetInt` silently returned 0 for a Go `int`.** Harmless from JSON, where
+  every number is a float64, but an internal caller or a YAML default lost its
+  value without a word.
+
 
 - **Batch update erased the field you did not send.** `UpdateBatch` assigned
   content and metadata unconditionally, so empty meant "clear it": an agent
