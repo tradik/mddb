@@ -996,6 +996,7 @@ message CollectionConfigProto {
   map<string, string> custom_meta = 5;
   int32 max_revisions = 6;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
   RetrievalProfileProto retrieval = 7;           // (v2.12.0+) per-collection retrieval defaults
+  string response_prompt = 8;                    // (v2.12.0+) how to format answers from this collection (RAG-002); max 4 KiB
 }
 
 message GetCollectionConfigRequest {
@@ -1017,6 +1018,7 @@ message SetCollectionConfigRequest {
   map<string, string> custom_meta = 6;
   int32 max_revisions = 7;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
   RetrievalProfileProto retrieval = 8;           // (v2.12.0+) per-collection retrieval defaults
+  string response_prompt = 9;                    // (v2.12.0+) how to format answers from this collection (RAG-002)
 }
 
 message SetCollectionConfigResponse {

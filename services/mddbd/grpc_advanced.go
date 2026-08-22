@@ -331,13 +331,14 @@ func (g *GRPCServer) GetCollectionConfig(ctx context.Context, req *proto.GetColl
 	}
 	if found && cfg != nil {
 		resp.Config = &proto.CollectionConfigProto{
-			Type:         cfg.Type,
-			Description:  cfg.Description,
-			Icon:         cfg.Icon,
-			Color:        cfg.Color,
-			CustomMeta:   cfg.CustomMeta,
-			MaxRevisions: safeInt32(cfg.MaxRevisions),
-			Retrieval:    retrievalProfileToProto(cfg.Retrieval),
+			Type:           cfg.Type,
+			Description:    cfg.Description,
+			Icon:           cfg.Icon,
+			Color:          cfg.Color,
+			CustomMeta:     cfg.CustomMeta,
+			MaxRevisions:   safeInt32(cfg.MaxRevisions),
+			Retrieval:      retrievalProfileToProto(cfg.Retrieval),
+			ResponsePrompt: cfg.ResponsePrompt,
 		}
 	}
 	return resp, nil
@@ -386,6 +387,16 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	cfg.CustomMeta = req.CustomMeta
 	cfg.MaxRevisions = int(req.MaxRevisions)
 
+	// RAG-002: proto3 cannot tell an omitted string from an empty one, so a
+	// gRPC client clearing the prompt and one not mentioning it look
+	// identical. Treated as "set it", which matches the REST PUT semantics
+	// this RPC mirrors — the merge above exists for fields gRPC cannot
+	// express at all, not for fields a client chose to leave blank.
+	cfg.ResponsePrompt = req.ResponsePrompt
+	if err := ValidateResponsePrompt(cfg.ResponsePrompt); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	// RAG-001: a nil retrieval block means "not sent", which leaves any
 	// profile configured over REST in place.
 	if req.Retrieval != nil {
@@ -422,13 +433,14 @@ func (g *GRPCServer) ListCollectionConfigs(ctx context.Context, req *proto.ListC
 		entries = append(entries, &proto.CollectionConfigEntry{
 			Collection: coll,
 			Config: &proto.CollectionConfigProto{
-				Type:         cfg.Type,
-				Description:  cfg.Description,
-				Icon:         cfg.Icon,
-				Color:        cfg.Color,
-				CustomMeta:   cfg.CustomMeta,
-				MaxRevisions: safeInt32(cfg.MaxRevisions),
-				Retrieval:    retrievalProfileToProto(cfg.Retrieval),
+				Type:           cfg.Type,
+				Description:    cfg.Description,
+				Icon:           cfg.Icon,
+				Color:          cfg.Color,
+				CustomMeta:     cfg.CustomMeta,
+				MaxRevisions:   safeInt32(cfg.MaxRevisions),
+				Retrieval:      retrievalProfileToProto(cfg.Retrieval),
+				ResponsePrompt: cfg.ResponsePrompt,
 			},
 		})
 	}

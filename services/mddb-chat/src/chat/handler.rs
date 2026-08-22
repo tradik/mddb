@@ -226,6 +226,16 @@ async fn handle_message(
     let temperature = scenario::get_temperature(&state.config, &scenario_name);
     let max_tokens = state.config.llm.max_tokens;
 
+    // RAG-002: the collection states how answers drawn from it should be
+    // formatted, and that instruction travels with the data rather than being
+    // repeated in every client's TOML.
+    let collection_prompt = state
+        .mddb_client
+        .clone()
+        .response_prompt(&collection)
+        .await;
+    let system_prompt = scenario::compose_system_prompt(&system_prompt, &collection_prompt);
+
     // Build initial API messages
     let mut api_messages: Vec<ApiMsg> = Vec::new();
 

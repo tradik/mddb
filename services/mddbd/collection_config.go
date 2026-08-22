@@ -53,6 +53,12 @@ type CollectionConfig struct {
 	// behaviour: every search path keeps its own historical default. See
 	// retrieval_profile.go for the precedence rule.
 	Retrieval *RetrievalProfileDef `json:"retrieval,omitempty"`
+	// ResponsePrompt is how answers drawn from this collection should be
+	// formatted (RAG-002) — numbered steps for runbooks, code blocks for API
+	// docs. Applied automatically by mddb-chat and returned to MCP agents, so
+	// the instruction travels with the data instead of living in every client.
+	// Plain text for a model, never rendered as markup. Max 4 KiB.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // WordPressTargetConfig holds the outbound publishing endpoint for a collection.
@@ -228,6 +234,7 @@ type SetCollectionConfigRequest struct {
 	Encrypted       bool                   `json:"encrypted,omitempty"`       // opt collection into AES-256-GCM at-rest encryption
 	WordPress       *WordPressTargetConfig `json:"wordpress,omitempty"`       // outbound publishing target (mddb-sync plugin)
 	Retrieval       *RetrievalProfileDef   `json:"retrieval,omitempty"`       // per-collection retrieval defaults (RAG-001)
+	ResponsePrompt  string                 `json:"responsePrompt,omitempty"`  // how to format answers from this collection (RAG-002)
 	// Temporal tracking and spell correction. These live in CollectionConfig
 	// and are read on every request, but were missing here — so the panel's
 	// toggles sent values the handler ignored, and every config save silently
@@ -349,6 +356,13 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// RAG-002: this text is prepended to prompts automatically, so an
+	// unbounded value would silently eat the context the answer needs.
+	if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
+		bad(w, err)
+		return
+	}
+
 	cfg := &CollectionConfig{
 		Type:            req.Type,
 		Description:     req.Description,
@@ -367,6 +381,7 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		TrackHot:        req.TrackHot,
 		SpellCorrect:    req.SpellCorrect,
 		SpellLang:       req.SpellLang,
+		ResponsePrompt:  req.ResponsePrompt,
 	}
 	if err := s.CollectionManager.Set(req.Collection, cfg); err != nil {
 		bad(w, err)

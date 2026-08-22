@@ -215,15 +215,40 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 	if err := validateWordPressTarget(req.WordPress); err != nil {
 		return err
 	}
-	cfg := &CollectionConfig{
-		Type:         req.Type,
-		Description:  req.Description,
-		Icon:         req.Icon,
-		Color:        req.Color,
-		CustomMeta:   req.CustomMeta,
-		MaxRevisions: req.MaxRevisions,
-		WordPress:    req.WordPress,
+	// Merge into the stored config rather than replacing it.
+	//
+	// MCPSetCollectionConfigRequest covers 9 of CollectionConfig's ~18 fields,
+	// and CollectionManager.Set writes whatever struct it is handed. Building
+	// a fresh one erased storageBackend, quantization, spell settings and —
+	// worst — Encrypted, whose false value goes straight into the encryptor,
+	// so an agent updating a description left the next document in an
+	// encrypted collection stored as plaintext. Same defect as the gRPC path
+	// fixed in RAG-001; this is the MCP one.
+	cfg := &CollectionConfig{}
+	if existing, found := c.server.CollectionManager.Get(req.Collection); found && existing != nil {
+		*cfg = *existing
 	}
+	cfg.Type = req.Type
+	cfg.Description = req.Description
+	cfg.Icon = req.Icon
+	cfg.Color = req.Color
+	cfg.CustomMeta = req.CustomMeta
+	cfg.MaxRevisions = req.MaxRevisions
+	cfg.WordPress = req.WordPress
+
+	if req.Retrieval != nil {
+		if err := req.Retrieval.Validate(); err != nil {
+			return err
+		}
+		cfg.Retrieval = req.Retrieval
+	}
+	if req.ResponsePrompt != "" {
+		if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
+			return err
+		}
+		cfg.ResponsePrompt = req.ResponsePrompt
+	}
+
 	return c.server.CollectionManager.Set(req.Collection, cfg)
 }
 

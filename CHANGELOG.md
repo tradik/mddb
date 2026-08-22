@@ -27,6 +27,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidateDocumentResponse` gains field 3 (`warnings`), which is
   wire-compatible: older clients ignore it.
 
+- **Per-collection answer formatting (RAG-002)** — a `responsePrompt` on the
+  collection says how answers drawn from it should be shaped: numbered steps for
+  runbooks, code blocks for API docs. That instruction used to live in the
+  client — a per-scenario system prompt in mddb-chat, and nothing at all for MCP
+  agents — so every consumer had to know separately what every collection
+  expected. mddb-chat now appends it to the scenario prompt, and MCP returns it
+  on `search_documents`, `vector_search` and `hybrid_search` results and folds it
+  into the `rag-pipeline` prompt, so an agent gets the instruction in the same
+  call that fetched what to say. `{{collection}}` and `{{query}}` expand through
+  the template mechanism the automation rules already use. Order in mddb-chat is
+  deliberate: the operator's scenario prompt is policy and comes first, so a
+  collection cannot talk its way past it by opening with an instruction of its
+  own. Capped at 4 KiB — it is prepended automatically, and an unbounded value
+  would quietly eat the context the answer needs. A collection without one
+  behaves exactly as before.
+
 - **Embedding cache (RAG-003)** — every vector, hybrid and memory-recall query
   called the embedding provider with no cache at all: a network round trip and a
   token charge even for a query asked seconds ago, and MCP agents repeat the same
@@ -112,6 +128,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into the encryptor, so the next document written to an encrypted collection
   was plaintext. The handler now merges into the stored config: a field a client
   omits means "leave it alone", not "clear it".
+
+- **MCP `set_collection_config` had the same defect**, found while wiring
+  RAG-002 through it: an agent updating a collection's description cleared its
+  storage backend, quantization, spell settings and encryption flag. Also merges
+  now.
 
 - **The panel's tracking and spell-correction toggles did nothing, and every
   config save cleared them.** `trackAccess`, `trackHot`, `spellCorrect` and

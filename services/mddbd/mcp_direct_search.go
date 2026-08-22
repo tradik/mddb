@@ -85,6 +85,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 				Results:        []MCPVectorSearchResult{},
 				Algorithm:      algo,
 				DistanceMetric: metricName,
+				// Included even with no results: a field that appears only
+				// sometimes is a field agents handle inconsistently.
+				ResponsePrompt: s.ResponsePrompt(req.Collection, req.Query),
 			}
 			if s.Embedding != nil {
 				resp.Model = s.Embedding.Model()
@@ -171,6 +174,10 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		Results:   items,
 		Total:     len(items),
 		Algorithm: algo,
+		// RAG-002: the collection's formatting instruction travels with the
+		// results, so an agent does not need a second call to learn how this
+		// collection wants its answers shaped.
+		ResponsePrompt: s.ResponsePrompt(req.Collection, req.Query),
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()
@@ -504,10 +511,11 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 	results = c.server.applyBoostFTS(req.Collection, results, req.Boost)
 
 	resp := &MCPFTSSearchResponse{
-		Algorithm: algo,
-		Fuzzy:     fuzzy,
-		Lang:      req.Lang,
-		Results:   make([]MCPFTSResult, 0, len(results)),
+		Algorithm:      algo,
+		Fuzzy:          fuzzy,
+		Lang:           req.Lang,
+		Results:        make([]MCPFTSResult, 0, len(results)),
+		ResponsePrompt: c.server.ResponsePrompt(req.Collection, req.Query),
 	}
 
 	_ = c.server.DBView(func(tx *bolt.Tx) error {
@@ -707,6 +715,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		VectorAlgorithm: httpReq.VectorAlgorithm,
 		DistanceMetric:  distMetric,
 		Results:         make([]MCPHybridSearchResult, 0, len(items)),
+		ResponsePrompt:  c.server.ResponsePrompt(httpReq.Collection, httpReq.Query),
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{

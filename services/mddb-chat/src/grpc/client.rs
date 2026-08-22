@@ -13,10 +13,11 @@ pub struct MddbClient {
     client: proto::mddb_client::MddbClient<Channel>,
     config: MddbConfig,
     auth_token: Option<String>,
-    /// Per-collection retrieval profiles (RAG-001). A cached `None` means the
-    /// collection has no profile, which is worth remembering too — otherwise
-    /// every search on an unconfigured collection asks again.
-    profile_cache: std::collections::HashMap<String, Option<proto::RetrievalProfileProto>>,
+    /// Per-collection config (RAG-001 retrieval profile, RAG-002 response
+    /// prompt). One lookup serves both. A cached `None` means the collection
+    /// has no config, which is worth remembering too — otherwise every search
+    /// on an unconfigured collection asks again.
+    config_cache: std::collections::HashMap<String, Option<proto::CollectionConfigProto>>,
 }
 
 impl MddbClient {
@@ -29,7 +30,7 @@ impl MddbClient {
             client,
             config,
             auth_token: None,
-            profile_cache: std::collections::HashMap::new(),
+            config_cache: std::collections::HashMap::new(),
         };
 
         this.login().await?;
@@ -210,38 +211,48 @@ impl MddbClient {
         Ok(results)
     }
 
-    /// Fetch a collection's retrieval profile, caching the answer.
+    /// Fetch a collection's config, caching the answer.
     ///
-    /// RAG-001 put retrieval settings next to the data so every client does not
-    /// have to carry them. Cached per collection: the profile changes when an
-    /// operator edits it, not per request, and a config lookup on every search
-    /// would double the round trips for a value that almost never moves.
+    /// RAG-001 and RAG-002 both put settings next to the data so every client
+    /// does not have to carry them; one lookup serves both. Cached per
+    /// collection: config changes when an operator edits it, not per request,
+    /// and asking on every search would double the round trips for values that
+    /// almost never move.
     ///
     /// A failure here is not an error worth surfacing — the caller still has
     /// the TOML and the built-in defaults, and a chat that stops answering
     /// because a config lookup failed is worse than one using its own numbers.
-    async fn retrieval_profile(
+    async fn collection_config(
         &mut self,
         collection: &str,
-    ) -> Option<proto::RetrievalProfileProto> {
-        if let Some(cached) = self.profile_cache.get(collection) {
+    ) -> Option<proto::CollectionConfigProto> {
+        if let Some(cached) = self.config_cache.get(collection) {
             return cached.clone();
         }
 
         let request = self.auth_request(proto::GetCollectionConfigRequest {
             collection: collection.to_string(),
         });
-        let profile = match self.client.get_collection_config(request).await {
-            Ok(response) => response.into_inner().config.and_then(|c| c.retrieval),
+        let config = match self.client.get_collection_config(request).await {
+            Ok(response) => response.into_inner().config,
             Err(e) => {
                 tracing::debug!("collection config lookup failed for {collection}: {e}");
                 None
             }
         };
 
-        self.profile_cache
-            .insert(collection.to_string(), profile.clone());
-        profile
+        self.config_cache
+            .insert(collection.to_string(), config.clone());
+        config
+    }
+
+    /// The collection's answer-formatting instruction (RAG-002), empty when it
+    /// has none.
+    pub async fn response_prompt(&mut self, collection: &str) -> String {
+        self.collection_config(collection)
+            .await
+            .map(|c| c.response_prompt)
+            .unwrap_or_default()
     }
 
     /// Search using the configured search type.
@@ -255,7 +266,7 @@ impl MddbClient {
         collection: &str,
     ) -> Result<Vec<SearchResult>, AppError> {
         let profile = if self.config.search_top_k.is_none() || self.config.search_type.is_none() {
-            self.retrieval_profile(collection).await
+            self.collection_config(collection).await.and_then(|c| c.retrieval)
         } else {
             None
         };

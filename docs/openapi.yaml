@@ -4700,6 +4700,10 @@ paths:
                   $ref: "#/components/schemas/WordPressTargetConfig"
                 retrieval:
                   $ref: "#/components/schemas/RetrievalProfile"
+                responsePrompt:
+                  type: string
+                  maxLength: 4096
+                  description: (v2.12.0+) How to format answers from this collection (RAG-002)
                 trackAccess:
                   type: boolean
                   description: Record per-read access events for temporal analytics
@@ -8571,6 +8575,19 @@ components:
           default: 0
         retrieval:
           $ref: "#/components/schemas/RetrievalProfile"
+        responsePrompt:
+          type: string
+          maxLength: 4096
+          description: >
+            (v2.12.0+) How answers drawn from this collection should be
+            formatted — numbered steps for runbooks, code blocks for API docs.
+            Applied automatically by mddb-chat and returned alongside MCP search
+            results, so the instruction travels with the data instead of living
+            in every client. Supports `{{collection}}` and `{{query}}`
+            placeholders. Plain text for a model; never rendered as markup.
+            Capped at 4 KiB because it is prepended to prompts automatically and
+            would otherwise eat the context the answer needs.
+          example: "Answer as numbered steps. Quote the exact command for each step."
           example: 20
         wordpress:
           $ref: "#/components/schemas/WordPressTargetConfig"

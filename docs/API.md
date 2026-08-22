@@ -2239,6 +2239,7 @@ Set or update collection configuration including storage backend.
 | `storageConfig` | object | No | Backend-specific settings (required for `s3`) |
 | `maxRevisions` | integer | No | (v2.9.14+) Revision retention cap. `0` (default) = unlimited; `N > 0` keeps only the newest N revisions per document. Older entries are trimmed inside the same transaction as every write. |
 | `retrieval` | object | No | (v2.12.0+) Per-collection retrieval defaults — see below |
+| `responsePrompt` | string | No | (v2.12.0+) How to format answers from this collection — see below (max 4 KiB) |
 | `trackAccess` | boolean | No | Record per-read access events for temporal analytics |
 | `trackHot` | boolean | No | Maintain a hot-documents leaderboard |
 | `spellCorrect` | boolean | No | Auto-correct FTS queries using the spell checker |
@@ -2288,6 +2289,42 @@ Applies to `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`, `/v1/search` and
 `/v1/memory/recall`, over REST, gRPC and MCP alike. Cross-collection search is
 deliberately excluded: it has no single collection whose profile could own
 `topK`, and picking one of N arbitrarily would be worse than a fixed default.
+
+##### Answer formatting (v2.12.0+)
+
+A collection of runbooks wants numbered steps; a collection of API docs wants
+code blocks and key references. That instruction used to live in the client — a
+per-scenario system prompt in mddb-chat, and nothing at all for MCP agents — so
+every consumer had to know, separately, what every collection expected.
+
+`responsePrompt` puts it with the data:
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d '{
+  "collection": "runbooks",
+  "responsePrompt": "Answer as numbered steps. Quote the exact command for each step and name the file it belongs in. If the runbook does not cover the question, say so instead of improvising."
+}'
+```
+
+It is picked up in two places, without a second round trip:
+
+- **mddb-chat** appends it to the scenario's system prompt. Order is deliberate:
+  the scenario is the operator's policy — who the assistant is, what it may say
+  — and the collection prompt is about the shape of its data. Policy comes
+  first, so a collection cannot talk its way past it by opening with "ignore
+  your previous instructions".
+- **MCP** returns it as `responsePrompt` on `search_documents`,
+  `vector_search` and `hybrid_search` results, and folds it into the
+  `rag-pipeline` prompt. An agent gets the instruction in the same call that
+  fetched what to say.
+
+`{{collection}}` and `{{query}}` are expanded through the same template
+mechanism the automation rules use. The value is plain text for a model, capped
+at 4 KiB — it is prepended to prompts automatically, so an unbounded one would
+quietly eat the context the answer needs — and the panel renders it as text,
+never as markup.
+
+A collection without a `responsePrompt` behaves exactly as before.
 
 **storageConfig fields (for S3):**
 | Field | Type | Required | Description |

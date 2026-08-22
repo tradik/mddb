@@ -6814,16 +6814,17 @@ func (x *RetrievalProfileProto) GetContextTokenBudget() int32 {
 // REST and are invisible over gRPC — a gRPC client cannot read or write them.
 // Tracked separately; retrieval is added here because RAG-001 needs it.
 type CollectionConfigProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Icon          string                 `protobuf:"bytes,3,opt,name=icon,proto3" json:"icon,omitempty"`
-	Color         string                 `protobuf:"bytes,4,opt,name=color,proto3" json:"color,omitempty"`
-	CustomMeta    map[string]string      `protobuf:"bytes,5,rep,name=custom_meta,json=customMeta,proto3" json:"custom_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	MaxRevisions  int32                  `protobuf:"varint,6,opt,name=max_revisions,json=maxRevisions,proto3" json:"max_revisions,omitempty"` // (v2.9.14+) per-collection revision cap; 0 = unlimited
-	Retrieval     *RetrievalProfileProto `protobuf:"bytes,7,opt,name=retrieval,proto3" json:"retrieval,omitempty"`                            // (v2.12.0+) per-collection retrieval defaults
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Description    string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Icon           string                 `protobuf:"bytes,3,opt,name=icon,proto3" json:"icon,omitempty"`
+	Color          string                 `protobuf:"bytes,4,opt,name=color,proto3" json:"color,omitempty"`
+	CustomMeta     map[string]string      `protobuf:"bytes,5,rep,name=custom_meta,json=customMeta,proto3" json:"custom_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MaxRevisions   int32                  `protobuf:"varint,6,opt,name=max_revisions,json=maxRevisions,proto3" json:"max_revisions,omitempty"`      // (v2.9.14+) per-collection revision cap; 0 = unlimited
+	Retrieval      *RetrievalProfileProto `protobuf:"bytes,7,opt,name=retrieval,proto3" json:"retrieval,omitempty"`                                 // (v2.12.0+) per-collection retrieval defaults
+	ResponsePrompt string                 `protobuf:"bytes,8,opt,name=response_prompt,json=responsePrompt,proto3" json:"response_prompt,omitempty"` // (v2.12.0+) how to format answers from this collection (RAG-002); max 4 KiB
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CollectionConfigProto) Reset() {
@@ -6903,6 +6904,13 @@ func (x *CollectionConfigProto) GetRetrieval() *RetrievalProfileProto {
 		return x.Retrieval
 	}
 	return nil
+}
+
+func (x *CollectionConfigProto) GetResponsePrompt() string {
+	if x != nil {
+		return x.ResponsePrompt
+	}
+	return ""
 }
 
 type GetCollectionConfigRequest struct {
@@ -7010,17 +7018,18 @@ func (x *GetCollectionConfigResponse) GetConfigured() bool {
 }
 
 type SetCollectionConfigRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	Icon          string                 `protobuf:"bytes,4,opt,name=icon,proto3" json:"icon,omitempty"`
-	Color         string                 `protobuf:"bytes,5,opt,name=color,proto3" json:"color,omitempty"`
-	CustomMeta    map[string]string      `protobuf:"bytes,6,rep,name=custom_meta,json=customMeta,proto3" json:"custom_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	MaxRevisions  int32                  `protobuf:"varint,7,opt,name=max_revisions,json=maxRevisions,proto3" json:"max_revisions,omitempty"` // (v2.9.14+) per-collection revision cap; 0 = unlimited
-	Retrieval     *RetrievalProfileProto `protobuf:"bytes,8,opt,name=retrieval,proto3" json:"retrieval,omitempty"`                            // (v2.12.0+) per-collection retrieval defaults
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Collection     string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Type           string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Description    string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	Icon           string                 `protobuf:"bytes,4,opt,name=icon,proto3" json:"icon,omitempty"`
+	Color          string                 `protobuf:"bytes,5,opt,name=color,proto3" json:"color,omitempty"`
+	CustomMeta     map[string]string      `protobuf:"bytes,6,rep,name=custom_meta,json=customMeta,proto3" json:"custom_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MaxRevisions   int32                  `protobuf:"varint,7,opt,name=max_revisions,json=maxRevisions,proto3" json:"max_revisions,omitempty"`      // (v2.9.14+) per-collection revision cap; 0 = unlimited
+	Retrieval      *RetrievalProfileProto `protobuf:"bytes,8,opt,name=retrieval,proto3" json:"retrieval,omitempty"`                                 // (v2.12.0+) per-collection retrieval defaults
+	ResponsePrompt string                 `protobuf:"bytes,9,opt,name=response_prompt,json=responsePrompt,proto3" json:"response_prompt,omitempty"` // (v2.12.0+) how to format answers from this collection (RAG-002)
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SetCollectionConfigRequest) Reset() {
@@ -7107,6 +7116,13 @@ func (x *SetCollectionConfigRequest) GetRetrieval() *RetrievalProfileProto {
 		return x.Retrieval
 	}
 	return nil
+}
+
+func (x *SetCollectionConfigRequest) GetResponsePrompt() string {
+	if x != nil {
+		return x.ResponsePrompt
+	}
+	return ""
 }
 
 type SetCollectionConfigResponse struct {
@@ -11921,7 +11937,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x0fhybrid_strategy\x18\x04 \x01(\tR\x0ehybridStrategy\x12!\n" +
 	"\fhybrid_alpha\x18\x05 \x01(\x01R\vhybridAlpha\x12(\n" +
 	"\x10hybrid_alpha_set\x18\x06 \x01(\bR\x0ehybridAlphaSet\x120\n" +
-	"\x14context_token_budget\x18\a \x01(\x05R\x12contextTokenBudget\"\xe4\x02\n" +
+	"\x14context_token_budget\x18\a \x01(\x05R\x12contextTokenBudget\"\x8d\x03\n" +
 	"\x15CollectionConfigProto\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x12\n" +
@@ -11930,7 +11946,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\vcustom_meta\x18\x05 \x03(\v2+.mddb.CollectionConfigProto.CustomMetaEntryR\n" +
 	"customMeta\x12#\n" +
 	"\rmax_revisions\x18\x06 \x01(\x05R\fmaxRevisions\x129\n" +
-	"\tretrieval\x18\a \x01(\v2\x1b.mddb.RetrievalProfileProtoR\tretrieval\x1a=\n" +
+	"\tretrieval\x18\a \x01(\v2\x1b.mddb.RetrievalProfileProtoR\tretrieval\x12'\n" +
+	"\x0fresponse_prompt\x18\b \x01(\tR\x0eresponsePrompt\x1a=\n" +
 	"\x0fCustomMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"<\n" +
@@ -11945,7 +11962,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06config\x18\x02 \x01(\v2\x1b.mddb.CollectionConfigProtoR\x06config\x12\x1e\n" +
 	"\n" +
 	"configured\x18\x03 \x01(\bR\n" +
-	"configured\"\x8e\x03\n" +
+	"configured\"\xb7\x03\n" +
 	"\x1aSetCollectionConfigRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -11957,7 +11974,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\vcustom_meta\x18\x06 \x03(\v20.mddb.SetCollectionConfigRequest.CustomMetaEntryR\n" +
 	"customMeta\x12#\n" +
 	"\rmax_revisions\x18\a \x01(\x05R\fmaxRevisions\x129\n" +
-	"\tretrieval\x18\b \x01(\v2\x1b.mddb.RetrievalProfileProtoR\tretrieval\x1a=\n" +
+	"\tretrieval\x18\b \x01(\v2\x1b.mddb.RetrievalProfileProtoR\tretrieval\x12'\n" +
+	"\x0fresponse_prompt\x18\t \x01(\tR\x0eresponsePrompt\x1a=\n" +
 	"\x0fCustomMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"U\n" +

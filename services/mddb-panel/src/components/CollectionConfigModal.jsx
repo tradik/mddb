@@ -45,6 +45,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
   const [hybridStrategy, setHybridStrategy] = useState('');
   const [hybridAlpha, setHybridAlpha] = useState('');
   const [contextTokenBudget, setContextTokenBudget] = useState('');
+  const [responsePrompt, setResponsePrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -88,6 +89,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         // "unset" when the server says it was never configured.
         setHybridAlpha(r.hybridAlphaSet ? String(r.hybridAlpha ?? 0) : '');
         setContextTokenBudget(r.contextTokenBudget || '');
+        setResponsePrompt(cfg.responsePrompt || '');
       }
     } catch (err) {
       setError(err.message);
@@ -136,6 +138,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
       }
       if (Number(contextTokenBudget) > 0) retrieval.contextTokenBudget = Number(contextTokenBudget);
       if (Object.keys(retrieval).length > 0) payload.retrieval = retrieval;
+      if (responsePrompt.trim()) payload.responsePrompt = responsePrompt.trim();
       if (storageBackend === 's3') {
         payload.storageConfig = storageConfig;
       }
@@ -559,6 +562,29 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                     </p>
                   </div>
                 </div>
+              </div>
+
+              {/* Response prompt (RAG-002, v2.12.0+) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Answer Formatting</label>
+                <p className="text-xs text-gray-500 mb-2">
+                  How answers drawn from this collection should be shaped — numbered steps for runbooks,
+                  code blocks for API docs. Applied automatically by the chat service and handed to MCP agents
+                  with their search results, so it travels with the data instead of living in every client.
+                  Use <code className="px-1 bg-gray-100 rounded">{'{{collection}}'}</code> and{' '}
+                  <code className="px-1 bg-gray-100 rounded">{'{{query}}'}</code> as placeholders.
+                </p>
+                <textarea
+                  value={responsePrompt}
+                  onChange={(e) => setResponsePrompt(e.target.value.slice(0, 4096))}
+                  rows={4}
+                  placeholder="e.g. Answer as numbered steps. Quote the exact command for each step and name the file it belongs in."
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className={`text-xs mt-0.5 ${responsePrompt.length > 3800 ? 'text-amber-600' : 'text-gray-400'}`}>
+                  {responsePrompt.length} / 4096 characters
+                  {responsePrompt.length > 3800 && ' — this is prepended to every prompt, so it competes with the answer for context'}
+                </p>
               </div>
 
               {/* At-Rest Encryption (ISO 27001 A.8.24 / SOC 2 CC6.7) */}

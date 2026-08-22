@@ -244,6 +244,10 @@ type MCPVectorSearchResponse struct {
 	Dimensions     int                     `json:"dimensions"`
 	Algorithm      string                  `json:"algorithm"`
 	DistanceMetric string                  `json:"distanceMetric"`
+	// ResponsePrompt is the collection's formatting instruction (RAG-002),
+	// present only when one is configured. Returned with the results so an
+	// agent gets it in the same round trip that fetched what to say.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // MCPVectorReindexRequest represents a reindex request.
@@ -330,6 +334,10 @@ type MCPFTSSearchResponse struct {
 	Algorithm string         `json:"algorithm"`
 	Fuzzy     int            `json:"fuzzy"`
 	Lang      string         `json:"lang,omitempty"`
+	// ResponsePrompt is the collection's formatting instruction (RAG-002),
+	// present only when one is configured. Returned with the results so an
+	// agent gets it in the same round trip that fetched what to say.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // MCPFTSReindexRequest represents a request to reindex FTS for a collection.
@@ -392,6 +400,10 @@ type MCPHybridSearchResponse struct {
 	FTSAlgorithm    string                  `json:"ftsAlgorithm"`
 	VectorAlgorithm string                  `json:"vectorAlgorithm"`
 	DistanceMetric  string                  `json:"distanceMetric"`
+	// ResponsePrompt is the collection's formatting instruction (RAG-002),
+	// present only when one is configured. Returned with the results so an
+	// agent gets it in the same round trip that fetched what to say.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // MCPGeoSearchRequest represents a geo radius search.
@@ -623,6 +635,10 @@ type MCPSetCollectionConfigRequest struct {
 	CustomMeta   map[string]string      `json:"customMeta,omitempty"`
 	MaxRevisions int                    `json:"maxRevisions,omitempty"`
 	WordPress    *WordPressTargetConfig `json:"wordpress,omitempty"`
+	// Retrieval and ResponsePrompt are nil/empty when the caller did not
+	// mention them, and are then left as stored (RAG-001, RAG-002).
+	Retrieval      *RetrievalProfileDef `json:"retrieval,omitempty"`
+	ResponsePrompt string               `json:"responsePrompt,omitempty"`
 }
 
 // MCPCollectionConfigListResponse is the response for list_collection_configs.
