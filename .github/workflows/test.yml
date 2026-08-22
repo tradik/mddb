@@ -18,6 +18,8 @@ on:
       - 'tools/bench/**'
       - 'test/**'
       - 'scripts/check-go-version.sh'
+      - 'scripts/check-proto-plugins.sh'
+      - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [main, develop]
@@ -32,6 +34,8 @@ on:
       - 'tools/bench/**'
       - 'test/**'
       - 'scripts/check-go-version.sh'
+      - 'scripts/check-proto-plugins.sh'
+      - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
 
 env:
@@ -147,8 +151,19 @@ jobs:
       - name: Set up buf
         uses: bufbuild/buf-setup-action@v1
         with:
-          version: "1.50.0"
+          version: "1.72.0"
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The protocolbuffers/go plugin in buf.gen.yaml generates the code that
+      # links against google.golang.org/protobuf in go.mod. The two drifted
+      # once already (plugin v1.36.11, runtime v1.36.12) because a dependency
+      # bump touched go.mod alone — a mismatch that surfaces as an
+      # unmarshalling bug rather than a build error.
+      - name: Verify protobuf plugin and runtime agree
+        run: bash scripts/check-proto-plugins.sh --print
+
+      - name: Run proto plugin guard test suite
+        run: bash scripts/tests/test-proto-plugins.sh
 
       - name: Lint proto files
         run: buf lint

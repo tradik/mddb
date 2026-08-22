@@ -63,6 +63,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The protobuf plugin pin had drifted from its runtime.** `buf.gen.yaml`
+  generated code with `protocolbuffers/go` v1.36.11 while `go.mod` linked
+  against `google.golang.org/protobuf` v1.36.12 — the comment beside the pin
+  claimed they matched, and a dependency bump that touched only `go.mod` made it
+  untrue. Generated code disagreeing with its runtime surfaces as an
+  unmarshalling bug rather than a build error, so the comment is now a CI gate:
+  `scripts/check-proto-plugins.sh` (7/7 guard tests, `make check-proto-plugins`).
+  Both are on v1.36.12.
+
+- **`buf` CLI bumped 1.50.0 → 1.72.0** in CI and in the generation script's
+  requirements. Verified byte-identical output before and after: generated code
+  comes from the plugins pinned in `buf.gen.yaml`, not from the CLI.
+
 - **`proto/generate.sh` wrote generated Go code one directory too high** when
   `buf` is not installed. The legacy protoc fallback still used the
   pre-buf-migration layout (`services/mddbd`, not `services/mddbd/proto`), so a

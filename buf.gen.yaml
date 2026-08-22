@@ -25,8 +25,10 @@ plugins:
   # places the generated files at services/mddbd/proto/mddb.pb.go —
   # matching `option go_package = "mddb/proto"` in mddb.proto.
   #
-  # Matches google.golang.org/protobuf in services/mddbd/go.mod (v1.36.11).
-  - remote: buf.build/protocolbuffers/go:v1.36.11
+  # Matches google.golang.org/protobuf in services/mddbd/go.mod (v1.36.12).
+  # scripts/check-proto-plugins.sh fails the build if the two drift apart —
+  # this pin sat at v1.36.11 while go.mod had already moved to v1.36.12.
+  - remote: buf.build/protocolbuffers/go:v1.36.12
     out: services/mddbd/proto
     opt:
       - paths=source_relative

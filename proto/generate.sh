@@ -9,7 +9,9 @@
 # Run from the repository root.
 #
 # Requirements:
-#   - buf CLI >= 1.50.0 (https://buf.build/docs/installation)
+#   - buf CLI >= 1.72.0 (https://buf.build/docs/installation)
+#     Install the exact version CI uses:
+#       go install github.com/bufbuild/buf/cmd/buf@v1.72.0
 #
 # Fallback: if buf is not installed, falls through to the legacy
 # protoc-based script (proto/generate-legacy.sh), which uses locally

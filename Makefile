@@ -171,6 +171,12 @@ check-changelog: ## Verify the CHANGELOG has exactly one, leading [Unreleased]
 test-changelog: ## Run the CHANGELOG structure guard test suite
 	@bash scripts/tests/test-changelog.sh
 
+check-proto-plugins: ## Verify the protobuf plugin pin matches the runtime in go.mod
+	@bash scripts/check-proto-plugins.sh --print
+
+test-proto-plugins: ## Run the protobuf plugin/runtime guard test suite
+	@bash scripts/tests/test-proto-plugins.sh
+
 mcp-tools-count: ## Verify docs' built-in MCP tool count matches the code (DOC-001)
 	@cd services/mddbd && go test -run TestMCPToolCountDocsInSync -count=1 . && \
 		echo "✅ docs MCP tool count matches len(mcpBuiltinTools())"
