@@ -41,6 +41,11 @@ type VectorSearchResultItem struct {
 	Rank       int         `json:"rank"`
 	ChunkIndex *int        `json:"chunkIndex,omitempty"` // set in chunk/window retrieval modes
 	ChunkText  string      `json:"chunkText,omitempty"`  // matching passage (chunk/window modes)
+	// StartLine and EndLine are 1-based and inclusive, locating the passage in
+	// the parent document (CODE-002). Without them a caller knows which
+	// document matched and has to read it to find where.
+	StartLine int `json:"startLine,omitempty"`
+	EndLine   int `json:"endLine,omitempty"`
 }
 
 // VectorSearchResponseHTTP represents the response from vector search.
@@ -296,7 +301,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 			if chunkMode {
 				idx := chunkIndex
 				item.ChunkIndex = &idx
-				item.ChunkText = chunkPassage(doc.ContentMD, chunkIndex, windowSize)
+				item.ChunkText, item.StartLine, item.EndLine =
+					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize)
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""

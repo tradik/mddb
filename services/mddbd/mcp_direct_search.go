@@ -157,7 +157,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 			if chunkMode {
 				idx := chunkIndex
 				item.ChunkIndex = &idx
-				item.ChunkText = chunkPassage(doc.ContentMD, chunkIndex, windowSize)
+				item.ChunkText, item.StartLine, item.EndLine =
+					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize)
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""
@@ -523,6 +524,17 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < time.Now().Unix() {
 				continue
 			}
+			// CODE-002: fragments and their line ranges are extracted before
+			// the body is dropped — the whole point is to answer without
+			// carrying the document, so the body must go and the lines stay.
+			var highlights []fts.Highlight
+			if req.Highlight && docPtr.ContentMD != "" {
+				highlights = fts.ExtractHighlights(docPtr.ContentMD, res.MatchedTerms, fts.HighlightOptions{
+					OpenTag:      req.HighlightTag,
+					MaxFragments: req.MaxHighlights,
+					FragmentSize: req.FragmentSize,
+				})
+			}
 			if !req.IncludeContent {
 				docPtr.ContentMD = "" // GO-022: don't carry a body the caller discards
 			}
@@ -530,6 +542,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 				Document:     docToMCPDocument(*docPtr),
 				Score:        res.Score,
 				MatchedTerms: res.MatchedTerms,
+				Highlights:   highlights,
 			})
 		}
 		return nil

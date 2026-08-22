@@ -315,6 +315,12 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		Lang:           mcpGetString(args, "lang"),
 		Boost:          mcpGetFloat64Map(args, "boost"),
 		IncludeContent: includeContent,
+		// CODE-002: highlights carry the line range, which is what lets an
+		// agent edit a place instead of reading a file.
+		Highlight:     mcpGetBool(args, "highlight"),
+		HighlightTag:  mcpGetString(args, "highlight_tag"),
+		MaxHighlights: mcpGetInt(args, "max_highlights"),
+		FragmentSize:  mcpGetInt(args, "fragment_size"),
 	}
 
 	resp, err := s.client.FTSSearch(ctx, req)

@@ -3302,6 +3302,45 @@ code without any meta at all, so a theme ingested by an existing tool indexes
 usefully as it stands. An explicit `kind` always wins, in both directions: set
 `kind: ["prose"]` on a `.css` document and it is tokenised as prose.
 
+### Finding the place, not just the file
+
+A search result that names the document answers "which file". The question an
+agent has is "where" — and answering it by reading the file is what makes a
+one-line change cost thousands of tokens (issue #192).
+
+Ask for `highlight: true` and every fragment carries the lines it occupies:
+
+```json
+{
+  "results": [{
+    "document": { "key": "css/style.css" },
+    "highlights": [{
+      "fragment": "…}\n\n.hero-banner {\n  <mark>background</mark>: url(hero.png);",
+      "startLine": 158,
+      "endLine": 163,
+      "startOffset": 4021,
+      "endOffset": 4104
+    }]
+  }]
+}
+```
+
+`startLine` and `endLine` are 1-based and inclusive. Byte offsets are still
+there for callers doing their own markup on the same bytes.
+
+**Combine it with a projection.** `fields` drops the document body, `highlight`
+says where to look; together they answer without carrying the file. The whole
+response above is under 800 bytes for a 164-line stylesheet. The two are
+deliberately compatible — a projection keeps the fragments.
+
+`fragmentSize` is a byte budget tuned for prose. Source lines are short, so 150
+bytes covers roughly fifteen lines of CSS against two or three of prose; lower
+it when searching code.
+
+Vector and hybrid hits carry the same information: in `chunk` and `window`
+retrieval modes each result reports `startLine`/`endLine` for the passage it
+matched, widened along with the passage when a window is requested.
+
 ### Why the tokeniser differs
 
 The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,

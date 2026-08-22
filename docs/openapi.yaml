@@ -6607,6 +6607,15 @@ components:
         endOffset:
           type: integer
 
+        startLine:
+          type: integer
+          description: |
+            (v2.12.0+) 1-based, inclusive line where the fragment begins. This
+            is what makes a result a place to edit rather than a document to
+            read — see docs/API.md#finding-the-place-not-just-the-file.
+        endLine:
+          type: integer
+          description: (v2.12.0+) 1-based, inclusive line where the fragment ends
     RangeFilter:
       type: object
       properties:

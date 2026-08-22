@@ -194,6 +194,32 @@ Edit `AGENTS.md` and run `make agent-instructions`; CI fails if a variant was
 edited directly, and a test fails if the instructions name a tool that no
 longer exists.
 
+## Locating a Match
+
+`full_text_search` accepts `highlight: true` (v2.12.0+), which returns each
+matching fragment with the lines it occupies:
+
+```json
+{"name": "full_text_search", "arguments": {
+  "collection": "theme", "query": "background",
+  "highlight": true, "fragment_size": 80, "fields": ["key"]
+}}
+```
+
+```
+css/style.css:158-163
+"…}\n\n.hero-banner {\n  <mark>background</mark>: url(hero.png);"
+```
+
+`fields` drops the document body and `highlight` says where to look, so the two
+together answer the question without carrying the file — under 800 bytes for a
+164-line stylesheet, against ~20 000 tokens for the same search returning whole
+documents. Projections keep the fragments deliberately: dropping them would
+leave a caller with neither the text nor its location.
+
+Lower `fragment_size` for source. The default of 150 is a byte budget tuned for
+prose; code lines are short, so it covers about fifteen lines of CSS.
+
 ## Built-in Tool Catalog
 
 All 79 built-in tools, grouped by area. Tool inputs are self-describing via

@@ -85,6 +85,14 @@ func projectFTSResult(resp *MCPFTSSearchResponse, fields []string, includeConten
 			"score":        resp.Results[i].Score,
 			"matchedTerms": resp.Results[i].MatchedTerms,
 		}
+		// Highlights survive projection deliberately (CODE-002). Projection
+		// and highlighting are the two halves of the same request — "do not
+		// send me the body, tell me where to look" — so dropping the fragments
+		// here would leave the caller with neither the text nor its location,
+		// which is the failure issue #192 describes.
+		if len(resp.Results[i].Highlights) > 0 {
+			results[i]["highlights"] = resp.Results[i].Highlights
+		}
 	}
 	out := map[string]interface{}{
 		"results":   results,

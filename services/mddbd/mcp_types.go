@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"mddb/internal/automationlog"
+	"mddb/internal/fts"
 	"mddb/internal/storage"
 	"time"
 )
@@ -228,6 +229,11 @@ type MCPVectorSearchResult struct {
 	Rank       int         `json:"rank"`
 	ChunkIndex *int        `json:"chunkIndex,omitempty"` // set in chunk/window retrieval modes
 	ChunkText  string      `json:"chunkText,omitempty"`  // matching passage (chunk/window modes)
+	// StartLine and EndLine are 1-based and inclusive, locating the passage in
+	// the parent document (CODE-002) — what an agent needs to edit a place
+	// rather than read a file.
+	StartLine int `json:"startLine,omitempty"`
+	EndLine   int `json:"endLine,omitempty"`
 }
 
 // MCPVectorSearchResponse represents vector search results.
@@ -298,6 +304,13 @@ type MCPFTSSearchRequest struct {
 	Boost      map[string]float64 `json:"boost,omitempty"`
 	// IncludeContent — see MCPSearchRequest (GO-022).
 	IncludeContent bool `json:"includeContent,omitempty"`
+	// Highlight asks for the matching fragments and, with them, the lines they
+	// occupy (CODE-002). This is the answer shape issue #192 asked for: a
+	// place to edit rather than a document to read.
+	Highlight     bool   `json:"highlight,omitempty"`
+	HighlightTag  string `json:"highlightTag,omitempty"`
+	MaxHighlights int    `json:"maxHighlights,omitempty"`
+	FragmentSize  int    `json:"fragmentSize,omitempty"`
 }
 
 // MCPFTSResult represents a single FTS result.
@@ -305,6 +318,9 @@ type MCPFTSResult struct {
 	Document     MCPDocument `json:"document"`
 	Score        float64     `json:"score"`
 	MatchedTerms []string    `json:"matchedTerms"`
+	// Highlights carry each matching fragment with the 1-based, inclusive line
+	// range it occupies (CODE-002).
+	Highlights []fts.Highlight `json:"highlights,omitempty"`
 }
 
 // MCPFTSSearchResponse represents full-text search results.

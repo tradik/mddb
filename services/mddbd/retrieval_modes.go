@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mddb/internal/fts"
 	"strconv"
 	"strings"
 
@@ -68,24 +69,47 @@ func splitChunkKey(key string) (docID string, chunkIndex int) {
 // parent document's content. windowSize is the number of neighboring chunks
 // included on each side; 0 returns just the matching chunk.
 func chunkPassage(contentMD string, chunkIndex, windowSize int) string {
+	text, _, _ := chunkPassageWithLines(contentMD, chunkIndex, windowSize)
+	return text
+}
+
+// chunkPassageWithLines is chunkPassage plus the 1-based, inclusive line range
+// the passage occupies in the parent document (CODE-002).
+//
+// The lines are what turn a hit into a place to edit: "css/style.css lines
+// 41-58" is a neighbourhood, where a document name and a chunk index mean
+// reading the file to find out where the chunk was. Both come from the same
+// segmentation, so the text and its range can never disagree.
+func chunkPassageWithLines(contentMD string, chunkIndex, windowSize int) (text string, startLine, endLine int) {
 	chunkSize := envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500)
-	chunks := ChunkText(contentMD, chunkSize)
-	if len(chunks) == 0 {
-		return ""
+	spans := ChunkSpans(contentMD, chunkSize)
+	if len(spans) == 0 {
+		return "", 0, 0
 	}
-	if chunkIndex >= len(chunks) {
-		chunkIndex = len(chunks) - 1
+	if chunkIndex >= len(spans) {
+		chunkIndex = len(spans) - 1
 	}
-	if windowSize <= 0 {
-		return chunks[chunkIndex]
+	if chunkIndex < 0 {
+		chunkIndex = 0
 	}
-	lo := chunkIndex - windowSize
-	if lo < 0 {
-		lo = 0
+
+	lo, hi := chunkIndex, chunkIndex+1
+	if windowSize > 0 {
+		lo = chunkIndex - windowSize
+		if lo < 0 {
+			lo = 0
+		}
+		hi = chunkIndex + windowSize + 1
+		if hi > len(spans) {
+			hi = len(spans)
+		}
 	}
-	hi := chunkIndex + windowSize + 1
-	if hi > len(chunks) {
-		hi = len(chunks)
+
+	parts := make([]string, 0, hi-lo)
+	for _, s := range spans[lo:hi] {
+		parts = append(parts, s.Text)
 	}
-	return strings.Join(chunks[lo:hi], "\n\n")
+	li := fts.NewLineIndex(contentMD)
+	startLine, endLine = li.Range(spans[lo].Start, spans[hi-1].End)
+	return strings.Join(parts, "\n\n"), startLine, endLine
 }

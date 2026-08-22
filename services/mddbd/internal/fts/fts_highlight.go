@@ -26,6 +26,12 @@ type Highlight struct {
 	MatchedTerms []string `json:"matchedTerms,omitempty"`
 	StartOffset  int      `json:"startOffset"`
 	EndOffset    int      `json:"endOffset"`
+	// StartLine and EndLine are 1-based and inclusive, derived from the byte
+	// offsets above (CODE-002). They are what makes a result actionable for
+	// code: "css/style.css lines 41-58" is a neighbourhood an agent can edit,
+	// where a document name alone means reading the file to find the place.
+	StartLine int `json:"startLine"`
+	EndLine   int `json:"endLine"`
 }
 
 // HighlightOptions tunes the extractor. A zero value produces the same
@@ -108,9 +114,15 @@ func ExtractHighlights(content string, terms []string, opts HighlightOptions) []
 	if len(clusters) > opts.MaxFragments {
 		clusters = clusters[:opts.MaxFragments]
 	}
+	// Built once for the document and shared by every fragment: the scan is
+	// linear in the content, the lookups logarithmic.
+	lines := NewLineIndex(content)
+
 	out := make([]Highlight, 0, len(clusters))
 	for _, cluster := range clusters {
-		out = append(out, renderFragment(content, cluster, opts))
+		h := renderFragment(content, cluster, opts)
+		h.StartLine, h.EndLine = lines.Range(h.StartOffset, h.EndOffset)
+		out = append(out, h)
 	}
 	// Re-sort fragments by document order so UIs can display them in reading
 	// flow rather than by relevance rank.
