@@ -46,6 +46,14 @@ type IngestOptionsHTTP struct {
 	SkipWebhooks            bool `json:"skipWebhooks,omitempty"`
 	AutoConfigureCollection bool `json:"autoConfigureCollection,omitempty"`
 	SaveRevision            bool `json:"saveRevision,omitempty"`
+	// Profile names a preset of the flags above (RAG-004): "" or "default"
+	// keeps every step, "fast" trades parsing fidelity and bookkeeping for
+	// throughput. An explicitly-set flag always overrides the preset.
+	Profile string `json:"profile,omitempty"`
+	// TextOnly extracts plain text from heavy formats (html, pdf, docx, odt,
+	// rtf) instead of rebuilding their structure as Markdown. Implied by
+	// profile "fast".
+	TextOnly bool `json:"textOnly,omitempty"`
 }
 
 // IngestResponseHTTP is the HTTP response body for a bulk ingest operation.
@@ -57,6 +65,10 @@ type IngestResponseHTTP struct {
 	Errors     []string `json:"errors,omitempty"`
 	Collection string   `json:"collection"`
 	DurationMs int64    `json:"durationMs"`
+	// Profile records which ingest profile actually applied (RAG-004), so a
+	// corpus loaded months ago can be explained without guessing which flags
+	// the caller happened to send.
+	Profile string `json:"profile,omitempty"`
 }
 
 // handleIngest handles POST /v1/ingest
@@ -94,6 +106,20 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) (*IngestResponseHTTP, error) {
 	start := time.Now()
 
+	// RAG-004: expand the named profile into the flags that already existed,
+	// so there is one place that decides what "fast" means and every explicit
+	// flag still overrides it.
+	profile, err := ResolveIngestProfile(&opts)
+	if err != nil {
+		return nil, err
+	}
+	opts.SkipDuplicates = profile.SkipDuplicates
+	opts.SkipEmbeddings = profile.SkipEmbeddings
+	opts.SkipFTS = profile.SkipFTS
+	opts.SkipWebhooks = profile.SkipWebhooks
+	opts.AutoConfigureCollection = profile.AutoConfigureCollection
+	opts.SaveRevision = profile.SaveRevision
+
 	// Auto-configure collection as "scraping" type
 	if opts.AutoConfigureCollection && s.CollectionManager != nil {
 		existing, _ := s.CollectionManager.Get(collection)
@@ -113,6 +139,7 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 		Skipped:    len(skippedIdx),
 		Failed:     len(errs),
 		Errors:     errs,
+		Profile:    profile.Name,
 	}
 
 	if len(protoDocs) == 0 {

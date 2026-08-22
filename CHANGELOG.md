@@ -27,6 +27,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ValidateDocumentResponse` gains field 3 (`warnings`), which is
   wire-compatible: older clients ignore it.
 
+- **Named `fast` ingest profile (RAG-004)** — MDDB could always ingest faster by
+  skipping steps, but only as separate flags a caller had to discover one at a
+  time, and the wiki importer made the same choice a third way with a `skipFts`
+  comment reading "faster bulk import". `profile: "fast"` names the trade-off
+  once, across `/v1/ingest`, `/v1/upload` and `/v1/import-wiki`, and the response
+  records which profile applied so a corpus loaded months ago can be explained.
+  It selects text-only parsing, no revisions, no webhooks and duplicate skipping
+  — but deliberately **not** `skipEmbeddings` or `skipFts`: fast means cheaper
+  parsing and less bookkeeping, not a collection nobody can search. Any flag set
+  explicitly overrides the preset, and an unknown profile name is a 400 rather
+  than a silent fall back, because a caller who asked for `fast` and got default
+  behaviour would see a slow load and no reason why.
+
+  Measured, not assumed: text-only HTML is **43× faster** (132 ms → 3.2 ms on a
+  200-section document), while text-only DOCX is only 1.13× faster — its
+  Markdown converter was already efficient, so the value there is tolerance of
+  documents odd exporters produce, not speed. PDF gets no text-only variant at
+  all, because its extractor already produces plain text and a second name for
+  it would promise a speedup that does not exist.
+
 - **Per-collection answer formatting (RAG-002)** — a `responsePrompt` on the
   collection says how answers drawn from it should be shaped: numbered steps for
   runbooks, code blocks for API docs. That instruction used to live in the

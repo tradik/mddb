@@ -6166,6 +6166,27 @@ components:
           type: boolean
           description: Save revision history for all documents in this batch
           default: false
+        profile:
+          type: string
+          enum: [ default, fast ]
+          default: default
+          description: >
+            (v2.12.0+) Named preset of the flags above. `default` keeps every
+            step. `fast` trades parsing fidelity and per-document bookkeeping
+            for throughput: text-only parsing, no webhooks, no revisions,
+            duplicates skipped. Notably `fast` does NOT skip embeddings or FTS —
+            that is a separate decision with its own flag. Any flag set
+            explicitly overrides the preset, so `fast` plus `saveRevision: true`
+            keeps revisions. An unknown name is rejected with 400 rather than
+            falling back silently.
+        textOnly:
+          type: boolean
+          default: false
+          description: >
+            (v2.12.0+) Extract plain text from html/docx/odt instead of
+            rebuilding their structure as Markdown. Implied by `profile: fast`.
+            PDF has no text-only variant: its extractor already produces plain
+            text and builds no structure.
 
     IngestResponse:
       type: object
@@ -6200,6 +6221,12 @@ components:
           format: int64
           description: Total processing time in milliseconds
           example: 45
+        profile:
+          type: string
+          description: >
+            (v2.12.0+) Which ingest profile actually applied, so a corpus
+            loaded months ago can be explained without guessing which flags the
+            caller sent.
 
     GetRequest:
       type: object

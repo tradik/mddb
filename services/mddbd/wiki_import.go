@@ -62,9 +62,13 @@ type WikiImportRequest struct {
 	Lang          string `json:"lang"`
 	Namespaces    []int  `json:"namespaces,omitempty"` // default [0] (articles only)
 	SkipRedirects bool   `json:"skipRedirects,omitempty"`
-	SkipFTS       bool   `json:"skipFts,omitempty"`   // skip FTS indexing (faster bulk import)
-	MaxPages      int    `json:"maxPages,omitempty"`  // 0 = unlimited
-	BatchSize     int    `json:"batchSize,omitempty"` // default 500
+	SkipFTS       bool   `json:"skipFts,omitempty"` // skip FTS indexing (faster bulk import)
+	// Profile names the same trade-off `skipFts` has always expressed here,
+	// alongside the other ingest paths (RAG-004). `skipFts` still works and
+	// still wins when set.
+	Profile   string `json:"profile,omitempty"`
+	MaxPages  int    `json:"maxPages,omitempty"`  // 0 = unlimited
+	BatchSize int    `json:"batchSize,omitempty"` // default 500
 }
 
 // WikiImportResponse is the JSON response for /v1/import-wiki.
@@ -75,6 +79,7 @@ type WikiImportResponse struct {
 	Errors     []string `json:"errors,omitempty"`
 	Collection string   `json:"collection"`
 	DurationMs int64    `json:"durationMs"`
+	Profile    string   `json:"profile,omitempty"`
 }
 
 // MediaWiki XML structures for streaming parse.
@@ -134,6 +139,22 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// RAG-004: `profile=fast` maps onto the SkipFTS this path has always used
+	// for "faster bulk import" — same trade-off, now with the same name it
+	// has everywhere else. An explicit skipFts still wins.
+	wikiProfile, err := ResolveIngestProfile(&IngestOptionsHTTP{
+		Profile: req.Profile,
+		SkipFTS: req.SkipFTS,
+	})
+	if err != nil {
+		bad(w, err)
+		return
+	}
+	if wikiProfile.Name == IngestProfileFast {
+		req.SkipFTS = true
+	}
+	req.SkipFTS = req.SkipFTS || wikiProfile.SkipFTS
+
 	// Auth check
 	if s.AuthManager != nil {
 		if err := s.AuthManager.CheckPermission(r.Context(), req.Collection, PermWrite); err != nil {
@@ -175,7 +196,7 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		nsAllow[ns] = true
 	}
 
-	resp := WikiImportResponse{Collection: req.Collection}
+	resp := WikiImportResponse{Collection: req.Collection, Profile: wikiProfile.Name}
 
 	// Streaming XML parse
 	decoder := xml.NewDecoder(bufio.NewReaderSize(xmlReader, 256*1024)) // #nosec G709 -- trusted wiki XML input, streaming parse
@@ -365,6 +386,7 @@ func (s *Server) parseWikiImportRequest(r *http.Request) (WikiImportRequest, io.
 		req.Lang = r.FormValue("lang")
 		req.SkipRedirects = r.FormValue("skipRedirects") == "true"
 		req.SkipFTS = r.FormValue("skipFts") == "true"
+		req.Profile = r.FormValue("profile")
 
 		if v := r.FormValue("maxPages"); v != "" {
 			if n, err := strconv.Atoi(v); err == nil {
@@ -405,6 +427,7 @@ func (s *Server) parseWikiImportRequest(r *http.Request) (WikiImportRequest, io.
 	req.Lang = q.Get("lang")
 	req.SkipRedirects = q.Get("skipRedirects") == "true"
 	req.SkipFTS = q.Get("skipFts") == "true"
+	req.Profile = q.Get("profile")
 	if v := q.Get("maxPages"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			req.MaxPages = n

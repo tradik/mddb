@@ -322,6 +322,8 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
   - `skipWebhooks` (optional): Skip webhook firing for this batch
   - `autoConfigureCollection` (optional): Auto-configure collection as "scraping" type if it doesn't exist
   - `saveRevision` (optional): Save revision history for all documents in this batch
+  - `profile` (optional, v2.12.0+): `default` or `fast` — see below
+  - `textOnly` (optional, v2.12.0+): Extract plain text from html/docx/odt instead of rebuilding Markdown structure. Implied by `profile: fast`.
 
 **Response**:
 ```json
@@ -332,9 +334,57 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
   "failed": 0,
   "errors": [],
   "collection": "imported",
-  "durationMs": 45
+  "durationMs": 45,
+  "profile": "fast"
 }
 ```
+
+#### The `fast` ingest profile (v2.12.0+)
+
+MDDB could always ingest faster by skipping steps — the flags existed — but only
+as separate switches a caller had to discover one at a time, and the wiki
+importer made the same choice a third way with a `skipFts` comment reading
+"faster bulk import". The trade-off was available and undiscoverable.
+
+`profile: fast` names it. It applies to `/v1/ingest`, `/v1/upload` (multipart
+field `profile`) and `/v1/import-wiki`, and the response records which profile
+actually applied — so a corpus loaded months ago can be explained without
+guessing which flags the caller sent.
+
+| | `default` | `fast` |
+|---|---|---|
+| Heavy-format parsing | Full Markdown structure | Plain text |
+| Revisions | As requested | Off |
+| Webhooks | Fired | Skipped |
+| Duplicates | As requested | Skipped |
+| **Embeddings** | On | **On** |
+| **Full-text index** | On | **On** |
+
+The last two rows are the point. `fast` means cheaper parsing and less
+bookkeeping — not a collection you cannot search. Skipping embeddings or FTS
+stays a separate decision with its own flag, because folding it in would make
+`fast` mean something the caller did not ask for.
+
+**Any flag set explicitly overrides the preset**, so `{"profile": "fast",
+"saveRevision": true}` gives fast ingest with revisions kept. An unknown profile
+name is a `400`, never a silent fall back to `default` — a caller who asked for
+`fast` and got default behaviour would see a slow load and no reason why.
+
+**What text-only actually buys, measured** (200-section documents, `-benchtime=2s`):
+
+| Format | Full conversion | Text-only | |
+|---|---:|---:|---|
+| HTML | 132 ms | 3.2 ms | **43× faster** |
+| DOCX | 147 µs | 130 µs | 1.13× faster |
+| PDF | — | — | no variant |
+
+HTML is where the win is: its Markdown converter makes repeated case-insensitive
+passes over the whole document for every tag type. The DOCX converter was
+already efficient, so text-only is barely faster there — its value for `.docx`
+is tolerance of documents that odd exporters produce, not speed. **PDF has no
+text-only variant at all**: `pdfToMarkdown` already extracts raw text from
+content streams and builds no structure, so a second name for it would promise
+a speedup that does not exist.
 
 **Features**:
 - **URL key derivation**: If `key` is empty, a deterministic key is derived from the URL path
