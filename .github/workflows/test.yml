@@ -17,6 +17,7 @@ on:
       - 'go.work'
       - 'tools/bench/**'
       - 'test/**'
+      - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'
       - 'scripts/check-proto-plugins.sh'
       - 'buf.gen.yaml'
@@ -33,6 +34,7 @@ on:
       - 'go.work'
       - 'tools/bench/**'
       - 'test/**'
+      - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'
       - 'scripts/check-proto-plugins.sh'
       - 'buf.gen.yaml'
@@ -92,6 +94,14 @@ jobs:
       # `go test` does with testdata/fuzz corpora, so a bug found once can
       # never come back silently. The short fuzz budget below looks for new
       # ones; it is deliberately small so a PR is not held up by luck.
+      # TEST-003: a database written by an older release must still open.
+      # Runs here as well as in the release workflow, because a compatibility
+      # break should surface in the pull request that causes it rather than
+      # weeks later when someone tries to tag.
+      - name: Upgrade compatibility (older release fixtures)
+        working-directory: services/mddbd
+        run: go test -run 'TestOpensFixturesFromOlderReleases|TestFixtureContentIsUnchanged' ./
+
       - name: Run fuzz corpus (regressions)
         working-directory: services/mddbd
         run: go test -run 'Fuzz' ./...

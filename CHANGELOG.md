@@ -34,6 +34,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Four bugs surfaced within the first hour; they are listed under Fixed.
 
+- **Upgrade compatibility gate (TEST-003)** — nothing ships until the new build
+  proves it can open a database an older release wrote. `test/upgrade-fixtures/`
+  holds a real file produced by the v2.11.4 binary (four documents, metadata,
+  revisions, an FTS index), and the release workflow will not start a single
+  build job until the current code reads it back with its content and metadata
+  intact. The same check runs on pull requests, so a break surfaces where it is
+  introduced rather than weeks later when someone tries to tag.
+
+  Every other test in this repository writes with the current code and reads
+  with the current code. That proves the format is self-consistent, which is
+  exactly the property that stays true while compatibility quietly breaks — and
+  the failure it hides is the worst one a database can hand a user: a file the
+  new version refuses to open, with the old binary already replaced.
+
 
 - **Metadata lint for lost structure (DOC-012, issue #187)** — `ValidateDocument`
   now returns a `warnings` list alongside `errors` on all four surfaces (REST,
