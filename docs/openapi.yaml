@@ -4022,14 +4022,32 @@ paths:
         - Real-Time
       summary: Server-Sent Events stream
       description: |
-        Subscribe to real-time document change events via SSE.
-        Events: doc.added, doc.updated, doc.deleted.
+        Subscribe to real-time events via SSE.
+
+        Document events: `doc.added`, `doc.updated`, `doc.deleted`.
+
+        Async job events: `job.started`, `job.progress`, `job.completed`,
+        `job.failed`, `job.cancelled` — so a client can watch a bulk import
+        finish instead of polling its status endpoint. Job events carry the
+        same record `GET /v1/bulk/jobs/{id}` returns, under a `job` key.
+        `job.progress` is throttled to one event per second per job; terminal
+        events are not throttled.
+
         Default enabled (MDDB_SSE_ENABLED=false to disable).
       operationId: sseEvents
       parameters:
         - name: collection
           in: query
           description: Filter events to a specific collection (optional)
+          schema:
+            type: string
+        - name: job
+          in: query
+          description: |
+            Filter to one async job's events. A connection with this parameter
+            receives that job's events only — no `doc.*` events — since a
+            client asking for one job's stream wants the job, not every
+            document change. Combines with `collection`.
           schema:
             type: string
       responses:

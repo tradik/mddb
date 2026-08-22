@@ -31,10 +31,20 @@ type SSEHub struct {
 type sseClient struct {
 	ch         chan []byte
 	collection string // "" = all collections, otherwise filter
+	job        string // "" = all jobs, otherwise a single job ID (GO-030)
 	ip         string // client IP for rate limiting
 	// Auth: nil = no auth / public (read-only), non-nil = authenticated
 	claims *JWTClaims
 	mode   string // "read" or "readwrite"
+}
+
+// SSEJobEvent carries an async job's state to SSE clients (GO-030), so a
+// client can watch an import finish instead of polling its status endpoint.
+// The payload is the same job record GET returns — one serialiser, one shape.
+type SSEJobEvent struct {
+	Event     string         `json:"event"` // "job.started", "job.progress", ...
+	Timestamp int64          `json:"timestamp"`
+	Job       *BulkIngestJob `json:"job"`
 }
 
 // SSEEvent represents a document change event sent to SSE clients.
@@ -137,6 +147,11 @@ func (h *SSEHub) BroadcastWithAuth(event, collection, key, lang string, authMana
 	defer h.mu.RUnlock()
 
 	for client := range h.clients {
+		// A client that asked for one job's stream (?job=) wants that job's
+		// events, not every document change on the server (GO-030).
+		if client.job != "" {
+			continue
+		}
 		// Filter by collection if client specified one
 		if client.collection != "" && client.collection != collection {
 			continue
@@ -207,6 +222,9 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	collection := r.URL.Query().Get("collection")
+	// GO-030: ?job=<id> narrows the stream to one async job's events, the same
+	// way ?collection= narrows document events. Both may be combined.
+	jobID := r.URL.Query().Get("job")
 	ip := clientIP(r)
 
 	// Resolve auth: extract claims from context (injected by auth middleware).
@@ -246,6 +264,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	client := &sseClient{
 		ch:         make(chan []byte, 64),
 		collection: collection,
+		job:        jobID,
 		ip:         ip,
 		claims:     claims,
 		mode:       mode,

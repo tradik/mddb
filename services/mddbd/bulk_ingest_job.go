@@ -69,11 +69,12 @@ type bulkWorkItem struct {
 // queued jobs. A single worker keeps BoltDB writes serialised and removes
 // the need for per-job locking on status transitions.
 type BulkIngestManager struct {
-	server *Server
-	queue  chan bulkWorkItem
-	stop   chan struct{}
-	wg     sync.WaitGroup
-	mu     sync.Mutex // guards job status transitions
+	server    *Server
+	queue     chan bulkWorkItem
+	stop      chan struct{}
+	wg        sync.WaitGroup
+	mu        sync.Mutex // guards job status transitions
+	jobEvents *jobEventThrottle
 }
 
 // NewBulkIngestManager constructs a manager with a buffered queue. BufferSize
@@ -84,9 +85,10 @@ func NewBulkIngestManager(server *Server, bufferSize int) *BulkIngestManager {
 		bufferSize = 64
 	}
 	return &BulkIngestManager{
-		server: server,
-		queue:  make(chan bulkWorkItem, bufferSize),
-		stop:   make(chan struct{}),
+		server:    server,
+		queue:     make(chan bulkWorkItem, bufferSize),
+		stop:      make(chan struct{}),
+		jobEvents: newJobEventThrottle(),
 	}
 }
 
@@ -239,6 +241,7 @@ func (m *BulkIngestManager) process(item bulkWorkItem) {
 	job.Status = BulkJobProcessing
 	job.StartedAt = time.Now().Unix()
 	_ = m.saveJob(job)
+	m.publishJobEvent(SSEJobStarted, job)
 
 	ctx := context.Background()
 	for i := 0; i < len(item.docs); i += bulkJobChunkSize {
@@ -263,6 +266,7 @@ func (m *BulkIngestManager) process(item bulkWorkItem) {
 		}
 		job.Processed = i + len(chunk)
 		_ = m.saveJob(job)
+		m.publishJobEvent(SSEJobProgress, job)
 	}
 
 	if job.Failed == job.Total {
@@ -272,6 +276,7 @@ func (m *BulkIngestManager) process(item bulkWorkItem) {
 	}
 	job.CompletedAt = time.Now().Unix()
 	_ = m.saveJob(job)
+	m.publishJobEvent(eventForStatus(job.Status), job)
 
 	if job.CallbackURL != "" {
 		go m.fireCallback(job)
@@ -308,7 +313,13 @@ func (m *BulkIngestManager) transitionStatus(jobID string, status BulkJobStatus,
 	} else {
 		job.CompletedAt = time.Now().Unix()
 	}
-	return m.saveJob(job)
+	if err := m.saveJob(job); err != nil {
+		return err
+	}
+	// Announced here rather than at each call site: this is the single place a
+	// job changes state, so a new transition cannot forget to emit (GO-030).
+	m.publishJobEvent(eventForStatus(status), job)
+	return nil
 }
 
 // markTerminal is the mutex-guarded version used during shutdown drain.
