@@ -63,6 +63,8 @@ jobs:
             target: FuzzLoadDoc
           - dir: ./
             target: FuzzDocRoundTrip
+          - dir: ./
+            target: FuzzPersistenceRoundTrip
 
     steps:
       - name: Checkout code

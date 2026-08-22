@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   twelve, uploading any new crasher as an artifact so a CI finding reaches the
   repository instead of being rediscovered from scratch.
 
+  A thirteenth target fuzzes the store itself rather than a decoder: random
+  programs of writes, overwrites, deletes and reopens, with two invariants
+  checked after every step — every live document reads back with the content it
+  was written with, and no metadata index entry points at a document that does
+  not exist. That is the shape of GO-001 and GO-010, which never announce
+  themselves as crashes; they surface as a search returning a document that was
+  deleted, weeks later.
+
   Four bugs surfaced within the first hour; they are listed under Fixed.
 
 

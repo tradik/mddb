@@ -106,6 +106,7 @@ jobs:
           go test -run='^$' -fuzz='^FuzzUnmarshalBinlogEntry$'     -fuzztime=20s ./internal/binlog/
           go test -run='^$' -fuzz='^FuzzDecompressDoc$'            -fuzztime=20s ./internal/compression/
           go test -run='^$' -fuzz='^FuzzLoadDoc$'                  -fuzztime=20s ./
+          go test -run='^$' -fuzz='^FuzzPersistenceRoundTrip$'   -fuzztime=20s ./
 
       - name: Upload coverage
         uses: codecov/codecov-action@v7
