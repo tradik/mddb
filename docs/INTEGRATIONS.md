@@ -855,6 +855,29 @@ volumes:
   mddb-data:
 ```
 
+### Structured frontmatter: what MDDB can and cannot hold
+
+SSG pages often carry structured frontmatter — an `faq:` list of objects, a
+`schema:` Recipe JSON-LD block. MDDB's metadata is flat
+(`map<string, repeated string>`) and cannot hold it directly. An importer that
+stringifies nested YAML with Go's `%v` produces values like
+`map[answer:Yes question:Is it free?]`; MDDB stores them faithfully, and the
+site build fails later on a template that cannot render them
+([issue #187](https://github.com/tradik/mddb/issues/187)).
+
+Before ingesting a site with structured frontmatter, pick one of the three
+patterns in [API.md](API.md#structured-frontmatter-and-flat-meta) — JSON in a
+single value, flattened leaf keys, or leaving the block in the markdown body.
+`POST /v1/validate` warns when a value looks stringified, so a pipeline can
+catch it at import time rather than at render time:
+
+```bash
+curl -s -X POST "$MDDB/v1/validate" \
+  -H 'Content-Type: application/json' \
+  -d '{"collection":"site","meta":{"faq":["[map[answer:Yes question:Is it free?]]"]}}' \
+  | jq .warnings
+```
+
 ### Workflow: Edit in Panel → Generate → Deploy
 
 ```mermaid

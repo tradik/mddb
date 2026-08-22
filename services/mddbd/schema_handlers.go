@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	json "github.com/goccy/go-json"
+	"mddb/internal/schema"
 )
 
 // --- HTTP Handlers ---
@@ -105,16 +106,26 @@ func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
 		bad(w, errors.New("missing collection"))
 		return
 	}
+	// DOC-012: advisory findings that do not fail validation. Reported
+	// alongside errors so a caller sees them even when the document is valid,
+	// which is the usual case — a stringified structure is a valid string.
+	warnings := schema.LintMetaStrings(req.Meta)
+	if warnings == nil {
+		warnings = []string{}
+	}
+
 	err := s.SchemaManager.Validate(req.Collection, req.Meta)
 	if err != nil {
 		ok(w, map[string]interface{}{
-			"valid":  false,
-			"errors": strings.Split(err.Error(), "; "),
+			"valid":    false,
+			"errors":   strings.Split(err.Error(), "; "),
+			"warnings": warnings,
 		})
 		return
 	}
 	ok(w, map[string]interface{}{
-		"valid":  true,
-		"errors": []string{},
+		"valid":    true,
+		"errors":   []string{},
+		"warnings": warnings,
 	})
 }

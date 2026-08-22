@@ -290,6 +290,9 @@ type UserPermission struct {
 type ValidationResult struct {
 	Valid  bool     `json:"valid"`
 	Errors []string `json:"errors"`
+	// Advisory findings that do not make the document invalid (DOC-012) — today,
+	// metadata values that look like a structure lost on the way in.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type VectorCollectionStats struct {

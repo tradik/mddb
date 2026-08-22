@@ -677,6 +677,11 @@ message ValidateDocumentRequest {
 message ValidateDocumentResponse {
   bool valid = 1;
   repeated string errors = 2;
+  // Advisory findings that do not fail validation (DOC-012). Today: metadata
+  // values that look like a structure lost on the way in — Go's `%v` rendering
+  // of a map or a list of maps. A warning, never an error: rejecting the value
+  // would break every caller legitimately storing text that looks like this.
+  repeated string warnings = 3;
 }
 
 // --- Partial Update ---

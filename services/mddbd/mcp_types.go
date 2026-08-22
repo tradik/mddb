@@ -494,6 +494,8 @@ type MCPValidateRequest struct {
 type MCPValidateResponse struct {
 	Valid  bool     `json:"valid"`
 	Errors []string `json:"errors"`
+	// Warnings are advisory and never make a document invalid (DOC-012).
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // MCPUpdateDocumentRequest represents request to partially update a document.

@@ -50,13 +50,22 @@ if ! command -v protoc-gen-go-grpc &> /dev/null; then
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 fi
 
-# Generate Go code
+# Generate Go code.
+#
+# The output directory is services/mddbd/proto, matching buf.gen.yaml and
+# `option go_package = "mddb/proto"`. It said services/mddbd before — the
+# pre-buf-migration layout — which silently wrote mddb.pb.go one level too high,
+# next to the server sources, where it neither compiles as `package proto` nor
+# shows up in the CI drift check against services/mddbd/proto/.
 mkdir -p services/mddbd/proto
-protoc --go_out=services/mddbd --go_opt=paths=source_relative \
-    --go-grpc_out=services/mddbd --go-grpc_opt=paths=source_relative \
+protoc --go_out=services/mddbd/proto --go_opt=paths=source_relative \
+    --go-grpc_out=services/mddbd/proto --go-grpc_opt=paths=source_relative \
     -I ${PROTO_DIR} ${PROTO_DIR}/${PROTO_FILE}
 
 echo "  ✅ Go code generated in services/mddbd/proto/"
+echo "  ⚠️  Plugin versions here are whatever is installed locally, NOT the"
+echo "     versions pinned in buf.gen.yaml. CI regenerates with buf and fails"
+echo "     on any difference — install buf before committing generated code."
 
 # ============================================================================
 # Python (Client Library)

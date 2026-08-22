@@ -7137,6 +7137,17 @@ components:
             type: string
           description: Validation error messages (empty if valid)
           example: []
+        warnings:
+          type: array
+          items:
+            type: string
+          description: >
+            Advisory findings that do not make the document invalid. Today:
+            metadata values that look like a structure lost on the way in —
+            Go's `%v` rendering of a map or a list of maps. A warning rather
+            than an error, because such a value is a valid string and rejecting
+            it would break callers legitimately storing text that looks like it.
+          example: []
 
     ReplicationStatusResponse:
       type: object

@@ -4079,9 +4079,14 @@ func (x *ValidateDocumentRequest) GetMeta() map[string]*MetaValues {
 }
 
 type ValidateDocumentResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
-	Errors        []string               `protobuf:"bytes,2,rep,name=errors,proto3" json:"errors,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	Valid  bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
+	Errors []string               `protobuf:"bytes,2,rep,name=errors,proto3" json:"errors,omitempty"`
+	// Advisory findings that do not fail validation (DOC-012). Today: metadata
+	// values that look like a structure lost on the way in — Go's `%v` rendering
+	// of a map or a list of maps. A warning, never an error: rejecting the value
+	// would break every caller legitimately storing text that looks like this.
+	Warnings      []string `protobuf:"bytes,3,rep,name=warnings,proto3" json:"warnings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4126,6 +4131,13 @@ func (x *ValidateDocumentResponse) GetValid() bool {
 func (x *ValidateDocumentResponse) GetErrors() []string {
 	if x != nil {
 		return x.Errors
+	}
+	return nil
+}
+
+func (x *ValidateDocumentResponse) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
 	}
 	return nil
 }
@@ -11530,10 +11542,11 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04meta\x18\x02 \x03(\v2'.mddb.ValidateDocumentRequest.MetaEntryR\x04meta\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
-	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"H\n" +
+	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"d\n" +
 	"\x18ValidateDocumentResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x16\n" +
-	"\x06errors\x18\x02 \x03(\tR\x06errors\"\xfb\x02\n" +
+	"\x06errors\x18\x02 \x03(\tR\x06errors\x12\x1a\n" +
+	"\bwarnings\x18\x03 \x03(\tR\bwarnings\"\xfb\x02\n" +
 	"\x15UpdateDocumentRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +

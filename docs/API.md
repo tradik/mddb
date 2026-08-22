@@ -3371,6 +3371,64 @@ collections whose documents were ingested without the convention.
 > source. Prose collections are unaffected: their segmentation is unchanged,
 > byte for byte.
 
+### Structured frontmatter and flat meta
+
+MDDB's metadata is flat, on purpose: `map<string, repeated string>`, the same
+shape in proto, REST, GraphQL and MCP. Every filter, facet and index in the
+system assumes it.
+
+Structured frontmatter does not fit. An SSG page with
+
+```yaml
+faq:
+  - question: Is it free?
+    answer: Yes, it is free.
+  - question: Is there a trial?
+    answer: No.
+```
+
+has nowhere to go, and an importer that reaches for Go's `%v` produces
+
+```
+faq: ["[map[answer:Yes, it is free. question:Is it free?] map[answer:No. question:Is there a trial?]]"]
+```
+
+MDDB stores that faithfully — it is a valid string — and the damage surfaces
+much later, in a template that cannot render it ([issue #187](https://github.com/tradik/mddb/issues/187)).
+
+**Three ways to handle it.** Pick by what you need to query, not by what is
+least work at import time:
+
+| Pattern | Looks like | Round-trip | Filterable |
+|---|---|---|---|
+| **JSON in one value** | `faq: ["[{\"question\":…}]"]` | Lossless | No — one opaque string |
+| **Flattened keys** | `faq.0.question: ["Is it free?"]` | Lossless if the shape is fixed | Yes, per leaf |
+| **Leave it in the body** | The markdown keeps its frontmatter | Lossless | No, but full-text searchable |
+
+JSON in one value is the usual answer: nothing is lost, and the consumer parses
+it once. Flatten only the leaves you actually filter on — `faq.0.question` is
+queryable, but the numbering makes reordering the source a metadata migration.
+Leaving the block in the markdown body costs nothing and stays findable through
+full-text search; choose it when nothing queries the structure.
+
+**The validator warns, it does not reject.** `POST /v1/validate` (and the gRPC,
+GraphQL and MCP equivalents) returns a `warnings` list alongside `errors` when a
+value looks like Go stringification:
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": ["meta.faq: looks like a Go-stringified list of objects (`[map[...] map[...]]`). …"]
+}
+```
+
+It stays a warning because such a value is a valid string, and MDDB has no
+business deciding a string is not what its author meant — a caller storing prose
+about `map[string]int` is doing nothing wrong. The lint runs even when a
+collection has no schema, which is precisely the case an unstructured import
+lands in.
+
 ### Symbols: which file declares this?
 
 Full-text search cannot tell a declaration from a mention. Search a theme for

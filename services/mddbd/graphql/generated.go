@@ -231,8 +231,9 @@ type ComplexityRoot struct {
 	}
 
 	ValidationResult struct {
-		Errors func(childComplexity int) int
-		Valid  func(childComplexity int) int
+		Errors   func(childComplexity int) int
+		Valid    func(childComplexity int) int
+		Warnings func(childComplexity int) int
 	}
 
 	VectorCollectionStats struct {
@@ -1282,6 +1283,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ValidationResult.Valid(childComplexity), true
+	case "ValidationResult.warnings":
+		if e.ComplexityRoot.ValidationResult.Warnings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ValidationResult.Warnings(childComplexity), true
 
 	case "VectorCollectionStats.collection":
 		if e.ComplexityRoot.VectorCollectionStats.Collection == nil {
@@ -1836,6 +1843,8 @@ func (ec *executionContext) childFields_ValidationResult(ctx context.Context, fi
 		return ec.fieldContext_ValidationResult_valid(ctx, field)
 	case "errors":
 		return ec.fieldContext_ValidationResult_errors(ctx, field)
+	case "warnings":
+		return ec.fieldContext_ValidationResult_warnings(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type ValidationResult", field.Name)
 }
@@ -7171,6 +7180,29 @@ func (ec *executionContext) fieldContext_ValidationResult_errors(_ context.Conte
 	return graphql.NewScalarFieldContext("ValidationResult", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
+func (ec *executionContext) _ValidationResult_warnings(ctx context.Context, field graphql.CollectedField, obj *ValidationResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ValidationResult_warnings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Warnings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalOString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ValidationResult_warnings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ValidationResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
 func (ec *executionContext) _VectorCollectionStats_collection(ctx context.Context, field graphql.CollectedField, obj *VectorCollectionStats) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -11346,6 +11378,11 @@ func (ec *executionContext) _ValidationResult(ctx context.Context, sel ast.Selec
 		case "errors":
 			out.Values[i] = ec._ValidationResult_errors(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "warnings":
+			out.Values[i] = ec._ValidationResult_warnings(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:

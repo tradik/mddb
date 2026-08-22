@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Metadata lint for lost structure (DOC-012, issue #187)** — `ValidateDocument`
+  now returns a `warnings` list alongside `errors` on all four surfaces (REST,
+  gRPC, GraphQL, MCP) when a metadata value looks like Go's `%v` rendering of a
+  map or a list of maps. MDDB's meta is flat by design, so structured
+  frontmatter — an `faq:` list of objects, a `schema:` JSON-LD block — has
+  nowhere to go, and an importer reaching for `%v` produces
+  `map[answer:… question:…]`, which MDDB stores faithfully because it is a valid
+  string. The damage surfaced much later, in a template that could not render
+  it. A warning and never an error: rejecting the value would break callers
+  legitimately storing text about `map[string]int`, and MDDB has no business
+  deciding a string is not what its author meant. The lint runs even where no
+  schema is configured, which is exactly the case an unstructured import lands
+  in. `docs/API.md` gains "Structured frontmatter and flat meta" with the three
+  ways to handle it — JSON in one value, flattened leaf keys, or leaving the
+  block in the markdown body — and the SSG integration guide points at it.
+  `ValidateDocumentResponse` gains field 3 (`warnings`), which is
+  wire-compatible: older clients ignore it.
+
 - **Code connection graph (CODE-005)** — answers the relational questions
   full-text search cannot: what breaks if `.hero-banner` changes, which pages
   load `checkout.js`, what does nothing reference any more. Available as
@@ -42,6 +60,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   write paths (single document and bulk) enrich through one call, so the
   behaviour cannot differ by transport. Only new writes are enriched; re-save an
   existing code collection to populate it.
+
+### Fixed
+
+- **`proto/generate.sh` wrote generated Go code one directory too high** when
+  `buf` is not installed. The legacy protoc fallback still used the
+  pre-buf-migration layout (`services/mddbd`, not `services/mddbd/proto`), so a
+  developer without buf produced 700 KB of files next to the server sources,
+  with whatever `protoc-gen-go` happened to be on their machine instead of the
+  version pinned in `buf.gen.yaml`. They compile as the wrong package and are
+  invisible to the CI drift check. Path corrected, and the fallback now says
+  loudly that its plugin versions are unpinned.
 
 ### Upgrading to 2.12.0
 
@@ -77,12 +106,17 @@ Anything matching on `keyPrefix` should move to `fingerprint`.
 against 13, so 13-only APIs would have failed at runtime on the version it
 claimed to support. Both now say 13.
 
-**6. Re-embed collections holding source.** Code documents are now chunked on
-bracket depth rather than on paragraphs, and chunks are re-derived rather than
-stored — so a document embedded before this release and read after it returns
-the wrong passage. Run `vector_reindex` on any collection holding source. Prose
-collections are untouched: their segmentation is byte-for-byte unchanged, which
-a test pins.
+**6. Re-embed collections holding source, and re-save them for the graph.**
+Code documents are now chunked on bracket depth rather than on paragraphs, and
+chunks are re-derived rather than stored — so a document embedded before this
+release and read after it returns the wrong passage. Run `vector_reindex` on any
+collection holding source. Prose collections are untouched: their segmentation is
+byte-for-byte unchanged, which a test pins.
+
+Separately, symbols (`defines`/`uses`/`imports`) are extracted on write, so
+documents stored before this release have none and the connection graph will
+report them as orphans. Re-save or bulk re-ingest a code collection to populate
+it — reading is unaffected either way.
 
 Also worth knowing: heavy queries can return `503` with `Retry-After` under
 load, where they previously all ran and risked exhausting memory

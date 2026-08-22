@@ -126,6 +126,11 @@ type Schema {
 type ValidationResult {
   valid: Boolean!
   errors: [String!]!
+  """
+  Advisory findings that do not make the document invalid (DOC-012) — today,
+  metadata values that look like a structure lost on the way in.
+  """
+  warnings: [String!]
 }
 
 # Authentication types

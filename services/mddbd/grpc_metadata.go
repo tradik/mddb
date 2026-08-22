@@ -14,6 +14,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"mddb/internal/schema"
 )
 
 // RegisterWebhook implements the RegisterWebhook RPC
@@ -209,6 +210,9 @@ func (g *GRPCServer) ValidateDocument(ctx context.Context, req *proto.ValidateDo
 	for k, v := range req.Meta {
 		meta[k] = v.Values
 	}
+	// DOC-012: advisory findings, reported whether or not validation passes.
+	warnings := schema.LintMetaStrings(meta)
+
 	err := g.server.SchemaManager.Validate(req.Collection, meta)
 	if err != nil {
 		parts := strings.SplitAfter(err.Error(), ": ")
@@ -218,9 +222,9 @@ func (g *GRPCServer) ValidateDocument(ctx context.Context, req *proto.ValidateDo
 		} else {
 			errMsgs = []string{err.Error()}
 		}
-		return &proto.ValidateDocumentResponse{Valid: false, Errors: errMsgs}, nil
+		return &proto.ValidateDocumentResponse{Valid: false, Errors: errMsgs, Warnings: warnings}, nil
 	}
-	return &proto.ValidateDocumentResponse{Valid: true}, nil
+	return &proto.ValidateDocumentResponse{Valid: true, Warnings: warnings}, nil
 }
 
 // UpdateDocument implements the UpdateDocument RPC - partial document update

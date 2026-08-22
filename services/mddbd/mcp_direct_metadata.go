@@ -10,6 +10,7 @@ import (
 	"time"
 
 	bolt "go.etcd.io/bbolt"
+	"mddb/internal/schema"
 )
 
 // RegisterWebhook registers a new webhook via the direct client.
@@ -100,15 +101,20 @@ func (c *DirectClient) ListSchemas(ctx context.Context) (*MCPListSchemasResponse
 
 // ValidateDocument validates a document against its collection schema via the direct client.
 func (c *DirectClient) ValidateDocument(ctx context.Context, req *MCPValidateRequest) (*MCPValidateResponse, error) {
+	// DOC-012: the lint is independent of the schema, so it runs even where
+	// no schema is configured — that is exactly the case an unstructured
+	// import lands in.
+	warnings := schema.LintMetaStrings(req.Meta)
+
 	if c.server.SchemaManager == nil {
-		return &MCPValidateResponse{Valid: true, Errors: []string{}}, nil
+		return &MCPValidateResponse{Valid: true, Errors: []string{}, Warnings: warnings}, nil
 	}
 	err := c.server.SchemaManager.Validate(req.Collection, req.Meta)
 	if err != nil {
 		parts := strings.Split(err.Error(), "; ")
-		return &MCPValidateResponse{Valid: false, Errors: parts}, nil
+		return &MCPValidateResponse{Valid: false, Errors: parts, Warnings: warnings}, nil
 	}
-	return &MCPValidateResponse{Valid: true, Errors: []string{}}, nil
+	return &MCPValidateResponse{Valid: true, Errors: []string{}, Warnings: warnings}, nil
 }
 
 // UpdateDocument updates an existing document via the direct client.
