@@ -3371,6 +3371,59 @@ collections whose documents were ingested without the convention.
 > source. Prose collections are unaffected: their segmentation is unchanged,
 > byte for byte.
 
+### Symbols: which file declares this?
+
+Full-text search cannot tell a declaration from a mention. Search a theme for
+`.hero-banner` and the stylesheet that defines it ranks alongside every template
+that merely applies it — and the template usually wins, because it repeats the
+name more often.
+
+Every code document therefore gets three extra meta keys, filled from its own
+content on each save:
+
+| Key | Holds | Example (CSS) |
+|---|---|---|
+| `defines` | What this file declares | `.hero-banner`, `#nav`, `--brand` |
+| `uses` | What it references but does not declare | `/images/hero.png` |
+| `imports` | What it pulls in | `reset.css` |
+
+They are ordinary values in the existing flat meta map, so the metadata filter
+already answers the question — no new query surface, no schema change:
+
+```bash
+# The file that declares the selector, not the twelve that apply it.
+curl -s "$MDDB/v1/fts?collection=theme&q=hero-banner&meta.defines=.hero-banner"
+
+# Everything that would break if that stylesheet were deleted.
+curl -s "$MDDB/v1/fts?collection=theme&q=*&meta.uses=.hero-banner"
+```
+
+What each language contributes:
+
+| Language | `defines` | `uses` | `imports` |
+|---|---|---|---|
+| CSS / SCSS / LESS | Selectors, their component classes and ids, `--custom-properties` | `url(...)` targets | `@import` targets |
+| JavaScript / TypeScript | Function, class, and arrow-const names | — | `import` and `require` specifiers |
+| HTML | `id` attributes | `class` names, `on*` handler names | Local `src` / `href` targets |
+
+Three deliberate limits:
+
+- **The extractor owns these keys.** They are rewritten on every save and
+  removed when a document stops being code, so they always describe the current
+  content. A hand-supplied `defines` will not survive the next write — a stale
+  one would point graph queries at a document that no longer exists.
+- **Scanners, not parsers.** Regex and a brace walker, which is why minified
+  files, `@media` blocks, and SCSS nesting all work, and why a class name built
+  at runtime (`` `btn-${size}` ``) is not found. A missing edge costs a search;
+  a wrong one costs trust.
+- **Capped and sorted.** At most `MDDB_CODE_MAX_SYMBOLS` (default 512) per key,
+  deduplicated and sorted. The output is deterministic because these bytes
+  travel through the replication binlog: the same document must produce the same
+  meta on every replica.
+
+Only new writes are enriched. Re-save (or bulk re-ingest) an existing code
+collection to populate symbols for documents stored before this version.
+
 ### Why the tokeniser differs
 
 The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,

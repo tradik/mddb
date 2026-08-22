@@ -4,6 +4,7 @@ import (
 	"path"
 	"strings"
 
+	"mddb/internal/codeintel"
 	"mddb/internal/envconf"
 
 	"mddb/internal/fts"
@@ -112,4 +113,68 @@ func ChunkModeFor(doc *storage.Doc) ChunkMode {
 		return ChunkModeCode
 	}
 	return ChunkModeProse
+}
+
+// Symbol meta keys (CODE-004). These are owned by the extractor: they are
+// rewritten on every save of a code document and removed when a document stops
+// being code, so they always describe the current content rather than whatever
+// a caller once supplied.
+const (
+	MetaKeyDefines = "defines"
+	MetaKeyUses    = "uses"
+	MetaKeyImports = "imports"
+)
+
+// EnrichCodeSymbols fills a document's meta with what its source declares,
+// references and imports.
+//
+// It runs before the document is written, so the symbols land in the ordinary
+// flat meta map and are queryable through the existing metadata filter —
+// `defines=.hero-banner` finds the stylesheet that declares the selector,
+// without ranking every file that merely applies it alongside.
+//
+// The three keys are owned by this function. A caller cannot supply them:
+// letting a stale hand-written `defines` survive a content change would make
+// the graph describe a document that no longer exists.
+func EnrichCodeSymbols(doc *storage.Doc) {
+	if doc == nil {
+		return
+	}
+	// A document that is no longer code must not keep symbols from when it was.
+	if DocumentKind(doc) != fts.KindCode || doc.ContentMD == "" {
+		clearSymbolMeta(doc)
+		return
+	}
+
+	syms := codeintel.ExtractWithLimit(
+		CodeLanguage(doc),
+		doc.ContentMD,
+		envconf.Int("MDDB_CODE_MAX_SYMBOLS", codeintel.DefaultMaxSymbols),
+	)
+
+	clearSymbolMeta(doc)
+	if syms.Empty() {
+		return
+	}
+	if doc.Meta == nil {
+		doc.Meta = make(map[string][]string, 3)
+	}
+	for key, vals := range map[string][]string{
+		MetaKeyDefines: syms.Defines,
+		MetaKeyUses:    syms.Uses,
+		MetaKeyImports: syms.Imports,
+	} {
+		if len(vals) > 0 {
+			doc.Meta[key] = vals
+		}
+	}
+}
+
+func clearSymbolMeta(doc *storage.Doc) {
+	if doc.Meta == nil {
+		return
+	}
+	delete(doc.Meta, MetaKeyDefines)
+	delete(doc.Meta, MetaKeyUses)
+	delete(doc.Meta, MetaKeyImports)
 }

@@ -168,6 +168,9 @@ func (bp *BatchProcessor) processDocument(collection string, batchDoc *proto.Bat
 		ID: docID, Key: batchDoc.Key, Lang: batchDoc.Lang, Meta: meta,
 		ContentMD: batchDoc.ContentMd, AddedAt: added, UpdatedAt: now,
 	}
+	// CODE-004: same enrichment as the single-document path — one behaviour
+	// across every write transport (the GO-001 lesson).
+	EnrichCodeSymbols(&doc)
 
 	// Marshal (+ optional at-rest encryption based on CollectionConfig.Encrypted)
 	buf, err := marshalAndEncrypt(&doc, collection)

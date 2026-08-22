@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Code symbols in meta (CODE-004)** — every code document now records what it
+  `defines`, `uses` and `imports`, extracted from its own content on each save.
+  Full-text search cannot tell a declaration from a mention, so searching a
+  theme for `.hero-banner` ranked the stylesheet that defines the selector
+  alongside every template that merely applies it — and the templates usually
+  won, because they repeat the name more often. The three keys are ordinary
+  values in the existing flat meta map, so `meta.defines=.hero-banner` answers
+  the question through the metadata filter already there: no new query surface,
+  no schema change. CSS contributes selectors, their component classes/ids and
+  `--custom-properties`; JS/TS contributes function, class and arrow-const names
+  plus import specifiers; HTML contributes `id`s as definitions, `class` and
+  `on*` handler names as uses, and local `src`/`href` as imports. Output is
+  deduplicated, sorted and capped at `MDDB_CODE_MAX_SYMBOLS` (default 512) —
+  deterministic because these bytes travel through the replication binlog. Both
+  write paths (single document and bulk) enrich through one call, so the
+  behaviour cannot differ by transport. Only new writes are enriched; re-save an
+  existing code collection to populate it.
+
 ### Upgrading to 2.12.0
 
 This release makes six changes that need action or attention. They are why

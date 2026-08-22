@@ -72,6 +72,10 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 			ID: docID, Key: key, Lang: lang, Meta: meta,
 			ContentMD: contentMD, AddedAt: added, UpdatedAt: now,
 		}
+		// CODE-004: source symbols go into meta before the document is
+		// marshalled, so the existing metadata filter can answer "which file
+		// declares this" without a new query surface.
+		EnrichCodeSymbols(&doc)
 		if ttl > 0 {
 			doc.ExpiresAt = now + ttl
 		}
