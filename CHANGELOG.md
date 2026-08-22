@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-area coverage floors (TEST-002)** — `go test ./...` reported one number
+  for a package of 150 files, and that number looked healthy while the surfaces
+  handling file uploads, 80 MCP tools and automation triggers sat at 22% between
+  them. `scripts/check-coverage-areas.sh` now reports coverage per source file
+  for the highest-risk areas and fails when one drops below its floor. The
+  floors are ratchets: raise one when you improve an area, never lower one to
+  make a build pass. It has its own 6-case guard suite, because a guard that
+  only ever sees the passing case proves nothing.
+
+  With it in place: **`upload_handler.go` went from 6.1% to 73.1%** and
+  `automation_trigger.go` from 38.3% to 58.7%, through behavioural tests rather
+  than exercise — the upload tests post real multipart bodies and assert what
+  key a file lands under and whether its text survives conversion; the trigger
+  tests run a real HTTP server and assert what actually goes out on the wire,
+  including that a webhook nobody can reach terminates instead of holding the
+  caller forever.
+
+
 - **Fuzz testing (TEST-003)** — the repository had no fuzz target at all. There
   are now 12, over the parsers and decoders that read bytes MDDB did not write:
   the FTS query expression parser, both embedding-record encodings, the
@@ -203,6 +221,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   existing code collection to populate it.
 
 ### Fixed
+
+- **`SchemaManager.Validate` and `Metrics.IncOp` panicked on a nil receiver.**
+  Half the call sites guarded the nil and half did not — five schema call sites
+  unguarded against four guarded, and one metrics call site out of thirty-eight.
+  Both now treat a nil receiver as the answer it already means: no schema
+  manager validates nothing, no metrics collector counts nothing. A counter is
+  never worth a crash, and handling it once makes the whole class impossible
+  rather than relying on every future caller remembering (TEST-002).
+
+- **`RunTrigger` returned `(nil, nil)` for an unknown search type** — no
+  matches and no error, indistinguishable from a trigger that matched nothing.
+  An operator who mistyped `hybrid` saw a rule that never fired and no reason
+  why. It returns `ErrUnknownSearchType` naming the offending value now. The
+  API refuses to create such a rule, but one stored by an older version or
+  edited outside the API arrives this way.
+
+- **A filename of `..` produced a document key of `..`.** Key derivation
+  rejected `.` but not `..`. MDDB itself stores keys in BoltDB, where this is
+  harmless — but consumers that write one file per document key (ssg,
+  wpexporter) resolve it against their output directory. A filename yielding a
+  path operator has no usable key, and inventing one puts the document
+  somewhere the caller cannot find it.
+
 
 - **Decompressing a document had no size limit.** A snappy payload states its
   own decompressed length, and nothing checked it: **five bytes can claim two

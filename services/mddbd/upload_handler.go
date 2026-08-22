@@ -325,7 +325,12 @@ func deriveKeyFromFilename(filename string) string {
 		base = base[:len(base)-len(ext)]
 	}
 	base = strings.TrimSpace(base)
-	if base == "" || base == "." {
+	// "." and ".." are not names — they are path operators, and consumers
+	// that write a file per document key (ssg, wpexporter) would resolve them
+	// against their output directory. A filename that yields one of these has
+	// no usable key, and inventing one puts the document somewhere the caller
+	// cannot find it (TEST-002).
+	if base == "" || base == "." || base == ".." {
 		return ""
 	}
 	// Replace spaces with hyphens, lowercase

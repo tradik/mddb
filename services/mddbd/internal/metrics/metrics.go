@@ -92,8 +92,12 @@ func NewMetrics(enabled bool, stats StatsProvider) *Metrics {
 }
 
 // IncOp increments an operation counter. Labels are joined with "|".
+//
+// A nil receiver counts nothing rather than panicking. "No metrics collector"
+// and "collection disabled" are the same answer, and 37 call sites guarded the
+// nil while at least one did not (TEST-002) — a counter is never worth a crash.
 func (m *Metrics) IncOp(labels ...string) {
-	if !m.enabled {
+	if m == nil || !m.enabled {
 		return
 	}
 	key := strings.Join(labels, "|")

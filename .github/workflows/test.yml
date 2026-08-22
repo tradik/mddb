@@ -20,6 +20,7 @@ on:
       - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'
       - 'scripts/check-proto-plugins.sh'
+      - 'scripts/check-coverage-areas.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
   pull_request:
@@ -37,6 +38,7 @@ on:
       - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'
       - 'scripts/check-proto-plugins.sh'
+      - 'scripts/check-coverage-areas.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
 
@@ -117,6 +119,16 @@ jobs:
           go test -run='^$' -fuzz='^FuzzDecompressDoc$'            -fuzztime=20s ./internal/compression/
           go test -run='^$' -fuzz='^FuzzLoadDoc$'                  -fuzztime=20s ./
           go test -run='^$' -fuzz='^FuzzPersistenceRoundTrip$'   -fuzztime=20s ./
+
+      # TEST-002: one number for a package of 150 files looked healthy while
+      # the surfaces handling uploads, 80 MCP tools and automation triggers sat
+      # at 22% between them. The floors are ratchets — raise one when you
+      # improve an area, never lower one to make a build pass.
+      - name: Per-area coverage floors
+        run: bash scripts/check-coverage-areas.sh
+
+      - name: Run coverage-floor guard test suite
+        run: bash scripts/tests/test-coverage-areas.sh
 
       - name: Upload coverage
         uses: codecov/codecov-action@v7

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	json "github.com/goccy/go-json"
 	"log/slog"
@@ -278,6 +279,14 @@ func (am *AutomationManager) evalHybrid(trigger *AutomationRule, doc *storage.Do
 
 // RunTrigger executes a trigger's search and returns all matches above threshold.
 // Used by cron scheduler and manual test endpoint.
+// ErrUnknownSearchType reports a trigger configured with a search type MDDB
+// does not implement.
+//
+// This used to return (nil, nil): no matches and no error, indistinguishable
+// from a trigger that simply matched nothing. An operator who mistyped
+// "hybrid" would see a rule that never fires and no reason why (TEST-002).
+var ErrUnknownSearchType = errors.New("unknown trigger search type")
+
 func (am *AutomationManager) RunTrigger(trigger *AutomationRule) ([]TriggerMatch, error) {
 	if am.server == nil {
 		return nil, nil
@@ -291,7 +300,7 @@ func (am *AutomationManager) RunTrigger(trigger *AutomationRule) ([]TriggerMatch
 	case "hybrid":
 		return am.runTriggerHybrid(trigger)
 	default:
-		return nil, nil
+		return nil, fmt.Errorf("%w: %q (want fts, vector or hybrid)", ErrUnknownSearchType, trigger.SearchType)
 	}
 }
 

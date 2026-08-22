@@ -177,6 +177,13 @@ check-proto-plugins: ## Verify the protobuf plugin pin matches the runtime in go
 test-proto-plugins: ## Run the protobuf plugin/runtime guard test suite
 	@bash scripts/tests/test-proto-plugins.sh
 
+coverage-areas: ## Report per-file coverage for the tracked high-risk areas
+	@cd services/mddbd && go test -coverprofile=coverage.out ./... > /dev/null 2>&1
+	@bash scripts/check-coverage-areas.sh --print
+
+test-coverage-areas: ## Run the per-area coverage guard test suite
+	@bash scripts/tests/test-coverage-areas.sh
+
 mcp-tools-count: ## Verify docs' built-in MCP tool count matches the code (DOC-001)
 	@cd services/mddbd && go test -run TestMCPToolCountDocsInSync -count=1 . && \
 		echo "✅ docs MCP tool count matches len(mcpBuiltinTools())"

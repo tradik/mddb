@@ -93,3 +93,13 @@ func TestStatusRecorderWrite(t *testing.T) {
 		t.Errorf("body = %q", rec.Body.String())
 	}
 }
+
+// A nil collector counts nothing rather than panicking: a counter is never
+// worth a crash, and the server has call sites that do not guard the nil
+// (TEST-002).
+func TestIncOpOnANilCollector(t *testing.T) {
+	var m *Metrics
+	m.IncOp("upload")                    // must not panic
+	m.IncOp("search", "collection", "x") // nor with labels
+	m.IncOp()                            // nor with none
+}

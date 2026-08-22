@@ -133,3 +133,14 @@ func TestMetaWarningString(t *testing.T) {
 		t.Errorf("String() = %q", w.String())
 	}
 }
+
+// A nil SchemaManager validates nothing rather than panicking: "no manager"
+// and "no schema for this collection" are the same answer to a caller, and
+// half the call sites in the server guarded the nil while half did not
+// (TEST-002).
+func TestValidateOnANilManager(t *testing.T) {
+	var sm *SchemaManager
+	if err := sm.Validate("any", map[string][]string{"k": {"v"}}); err != nil {
+		t.Errorf("a nil manager rejected a document: %v", err)
+	}
+}
