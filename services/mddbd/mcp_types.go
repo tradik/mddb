@@ -821,6 +821,10 @@ type MCPClient interface {
 	UpdateDocument(ctx context.Context, req *MCPUpdateDocumentRequest) (*MCPDocument, error)
 	GetDocumentMeta(ctx context.Context, req *MCPGetDocMetaRequest) (*MCPDocMetaResponse, error)
 	CodeGraph(ctx context.Context, req *MCPCodeGraphRequest) (*GraphResult, error)
+	// SearchAdvisor measures a collection and recommends how to search it
+	// (SRCH-010), so an agent picks an algorithm from evidence rather than
+	// from the names.
+	SearchAdvisor(ctx context.Context, collection string) (*SearchRecommendation, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)
 	// Synonyms
 	ListSynonyms(ctx context.Context, collection string) (*MCPSynonymListResponse, error)

@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`search_advisor` — how should I search this collection? (SRCH-010)** — the
+  server offers eight vector algorithms, four ranking algorithms, three fusion
+  strategies and four retrieval modes, and an agent connecting over MCP sees a
+  list of names and nothing else. It defaults or guesses, and every algorithm
+  added since made the menu longer without making the choice easier.
+
+  The advisor measures the collection — how many documents, how long, how much
+  new vocabulary each contributes, whether they are embedded, whether they are
+  code — and recommends the search type, ranking algorithm, vector index,
+  fusion weights and result shape, **with a plain-language reason for every
+  choice**. Three collections on one server get three different answers: a
+  theme gets `bm25` + `retrievalMode: graph`, 900-word manuals get `pmisparse`
+  + `chunk` + topK 5, short status notes get `bm25` + `parent` + topK 20.
+
+  `GET /v1/search-advisor?collection=X`, the `search_advisor` MCP tool
+  (annotated read-only), and a returned `retrievalProfile` ready to store on
+  the collection so every client inherits it. `apply=true` stores it, merging
+  rather than replacing — a collection's response prompt and encryption flag
+  have nothing to do with retrieval and must survive.
+
+  It measures the corpus, not your queries, which is why it explains itself:
+  disagreeing with a reason is a legitimate outcome.
+
+
+- **`retrievalMode: "graph"` (SRCH-006)** — `parent`, `chunk` and `window`
+  change the *shape* of a result; this changes which documents are *reached*.
+  A query about a checkout bug matches `checkout.js`; the stylesheet whose
+  selector it manipulates and the template that loads it match nothing, and an
+  agent has to notice the gap and ask again. Graph mode follows the connection
+  graph out from the documents that did match, scoring each neighbour as a
+  decaying fraction of the result that reached it, and returns the edge that
+  justifies each one — `fromKey`, `symbol`, `kind`, `depth`. Without that a
+  caller sees a document that matched nothing and cannot tell whether the
+  search is working. Neighbours are appended after the direct matches rather
+  than merged into the ranking, because they are a different kind of answer.
+
+
 - **COMPARISON.md rewritten around measured numbers (DOC-013, DOC-015)** — the
   page was 286 lines of "✅ Advantages" checklists with one performance table
   whose numbers had no methodology, no date and no way to reproduce them. Every

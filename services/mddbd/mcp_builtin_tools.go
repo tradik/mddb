@@ -438,6 +438,22 @@ func mcpBuiltinToolsCore() []MCPTool {
 			},
 		},
 		{
+			Name: "search_advisor",
+			Description: "Ask how to search a collection before searching it. Measures the collection — " +
+				"how many documents, how long, how varied the vocabulary, whether they are embedded, " +
+				"whether they are code — and recommends the search type, ranking algorithm, vector index, " +
+				"fusion weights and result shape, with a plain-language reason for each choice. " +
+				"Call this once per collection instead of guessing from algorithm names; the returned " +
+				"retrievalProfile can be stored on the collection so every client inherits it.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"collection": map[string]interface{}{"type": "string", "description": "Collection to profile"},
+				},
+				"required": []string{"collection"},
+			},
+		},
+		{
 			Name: "code_graph",
 			Description: "Code connection graph. Answers what a document depends on and what depends on it: " +
 				"which stylesheet declares a selector a template applies, which pages load a script, " +

@@ -4668,6 +4668,76 @@ paths:
                   id:
                     type: string
 
+  /v1/search-advisor:
+    get:
+      tags:
+        - Search
+      summary: How should I search this collection?
+      description: |
+        Measures a collection and recommends the search type, ranking
+        algorithm, vector index, fusion weights and result shape — with a
+        plain-language reason for every choice (SRCH-010).
+
+        Read-only by default. `apply=true` additionally writes the
+        recommendation into the collection's retrieval profile, which needs
+        write permission.
+
+        Also available as the `search_advisor` MCP tool, annotated read-only,
+        so an agent can ask before it searches instead of guessing from
+        algorithm names.
+      operationId: getSearchAdvisor
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: apply
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Store the recommendation as the collection's retrieval profile.
+      responses:
+        "200":
+          description: The recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchRecommendation"
+        "403":
+          description: Forbidden, or read-only mode when apply=true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Search
+      summary: How should I search this collection? (body form)
+      operationId: postSearchAdvisor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ collection ]
+              properties:
+                collection:
+                  type: string
+                apply:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: The recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchRecommendation"
+
   /v1/collection-config:
     get:
       tags:
@@ -6569,7 +6639,7 @@ components:
           example: cosine
         retrievalMode:
           type: string
-          enum: [ parent, chunk, window ]
+          enum: [ parent, chunk, window, graph ]
           description: |
             Result granularity (default "parent").
             - **parent**: One result per document, scored by its best-matching chunk.
@@ -7648,6 +7718,104 @@ components:
           format: int64
       required: [ collection, query ]
 
+    SearchRecommendation:
+      type: object
+      description: |
+        How to search a collection, measured rather than guessed (SRCH-010).
+
+        MDDB offers eight vector algorithms, four ranking algorithms, three
+        fusion strategies and four retrieval modes. An agent connecting over
+        MCP has no basis for choosing among them. This measures the collection
+        — length, vocabulary, whether it is embedded, whether it is code — and
+        recommends, with a reason for every choice.
+
+        It changes nothing. `retrievalProfile` is the advice encoded as a
+        RAG-001 profile, ready to `PUT` to `/v1/collection-config` if you agree.
+      properties:
+        profile:
+          $ref: "#/components/schemas/CollectionProfile"
+        searchType:
+          type: string
+          enum: [ fts, vector, hybrid ]
+        ftsAlgorithm:
+          type: string
+          enum: [ tfidf, bm25, bm25f, pmisparse ]
+        vectorAlgorithm:
+          type: string
+          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq ]
+        hybridStrategy:
+          type: string
+          enum: [ alpha, rrf, weighted ]
+        hybridAlpha:
+          type: number
+        retrievalMode:
+          type: string
+          enum: [ parent, chunk, window, graph ]
+        topK:
+          type: integer
+        signals:
+          $ref: "#/components/schemas/FusionSignals"
+        reasons:
+          type: array
+          description: >-
+            One line per decision, in plain language. The part worth reading:
+            a recommendation nobody can argue with is one nobody should follow.
+          items:
+            type: string
+        warnings:
+          type: array
+          description: What would stop the recommendation working — a
+            half-embedded collection, a missing provider.
+          items:
+            type: string
+        retrievalProfile:
+          $ref: "#/components/schemas/RetrievalProfile"
+
+    CollectionProfile:
+      type: object
+      description: What the advisor measured, from a sample of up to 2000 documents.
+      properties:
+        collection:
+          type: string
+        documents:
+          type: integer
+        sampled:
+          type: integer
+          description: How many were actually read. A recommendation from a
+            sample should say so.
+        embeddedDocuments:
+          type: integer
+        vectorDimensions:
+          type: integer
+        medianWords:
+          type: integer
+          description: Median, not mean — one long manual among ten thousand
+            notes moves a mean and describes nothing.
+        longDocumentRatio:
+          type: number
+          description: Share above 500 words, where returning whole documents
+            starts wasting a prompt.
+        distinctTerms:
+          type: integer
+        termsPerDocument:
+          type: number
+          description: >-
+            Vocabulary divided by documents sampled — how much new vocabulary
+            each document contributes. This decides whether keyword search can
+            discriminate. Type-token ratio would not: pooled over a corpus it
+            falls towards zero as the corpus grows, so every large collection
+            would look repetitive.
+        typeTokenRatio:
+          type: number
+          description: Reported because it is familiar; not used for any decision.
+        codeDocuments:
+          type: integer
+          description: How many carry extracted symbols, which is what makes
+            the connection graph useful.
+        estimatedVectorBytes:
+          type: integer
+          format: int64
+
     FusionSignals:
       type: object
       description: |
@@ -8701,7 +8869,7 @@ components:
           description: Results per search. 0 = unset.
         retrievalMode:
           type: string
-          enum: [ parent, chunk, window ]
+          enum: [ parent, chunk, window, graph ]
           description: Granularity — whole document, matching passage, or passage with neighbours.
         hybridStrategy:
           type: string

@@ -19,6 +19,11 @@ import (
 //     matched (chunkIndex + chunkText) — precise context for LLM prompts.
 //   - "window": like "chunk", but the passage is widened with N neighboring
 //     chunks on each side, trading precision for surrounding context.
+//   - "graph": whole documents, plus their neighbours in the code connection
+//     graph (SRCH-006). The first three decide what a result looks like; this
+//     one decides which documents are reached at all — a query matching
+//     checkout.js also returns the stylesheet whose selector it manipulates,
+//     which matches the query on no term.
 //
 // Chunking is deterministic (ChunkText on the parent's content with the
 // configured chunk size), so passages are re-derived from the parent document
@@ -27,13 +32,17 @@ const (
 	RetrievalModeParent = "parent"
 	RetrievalModeChunk  = "chunk"
 	RetrievalModeWindow = "window"
+	// RetrievalModeGraph returns whole documents and adds their neighbours
+	// from the code connection graph (SRCH-006). The other three change what a
+	// result *looks like*; this one changes which documents are *reached*.
+	RetrievalModeGraph = "graph"
 )
 
 // validRetrievalMode reports whether mode is a supported retrieval mode.
 // The empty string is valid and means RetrievalModeParent.
 func validRetrievalMode(mode string) bool {
 	switch mode {
-	case "", RetrievalModeParent, RetrievalModeChunk, RetrievalModeWindow:
+	case "", RetrievalModeParent, RetrievalModeChunk, RetrievalModeWindow, RetrievalModeGraph:
 		return true
 	}
 	return false

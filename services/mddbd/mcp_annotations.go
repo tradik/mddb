@@ -38,10 +38,13 @@ func writeOpenWorld() *MCPToolAnnotations {
 // Tools not in this map get no annotations (defaults per spec: readOnly=false, destructive=true).
 var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	// --- Read-only, closed world (database reads) ---
-	"get_stats":               readOnly(),
-	"search_documents":        readOnly(),
-	"get_document_meta":       readOnly(),
-	"code_graph":              readOnly(),
+	"get_stats":         readOnly(),
+	"search_documents":  readOnly(),
+	"get_document_meta": readOnly(),
+	"code_graph":        readOnly(),
+	// Measures and recommends; changes nothing. Applying the recommendation is
+	// a separate, explicit write through /v1/collection-config.
+	"search_advisor":          readOnly(),
 	"vector_stats":            readOnly(),
 	"fts_languages":           readOnly(),
 	"list_webhooks":           readOnly(),

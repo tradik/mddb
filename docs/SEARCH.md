@@ -1084,6 +1084,135 @@ curl -X POST http://localhost:11023/v1/hybrid-search \
 }
 ```
 
+## Which algorithm should I use? (v2.12.0+)
+
+MDDB offers eight vector algorithms, four ranking algorithms, three fusion
+strategies and four retrieval modes. That is a lot of menu and no basis for
+choosing — especially for an agent connecting over MCP, which sees the names
+and nothing else.
+
+Ask the server. It can measure the collection:
+
+```bash
+curl -s "$MDDB/v1/search-advisor?collection=theme"
+```
+
+```json
+{
+  "profile": {
+    "documents": 4,
+    "medianWords": 7,
+    "termsPerDocument": 5.0,
+    "codeDocuments": 4
+  },
+  "searchType": "fts",
+  "ftsAlgorithm": "bm25",
+  "retrievalMode": "graph",
+  "topK": 20,
+  "reasons": [
+    "No embedding provider is configured and no document has a vector, so keyword search is the only search available.",
+    "bm25 for ranking: this is code, where queries are identifiers and exact term matching matters more than query expansion.",
+    "retrievalMode graph: this is code, so the connection graph reaches the stylesheet a matching script touches — a document no score would have found."
+  ],
+  "retrievalProfile": { "defaultSearchType": "fts", "topK": 20, "retrievalMode": "graph" }
+}
+```
+
+Three collections on the same server, three different answers:
+
+| Collection | Shape | Recommendation |
+|---|---|---|
+| A theme (CSS/JS/HTML) | 4 documents, 7 words median, all code | `bm25`, `retrievalMode: graph` |
+| Manuals | 120 documents, 902 words median, 0.18 new terms each | `pmisparse`, `chunk`, topK 5 |
+| Status notes | 200 documents, 8 words median | `bm25`, `parent`, topK 20 |
+
+**What it measures, and why each thing matters:**
+
+| Measurement | Decides |
+|---|---|
+| Embedded documents vs total | Whether vector search is possible at all, and whether a partial reindex is silently hiding documents |
+| Median document length | `parent` vs `chunk`, and how many results fit a context window |
+| Terms per document | Whether keyword ranking can tell documents apart, or needs query expansion |
+| Documents carrying symbols | Whether the connection graph reaches documents a score cannot |
+| Vector bytes at float32 | Whether a quantized index is worth the recall it costs |
+
+**Terms per document, not type-token ratio.** Type-token ratio pooled over a
+corpus falls towards zero as the corpus grows — vocabulary saturates while
+tokens accumulate. The same text measured over 100 documents and over 100 000
+gives wildly different numbers, and every large collection would look
+repetitive. Vocabulary divided by document count is stable.
+
+**Every recommendation carries its reasons.** "Use bm25" is an instruction;
+"bm25, because a median document of 8 words is short and bm25's length
+normalisation is what stops a one-line note outranking a real answer" is
+something you can disagree with. Disagreeing with it is a legitimate outcome —
+this measures the corpus, not your queries.
+
+### Storing the answer
+
+`retrievalProfile` is the advice as a per-collection profile (RAG-001). Store
+it and every client inherits it without being told:
+
+```bash
+curl -s "$MDDB/v1/search-advisor?collection=theme&apply=true"
+```
+
+`apply` needs write permission, and merges into the existing configuration
+rather than replacing it — a collection's response prompt and encryption flag
+have nothing to do with retrieval and must survive.
+
+### For agents
+
+The same thing is the `search_advisor` MCP tool, annotated read-only. An agent
+should call it once per collection before its first search, rather than
+guessing from algorithm names or defaulting forever.
+
+## Graph retrieval (v2.12.0+)
+
+`parent`, `chunk` and `window` change the *shape* of a result. `graph` changes
+which documents are *reached*.
+
+A query about a checkout bug matches `checkout.js`. The stylesheet whose
+selector it manipulates and the template that loads it match nothing — and an
+agent has to notice the gap and ask again, two or three round trips to assemble
+what one traversal already knows.
+
+```bash
+curl -s -X POST "$MDDB/v1/vector-search" -d '{
+  "collection": "theme",
+  "query": "cart total not updating",
+  "retrievalMode": "graph",
+  "graphExpand": { "graphDepth": 1, "graphDecay": 0.5 }
+}'
+```
+
+Neighbours come back after the direct matches, each with the edge that
+justifies it:
+
+```json
+"graphExpansions": [
+  { "key": "css/site.css", "fromKey": "js/checkout.js",
+    "symbol": ".cart-total", "kind": "uses-selector", "depth": 1, "score": 0.45 }
+]
+```
+
+Without `fromKey` and `symbol` a caller sees a document that matched nothing
+and cannot tell whether the search is working.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `graphDepth` | 1 | Clamped to 3, for the same reason `/v1/code-graph` clamps it |
+| `graphDecay` | 0.5 | Fraction of the source's score a neighbour inherits per hop |
+| `graphMaxNeighbours` | 10 | Stops a hub document flooding the answer |
+| `graphDirection` | `both` | `in` = what depends on this, `out` = what it depends on |
+
+Neighbours are appended rather than merged into the ranking: a document that
+matched the query and one merely adjacent to a match are different kinds of
+answer, and sorting them together hides which is which.
+
+A collection with no edges — most prose — expands to nothing, which is the
+right answer rather than an error.
+
 ### Weighted (multi-signal fusion, v2.12.0+)
 
 `alpha` and `rrf` both answer one question: how well does this document match

@@ -766,3 +766,12 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 
 	return resp, nil
 }
+
+// SearchAdvisor measures a collection and recommends how to search it
+// (SRCH-010).
+func (c *DirectClient) SearchAdvisor(ctx context.Context, collection string) (*SearchRecommendation, error) {
+	if collection == "" {
+		return nil, errors.New("missing required field: collection")
+	}
+	return c.server.RecommendSearch(collection)
+}

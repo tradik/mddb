@@ -128,7 +128,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	req.Strategy = s.ResolveHybridStrategy(req.Collection, req.Strategy, "alpha")
 	if req.Strategy == "alpha" && req.Alpha == 0 {
 		// The request cannot distinguish "alpha omitted" from "alpha 0"
-		// (see SRCH-007), so the profile slots in exactly where the
+		// (see SRCH-010), so the profile slots in exactly where the
 		// hardcoded 0.5 sat — no behaviour change for a collection
 		// without one.
 		req.Alpha = s.ResolveHybridAlpha(req.Collection, 0, false, 0.5)

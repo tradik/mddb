@@ -28,10 +28,13 @@ type VectorSearchRequest struct {
 	IncludeContent bool                `json:"includeContent"`
 	Algorithm      string              `json:"algorithm"`      // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	DistanceMetric string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
-	RetrievalMode  string              `json:"retrievalMode"`  // "parent" (default), "chunk", "window"
-	WindowSize     int                 `json:"windowSize"`     // neighbor chunks per side in "window" mode (default 1)
-	MMR            bool                `json:"mmr"`            // diversify results via Maximal Marginal Relevance
-	MMRLambda      float64             `json:"mmrLambda"`      // relevance/diversity balance, 0..1 (default 0.5)
+	RetrievalMode  string              `json:"retrievalMode"`  // "parent" (default), "chunk", "window", "graph"
+	// GraphExpand tunes retrievalMode "graph" (SRCH-006). Ignored in the other
+	// modes, so a request carrying both is not ambiguous.
+	GraphExpand GraphExpandOptions `json:"graphExpand,omitempty"`
+	WindowSize  int                `json:"windowSize"` // neighbor chunks per side in "window" mode (default 1)
+	MMR         bool               `json:"mmr"`        // diversify results via Maximal Marginal Relevance
+	MMRLambda   float64            `json:"mmrLambda"`  // relevance/diversity balance, 0..1 (default 0.5)
 	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
 	// the index per requested result, before deduplication trims them.
 	// 1.0-10.0; 0 = use the collection profile, then the default.
@@ -64,6 +67,10 @@ type VectorSearchResponseHTTP struct {
 	// ContextTruncated reports that the collection's contextTokenBudget
 	// dropped results from the tail (RAG-001).
 	ContextTruncated bool `json:"contextTruncated,omitempty"`
+	// GraphExpansions lists documents added by retrievalMode "graph" and the
+	// edge that justifies each (SRCH-006). Present only in that mode: a
+	// document that matched nothing needs to say why it is here.
+	GraphExpansions []GraphExpansion `json:"graphExpansions,omitempty"`
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -335,12 +342,22 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 			return approxTokens(it.Document.ContentMD)
 		})
 
+	// SRCH-006: reach documents the query matches on no term, by following the
+	// edges the matching documents already have. Applied after the budget so
+	// expansion cannot be trimmed away by a cap it was not counted against,
+	// and before the response so its documents arrive with the rest.
+	var expansions []GraphExpansion
+	if req.RetrievalMode == RetrievalModeGraph {
+		expansions, items = s.appendGraphNeighbours(req.Collection, items, req.GraphExpand, req.IncludeContent)
+	}
+
 	resp := VectorSearchResponseHTTP{
 		Results:          items,
 		Total:            len(items),
 		Algorithm:        algo,
 		DistanceMetric:   metricName,
 		ContextTruncated: contextTruncated,
+		GraphExpansions:  expansions,
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()

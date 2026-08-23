@@ -73,7 +73,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 80 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 81 built-in tools (only custom tools exposed) |
 
 ### API Key Authentication
 
@@ -222,7 +222,7 @@ prose; code lines are short, so it covers about fifteen lines of CSS.
 
 ## Built-in Tool Catalog
 
-All 80 built-in tools, grouped by area. Tool inputs are self-describing via
+All 81 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).

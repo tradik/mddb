@@ -594,3 +594,14 @@ func (s *MCPToolServer) toolClassifyDocument(ctx context.Context, args map[strin
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil
 }
+
+// toolSearchAdvisor answers "how should I search this collection?" (SRCH-010).
+func (s *MCPToolServer) toolSearchAdvisor(ctx context.Context, args map[string]interface{}) (string, error) {
+	resp, err := s.client.SearchAdvisor(ctx, mcpGetString(args, "collection"))
+	if err != nil {
+		return "", err
+	}
+
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return string(data), nil
+}
