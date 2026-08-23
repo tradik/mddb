@@ -34,12 +34,16 @@ type EmbeddingConfig struct {
 // these providers bypass the SSRF guard at all — while any other private or
 // reserved address needs MDDB_OUTBOUND_ALLOW_PRIVATE or the host allowlist.
 func (s *Server) SaveEmbeddingConfig(config *EmbeddingConfig) error {
-	if err := httpclient.ValidateServiceURL(config.APIURL); err != nil {
+	// The validated form replaces the stored one, so nothing downstream can
+	// reach for the string that was never checked.
+	safeURL, err := httpclient.ValidateServiceURL(config.APIURL)
+	if err != nil {
 		return err
 	}
+	config.APIURL = safeURL
 
 	var bo binlog.BinlogOps
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
+	err = s.DBUpdate(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("embedding_configs"))
 		if bucket == nil {
 			return fmt.Errorf("embedding_configs bucket not found")

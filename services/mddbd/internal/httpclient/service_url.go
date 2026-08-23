@@ -28,34 +28,36 @@ import (
 //
 // The check is at configuration time. It is not a dialer: these providers keep
 // their own http.Client, so a URL that passes here still dials directly.
-func ValidateServiceURL(raw string) error {
+// Like ValidateOutboundURL, it returns the URL to use rather than only an
+// error, so the unvalidated string cannot be reached for by mistake.
+func ValidateServiceURL(raw string) (string, error) {
 	if raw == "" {
-		return nil // Provider falls back to its own default endpoint.
+		return "", nil // Provider falls back to its own default endpoint.
 	}
 
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("apiUrl is not a URL: %w", err)
+		return "", fmt.Errorf("apiUrl is not a URL: %w", err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("apiUrl must be http or https, got %q", u.Scheme)
+		return "", fmt.Errorf("apiUrl must be http or https, got %q", u.Scheme)
 	}
 	host := u.Hostname()
 	if host == "" {
-		return fmt.Errorf("apiUrl has no host")
+		return "", fmt.Errorf("apiUrl has no host")
 	}
 
 	if isLoopbackHost(host) {
-		return nil
+		return u.String(), nil
 	}
 	if err := validateOutboundURL(u); err != nil {
-		return fmt.Errorf(
+		return "", fmt.Errorf(
 			"apiUrl %q resolves to a private or reserved address. Loopback needs no "+
 				"opt-in; for a service elsewhere on a trusted network set "+
 				"MDDB_OUTBOUND_ALLOW_PRIVATE=true or add the host to "+
 				"MDDB_OUTBOUND_ALLOWLIST: %w", raw, err)
 	}
-	return nil
+	return u.String(), nil
 }
 
 // isLoopbackHost reports whether host names this machine.

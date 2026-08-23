@@ -150,15 +150,24 @@ func validateOutboundURL(u *url.URL) error {
 // can see the URL being validated, where a dialer buried in a transport is
 // invisible to both. CodeQL's go/request-forgery reported exactly that
 // blindness as three critical findings on guarded code.
-func ValidateOutboundURL(raw string) error {
+// It returns the URL to use rather than only an error. That is the difference
+// between a check and a barrier: a caller that validates and then reaches for
+// the original variable has validated nothing, and an error-only signature
+// does not stop them. Returning the value makes the unvalidated string
+// impossible to use by accident — and it is also the shape a taint tracker can
+// follow, where "call this, then check err" is not.
+func ValidateOutboundURL(raw string) (string, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
-		return fmt.Errorf("invalid URL: %w", err)
+		return "", fmt.Errorf("invalid URL: %w", err)
 	}
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return fmt.Errorf("URL must be http or https, got %q", u.Scheme)
+		return "", fmt.Errorf("URL must be http or https, got %q", u.Scheme)
 	}
-	return validateOutboundURL(u)
+	if err := validateOutboundURL(u); err != nil {
+		return "", err
+	}
+	return u.String(), nil
 }
 
 // ssrfCheckRedirect is the http.Client.CheckRedirect that re-validates every

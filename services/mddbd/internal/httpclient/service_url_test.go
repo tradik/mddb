@@ -19,7 +19,7 @@ func TestValidateServiceURLAllowsLoopbackWithoutOptIn(t *testing.T) {
 		"https://localhost:8443",
 		"http://[::1]:11434",
 	} {
-		if err := ValidateServiceURL(raw); err != nil {
+		if _, err := ValidateServiceURL(raw); err != nil {
 			t.Errorf("%s was refused: %v", raw, err)
 		}
 	}
@@ -35,7 +35,7 @@ func TestValidateServiceURLBlocksTheRestOfThePrivateSpace(t *testing.T) {
 		"http://172.16.0.2:9200",
 		"http://100.64.0.1",
 	} {
-		err := ValidateServiceURL(raw)
+		_, err := ValidateServiceURL(raw)
 		if err == nil {
 			t.Errorf("%s was accepted", raw)
 			continue
@@ -50,21 +50,21 @@ func TestValidateServiceURLBlocksTheRestOfThePrivateSpace(t *testing.T) {
 
 func TestValidateServiceURLHonoursTheOptIn(t *testing.T) {
 	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "true")
-	if err := ValidateServiceURL("http://10.0.0.5:11434"); err != nil {
+	if _, err := ValidateServiceURL("http://10.0.0.5:11434"); err != nil {
 		t.Errorf("the opt-in did not take: %v", err)
 	}
 }
 
 func TestValidateServiceURLHonoursTheAllowlist(t *testing.T) {
 	t.Setenv("MDDB_OUTBOUND_ALLOWLIST", "ollama.internal")
-	if err := ValidateServiceURL("http://ollama.internal:11434"); err != nil {
+	if _, err := ValidateServiceURL("http://ollama.internal:11434"); err != nil {
 		t.Errorf("the allowlist did not take: %v", err)
 	}
 }
 
 func TestValidateServiceURLAllowsAPublicEndpoint(t *testing.T) {
 	// The hosted providers still have to work.
-	if err := ValidateServiceURL("https://api.openai.com/v1"); err != nil {
+	if _, err := ValidateServiceURL("https://api.openai.com/v1"); err != nil {
 		t.Errorf("a public endpoint was refused: %v", err)
 	}
 }
@@ -72,7 +72,7 @@ func TestValidateServiceURLAllowsAPublicEndpoint(t *testing.T) {
 func TestValidateServiceURLAcceptsAnEmptyValue(t *testing.T) {
 	// Empty means "use the provider's own default endpoint", which is a
 	// constant in our code rather than anything a client supplied.
-	if err := ValidateServiceURL(""); err != nil {
+	if _, err := ValidateServiceURL(""); err != nil {
 		t.Errorf("an empty apiUrl was refused: %v", err)
 	}
 }
@@ -85,7 +85,7 @@ func TestValidateServiceURLRejectsWhatIsNotAnHTTPURL(t *testing.T) {
 		"not a URL at all":          "://nonsense",
 	}
 	for name, raw := range cases {
-		if err := ValidateServiceURL(raw); err == nil {
+		if _, err := ValidateServiceURL(raw); err == nil {
 			t.Errorf("%s (%q) was accepted", name, raw)
 		}
 	}
@@ -124,7 +124,7 @@ func TestValidateOutboundURLRefusesPrivateDestinations(t *testing.T) {
 		"http://127.0.0.1:11434",
 		"http://[::1]:8080",
 	} {
-		if err := ValidateOutboundURL(raw); err == nil {
+		if _, err := ValidateOutboundURL(raw); err == nil {
 			t.Errorf("%s was allowed", raw)
 		}
 	}
@@ -136,12 +136,12 @@ func TestValidateOutboundURLRefusesPrivateDestinations(t *testing.T) {
 func TestValidateOutboundURLDoesNotExemptLoopback(t *testing.T) {
 	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "")
 
-	if err := ValidateOutboundURL("http://localhost:8080/"); err == nil {
+	if _, err := ValidateOutboundURL("http://localhost:8080/"); err == nil {
 		t.Error("loopback was allowed for an outbound request")
 	}
 	// ValidateServiceURL, which guards a service this deployment runs itself,
 	// does allow it — the two answer different questions.
-	if err := ValidateServiceURL("http://localhost:11434"); err != nil {
+	if _, err := ValidateServiceURL("http://localhost:11434"); err != nil {
 		t.Errorf("ValidateServiceURL should still allow loopback: %v", err)
 	}
 }
@@ -149,7 +149,7 @@ func TestValidateOutboundURLDoesNotExemptLoopback(t *testing.T) {
 func TestValidateOutboundURLAllowsAPublicDestination(t *testing.T) {
 	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "")
 
-	if err := ValidateOutboundURL("https://example.com/webhook"); err != nil {
+	if _, err := ValidateOutboundURL("https://example.com/webhook"); err != nil {
 		t.Errorf("a public destination was refused: %v", err)
 	}
 }
@@ -162,7 +162,7 @@ func TestValidateOutboundURLRejectsWhatIsNotAnHTTPURL(t *testing.T) {
 		"empty":       "",
 		"no scheme":   "example.com/webhook",
 	} {
-		if err := ValidateOutboundURL(raw); err == nil {
+		if _, err := ValidateOutboundURL(raw); err == nil {
 			t.Errorf("%s (%q) was allowed", name, raw)
 		}
 	}
@@ -171,7 +171,39 @@ func TestValidateOutboundURLRejectsWhatIsNotAnHTTPURL(t *testing.T) {
 func TestValidateOutboundURLHonoursTheOptIn(t *testing.T) {
 	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "true")
 
-	if err := ValidateOutboundURL("http://10.0.0.5:9000/hook"); err != nil {
+	if _, err := ValidateOutboundURL("http://10.0.0.5:9000/hook"); err != nil {
 		t.Errorf("the opt-in did not take: %v", err)
+	}
+}
+
+// Returning the validated URL is a barrier rather than a check: a caller that
+// validated and then reached for the original variable would have validated
+// nothing, and an error-only signature could not stop them.
+func TestValidatorsReturnTheURLToUse(t *testing.T) {
+	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "")
+
+	got, err := ValidateOutboundURL("https://example.com/webhook")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "https://example.com/webhook" {
+		t.Errorf("got %q", got)
+	}
+
+	got, err = ValidateServiceURL("http://localhost:11434")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "http://localhost:11434" {
+		t.Errorf("got %q", got)
+	}
+
+	// A refusal returns no URL, so there is nothing to use by mistake.
+	if got, err := ValidateOutboundURL("http://169.254.169.254/"); err == nil || got != "" {
+		t.Errorf("a refusal returned %q, %v", got, err)
+	}
+	// An empty apiUrl means "use the provider's own default", not a failure.
+	if got, err := ValidateServiceURL(""); err != nil || got != "" {
+		t.Errorf("empty apiUrl returned %q, %v", got, err)
 	}
 }

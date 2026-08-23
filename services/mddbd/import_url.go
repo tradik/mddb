@@ -86,11 +86,12 @@ func fetchURL(ctx context.Context, rawURL string) (string, error) {
 	// like a network problem, and it puts the guard where a reader can see it.
 	// CodeQL reported this call as critical go/request-forgery precisely
 	// because a dialer inside a transport is invisible to it.
-	if err := httpclient.ValidateOutboundURL(rawURL); err != nil {
+	safeURL, err := httpclient.ValidateOutboundURL(rawURL)
+	if err != nil {
 		return "", err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, safeURL, nil)
 	if err != nil {
 		return "", err
 	}

@@ -193,7 +193,8 @@ func wordpressPost(ctx context.Context, target *WordPressTargetConfig, path stri
 	// WordPress on the same machine is the documented development setup —
 	// while anything else private needs MDDB_OUTBOUND_ALLOW_PRIVATE or the
 	// host allowlist, exactly as the embedding providers do.
-	if err := httpclient.ValidateServiceURL(target.URL); err != nil {
+	safeURL, err := httpclient.ValidateServiceURL(target.URL)
+	if err != nil {
 		return "", fmt.Errorf("wordpress.url: %w", err)
 	}
 
@@ -201,7 +202,7 @@ func wordpressPost(ctx context.Context, target *WordPressTargetConfig, path stri
 	if err != nil {
 		return "", err
 	}
-	endpoint := strings.TrimRight(target.URL, "/") + wordpressRestBase + path
+	endpoint := strings.TrimRight(safeURL, "/") + wordpressRestBase + path
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 	if err != nil {
 		return "", err

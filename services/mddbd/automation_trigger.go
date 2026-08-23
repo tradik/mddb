@@ -482,10 +482,12 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 	// three identical dial failures, and a guard a reader can see beats one
 	// buried in a transport. CodeQL reported the second of these two sites as
 	// critical go/request-forgery; both have the same shape.
-	if err := httpclient.ValidateOutboundURL(expandedURL); err != nil {
+	safeURL, err := httpclient.ValidateOutboundURL(expandedURL)
+	if err != nil {
 		slog.Warn("webhook destination refused", "iD", webhook.ID, "err", err) // #nosec G706 -- internal log
 		return
 	}
+	expandedURL = safeURL
 
 	var finalStatus string
 	var lastHTTPStatus int
@@ -598,10 +600,12 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 	// three identical dial failures, and a guard a reader can see beats one
 	// buried in a transport. CodeQL reported the second of these two sites as
 	// critical go/request-forgery; both have the same shape.
-	if err := httpclient.ValidateOutboundURL(expandedURL); err != nil {
+	safeURL, err := httpclient.ValidateOutboundURL(expandedURL)
+	if err != nil {
 		slog.Warn("webhook destination refused", "iD", webhook.ID, "err", err) // #nosec G706 -- internal log
 		return
 	}
+	expandedURL = safeURL
 
 	var finalStatus string
 	var lastHTTPStatus int
