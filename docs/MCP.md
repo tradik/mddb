@@ -180,8 +180,8 @@ the cost by more than an order of magnitude. Measured on this engine, the same
 `full_text_search` over five 12 KB documents returns ~19 700 tokens by default
 and ~327 with `fields: ["key"]`.
 
-[`integrations/agent-instructions/`](../integrations/agent-instructions/) ships
-that guidance in the formats agents read:
+[`integrations/agent-instructions/`](https://github.com/tradik/mddb/tree/main/integrations/agent-instructions)
+ships that guidance in the formats agents read:
 
 | File | For |
 |---|---|

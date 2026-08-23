@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Two release write-ups on the blog** — *What Breaks If I Change This?* on
+  the code connection graph, and *The Collection Knows How to Be Searched* on
+  per-collection retrieval profiles. Every number, command and JSON body in
+  both was produced against a running instance rather than written from
+  memory, which is how the RAG-001 gap above was found. Both carry the
+  frontmatter the current SSG understands (`type`, `tags`, `excerpt`, per-post
+  mermaid), and `blog/README.md` now documents that shape instead of the older
+  four-field one.
+
+
 - **Static analysis in CI (OPS-008)** — CI scanned dependencies for known CVEs
   and never looked at the code. gosec was in the repository's conventions and
   in `.gitignore`: used locally, enforced nowhere. A new SAST workflow runs
@@ -386,6 +396,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+
+- **The documentation site would not build** — `docs/MCP.md` linked
+  `../integrations/agent-instructions/`, a repository directory the site does
+  not publish, so the generator's link check failed and every docs deploy
+  after that page landed was blocked. It points at GitHub now.
+
+
+- **Three site figures were wrong** — the homepage advertised 79 MCP tools
+  (there are 80, counted from `tools/list` against a running server) and a
+  ~26MB binary (a release build with `-ldflags="-s -w"` is ~28MB; a plain
+  `go build` is ~40MB, which is not what anyone downloads). `mddbReleaseDate`
+  still reads 2.11.4's release day while `mddbVersion` says 2.12.0, so every
+  page dates this release to the previous one's; it is now commented as a
+  release-time step.
+
 
 - **The context budget skipped the callers it exists for (RAG-001)** — a
   collection's `contextTokenBudget` was applied on the HTTP, hybrid and vector

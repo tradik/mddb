@@ -50,9 +50,16 @@ fingerprint: true
 # Updated by the release version sweep alongside Makefile/main.go.
 variables:
   mddbVersion: "2.12.0"
+  # Set to the 2.12.0 tag date when the release is cut. It read "31 July 2026"
+  # — 2.11.4's date — while the version above already said 2.12.0, so every
+  # page dated this release to the previous one's release day.
   mddbReleaseDate: "31 July 2026"
-  mcpTools: "79"
-  mddbBinarySize: "~26MB"
+  # Counted from tools/list against a running server, not from memory.
+  mcpTools: "80"
+  # A release binary: CGO_ENABLED=0, -ldflags="-s -w". A plain `go build` is
+  # ~40MB because it keeps the symbol table and DWARF, which is not what
+  # anyone downloads.
+  mddbBinarySize: "~28MB"
   mddbDockerSize: "~33MB"
 
 
