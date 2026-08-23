@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 	"io"
 	"log/slog"
-	"mddb/internal/vector"
 	proto "mddb/proto"
 	"os"
 	"path/filepath"
@@ -293,7 +292,7 @@ func (rc *ReplicationClient) requestSnapshot(ctx context.Context) error {
 		if err := rc.replaceDatabase(tmpPath); err != nil {
 			return err
 		}
-		rc.rebuildInMemoryState()
+		rc.server.rebuildInMemoryState()
 		return nil
 	}); err != nil {
 		_ = os.Remove(tmpPath)
@@ -331,46 +330,6 @@ func (rc *ReplicationClient) replaceDatabase(snapshotPath string) error {
 
 	rc.server.DB = db
 	return nil
-}
-
-// rebuildInMemoryState reloads all in-memory state from the new database.
-// MUST be called while holding the restore write lock (see requestSnapshot):
-// it reads the freshly swapped rc.server.DB and re-points the caches/managers.
-// The managers and cache are reloaded IN PLACE (same pointers) so concurrent
-// readers of Server.WebhookManager / schema.SchemaManager / Cache never see a swapped
-// field (GO-004). The manager reload helpers use their own (lowercase) db
-// handle, not DBView/DBUpdate, so they don't re-enter the restore lock.
-func (rc *ReplicationClient) rebuildInMemoryState() {
-	// Reload vector index. The store wraps the new DB; the in-memory index is
-	// rebuilt asynchronously (loadVectorIndex acquires the restore read lock via
-	// DBView, so it waits until this restore releases the write lock).
-	if rc.server.VectorIndex != nil && rc.server.VectorStore != nil {
-		rc.server.VectorStore = vector.NewVectorStore(rc.server.DB)
-		go rc.server.loadVectorIndex()
-	}
-
-	// Reload webhooks in place.
-	if rc.server.WebhookManager != nil {
-		if err := rc.server.WebhookManager.Reload(rc.server.DB); err != nil {
-			slog.Warn("Replication webhook reload after snapshot failed", "err", err)
-		}
-	}
-
-	// Reload schemas in place.
-	if rc.server.SchemaManager != nil {
-		if err := rc.server.SchemaManager.Reload(rc.server.DB); err != nil {
-			slog.Warn("Replication schema reload after snapshot failed", "err", err)
-		}
-	}
-
-	// Reset the document cache in place — same cache.DocumentCache (and its single
-	// cleanup goroutine), contents cleared. Avoids both the Server.Cache pointer
-	// race and the per-restore goroutine leak of allocating a fresh cache.
-	if rc.server.Cache != nil {
-		rc.server.Cache.Clear()
-	}
-
-	slog.Info("Replication in-memory state rebuilt after snapshot")
 }
 
 // ackLoop periodically sends LSN acknowledgments to the leader

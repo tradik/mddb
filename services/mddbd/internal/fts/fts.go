@@ -83,6 +83,17 @@ func NewFTSIndex(db *bolt.DB) *FTSIndex {
 	}
 }
 
+// Reload points the index at a freshly swapped database handle after a
+// restore, and drops the in-memory PMI data built from the old one. The caller
+// must hold the server's restore write lock, so no search is mid-flight on the
+// old handle (SEC-015/SEC-016).
+func (f *FTSIndex) Reload(db *bolt.DB) {
+	f.db = db
+	if f.pmiData != nil {
+		f.pmiData = NewPMIData()
+	}
+}
+
 // EnsureBuckets creates the FTS buckets if they don't exist.
 func (f *FTSIndex) EnsureBuckets() error {
 	return f.db.Update(func(tx *bolt.Tx) error {

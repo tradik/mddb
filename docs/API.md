@@ -1346,6 +1346,14 @@ curl -X POST http://localhost:11023/v1/restore \
 - The server briefly closes and reopens the database connection
 - All current data will be replaced with the backup
 
+**Safety** (v2.12.0): the backup is validated (it must open as a database)
+before the live file is touched, the current database is kept as a snapshot
+until the swap succeeds, and any failure rolls back — the server never ends up
+with a closed or destroyed database. A failed restore returns `500` with the
+previous data still being served. The gRPC `Restore` RPC follows the same
+contract and, like this endpoint, resets the binlog so replication followers
+re-snapshot.
+
 ---
 
 ### POST /v1/truncate

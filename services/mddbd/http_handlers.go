@@ -379,25 +379,11 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// zamknij db, podmień plik, otwórz ponownie
-	_ = s.DB.Close()
-	if err := copyFile(safeFrom, s.Path); err != nil {
-		bad(w, err)
+	// SEC-015: validated snapshot -> close -> copy -> reopen with rollback,
+	// under the restore lock — shared with the gRPC Restore RPC.
+	if err := s.restoreFromBackup(safeFrom); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
 		return
-	}
-
-	db, err := bolt.Open(s.Path, 0600, getOptimizedBoltOptions())
-	if err != nil {
-		bad(w, err)
-		return
-	}
-	s.DB = db
-
-	// Reset binlog after restore — forces followers to re-snapshot
-	if s.Binlog != nil {
-		if err := s.Binlog.Rotate(0); err != nil {
-			slog.Warn("failed to reset binlog after restore", "err", err)
-		}
 	}
 
 	ok(w, map[string]string{"restored": body.From})

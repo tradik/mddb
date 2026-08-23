@@ -887,6 +887,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: >-
+            Restore failed (unusable backup, copy or reopen error). The
+            previous database is rolled back and keeps serving — the backup is
+            validated before the live file is touched, and a pre-restore
+            snapshot guards the swap.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/truncate:
     post:

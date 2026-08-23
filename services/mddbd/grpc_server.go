@@ -488,7 +488,12 @@ func (g *GRPCServer) Restore(ctx context.Context, req *proto.RestoreRequest) (*p
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if err := copyFile(safeFrom, g.server.Path); err != nil {
+	// SEC-016: this used to copy the backup underneath the still-open handle —
+	// the server kept serving the old data, reported success, and buried every
+	// later write at the next restart. Now it shares the HTTP restore contract:
+	// validated snapshot -> close -> copy -> reopen with rollback, under the
+	// restore lock, followed by a binlog reset.
+	if err := g.server.restoreFromBackup(safeFrom); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
