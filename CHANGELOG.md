@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Cross-database numbers in COMPARISON.md (DOC-013)** — the page shipped
+  without them because Docker was unavailable when it was rewritten, and
+  inventing figures for systems that were not run was not an option. Measured
+  now, same host, containers pinned in `test/docker-compose.benchmark.yml`:
+  3 000 single inserts gives MongoDB 2 358/s, PostgreSQL 1 368/s, MySQL 454/s
+  and CouchDB 202/s.
+
+  MDDB appears **twice**, because one row would be dishonest in both
+  directions: **502/s without a full-text index, 104/s with one**. None of the
+  other systems is building a search index in that table — a PostgreSQL row
+  with a GIN `tsvector` index would not be at 1 368 either — so the page says
+  which row to compare against what you are asking the other system to do. And
+  single inserts are the wrong way to load a corpus into MDDB at all: through
+  the batch API the same engine does 13 883/s unindexed and 562/s indexed.
+
+
 - **The panel represents this release's features** — a search index nobody can
   select from the UI is a feature only the API has. Added: a **Search Advisor**
   view that measures a collection and shows what it found, what it recommends

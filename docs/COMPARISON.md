@@ -32,6 +32,7 @@ make bench-comparison-all                  # cross-database (needs Docker)
 | Go | 1.27.0 |
 | Corpus | generated prose, Zipfian term distribution over an 8 000-word vocabulary |
 | Transport | HTTP/JSON, batches of 500 documents |
+| Cross-database run | 2026-08-23, same host, containers from `test/docker-compose.benchmark.yml` |
 | Search | 500 timed queries after 20 warm-up queries; percentiles, not averages |
 
 The corpus generator is worth one sentence, because two earlier versions of it
@@ -84,6 +85,48 @@ removed rather than adjusted.
 -ldflags="-s -w"`; a plain `go build` is ~40 MB, because it keeps the symbol
 table). The Docker image is ~33 MB.
 
+## Against other databases, measured
+
+Docker was unavailable when this page was first rewritten, so it carried no
+cross-database numbers rather than invented ones. Here they are.
+
+**The workload:** 3 000 documents, inserted **one at a time** over each
+system's normal protocol, rotating three Lorem Ipsum sizes (124 B, 707 B,
+1876 B). `test/compare-all-databases.sh` runs it; every client lives beside it
+in `test/`.
+
+| System | Version | Inserts/s | Median insert |
+|---|---|---|---|
+| MongoDB | 8 | **2 358** | 414 µs |
+| PostgreSQL | 17 | **1 368** | 712 µs |
+| **MDDB**, no full-text index | 2.12.0 | **502** | 1 798 µs |
+| MySQL | 9.1 | **454** | 2 131 µs |
+| CouchDB | 3 | **202** | 4 880 µs |
+| **MDDB**, full-text index on | 2.12.0 | **104** | 9 883 µs |
+
+Two rows for MDDB, because the comparison is otherwise dishonest in both
+directions.
+
+**None of the other systems is building a full-text index in that table.** A
+PostgreSQL row with a GIN `tsvector` index would not be at 1 368 either. MDDB
+indexes every document for search on write by default, and that costs it a
+factor of five: 502 inserts/s becomes 104. Compare the row that matches what
+you are asking the other system to do.
+
+**Single inserts are the wrong way to load a corpus into MDDB**, and the table
+uses them only because it is the one shape every system supports identically.
+Through the batch API the same engine does **13 883 docs/s** without the index
+and **562** with it — the figures in the section above. If you are loading a
+corpus and comparing to a bulk-load path elsewhere, those are the numbers.
+
+Where MDDB lands honestly: an embedded single-file store doing an fsync per
+write sits between PostgreSQL and MySQL on raw insert rate, and last by a wide
+margin once you ask it to also make every document searchable. What it buys is
+that the search index exists at all — the systems above it in the table need a
+second system for that, and then a synchronisation problem between the two.
+
+---
+
 ## vs Relational databases
 
 ### PostgreSQL / MySQL
@@ -121,6 +164,7 @@ shard across a cluster; MDDB is built to be one file you can copy.
 | Change feed | webhooks, binlog replication | change streams | `_changes` |
 | Markdown-aware | yes | no | no |
 | Docker image | ~33 MB | ~400 MB | ~180 MB |
+| Inserts/s, measured | 502 (no index) / 104 (indexed) | 2 358 | 202 |
 
 **Choose MongoDB when** you need automatic sharding at a scale one machine
 cannot hold, change streams, or its geospatial features beyond what
