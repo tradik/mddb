@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { jsonToPHP, jsonToPython } from '../lib/code-snippets';
 import { X, Copy, Check } from 'lucide-react';
 
 function generateCurl(type, params) {
@@ -153,26 +154,7 @@ $result = json_decode($response, true);
 print_r($result);`;
 }
 
-function jsonToPHP(obj, indent = 0) {
-  const pad = '    '.repeat(indent);
-  const innerPad = '    '.repeat(indent + 1);
 
-  if (obj === null || obj === undefined) return 'null';
-  if (typeof obj === 'boolean') return obj ? 'true' : 'false';
-  if (typeof obj === 'number') return String(obj);
-  if (typeof obj === 'string') return `'${obj.replace(/'/g, "\\'")}'`;
-
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) return '[]';
-    const items = obj.map(v => `${innerPad}${jsonToPHP(v, indent + 1)}`);
-    return `[\n${items.join(",\n")}\n${pad}]`;
-  }
-
-  const entries = Object.entries(obj);
-  if (entries.length === 0) return '[]';
-  const items = entries.map(([k, v]) => `${innerPad}'${k}' => ${jsonToPHP(v, indent + 1)}`);
-  return `[\n${items.join(",\n")}\n${pad}]`;
-}
 
 function generatePython(type, params) {
   const base = 'http://localhost:11023/v1';
@@ -249,26 +231,7 @@ result = response.json()
 print(result)`;
 }
 
-function jsonToPython(obj, indent) {
-  const pad = '    '.repeat(indent);
-  const innerPad = '    '.repeat(indent + 1);
 
-  if (obj === null || obj === undefined) return 'None';
-  if (typeof obj === 'boolean') return obj ? 'True' : 'False';
-  if (typeof obj === 'number') return String(obj);
-  if (typeof obj === 'string') return `"${obj.replace(/"/g, '\\"')}"`;
-
-  if (Array.isArray(obj)) {
-    if (obj.length === 0) return '[]';
-    const items = obj.map(v => `${innerPad}${jsonToPython(v, indent + 1)}`);
-    return `[\n${items.join(",\n")}\n${pad}]`;
-  }
-
-  const entries = Object.entries(obj);
-  if (entries.length === 0) return '{}';
-  const items = entries.map(([k, v]) => `${innerPad}"${k}": ${jsonToPython(v, indent + 1)}`);
-  return `{\n${items.join(",\n")}\n${pad}}`;
-}
 
 function generateJavaScript(type, params) {
   const base = 'http://localhost:11023/v1';

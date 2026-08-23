@@ -616,6 +616,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`services/ssg-template/md-viewer.html`** — a client-side markdown viewer
+  that fetched `.md` files at runtime and rendered them in the browser. It made
+  sense when the docs were served from GitHub Pages as raw markdown; the site
+  is now built by SSG onto Cloudflare, which renders markdown to real pages at
+  build time.
+
+  `.ssg.yaml` settles it: `static_sources` lists exactly four files that reach
+  the site, and this was not one of them — so it had already stopped being
+  deployed. Nothing in the tree linked to it except itself, and a CHANGELOG
+  entry from an earlier release records removing the last reference to it from
+  `docs/README.md` as obsolete.
+
+  It was also the subject of the only open **high**-severity code-scanning
+  alert left in this area (`js/client-side-request-forgery` on its `?doc=`
+  parameter): a page that no longer exists cannot be aimed at anything.
+  `xss.test.mjs` went with it, since every one of its assertions was about that
+  file. `sri.test.mjs` did not: its subresource-integrity and mermaid
+  version-pinning checks now run over **every** template rather than one named
+  file, so a new page loading a CDN asset without SRI is caught rather than
+  missed for not being on a list.
+
 - **Dead code in mddb-chat (RUST-001)** — the Rust twin of GO-021.
   `cargo clippy --all-targets -- -D warnings` now passes clean; it had 12
   warnings.

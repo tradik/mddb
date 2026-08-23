@@ -417,6 +417,23 @@
 
             function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
+            // A character scan, not replace(/<[^>]*>/g, ''). That regex needs a
+            // closing > to match, so an unterminated tag survives it whole:
+            // "hi <img src=x onerror=alert(1)" comes out unchanged. This scan
+            // drops everything from a < onward until a > closes it, or to the
+            // end if none does. Same algorithm as the server's
+            // strip_html_tags, so the message echoed here matches what the
+            // server stores.
+            function stripTags(t) {
+                let out = '', inTag = false;
+                for (const ch of t) {
+                    if (ch === '<') inTag = true;
+                    else if (ch === '>' && inTag) inTag = false;
+                    else if (!inTag) out += ch;
+                }
+                return out;
+            }
+
             // --- WebSocket ---
             function wsConnect() {
                 if (ws && ws.readyState === WebSocket.OPEN) return;
@@ -565,7 +582,7 @@
 
             function sendMsg() {
                 if (state.isStreaming || !state.isJoined) return;
-                const content = inputEl.value.replace(/<[^>]*>/g, '').trim().slice(0, 2000);
+                const content = stripTags(inputEl.value).trim().slice(0, 2000);
                 if (!content) return;
                 inputEl.value = ''; inputEl.style.height = 'auto';
                 state.messages.push({ role: 'user', content });
