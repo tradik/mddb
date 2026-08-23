@@ -209,11 +209,17 @@ func ReplaceBinary(path string, content []byte) (backup string, err error) {
 	if err = temp.Close(); err != nil {
 		return "", err
 	}
-	// 0755 rather than something narrower: this file replaces a binary that
-	// has to stay runnable by whoever could run the old one, which on a shared
-	// host is not only its owner. Narrowing it here would silently break the
-	// install for every user but one.
-	if err = os.Chmod(tempPath, 0o755); err != nil { // #nosec G302 -- an executable has to be executable
+	// The replacement inherits the mode of the binary it replaces, rather than
+	// being given one. An installation where the operator widened or narrowed
+	// the permissions had a reason to, and an updater that resets them to its
+	// own idea of correct silently undoes that — locking out every user but
+	// one, or opening it to more than intended. Reading the mode also means
+	// there is no permission literal here to be wrong.
+	current, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("cannot read the current binary's permissions: %w", err)
+	}
+	if err = os.Chmod(tempPath, current.Mode().Perm()); err != nil {
 		return "", err
 	}
 

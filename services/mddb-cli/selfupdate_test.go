@@ -415,3 +415,33 @@ func TestFetchBytesOnAnInvalidURL(t *testing.T) {
 		t.Error("an invalid URL was accepted")
 	}
 }
+
+// The replacement inherits the mode of the binary it replaces. An operator who
+// widened or narrowed the permissions had a reason to, and an updater that
+// resets them to its own idea of correct silently undoes that.
+func TestReplaceBinaryPreservesTheExistingMode(t *testing.T) {
+	for _, mode := range []os.FileMode{0o755, 0o700, 0o775} {
+		dir := t.TempDir()
+		path := filepath.Join(dir, "mddb-cli")
+		if err := os.WriteFile(path, []byte("old"), mode); err != nil { // #nosec G306 -- the mode under test
+			t.Fatal(err)
+		}
+		// WriteFile is subject to umask, so read back what actually landed.
+		before, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if _, err := ReplaceBinary(path, []byte("new")); err != nil {
+			t.Fatalf("mode %v: %v", mode, err)
+		}
+
+		after, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if after.Mode().Perm() != before.Mode().Perm() {
+			t.Errorf("mode %v became %v", before.Mode().Perm(), after.Mode().Perm())
+		}
+	}
+}
