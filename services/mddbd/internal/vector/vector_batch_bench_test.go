@@ -15,7 +15,7 @@ import (
 // the point: it says where the change can and cannot pay.
 
 func benchVectors(dims, count int) ([]float32, []float32, []float32) {
-	rng := rand.New(rand.NewSource(1))
+	rng := rand.New(rand.NewSource(1)) // #nosec G404 -- deterministic benchmark fixture
 	query := make([]float32, dims)
 	for i := range query {
 		query[i] = rng.Float32()*2 - 1

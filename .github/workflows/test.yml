@@ -501,6 +501,12 @@ jobs:
       # TEST-001: the crate had 10 tests in 3 of 27 files. Writing the rest
       # surfaced a queue that double-booked every admission, a CORS setting
       # that was ignored, and a turn limit that capped nothing.
+      # mddb-chat's build script runs prost-build, which shells out to protoc.
+      # The runner does not ship one, so this job could never get as far as a
+      # test — it failed in the build script every time.
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
       - name: Run tests
         working-directory: services/mddb-chat
         run: cargo test --all-targets
@@ -587,4 +593,12 @@ jobs:
           go test -race -coverprofile=coverage.out ./...
           pct=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
           echo "tools/bench coverage: ${pct}%"
-          awk -v p="$pct" 'BEGIN { if (p+0 < 68) { print "coverage " p "% is below the 68% floor"; exit 1 } }
+          # The guard used to be an awk one-liner with an unterminated quote,
+          # so the step exited 2 on every run whatever the coverage was — it
+          # printed the number and then failed regardless of it.
+          awk -v p="$pct" 'BEGIN {
+            if (p + 0 < 68) {
+              printf "::error::tools/bench coverage %s%% is below the 68%% floor\n", p
+              exit 1
+            }
+          }'

@@ -161,7 +161,13 @@ func freeBytes(dir string) (uint64, error) {
 	if err := syscall.Statfs(dir, &st); err != nil {
 		return 0, err
 	}
-	return st.Bavail * uint64(st.Bsize), nil // #nosec G115 -- block size is positive
+	// Both fields are converted rather than one: syscall.Statfs_t is
+	// platform-specific, and Bavail is uint64 on Linux but int64 on the BSDs.
+	// Multiplying them directly compiles on Linux and fails the FreeBSD build
+	// with a type mismatch, which is how this reached a release branch — the
+	// only builder that could see it is the one nobody runs locally.
+	// #nosec G115 -- a block count and a block size are both non-negative
+	return uint64(st.Bavail) * uint64(st.Bsize), nil
 }
 
 // logPersistenceStatus reports the findings at startup. Warnings are logged
