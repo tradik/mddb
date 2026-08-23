@@ -73,6 +73,11 @@ type VectorConfig struct {
 	Model      string `json:"model"`
 	Dimensions int    `json:"dimensions"`
 	APIURL     string `json:"apiUrl"`
+	// Source says where this configuration came from: "environment",
+	// "stored" or "autodetected" (SRCH-001). A provider MDDB found on the
+	// machine rather than one anybody chose should say so — otherwise the
+	// panel shows a configuration nobody recognises writing.
+	Source string `json:"source,omitempty"`
 }
 
 // ---- Handlers ----
@@ -144,6 +149,19 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			Model:      model,
 			Dimensions: dimensions,
 			APIURL:     apiURL,
+			Source:     "environment",
+		}
+	} else if detected := s.DetectedEmbedding; detected != nil {
+		// SRCH-001: nothing was configured and startup found a provider on
+		// this machine. Reporting nothing here would leave the panel saying
+		// vector search is off while the server is embedding documents.
+		response.VectorConfig = &VectorConfig{
+			Enabled:    true,
+			Provider:   detected.Name,
+			Model:      detected.Model,
+			Dimensions: detected.Dimensions,
+			APIURL:     detected.APIURL,
+			Source:     "autodetected",
 		}
 	}
 

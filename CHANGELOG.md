@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A local embedding model is found without being configured (SRCH-001)** — a
+  fresh install with no API key had no semantic search, which contradicts the
+  "single binary, zero configuration" line this project takes everywhere else.
+  The ticket asks for a model compiled into the binary; its spike concluded
+  that means a full transformer inference stack in pure Go — tokenizer, forward
+  pass, tens of megabytes of weights — and that a hash-based stand-in would
+  earn the words "offline semantic search" while failing the ticket's own
+  quality gate. That part is still open and still a project.
+
+  What was not the hard part: a great many machines with no semantic search
+  already had Ollama running on them. Nothing ever asked. MDDB now asks once at
+  startup, when nothing else is configured, and uses what it finds.
+
+  Only models whose dimensionality is known are picked — `nomic-embed-text`,
+  `mxbai-embed-large`, `snowflake-arctic-embed`, `bge-m3`, `all-minilm` —
+  because Ollama's `/api/tags` does not report embedding dimensions and a wrong
+  one writes vectors no later query can match. Preference order beats
+  installation order. An Ollama holding only chat models is left alone. Stored
+  configuration and `MDDB_EMBEDDING_PROVIDER` both take precedence, so this
+  never overrides a choice anyone made, and `MDDB_EMBEDDING_AUTODETECT=0`
+  skips it. `GET /config` reports `vectorConfig.source: "autodetected"`, so the
+  panel shows a configuration nobody remembers writing for what it is.
+
 - **A benchmark for the vector batch kernel (SRCH-009)** — `internal/vector`
   ships two implementations of its maths behind build tags, scalar and
   NEON/SME, and both export a batch kernel the search path never calls. The

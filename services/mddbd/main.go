@@ -89,6 +89,11 @@ type Server struct {
 	QuantizedVecIndex *vector.QuantizedVectorIndex     // In-memory quantized vector index (int8/int4)
 	EmbeddingWorker   *EmbeddingWorker                 // Background embedding processor
 	Embedding         embedding.Provider               // Embedding generation provider
+	// DetectedEmbedding records a provider found on this machine at startup
+	// rather than configured (SRCH-001). Nil whenever the provider came from
+	// the environment or from stored config, so /config can report where the
+	// configuration actually came from instead of inferring it.
+	DetectedEmbedding *embedding.DetectedProvider
 	// Geo search
 	GeoStore     *geo.GeoStore     // Persistent geo points in BoltDB ("geo" bucket)
 	GeoIndex     *geo.GeoIndex     // In-memory R-tree geo index (default)
@@ -403,6 +408,19 @@ func main() {
 			s.EmbeddingWorker.Start(2)
 			slog.Info("vector search enabled", "source", "environment",
 				"provider", s.Embedding.Model(), "model", s.Embedding.Model(), "dimensions", s.Embedding.Dimensions())
+		} else if detected := embedding.DetectLocalProvider(context.Background()); detected != nil {
+			// SRCH-001: nothing configured, but this machine is already
+			// running a model. Most installs with no semantic search have one
+			// sitting there — MDDB simply never looked.
+			s.Embedding = detected.Provider
+			s.DetectedEmbedding = detected
+			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, 1000)
+			s.EmbeddingWorker.SetDiskOnly(s.QuantizedVecIndex, s.collectionDiskOnly)
+			s.EmbeddingWorker.Start(2)
+			slog.Info("vector search enabled", "source", "autodetected",
+				"provider", detected.Name, "model", detected.Model,
+				"dimensions", detected.Dimensions, "url", detected.APIURL,
+				"note", "set MDDB_EMBEDDING_AUTODETECT=0 to disable this probe")
 		} else {
 			slog.Info("Vector search embedding provider not configured (set MDDB_EMBEDDING_PROVIDER or configure in panel)")
 		}
