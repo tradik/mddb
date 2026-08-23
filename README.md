@@ -607,6 +607,7 @@ mddb-cli stats
 - **[Custom MCP Tools](docs/CUSTOM-TOOLS.md)** - YAML-defined AI tools
 - **[Examples](docs/EXAMPLES.md)** - Code samples
 - **[Contributing](CONTRIBUTING.md)** - Development guide
+- **[Versioning](VERSIONING.md)** - What moves with a release, and what does not
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ## 🏗️ Architecture

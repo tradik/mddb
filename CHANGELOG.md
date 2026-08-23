@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **VERSIONING.md** — which components move with a release and which keep their
+  own version, why each is on its list, and what a patch, minor or major bump
+  actually promises. Five components sit at `0.1.0` and have never been bumped;
+  that is now recorded as a fact about the past rather than an implied claim
+  that they are pre-release. RELEASING.md pointed at "any other version
+  references"; it now points at the guard.
+
+
 - **mddb-chat has tests beyond one file (TEST-001)** — 10 tests in 3 of 27
   source files became 63 in 8, covering session admission and queueing, history
   trimming, the rate limiter, error-to-status mapping and the webhook payload
@@ -345,6 +353,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+
+- **Five package manifests still declared 2.11.4 (DOC-011)** — the Node and
+  Python clients, the panel and both language extensions were bumped by hand at
+  2.11.4 and nothing bumped them since, because `check-version.sh` did not
+  watch them. Publishing `@tradik/mddb-client@2.11.4` from a 2.12.0 tree is
+  worse than a stale number: it names a server it was not built against, so
+  anyone diagnosing a protocol mismatch starts from the wrong assumption. All
+  five now move with the release and the guard covers thirteen sources instead
+  of eight, with two new cases in its own test suite for the shape that got
+  past it.
+
 
 - **A queued chat visitor was double-booked, and at capacity 1 waited forever
   (TEST-001)** — `admit_from_queue` created the session, inserted it into the

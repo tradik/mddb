@@ -6,8 +6,9 @@
 #   1. the real repository agrees                    -> 0
 #   2. a synthetic tree that agrees                  -> 0
 #   3. one source left behind (the DOC-011 case)     -> 1
-#   4. nothing to check                              -> 2
-#   5. CHANGELOG state is reported, not enforced
+#   4. a stale package manifest (the 2.12.0 case)    -> 1
+#   5. nothing to check                              -> 2
+#   6. CHANGELOG state is reported, not enforced
 #
 set -euo pipefail
 
@@ -42,6 +43,20 @@ scaffold() {
 	printf 'version: "%s"\n' "${ver}" > "${dir}/services/mddbd/snapcraft.yaml"
 	printf 'MDDB_VERSION=%s\n' "${ver}" > "${dir}/.env.example"
 	printf 'vars:\n  mddbVersion: "%s"\n' "${ver}" > "${dir}/.ssg.yaml"
+
+	# Package manifests. Added after 2.12.0 found five of them still declaring
+	# 2.11.4 because nothing was watching them.
+	mkdir -p "${dir}/clients/nodejs" "${dir}/clients/python" \
+		"${dir}/services/mddb-panel" "${dir}/services/php-extension" \
+		"${dir}/services/python-extension"
+	printf '{\n  "name": "@tradik/mddb-client",\n  "version": "%s"\n}\n' "${ver}" \
+		> "${dir}/clients/nodejs/package.json"
+	printf '{\n  "name": "mddb-panel",\n  "version": "%s"\n}\n' "${ver}" \
+		> "${dir}/services/mddb-panel/package.json"
+	printf '{\n  "name": "tradik/mddb",\n  "version": "%s"\n}\n' "${ver}" \
+		> "${dir}/services/php-extension/composer.json"
+	printf '[project]\nversion = "%s"\n' "${ver}" > "${dir}/clients/python/pyproject.toml"
+	printf '[project]\nversion = "%s"\n' "${ver}" > "${dir}/services/python-extension/pyproject.toml"
 }
 
 # Case 0: the real repository.
@@ -55,7 +70,20 @@ expect_exit "synthetic tree agrees" 0 bash "${TMP}/ok/scripts/check-version.sh"
 scaffold "${TMP}/drift" "3.1.4" "3.1.3"
 expect_exit "one stale source is rejected" 1 bash "${TMP}/drift/scripts/check-version.sh"
 
-# Case 3: nothing to check at all.
+# Case 3: a package manifest left behind. This is the 2.12.0 shape — the
+# server, the docs and the snaps all move together while an npm or PyPI
+# manifest keeps the previous release's number, and the package is published
+# claiming a version that does not name the server it was built against.
+scaffold "${TMP}/manifest" "3.1.4"
+printf '{\n  "name": "@tradik/mddb-client",\n  "version": "3.1.3"\n}\n' \
+	> "${TMP}/manifest/clients/nodejs/package.json"
+expect_exit "a stale package manifest is rejected" 1 bash "${TMP}/manifest/scripts/check-version.sh"
+
+scaffold "${TMP}/pypi" "3.1.4"
+printf '[project]\nversion = "3.1.3"\n' > "${TMP}/pypi/clients/python/pyproject.toml"
+expect_exit "a stale pyproject is rejected" 1 bash "${TMP}/pypi/scripts/check-version.sh"
+
+# Case 4: nothing to check at all.
 mkdir -p "${TMP}/empty/scripts"
 cp "${GUARD}" "${TMP}/empty/scripts/check-version.sh"
 expect_exit "empty tree reports nothing-found" 2 bash "${TMP}/empty/scripts/check-version.sh"

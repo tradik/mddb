@@ -12,10 +12,18 @@ This document describes the release process for MDDB.
 
 ### 1. Update Version
 
-Update version in relevant files:
-- `CHANGELOG.md` - Move unreleased changes to new version section
-- `README.md` - Update version numbers if needed
-- Any other version references
+The release version lives in **thirteen** files. Do not hunt for them by hand:
+
+```bash
+scripts/check-version.sh --print   # every source and what it currently says
+make check-version                 # fails until they all agree
+```
+
+[VERSIONING.md](VERSIONING.md) lists each one and says which components
+deliberately do *not* follow the release. Also:
+
+- `CHANGELOG.md` — move the unreleased changes into a dated section
+- `README.md` — version numbers and badges, if they name one
 
 ### 2. Commit Changes
 

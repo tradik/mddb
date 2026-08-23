@@ -2,10 +2,17 @@
 #
 # check-version.sh — guard against release-version drift (DOC-011).
 #
-# The release version is written in seven places, by hand, and they have
+# The release version is written in a dozen places, by hand, and they have
 # drifted before: the CHANGELOG once described 2.10.1 while the binary still
 # reported 2.10.0 and no such tag existed. This collects every one of them and
 # fails if they disagree, so a release cannot ship claiming two versions.
+#
+# The package manifests were added after 2.12.0 found five of them — the Node
+# and Python clients, the panel, and both language extensions — still declaring
+# 2.11.4. They were bumped by hand at 2.11.4 and nothing bumped them since,
+# because nothing was watching them. Publishing 2.11.4 from a 2.12.0 tree is
+# worse than a stale number: whoever installs the client gets a package whose
+# version does not name the server it was built against.
 #
 # Deliberately NOT checked: the git tag. A tag is created at release time,
 # after this passes — checking it here would make the guard fail for the whole
@@ -52,6 +59,15 @@ extract "services/mddb-cli/snapcraft.yaml" "snap version"   "^version: \"${versi
 extract "services/mddb-panel/snapcraft.yaml" "snap version" "^version: \"${version_re}\""
 extract ".env.example"                     "MDDB_VERSION"   "^MDDB_VERSION=${version_re}"
 extract ".ssg.yaml"                        "mddbVersion"    "^  mddbVersion: \"${version_re}\""
+
+# Package manifests that track the server's version. Deliberately NOT here:
+# the integrations, the chat widget and mddb-chat, which sit at 0.1.0 and have
+# never been bumped — see VERSIONING.md for which components move together.
+extract "clients/nodejs/package.json"        "npm version"      "^  \"version\": \"${version_re}\""
+extract "services/mddb-panel/package.json"   "npm version"      "^  \"version\": \"${version_re}\""
+extract "services/php-extension/composer.json" "composer version" "^  \"version\": \"${version_re}\""
+extract "clients/python/pyproject.toml"      "pypi version"     "^version = \"${version_re}\""
+extract "services/python-extension/pyproject.toml" "pypi version" "^version = \"${version_re}\""
 
 # The compose default must match too: it is what `docker compose up` pulls.
 while IFS= read -r match; do
