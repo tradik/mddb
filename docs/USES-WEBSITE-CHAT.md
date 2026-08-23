@@ -118,6 +118,7 @@ max_response_length = 4096
 rate_limit_per_minute = 30
 max_message_length = 2000
 trusted_proxies = []   # see "Rate limiting behind a proxy" below
+max_tokens_per_session = 0   # 0 = unlimited; see "Capping what a session costs"
 
 [scenarios.assistant]
 name = "Website Assistant"
@@ -127,6 +128,38 @@ Be concise, accurate, and friendly. If you don't know the answer,
 say so honestly rather than making something up."""
 allowed_collections = ["docs"]
 ```
+
+### Capping what a session costs
+
+A scenario's `max_turns` caps how many turns a conversation takes. It says
+nothing about what they cost, and that is the dimension a budget runs out in:
+one turn carrying a large retrieval context through several tool-calling rounds
+can be worth ten short ones.
+
+```toml
+[security]
+max_tokens_per_session = 120000   # 0 = unlimited
+```
+
+Once a session has spent its budget, its next message is refused with a message
+rather than silence:
+
+> this conversation has used its token budget (121450 tokens)
+
+The count comes from the `usage` block every provider response carries —
+`input_tokens`/`output_tokens` from Anthropic, `prompt_tokens`/`completion_tokens`
+from OpenAI — and is summed across **every round of a turn**, not only the round
+that produced the answer. The agentic loop calls the model once per tool-calling
+round, so counting the last call alone would miss most of what was spent.
+
+Two limits worth knowing:
+
+- A provider that omits its usage block contributes **zero** for that call. A
+  budget must not depend on a field the provider is free to leave out, so a
+  missing block is logged rather than treated as an error.
+- A turn that exhausts the tool-calling rounds and falls through to the
+  streaming path **undercounts by its final response**: that call's usage
+  arrives in an SSE frame this server does not read.
 
 ### Scenario names
 

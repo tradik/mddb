@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::chat::{scenario, tools};
 use crate::error::AppError;
-use crate::llm::provider::{ApiMsg, ChatResponse};
+use crate::llm::provider::{ApiMsg, ChatResponse, TokenUsage};
 use crate::session::manager::JoinResult;
 use crate::session::types::{MessageRole, WsIncoming, WsOutgoing};
 use crate::state::AppState;
@@ -268,6 +268,18 @@ async fn handle_message(
             ));
         }
 
+        // RAG-005: the second limit, and the one a budget actually runs out
+        // in. max_turns caps how many turns a session takes; it says nothing
+        // about what they cost, and one turn carrying a large RAG context
+        // through several tool-calling rounds can be worth ten short ones.
+        //
+        // Checked before the message is recorded, for the same reason as
+        // above: a refused turn should not count against the limit that
+        // refused it.
+        if !session.within_token_budget(state.config.security.max_tokens_per_session) {
+            return Err(AppError::TokenBudgetExceeded(session.total_tokens_used));
+        }
+
         session.add_message(MessageRole::User, content.clone());
         session.trim_history(state.config.session.max_history_length);
 
@@ -325,16 +337,25 @@ async fn handle_message(
     let tool_defs = tools::tool_definitions();
     let mut mddb_client = state.mddb_client.clone();
 
+    // Accumulated across every round of this turn and charged to the session
+    // once, whichever way the loop ends (RAG-005).
+    let mut spent = TokenUsage::default();
+
     // Agentic loop: let LLM call tools until it produces a final response
     for round in 0..MAX_TOOL_ROUNDS {
         debug!(round = round, "tool-calling round");
 
-        let response = state
+        let turn = state
             .llm_provider
             .chat_with_tools(&api_messages, &tool_defs, temperature, max_tokens)
             .await?;
 
-        match response {
+        // RAG-005: charged per round, not per turn. The loop calls the model
+        // once per tool-calling round, and a budget that counted only the round
+        // that produced the answer would miss most of what was spent.
+        spent += turn.usage;
+
+        match turn.response {
             ChatResponse::ToolCalls { tool_calls } => {
                 debug!(count = tool_calls.len(), "LLM requested tool calls");
 
@@ -391,6 +412,7 @@ async fn handle_message(
 
                 if let Some(mut session) = state.session_manager.get_session_mut(session_id) {
                     session.add_message(MessageRole::Assistant, text);
+                    session.add_tokens(spent);
                 }
                 return Ok(());
             }
@@ -435,6 +457,15 @@ async fn handle_message(
 
     if let Some(mut session) = state.session_manager.get_session_mut(session_id) {
         session.add_message(MessageRole::Assistant, full_response);
+        // RAG-005: the tool-calling rounds are charged here too, so a turn that
+        // exhausted MAX_TOOL_ROUNDS costs what it cost.
+        //
+        // The streaming call above is NOT counted: its usage arrives in the SSE
+        // message_delta frame, which this reader discards along with everything
+        // that is not a text delta. So a turn that reaches this path undercounts
+        // by its final response. Stated rather than hidden, because a budget
+        // that quietly misses a case is worse than one that says which.
+        session.add_tokens(spent);
     }
 
     Ok(())

@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A per-session token budget for mddb-chat (RAG-005)** — a scenario's
+  `max_turns` caps how many turns a conversation takes and says nothing about
+  what they cost. One turn carrying a large retrieval context through several
+  tool-calling rounds can be worth ten short ones, and on a publicly reachable
+  chat that is the dimension a budget actually runs out in.
+
+  `security.max_tokens_per_session` (0 = unlimited, so nothing changes for an
+  existing config) refuses the next message with a message rather than silence
+  once a session has spent its budget.
+
+  The measurement path is what was missing, not the caller: neither provider
+  parsed the `usage` block at all, and `ChatResponse` had nowhere to carry the
+  number — which is why `Session.total_tokens_used` was removed earlier in this
+  release rather than wired up. Both providers now read it —
+  `input_tokens`/`output_tokens` from Anthropic, `prompt_tokens`/`completion_tokens`
+  from OpenAI, two names for the same pair, which is exactly the kind of
+  difference that goes unnoticed until a budget silently stops counting on one
+  of them — and it is summed across **every round of a turn**, not only the
+  round that produced the answer.
+
+  Two limits, stated rather than hidden: a provider that omits its usage block
+  contributes zero for that call, because a budget must not depend on a field
+  the provider is free to leave out; and a turn that exhausts the tool-calling
+  rounds and falls through to the streaming path undercounts by its final
+  response, whose usage arrives in an SSE frame this server does not read.
+
 - **`mddb-cli self-update`, and `mddbd --check-update` (OPS-019)** — MDDB ships
   as a single binary, and someone who downloaded one onto a VPS had no way to
   learn that a newer one exists. They stayed on the version they first

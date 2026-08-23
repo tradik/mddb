@@ -69,6 +69,7 @@ mod tests {
             max_message_length: 2000,
             webhook_secret: String::new(),
             trusted_proxies: Vec::new(),
+            max_tokens_per_session: 0,
         }
     }
 

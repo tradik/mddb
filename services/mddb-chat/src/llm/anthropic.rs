@@ -6,7 +6,8 @@ use tracing::debug;
 use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::llm::provider::{
-    ApiMsg, ChatResponse, ChunkStream, LlmProvider, ToolCall, ToolCallFunction, ToolDef,
+    ApiMsg, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall,
+    ToolCallFunction, ToolDef,
 };
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -47,6 +48,18 @@ struct MessagesResponse {
     content: Vec<ContentBlock>,
     #[allow(dead_code)]
     stop_reason: Option<String>,
+    /// RAG-005. Optional because a budget must not depend on a field the
+    /// provider is free to omit: a missing block counts as zero and is logged,
+    /// rather than failing the turn over accounting.
+    usage: Option<AnthropicUsage>,
+}
+
+#[derive(Deserialize)]
+struct AnthropicUsage {
+    #[serde(default)]
+    input_tokens: u64,
+    #[serde(default)]
+    output_tokens: u64,
 }
 
 #[derive(Deserialize)]
@@ -327,7 +340,7 @@ impl LlmProvider for AnthropicProvider {
         tools: &[ToolDef],
         temperature: f32,
         max_tokens: u32,
-    ) -> Result<ChatResponse, AppError> {
+    ) -> Result<ChatTurn, AppError> {
         let (system, filtered) = Self::extract_system(messages);
         let converted = Self::convert_messages(&filtered);
 
@@ -392,12 +405,25 @@ impl LlmProvider for AnthropicProvider {
             }
         }
 
-        if !tool_calls.is_empty() {
+        let usage = match &resp.usage {
+            Some(u) => TokenUsage {
+                input: u.input_tokens,
+                output: u.output_tokens,
+            },
+            None => {
+                debug!("Anthropic returned no usage block; this call counts as zero");
+                TokenUsage::default()
+            }
+        };
+
+        let response = if !tool_calls.is_empty() {
             debug!(count = tool_calls.len(), "Anthropic returned tool calls");
-            Ok(ChatResponse::ToolCalls { tool_calls })
+            ChatResponse::ToolCalls { tool_calls }
         } else {
-            Ok(ChatResponse::Content(text_parts.join("")))
-        }
+            ChatResponse::Content(text_parts.join(""))
+        };
+
+        Ok(ChatTurn { response, usage })
     }
 
     async fn chat_stream_raw(
@@ -439,5 +465,54 @@ impl LlmProvider for AnthropicProvider {
         }
 
         Ok(self.build_sse_stream(response))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // RAG-005: the usage block is the whole measurement path, and until now
+    // neither provider parsed it. These tests pin the shape each one sends,
+    // because a field renamed upstream would otherwise show up as a session
+    // that costs nothing.
+
+    #[test]
+    fn usage_is_read_from_the_response() {
+        let body = r#"{
+            "content": [{"type": "text", "text": "hello"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1234, "output_tokens": 56}
+        }"#;
+
+        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
+        let usage = parsed.usage.expect("usage block");
+
+        assert_eq!(usage.input_tokens, 1234);
+        assert_eq!(usage.output_tokens, 56);
+    }
+
+    #[test]
+    fn a_response_without_usage_still_parses() {
+        // A budget must not depend on a field the provider is free to omit:
+        // the turn succeeds and simply contributes nothing.
+        let body = r#"{"content": [{"type": "text", "text": "hi"}]}"#;
+
+        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
+        assert!(parsed.usage.is_none());
+    }
+
+    #[test]
+    fn a_partial_usage_block_counts_what_it_reports() {
+        let body = r#"{
+            "content": [],
+            "usage": {"output_tokens": 7}
+        }"#;
+
+        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
+        let usage = parsed.usage.expect("usage block");
+
+        assert_eq!(usage.input_tokens, 0);
+        assert_eq!(usage.output_tokens, 7);
     }
 }

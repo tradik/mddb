@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::LlmConfig;
 use crate::error::AppError;
-use crate::llm::provider::{ApiMsg, ChatResponse, ChunkStream, LlmProvider, ToolCall, ToolDef};
+use crate::llm::provider::{
+    ApiMsg, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall, ToolDef,
+};
+use tracing::debug;
 
 pub struct OpenAiProvider {
     client: Client,
@@ -29,6 +32,17 @@ struct ChatRequest {
 #[derive(Deserialize)]
 struct ChatCompletion {
     choices: Vec<CompletionChoice>,
+    /// RAG-005. Optional for the same reason as Anthropic's: a budget must not
+    /// depend on a field the provider may omit.
+    usage: Option<OpenAiUsage>,
+}
+
+#[derive(Deserialize)]
+struct OpenAiUsage {
+    #[serde(default)]
+    prompt_tokens: u64,
+    #[serde(default)]
+    completion_tokens: u64,
 }
 
 #[derive(Deserialize)]
@@ -167,7 +181,7 @@ impl LlmProvider for OpenAiProvider {
         tools: &[ToolDef],
         temperature: f32,
         max_tokens: u32,
-    ) -> Result<ChatResponse, AppError> {
+    ) -> Result<ChatTurn, AppError> {
         let request = ChatRequest {
             model: self.config.model.clone(),
             messages: Self::api_messages(messages),
@@ -203,21 +217,29 @@ impl LlmProvider for OpenAiProvider {
             .await
             .map_err(|e| AppError::LlmError(format!("failed to parse response: {e}")))?;
 
+        let usage = match &completion.usage {
+            Some(u) => TokenUsage {
+                input: u.prompt_tokens,
+                output: u.completion_tokens,
+            },
+            None => {
+                debug!("OpenAI returned no usage block; this call counts as zero");
+                TokenUsage::default()
+            }
+        };
+
         let choice = completion
             .choices
             .into_iter()
             .next()
             .ok_or_else(|| AppError::LlmError("no choices in response".to_string()))?;
 
-        if let Some(tool_calls) = choice.message.tool_calls
-            && !tool_calls.is_empty()
-        {
-            return Ok(ChatResponse::ToolCalls { tool_calls });
-        }
+        let response = match choice.message.tool_calls {
+            Some(tool_calls) if !tool_calls.is_empty() => ChatResponse::ToolCalls { tool_calls },
+            _ => ChatResponse::Content(choice.message.content.unwrap_or_default()),
+        };
 
-        Ok(ChatResponse::Content(
-            choice.message.content.unwrap_or_default(),
-        ))
+        Ok(ChatTurn { response, usage })
     }
 
     async fn chat_stream_raw(
@@ -253,5 +275,47 @@ impl LlmProvider for OpenAiProvider {
         }
 
         Ok(self.build_sse_stream(response))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // RAG-005. OpenAI names the same two numbers differently from Anthropic,
+    // which is exactly the kind of difference that goes unnoticed until a
+    // budget silently stops counting on one provider.
+
+    #[test]
+    fn usage_is_read_from_the_response() {
+        let body = r#"{
+            "choices": [{"message": {"content": "hello"}}],
+            "usage": {"prompt_tokens": 900, "completion_tokens": 100, "total_tokens": 1000}
+        }"#;
+
+        let parsed: ChatCompletion = serde_json::from_str(body).expect("parse");
+        let usage = parsed.usage.expect("usage block");
+
+        assert_eq!(usage.prompt_tokens, 900);
+        assert_eq!(usage.completion_tokens, 100);
+    }
+
+    #[test]
+    fn a_response_without_usage_still_parses() {
+        let body = r#"{"choices": [{"message": {"content": "hi"}}]}"#;
+
+        let parsed: ChatCompletion = serde_json::from_str(body).expect("parse");
+        assert!(parsed.usage.is_none());
+    }
+
+    #[test]
+    fn a_partial_usage_block_counts_what_it_reports() {
+        let body = r#"{"choices": [], "usage": {"prompt_tokens": 42}}"#;
+
+        let parsed: ChatCompletion = serde_json::from_str(body).expect("parse");
+        let usage = parsed.usage.expect("usage block");
+
+        assert_eq!(usage.prompt_tokens, 42);
+        assert_eq!(usage.completion_tokens, 0);
     }
 }

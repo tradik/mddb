@@ -122,6 +122,14 @@ pub struct SecurityConfig {
     pub max_message_length: usize,
     #[serde(default)]
     pub webhook_secret: String,
+    /// Tokens one session may spend before it is refused (RAG-005).
+    ///
+    /// 0 (the default) means unlimited, which is the behaviour before this
+    /// existed. `max_turns` caps how many turns a session takes and says
+    /// nothing about what they cost; this is the limit a budget actually runs
+    /// out in.
+    #[serde(default)]
+    pub max_tokens_per_session: u64,
     /// Addresses or CIDRs whose `X-Forwarded-For` is believed (SEC-014).
     ///
     /// Empty by default, which charges the rate limit to the TCP peer — right

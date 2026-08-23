@@ -1,3 +1,4 @@
+use crate::llm::provider::TokenUsage;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -27,6 +28,14 @@ pub struct Session {
     /// `max_turns` counts. Separate from `message_count`, which also counts
     /// the assistant's replies and so would halve any configured limit.
     pub user_turns: usize,
+    /// Tokens this session has spent (RAG-005).
+    ///
+    /// This field existed before and was never written or read, which made it
+    /// a cost counter that did not count — worse than none, because it implies
+    /// a control that is not there. It is now charged from the `usage` block
+    /// every provider response carries, summed across every tool-calling round
+    /// rather than only the round that produced the answer.
+    pub total_tokens_used: u64,
 }
 
 impl Session {
@@ -45,7 +54,27 @@ impl Session {
             last_active: now,
             message_count: 0,
             user_turns: 0,
+            total_tokens_used: 0,
         }
+    }
+
+    /// Whether this session may spend more, given a budget (RAG-005).
+    ///
+    /// A budget of 0 means unlimited, which is the behaviour before this
+    /// existed. Mirrors `Scenario::allows_another_turn` deliberately: the two
+    /// limits answer the same question about different resources, and reading
+    /// them side by side in the handler should not require holding two shapes
+    /// in mind.
+    pub fn within_token_budget(&self, budget: u64) -> bool {
+        budget == 0 || self.total_tokens_used < budget
+    }
+
+    /// Charges a turn's token usage to this session.
+    pub fn add_tokens(&mut self, usage: TokenUsage) {
+        // Saturating rather than wrapping: a session that overflowed would
+        // report almost nothing spent, which is the one wrong answer a budget
+        // must not give.
+        self.total_tokens_used = self.total_tokens_used.saturating_add(usage.total());
     }
 
     pub fn add_message(&mut self, role: MessageRole, content: String) {
@@ -271,5 +300,142 @@ mod tests {
             WsIncoming::Message { content } => assert_eq!(content, "hello"),
             other => panic!("parsed as {other:?}"),
         }
+    }
+
+    // RAG-005: the counter that used to exist and never counted.
+
+    #[test]
+    fn a_new_session_has_spent_nothing() {
+        assert_eq!(
+            Session::new("Ada".into(), "default".into()).total_tokens_used,
+            0
+        );
+    }
+
+    #[test]
+    fn tokens_accumulate_across_turns() {
+        let mut session = Session::new("Ada".into(), "default".into());
+
+        session.add_tokens(TokenUsage {
+            input: 1200,
+            output: 300,
+        });
+        assert_eq!(session.total_tokens_used, 1500);
+
+        // A second turn adds to the first rather than replacing it — the whole
+        // point of a session budget.
+        session.add_tokens(TokenUsage {
+            input: 800,
+            output: 200,
+        });
+        assert_eq!(session.total_tokens_used, 2500);
+    }
+
+    #[test]
+    fn a_turn_that_reported_nothing_costs_nothing() {
+        // A provider that omits its usage block must not be able to break the
+        // count; it simply contributes zero.
+        let mut session = Session::new("Ada".into(), "default".into());
+        session.add_tokens(TokenUsage::default());
+        assert_eq!(session.total_tokens_used, 0);
+    }
+
+    #[test]
+    fn the_counter_saturates_rather_than_wrapping() {
+        // Wrapping would report a session that had spent almost nothing, which
+        // is the one wrong answer a budget must not give.
+        let mut session = Session::new("Ada".into(), "default".into());
+        session.add_tokens(TokenUsage {
+            input: u64::MAX,
+            output: 0,
+        });
+        session.add_tokens(TokenUsage {
+            input: 1000,
+            output: 1000,
+        });
+        assert_eq!(session.total_tokens_used, u64::MAX);
+    }
+
+    #[test]
+    fn an_unset_budget_never_refuses() {
+        // 0 means unlimited: the behaviour before a budget existed.
+        let mut session = Session::new("Ada".into(), "default".into());
+        session.add_tokens(TokenUsage {
+            input: u64::MAX,
+            output: 0,
+        });
+        assert!(session.within_token_budget(0));
+    }
+
+    #[test]
+    fn a_budget_refuses_once_it_is_reached() {
+        let mut session = Session::new("Ada".into(), "default".into());
+
+        session.add_tokens(TokenUsage {
+            input: 9_000,
+            output: 0,
+        });
+        assert!(session.within_token_budget(10_000), "under budget");
+
+        session.add_tokens(TokenUsage {
+            input: 1_000,
+            output: 0,
+        });
+        // Reaching the budget exhausts it; the check is >=, not >, so a
+        // session cannot spend one more turn on the boundary.
+        assert!(!session.within_token_budget(10_000), "at the budget");
+    }
+
+    #[test]
+    fn token_usage_totals_both_directions() {
+        assert_eq!(
+            TokenUsage {
+                input: 10,
+                output: 5
+            }
+            .total(),
+            15
+        );
+        assert_eq!(TokenUsage::default().total(), 0);
+    }
+
+    #[test]
+    fn token_usage_adds_each_direction_separately() {
+        // Kept apart because input and output are priced differently, and a
+        // later report will want them separately even though the budget sums.
+        let mut a = TokenUsage {
+            input: 10,
+            output: 5,
+        };
+        a += TokenUsage {
+            input: 1,
+            output: 2,
+        };
+        assert_eq!(
+            a,
+            TokenUsage {
+                input: 11,
+                output: 7
+            }
+        );
+    }
+
+    #[test]
+    fn token_usage_saturates_too() {
+        let mut a = TokenUsage {
+            input: u64::MAX,
+            output: u64::MAX,
+        };
+        a += TokenUsage {
+            input: 5,
+            output: 5,
+        };
+        assert_eq!(
+            a,
+            TokenUsage {
+                input: u64::MAX,
+                output: u64::MAX
+            }
+        );
     }
 }

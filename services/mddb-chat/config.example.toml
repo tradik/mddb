@@ -52,6 +52,20 @@ rate_limit_per_minute = 30
 max_message_length = 2000
 webhook_secret = ""  # or set MDDB_CHAT_WEBHOOK_SECRET env var
 
+# Tokens one session may spend before it is refused. 0 = unlimited.
+#
+# The second limit, and the one a budget actually runs out in. A scenario's
+# max_turns caps how many turns a conversation takes and says nothing about
+# what they cost — one turn carrying a large retrieval context through several
+# tool-calling rounds can be worth ten short ones.
+#
+# Charged from the usage block every provider response carries, summed across
+# every round of a turn rather than only the round that produced the answer.
+# A turn that exhausts the tool-calling rounds and falls through to the
+# streaming path undercounts by its final response: that call's usage arrives
+# in an SSE frame this server does not read.
+max_tokens_per_session = 0
+
 # Networks whose X-Forwarded-For header is believed, as addresses or CIDRs.
 #
 # Leave this empty and the rate limit is charged to the TCP peer, which cannot

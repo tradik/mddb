@@ -12,6 +12,8 @@ pub enum AppError {
     NameTooLong,
     /// The scenario's `max_turns` has been reached for this session.
     TurnLimitReached(usize),
+    /// The session has spent its token budget (RAG-005).
+    TokenBudgetExceeded(u64),
     GrpcError(tonic::Status),
     LlmError(String),
     Internal(String),
@@ -26,6 +28,10 @@ impl std::fmt::Display for AppError {
             AppError::RateLimited => write!(f, "rate limited"),
             AppError::MessageTooLong => write!(f, "message too long"),
             AppError::NameTooLong => write!(f, "name too long"),
+            AppError::TokenBudgetExceeded(spent) => write!(
+                f,
+                "this conversation has used its token budget ({spent} tokens)"
+            ),
             AppError::TurnLimitReached(max) => {
                 write!(f, "this conversation is limited to {max} turns")
             }
@@ -50,6 +56,9 @@ impl IntoResponse for AppError {
             // 403 rather than 429: the limit is a property of the scenario and
             // waiting does not lift it, so Retry-After would be a lie.
             AppError::TurnLimitReached(_) => (StatusCode::FORBIDDEN, self.to_string()),
+            // Refusal, not backpressure: the conversation is over rather than
+            // busy, so there is nothing to retry.
+            AppError::TokenBudgetExceeded(_) => (StatusCode::FORBIDDEN, self.to_string()),
             AppError::GrpcError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppError::LlmError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
@@ -84,6 +93,7 @@ mod tests {
             AppError::MessageTooLong,
             AppError::NameTooLong,
             AppError::TurnLimitReached(10),
+            AppError::TokenBudgetExceeded(120_000),
             AppError::LlmError("upstream refused".into()),
             AppError::Internal("boom".into()),
         ];
@@ -130,6 +140,10 @@ mod tests {
             // Waiting does not: the scenario caps the conversation, so this is
             // a refusal rather than backpressure.
             (AppError::TurnLimitReached(5), StatusCode::FORBIDDEN),
+            (
+                AppError::TokenBudgetExceeded(120_000),
+                StatusCode::FORBIDDEN,
+            ),
             // Something behind us failed.
             (AppError::LlmError("x".into()), StatusCode::BAD_GATEWAY),
             (
