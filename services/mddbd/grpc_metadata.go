@@ -354,27 +354,11 @@ func (g *GRPCServer) UpdateDocument(ctx context.Context, req *proto.UpdateDocume
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Post-update hooks
-	if req.UpdateContent && g.server.EmbeddingWorker != nil && saved.ContentMD != "" {
-		g.server.EmbeddingWorker.Enqueue(EmbeddingJob{
-			Collection: req.Collection,
-			DocID:      saved.ID,
-			ContentMD:  saved.ContentMD,
-			ChunkMode:  ChunkModeFor(&saved),
-		})
-	}
-
-	if g.server.TTLManager != nil {
-		if saved.ExpiresAt > 0 {
-			_ = g.server.TTLManager.Set(req.Collection, saved.ID, saved.ExpiresAt)
-		} else if req.UpdateTtl {
-			_ = g.server.TTLManager.Remove(req.Collection, saved.ID)
-		}
-	}
-
-	if g.server.AutomationManager != nil && env("MDDB_TRIGGERS", "false") == "true" {
-		go g.server.AutomationManager.EvaluateTriggers(req.Collection, saved, "update")
-	}
+	// Post-update side effects — the same pipeline as PATCH /v1/update.
+	// GO-038: this path used to run only embedding/TTL/triggers, so the read
+	// caches kept serving the pre-update document (a gRPC Get consults them)
+	// and FTS never saw the new content.
+	g.server.runPostUpdateHooks(req.Collection, req.Key, req.Lang, saved, req.UpdateContent, req.UpdateTtl)
 
 	return docToProto(&saved), nil
 }
