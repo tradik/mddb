@@ -56,6 +56,7 @@ const (
 	MDDB_UpdateDocument_FullMethodName        = "/mddb.MDDB/UpdateDocument"
 	MDDB_GetDocumentMeta_FullMethodName       = "/mddb.MDDB/GetDocumentMeta"
 	MDDB_Classify_FullMethodName              = "/mddb.MDDB/Classify"
+	MDDB_SearchAdvisor_FullMethodName         = "/mddb.MDDB/SearchAdvisor"
 	MDDB_DeleteDocument_FullMethodName        = "/mddb.MDDB/DeleteDocument"
 	MDDB_DeleteCollection_FullMethodName      = "/mddb.MDDB/DeleteCollection"
 	MDDB_ListSynonyms_FullMethodName          = "/mddb.MDDB/ListSynonyms"
@@ -171,6 +172,11 @@ type MDDBClient interface {
 	GetDocumentMeta(ctx context.Context, in *GetDocumentMetaRequest, opts ...grpc.CallOption) (*GetDocumentMetaResponse, error)
 	// Zero-shot document classification using embedding similarity
 	Classify(ctx context.Context, in *ClassifyRequest, opts ...grpc.CallOption) (*ClassifyResponse, error)
+	// SearchAdvisor measures a collection and recommends how to search it
+	// (SRCH-010), so a client picks an algorithm from evidence rather than from
+	// the names. Added for gRPC parity: the HTTP endpoint and the MCP tool
+	// already existed, and the Python client speaks gRPC.
+	SearchAdvisor(ctx context.Context, in *SearchAdvisorRequest, opts ...grpc.CallOption) (*SearchAdvisorResponse, error)
 	// Delete a single document
 	DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -626,6 +632,16 @@ func (c *mDDBClient) Classify(ctx context.Context, in *ClassifyRequest, opts ...
 	return out, nil
 }
 
+func (c *mDDBClient) SearchAdvisor(ctx context.Context, in *SearchAdvisorRequest, opts ...grpc.CallOption) (*SearchAdvisorResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchAdvisorResponse)
+	err := c.cc.Invoke(ctx, MDDB_SearchAdvisor_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mDDBClient) DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteDocumentResponse)
@@ -1036,6 +1052,11 @@ type MDDBServer interface {
 	GetDocumentMeta(context.Context, *GetDocumentMetaRequest) (*GetDocumentMetaResponse, error)
 	// Zero-shot document classification using embedding similarity
 	Classify(context.Context, *ClassifyRequest) (*ClassifyResponse, error)
+	// SearchAdvisor measures a collection and recommends how to search it
+	// (SRCH-010), so a client picks an algorithm from evidence rather than from
+	// the names. Added for gRPC parity: the HTTP endpoint and the MCP tool
+	// already existed, and the Python client speaks gRPC.
+	SearchAdvisor(context.Context, *SearchAdvisorRequest) (*SearchAdvisorResponse, error)
 	// Delete a single document
 	DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -1222,6 +1243,9 @@ func (UnimplementedMDDBServer) GetDocumentMeta(context.Context, *GetDocumentMeta
 }
 func (UnimplementedMDDBServer) Classify(context.Context, *ClassifyRequest) (*ClassifyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Classify not implemented")
+}
+func (UnimplementedMDDBServer) SearchAdvisor(context.Context, *SearchAdvisorRequest) (*SearchAdvisorResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SearchAdvisor not implemented")
 }
 func (UnimplementedMDDBServer) DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteDocument not implemented")
@@ -2002,6 +2026,24 @@ func _MDDB_Classify_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_SearchAdvisor_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchAdvisorRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).SearchAdvisor(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_SearchAdvisor_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).SearchAdvisor(ctx, req.(*SearchAdvisorRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MDDB_DeleteDocument_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteDocumentRequest)
 	if err := dec(in); err != nil {
@@ -2746,6 +2788,10 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Classify",
 			Handler:    _MDDB_Classify_Handler,
+		},
+		{
+			MethodName: "SearchAdvisor",
+			Handler:    _MDDB_SearchAdvisor_Handler,
 		},
 		{
 			MethodName: "DeleteDocument",

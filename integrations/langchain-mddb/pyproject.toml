@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "langchain-mddb"
+version = "2.12.0"
+description = "LangChain VectorStore and Retriever backed by MDDB (Markdown Database)."
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [{ name = "tradik" }]
+requires-python = ">=3.9"
+keywords = ["langchain", "rag", "retrieval", "vectorstore", "mddb"]
+dependencies = [
+    "langchain-core>=0.3",
+]
+
+[project.optional-dependencies]
+# The MDDB client itself. Separate because a caller may already have it
+# pinned, and because the adapter is useful to read without installing gRPC.
+client = ["mddb-client>=2.12.0"]
+test = ["pytest>=8.0", "langchain-core>=0.3"]
+
+[project.urls]
+Homepage = "https://github.com/tradik/mddb"
+Repository = "https://github.com/tradik/mddb"
+Documentation = "https://mddb.tradik.com/docs/integrations/"
+
+[tool.setuptools]
+packages = ["langchain_mddb"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

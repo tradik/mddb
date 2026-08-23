@@ -71,6 +71,9 @@ test: ## Run all Go tests
 	cd tools/bench && go test -timeout 5m ./...
 	@echo "✅ Tests passed!"
 
+test-langchain: ## Run the LangChain adapter tests (INT-017)
+	@cd integrations/langchain-mddb && python3 -m pytest -q
+
 test-clients: ## Run the Node.js and Python client tests (TEST-001)
 	@echo "🧪 Running Node.js client tests..."
 	cd clients/nodejs && npm test
@@ -133,7 +136,7 @@ test-graphql: ## Run GraphQL tests with coverage
 lint-all: fmt vet sec lint ## Run all linters
 	@echo "✅ All linting passed!"
 
-test-all: test test-graphql test-clients ## Run every test suite in the monorepo
+test-all: test test-graphql test-clients test-langchain ## Run every test suite in the monorepo
 	@echo "✅ All tests passed!"
 
 ci: check-go-version check-version check-action-pins check-repo-links fmt-check lint-all test-all ## Run full CI pipeline (lint + test)

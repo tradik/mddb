@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`langchain-mddb` — a LangChain VectorStore and Retriever (INT-017)** — a
+  developer choosing a retrieval backend inside LangChain picks from the list
+  that has an adapter, so MDDB was not chosen regardless of what the engine
+  does. Thin layer over `clients/python`; the adapter's whole job is mapping
+  one interface onto the other.
+
+  Two places where the two disagree, resolved deliberately. **MDDB embeds
+  server-side**, so `similarity_search_by_vector` raises rather than quietly
+  re-embedding your text with a different model — a caller reaching for that
+  method is usually trying to keep two systems in one vector space, and
+  silently using another model defeats exactly that. And **hybrid is the
+  default**, not vector: following LangChain's reading of `similarity_search`
+  would mean the adapter returns worse results than the same server queried
+  directly.
+
+  Filters translate equality and membership; operator forms raise rather than
+  being dropped, because a dropped condition silently widens the search.
+  Generated ids are derived from content, so re-running an ingest script
+  updates the collection instead of doubling it. `recommended_settings()`
+  exposes the search advisor, since choosing `search_type` by hand is guessing
+  while the server has measured.
+
+
+- **`SearchAdvisor` over gRPC** — added for parity after the HTTP endpoint and
+  the MCP tool. Found by running the new LangChain adapter against a real
+  server: the Python client speaks gRPC, so `recommended_settings()` could not
+  reach the advice at all. `CodeGraph` has the same gap and is left as it was —
+  it never claimed a gRPC surface.
+
+
 - **`search_advisor` — how should I search this collection? (SRCH-010)** — the
   server offers eight vector algorithms, four ranking algorithms, three fusion
   strategies and four retrieval modes, and an agent connecting over MCP sees a

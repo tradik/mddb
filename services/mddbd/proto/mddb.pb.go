@@ -11288,6 +11288,307 @@ func (x *DeleteCurationRuleResponse) GetId() string {
 	return ""
 }
 
+// SearchAdvisorRequest asks how a collection should be searched (SRCH-010).
+type SearchAdvisorRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchAdvisorRequest) Reset() {
+	*x = SearchAdvisorRequest{}
+	mi := &file_mddb_proto_msgTypes[174]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchAdvisorRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchAdvisorRequest) ProtoMessage() {}
+
+func (x *SearchAdvisorRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[174]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchAdvisorRequest.ProtoReflect.Descriptor instead.
+func (*SearchAdvisorRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{174}
+}
+
+func (x *SearchAdvisorRequest) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+// CollectionProfile is what the advisor measured.
+type CollectionProfile struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Collection        string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Documents         int32                  `protobuf:"varint,2,opt,name=documents,proto3" json:"documents,omitempty"`
+	Sampled           int32                  `protobuf:"varint,3,opt,name=sampled,proto3" json:"sampled,omitempty"`
+	EmbeddedDocuments int32                  `protobuf:"varint,4,opt,name=embedded_documents,json=embeddedDocuments,proto3" json:"embedded_documents,omitempty"`
+	VectorDimensions  int32                  `protobuf:"varint,5,opt,name=vector_dimensions,json=vectorDimensions,proto3" json:"vector_dimensions,omitempty"`
+	MedianWords       int32                  `protobuf:"varint,6,opt,name=median_words,json=medianWords,proto3" json:"median_words,omitempty"`
+	LongDocumentRatio float64                `protobuf:"fixed64,7,opt,name=long_document_ratio,json=longDocumentRatio,proto3" json:"long_document_ratio,omitempty"`
+	DistinctTerms     int32                  `protobuf:"varint,8,opt,name=distinct_terms,json=distinctTerms,proto3" json:"distinct_terms,omitempty"`
+	// How much new vocabulary each document contributes. This, and not the
+	// type-token ratio, decides whether keyword search can discriminate: TTR
+	// pooled over a corpus falls towards zero as the corpus grows.
+	TermsPerDocument     float64 `protobuf:"fixed64,9,opt,name=terms_per_document,json=termsPerDocument,proto3" json:"terms_per_document,omitempty"`
+	TypeTokenRatio       float64 `protobuf:"fixed64,10,opt,name=type_token_ratio,json=typeTokenRatio,proto3" json:"type_token_ratio,omitempty"`
+	CodeDocuments        int32   `protobuf:"varint,11,opt,name=code_documents,json=codeDocuments,proto3" json:"code_documents,omitempty"`
+	EstimatedVectorBytes int64   `protobuf:"varint,12,opt,name=estimated_vector_bytes,json=estimatedVectorBytes,proto3" json:"estimated_vector_bytes,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *CollectionProfile) Reset() {
+	*x = CollectionProfile{}
+	mi := &file_mddb_proto_msgTypes[175]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CollectionProfile) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CollectionProfile) ProtoMessage() {}
+
+func (x *CollectionProfile) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[175]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CollectionProfile.ProtoReflect.Descriptor instead.
+func (*CollectionProfile) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{175}
+}
+
+func (x *CollectionProfile) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *CollectionProfile) GetDocuments() int32 {
+	if x != nil {
+		return x.Documents
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetSampled() int32 {
+	if x != nil {
+		return x.Sampled
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetEmbeddedDocuments() int32 {
+	if x != nil {
+		return x.EmbeddedDocuments
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetVectorDimensions() int32 {
+	if x != nil {
+		return x.VectorDimensions
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetMedianWords() int32 {
+	if x != nil {
+		return x.MedianWords
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetLongDocumentRatio() float64 {
+	if x != nil {
+		return x.LongDocumentRatio
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetDistinctTerms() int32 {
+	if x != nil {
+		return x.DistinctTerms
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetTermsPerDocument() float64 {
+	if x != nil {
+		return x.TermsPerDocument
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetTypeTokenRatio() float64 {
+	if x != nil {
+		return x.TypeTokenRatio
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetCodeDocuments() int32 {
+	if x != nil {
+		return x.CodeDocuments
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetEstimatedVectorBytes() int64 {
+	if x != nil {
+		return x.EstimatedVectorBytes
+	}
+	return 0
+}
+
+// SearchAdvisorResponse is the advice, with the reasons for it.
+type SearchAdvisorResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Profile         *CollectionProfile     `protobuf:"bytes,1,opt,name=profile,proto3" json:"profile,omitempty"`
+	SearchType      string                 `protobuf:"bytes,2,opt,name=search_type,json=searchType,proto3" json:"search_type,omitempty"`
+	FtsAlgorithm    string                 `protobuf:"bytes,3,opt,name=fts_algorithm,json=ftsAlgorithm,proto3" json:"fts_algorithm,omitempty"`
+	VectorAlgorithm string                 `protobuf:"bytes,4,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"`
+	HybridStrategy  string                 `protobuf:"bytes,5,opt,name=hybrid_strategy,json=hybridStrategy,proto3" json:"hybrid_strategy,omitempty"`
+	HybridAlpha     float64                `protobuf:"fixed64,6,opt,name=hybrid_alpha,json=hybridAlpha,proto3" json:"hybrid_alpha,omitempty"`
+	RetrievalMode   string                 `protobuf:"bytes,7,opt,name=retrieval_mode,json=retrievalMode,proto3" json:"retrieval_mode,omitempty"`
+	TopK            int32                  `protobuf:"varint,8,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
+	// One line per decision, in plain language. A recommendation nobody can
+	// argue with is one nobody should follow.
+	Reasons []string `protobuf:"bytes,9,rep,name=reasons,proto3" json:"reasons,omitempty"`
+	// What would stop the recommendation working.
+	Warnings      []string `protobuf:"bytes,10,rep,name=warnings,proto3" json:"warnings,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchAdvisorResponse) Reset() {
+	*x = SearchAdvisorResponse{}
+	mi := &file_mddb_proto_msgTypes[176]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchAdvisorResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchAdvisorResponse) ProtoMessage() {}
+
+func (x *SearchAdvisorResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[176]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchAdvisorResponse.ProtoReflect.Descriptor instead.
+func (*SearchAdvisorResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{176}
+}
+
+func (x *SearchAdvisorResponse) GetProfile() *CollectionProfile {
+	if x != nil {
+		return x.Profile
+	}
+	return nil
+}
+
+func (x *SearchAdvisorResponse) GetSearchType() string {
+	if x != nil {
+		return x.SearchType
+	}
+	return ""
+}
+
+func (x *SearchAdvisorResponse) GetFtsAlgorithm() string {
+	if x != nil {
+		return x.FtsAlgorithm
+	}
+	return ""
+}
+
+func (x *SearchAdvisorResponse) GetVectorAlgorithm() string {
+	if x != nil {
+		return x.VectorAlgorithm
+	}
+	return ""
+}
+
+func (x *SearchAdvisorResponse) GetHybridStrategy() string {
+	if x != nil {
+		return x.HybridStrategy
+	}
+	return ""
+}
+
+func (x *SearchAdvisorResponse) GetHybridAlpha() float64 {
+	if x != nil {
+		return x.HybridAlpha
+	}
+	return 0
+}
+
+func (x *SearchAdvisorResponse) GetRetrievalMode() string {
+	if x != nil {
+		return x.RetrievalMode
+	}
+	return ""
+}
+
+func (x *SearchAdvisorResponse) GetTopK() int32 {
+	if x != nil {
+		return x.TopK
+	}
+	return 0
+}
+
+func (x *SearchAdvisorResponse) GetReasons() []string {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+func (x *SearchAdvisorResponse) GetWarnings() []string {
+	if x != nil {
+		return x.Warnings
+	}
+	return nil
+}
+
 var File_mddb_proto protoreflect.FileDescriptor
 
 const file_mddb_proto_rawDesc = "" +
@@ -12400,7 +12701,40 @@ const file_mddb_proto_rawDesc = "" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"D\n" +
 	"\x1aDeleteCurationRuleResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x0e\n" +
-	"\x02id\x18\x02 \x01(\tR\x02id2\xd8%\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"6\n" +
+	"\x14SearchAdvisorRequest\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\"\xf6\x03\n" +
+	"\x11CollectionProfile\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12\x1c\n" +
+	"\tdocuments\x18\x02 \x01(\x05R\tdocuments\x12\x18\n" +
+	"\asampled\x18\x03 \x01(\x05R\asampled\x12-\n" +
+	"\x12embedded_documents\x18\x04 \x01(\x05R\x11embeddedDocuments\x12+\n" +
+	"\x11vector_dimensions\x18\x05 \x01(\x05R\x10vectorDimensions\x12!\n" +
+	"\fmedian_words\x18\x06 \x01(\x05R\vmedianWords\x12.\n" +
+	"\x13long_document_ratio\x18\a \x01(\x01R\x11longDocumentRatio\x12%\n" +
+	"\x0edistinct_terms\x18\b \x01(\x05R\rdistinctTerms\x12,\n" +
+	"\x12terms_per_document\x18\t \x01(\x01R\x10termsPerDocument\x12(\n" +
+	"\x10type_token_ratio\x18\n" +
+	" \x01(\x01R\x0etypeTokenRatio\x12%\n" +
+	"\x0ecode_documents\x18\v \x01(\x05R\rcodeDocuments\x124\n" +
+	"\x16estimated_vector_bytes\x18\f \x01(\x03R\x14estimatedVectorBytes\"\xf9\x02\n" +
+	"\x15SearchAdvisorResponse\x121\n" +
+	"\aprofile\x18\x01 \x01(\v2\x17.mddb.CollectionProfileR\aprofile\x12\x1f\n" +
+	"\vsearch_type\x18\x02 \x01(\tR\n" +
+	"searchType\x12#\n" +
+	"\rfts_algorithm\x18\x03 \x01(\tR\fftsAlgorithm\x12)\n" +
+	"\x10vector_algorithm\x18\x04 \x01(\tR\x0fvectorAlgorithm\x12'\n" +
+	"\x0fhybrid_strategy\x18\x05 \x01(\tR\x0ehybridStrategy\x12!\n" +
+	"\fhybrid_alpha\x18\x06 \x01(\x01R\vhybridAlpha\x12%\n" +
+	"\x0eretrieval_mode\x18\a \x01(\tR\rretrievalMode\x12\x13\n" +
+	"\x05top_k\x18\b \x01(\x05R\x04topK\x12\x18\n" +
+	"\areasons\x18\t \x03(\tR\areasons\x12\x1a\n" +
+	"\bwarnings\x18\n" +
+	" \x03(\tR\bwarnings2\xa2&\n" +
 	"\x04MDDB\x12'\n" +
 	"\x03Add\x12\x10.mddb.AddRequest\x1a\x0e.mddb.Document\x129\n" +
 	"\bAddBatch\x12\x15.mddb.AddBatchRequest\x1a\x16.mddb.AddBatchResponse\x12B\n" +
@@ -12440,7 +12774,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\x10ValidateDocument\x12\x1d.mddb.ValidateDocumentRequest\x1a\x1e.mddb.ValidateDocumentResponse\x12=\n" +
 	"\x0eUpdateDocument\x12\x1b.mddb.UpdateDocumentRequest\x1a\x0e.mddb.Document\x12N\n" +
 	"\x0fGetDocumentMeta\x12\x1c.mddb.GetDocumentMetaRequest\x1a\x1d.mddb.GetDocumentMetaResponse\x129\n" +
-	"\bClassify\x12\x15.mddb.ClassifyRequest\x1a\x16.mddb.ClassifyResponse\x12K\n" +
+	"\bClassify\x12\x15.mddb.ClassifyRequest\x1a\x16.mddb.ClassifyResponse\x12H\n" +
+	"\rSearchAdvisor\x12\x1a.mddb.SearchAdvisorRequest\x1a\x1b.mddb.SearchAdvisorResponse\x12K\n" +
 	"\x0eDeleteDocument\x12\x1b.mddb.DeleteDocumentRequest\x1a\x1c.mddb.DeleteDocumentResponse\x12Q\n" +
 	"\x10DeleteCollection\x12\x1d.mddb.DeleteCollectionRequest\x1a\x1e.mddb.DeleteCollectionResponse\x12E\n" +
 	"\fListSynonyms\x12\x19.mddb.ListSynonymsRequest\x1a\x1a.mddb.ListSynonymsResponse\x12?\n" +
@@ -12494,7 +12829,7 @@ func file_mddb_proto_rawDescGZIP() []byte {
 	return file_mddb_proto_rawDescData
 }
 
-var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 206)
+var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 209)
 var file_mddb_proto_goTypes = []any{
 	(*Document)(nil),                      // 0: mddb.Document
 	(*MetaValues)(nil),                    // 1: mddb.MetaValues
@@ -12670,298 +13005,304 @@ var file_mddb_proto_goTypes = []any{
 	(*UpdateCurationRuleRequest)(nil),     // 171: mddb.UpdateCurationRuleRequest
 	(*DeleteCurationRuleRequest)(nil),     // 172: mddb.DeleteCurationRuleRequest
 	(*DeleteCurationRuleResponse)(nil),    // 173: mddb.DeleteCurationRuleResponse
-	nil,                                   // 174: mddb.Document.MetaEntry
-	nil,                                   // 175: mddb.AddRequest.MetaEntry
-	nil,                                   // 176: mddb.BatchDocument.MetaEntry
-	nil,                                   // 177: mddb.GetRequest.EnvEntry
-	nil,                                   // 178: mddb.SearchRequest.FilterMetaEntry
-	nil,                                   // 179: mddb.ExportRequest.FilterMetaEntry
-	nil,                                   // 180: mddb.UpdateDocument.MetaEntry
-	nil,                                   // 181: mddb.VectorSearchRequest.FilterMetaEntry
-	nil,                                   // 182: mddb.VectorStatsResponse.CollectionsEntry
-	nil,                                   // 183: mddb.ImportURLRequest.MetaEntry
-	nil,                                   // 184: mddb.FTSRequest.FilterMetaEntry
-	nil,                                   // 185: mddb.FTSRequest.BoostEntry
-	nil,                                   // 186: mddb.FTSResponse.FacetsEntry
-	nil,                                   // 187: mddb.HybridSearchRequest.FilterMetaEntry
-	nil,                                   // 188: mddb.HybridSearchRequest.FieldWeightsEntry
-	nil,                                   // 189: mddb.HybridSearchRequest.BoostEntry
-	nil,                                   // 190: mddb.HybridSearchResponse.FacetsEntry
-	nil,                                   // 191: mddb.ValidateDocumentRequest.MetaEntry
-	nil,                                   // 192: mddb.UpdateDocumentRequest.MetaEntry
-	nil,                                   // 193: mddb.GetDocumentMetaResponse.MetaEntry
-	nil,                                   // 194: mddb.GetMetaKeysResponse.MetaEntry
-	nil,                                   // 195: mddb.AutomationRuleProto.HeadersEntry
-	nil,                                   // 196: mddb.CollectionConfigProto.CustomMetaEntry
-	nil,                                   // 197: mddb.SetCollectionConfigRequest.CustomMetaEntry
-	nil,                                   // 198: mddb.CrossSearchRequest.FilterMetaEntry
-	nil,                                   // 199: mddb.IngestDocument.MetaEntry
-	nil,                                   // 200: mddb.RevisionEntryProto.MetaEntry
-	nil,                                   // 201: mddb.GeoSearchRequest.FilterMetaEntry
-	nil,                                   // 202: mddb.GeoWithinRequest.FilterMetaEntry
-	nil,                                   // 203: mddb.GeoReindexResponse.PostcodesLoadedEntry
-	nil,                                   // 204: mddb.GeoStatsResponse.CollectionsEntry
-	nil,                                   // 205: mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	(*SearchAdvisorRequest)(nil),          // 174: mddb.SearchAdvisorRequest
+	(*CollectionProfile)(nil),             // 175: mddb.CollectionProfile
+	(*SearchAdvisorResponse)(nil),         // 176: mddb.SearchAdvisorResponse
+	nil,                                   // 177: mddb.Document.MetaEntry
+	nil,                                   // 178: mddb.AddRequest.MetaEntry
+	nil,                                   // 179: mddb.BatchDocument.MetaEntry
+	nil,                                   // 180: mddb.GetRequest.EnvEntry
+	nil,                                   // 181: mddb.SearchRequest.FilterMetaEntry
+	nil,                                   // 182: mddb.ExportRequest.FilterMetaEntry
+	nil,                                   // 183: mddb.UpdateDocument.MetaEntry
+	nil,                                   // 184: mddb.VectorSearchRequest.FilterMetaEntry
+	nil,                                   // 185: mddb.VectorStatsResponse.CollectionsEntry
+	nil,                                   // 186: mddb.ImportURLRequest.MetaEntry
+	nil,                                   // 187: mddb.FTSRequest.FilterMetaEntry
+	nil,                                   // 188: mddb.FTSRequest.BoostEntry
+	nil,                                   // 189: mddb.FTSResponse.FacetsEntry
+	nil,                                   // 190: mddb.HybridSearchRequest.FilterMetaEntry
+	nil,                                   // 191: mddb.HybridSearchRequest.FieldWeightsEntry
+	nil,                                   // 192: mddb.HybridSearchRequest.BoostEntry
+	nil,                                   // 193: mddb.HybridSearchResponse.FacetsEntry
+	nil,                                   // 194: mddb.ValidateDocumentRequest.MetaEntry
+	nil,                                   // 195: mddb.UpdateDocumentRequest.MetaEntry
+	nil,                                   // 196: mddb.GetDocumentMetaResponse.MetaEntry
+	nil,                                   // 197: mddb.GetMetaKeysResponse.MetaEntry
+	nil,                                   // 198: mddb.AutomationRuleProto.HeadersEntry
+	nil,                                   // 199: mddb.CollectionConfigProto.CustomMetaEntry
+	nil,                                   // 200: mddb.SetCollectionConfigRequest.CustomMetaEntry
+	nil,                                   // 201: mddb.CrossSearchRequest.FilterMetaEntry
+	nil,                                   // 202: mddb.IngestDocument.MetaEntry
+	nil,                                   // 203: mddb.RevisionEntryProto.MetaEntry
+	nil,                                   // 204: mddb.GeoSearchRequest.FilterMetaEntry
+	nil,                                   // 205: mddb.GeoWithinRequest.FilterMetaEntry
+	nil,                                   // 206: mddb.GeoReindexResponse.PostcodesLoadedEntry
+	nil,                                   // 207: mddb.GeoStatsResponse.CollectionsEntry
+	nil,                                   // 208: mddb.GeoStatsResponse.PostcodeDatasetsEntry
 }
 var file_mddb_proto_depIdxs = []int32{
-	174, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
-	175, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
+	177, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
+	178, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
 	4,   // 2: mddb.AddBatchRequest.documents:type_name -> mddb.BatchDocument
-	176, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
-	177, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
-	178, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
+	179, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
+	180, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
+	181, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
 	0,   // 6: mddb.SearchResponse.documents:type_name -> mddb.Document
-	179, // 7: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
+	182, // 7: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
 	19,  // 8: mddb.StatsResponse.collections:type_name -> mddb.CollectionStats
 	21,  // 9: mddb.DeleteBatchRequest.documents:type_name -> mddb.DeleteDocument
 	24,  // 10: mddb.UpdateBatchRequest.documents:type_name -> mddb.UpdateDocument
-	180, // 11: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
-	181, // 12: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
+	183, // 11: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
+	184, // 12: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
 	0,   // 13: mddb.VectorSearchResult.document:type_name -> mddb.Document
 	27,  // 14: mddb.VectorSearchResponse.results:type_name -> mddb.VectorSearchResult
-	182, // 15: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
-	183, // 16: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
-	184, // 17: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
-	185, // 18: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
+	185, // 15: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
+	186, // 16: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
+	187, // 17: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
+	188, // 18: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
 	0,   // 19: mddb.FTSResult.document:type_name -> mddb.Document
 	38,  // 20: mddb.FacetBucketList.buckets:type_name -> mddb.FacetBucketProto
 	37,  // 21: mddb.FTSResponse.results:type_name -> mddb.FTSResult
-	186, // 22: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
+	189, // 22: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
 	44,  // 23: mddb.FTSLanguagesResponse.languages:type_name -> mddb.FTSLanguageInfo
-	187, // 24: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
-	188, // 25: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
-	189, // 26: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
+	190, // 24: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
+	191, // 25: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
+	192, // 26: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
 	0,   // 27: mddb.HybridSearchResult.document:type_name -> mddb.Document
 	47,  // 28: mddb.HybridSearchResponse.results:type_name -> mddb.HybridSearchResult
-	190, // 29: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
+	193, // 29: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
 	49,  // 30: mddb.ListWebhooksResponse.webhooks:type_name -> mddb.WebhookProto
 	63,  // 31: mddb.ListSchemasResponse.schemas:type_name -> mddb.SchemaInfo
-	191, // 32: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
-	192, // 33: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
-	193, // 34: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
+	194, // 32: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
+	195, // 33: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
+	196, // 34: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
 	70,  // 35: mddb.ClassifyResponse.results:type_name -> mddb.ClassifyLabelScore
 	76,  // 36: mddb.ListSynonymsResponse.entries:type_name -> mddb.SynonymEntry
 	83,  // 37: mddb.ListStopwordsResponse.entries:type_name -> mddb.StopwordEntry
-	194, // 38: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
-	195, // 39: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
+	197, // 38: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
+	198, // 39: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
 	94,  // 40: mddb.ListAutomationResponse.rules:type_name -> mddb.AutomationRuleProto
 	94,  // 41: mddb.CreateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
 	94,  // 42: mddb.UpdateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
 	94,  // 43: mddb.TestAutomationResponse.trigger:type_name -> mddb.AutomationRuleProto
 	0,   // 44: mddb.TestAutomationResponse.matches:type_name -> mddb.Document
 	104, // 45: mddb.GetAutomationLogsResponse.logs:type_name -> mddb.AutomationLogEntryProto
-	196, // 46: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
+	199, // 46: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
 	107, // 47: mddb.CollectionConfigProto.retrieval:type_name -> mddb.RetrievalProfileProto
 	108, // 48: mddb.GetCollectionConfigResponse.config:type_name -> mddb.CollectionConfigProto
-	197, // 49: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
+	200, // 49: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
 	107, // 50: mddb.SetCollectionConfigRequest.retrieval:type_name -> mddb.RetrievalProfileProto
 	108, // 51: mddb.CollectionConfigEntry.config:type_name -> mddb.CollectionConfigProto
 	114, // 52: mddb.ListCollectionConfigsResponse.configs:type_name -> mddb.CollectionConfigEntry
-	198, // 53: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
+	201, // 53: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
 	0,   // 54: mddb.CrossSearchResultItem.document:type_name -> mddb.Document
 	117, // 55: mddb.CrossSearchResponse.results:type_name -> mddb.CrossSearchResultItem
 	120, // 56: mddb.DuplicateGroupProto.documents:type_name -> mddb.DuplicateDocInfoProto
 	121, // 57: mddb.FindDuplicatesResponse.exact_groups:type_name -> mddb.DuplicateGroupProto
 	121, // 58: mddb.FindDuplicatesResponse.similar_groups:type_name -> mddb.DuplicateGroupProto
-	199, // 59: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
+	202, // 59: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
 	123, // 60: mddb.IngestRequest.documents:type_name -> mddb.IngestDocument
 	124, // 61: mddb.IngestRequest.options:type_name -> mddb.IngestOptions
-	200, // 62: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
+	203, // 62: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
 	128, // 63: mddb.ListRevisionsResponse.revisions:type_name -> mddb.RevisionEntryProto
 	137, // 64: mddb.ReplicationStatusResponse.followers:type_name -> mddb.FollowerInfo
 	141, // 65: mddb.TemporalQueryResponse.events:type_name -> mddb.TemporalEventProto
 	0,   // 66: mddb.TemporalHotEntry.document:type_name -> mddb.Document
 	144, // 67: mddb.TemporalHotResponse.entries:type_name -> mddb.TemporalHotEntry
 	147, // 68: mddb.SpellSuggestResponse.token_suggestions:type_name -> mddb.SpellSuggestionProto
-	201, // 69: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
+	204, // 69: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
 	0,   // 70: mddb.GeoSearchResultItem.document:type_name -> mddb.Document
 	152, // 71: mddb.GeoSearchResponse.results:type_name -> mddb.GeoSearchResultItem
-	202, // 72: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
+	205, // 72: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
 	152, // 73: mddb.GeoWithinResponse.results:type_name -> mddb.GeoSearchResultItem
 	156, // 74: mddb.GeoReindexRequest.load_postcodes:type_name -> mddb.GeoPostcodeLoadProto
-	203, // 75: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
-	204, // 76: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
-	205, // 77: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	206, // 75: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
+	207, // 76: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
+	208, // 77: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
 	166, // 78: mddb.CurationRuleProto.pins:type_name -> mddb.PinnedDocProto
 	167, // 79: mddb.ListCurationRulesResponse.rules:type_name -> mddb.CurationRuleProto
 	167, // 80: mddb.CreateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
 	167, // 81: mddb.UpdateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
-	1,   // 82: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 83: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 84: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 85: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 86: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 87: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 88: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	33,  // 89: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
-	1,   // 90: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 91: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	39,  // 92: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 93: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	39,  // 94: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 95: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 96: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 97: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 98: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 99: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 100: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 101: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 102: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 103: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	160, // 104: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
-	2,   // 105: mddb.MDDB.Add:input_type -> mddb.AddRequest
-	3,   // 106: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
-	20,  // 107: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
-	23,  // 108: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
-	6,   // 109: mddb.MDDB.Get:input_type -> mddb.GetRequest
-	7,   // 110: mddb.MDDB.Search:input_type -> mddb.SearchRequest
-	9,   // 111: mddb.MDDB.Export:input_type -> mddb.ExportRequest
-	11,  // 112: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
-	13,  // 113: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
-	15,  // 114: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
-	17,  // 115: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
-	26,  // 116: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
-	29,  // 117: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
-	31,  // 118: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
-	151, // 119: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
-	154, // 120: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
-	157, // 121: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
-	159, // 122: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
-	162, // 123: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
-	164, // 124: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
-	34,  // 125: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
-	35,  // 126: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
-	36,  // 127: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
-	41,  // 128: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
-	43,  // 129: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
-	46,  // 130: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
-	50,  // 131: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
-	51,  // 132: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
-	53,  // 133: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
-	55,  // 134: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
-	57,  // 135: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
-	59,  // 136: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
-	61,  // 137: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
-	64,  // 138: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
-	66,  // 139: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
-	67,  // 140: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
-	69,  // 141: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
-	72,  // 142: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
-	74,  // 143: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
-	77,  // 144: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
-	79,  // 145: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
-	81,  // 146: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
-	84,  // 147: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
-	86,  // 148: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
-	88,  // 149: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
-	90,  // 150: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
-	92,  // 151: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
-	95,  // 152: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
-	97,  // 153: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
-	98,  // 154: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
-	99,  // 155: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
-	101, // 156: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
-	102, // 157: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
-	105, // 158: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
-	109, // 159: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
-	111, // 160: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
-	113, // 161: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
-	116, // 162: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
-	119, // 163: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
-	125, // 164: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
-	127, // 165: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
-	130, // 166: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
-	140, // 167: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
-	143, // 168: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
-	146, // 169: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
-	149, // 170: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
-	168, // 171: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
-	170, // 172: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
-	171, // 173: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
-	172, // 174: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
-	131, // 175: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
-	133, // 176: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
-	135, // 177: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
-	138, // 178: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
-	0,   // 179: mddb.MDDB.Add:output_type -> mddb.Document
-	5,   // 180: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
-	22,  // 181: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
-	25,  // 182: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
-	0,   // 183: mddb.MDDB.Get:output_type -> mddb.Document
-	8,   // 184: mddb.MDDB.Search:output_type -> mddb.SearchResponse
-	10,  // 185: mddb.MDDB.Export:output_type -> mddb.ExportChunk
-	12,  // 186: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
-	14,  // 187: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
-	16,  // 188: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
-	18,  // 189: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
-	28,  // 190: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
-	30,  // 191: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
-	32,  // 192: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
-	153, // 193: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
-	155, // 194: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
-	158, // 195: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
-	161, // 196: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
-	163, // 197: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
-	165, // 198: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
-	0,   // 199: mddb.MDDB.ImportURL:output_type -> mddb.Document
-	0,   // 200: mddb.MDDB.SetTTL:output_type -> mddb.Document
-	40,  // 201: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
-	42,  // 202: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
-	45,  // 203: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
-	48,  // 204: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
-	49,  // 205: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
-	52,  // 206: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
-	54,  // 207: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
-	56,  // 208: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
-	58,  // 209: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
-	60,  // 210: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
-	62,  // 211: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
-	65,  // 212: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
-	0,   // 213: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
-	68,  // 214: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
-	71,  // 215: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
-	73,  // 216: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
-	75,  // 217: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
-	78,  // 218: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
-	80,  // 219: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
-	82,  // 220: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
-	85,  // 221: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
-	87,  // 222: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
-	89,  // 223: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
-	91,  // 224: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
-	93,  // 225: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
-	96,  // 226: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
-	94,  // 227: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
-	94,  // 228: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
-	94,  // 229: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
-	100, // 230: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
-	103, // 231: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
-	106, // 232: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
-	110, // 233: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
-	112, // 234: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
-	115, // 235: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
-	118, // 236: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
-	122, // 237: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
-	126, // 238: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
-	129, // 239: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
-	0,   // 240: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
-	142, // 241: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
-	145, // 242: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
-	148, // 243: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
-	150, // 244: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
-	169, // 245: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
-	167, // 246: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
-	167, // 247: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
-	173, // 248: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
-	132, // 249: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
-	134, // 250: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
-	136, // 251: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
-	139, // 252: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
-	179, // [179:253] is the sub-list for method output_type
-	105, // [105:179] is the sub-list for method input_type
-	105, // [105:105] is the sub-list for extension type_name
-	105, // [105:105] is the sub-list for extension extendee
-	0,   // [0:105] is the sub-list for field type_name
+	175, // 82: mddb.SearchAdvisorResponse.profile:type_name -> mddb.CollectionProfile
+	1,   // 83: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 84: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 85: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 86: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 87: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 88: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 89: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	33,  // 90: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
+	1,   // 91: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 92: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	39,  // 93: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 94: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	39,  // 95: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 96: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 97: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 98: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 99: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 100: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 101: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 102: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 103: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 104: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	160, // 105: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
+	2,   // 106: mddb.MDDB.Add:input_type -> mddb.AddRequest
+	3,   // 107: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
+	20,  // 108: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
+	23,  // 109: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
+	6,   // 110: mddb.MDDB.Get:input_type -> mddb.GetRequest
+	7,   // 111: mddb.MDDB.Search:input_type -> mddb.SearchRequest
+	9,   // 112: mddb.MDDB.Export:input_type -> mddb.ExportRequest
+	11,  // 113: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
+	13,  // 114: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
+	15,  // 115: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
+	17,  // 116: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
+	26,  // 117: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
+	29,  // 118: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
+	31,  // 119: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
+	151, // 120: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
+	154, // 121: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
+	157, // 122: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
+	159, // 123: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
+	162, // 124: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
+	164, // 125: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
+	34,  // 126: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
+	35,  // 127: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
+	36,  // 128: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
+	41,  // 129: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
+	43,  // 130: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
+	46,  // 131: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
+	50,  // 132: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
+	51,  // 133: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
+	53,  // 134: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
+	55,  // 135: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
+	57,  // 136: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
+	59,  // 137: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
+	61,  // 138: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
+	64,  // 139: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
+	66,  // 140: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
+	67,  // 141: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
+	69,  // 142: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
+	174, // 143: mddb.MDDB.SearchAdvisor:input_type -> mddb.SearchAdvisorRequest
+	72,  // 144: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
+	74,  // 145: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
+	77,  // 146: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
+	79,  // 147: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
+	81,  // 148: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
+	84,  // 149: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
+	86,  // 150: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
+	88,  // 151: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
+	90,  // 152: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
+	92,  // 153: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
+	95,  // 154: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
+	97,  // 155: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
+	98,  // 156: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
+	99,  // 157: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
+	101, // 158: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
+	102, // 159: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
+	105, // 160: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
+	109, // 161: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
+	111, // 162: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
+	113, // 163: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
+	116, // 164: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
+	119, // 165: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
+	125, // 166: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
+	127, // 167: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
+	130, // 168: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
+	140, // 169: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
+	143, // 170: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
+	146, // 171: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
+	149, // 172: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
+	168, // 173: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
+	170, // 174: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
+	171, // 175: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
+	172, // 176: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
+	131, // 177: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
+	133, // 178: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
+	135, // 179: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
+	138, // 180: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
+	0,   // 181: mddb.MDDB.Add:output_type -> mddb.Document
+	5,   // 182: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
+	22,  // 183: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
+	25,  // 184: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
+	0,   // 185: mddb.MDDB.Get:output_type -> mddb.Document
+	8,   // 186: mddb.MDDB.Search:output_type -> mddb.SearchResponse
+	10,  // 187: mddb.MDDB.Export:output_type -> mddb.ExportChunk
+	12,  // 188: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
+	14,  // 189: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
+	16,  // 190: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
+	18,  // 191: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
+	28,  // 192: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
+	30,  // 193: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
+	32,  // 194: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
+	153, // 195: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
+	155, // 196: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
+	158, // 197: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
+	161, // 198: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
+	163, // 199: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
+	165, // 200: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
+	0,   // 201: mddb.MDDB.ImportURL:output_type -> mddb.Document
+	0,   // 202: mddb.MDDB.SetTTL:output_type -> mddb.Document
+	40,  // 203: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
+	42,  // 204: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
+	45,  // 205: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
+	48,  // 206: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
+	49,  // 207: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
+	52,  // 208: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
+	54,  // 209: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
+	56,  // 210: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
+	58,  // 211: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
+	60,  // 212: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
+	62,  // 213: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
+	65,  // 214: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
+	0,   // 215: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
+	68,  // 216: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
+	71,  // 217: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
+	176, // 218: mddb.MDDB.SearchAdvisor:output_type -> mddb.SearchAdvisorResponse
+	73,  // 219: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
+	75,  // 220: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
+	78,  // 221: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
+	80,  // 222: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
+	82,  // 223: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
+	85,  // 224: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
+	87,  // 225: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
+	89,  // 226: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
+	91,  // 227: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
+	93,  // 228: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
+	96,  // 229: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
+	94,  // 230: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
+	94,  // 231: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
+	94,  // 232: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
+	100, // 233: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
+	103, // 234: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
+	106, // 235: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
+	110, // 236: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
+	112, // 237: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
+	115, // 238: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
+	118, // 239: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
+	122, // 240: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
+	126, // 241: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
+	129, // 242: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
+	0,   // 243: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
+	142, // 244: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
+	145, // 245: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
+	148, // 246: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
+	150, // 247: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
+	169, // 248: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
+	167, // 249: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
+	167, // 250: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
+	173, // 251: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
+	132, // 252: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
+	134, // 253: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
+	136, // 254: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
+	139, // 255: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
+	181, // [181:256] is the sub-list for method output_type
+	106, // [106:181] is the sub-list for method input_type
+	106, // [106:106] is the sub-list for extension type_name
+	106, // [106:106] is the sub-list for extension extendee
+	0,   // [0:106] is the sub-list for field type_name
 }
 
 func init() { file_mddb_proto_init() }
@@ -12975,7 +13316,7 @@ func file_mddb_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mddb_proto_rawDesc), len(file_mddb_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   206,
+			NumMessages:   209,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

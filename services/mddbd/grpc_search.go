@@ -878,3 +878,53 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 	}
 	return resp, nil
 }
+
+// SearchAdvisor measures a collection and recommends how to search it
+// (SRCH-010).
+//
+// Added for gRPC parity after the HTTP endpoint and the MCP tool: the Python
+// client speaks gRPC, so an adapter built on it could not reach the advice at
+// all. Read-only — it measures and returns, and storing the recommendation
+// stays an explicit write through the collection-config surface.
+func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisorRequest) (*proto.SearchAdvisorResponse, error) {
+	if req.GetCollection() == "" {
+		return nil, status.Error(codes.InvalidArgument, "collection is required")
+	}
+	if g.server.AuthManager != nil {
+		if err := g.server.AuthManager.CheckPermission(ctx, req.GetCollection(), PermRead); err != nil {
+			return nil, status.Error(codes.PermissionDenied, "forbidden")
+		}
+	}
+
+	rec, err := g.server.RecommendSearch(req.GetCollection())
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	p := rec.Profile
+	return &proto.SearchAdvisorResponse{
+		Profile: &proto.CollectionProfile{
+			Collection:           p.Collection,
+			Documents:            int32(p.Documents),
+			Sampled:              int32(p.Sampled),
+			EmbeddedDocuments:    int32(p.EmbeddedDocuments),
+			VectorDimensions:     int32(p.VectorDimensions),
+			MedianWords:          int32(p.MedianWords),
+			LongDocumentRatio:    p.LongDocumentRatio,
+			DistinctTerms:        int32(p.DistinctTerms),
+			TermsPerDocument:     p.TermsPerDocument,
+			TypeTokenRatio:       p.TypeTokenRatio,
+			CodeDocuments:        int32(p.CodeDocuments),
+			EstimatedVectorBytes: p.EstimatedVectorBytes,
+		},
+		SearchType:      rec.SearchType,
+		FtsAlgorithm:    rec.FTSAlgorithm,
+		VectorAlgorithm: rec.VectorAlgorithm,
+		HybridStrategy:  rec.HybridStrategy,
+		HybridAlpha:     rec.HybridAlpha,
+		RetrievalMode:   rec.RetrievalMode,
+		TopK:            int32(rec.TopK),
+		Reasons:         rec.Reasons,
+		Warnings:        rec.Warnings,
+	}, nil
+}

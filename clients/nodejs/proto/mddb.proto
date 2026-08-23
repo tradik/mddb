@@ -117,6 +117,12 @@ service MDDB {
   // Zero-shot document classification using embedding similarity
   rpc Classify(ClassifyRequest) returns (ClassifyResponse);
 
+  // SearchAdvisor measures a collection and recommends how to search it
+  // (SRCH-010), so a client picks an algorithm from evidence rather than from
+  // the names. Added for gRPC parity: the HTTP endpoint and the MCP tool
+  // already existed, and the Python client speaks gRPC.
+  rpc SearchAdvisor(SearchAdvisorRequest) returns (SearchAdvisorResponse);
+
   // Delete a single document
   rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
 
@@ -1489,4 +1495,45 @@ message DeleteCurationRuleRequest {
 message DeleteCurationRuleResponse {
   string status = 1;
   string id = 2;
+}
+
+// SearchAdvisorRequest asks how a collection should be searched (SRCH-010).
+message SearchAdvisorRequest {
+  string collection = 1;
+}
+
+// CollectionProfile is what the advisor measured.
+message CollectionProfile {
+  string collection = 1;
+  int32 documents = 2;
+  int32 sampled = 3;
+  int32 embedded_documents = 4;
+  int32 vector_dimensions = 5;
+  int32 median_words = 6;
+  double long_document_ratio = 7;
+  int32 distinct_terms = 8;
+  // How much new vocabulary each document contributes. This, and not the
+  // type-token ratio, decides whether keyword search can discriminate: TTR
+  // pooled over a corpus falls towards zero as the corpus grows.
+  double terms_per_document = 9;
+  double type_token_ratio = 10;
+  int32 code_documents = 11;
+  int64 estimated_vector_bytes = 12;
+}
+
+// SearchAdvisorResponse is the advice, with the reasons for it.
+message SearchAdvisorResponse {
+  CollectionProfile profile = 1;
+  string search_type = 2;
+  string fts_algorithm = 3;
+  string vector_algorithm = 4;
+  string hybrid_strategy = 5;
+  double hybrid_alpha = 6;
+  string retrieval_mode = 7;
+  int32 top_k = 8;
+  // One line per decision, in plain language. A recommendation nobody can
+  // argue with is one nobody should follow.
+  repeated string reasons = 9;
+  // What would stop the recommendation working.
+  repeated string warnings = 10;
 }
