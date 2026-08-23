@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"log/slog"
+	"math"
 	"mddb/internal/fts"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
@@ -904,17 +905,20 @@ func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisor
 	p := rec.Profile
 	return &proto.SearchAdvisorResponse{
 		Profile: &proto.CollectionProfile{
-			Collection:           p.Collection,
-			Documents:            int32(p.Documents),
-			Sampled:              int32(p.Sampled),
-			EmbeddedDocuments:    int32(p.EmbeddedDocuments),
-			VectorDimensions:     int32(p.VectorDimensions),
-			MedianWords:          int32(p.MedianWords),
+			Collection: p.Collection,
+			// Counts are clamped rather than converted: a collection of more
+			// than two billion documents would otherwise arrive negative, and
+			// a negative document count is a worse answer than a saturated one.
+			Documents:            clampInt32(p.Documents),
+			Sampled:              clampInt32(p.Sampled),
+			EmbeddedDocuments:    clampInt32(p.EmbeddedDocuments),
+			VectorDimensions:     clampInt32(p.VectorDimensions),
+			MedianWords:          clampInt32(p.MedianWords),
 			LongDocumentRatio:    p.LongDocumentRatio,
-			DistinctTerms:        int32(p.DistinctTerms),
+			DistinctTerms:        clampInt32(p.DistinctTerms),
 			TermsPerDocument:     p.TermsPerDocument,
 			TypeTokenRatio:       p.TypeTokenRatio,
-			CodeDocuments:        int32(p.CodeDocuments),
+			CodeDocuments:        clampInt32(p.CodeDocuments),
 			EstimatedVectorBytes: p.EstimatedVectorBytes,
 		},
 		SearchType:      rec.SearchType,
@@ -923,8 +927,23 @@ func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisor
 		HybridStrategy:  rec.HybridStrategy,
 		HybridAlpha:     rec.HybridAlpha,
 		RetrievalMode:   rec.RetrievalMode,
-		TopK:            int32(rec.TopK),
+		TopK:            clampInt32(rec.TopK),
 		Reasons:         rec.Reasons,
 		Warnings:        rec.Warnings,
 	}, nil
+}
+
+// clampInt32 narrows a count to the protobuf field that carries it.
+//
+// Saturating rather than wrapping: a collection larger than MaxInt32 would
+// otherwise be reported as a negative number of documents, and a caller
+// reading that has no way to tell it from a bug.
+func clampInt32(n int) int32 {
+	if n > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	if n < math.MinInt32 {
+		return math.MinInt32
+	}
+	return int32(n)
 }
