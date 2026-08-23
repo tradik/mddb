@@ -996,6 +996,28 @@ message RetrievalProfileProto {
 // track_access, track_hot, spell_correct, spell_lang and wordpress exist over
 // REST and are invisible over gRPC — a gRPC client cannot read or write them.
 // Tracked separately; retrieval is added here because RAG-001 needs it.
+// StorageConfigProto is the backend-specific half of a collection's storage
+// settings (GO-035). `secret_key` is never populated on read — see
+// `secret_key_set`.
+message StorageConfigProto {
+  string endpoint = 1;
+  string bucket = 2;
+  string region = 3;
+  string access_key = 4;
+  string secret_key = 5;                         // write-only; reads return empty, see secret_key_set
+  string prefix = 6;
+  bool use_tls = 7;
+  bool secret_key_set = 8;                       // read-only: a secret is stored, its value is withheld
+}
+
+// WordPressTargetProto is the outbound publishing target (GO-035). `api_key`
+// is never populated on read — see `api_key_set`.
+message WordPressTargetProto {
+  string url = 1;
+  string api_key = 2;                            // write-only; reads return empty, see api_key_set
+  bool api_key_set = 3;                          // read-only: a key is stored, its value is withheld
+}
+
 message CollectionConfigProto {
   string type = 1;
   string description = 2;
@@ -1005,6 +1027,19 @@ message CollectionConfigProto {
   int32 max_revisions = 6;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
   RetrievalProfileProto retrieval = 7;           // (v2.12.0+) per-collection retrieval defaults
   string response_prompt = 8;                    // (v2.12.0+) how to format answers from this collection (RAG-002); max 4 KiB
+  // (v2.12.0+, GO-035) The rest of CollectionConfig. Until these existed a
+  // gRPC client saw a partially configured collection and could not tell that
+  // from a partially configured one.
+  string storage_backend = 9;                    // "boltdb" (default), "memory", "s3"
+  StorageConfigProto storage_config = 10;        // backend-specific settings (required for s3)
+  string quantization = 11;                      // "float32" (default), "int8", "int4"
+  bool disk_only_vectors = 12;                   // RAM holds only quantized vectors; full vectors stay on disk
+  bool encrypted = 13;                           // AES-256-GCM at rest
+  bool track_access = 14;                        // record per-read access events
+  bool track_hot = 15;                           // maintain hot-docs leaderboard
+  bool spell_correct = 16;                       // auto-correct FTS queries
+  string spell_lang = 17;                        // override language for spell correction
+  WordPressTargetProto wordpress = 18;           // outbound publishing target (mddb-sync plugin)
 }
 
 message GetCollectionConfigRequest {
@@ -1027,6 +1062,24 @@ message SetCollectionConfigRequest {
   int32 max_revisions = 7;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
   RetrievalProfileProto retrieval = 8;           // (v2.12.0+) per-collection retrieval defaults
   string response_prompt = 9;                    // (v2.12.0+) how to format answers from this collection (RAG-002)
+  // (v2.12.0+, GO-035) The remaining CollectionConfig fields.
+  //
+  // The booleans are `optional` deliberately. A plain proto3 bool cannot tell
+  // "the client did not mention encryption" from "the client wants encryption
+  // off", and this handler merges into the stored config — so an unset bool
+  // would arrive as false and turn off encryption on a collection whose owner
+  // only wanted to change the icon. That exact shape was the RAG-001 data-loss
+  // bug; presence keeps it from coming back through a different door.
+  string storage_backend = 10;                   // "" leaves the stored backend alone
+  StorageConfigProto storage_config = 11;        // nil leaves the stored settings alone
+  string quantization = 12;                      // "" leaves the stored setting alone
+  optional bool disk_only_vectors = 13;
+  optional bool encrypted = 14;
+  optional bool track_access = 15;
+  optional bool track_hot = 16;
+  optional bool spell_correct = 17;
+  string spell_lang = 18;                        // "" leaves the stored setting alone
+  WordPressTargetProto wordpress = 19;           // nil leaves the stored target alone
 }
 
 message SetCollectionConfigResponse {

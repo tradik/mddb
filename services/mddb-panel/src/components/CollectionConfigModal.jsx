@@ -344,9 +344,18 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                         type="password"
                         value={storageConfig.secretKey}
                         onChange={(e) => setStorageConfig({ ...storageConfig, secretKey: e.target.value })}
-                        placeholder="wJalrXUtnFEMI/K7MDENG..."
+                        placeholder={storageConfig.secretKeySet ? 'Stored — leave blank to keep' : 'wJalrXUtnFEMI/K7MDENG...'}
+                        aria-describedby="storage-secret-hint"
                         className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
+                      {/* GO-035: the server never sends a stored secret back,
+                          so an empty field means "unchanged", not "none". Say
+                          so, or saving looks like it silently dropped one. */}
+                      <p id="storage-secret-hint" className="mt-0.5 text-[11px] text-gray-600">
+                        {storageConfig.secretKeySet
+                          ? 'A secret is stored. Leave blank to keep it, or type a new one to replace it.'
+                          : 'No secret stored yet.'}
+                      </p>
                     </div>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">

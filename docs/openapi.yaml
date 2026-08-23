@@ -9027,7 +9027,19 @@ components:
           example: https://blog.example.com
         apiKey:
           type: string
-          description: mddb-sync publish key (Settings → MDDB Sync), sent as Authorization Bearer.
+          writeOnly: true
+          description: |
+            mddb-sync publish key (Settings → MDDB Sync), sent as Authorization Bearer.
+
+            (v2.12.0+) Write-only. Reads never return it — see `apiKeySet`. On
+            write, an empty value keeps the stored key; remove the whole
+            `wordpress` block to clear it.
+        apiKeySet:
+          type: boolean
+          readOnly: true
+          description: |
+            (v2.12.0+) Read-only. `true` when a publish key is stored.
+          example: true
 
     StorageConfigDef:
       type: object
@@ -9052,8 +9064,25 @@ components:
           example: AKIAIOSFODNN7EXAMPLE
         secretKey:
           type: string
-          description: Secret key for authentication
+          writeOnly: true
+          description: |
+            (v2.12.0+) Write-only. Reads never return it — see `secretKeySet`.
+
+            Reading a collection's configuration requires read permission on
+            that collection, which is permission to read its documents, not to
+            collect the credentials for the bucket underneath them.
+
+            On write, an empty value keeps the stored secret, so the usual
+            read-modify-write loop does not erase it. Send a new value to
+            replace it; remove the whole `storageConfig` block to clear it.
           example: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+        secretKeySet:
+          type: boolean
+          readOnly: true
+          description: |
+            (v2.12.0+) Read-only. `true` when a secret key is stored — so a
+            blank `secretKey` field can be told apart from no credential at all.
+          example: true
         prefix:
           type: string
           description: Key prefix within the bucket

@@ -2272,6 +2272,47 @@ curl "http://localhost:11023/v1/collection-config?collection=blog"
 
 Also supports **PUT** to set config and **DELETE** to remove config for a collection.
 
+##### Credentials are masked on read (v2.12.0+)
+
+A collection config can hold two credentials: `storageConfig.secretKey` and
+`wordpress.apiKey`. Reads — REST, gRPC and MCP alike — return them empty and
+set a presence flag instead:
+
+```json
+{
+  "storageConfig": { "bucket": "docs", "accessKey": "AKIA", "secretKeySet": true },
+  "wordpress":     { "url": "https://blog.example.com", "apiKeySet": true }
+}
+```
+
+Reading a collection's configuration requires read permission on that
+collection. That is permission to read its documents — not to collect the
+credentials for the bucket underneath them, which reach every other collection
+sharing it.
+
+On write, an **empty credential keeps the stored one**, so the read-modify-write
+loop a UI performs does not erase it. Send a new value to replace it; remove the
+whole `storageConfig` or `wordpress` block to clear it. `secretKeySet` and
+`apiKeySet` are output-only and ignored on write.
+
+##### gRPC carries the same fields as REST (v2.12.0+)
+
+`CollectionConfigProto` used to carry 8 of the 18 fields `CollectionConfig`
+holds, so a gRPC client saw a partially configured collection and could not tell
+that from a collection that really was partially configured. It now carries all
+of them: `storage_backend`, `storage_config`, `quantization`,
+`disk_only_vectors`, `encrypted`, `track_access`, `track_hot`, `spell_correct`,
+`spell_lang` and `wordpress`.
+
+The booleans in `SetCollectionConfigRequest` are declared `optional`, which is
+load-bearing rather than stylistic: a plain proto3 bool cannot tell "the client
+did not mention encryption" from "the client wants encryption off". Since the
+handler merges into the stored config, an unset bool arriving as `false` would
+switch encryption off on a collection whose owner only wanted a new icon —
+after which the next document is written as plaintext. Presence keeps that from
+happening. **Omitted means "leave it alone" for every field on this RPC**,
+strings included.
+
 #### PUT /v1/collection-config
 
 Set or update collection configuration including storage backend.

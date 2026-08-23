@@ -12,10 +12,10 @@ import (
 	"strconv"
 	"strings"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	json "mddb/internal/jsonx"
 )
 
 // automationRuleToProto converts internal AutomationRule to proto.
@@ -330,16 +330,8 @@ func (g *GRPCServer) GetCollectionConfig(ctx context.Context, req *proto.GetColl
 		Configured: found,
 	}
 	if found && cfg != nil {
-		resp.Config = &proto.CollectionConfigProto{
-			Type:           cfg.Type,
-			Description:    cfg.Description,
-			Icon:           cfg.Icon,
-			Color:          cfg.Color,
-			CustomMeta:     cfg.CustomMeta,
-			MaxRevisions:   safeInt32(cfg.MaxRevisions),
-			Retrieval:      retrievalProfileToProto(cfg.Retrieval),
-			ResponsePrompt: cfg.ResponsePrompt,
-		}
+		// GO-035: every field, secrets masked. See grpc_collection_config.go.
+		resp.Config = collectionConfigToProto(cfg)
 	}
 	return resp, nil
 }
@@ -365,17 +357,17 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	}
 	// Merge into the stored config rather than replacing it.
 	//
-	// CollectionConfigProto carries 7 of CollectionConfig's ~15 fields, and
 	// CollectionManager.Set writes whatever struct it is handed. Building a
-	// fresh struct here therefore erased everything gRPC cannot express — a
+	// fresh struct here erased everything the request did not mention — a
 	// client updating an icon silently cleared storageBackend, quantization
 	// and, worst of all, Encrypted, whose false value is pushed straight into
 	// the encryptor, so the next document in an encrypted collection was
 	// written as plaintext.
 	//
-	// Preserving the unrepresented fields is not a workaround for the proto
-	// gap: even once the proto carries everything, a client that omits a
-	// field means "leave it alone", not "clear it".
+	// GO-035 closed the proto gap, and the merge stays: a client that omits a
+	// field means "leave it alone", not "clear it". That is also why the new
+	// booleans carry proto3 presence — without it, closing the gap would have
+	// reintroduced the bug through the fields that were just added.
 	cfg := &CollectionConfig{}
 	if existing, found := g.server.CollectionManager.Get(req.Collection); found && existing != nil {
 		*cfg = *existing
@@ -396,6 +388,10 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	if err := ValidateResponsePrompt(cfg.ResponsePrompt); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+
+	// GO-035: the fields the proto gained in v2.12.0, each with the same
+	// "omitted means leave it alone" rule.
+	applyCollectionConfigRequest(cfg, req)
 
 	// RAG-001: a nil retrieval block means "not sent", which leaves any
 	// profile configured over REST in place.
@@ -432,16 +428,10 @@ func (g *GRPCServer) ListCollectionConfigs(ctx context.Context, req *proto.ListC
 		}
 		entries = append(entries, &proto.CollectionConfigEntry{
 			Collection: coll,
-			Config: &proto.CollectionConfigProto{
-				Type:           cfg.Type,
-				Description:    cfg.Description,
-				Icon:           cfg.Icon,
-				Color:          cfg.Color,
-				CustomMeta:     cfg.CustomMeta,
-				MaxRevisions:   safeInt32(cfg.MaxRevisions),
-				Retrieval:      retrievalProfileToProto(cfg.Retrieval),
-				ResponsePrompt: cfg.ResponsePrompt,
-			},
+			// GO-035: same full, secret-masked rendering as the single-config
+			// read. A listing that showed fewer fields than a Get would be its
+			// own kind of drift.
+			Config: collectionConfigToProto(cfg),
 		})
 	}
 	return &proto.ListCollectionConfigsResponse{Configs: entries, Total: safeInt32(len(entries))}, nil

@@ -526,6 +526,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **gRPC saw half a collection's configuration (GO-035)** —
+  `CollectionConfigProto` carried 8 of `CollectionConfig`'s 18 fields, so a
+  gRPC client could neither read nor set `storageBackend`, `storageConfig`,
+  `quantization`, `diskOnlyVectors`, `encrypted`, `trackAccess`, `trackHot`,
+  `spellCorrect`, `spellLang` or `wordpress`. A collection configured over REST
+  looked partly configured over gRPC, and an operational tool reporting "this
+  collection is not encrypted" because it asked over gRPC is worse than one
+  that reports nothing. All ten added; `buf breaking` passes, since they are
+  additions.
+
+  The new booleans are `optional` rather than plain proto3 bools, and that is
+  load-bearing. A plain bool cannot tell "the client did not mention
+  encryption" from "the client wants encryption off", and this handler merges
+  into the stored config — so closing the gap without presence would have
+  reintroduced the RAG-001 data-loss bug through the very fields being added.
+  Omitted now means "leave it alone" for every field on the RPC.
+
+  Found while wiring it: the MCP path assigned `cfg.WordPress = req.WordPress`
+  unconditionally, one line below the comment explaining why that shape is a
+  bug — so an agent editing a description deleted the collection's publishing
+  target.
+
 - **A quoted phrase could not contain a quote (SRCH-008)** — in
   `mode: "expression"`, an embedded quote closed the phrase early and the rest
   of the query was reinterpreted as operators, so `"the "json" field"` searched
@@ -1021,6 +1043,28 @@ graceful shutdown drains its queues, so both compose files allow a 20s stop
 grace period — set the same if you run the image directly.
 
 ### Security
+- **Collection credentials were readable by anyone who could read the
+  collection (GO-035)** — a collection config can hold an S3 secret key and an
+  mddb-sync publish key, and every read returned both in full, over REST, gRPC
+  and MCP. Reading a collection's configuration requires read permission on
+  that collection: permission to read its documents, not to collect the
+  credentials for the bucket underneath them, which reach every other
+  collection sharing it. The MCP path is the sharpest case, since it answers an
+  LLM that may repeat what it is given into a transcript or a reply.
+
+  Reads now return an empty credential and a `secretKeySet` / `apiKeySet` flag
+  saying whether one is stored — masked is not the same as absent, and someone
+  configuring a collection has to be able to tell those apart. Writes treat an
+  empty credential as "keep the stored one", so the read-modify-write loop a UI
+  performs no longer erases it; send a new value to replace it, or remove the
+  block to clear it. The presence flags are output-only and are stripped on the
+  way in.
+
+  **This changes what reads return.** A client that relied on
+  `/v1/collection-config` handing back a usable S3 secret will get an empty
+  string. The panel shows "a secret is stored, leave blank to keep it" in place
+  of a blank field that used to look like no credential at all.
+
 - **The server says when its storage cannot keep what it accepts** — bbolt fsyncs every commit, so an acknowledged write survives a crash; verified rather than assumed, by writing over REST, sending `kill -9` with no shutdown hooks, and finding the document and its full-text index intact after restart. But that promise is only worth what the storage under it is worth, and a container started without a volume writes to its own overlay layer: accepted, fsynced, gone when the container is removed. The data directory is now checked before the first write is accepted — for ephemeral filesystems (tmpfs, ramfs, overlay), for real writability (by creating a file, since a read-only mount or a user mismatch looks writable in the mode bits) and for free space against `MDDB_DISK_MIN_FREE` — and each finding is logged as a WARN carrying a code, so a collector can alert on `ephemeral_storage` rather than on prose. `GET /health` reports the same as `persistence` plus a computed `durable`, and `docs/DEPLOYMENT.md` now states per surface what is guaranteed and what is not — async bulk jobs and embeddings are queued, not written, and say so.
 - **The extreme-mode log stopped promising a durability mode that does not exist** — it announced "WAL initialized (SyncPeriodic)", but nothing in the tree writes to that WAL: it opens a file, starts a flusher goroutine and receives nothing, while durability actually comes from bbolt's per-commit fsync. The line now says what is true. Whether the subsystem should be wired up or removed is a separate decision — a write-ahead log in front of a store that already fsyncs adds cost rather than a guarantee.
 

@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"sync"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 var bucketColMeta = []byte("colmeta")
@@ -65,6 +65,8 @@ type CollectionConfig struct {
 type WordPressTargetConfig struct {
 	URL    string `json:"url"`              // site base URL, e.g. https://blog.example.com
 	APIKey string `json:"apiKey,omitempty"` // mddb-sync publish key
+	// APIKeySet is an output-only flag; see StorageConfigDef.SecretKeySet.
+	APIKeySet bool `json:"apiKeySet,omitempty"`
 }
 
 // StorageConfigDef holds backend-specific configuration for non-default storage backends.
@@ -77,6 +79,11 @@ type StorageConfigDef struct {
 	SecretKey string `json:"secretKey,omitempty"`
 	Prefix    string `json:"prefix,omitempty"`
 	UseTLS    bool   `json:"useTLS,omitempty"`
+	// SecretKeySet is an output-only flag (GO-035). Reads blank SecretKey and
+	// set this instead, so a client can tell "a credential is configured" from
+	// "none is" without being handed the credential. It is never true in
+	// storage — only on the copy the read handlers render.
+	SecretKeySet bool `json:"secretKeySet,omitempty"`
 }
 
 // CollectionManager manages per-collection configuration in a dedicated BoltDB bucket.
@@ -283,7 +290,8 @@ func (s *Server) handleCollectionConfigGet(w http.ResponseWriter, r *http.Reques
 	}
 	ok(w, map[string]interface{}{
 		"collection": collection,
-		"config":     cfg,
+		// GO-035: credentials are masked; see collection_config_secrets.go.
+		"config":     redactCollectionConfig(cfg),
 		"configured": found,
 	})
 }
@@ -383,6 +391,16 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		SpellLang:       req.SpellLang,
 		ResponsePrompt:  req.ResponsePrompt,
 	}
+	// GO-035: a client that read this config back saw masked credentials, so
+	// an empty one means "unchanged", not "remove it". Runs before the backend
+	// is applied — connecting to S3 with a blanked secret would fail here for
+	// a reason that has nothing to do with the config being wrong.
+	if stored, found := s.CollectionManager.Get(req.Collection); found {
+		carryOverSecrets(cfg, stored)
+	} else {
+		carryOverSecrets(cfg, nil)
+	}
+
 	// GO-021: create or drop the storage backend this config asks for, before
 	// storing it — a config that names a backend which cannot be reached
 	// should be refused rather than accepted and silently ignored, which is
@@ -456,7 +474,9 @@ func (s *Server) handleCollectionConfigList(w http.ResponseWriter, r *http.Reque
 		if !CollectionInTenant(tenant, col) {
 			continue
 		}
-		result = append(result, configInfo{Collection: col, Config: cfg})
+		// GO-035: masked here too. A listing that leaked what the single-config
+		// read withholds would make the masking decorative.
+		result = append(result, configInfo{Collection: col, Config: redactCollectionConfig(cfg)})
 	}
 	if result == nil {
 		result = []configInfo{}

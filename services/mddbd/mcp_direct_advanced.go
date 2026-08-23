@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // --- Automation ---
@@ -205,7 +205,11 @@ func (c *DirectClient) GetCollectionConfig(ctx context.Context, collection strin
 	}
 	return &MCPCollectionConfigResponse{
 		Collection: collection,
-		Config:     cfg,
+		// GO-035: credentials masked. This path answers an LLM, which may
+		// repeat what it is given into a transcript, a log or a reply — the
+		// one audience for which handing over an S3 secret key is least
+		// recoverable.
+		Config:     redactCollectionConfig(cfg),
 		Configured: found,
 	}, nil
 }
@@ -234,7 +238,13 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 	cfg.Color = req.Color
 	cfg.CustomMeta = req.CustomMeta
 	cfg.MaxRevisions = req.MaxRevisions
-	cfg.WordPress = req.WordPress
+	// GO-035: a nil target means "not sent". Assigning it unconditionally
+	// deleted a configured publishing target whenever an agent touched
+	// anything else — the same shape as the bug the merge above exists to
+	// stop, one line below the comment describing it.
+	if req.WordPress != nil {
+		cfg.WordPress = req.WordPress
+	}
 
 	if req.Retrieval != nil {
 		if err := req.Retrieval.Validate(); err != nil {
@@ -249,6 +259,13 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 		cfg.ResponsePrompt = req.ResponsePrompt
 	}
 
+	// GO-035: an agent that read this config back saw masked credentials, so
+	// an empty one means "unchanged".
+	if stored, found := c.server.CollectionManager.Get(req.Collection); found {
+		carryOverSecrets(cfg, stored)
+	} else {
+		carryOverSecrets(cfg, nil)
+	}
 	return c.server.CollectionManager.Set(req.Collection, cfg)
 }
 
@@ -314,9 +331,14 @@ func (c *DirectClient) DeleteCurationRule(ctx context.Context, id string) error 
 // ListCollectionConfigs returns all collection configurations via the direct client.
 func (c *DirectClient) ListCollectionConfigs(ctx context.Context) (*MCPCollectionConfigListResponse, error) {
 	all := c.server.CollectionManager.ListAll()
+	// GO-035: masked, same reasoning as the single-config read.
+	redacted := make(map[string]*CollectionConfig, len(all))
+	for collection, cfg := range all {
+		redacted[collection] = redactCollectionConfig(cfg)
+	}
 	return &MCPCollectionConfigListResponse{
-		Configs: all,
-		Total:   len(all),
+		Configs: redacted,
+		Total:   len(redacted),
 	}, nil
 }
 
