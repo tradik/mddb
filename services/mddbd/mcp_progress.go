@@ -1,7 +1,5 @@
 package main
 
-import ()
-
 // MCPProgressSender sends progress notifications.
 //
 // The writer comes from the transport, which is the only part that knows where

@@ -380,6 +380,23 @@ jobs:
         with:
           python-version: '3.12'
 
+      # The generated stubs are gitignored, so a fresh checkout does not have
+      # them and `from mddb_client import mddb_pb2` cannot resolve. This job
+      # was added in this release and had never passed for exactly that
+      # reason — it tested an import of a module the checkout did not contain.
+      - name: Set up buf
+        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+        with:
+          version: "1.72.0"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # generate.sh, not `buf generate`: the Python gRPC plugin emits an
+      # absolute `import mddb_pb2`, and the rewrite to a relative import lives
+      # in that script. Calling buf directly here would regenerate the very
+      # bug TEST-001 fixed.
+      - name: Generate the client stubs
+        run: ./proto/generate.sh
+
       # TEST-001: `import mddb_client` raised ModuleNotFoundError, because the
       # generated stub used an absolute `import mddb_pb2` that only resolves
       # when the files sit on sys.path directly. The package had never been
