@@ -170,19 +170,26 @@ async fn handle_join(
             }).await;
             Ok(session_id)
         }
-        JoinResult::Queued { position, notify } => {
+        JoinResult::Queued { position, admitted } => {
             info!(name = name, position = position, "user queued");
             send_json(sender, &WsOutgoing::Queued { position }).await;
-            notify.notified().await;
-            let result = state.session_manager.join(name.clone(), scenario_name.clone()).await;
-            if let JoinResult::Admitted { session_id } = result {
-                send_json(sender, &WsOutgoing::Session {
-                    id: session_id.clone(),
-                    scenario: scenario_name,
-                }).await;
-                Ok(session_id)
-            } else {
-                Err(AppError::SessionFull)
+
+            // The manager creates the session and sends its id here. This used
+            // to wake up and call join() again, which created a second session
+            // for the same visitor — see QueueEntry::admitted.
+            match admitted.await {
+                Ok(session_id) => {
+                    info!(session_id = session_id, name = name, "queued session started");
+                    state.webhook_dispatcher.dispatch(WebhookPayload::session_start(
+                        &session_id, &name, &scenario_name,
+                    ));
+                    send_json(sender, &WsOutgoing::Session {
+                        id: session_id.clone(),
+                        scenario: scenario_name,
+                    }).await;
+                    Ok(session_id)
+                }
+                Err(_) => Err(AppError::SessionFull),
             }
         }
         JoinResult::Full => {
@@ -208,6 +215,18 @@ async fn handle_message(
             .session_manager
             .get_session_mut(session_id)
             .ok_or(AppError::SessionNotFound)?;
+
+        // TEST-001: a scenario's max_turns was parsed and never consulted, so
+        // a demo capped at ten turns served an unbounded conversation — and an
+        // unbounded LLM bill. Checked before the message is recorded, so a
+        // refused turn does not count against the limit it was refused by.
+        if let Some(scenario) = state.config.get_scenario(&session.scenario)
+            && !scenario.allows_another_turn(session.user_turns)
+        {
+            return Err(AppError::TurnLimitReached(
+                scenario.max_turns.unwrap_or(session.user_turns),
+            ));
+        }
 
         session.add_message(MessageRole::User, content.clone());
         session.trim_history(state.config.session.max_history_length);

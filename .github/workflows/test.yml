@@ -360,6 +360,44 @@ jobs:
         working-directory: clients/python
         run: pytest -q
 
+  chat:
+    name: mddb-chat (Rust)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup component add clippy rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            services/mddb-chat/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('services/mddb-chat/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      # TEST-001: the crate had 10 tests in 3 of 27 files. Writing the rest
+      # surfaced a queue that double-booked every admission, a CORS setting
+      # that was ignored, and a turn limit that capped nothing.
+      - name: Run tests
+        working-directory: services/mddb-chat
+        run: cargo test --all-targets
+
+      - name: Check formatting
+        working-directory: services/mddb-chat
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: services/mddb-chat
+        run: cargo clippy --all-targets
+
   build:
     name: Build Binaries
     runs-on: ubuntu-latest

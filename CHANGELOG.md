@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **mddb-chat has tests beyond one file (TEST-001)** — 10 tests in 3 of 27
+  source files became 63 in 8, covering session admission and queueing, history
+  trimming, the rate limiter, error-to-status mapping and the webhook payload
+  contract. The three bugs above were found by writing them. `make test-chat`
+  runs the suite.
+
+
 - **The Node.js and Python packages have a client (TEST-001)** — both shipped
   as example scripts. `@tradik/mddb-client` pointed `main` at `example.js`, so
   requiring the package executed a demo that connected to localhost and wrote
@@ -338,6 +345,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+
+- **A queued chat visitor was double-booked, and at capacity 1 waited forever
+  (TEST-001)** — `admit_from_queue` created the session, inserted it into the
+  active map and then only *woke* the waiting task, which called `join()` again
+  and created a second session for the same person. Every admission from the
+  queue left an orphan holding a `max_concurrent` slot until its TTL expired.
+  With `max_concurrent = 1` the orphan took the slot that had just been freed,
+  so the visitor it was created for was re-queued behind a phantom of
+  themselves, waiting on a fresh notifier nobody held. The session id now
+  travels with the wake-up, so there is exactly one session per visitor, and a
+  visitor who closed their browser while queued is skipped rather than being
+  handed the slot.
+
+
+- **`server.cors_origins` was configured and ignored (TEST-001)** — the field
+  was parsed, defaulted and documented, and `main.rs` built its CORS layer with
+  `allow_origin(Any)` regardless. An operator who listed their own origins
+  still served `Access-Control-Allow-Origin: *` to every page on the internet.
+  The listed origins are now applied; `["*"]` remains the default and now logs
+  a warning, since it is only appropriate for a loopback deployment.
+
+
+- **A scenario's `max_turns` capped nothing (TEST-001)** — parsed from the TOML
+  and never read, so a public demo declaring a ten-turn limit served an
+  unbounded conversation and an unbounded LLM bill. Enforced now, answering
+  `403` rather than `429`: waiting does not lift the limit, so `Retry-After`
+  would be a lie. Turns count user messages only — counting the assistant's
+  replies would halve every configured limit.
+
 
 - **`mddb-cli schema set` panicked on every invocation (TEST-001)** — it
   defined `-s` for `--schema` while the root command uses `-s` for `--server`,

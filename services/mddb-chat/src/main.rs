@@ -92,11 +92,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Build CORS layer
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // CORS from the configuration, not a hardcoded wildcard.
+    //
+    // TEST-001: this used to be `allow_origin(Any)` unconditionally, so
+    // `server.cors_origins` was read from the TOML, defaulted, and then had no
+    // effect — an operator who listed their own origins still served
+    // `Access-Control-Allow-Origin: *` to every page on the internet.
+    let cors = if config.server.allows_any_origin() {
+        tracing::warn!(
+            "CORS allows any origin; set server.cors_origins for a deployment \
+             a browser can reach"
+        );
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        let origins = config.server.allowed_origins();
+        tracing::info!(count = origins.len(), "CORS restricted to configured origins");
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
 
     // Build router
     let app = Router::new()
