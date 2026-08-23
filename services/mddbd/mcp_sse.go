@@ -44,7 +44,7 @@ func NewMCPSSETransport(handler *MCPHandler) *MCPSSETransport {
 // HandleSSE handles GET /sse — the SSE connection endpoint.
 // Sends an "endpoint" event telling the client where to POST messages.
 func (t *MCPSSETransport) HandleSSE(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := httpFlusher(w)
 	if !ok {
 		http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
 		return

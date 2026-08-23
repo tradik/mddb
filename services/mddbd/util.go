@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"mddb/internal/storage"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -111,6 +112,24 @@ func copyFile(src, dst string) error {
 	}
 	return os.Rename(tmp, dst) // #nosec G703 -- paths are internally constructed
 }
+
+// httpFlusher resolves the http.Flusher behind w, walking Unwrap()-style
+// middleware wrappers the way http.ResponseController does. GO-040: a bare
+// `w.(http.Flusher)` assertion fails on any wrapper that hides Flush, which
+// turned every SSE endpoint into a 500 whenever the metrics middleware was on.
+func httpFlusher(w http.ResponseWriter) (http.Flusher, bool) {
+	for {
+		if f, ok := w.(http.Flusher); ok {
+			return f, true
+		}
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return nil, false
+		}
+		w = u.Unwrap()
+	}
+}
+
 func sortDocs(docs []storage.Doc, field string, asc bool) {
 	sort.Slice(docs, func(i, j int) bool {
 		var less bool

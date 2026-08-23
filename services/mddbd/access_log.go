@@ -37,6 +37,14 @@ func (r *accessLogRecorder) Write(b []byte) (int, error) {
 // streaming handlers (SSE, MCP transports) keep their flush and hijack.
 func (r *accessLogRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
+// Flush forwards http.Flusher for handlers that assert the interface directly
+// instead of going through http.ResponseController (GO-040).
+func (r *accessLogRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // accessLogLevel keeps the log readable at a glance: server errors are errors,
 // client errors are warnings, everything else is routine.
 func accessLogLevel(status int) slog.Level {

@@ -114,7 +114,7 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 }
 
 func (t *MCPStreamableTransport) handleGet(w http.ResponseWriter, r *http.Request) {
-	flusher, ok := w.(http.Flusher)
+	flusher, ok := httpFlusher(w)
 	if !ok {
 		http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
 		return

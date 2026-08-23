@@ -161,6 +161,18 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 	return r.ResponseWriter.Write(b)
 }
 
+// Flush forwards http.Flusher, so wrapping every route in this middleware does
+// not turn the streaming endpoints (SSE, MCP transports) into "streaming not
+// supported" 500s the moment metrics are enabled (GO-040).
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+// Unwrap lets http.ResponseController reach the underlying writer.
+func (r *statusRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 // Middleware wraps an http.Handler, recording request count and latency.
 func (m *Metrics) Middleware(next http.Handler) http.Handler {
 	if !m.enabled {
