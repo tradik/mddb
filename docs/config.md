@@ -284,6 +284,7 @@ export MDDB_AUDIT_EXPORT_SYSLOG_ADDR="tcp://logs.papertrailapp.com:12345"
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
 | `MDDB_BACKUP_DIR` | `./backups` | path | Directory backups are written to and restored from. Symlinks that escape the jail are rejected; absolute paths and `../` traversal are rejected; empty / NUL bytes are rejected. |
+| `MDDB_GEO_DATA_DIR` | `"geodata"` | path | Directory postcode CSVs must live in. `/v1/geo-reindex` and its gRPC twin accept a name relative to it and refuse anything that resolves outside, symlinks included — the path used to be taken from the request and opened as given |
 
 No further configuration required — the jail is always on.
 

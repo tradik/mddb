@@ -1308,6 +1308,26 @@ graceful shutdown drains its queues, so both compose files allow a 20s stop
 grace period — set the same if you run the image directly.
 
 ### Security
+- **`/v1/geo-reindex` opened any file the process could, and checked nothing
+  (CodeQL `go/path-injection`)** — the endpoint takes a `csvPath` per country
+  and handed it straight to `os.Open`. Its gRPC twin at least required write
+  permission on a collection; the HTTP one required **nothing at all**, so the
+  same operation was gated two different ways depending on which port it
+  arrived at.
+
+  Neither gate was the right one. Writing documents to a collection is not
+  authority to read the filesystem. The path is now confined to
+  `MDDB_GEO_DATA_DIR` (default `./geodata`) — a name relative to it, with
+  anything resolving outside refused, symlinks included — and the HTTP handler
+  checks admin permission before loading anything.
+
+  The confinement is `safeBackupPath`'s, generalised rather than copied: both
+  the jail root and the candidate are symlink-resolved before being compared,
+  and a path that does not exist yet has its parent resolved instead. That
+  handling is the part worth not writing twice, and a symlink planted inside
+  the directory is exactly what a naive prefix check misses — there is a test
+  for it.
+
 - **An embedding provider's `apiUrl` no longer reaches the whole private
   network, and stops reading it back (SEC-013)** — the field deliberately
   bypasses the SSRF guard, because a local Ollama on `http://localhost:11434`

@@ -384,8 +384,11 @@ func TestHandleGeoWithin_WithResults(t *testing.T) {
 }
 
 func TestHandleGeoReindex_LoadPostcodes(t *testing.T) {
-	// Write a tiny CSV to disk and pass it to the reindex handler.
+	// Write a tiny CSV inside the geo data directory and pass its name to the
+	// reindex handler. The directory is where CSVs are confined to: the
+	// endpoint used to accept any path on the filesystem.
 	dir := t.TempDir()
+	t.Setenv("MDDB_GEO_DATA_DIR", dir)
 	csvPath := filepath.Join(dir, "pl.csv")
 	if err := os.WriteFile(csvPath, []byte("00-001,52.231,21.006\n"), 0600); err != nil {
 		t.Fatal(err)
@@ -411,5 +414,61 @@ func TestHandleGeoReindex_LoadPostcodes(t *testing.T) {
 	// The lookup must now be attached to GeoIndex.
 	if pc := s.GeoIndex.Postcodes(); pc == nil {
 		t.Error("expected postcode lookup to be attached to GeoIndex")
+	}
+}
+
+// CodeQL go/path-injection: csvPath came from the request body and went
+// straight to os.Open, so this endpoint would read any file the process could.
+func TestHandleGeoReindexRefusesAPathOutsideTheDataDir(t *testing.T) {
+	t.Setenv("MDDB_GEO_DATA_DIR", t.TempDir())
+
+	s, cleanup := newTestServerForGeo(t)
+	defer cleanup()
+
+	for _, hostile := range []string{
+		"/etc/passwd",
+		"../../../etc/passwd",
+		"../outside.csv",
+	} {
+		body, _ := json.Marshal(GeoReindexRequest{
+			LoadPostcodes: []GeoPostcodeLoad{{Country: "PL", CSVPath: hostile}},
+		})
+		req := httptest.NewRequest(http.MethodPost, "/v1/geo-reindex", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		s.handleGeoReindex(w, req)
+
+		if w.Code == http.StatusOK {
+			t.Errorf("%s was accepted", hostile)
+		}
+	}
+}
+
+// A symlink inside the directory pointing out of it is the escape a naive
+// prefix check misses; confineToDir resolves both ends before comparing.
+func TestHandleGeoReindexRefusesASymlinkOutOfTheDataDir(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("MDDB_GEO_DATA_DIR", dir)
+
+	outside := filepath.Join(t.TempDir(), "secret.csv")
+	if err := os.WriteFile(outside, []byte("00-001,1,1\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "pl.csv")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+
+	s, cleanup := newTestServerForGeo(t)
+	defer cleanup()
+
+	body, _ := json.Marshal(GeoReindexRequest{
+		LoadPostcodes: []GeoPostcodeLoad{{Country: "PL", CSVPath: "pl.csv"}},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/v1/geo-reindex", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	s.handleGeoReindex(w, req)
+
+	if w.Code == http.StatusOK {
+		t.Error("a symlink out of the data directory was followed")
 	}
 }

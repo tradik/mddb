@@ -176,7 +176,13 @@ func (g *GRPCServer) GeoReindex(ctx context.Context, req *proto.GeoReindexReques
 			g.server.GeoIndex.SetPostcodes(pc)
 		}
 		for _, p := range req.LoadPostcodes {
-			n, err := pc.LoadCountry(p.Country, p.CsvPath)
+			// Same confinement as the HTTP path: write permission on a
+			// collection is not authority to read an arbitrary file.
+			csvPath, err := safeGeoCSVPath(p.CsvPath)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, err.Error())
+			}
+			n, err := pc.LoadCountry(p.Country, csvPath)
 			if err != nil {
 				return nil, status.Error(codes.Internal, err.Error())
 			}
