@@ -48,7 +48,12 @@ test('stays out of search indexes', () => {
 });
 
 test('carries a GTM snippet with a build-time placeholder', () => {
-  assert.match(html, /googletagmanager\.com\/gtm\.js/);
+  // Anchored to the full URL, scheme included. The bare
+  // /googletagmanager\.com\/gtm\.js/ this replaces accepted
+  // https://evil-googletagmanager.com/gtm.js and an http:// downgrade of the
+  // real host — both of which are exactly what a test pinning where the page
+  // loads a script from exists to catch.
+  assert.match(html, /'https:\/\/www\.googletagmanager\.com\/gtm\.js\?id='/);
   assert.ok(html.includes('%VITE_GTM_ID%'), 'the GTM id must come from VITE_GTM_ID');
 });
 

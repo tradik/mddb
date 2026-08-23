@@ -18,6 +18,12 @@ dependencies = [
 [project.optional-dependencies]
 # The MDDB client itself. Separate because a caller may already have it
 # pinned, and because the adapter is useful to read without installing gRPC.
+#
+# mddb-client is NOT on PyPI, and cannot be installed from git either: its
+# protobuf stubs are generated at build time and are not committed. It is
+# installed from a checkout — see the README. The extra names the dependency
+# so the requirement is declared rather than implied; it does not make `pip
+# install "langchain-mddb[client]"` work on its own.
 client = ["mddb-client>=2.12.0"]
 test = ["pytest>=8.0", "langchain-core>=0.3"]
 
@@ -31,3 +37,9 @@ packages = ["langchain_mddb"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# The client is a path dependency, not a published one. Without this, locking
+# the project fails outright: uv looks for mddb-client on PyPI and does not
+# find it, because it is not there.
+[tool.uv.sources]
+mddb-client = { path = "../../clients/python" }

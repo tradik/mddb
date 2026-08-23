@@ -213,8 +213,7 @@ func ReplaceBinary(path string, content []byte) (backup string, err error) {
 	// has to stay runnable by whoever could run the old one, which on a shared
 	// host is not only its owner. Narrowing it here would silently break the
 	// install for every user but one.
-	// #nosec G302 -- an executable has to be executable // NOSONAR -- see above
-	if err = os.Chmod(tempPath, 0o755); err != nil {
+	if err = os.Chmod(tempPath, 0o755); err != nil { // #nosec G302 // NOSONAR -- an executable has to stay executable for everyone who could run the old binary
 		return "", err
 	}
 

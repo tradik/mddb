@@ -102,8 +102,17 @@ def main() -> int:
     args = ap.parse_args()
 
     version = args.version.lstrip("v")
-    changelog = Path(args.changelog)
-    if not changelog.exists():
+
+    # Resolved and confined to the repository. A release-notes generator has no
+    # business reading a file outside the tree it is describing, and --changelog
+    # is a path this process is handed rather than one it chose.
+    changelog = Path(args.changelog).resolve()
+    try:
+        changelog.relative_to(ROOT.resolve())
+    except ValueError:
+        print(f"--changelog must be inside {ROOT}: {changelog}", file=sys.stderr)
+        return 2
+    if not changelog.is_file():
         print(f"missing changelog: {changelog}", file=sys.stderr)
         return 2
 

@@ -71,8 +71,13 @@ class MddbVectorStore(VectorStore):
                 from mddb_client import MddbClient
             except ImportError as exc:  # pragma: no cover - import-time guard
                 raise ImportError(
-                    "langchain-mddb needs the MDDB client: "
-                    "pip install 'langchain-mddb[client]'"
+                    "langchain-mddb needs mddb-client, which is not on PyPI and "
+                    "cannot be installed from git: its protobuf stubs are "
+                    "generated at build time and are not committed. Build it "
+                    "from a checkout:\n"
+                    "  git clone https://github.com/tradik/mddb.git\n"
+                    "  cd mddb && ./proto/generate.sh\n"
+                    "  pip install ./clients/python"
                 ) from exc
             client = MddbClient(address, **client_kwargs)
             self._owns_client = True

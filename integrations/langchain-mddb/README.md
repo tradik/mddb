@@ -6,8 +6,22 @@ LangChain `VectorStore` and `Retriever` backed by
 ## Install
 
 ```bash
-pip install "langchain-mddb[client]"
+pip install langchain-mddb
 ```
+
+The adapter needs `mddb-client`, and **that is not on PyPI**. Its protobuf
+stubs are generated at build time and are not committed, so it cannot be
+installed from git either — it is built from a checkout:
+
+```bash
+git clone https://github.com/tradik/mddb.git
+cd mddb && ./proto/generate.sh      # needs buf
+pip install ./clients/python
+```
+
+`pip install "langchain-mddb[client]"` names the dependency but cannot satisfy
+it on its own; the extra exists so the requirement is declared rather than
+implied.
 
 ## Use
 

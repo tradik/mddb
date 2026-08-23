@@ -404,22 +404,26 @@ jobs:
       # generated stub used an absolute `import mddb_pb2` that only resolves
       # when the files sit on sys.path directly. The package had never been
       # importable, and nothing noticed because nothing imported it.
+      # uv sync --locked, not pip install: every version comes from the
+      # committed uv.lock and the run fails if the lock and pyproject.toml
+      # disagree. A CI job that resolves dependencies afresh on every run is
+      # a job whose result depends on what PyPI published this morning.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+
       - name: Install the client and its test extra
         working-directory: clients/python
-        run: |
-          # An editable install has to run a build backend, so
-          # --only-binary is not available here. The pip upgrade is pinned
-          # instead, so the one thing that can be pinned is.
-          python -m pip install --upgrade "pip==26.2.1"
-          pip install -e ".[test]"
+        run: uv sync --locked --extra test
 
       - name: The package imports at all
         working-directory: clients/python
-        run: python -c "from mddb_client import MddbClient, mddb_pb2; print(MddbClient)"
+        run: uv run --no-sync python -c "from mddb_client import MddbClient, mddb_pb2; print(MddbClient)"
 
       - name: Run client tests
         working-directory: clients/python
-        run: pytest -q
+        run: uv run --no-sync pytest -q
 
   panel:
     name: Panel (build + tests)
@@ -474,18 +478,20 @@ jobs:
       # breaks it is a field named differently on the two sides. The suite runs
       # against a fake client, so no MDDB instance is needed — but the fake has
       # to match the real signatures, which is why one of its tests exists.
+      # Same reasoning as the Python client job: versions come from the
+      # committed uv.lock rather than from whatever resolves today.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+
       - name: Install
         working-directory: integrations/langchain-mddb
-        run: |
-          # An editable install has to run a build backend, so
-          # --only-binary is not available here. The pip upgrade is pinned
-          # instead, so the one thing that can be pinned is.
-          python -m pip install --upgrade "pip==26.2.1"
-          pip install -e ".[test]"
+        run: uv sync --locked --extra test
 
       - name: Run tests
         working-directory: integrations/langchain-mddb
-        run: pytest -q
+        run: uv run --no-sync pytest -q
 
   chat:
     name: mddb-chat (Rust)
