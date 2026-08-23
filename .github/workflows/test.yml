@@ -147,6 +147,16 @@ jobs:
       - name: Run action-pin guard test suite
         run: bash scripts/tests/test-action-pins.sh
 
+      # DOC-013: check-docs-links.py checks the built site, so nothing checked
+      # README.md — which is what most people read first, and which linked six
+      # pages that never existed. 33 dead links across the tree on the first
+      # run.
+      - name: Relative Markdown links resolve
+        run: bash scripts/check-repo-links.sh
+
+      - name: Run repo-link guard test suite
+        run: bash scripts/tests/test-repo-links.sh
+
       - name: Upload coverage
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
         with:

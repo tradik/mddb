@@ -1,286 +1,268 @@
 ---
 title: "MDDB vs Alternatives"
 slug: "docs/comparison"
-description: "How MDDB compares with other document databases, vector stores and content systems on storage model, search, protocols and operational footprint."
+description: "Measured numbers and honest trade-offs: how MDDB compares with relational and document databases, search engines, vector stores and RAG wrappers — with the command that reproduces every figure."
 status: publish
 ---
 
 # MDDB vs Alternatives
 
-How MDDB compares to other database and content management solutions.
+Every number on this page was measured, not estimated, and each one names the
+command that produces it again. Where a figure depends on your corpus — and
+most of them do, heavily — the page says so and shows by how much.
 
-## vs Traditional Databases
+The comparisons keep their "when to use the other thing instead" sections.
+Those are the most useful part: a page that recommends itself for everything is
+a page nobody believes.
+
+## How these numbers were produced
+
+```bash
+# start a server, then:
+make bench-comparison                      # MDDB's own profile
+make bench-comparison BENCH_ARGS="-docs 20000 -words 160"
+make bench-comparison-all                  # cross-database (needs Docker)
+```
+
+| Parameter | Value |
+|---|---|
+| Measured | 2026-08-23 |
+| MDDB | 2.12.0, release build (`CGO_ENABLED=0`, `-ldflags="-s -w"`) |
+| Host | linux/amd64, 32 CPUs, 16 GB RAM |
+| Go | 1.27.0 |
+| Corpus | generated prose, Zipfian term distribution over an 8 000-word vocabulary |
+| Transport | HTTP/JSON, batches of 500 documents |
+| Search | 500 timed queries after 20 warm-up queries; percentiles, not averages |
+
+The corpus generator is worth one sentence, because two earlier versions of it
+produced numbers that were wrong in opposite directions. A fifteen-word
+vocabulary gave almost no distinct terms, and the database came out ten times
+its content. Then 250 words drawn uniformly gave the opposite pathology — every
+document containing nearly every term, which is the densest an inverted index
+can be — and the database came out twenty-seven times its content. Neither said
+anything about the engine. Natural language is Zipfian, so the generator is
+too.
+
+## MDDB, measured
+
+Prose documents of ~1.7 KB, full-text indexing on:
+
+| Corpus | Ingest | Search p50 | p95 | p99 | On disk | Server RSS |
+|---|---|---|---|---|---|---|
+| 1 000 docs | 207 docs/s | 745 µs | 993 µs | — | 79 MiB | 223 MiB |
+| 5 000 docs | 562 docs/s | 1.54 ms | 2.74 ms | 3.09 ms | 325 MiB | 274 MiB |
+| 20 000 docs | 653 docs/s | 5.90 ms | 7.81 ms | 8.54 ms | 1 175 MiB | 1 030 MiB |
+
+Two things in that table deserve explaining rather than burying.
+
+**Ingest looks slow at 1 000 documents and faster at 20 000.** That is a fixed
+start-up cost — roughly four seconds of bucket creation and file growth — being
+amortised. The marginal rate is what the 20 000-document row shows.
+
+**The database is 35× the size of its content, and RSS grows with it.** That is
+almost entirely the full-text index, and you can watch it disappear. The same
+5 000 documents, ingested with `skipFts`:
+
+| Same corpus, 5 000 docs | Ingest | On disk |
+|---|---|---|
+| Full-text index on | 562 docs/s | 325 MiB |
+| `"options": {"skipFts": true}` | **13 883 docs/s** | **16 MiB** |
+
+**The index costs 25× the write throughput and 20× the storage.** That is the
+honest price of instant full-text search over every document, and it is a
+choice you get to make per ingest — `profile: "fast"` names the same trade-off.
+If your workload is write-heavy and searched rarely, turn it off and reindex on
+demand.
+
+It also explains a number this page used to carry. The previous version claimed
+**29 810 docs/s** with no methodology attached. Nothing in this repository
+reproduces that against an indexed corpus of real prose; it is the shape of a
+figure measured with tiny documents and no meaningful index work. It has been
+removed rather than adjusted.
+
+**Binary and image:** the release binary is 27.7 MB (`CGO_ENABLED=0 go build
+-ldflags="-s -w"`; a plain `go build` is ~40 MB, because it keeps the symbol
+table). The Docker image is ~33 MB.
+
+## vs Relational databases
 
 ### PostgreSQL / MySQL
 
-**Advantages of MDDB:**
-- ✅ **Specialized for Markdown** - Native support, not plain text blobs
-- ✅ **Zero Configuration** - No database server to install and manage
-- ✅ **Built-in Versioning** - Automatic revision history without triggers
-- ✅ **Simpler Deployment** - Single ~29MB binary vs database server
-- ✅ **Lower Resource Usage** - Minimal memory footprint (~50MB)
-- ✅ **Embedded** - No network latency, direct file access
-- ✅ **Vector Search Built-in** - No pgvector extension needed
+The real difference is not performance, it is what you have to operate. MDDB is
+one process with one file; the comparison is against a server, a connection
+pool, a schema, and a migration story.
 
-**When to use PostgreSQL/MySQL instead:**
-- Need SQL joins and complex relational queries
-- Require multi-table transactions
-- Building traditional CRUD applications
-- Need mature ecosystem (ORMs, GUIs, tools)
+| | MDDB | PostgreSQL / MySQL |
+|---|---|---|
+| Deployment | one binary, one file | server process, users, schema, migrations |
+| Markdown | native document type, front matter parsed | `TEXT` column |
+| Revision history | every write, automatically | triggers and a history table you write |
+| Vector search | built in | pgvector (Postgres) / none (MySQL) |
+| Full-text search | built in, four algorithms | built in (Postgres), basic (MySQL) |
+| Relational joins | none | the entire point |
+| Multi-table transactions | no | yes |
 
----
+**Choose PostgreSQL or MySQL when** you need joins, multi-table transactions,
+or the ecosystem — ORMs, migration tools, managed hosting, people who already
+know it. If your data is relational, a document store is the wrong shape and no
+benchmark will fix that.
 
-## vs Document Databases
+## vs Document databases
 
-### MongoDB
+### MongoDB, CouchDB
 
-**Advantages of MDDB:**
-- ✅ **Markdown-First** - Purpose-built, not generic JSON storage
-- ✅ **Triple Protocol** - HTTP, gRPC, GraphQL (MongoDB: wire protocol only)
-- ✅ **Smaller Footprint** - 29MB Docker image vs ~400MB
-- ✅ **Type-Safe APIs** - gRPC/Protobuf + GraphQL schema
-- ✅ **Simpler Operations** - No sharding/replication complexity
-- ✅ **Built-in Full-Text Search** - No Atlas Search needed
+Closer in shape, and the trade is scale against footprint. These are built to
+shard across a cluster; MDDB is built to be one file you can copy.
 
-**When to use MongoDB instead:**
-- Need horizontal sharding at scale (>100GB)
-- Require geo-spatial queries
-- Building complex aggregation pipelines
-- Need change streams for real-time sync
+| | MDDB | MongoDB | CouchDB |
+|---|---|---|---|
+| Horizontal sharding | consistent-hash ring, manual | automatic, mature | clustered |
+| Protocols | HTTP, gRPC, GraphQL, MCP | wire protocol | HTTP |
+| Change feed | webhooks, binlog replication | change streams | `_changes` |
+| Markdown-aware | yes | no | no |
+| Docker image | ~33 MB | ~400 MB | ~180 MB |
 
-### CouchDB
+**Choose MongoDB when** you need automatic sharding at a scale one machine
+cannot hold, change streams, or its geospatial features beyond what
+[GEOSEARCH](GEOSEARCH.md) covers. **Choose CouchDB when** offline-first
+replication to clients is the requirement.
 
-**Advantages of MDDB:**
-- ✅ **Higher Performance** - 95x faster writes (29K vs 312 docs/s)
-- ✅ **Lower Latency** - 34µs vs 3.2ms average
-- ✅ **Modern APIs** - gRPC + GraphQL vs HTTP-only
-- ✅ **Vector Search** - Built-in semantic search
-- ✅ **Smaller Size** - 29MB vs ~200MB Docker image
+## vs Search engines
 
-**When to use CouchDB instead:**
-- Need master-master replication
-- Require offline-first mobile sync
-- Building distributed systems
+Heavyweight search clusters are a different class of tool. They win on scale
+and on analysis depth; they cost a JVM, a cluster, and an operations budget.
 
----
+| | MDDB | Heavyweight search engine |
+|---|---|---|
+| Deployment | one binary | cluster, JVM, coordinator nodes |
+| Baseline memory | ~90 MiB with 5 000 short documents | gigabytes before any data |
+| Ranking algorithms | TF-IDF, BM25, BM25F, [PMISparse](PMISPARSE.md) | BM25 plus a large analysis toolkit |
+| Analyzers | stemming, stop words, synonyms, 30+ languages | far more, and pluggable |
+| Vector search | built in, hybrid with keyword | built in (recent versions) |
+| Distributed search | no | yes, that is the product |
 
-## vs File-Based Systems
+The algorithm choice is measured too, on quality as well as speed:
+[FTS Algorithm Benchmark](BENCHMARK.md) compares all four on the same corpus,
+and [PMISparse](PMISPARSE.md) documents the sparse-retrieval algorithm that
+performs best on short technical queries here.
 
-### Git + Filesystem
+**Choose a heavyweight search engine when** you need a distributed search
+cluster, log aggregation, or analysis features — custom analyzers, complex
+aggregations, percolation — beyond what a document store should be doing.
 
-**Advantages of MDDB:**
-- ✅ **Instant Queries** - Indexed metadata vs grep/find
-- ✅ **API Access** - REST/gRPC/GraphQL vs file system calls
-- ✅ **Concurrent Access** - ACID transactions vs file locks
-- ✅ **Rich Metadata** - Structured tags vs filename conventions
-- ✅ **Better Performance** - Optimized for document ops
-- ✅ **Vector Search** - Semantic similarity impossible with files
-- ✅ **Full-Text Search** - Built-in inverted index
+## vs Vector databases
 
-**When to use Git/Filesystem instead:**
-- Content authored by non-technical users (GUI editors)
-- Need distributed collaboration (GitHub, GitLab)
-- Require merge conflict resolution
-- Want human-readable diffs
+| | MDDB | Dedicated vector database |
+|---|---|---|
+| Vectors | one part of the store | the whole product |
+| Index types | flat, IVF, quantized (int8/int4) | HNSW, IVF-PQ, DiskANN, more |
+| Hybrid keyword + vector | native, one query, alpha or RRF | usually a separate keyword system |
+| The documents themselves | stored here | usually somewhere else |
+| Scale ceiling | one machine's disk | designed for billions |
 
----
+The honest framing: if vector search *is* your application and you have more
+than a few million vectors, use something built for that. MDDB's advantage is
+that the vectors, the text, the metadata and the revision history are the same
+records — no synchronisation between two systems, no "the vector store has a
+document the database deleted".
 
-## vs CMS Platforms
+See [Quantization](QUANTIZATION.md) for the memory trade-offs, including
+disk-only vectors.
 
-### WordPress
+## vs RAG wrappers
 
-**Advantages of MDDB:**
-- ✅ **Lightweight** - 29MB binary vs ~200MB PHP + MySQL
-- ✅ **API-First** - Built for programmatic access
-- ✅ **No PHP/Database** - Single Go binary
-- ✅ **Version Control** - Built-in, not plugin-based
-- ✅ **Developer-Friendly** - Simple API vs WordPress hooks
-- ✅ **Performance** - Direct DB access vs WordPress query overhead
+A category worth naming, because it is where most "memory for my agent"
+searches land: tools that wrap somebody else's retrieval engine in an MCP
+server and a CLI.
 
-**When to use WordPress instead:**
-- Need visual page builder
-- Require thousands of plugins
-- Non-technical content editors
-- Want mature themes ecosystem
+They are a genuinely good way to start. They are also a coupling decision, and
+the coupling is invisible until it matters.
 
-### Strapi
+| | MDDB | Wrapper over a third-party engine |
+|---|---|---|
+| Who owns the storage format | this project | the upstream engine |
+| Who decides the release cadence | this project | upstream, then the wrapper |
+| Deployment | one binary | Python runtime, the engine, its dependencies |
+| MCP | native — 80 tools over the same core the HTTP API uses | an adapter layer over an engine that predates MCP |
+| Per-collection retrieval config | [built in](RAG-PIPELINE.md) | whatever upstream exposes |
+| Replication | binlog-based, built in | whatever upstream exposes |
+| Upgrade risk | one project's decisions | two projects' decisions, in sequence |
 
-**Advantages of MDDB:**
-- ✅ **Simpler** - Embedded DB vs separate database server
-- ✅ **Smaller** - 29MB Docker image vs ~600MB
-- ✅ **Faster Startup** - Instant vs 30-60s
-- ✅ **Purpose-Built** - Markdown-specific vs generic headless CMS
-- ✅ **Triple Protocol** - HTTP + gRPC + GraphQL from start
+The practical difference shows up in small requests. "Cap the context this
+collection returns", "make search results carry the collection's answer
+format", "annotate which tools are read-only so an agent cannot write" — each
+is a change to one codebase here. Through a wrapper, each one is either
+upstream's decision or a workaround layered on top of it.
 
-**When to use Strapi instead:**
-- Need admin UI for content management
-- Require rich media management (images, videos)
-- Building complex content types with relationships
-- Want plugin marketplace
+**Choose a wrapper when** you want to try retrieval-augmented generation this
+afternoon, your knowledge base is small, and one person is using it. The
+setup cost is genuinely lower and you are not committing to anything.
 
----
+**Choose an engine when** the knowledge base is part of your product: when you
+need the storage format to be stable because you have data in it, when an
+upstream release should not be able to change your retrieval behaviour, and
+when "one more service to operate" is a real cost.
 
-## vs Vector Databases
+## vs Git and the filesystem
 
-### Dedicated Vector Database Services
+Storing Markdown in Git is the right answer more often than vendors like to
+admit. It is free, diffable, reviewable, and every developer already knows it.
 
-**Advantages of MDDB:**
-- ✅ **All-in-One** - Vectors + metadata + full-text + storage
-- ✅ **Embedded** - No separate vector DB service
-- ✅ **Markdown-Native** - Built for documents, not just vectors
-- ✅ **Simpler Architecture** - Single database for everything
-- ✅ **Lower Cost** - No vector DB subscription needed
+| | MDDB | Git + filesystem |
+|---|---|---|
+| Query by metadata | indexed, instant | `grep` and a script |
+| Full-text search | indexed, ranked | `grep`, unranked |
+| Vector search | built in | none |
+| Concurrent writers | handled | merge conflicts |
+| Serving over an API | built in | you build it |
+| Human review of changes | revisions, no diff UI | pull requests, the best in the world |
+| Cost | a process | nothing |
 
-**When to use dedicated vector DB instead:**
-- Need >1M vectors at scale
-- Require advanced vector indexes (HNSW, IVF)
-- Building pure semantic search (no metadata/full-text)
-- Need sub-5ms vector query latency
+**Choose Git when** the content is authored by developers, changes go through
+review, and search means `grep`. Use both when content is authored in Git and
+*served* by something that can rank it — that is what
+[the WordPress and SSG integrations](INTEGRATIONS.md) do.
 
----
+## vs CMS platforms
 
-## vs Search Engines
+### WordPress, Strapi
 
-### Heavyweight Search Engines
+Different audience. A CMS is for people who need an editing interface; MDDB is
+for applications that need an API. That is not a ranking, it is a different
+question being answered.
 
-**Advantages of MDDB:**
-- ✅ **Zero Configuration** - No cluster setup, no index mappings
-- ✅ **Embedded** - No separate search service
-- ✅ **Simpler** - Single binary vs Java + heap tuning
-- ✅ **Lower Resources** - 50MB RAM vs multiple GB for a JVM-based search cluster
-- ✅ **Built-in Storage** - Documents + search in one place
+| | MDDB | WordPress / Strapi |
+|---|---|---|
+| Editing UI | admin panel, developer-oriented | full editorial workflow |
+| Non-technical authors | no | yes, that is the product |
+| Plugin ecosystem | integrations, not plugins | thousands |
+| API-first | yes | REST bolted on (WordPress), yes (Strapi) |
+| Vector search for RAG | built in | none |
+| Deployment | one binary | PHP/Node + database + web server |
 
-**When to use a heavyweight search engine instead:**
-- Need distributed search across nodes
-- Require advanced text analysis (stemming, synonyms)
-- Building log aggregation (ELK stack)
-- Need Kibana dashboards
+**Choose a CMS when** humans who do not write code need to publish. If that is
+your requirement, the [WordPress plugin](INTEGRATIONS.md) puts MDDB behind it —
+authors keep their editor, and the content becomes searchable by an agent.
 
----
+## When MDDB fits
 
-## vs Key-Value Stores
+- Markdown is your primary format, not a `TEXT` column.
+- You want retrieval — keyword, vector or both — without operating a second
+  system for it.
+- You are building for agents, and want MCP that was designed in rather than
+  adapted on.
+- One binary and one file is a feature, not a limitation.
+- Your corpus fits comfortably on one machine.
 
-### Redis
+## When it does not
 
-**Advantages of MDDB:**
-- ✅ **Persistent by Default** - No AOF/RDB configuration
-- ✅ **Rich Metadata** - Structured tags vs string keys
-- ✅ **Full Documents** - Not just key-value pairs
-- ✅ **Revision History** - Built-in versioning
-- ✅ **Vector Search** - Semantic similarity (Redis requires RediSearch)
-
-**When to use Redis instead:**
-- Need sub-millisecond latency for caching
-- Require pub/sub messaging
-- Building real-time leaderboards
-- Need data structures (lists, sets, sorted sets)
-
-**MDDB + Redis:** Use MDDB for storage, Redis for caching
-
----
-
-## vs Static Site Generators
-
-### Hugo / Jekyll / Gatsby
-
-**Advantages of MDDB:**
-- ✅ **Dynamic Content** - No rebuild needed for updates
-- ✅ **API Access** - Query content programmatically
-- ✅ **Real-time Updates** - Instant vs regenerate + deploy
-- ✅ **Search Built-in** - Metadata + full-text + vector search
-- ✅ **Multi-language** - Same key, multiple languages
-
-**When to use SSG instead:**
-- Need maximum performance (pre-rendered HTML)
-- Building purely static sites
-- Want CDN distribution
-- Content changes infrequently
-
-**MDDB + SSG:** Use MDDB as CMS, SSG pulls content via API for builds
+- Your data is relational. Use a relational database.
+- You need a distributed search or vector cluster. Use one.
+- Your authors are not developers and need an editorial workflow. Use a CMS —
+  and put MDDB behind it if the content should also be searchable by an agent.
+- You need more vectors than one machine's disk holds.
 
 ---
 
-## Performance Comparison
-
-Benchmark: 3000 documents, batch inserts
-
-| Database | Throughput | Avg Latency | Memory Usage |
-|----------|------------|-------------|--------------|
-| **MDDB (Batch API)** | **29,810 docs/s** | **34µs** | **~50MB** |
-| MongoDB | 5,176 docs/s | 192µs | ~200MB |
-| PostgreSQL | 4,324 docs/s | 231µs | ~150MB |
-| MySQL | 1,214 docs/s | 822µs | ~300MB |
-| CouchDB | 312 docs/s | 3,185µs | ~180MB |
-
-**See also:** [Performance Benchmarks](BENCHMARK.md)
-
----
-
-## Feature Matrix
-
-| Feature | MDDB | MongoDB | PostgreSQL | WordPress | Search Engine* |
-|---------|------|---------|------------|-----------|---------------|
-| **Markdown Native** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Embedded** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **HTTP/JSON API** | ✅ | ❌ | ❌ | ✅ | ✅ |
-| **gRPC API** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **GraphQL API** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Vector Search** | ✅ | ✅ (Atlas) | ✅ (pgvector) | ❌ | ✅ (v8.0+) |
-| **Full-Text Search** | ✅ | ✅ (Atlas) | ✅ | ❌ | ✅ |
-| **Revision History** | ✅ | ❌ | ❌ | ✅ (plugin) | ❌ |
-| **Document TTL** | ✅ | ✅ | ❌ | ❌ | ✅ |
-| **Webhooks** | ✅ | ✅ (triggers) | ✅ (NOTIFY) | ✅ | ✅ (watcher) |
-| **Multi-language** | ✅ | ❌ | ❌ | ✅ (plugin) | ❌ |
-| **Auth + RBAC** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Single Binary** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Docker Size** | 15MB | 400MB | 200MB | 200MB | 600MB |
-
----
-
-## When to Choose MDDB
-
-Choose MDDB when you need:
-
-1. **Markdown as primary data format**
-2. **Embedded database** (no separate server)
-3. **Version control** out of the box
-4. **Triple protocol** (HTTP + gRPC + GraphQL)
-5. **Vector + full-text search** built-in
-6. **Simple deployment** (single binary or Docker)
-7. **Low resource usage** (<100MB RAM)
-8. **Developer-first** API design
-9. **RAG pipelines** with semantic search
-10. **Multi-language content** management
-
----
-
-## When to Choose Alternatives
-
-**Choose PostgreSQL/MySQL if:**
-- Building traditional relational apps
-- Need SQL joins and complex queries
-- Require ACID across multiple tables
-
-**Choose MongoDB if:**
-- Need horizontal sharding at massive scale
-- Building geo-spatial applications
-- Require change streams
-
-**Choose WordPress if:**
-- Need visual content editor for non-technical users
-- Want thousands of plugins
-- Building traditional websites
-
-**Choose a heavyweight search engine if:**
-- Need distributed search cluster
-- Building log aggregation system
-- Require advanced text analysis
-
-**Choose dedicated vector DB if:**
-- Pure vector search (>1M vectors)
-- Need sub-5ms latency
-- Advanced vector indexing (HNSW, IVF)
-
----
-
-**[← Back to README](../README.md)** | **[See all features →](FEATURES.md)**
+**[← Back to README](../README.md)** | **[See all features →](FEATURES.md)** |
+**[FTS algorithm benchmark →](BENCHMARK.md)**

@@ -136,7 +136,7 @@ lint-all: fmt vet sec lint ## Run all linters
 test-all: test test-graphql test-clients ## Run every test suite in the monorepo
 	@echo "✅ All tests passed!"
 
-ci: check-go-version check-version check-action-pins fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
+ci: check-go-version check-version check-action-pins check-repo-links fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
 	@echo "✅ CI pipeline complete!"
 
 dev-logs-chat: ## Show logs from chat server only
@@ -193,6 +193,19 @@ test-proto-plugins: ## Run the protobuf plugin/runtime guard test suite
 coverage-areas: ## Report per-file coverage for the tracked high-risk areas
 	@cd services/mddbd && go test -coverprofile=coverage.out ./... > /dev/null 2>&1
 	@bash scripts/check-coverage-areas.sh --print
+
+bench-comparison: ## Measure the numbers docs/COMPARISON.md publishes (DOC-013)
+	@echo "🧪 Profiling MDDB — start a server first (make dev-start or ./mddbd)"
+	@cd test && go run ./mddb-profile -markdown $(BENCH_ARGS)
+
+bench-comparison-all: ## Full cross-database comparison (needs Docker)
+	@cd test && bash compare-all-databases.sh
+
+check-repo-links: ## Verify every relative Markdown link resolves (DOC-013)
+	@bash scripts/check-repo-links.sh
+
+test-repo-links: ## Run the repo-link guard test suite
+	@bash scripts/tests/test-repo-links.sh
 
 check-action-pins: ## Verify every GitHub Action is pinned to a commit SHA (OPS-018)
 	@bash scripts/check-action-pins.sh

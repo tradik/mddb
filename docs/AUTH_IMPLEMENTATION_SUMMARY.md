@@ -276,8 +276,8 @@ curl -H "Authorization: Bearer $TOKEN" \
    ```
 
 2. **Review documentation:**
-   - Read [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)
-   - Quick start: [docs/AUTH_QUICKSTART.md](docs/AUTH_QUICKSTART.md)
+   - Read [docs/AUTHENTICATION.md](AUTHENTICATION.md)
+   - Quick start: [docs/AUTH_QUICKSTART.md](AUTH_QUICKSTART.md)
 
 3. **Commit changes:**
    ```bash
@@ -306,8 +306,8 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### Documentation
 
-- Complete guide: [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)
-- Quick start: [docs/AUTH_QUICKSTART.md](docs/AUTH_QUICKSTART.md)
+- Complete guide: [docs/AUTHENTICATION.md](AUTHENTICATION.md)
+- Quick start: [docs/AUTH_QUICKSTART.md](AUTH_QUICKSTART.md)
 
 ### Testing
 
@@ -322,7 +322,7 @@ If you encounter issues:
 1. Check environment variables are set correctly
 2. Review server logs for errors
 3. Run test scripts to verify setup
-4. See troubleshooting section in [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md)
+4. See troubleshooting section in [docs/AUTHENTICATION.md](AUTHENTICATION.md)
 
 ---
 

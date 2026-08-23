@@ -362,7 +362,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics
 
-**[→ See all features](docs/FEATURES.md)** | **[→ Compare with alternatives](docs/COMPARISON.md)** | **[→ Performance benchmarks](docs/PERFORMANCE.md)**
+**[→ See all features](docs/FEATURES.md)** | **[→ Compare with alternatives](docs/COMPARISON.md)** | **[→ Measured benchmarks](docs/BENCHMARK.md)**
 
 ## 🔄 Replication Architecture
 
@@ -386,7 +386,7 @@ graph LR
 
 Modern React-based UI for managing documents, users, and search with REST/GraphQL API toggle.
 
-![MDDB Web Panel](docs/panel.png)
+![MDDB Web Panel](services/ssg-template/images/panel.png)
 
 **Features:** Browse collections, view/edit documents, vector search, user management, API mode switching (REST ↔ GraphQL), live markdown preview.
 
@@ -556,7 +556,7 @@ mddb-cli fts blog --query="getting started"
 mddb-cli stats
 ```
 
-**[→ More examples](docs/API_QUICK_REFERENCE.md)** | **[→ Use case examples](docs/USE_CASES.md)** | **[→ Client libraries](docs/CLIENTS.md)**
+**[→ API reference](docs/API.md)** | **[→ Use case examples](docs/USE_CASES.md)** | **[→ Client libraries](docs/EXAMPLES.md)**
 
 ## 📚 Documentation
 
@@ -572,7 +572,7 @@ mddb-cli stats
 - **[gRPC API](docs/GRPC.md)** - High-performance protocol guide
 - **[GraphQL API](docs/GRAPHQL.md)** - Flexible query language
 - **[OpenAPI/Swagger](docs/openapi.yaml)** - Machine-readable spec
-- **[Swagger UI](docs/swagger.html)** - Interactive API docs
+- **[Swagger UI](https://mddb.tradik.com/docs/api/swagger/)** - Interactive API docs
 
 ### Features & Guides
 - **[Vector Search](docs/EMBEDDING_PROVIDERS.md)** - Semantic search setup (OpenAI, Cohere, Voyage, Ollama)
@@ -580,14 +580,14 @@ mddb-cli stats
 - **[Search Algorithms](docs/SEARCH.md)** - TF-IDF, BM25, BM25F, PMISparse, Flat, HNSW, IVF, PQ, SQ, BQ
 - **[Vector Quantization](docs/QUANTIZATION.md)** - Per-collection int8/int4 scalar quantization (4-8x compression)
 - **[Server-Sent Events](docs/SSE.md)** - Real-time document change notifications with auth and rate limiting
-- **[Full-Text Search](docs/FTS.md)** - Built-in inverted index with multi-language support
+- **[Search algorithms](docs/SEARCH.md)** - Inverted index, four ranking algorithms, multi-language
 - **[Zero-Shot Classification](docs/ZERO-SHOT-CLASSIFICATION.md)** - Classify documents against labels using embeddings
 - **[PMISparse](docs/PMISPARSE.md)** - Two-phase BM25 + PPMI query expansion (invented by Tradik Limited)
-- **[Webhooks](docs/WEBHOOKS.md)** - Event-driven integration
+- **[Webhooks](docs/API.md#getpost-v1webhooks)** - Event-driven integration (API reference)
 - **[Automations](docs/AUTOMATIONS.md)** - Triggers, crons, webhooks, sentiment, template variables
 - **[Temporal Tracking](docs/TEMPORAL-TRACK.md)** - Document event history, hot-docs leaderboard, activity histograms
 - **[Spell Correction](docs/SYMSPELL.md)** - SymSpell FTS spell suggestions, text cleanup, custom dictionaries
-- **[Authentication](docs/AUTH.md)** - JWT & API keys, RBAC
+- **[Authentication](docs/AUTHENTICATION.md)** - JWT & API keys, RBAC
 - **[Web Panel](docs/PANEL.md)** - Admin UI guide
 - **[LLM Connections](docs/LLM_CONNECTIONS.md)** - MCP for Claude, ChatGPT, Ollama, DeepSeek
 - **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension
@@ -599,11 +599,11 @@ mddb-cli stats
 - **[Deployment](docs/DEPLOYMENT.md)** - Production setup
 - **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes
-- **[Performance](docs/PERFORMANCE.md)** - Benchmarks & tuning
+- **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured
 - **[Architecture](docs/ARCHITECTURE.md)** - System design
 
 ### Development
-- **[Client Libraries](docs/CLIENTS.md)** - PHP, Python, Go, Node.js
+- **[Client Libraries](docs/EXAMPLES.md)** - PHP, Python, Go, Node.js
 - **[Custom MCP Tools](docs/CUSTOM-TOOLS.md)** - YAML-defined AI tools
 - **[Examples](docs/EXAMPLES.md)** - Code samples
 - **[Contributing](CONTRIBUTING.md)** - Development guide

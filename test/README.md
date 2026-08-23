@@ -16,6 +16,11 @@ Each benchmark is its own `package main` in a dedicated sub-directory (one
 `main.go` per directory), so the `test/` module builds cleanly and is covered by
 CI build + vet (GO-011). Build/run any of them with `go run ./<dir>`:
 
+- `mddb-profile/` - **the numbers `docs/COMPARISON.md` publishes** (DOC-013):
+  ingest throughput, search latency percentiles, on-disk size and server RSS,
+  against a generated corpus with a Zipfian term distribution. `make
+  bench-comparison` runs it; `-markdown` prints a table ready to paste into
+  the docs. It measures one system and fabricates nothing for the others.
 - `grpc-perf/` - MDDB gRPC/Protobuf performance test
 - `grpc-batch/` - MDDB gRPC batch-add performance test
 - `mysql/` - MySQL performance test client

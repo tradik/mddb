@@ -116,5 +116,5 @@ make import-folder FOLDER=./docs COLLECTION=blog LANG=pl_PL META="author=John"
 ## See Also
 
 - [Bulk Import Documentation](../docs/BULK-IMPORT.md)
-- [Examples](../examples/)
+- [Examples](../docs/EXAMPLES.md)
 - [API Documentation](../docs/API.md)
