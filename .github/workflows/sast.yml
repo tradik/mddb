@@ -137,6 +137,10 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+          # Rule exclusions and their reasons live in the repository, where a
+          # reviewer can see them, rather than as one-off dismissals in a web
+          # UI where the reasoning does not survive.
+          config-file: .github/codeql/codeql-config.yml
           # security-extended adds the rules that need more analysis time than
           # the default set; a weekly cron can afford them.
           queries: security-extended
