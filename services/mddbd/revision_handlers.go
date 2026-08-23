@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strconv"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // RevisionListRequest is the request for listing document revisions.

@@ -9,8 +9,8 @@ import (
 	"sort"
 	"time"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // ClassifyHTTPRequest is the HTTP JSON request for zero-shot classification.

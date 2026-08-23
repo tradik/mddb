@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // GeoSearchRequest is the JSON payload for POST /v1/geo-search.

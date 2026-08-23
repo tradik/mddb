@@ -8,8 +8,8 @@ import (
 	"os"
 	"testing"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 func newTestServerForLang(t *testing.T) (*Server, func()) {

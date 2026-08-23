@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // newTestServerForAutomation creates a Server with AutomationManager and FTSIndex for testing.

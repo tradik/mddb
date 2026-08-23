@@ -10,8 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // TemporalEventType classifies document lifecycle events.

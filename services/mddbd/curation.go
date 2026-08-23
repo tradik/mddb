@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 var bucketCuration = []byte("curation")

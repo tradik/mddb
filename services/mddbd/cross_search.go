@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // CrossSearchRequest represents a cross-collection vector search request.

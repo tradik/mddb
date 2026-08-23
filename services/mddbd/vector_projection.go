@@ -10,8 +10,8 @@ import (
 
 	"mddb/internal/storage"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // Vector-space projection: server-side PCA reduction of a collection's

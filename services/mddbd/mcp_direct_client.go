@@ -15,8 +15,8 @@ import (
 	"mddb/internal/storage"
 	proto "mddb/proto"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // DirectClient implements MCPClient by calling Server methods directly.

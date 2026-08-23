@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 var bucketSchemas = []byte("schemas")
