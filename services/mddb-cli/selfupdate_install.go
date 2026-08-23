@@ -209,7 +209,12 @@ func ReplaceBinary(path string, content []byte) (backup string, err error) {
 	if err = temp.Close(); err != nil {
 		return "", err
 	}
-	if err = os.Chmod(tempPath, 0o755); err != nil { // #nosec G302 -- an executable has to be executable
+	// 0755 rather than something narrower: this file replaces a binary that
+	// has to stay runnable by whoever could run the old one, which on a shared
+	// host is not only its owner. Narrowing it here would silently break the
+	// install for every user but one.
+	// #nosec G302 -- an executable has to be executable // NOSONAR -- see above
+	if err = os.Chmod(tempPath, 0o755); err != nil {
 		return "", err
 	}
 

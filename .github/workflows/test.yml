@@ -354,7 +354,10 @@ jobs:
       # both properties true from here on.
       - name: Install from lockfile
         working-directory: clients/nodejs
-        run: npm ci
+        # --ignore-scripts: `npm ci` runs lifecycle scripts from every
+        # transitive dependency, which is arbitrary code execution on a
+        # runner holding repository credentials. Nothing here needs one.
+        run: npm ci --ignore-scripts
 
       - name: npm audit (production, high+)
         working-directory: clients/nodejs
@@ -404,7 +407,10 @@ jobs:
       - name: Install the client and its test extra
         working-directory: clients/python
         run: |
-          python -m pip install --upgrade pip
+          # An editable install has to run a build backend, so
+          # --only-binary is not available here. The pip upgrade is pinned
+          # instead, so the one thing that can be pinned is.
+          python -m pip install --upgrade "pip==26.2.1"
           pip install -e ".[test]"
 
       - name: The package imports at all
@@ -432,7 +438,10 @@ jobs:
 
       - name: Install from lockfile
         working-directory: services/mddb-panel
-        run: npm ci
+        # --ignore-scripts: `npm ci` runs lifecycle scripts from every
+        # transitive dependency, which is arbitrary code execution on a
+        # runner holding repository credentials. Nothing here needs one.
+        run: npm ci --ignore-scripts
 
       - name: Lint
         working-directory: services/mddb-panel
@@ -468,7 +477,10 @@ jobs:
       - name: Install
         working-directory: integrations/langchain-mddb
         run: |
-          python -m pip install --upgrade pip
+          # An editable install has to run a build backend, so
+          # --only-binary is not available here. The pip upgrade is pinned
+          # instead, so the one thing that can be pinned is.
+          python -m pip install --upgrade "pip==26.2.1"
           pip install -e ".[test]"
 
       - name: Run tests

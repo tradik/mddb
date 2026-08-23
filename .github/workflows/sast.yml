@@ -137,6 +137,11 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: '1.27.0'
+          # No restored build cache. CodeQL learns what the code is by
+          # watching it compile, and a cached build compiles nothing — the
+          # first attempt at manual mode built all four modules successfully
+          # and then reported "could not process any code written in Go".
+          cache: false
 
       # Each module is built on its own because GOWORK is off, and each one is
       # named because a module missed here is a module nobody analyses. The
@@ -146,6 +151,10 @@ jobs:
         env:
           GOWORK: "off"
         run: |
+          # Belt and braces with cache: false above — the runner image ships
+          # its own warm build cache, and anything already in it is a package
+          # CodeQL never sees compile.
+          go clean -cache
           for module in services/mddbd services/mddb-cli clients/go/mddb tools/bench; do
             echo "::group::$module"
             (cd "$module" && go build ./...)
