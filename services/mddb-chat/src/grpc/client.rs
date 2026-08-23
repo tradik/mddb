@@ -87,10 +87,11 @@ impl MddbClient {
     /// Create a tonic request with auth metadata
     fn auth_request<T>(&self, inner: T) -> tonic::Request<T> {
         let mut req = tonic::Request::new(inner);
-        if let Some(token) = &self.auth_token {
-            if let Ok(val) = format!("Bearer {}", token).parse::<MetadataValue<tonic::metadata::Ascii>>() {
-                req.metadata_mut().insert("authorization", val);
-            }
+        if let Some(token) = &self.auth_token
+            && let Ok(val) =
+                format!("Bearer {}", token).parse::<MetadataValue<tonic::metadata::Ascii>>()
+        {
+            req.metadata_mut().insert("authorization", val);
         }
         req
     }
@@ -266,7 +267,9 @@ impl MddbClient {
         collection: &str,
     ) -> Result<Vec<SearchResult>, AppError> {
         let profile = if self.config.search_top_k.is_none() || self.config.search_type.is_none() {
-            self.collection_config(collection).await.and_then(|c| c.retrieval)
+            self.collection_config(collection)
+                .await
+                .and_then(|c| c.retrieval)
         } else {
             None
         };

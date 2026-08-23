@@ -102,20 +102,11 @@ pub enum WsIncoming {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum WsOutgoing {
-    Session {
-        id: String,
-        scenario: String,
-    },
-    Queued {
-        position: usize,
-    },
-    Chunk {
-        content: String,
-    },
+    Session { id: String, scenario: String },
+    Queued { position: usize },
+    Chunk { content: String },
     Done,
-    Error {
-        message: String,
-    },
+    Error { message: String },
     Pong,
     Ended,
 }
@@ -269,7 +260,10 @@ mod tests {
         })
         .expect("serialise");
 
-        assert!(json.contains(r#""type":"error""#), "unexpected shape: {json}");
+        assert!(
+            json.contains(r#""type":"error""#),
+            "unexpected shape: {json}"
+        );
 
         let incoming: WsIncoming =
             serde_json::from_str(r#"{"type":"message","content":"hello"}"#).expect("parse");

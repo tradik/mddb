@@ -104,12 +104,16 @@ mod tests {
 
     #[test]
     fn the_detail_survives_into_the_message() {
-        assert!(AppError::InvalidMessage("bad shape".into())
-            .to_string()
-            .contains("bad shape"));
-        assert!(AppError::LlmError("upstream refused".into())
-            .to_string()
-            .contains("upstream refused"));
+        assert!(
+            AppError::InvalidMessage("bad shape".into())
+                .to_string()
+                .contains("bad shape")
+        );
+        assert!(
+            AppError::LlmError("upstream refused".into())
+                .to_string()
+                .contains("upstream refused")
+        );
         assert!(AppError::TurnLimitReached(10).to_string().contains("10"));
     }
 
@@ -117,7 +121,10 @@ mod tests {
     fn statuses_separate_the_client_from_the_server() {
         let cases = [
             // The caller can fix these.
-            (AppError::InvalidMessage("x".into()), StatusCode::BAD_REQUEST),
+            (
+                AppError::InvalidMessage("x".into()),
+                StatusCode::BAD_REQUEST,
+            ),
             (AppError::MessageTooLong, StatusCode::BAD_REQUEST),
             (AppError::NameTooLong, StatusCode::BAD_REQUEST),
             (AppError::SessionNotFound, StatusCode::NOT_FOUND),
@@ -129,8 +136,14 @@ mod tests {
             (AppError::TurnLimitReached(5), StatusCode::FORBIDDEN),
             // Something behind us failed.
             (AppError::LlmError("x".into()), StatusCode::BAD_GATEWAY),
-            (AppError::WebhookError("x".into()), StatusCode::INTERNAL_SERVER_ERROR),
-            (AppError::Internal("x".into()), StatusCode::INTERNAL_SERVER_ERROR),
+            (
+                AppError::WebhookError("x".into()),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
+            (
+                AppError::Internal("x".into()),
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ),
         ];
 
         for (err, want) in cases {
@@ -143,7 +156,9 @@ mod tests {
     #[tokio::test]
     async fn the_body_is_a_json_object_carrying_the_message() {
         let response = AppError::SessionNotFound.into_response();
-        let bytes = to_bytes(response.into_body(), 4096).await.expect("read body");
+        let bytes = to_bytes(response.into_body(), 4096)
+            .await
+            .expect("read body");
         let body: serde_json::Value = serde_json::from_slice(&bytes).expect("parse body");
 
         assert_eq!(body["error"], "session not found");

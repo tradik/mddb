@@ -86,13 +86,22 @@ mod tests {
 
     #[test]
     fn a_collection_without_a_prompt_changes_nothing() {
-        assert_eq!(compose_system_prompt("You are terse.", ""), "You are terse.");
-        assert_eq!(compose_system_prompt("You are terse.", "   "), "You are terse.");
+        assert_eq!(
+            compose_system_prompt("You are terse.", ""),
+            "You are terse."
+        );
+        assert_eq!(
+            compose_system_prompt("You are terse.", "   "),
+            "You are terse."
+        );
     }
 
     #[test]
     fn a_collection_prompt_alone_is_used_as_is() {
-        assert_eq!(compose_system_prompt("", "Answer in steps."), "Answer in steps.");
+        assert_eq!(
+            compose_system_prompt("", "Answer in steps."),
+            "Answer in steps."
+        );
         assert_eq!(compose_system_prompt("", ""), "");
     }
 

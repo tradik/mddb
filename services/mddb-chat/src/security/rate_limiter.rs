@@ -6,7 +6,16 @@ use dashmap::DashMap;
 
 /// Per-IP rate limiter using token bucket algorithm
 pub struct RateLimiter {
-    limiters: DashMap<String, Arc<GovRateLimiter<governor::state::NotKeyed, governor::state::InMemoryState, governor::clock::DefaultClock>>>,
+    limiters: DashMap<
+        String,
+        Arc<
+            GovRateLimiter<
+                governor::state::NotKeyed,
+                governor::state::InMemoryState,
+                governor::clock::DefaultClock,
+            >,
+        >,
+    >,
     quota: Quota,
 }
 
@@ -117,7 +126,10 @@ mod tests {
         let limiter = RateLimiter::new(10_000);
 
         for i in 0..100 {
-            assert!(limiter.check("10.0.0.1"), "request {i} was refused under a large quota");
+            assert!(
+                limiter.check("10.0.0.1"),
+                "request {i} was refused under a large quota"
+            );
         }
     }
 
@@ -148,7 +160,11 @@ mod tests {
 
         limiter.cleanup();
 
-        assert_eq!(limiter.entry_count(), 0, "the map was not cleared past its cap");
+        assert_eq!(
+            limiter.entry_count(),
+            0,
+            "the map was not cleared past its cap"
+        );
     }
 
     #[test]

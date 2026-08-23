@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -66,8 +66,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // all use OpenAI-compatible API format
         _ => Arc::new(OpenAiProvider::new(config.llm.clone())),
     };
-    let webhook_dispatcher =
-        WebhookDispatcher::new(config.webhooks.clone(), config.security.webhook_secret.clone());
+    let webhook_dispatcher = WebhookDispatcher::new(
+        config.webhooks.clone(),
+        config.security.webhook_secret.clone(),
+    );
     let rate_limiter = RateLimiter::new(config.security.rate_limit_per_minute);
     let sanitizer = Sanitizer::new(config.security.clone());
 
@@ -109,7 +111,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .allow_headers(Any)
     } else {
         let origins = config.server.allowed_origins();
-        tracing::info!(count = origins.len(), "CORS restricted to configured origins");
+        tracing::info!(
+            count = origins.len(),
+            "CORS restricted to configured origins"
+        );
         CorsLayer::new()
             .allow_origin(origins)
             .allow_methods(Any)

@@ -68,17 +68,26 @@ pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: Strin
             WsIncoming::Resume { session_id: sid } => {
                 if state.session_manager.get_session(&sid).is_some() {
                     session_id = Some(sid.clone());
-                    send_json(&sender, &WsOutgoing::Session {
-                        id: sid,
-                        scenario: String::new(),
-                    }).await;
+                    send_json(
+                        &sender,
+                        &WsOutgoing::Session {
+                            id: sid,
+                            scenario: String::new(),
+                        },
+                    )
+                    .await;
                 } else {
                     send_error(&sender, "session not found or expired").await;
                 }
             }
-            WsIncoming::Feedback { rating, question, answer } => {
+            WsIncoming::Feedback {
+                rating,
+                question,
+                answer,
+            } => {
                 let sid_str = session_id.as_deref().unwrap_or("unknown");
-                let user_name = session_id.as_ref()
+                let user_name = session_id
+                    .as_ref()
                     .and_then(|sid| state.session_manager.get_session(sid))
                     .map(|s| s.name.clone())
                     .unwrap_or_default();
@@ -108,9 +117,9 @@ pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: Strin
                             .unwrap_or_default()
                     };
                     state.session_manager.remove_session(&sid).await;
-                    state.webhook_dispatcher.dispatch(WebhookPayload::session_end(
-                        &sid, &name, &scenario_name,
-                    ));
+                    state
+                        .webhook_dispatcher
+                        .dispatch(WebhookPayload::session_end(&sid, &name, &scenario_name));
                     info!(session_id = sid, name = name, "session ended by user");
                 }
                 send_json(&sender, &WsOutgoing::Ended).await;
@@ -131,9 +140,9 @@ pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: Strin
         };
 
         state.session_manager.remove_session(&sid).await;
-        state.webhook_dispatcher.dispatch(WebhookPayload::session_end(
-            &sid, &name, &scenario_name,
-        ));
+        state
+            .webhook_dispatcher
+            .dispatch(WebhookPayload::session_end(&sid, &name, &scenario_name));
         info!(session_id = sid, name = name, "session ended");
     }
 }
@@ -158,16 +167,33 @@ async fn handle_join(
         return Err(AppError::RateLimited);
     }
 
-    match state.session_manager.join(name.clone(), scenario_name.clone()).await {
+    match state
+        .session_manager
+        .join(name.clone(), scenario_name.clone())
+        .await
+    {
         JoinResult::Admitted { session_id } => {
-            info!(session_id = session_id, name = name, scenario = scenario_name, "session started");
-            state.webhook_dispatcher.dispatch(WebhookPayload::session_start(
-                &session_id, &name, &scenario_name,
-            ));
-            send_json(sender, &WsOutgoing::Session {
-                id: session_id.clone(),
-                scenario: scenario_name,
-            }).await;
+            info!(
+                session_id = session_id,
+                name = name,
+                scenario = scenario_name,
+                "session started"
+            );
+            state
+                .webhook_dispatcher
+                .dispatch(WebhookPayload::session_start(
+                    &session_id,
+                    &name,
+                    &scenario_name,
+                ));
+            send_json(
+                sender,
+                &WsOutgoing::Session {
+                    id: session_id.clone(),
+                    scenario: scenario_name,
+                },
+            )
+            .await;
             Ok(session_id)
         }
         JoinResult::Queued { position, admitted } => {
@@ -179,24 +205,38 @@ async fn handle_join(
             // for the same visitor — see QueueEntry::admitted.
             match admitted.await {
                 Ok(session_id) => {
-                    info!(session_id = session_id, name = name, "queued session started");
-                    state.webhook_dispatcher.dispatch(WebhookPayload::session_start(
-                        &session_id, &name, &scenario_name,
-                    ));
-                    send_json(sender, &WsOutgoing::Session {
-                        id: session_id.clone(),
-                        scenario: scenario_name,
-                    }).await;
+                    info!(
+                        session_id = session_id,
+                        name = name,
+                        "queued session started"
+                    );
+                    state
+                        .webhook_dispatcher
+                        .dispatch(WebhookPayload::session_start(
+                            &session_id,
+                            &name,
+                            &scenario_name,
+                        ));
+                    send_json(
+                        sender,
+                        &WsOutgoing::Session {
+                            id: session_id.clone(),
+                            scenario: scenario_name,
+                        },
+                    )
+                    .await;
                     Ok(session_id)
                 }
                 Err(_) => Err(AppError::SessionFull),
             }
         }
         JoinResult::Full => {
-            state.webhook_dispatcher.dispatch(WebhookPayload::queue_full(
-                state.session_manager.queue_len().await,
-                state.session_manager.active_count(),
-            ));
+            state
+                .webhook_dispatcher
+                .dispatch(WebhookPayload::queue_full(
+                    state.session_manager.queue_len().await,
+                    state.session_manager.active_count(),
+                ));
             Err(AppError::SessionFull)
         }
     }
@@ -248,11 +288,7 @@ async fn handle_message(
     // RAG-002: the collection states how answers drawn from it should be
     // formatted, and that instruction travels with the data rather than being
     // repeated in every client's TOML.
-    let collection_prompt = state
-        .mddb_client
-        .clone()
-        .response_prompt(&collection)
-        .await;
+    let collection_prompt = state.mddb_client.clone().response_prompt(&collection).await;
     let system_prompt = scenario::compose_system_prompt(&system_prompt, &collection_prompt);
 
     // Build initial API messages
@@ -278,7 +314,8 @@ async fn handle_message(
                 MessageRole::User => "user",
                 MessageRole::Assistant => "assistant",
                 MessageRole::System => "system",
-            }.to_string(),
+            }
+            .to_string(),
             content: Some(msg.content.clone()),
             tool_calls: None,
             tool_call_id: None,
@@ -325,10 +362,15 @@ async fn handle_message(
 
                 // Execute each tool and add results
                 for tc in &tool_calls {
-                    let result = tools::execute_tool(&mut mddb_client, tc, &collection).await
+                    let result = tools::execute_tool(&mut mddb_client, tc, &collection)
+                        .await
                         .unwrap_or_else(|e| format!("Tool error: {e}"));
 
-                    debug!(tool = tc.function.name, result_len = result.len(), "tool result");
+                    debug!(
+                        tool = tc.function.name,
+                        result_len = result.len(),
+                        "tool result"
+                    );
 
                     api_messages.push(ApiMsg {
                         role: "tool".to_string(),
@@ -370,9 +412,13 @@ async fn handle_message(
             Ok(text) => {
                 full_response.push_str(&text);
                 if full_response.len() > state.config.session.max_response_length {
-                    send_json(sender, &WsOutgoing::Chunk {
-                        content: "\n\n[Response truncated]".to_string(),
-                    }).await;
+                    send_json(
+                        sender,
+                        &WsOutgoing::Chunk {
+                            content: "\n\n[Response truncated]".to_string(),
+                        },
+                    )
+                    .await;
                     break;
                 }
                 send_json(sender, &WsOutgoing::Chunk { content: text }).await;
@@ -407,7 +453,11 @@ async fn send_error(
     sender: &Arc<Mutex<futures::stream::SplitSink<WebSocket, Message>>>,
     message: &str,
 ) {
-    send_json(sender, &WsOutgoing::Error {
-        message: message.to_string(),
-    }).await;
+    send_json(
+        sender,
+        &WsOutgoing::Error {
+            message: message.to_string(),
+        },
+    )
+    .await;
 }

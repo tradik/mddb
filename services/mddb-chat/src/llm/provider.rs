@@ -38,9 +38,7 @@ pub struct ToolCallFunction {
 #[derive(Debug)]
 pub enum ChatResponse {
     /// LLM wants to call tools
-    ToolCalls {
-        tool_calls: Vec<ToolCall>,
-    },
+    ToolCalls { tool_calls: Vec<ToolCall> },
     /// LLM produced a final text response
     Content(String),
 }

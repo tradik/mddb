@@ -127,10 +127,7 @@ impl AnthropicProvider {
     }
 
     fn api_url(&self) -> String {
-        format!(
-            "{}/messages",
-            self.config.api_url.trim_end_matches('/')
-        )
+        format!("{}/messages", self.config.api_url.trim_end_matches('/'))
     }
 
     fn request_builder(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -177,13 +174,13 @@ impl AnthropicProvider {
                         let mut content: Vec<serde_json::Value> = Vec::new();
 
                         // Add text if present
-                        if let Some(text) = &msg.content {
-                            if !text.is_empty() {
-                                content.push(serde_json::json!({
-                                    "type": "text",
-                                    "text": text,
-                                }));
-                            }
+                        if let Some(text) = &msg.content
+                            && !text.is_empty()
+                        {
+                            content.push(serde_json::json!({
+                                "type": "text",
+                                "text": text,
+                            }));
                         }
 
                         // Convert OpenAI-format tool_calls to Anthropic tool_use blocks
@@ -222,14 +219,13 @@ impl AnthropicProvider {
                     });
 
                     // Merge consecutive tool results into one user message
-                    if let Some(last) = result.last_mut() {
-                        if last["role"] == "user" {
-                            if let Some(arr) = last["content"].as_array_mut() {
-                                // Already an array of tool_results, append
-                                arr.push(tool_result);
-                                continue;
-                            }
-                        }
+                    if let Some(last) = result.last_mut()
+                        && last["role"] == "user"
+                        && let Some(arr) = last["content"].as_array_mut()
+                    {
+                        // Already an array of tool_results, append
+                        arr.push(tool_result);
+                        continue;
                     }
 
                     result.push(serde_json::json!({
@@ -309,13 +305,10 @@ impl AnthropicProvider {
                         match serde_json::from_str::<StreamEvent>(data) {
                             Ok(event) => match event {
                                 StreamEvent::ContentBlockDelta { delta, .. } => {
-                                    if let DeltaBlock::TextDelta { text } = delta {
-                                        if !text.is_empty() {
-                                            return Some((
-                                                Ok(text),
-                                                (byte_stream, buffer),
-                                            ));
-                                        }
+                                    if let DeltaBlock::TextDelta { text } = delta
+                                        && !text.is_empty()
+                                    {
+                                        return Some((Ok(text), (byte_stream, buffer)));
                                     }
                                     continue;
                                 }
@@ -372,7 +365,7 @@ impl LlmProvider for AnthropicProvider {
             stream: true,
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.request_builder(req);
 
         let response = req
@@ -382,8 +375,13 @@ impl LlmProvider for AnthropicProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("Anthropic API {status}: {body}")));
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "unknown".to_string());
+            return Err(AppError::LlmError(format!(
+                "Anthropic API {status}: {body}"
+            )));
         }
 
         Ok(self.build_sse_stream(response))
@@ -415,7 +413,7 @@ impl LlmProvider for AnthropicProvider {
             stream: false,
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.request_builder(req);
 
         let response = req
@@ -425,8 +423,13 @@ impl LlmProvider for AnthropicProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("Anthropic API {status}: {body}")));
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "unknown".to_string());
+            return Err(AppError::LlmError(format!(
+                "Anthropic API {status}: {body}"
+            )));
         }
 
         let resp: MessagesResponse = response
@@ -482,7 +485,7 @@ impl LlmProvider for AnthropicProvider {
             stream: true,
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.request_builder(req);
 
         let response = req
@@ -492,8 +495,13 @@ impl LlmProvider for AnthropicProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("Anthropic API {status}: {body}")));
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "unknown".to_string());
+            return Err(AppError::LlmError(format!(
+                "Anthropic API {status}: {body}"
+            )));
         }
 
         Ok(self.build_sse_stream(response))

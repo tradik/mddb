@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::time::Duration;
 
 use dashmap::DashMap;
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 use uuid::Uuid;
 
 use crate::config::SessionConfig;
@@ -94,8 +94,11 @@ impl SessionManager {
 
             match entry.admitted.send(session_id.clone()) {
                 Ok(()) => {
-                    let session =
-                        Session::new(session_id.clone(), entry.name.clone(), entry.scenario.clone());
+                    let session = Session::new(
+                        session_id.clone(),
+                        entry.name.clone(),
+                        entry.scenario.clone(),
+                    );
                     self.active.insert(session_id.clone(), session);
                     return Some((session_id, entry.name, entry.scenario));
                 }
@@ -116,7 +119,10 @@ impl SessionManager {
         self.active.get(id)
     }
 
-    pub fn get_session_mut(&self, id: &str) -> Option<dashmap::mapref::one::RefMut<'_, String, Session>> {
+    pub fn get_session_mut(
+        &self,
+        id: &str,
+    ) -> Option<dashmap::mapref::one::RefMut<'_, String, Session>> {
         self.active.get_mut(id)
     }
 
@@ -252,9 +258,16 @@ mod tests {
 
         m.remove_session(&first).await;
 
-        assert_eq!(m.queue_len().await, 0, "the queued visitor was not admitted");
+        assert_eq!(
+            m.queue_len().await,
+            0,
+            "the queued visitor was not admitted"
+        );
         assert_eq!(m.active_count(), 1);
-        assert!(m.get_session(&first).is_none(), "the closed session is still active");
+        assert!(
+            m.get_session(&first).is_none(),
+            "the closed session is still active"
+        );
     }
 
     #[tokio::test]
@@ -275,11 +288,17 @@ mod tests {
 
         assert!(!id.is_empty());
         assert_eq!(name, "Grace");
-        assert_eq!(scenario, "support", "the queued visitor lost their scenario");
+        assert_eq!(
+            scenario, "support",
+            "the queued visitor lost their scenario"
+        );
 
         // The same id must reach the visitor waiting on the channel, or they
         // would be holding a session nobody created for them.
-        assert_eq!(rx.try_recv().expect("Grace was never told her session id"), id);
+        assert_eq!(
+            rx.try_recv().expect("Grace was never told her session id"),
+            id
+        );
     }
 
     // TEST-001: admit_from_queue created the session and only woke the waiting
@@ -334,7 +353,11 @@ mod tests {
                 .try_recv()
                 .unwrap_or_else(|e| panic!("{name} was never admitted: {e}"));
 
-            assert_eq!(m.active_count(), 1, "{name}'s admission left extra sessions");
+            assert_eq!(
+                m.active_count(),
+                1,
+                "{name}'s admission left extra sessions"
+            );
         }
 
         assert_eq!(m.queue_len().await, 0, "the queue never drained");
@@ -431,7 +454,11 @@ mod tests {
 
         // Ada's slot was freed and Grace took it — and Grace, being brand new,
         // must not be reaped in the same pass.
-        assert_eq!(m.queue_len().await, 0, "the queue was not drained into the freed slot");
+        assert_eq!(
+            m.queue_len().await,
+            0,
+            "the queue was not drained into the freed slot"
+        );
         assert!(m.active_count() <= 1, "cleanup admitted past capacity");
     }
 
@@ -454,7 +481,11 @@ mod tests {
 
         m.cleanup_expired().await;
 
-        assert_eq!(m.active_count(), 2, "cleanup let the server past max_concurrent");
+        assert_eq!(
+            m.active_count(),
+            2,
+            "cleanup let the server past max_concurrent"
+        );
         assert_eq!(m.queue_len().await, 3);
     }
 

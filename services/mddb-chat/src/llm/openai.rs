@@ -123,10 +123,7 @@ impl OpenAiProvider {
             .collect()
     }
 
-    fn build_sse_stream(
-        &self,
-        response: reqwest::Response,
-    ) -> ChunkStream {
+    fn build_sse_stream(&self, response: reqwest::Response) -> ChunkStream {
         let byte_stream = response.bytes_stream();
 
         let stream = futures::stream::unfold(
@@ -149,13 +146,10 @@ impl OpenAiProvider {
                         match serde_json::from_str::<StreamChunk>(data) {
                             Ok(chunk) => {
                                 if let Some(choice) = chunk.choices.first() {
-                                    if let Some(content) = &choice.delta.content {
-                                        if !content.is_empty() {
-                                            return Some((
-                                                Ok(content.clone()),
-                                                (byte_stream, buffer),
-                                            ));
-                                        }
+                                    if let Some(content) = &choice.delta.content
+                                        && !content.is_empty()
+                                    {
+                                        return Some((Ok(content.clone()), (byte_stream, buffer)));
                                     }
                                     if choice.finish_reason.is_some() {
                                         return None;
@@ -204,7 +198,7 @@ impl LlmProvider for OpenAiProvider {
             tools: None,
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.auth_header(req);
 
         let response = req
@@ -244,7 +238,7 @@ impl LlmProvider for OpenAiProvider {
             },
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.auth_header(req);
 
         let response = req
@@ -272,10 +266,10 @@ impl LlmProvider for OpenAiProvider {
             .next()
             .ok_or_else(|| AppError::LlmError("no choices in response".to_string()))?;
 
-        if let Some(tool_calls) = choice.message.tool_calls {
-            if !tool_calls.is_empty() {
-                return Ok(ChatResponse::ToolCalls { tool_calls });
-            }
+        if let Some(tool_calls) = choice.message.tool_calls
+            && !tool_calls.is_empty()
+        {
+            return Ok(ChatResponse::ToolCalls { tool_calls });
         }
 
         Ok(ChatResponse::Content(
@@ -298,7 +292,7 @@ impl LlmProvider for OpenAiProvider {
             tools: None,
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.auth_header(req);
 
         let response = req

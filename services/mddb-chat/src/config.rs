@@ -171,30 +171,30 @@ impl Config {
         let mut config: Config = toml::from_str(&content)?;
 
         // Override api_key from env if empty
-        if config.llm.api_key.is_empty() {
-            if let Ok(key) = std::env::var("MDDB_CHAT_LLM_API_KEY") {
-                config.llm.api_key = key;
-            }
+        if config.llm.api_key.is_empty()
+            && let Ok(key) = std::env::var("MDDB_CHAT_LLM_API_KEY")
+        {
+            config.llm.api_key = key;
         }
 
         // Override webhook secret from env if empty
-        if config.security.webhook_secret.is_empty() {
-            if let Ok(secret) = std::env::var("MDDB_CHAT_WEBHOOK_SECRET") {
-                config.security.webhook_secret = secret;
-            }
+        if config.security.webhook_secret.is_empty()
+            && let Ok(secret) = std::env::var("MDDB_CHAT_WEBHOOK_SECRET")
+        {
+            config.security.webhook_secret = secret;
         }
 
         // Override MDDB auth credentials from env if empty (SEC-007): keeps the
         // real password out of a committed config.toml — the env value wins.
-        if config.mddb.auth_username.is_empty() {
-            if let Ok(user) = std::env::var("MDDB_CHAT_AUTH_USERNAME") {
-                config.mddb.auth_username = user;
-            }
+        if config.mddb.auth_username.is_empty()
+            && let Ok(user) = std::env::var("MDDB_CHAT_AUTH_USERNAME")
+        {
+            config.mddb.auth_username = user;
         }
-        if config.mddb.auth_password.is_empty() {
-            if let Ok(pass) = std::env::var("MDDB_CHAT_AUTH_PASSWORD") {
-                config.mddb.auth_password = pass;
-            }
+        if config.mddb.auth_password.is_empty()
+            && let Ok(pass) = std::env::var("MDDB_CHAT_AUTH_PASSWORD")
+        {
+            config.mddb.auth_password = pass;
         }
 
         // Ensure default scenario exists
@@ -219,27 +219,61 @@ impl Config {
     }
 }
 
-fn default_host() -> String { "0.0.0.0".to_string() }
-fn default_port() -> u16 { 11030 }
-fn default_cors_origins() -> Vec<String> { vec!["*".to_string()] }
-fn default_grpc_addr() -> String { "http://localhost:11024".to_string() }
-fn default_collection() -> String { "docs".to_string() }
+fn default_host() -> String {
+    "0.0.0.0".to_string()
+}
+fn default_port() -> u16 {
+    11030
+}
+fn default_cors_origins() -> Vec<String> {
+    vec!["*".to_string()]
+}
+fn default_grpc_addr() -> String {
+    "http://localhost:11024".to_string()
+}
+fn default_collection() -> String {
+    "docs".to_string()
+}
 /// Built-in fallbacks, used only when neither the TOML nor the collection's
 /// retrieval profile says anything.
 pub const FALLBACK_SEARCH_TOP_K: u32 = 5;
 pub const FALLBACK_SEARCH_TYPE: &str = "hybrid";
-fn default_llm_provider() -> String { "openai".to_string() }
-fn default_max_tokens() -> u32 { 1024 }
-fn default_temperature() -> f32 { 0.7 }
-fn default_true() -> bool { true }
-fn default_max_concurrent() -> usize { 2 }
-fn default_queue_size() -> usize { 10 }
-fn default_max_history() -> usize { 50 }
-fn default_session_ttl() -> u64 { 1440 }
-fn default_max_response_length() -> usize { 4096 }
-fn default_name_max_chars() -> usize { 50 }
-fn default_rate_limit() -> u32 { 30 }
-fn default_max_message_length() -> usize { 2000 }
+fn default_llm_provider() -> String {
+    "openai".to_string()
+}
+fn default_max_tokens() -> u32 {
+    1024
+}
+fn default_temperature() -> f32 {
+    0.7
+}
+fn default_true() -> bool {
+    true
+}
+fn default_max_concurrent() -> usize {
+    2
+}
+fn default_queue_size() -> usize {
+    10
+}
+fn default_max_history() -> usize {
+    50
+}
+fn default_session_ttl() -> u64 {
+    1440
+}
+fn default_max_response_length() -> usize {
+    4096
+}
+fn default_name_max_chars() -> usize {
+    50
+}
+fn default_rate_limit() -> u32 {
+    30
+}
+fn default_max_message_length() -> usize {
+    2000
+}
 
 #[cfg(test)]
 mod tests {
@@ -425,7 +459,11 @@ model = "test"
         );
 
         let origins = cfg.server.allowed_origins();
-        assert_eq!(origins.len(), 1, "the good origin did not survive the bad one");
+        assert_eq!(
+            origins.len(),
+            1,
+            "the good origin did not survive the bad one"
+        );
         assert_eq!(origins[0].to_str().unwrap(), "https://good.example.test");
     }
 

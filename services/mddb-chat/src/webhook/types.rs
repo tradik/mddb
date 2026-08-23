@@ -99,7 +99,10 @@ mod tests {
 
         assert_eq!(start["event"], "session.start");
         assert_eq!(end["event"], "session.end");
-        assert_eq!(start["data"], end["data"], "the two events describe the session differently");
+        assert_eq!(
+            start["data"], end["data"],
+            "the two events describe the session differently"
+        );
     }
 
     #[test]
