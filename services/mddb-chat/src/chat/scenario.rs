@@ -1,5 +1,4 @@
 use crate::config::Config;
-use crate::session::types::{ChatMessage, MessageRole};
 
 /// Join the operator's instruction with the collection's (RAG-002).
 ///
@@ -17,45 +16,6 @@ pub fn compose_system_prompt(operator_prompt: &str, collection_prompt: &str) -> 
         (true, false) => collection.to_string(),
         (false, false) => format!("{operator}\n\n{collection}"),
     }
-}
-
-/// Build the full message list for the LLM call
-pub fn build_messages(
-    config: &Config,
-    scenario_name: &str,
-    collection_prompt: &str,
-    context: &str,
-    history: &[ChatMessage],
-) -> Vec<ChatMessage> {
-    let mut messages = Vec::new();
-
-    // System prompt from scenario
-    let system_prompt = if let Some(scenario) = config.get_scenario(scenario_name) {
-        &scenario.system_prompt
-    } else {
-        "You are a helpful assistant. Answer questions based on the provided context."
-    };
-
-    let mut system_content = compose_system_prompt(system_prompt, collection_prompt);
-
-    // Append RAG context if available
-    if !context.is_empty() {
-        system_content.push_str("\n\n");
-        system_content.push_str("Use the following documentation to answer the user's question. ");
-        system_content.push_str("If the answer is not in the documentation, say so honestly.\n\n");
-        system_content.push_str(context);
-    }
-
-    messages.push(ChatMessage {
-        role: MessageRole::System,
-        content: system_content,
-        timestamp: 0,
-    });
-
-    // Conversation history
-    messages.extend_from_slice(history);
-
-    messages
 }
 
 /// Get the temperature for a scenario (or default)

@@ -18,8 +18,20 @@ pub async fn health(State(state): State<Arc<AppState>>) -> Json<Value> {
 
 pub async fn config_info(State(state): State<Arc<AppState>>) -> Json<Value> {
     let scenarios: Vec<&str> = state.config.scenarios.keys().map(|k| k.as_str()).collect();
+    // RUST-001: a scenario has two names — the map key that identifies it and
+    // the `name` a TOML sets for people to read. Nothing read the second, so
+    // the two silently disagreed whenever an operator set one. The key stays
+    // the identifier; `name` is now the label, exposed beside it so a picker
+    // can show something other than a slug.
+    let scenario_labels: serde_json::Map<String, Value> = state
+        .config
+        .scenarios
+        .iter()
+        .map(|(key, scenario)| (key.clone(), Value::from(scenario.name.clone())))
+        .collect();
     Json(json!({
         "scenarios": scenarios,
+        "scenario_labels": scenario_labels,
         "max_concurrent": state.config.session.max_concurrent,
         "queue_size": state.config.session.queue_size,
         "max_message_length": state.config.security.max_message_length,

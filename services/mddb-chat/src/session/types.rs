@@ -18,33 +18,33 @@ pub enum MessageRole {
 
 #[derive(Debug)]
 pub struct Session {
-    pub id: String,
     pub name: String,
     pub scenario: String,
     pub history: Vec<ChatMessage>,
-    pub created_at: Instant,
     pub last_active: Instant,
     pub message_count: usize,
     /// User messages sent in this session, which is what a scenario's
     /// `max_turns` counts. Separate from `message_count`, which also counts
     /// the assistant's replies and so would halve any configured limit.
     pub user_turns: usize,
-    pub total_tokens_used: usize,
 }
 
 impl Session {
-    pub fn new(id: String, name: String, scenario: String) -> Self {
+    /// Builds a session.
+    ///
+    /// RUST-001: the id is not stored. The manager keys its map by it, and
+    /// holding a second copy inside the value was the same two-sources-of-truth
+    /// shape as a scenario's name — with nothing reading the copy, it could
+    /// only ever disagree.
+    pub fn new(name: String, scenario: String) -> Self {
         let now = Instant::now();
         Self {
-            id,
             name,
             scenario,
             history: Vec::new(),
-            created_at: now,
             last_active: now,
             message_count: 0,
             user_turns: 0,
-            total_tokens_used: 0,
         }
     }
 
@@ -124,7 +124,7 @@ mod tests {
     // without bound.
 
     fn session() -> Session {
-        Session::new("id".into(), "Ada".into(), "default".into())
+        Session::new("Ada".into(), "default".into())
     }
 
     #[test]

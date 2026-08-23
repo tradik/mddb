@@ -56,7 +56,7 @@ impl SessionManager {
         // Check if there's room
         if self.active.len() < self.config.max_concurrent {
             let session_id = Uuid::new_v4().to_string();
-            let session = Session::new(session_id.clone(), name, scenario);
+            let session = Session::new(name, scenario);
             self.active.insert(session_id.clone(), session);
             return JoinResult::Admitted { session_id };
         }
@@ -94,11 +94,7 @@ impl SessionManager {
 
             match entry.admitted.send(session_id.clone()) {
                 Ok(()) => {
-                    let session = Session::new(
-                        session_id.clone(),
-                        entry.name.clone(),
-                        entry.scenario.clone(),
-                    );
+                    let session = Session::new(entry.name.clone(), entry.scenario.clone());
                     self.active.insert(session_id.clone(), session);
                     return Some((session_id, entry.name, entry.scenario));
                 }

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A scenario's display name is finally used (RUST-001)** — a chat scenario has
+  two names: the TOML table key (`[scenarios.assistant]`) that a client sends to
+  open a session, and `name`, the label people read. Nothing read the second, so
+  an operator who set it saw no effect anywhere and the two silently disagreed.
+  `GET /config` now returns `scenario_labels` alongside `scenarios`, so a picker
+  can show "Documentation Assistant" and send `assistant`. The key is the
+  identifier, `name` is the label; the existing `scenarios` array is unchanged.
+
 - **Cross-database numbers in COMPARISON.md (DOC-013)** — the page shipped
   without them because Docker was unavailable when it was rewritten, and
   inventing figures for systems that were not run was not an option. Measured
@@ -506,6 +514,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Removed
+
+- **Dead code in mddb-chat (RUST-001)** — the Rust twin of GO-021.
+  `cargo clippy --all-targets -- -D warnings` now passes clean; it had 12
+  warnings.
+
+  Two of them were unfinished wiring rather than clutter. `build_messages` and
+  `build_context` belong to an earlier design where RAG context was fetched up
+  front and stuffed into the system prompt; the handler runs an agentic loop
+  where the model calls `search_docs` itself, so both were superseded rather
+  than forgotten. And `chat_stream` was the older-signature twin of
+  `chat_stream_raw`, which is the one that actually runs — with it went
+  `simple_messages` in both providers and `map_role` in the OpenAI one, which
+  existed only to serve it.
+
+  `llm.stream` went too. It was never read, and it defaulted to `true`, so
+  every deployment believed it had turned something on. Streaming is not
+  optional here — the handler streams the final response either way — which
+  made the setting purely misleading, the same shape as `cors_origins` before
+  it was fixed.
+
+  Also removed: `WebhookData::Message` (per-message webhooks were never
+  constructed and are promised nowhere), `AppError::WebhookError`,
+  `SearchResult.collection`, and `Session`'s `id` and `created_at` — `id` was a
+  second copy of the map key that nothing read, so it could only ever disagree
+  with it.
+
+  `Session.total_tokens_used` is gone as well, and that one is a deliberate
+  deferral rather than a deletion: it was never written *or* read, because no
+  provider parses the `usage` block and `ChatResponse` has nowhere to carry the
+  number. A cost counter that does not count implies a control that does not
+  exist. The per-session token budget it was reaching for is worth building —
+  `max_turns` caps how many turns a session takes, not what they cost — and is
+  filed as its own piece of work.
+
+  Kept, with a comment saying why: `ContentBlockStart`'s fields in the
+  Anthropic provider. Neither is read, but the enum is the documentation of
+  Anthropic's SSE event shape, and a variant carrying half its fields is a
+  worse reference than one carrying them all.
 
 - **Dead helpers and unfinished stubs (GO-020, GO-021)** — the dead-function
   count in `services/mddbd` went from 83 to 9, and the nine that remain are

@@ -2,8 +2,6 @@ use futures::Stream;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 
-use crate::session::types::ChatMessage;
-
 pub type ChunkStream = Pin<Box<dyn Stream<Item = Result<String, crate::error::AppError>> + Send>>;
 
 /// Tool definition sent to the LLM
@@ -57,14 +55,6 @@ pub struct ApiMsg {
 
 #[async_trait::async_trait]
 pub trait LlmProvider: Send + Sync {
-    /// Send messages and get a streaming response (no tools)
-    async fn chat_stream(
-        &self,
-        messages: &[ChatMessage],
-        temperature: f32,
-        max_tokens: u32,
-    ) -> Result<ChunkStream, crate::error::AppError>;
-
     /// Send messages with tools, get either tool_calls or content (non-streaming)
     async fn chat_with_tools(
         &self,

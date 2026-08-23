@@ -96,8 +96,6 @@ pub struct LlmConfig {
     pub max_tokens: u32,
     #[serde(default = "default_temperature")]
     pub temperature: f32,
-    #[serde(default = "default_true")]
-    pub stream: bool,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -255,9 +253,6 @@ fn default_max_tokens() -> u32 {
 }
 fn default_temperature() -> f32 {
     0.7
-}
-fn default_true() -> bool {
-    true
 }
 fn default_max_concurrent() -> usize {
     2

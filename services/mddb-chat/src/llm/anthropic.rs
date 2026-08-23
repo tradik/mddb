@@ -8,7 +8,6 @@ use crate::error::AppError;
 use crate::llm::provider::{
     ApiMsg, ChatResponse, ChunkStream, LlmProvider, ToolCall, ToolCallFunction, ToolDef,
 };
-use crate::session::types::{ChatMessage, MessageRole};
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
@@ -75,8 +74,13 @@ enum StreamEvent {
     },
     #[serde(rename = "content_block_start")]
     ContentBlockStart {
+        // RUST-001: neither field is read — the stream is consumed for its
+        // text deltas alone. They stay because this enum is the documentation
+        // of Anthropic's SSE event shape, and a variant missing half its
+        // fields is a worse reference than one carrying them.
         #[allow(dead_code)]
         index: usize,
+        #[allow(dead_code)]
         content_block: serde_json::Value,
     },
     #[serde(rename = "content_block_delta")]
@@ -242,36 +246,6 @@ impl AnthropicProvider {
         result
     }
 
-    /// Convert simple ChatMessages to Anthropic format
-    fn simple_messages(messages: &[ChatMessage]) -> (Option<String>, Vec<serde_json::Value>) {
-        let mut system = None;
-        let mut result = Vec::new();
-        for msg in messages {
-            match msg.role {
-                MessageRole::System => {
-                    let text = msg.content.clone();
-                    system = Some(match system {
-                        Some(existing) => format!("{}\n\n{}", existing, text),
-                        None => text,
-                    });
-                }
-                MessageRole::User => {
-                    result.push(serde_json::json!({
-                        "role": "user",
-                        "content": msg.content,
-                    }));
-                }
-                MessageRole::Assistant => {
-                    result.push(serde_json::json!({
-                        "role": "assistant",
-                        "content": msg.content,
-                    }));
-                }
-            }
-        }
-        (system, result)
-    }
-
     /// Convert ToolDef (OpenAI format) to Anthropic tool format
     fn convert_tools(tools: &[ToolDef]) -> Vec<AnthropicTool> {
         tools
@@ -347,46 +321,6 @@ impl AnthropicProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for AnthropicProvider {
-    async fn chat_stream(
-        &self,
-        messages: &[ChatMessage],
-        temperature: f32,
-        max_tokens: u32,
-    ) -> Result<ChunkStream, AppError> {
-        let (system, msgs) = Self::simple_messages(messages);
-
-        let request = MessagesRequest {
-            model: self.config.model.clone(),
-            max_tokens,
-            system,
-            messages: msgs,
-            tools: None,
-            temperature: Some(temperature),
-            stream: true,
-        };
-
-        let req = self.client.post(self.api_url()).json(&request);
-        let req = self.request_builder(req);
-
-        let response = req
-            .send()
-            .await
-            .map_err(|e| AppError::LlmError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!(
-                "Anthropic API {status}: {body}"
-            )));
-        }
-
-        Ok(self.build_sse_stream(response))
-    }
-
     async fn chat_with_tools(
         &self,
         messages: &[ApiMsg],

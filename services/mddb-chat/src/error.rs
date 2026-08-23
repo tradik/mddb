@@ -14,7 +14,6 @@ pub enum AppError {
     TurnLimitReached(usize),
     GrpcError(tonic::Status),
     LlmError(String),
-    WebhookError(String),
     Internal(String),
 }
 
@@ -32,7 +31,6 @@ impl std::fmt::Display for AppError {
             }
             AppError::GrpcError(s) => write!(f, "grpc error: {s}"),
             AppError::LlmError(msg) => write!(f, "llm error: {msg}"),
-            AppError::WebhookError(msg) => write!(f, "webhook error: {msg}"),
             AppError::Internal(msg) => write!(f, "internal error: {msg}"),
         }
     }
@@ -54,7 +52,6 @@ impl IntoResponse for AppError {
             AppError::TurnLimitReached(_) => (StatusCode::FORBIDDEN, self.to_string()),
             AppError::GrpcError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppError::LlmError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
-            AppError::WebhookError(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
 
@@ -88,7 +85,6 @@ mod tests {
             AppError::NameTooLong,
             AppError::TurnLimitReached(10),
             AppError::LlmError("upstream refused".into()),
-            AppError::WebhookError("delivery failed".into()),
             AppError::Internal("boom".into()),
         ];
 
@@ -136,10 +132,6 @@ mod tests {
             (AppError::TurnLimitReached(5), StatusCode::FORBIDDEN),
             // Something behind us failed.
             (AppError::LlmError("x".into()), StatusCode::BAD_GATEWAY),
-            (
-                AppError::WebhookError("x".into()),
-                StatusCode::INTERNAL_SERVER_ERROR,
-            ),
             (
                 AppError::Internal("x".into()),
                 StatusCode::INTERNAL_SERVER_ERROR,

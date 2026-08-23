@@ -15,11 +15,6 @@ pub enum WebhookData {
         user_name: String,
         scenario: String,
     },
-    Message {
-        session_id: String,
-        user_name: String,
-        content: String,
-    },
     Queue {
         queue_size: usize,
         active_sessions: usize,

@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::llm::provider::{ApiMsg, ChatResponse, ChunkStream, LlmProvider, ToolCall, ToolDef};
-use crate::session::types::{ChatMessage, MessageRole};
 
 pub struct OpenAiProvider {
     client: Client,
@@ -67,14 +66,6 @@ impl OpenAiProvider {
         Self { client, config }
     }
 
-    fn map_role(role: &MessageRole) -> &'static str {
-        match role {
-            MessageRole::User => "user",
-            MessageRole::Assistant => "assistant",
-            MessageRole::System => "system",
-        }
-    }
-
     fn api_url(&self) -> String {
         format!(
             "{}/chat/completions",
@@ -88,19 +79,6 @@ impl OpenAiProvider {
         } else {
             req
         }
-    }
-
-    /// Convert simple ChatMessages to JSON values
-    fn simple_messages(messages: &[ChatMessage]) -> Vec<serde_json::Value> {
-        messages
-            .iter()
-            .map(|m| {
-                serde_json::json!({
-                    "role": Self::map_role(&m.role),
-                    "content": m.content,
-                })
-            })
-            .collect()
     }
 
     /// Convert ApiMsg to JSON values (preserves tool_calls and tool_call_id)
@@ -183,41 +161,6 @@ impl OpenAiProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for OpenAiProvider {
-    async fn chat_stream(
-        &self,
-        messages: &[ChatMessage],
-        temperature: f32,
-        max_tokens: u32,
-    ) -> Result<ChunkStream, AppError> {
-        let request = ChatRequest {
-            model: self.config.model.clone(),
-            messages: Self::simple_messages(messages),
-            max_tokens,
-            temperature,
-            stream: true,
-            tools: None,
-        };
-
-        let req = self.client.post(self.api_url()).json(&request);
-        let req = self.auth_header(req);
-
-        let response = req
-            .send()
-            .await
-            .map_err(|e| AppError::LlmError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("LLM API {status}: {body}")));
-        }
-
-        Ok(self.build_sse_stream(response))
-    }
-
     async fn chat_with_tools(
         &self,
         messages: &[ApiMsg],

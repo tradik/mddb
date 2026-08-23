@@ -106,7 +106,6 @@ api_key = "not-needed"
 model = "qwen3:8b"
 max_tokens = 1024
 temperature = 0.7
-stream = true
 
 [session]
 max_concurrent = 2
@@ -128,6 +127,17 @@ Be concise, accurate, and friendly. If you don't know the answer,
 say so honestly rather than making something up."""
 allowed_collections = ["docs"]
 ```
+
+### Scenario names
+
+A scenario has two names. The TOML table key (`[scenarios.assistant]`) is the
+identifier a client sends when opening a session; `name` is the label people
+read. `GET /config` returns both — `scenarios` lists the identifiers,
+`scenario_labels` maps each to its label — so a picker can show
+"Documentation Assistant" and send `assistant`.
+
+Before v2.12.0 nothing read `name`, so an operator who set it saw no effect
+anywhere.
 
 ### Rate limiting behind a proxy
 

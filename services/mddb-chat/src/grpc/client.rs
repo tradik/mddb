@@ -100,12 +100,11 @@ impl MddbClient {
     pub async fn hybrid_search(
         &mut self,
         query: &str,
-        collection: &str,
+        _collection: &str,
         top_k: u32,
     ) -> Result<Vec<SearchResult>, AppError> {
         let request = proto::HybridSearchRequest {
             query: query.to_string(),
-            collection: collection.to_string(),
             top_k: top_k as i32,
             include_content: true,
             ..Default::default()
@@ -127,7 +126,6 @@ impl MddbClient {
                     key: doc.key,
                     content: doc.content_md,
                     score: r.combined_score as f32,
-                    collection: collection.to_string(),
                 })
             })
             .collect();
@@ -139,12 +137,11 @@ impl MddbClient {
     pub async fn fts_search(
         &mut self,
         query: &str,
-        collection: &str,
+        _collection: &str,
         top_k: u32,
     ) -> Result<Vec<SearchResult>, AppError> {
         let request = proto::FtsRequest {
             query: query.to_string(),
-            collection: collection.to_string(),
             limit: top_k as i32,
             ..Default::default()
         };
@@ -165,7 +162,6 @@ impl MddbClient {
                     key: doc.key,
                     content: doc.content_md,
                     score: r.score as f32,
-                    collection: collection.to_string(),
                 })
             })
             .collect();
@@ -177,12 +173,11 @@ impl MddbClient {
     pub async fn vector_search(
         &mut self,
         query: &str,
-        collection: &str,
+        _collection: &str,
         top_k: u32,
     ) -> Result<Vec<SearchResult>, AppError> {
         let request = proto::VectorSearchRequest {
             query: query.to_string(),
-            collection: collection.to_string(),
             top_k: top_k as i32,
             include_content: true,
             ..Default::default()
@@ -204,7 +199,6 @@ impl MddbClient {
                     key: doc.key,
                     content: doc.content_md,
                     score: r.score,
-                    collection: collection.to_string(),
                 })
             })
             .collect();
@@ -305,5 +299,4 @@ pub struct SearchResult {
     pub key: String,
     pub content: String,
     pub score: f32,
-    pub collection: String,
 }
