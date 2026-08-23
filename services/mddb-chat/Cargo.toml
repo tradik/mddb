@@ -34,6 +34,9 @@ uuid = { version = "1", features = ["v4"] }
 
 # Security
 governor = "0.10"
+# Trusted-proxy matching for the rate limiter (SEC-014). Already in the tree
+# through reqwest; declared directly because client_ip depends on it.
+ipnet = "2.12"
 
 # Logging
 tracing = "0.1"

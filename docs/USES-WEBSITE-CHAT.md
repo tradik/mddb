@@ -118,6 +118,7 @@ max_response_length = 4096
 [security]
 rate_limit_per_minute = 30
 max_message_length = 2000
+trusted_proxies = []   # see "Rate limiting behind a proxy" below
 
 [scenarios.assistant]
 name = "Website Assistant"
@@ -127,6 +128,29 @@ Be concise, accurate, and friendly. If you don't know the answer,
 say so honestly rather than making something up."""
 allowed_collections = ["docs"]
 ```
+
+### Rate limiting behind a proxy
+
+The rate limit is charged per client address, and that address is the TCP peer
+— it cannot be forged by sending a header.
+
+Behind a reverse proxy or cloudflared, the TCP peer is the *proxy*. Every
+visitor then shares one bucket, so the first noisy one locks out the rest, and
+`rate_limit_per_minute` stops meaning what it says.
+
+Set `trusted_proxies` to the proxy's address or network and `X-Forwarded-For`
+is honoured from it:
+
+```toml
+[security]
+trusted_proxies = ["172.16.0.0/12"]   # the Docker bridge network
+```
+
+Only list addresses you control. Anything listed here can name whatever client
+address it likes, which is the whole reason the list exists rather than the
+header being trusted outright. Addresses to the left of the last trusted hop
+are ignored, so a client prepending its own `X-Forwarded-For` cannot pick which
+bucket it lands in.
 
 Key settings:
 - `api_url` points to Ollama's OpenAI-compatible endpoint

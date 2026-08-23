@@ -25,6 +25,7 @@ use grpc::client::MddbClient;
 use llm::anthropic::AnthropicProvider;
 use llm::openai::OpenAiProvider;
 use llm::provider::LlmProvider;
+use security::client_ip::TrustedProxies;
 use security::rate_limiter::RateLimiter;
 use security::sanitizer::Sanitizer;
 use session::manager::SessionManager;
@@ -71,6 +72,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config.security.webhook_secret.clone(),
     );
     let rate_limiter = RateLimiter::new(config.security.rate_limit_per_minute);
+    // SEC-014: parsed once, not per connection. An empty list charges the rate
+    // limit to the TCP peer, which is right for a directly exposed server and
+    // wrong behind the reverse proxy this is documented to run behind.
+    let trusted_proxies = TrustedProxies::parse(&config.security.trusted_proxies);
+    if trusted_proxies.is_empty() {
+        tracing::info!("no trusted proxies configured; rate limits are charged to the TCP peer");
+    }
     let sanitizer = Sanitizer::new(config.security.clone());
 
     let state = Arc::new(AppState {
@@ -81,6 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         webhook_dispatcher,
         rate_limiter,
         sanitizer,
+        trusted_proxies,
     });
 
     // Session cleanup task

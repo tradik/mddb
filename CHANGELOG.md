@@ -1043,6 +1043,34 @@ graceful shutdown drains its queues, so both compose files allow a 20s stop
 grace period — set the same if you run the image directly.
 
 ### Security
+- **A full rate-limiter map no longer resets everyone's budget (SEC-014)** —
+  `cleanup()` cleared the whole per-address map once it passed 10 000 entries,
+  handing every address a fresh quota including whichever one filled it: an
+  address that had just been refused could start over. governor's own state
+  carries no last-used timestamp, so there had been nothing to evict on. One is
+  now kept alongside it.
+
+  Idle entries go first, at a threshold of one full refill window — past that
+  point an entry says nothing a fresh one would not, so dropping it changes no
+  decision. Only if more than 10 000 addresses are still active does the least
+  recently seen get evicted, down to the cap. That ordering is what makes the
+  cap safe to reach: to lose its own entry an address has to become the least
+  recently seen, which means it stopped sending requests, which is what the
+  limiter wanted from it.
+
+- **Rate limits are per visitor behind a reverse proxy (SEC-014)** — the limit
+  is charged to the TCP peer, which cannot be forged by a header. Behind the
+  reverse proxy `docs/DEPLOYMENT.md` and `docker-compose.yml` describe, the TCP
+  peer *is* the proxy: every visitor shared one bucket, the first noisy one
+  locked out the rest, and `rate_limit_per_minute` stopped meaning what it said.
+
+  A new `security.trusted_proxies` (addresses or CIDRs, empty by default —
+  behaviour is unchanged for a directly exposed server) makes
+  `X-Forwarded-For` believable from those peers only. The address taken is the
+  rightmost one the trusted chain did not vouch for: entries to its left were
+  written by whoever is being limited, so a client prepending its own header
+  cannot choose which bucket it lands in.
+
 - **Collection credentials were readable by anyone who could read the
   collection (GO-035)** — a collection config can hold an S3 secret key and an
   mddb-sync publish key, and every read returned both in full, over REST, gRPC

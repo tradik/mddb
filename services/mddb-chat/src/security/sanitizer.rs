@@ -68,6 +68,7 @@ mod tests {
             rate_limit_per_minute: 30,
             max_message_length: 2000,
             webhook_secret: String::new(),
+            trusted_proxies: Vec::new(),
         }
     }
 

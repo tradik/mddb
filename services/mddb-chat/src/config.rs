@@ -124,6 +124,15 @@ pub struct SecurityConfig {
     pub max_message_length: usize,
     #[serde(default)]
     pub webhook_secret: String,
+    /// Addresses or CIDRs whose `X-Forwarded-For` is believed (SEC-014).
+    ///
+    /// Empty by default, which charges the rate limit to the TCP peer — right
+    /// for a directly exposed server, wrong behind the reverse proxy this is
+    /// documented to run behind, where every visitor arrives from the proxy
+    /// and shares one bucket. Set this to the proxy's address or network to
+    /// get per-visitor limits back.
+    #[serde(default)]
+    pub trusted_proxies: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]

@@ -53,6 +53,21 @@ rate_limit_per_minute = 30
 max_message_length = 2000
 webhook_secret = ""  # or set MDDB_CHAT_WEBHOOK_SECRET env var
 
+# Networks whose X-Forwarded-For header is believed, as addresses or CIDRs.
+#
+# Leave this empty and the rate limit is charged to the TCP peer, which cannot
+# be spoofed — right for a directly exposed server. Behind a reverse proxy or
+# cloudflared, though, every visitor arrives from the proxy's address and they
+# all share one bucket, so the first noisy visitor locks everyone out.
+#
+# Set it to the proxy's address or network to get per-visitor limits back.
+# Only list addresses you control: anything listed here can name whatever
+# client address it likes.
+#
+#   trusted_proxies = ["172.16.0.0/12"]   # the Docker bridge network
+#   trusted_proxies = ["10.0.0.7"]        # one nginx host
+trusted_proxies = []
+
 [scenarios.assistant]
 name = "Documentation Assistant"
 system_prompt = """You are a helpful documentation assistant for our product.
