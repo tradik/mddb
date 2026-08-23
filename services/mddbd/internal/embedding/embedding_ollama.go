@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -62,8 +61,8 @@ func (p *OllamaProvider) Embed(ctx context.Context, text string) ([]float32, err
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("ollama API error (status %d): %s", resp.StatusCode, string(respBody))
+		// SEC-013: bounded; see upstream_error.go.
+		return nil, upstreamError("ollama", resp)
 	}
 
 	var result ollamaEmbedResponse

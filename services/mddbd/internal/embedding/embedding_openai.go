@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
@@ -78,8 +77,8 @@ func (p *OpenAIProvider) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("OpenAI API error (status %d): %s", resp.StatusCode, string(respBody))
+		// SEC-013: bounded; see upstream_error.go.
+		return nil, upstreamError("openai", resp)
 	}
 
 	var result openAIEmbeddingResponse

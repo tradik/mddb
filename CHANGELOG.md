@@ -1089,6 +1089,29 @@ graceful shutdown drains its queues, so both compose files allow a 20s stop
 grace period — set the same if you run the image directly.
 
 ### Security
+- **An embedding provider's `apiUrl` no longer reaches the whole private
+  network, and stops reading it back (SEC-013)** — the field deliberately
+  bypasses the SSRF guard, because a local Ollama on `http://localhost:11434`
+  is exactly what that guard refuses. The exemption is the feature; its width
+  was not. An `apiUrl` of `http://169.254.169.254/latest/meta-data/` is not an
+  embedding service, and admin permission gates who aims the field rather than
+  what it can hit — while a configuration replicated to another node carries
+  the aim along with it.
+
+  Loopback still needs no opt-in: it reaches only the machine running mddbd.
+  Any other private or reserved address is now refused when the configuration
+  is saved, unless `MDDB_OUTBOUND_ALLOW_PRIVATE=true` or the host is in
+  `MDDB_OUTBOUND_ALLOWLIST` — the same two switches the rest of the outbound
+  policy already uses, rather than a third one meaning the same thing. **An
+  Ollama running on another machine on your network now needs one of them set.**
+
+  Separately, all four providers read a failing response in full and put it in
+  the returned error, so a URL aimed at something that was not an embedding
+  service answered with its own body and that body came back to the caller —
+  which is what turns a blind request primitive into a readable one. The body
+  is now capped at 512 bytes: enough to carry Ollama's own "model not found",
+  not enough to return a page.
+
 - **A full rate-limiter map no longer resets everyone's budget (SEC-014)** —
   `cleanup()` cleared the whole per-address map once it passed 10 000 entries,
   handing every address a fresh quota including whichever one filled it: an

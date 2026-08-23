@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mddb/internal/binlog"
 	"mddb/internal/embedding"
+	"mddb/internal/httpclient"
 	"net/http"
 	"strings"
 	"time"
@@ -25,8 +26,18 @@ type EmbeddingConfig struct {
 	CreatedAt  int64  `json:"createdAt"`  // creation timestamp
 }
 
-// SaveEmbeddingConfig saves an embedding configuration to the database
+// SaveEmbeddingConfig saves an embedding configuration to the database.
+//
+// SEC-013: apiUrl is validated here rather than in each handler, because every
+// write goes through this function and a rule enforced in two of three places
+// is not a rule. Loopback passes without opt-in — a local Ollama is the reason
+// these providers bypass the SSRF guard at all — while any other private or
+// reserved address needs MDDB_OUTBOUND_ALLOW_PRIVATE or the host allowlist.
 func (s *Server) SaveEmbeddingConfig(config *EmbeddingConfig) error {
+	if err := httpclient.ValidateServiceURL(config.APIURL); err != nil {
+		return err
+	}
+
 	var bo binlog.BinlogOps
 	err := s.DBUpdate(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("embedding_configs"))

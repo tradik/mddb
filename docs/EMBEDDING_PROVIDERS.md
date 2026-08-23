@@ -341,6 +341,28 @@ If you're using environment variables and want to migrate to database config:
 }
 ```
 
+### Where `apiUrl` may point (v2.12.0+)
+
+`apiUrl` is the one field that reaches the network without going through the
+server's SSRF guard — because `localhost` is precisely what that guard refuses,
+and a local Ollama is the reason the field exists.
+
+Loopback (`localhost`, `127.0.0.1`, `[::1]`) is accepted with no configuration.
+Any other private or reserved address is refused when the config is saved:
+
+```
+apiUrl "http://10.0.0.5:11434" resolves to a private or reserved address.
+Loopback needs no opt-in; for a service elsewhere on a trusted network set
+MDDB_OUTBOUND_ALLOW_PRIVATE=true or add the host to MDDB_OUTBOUND_ALLOWLIST
+```
+
+Running Ollama on another machine on your network is a legitimate setup — set
+one of those two variables and it works. The refusal exists because the same
+field also reaches cloud metadata endpoints and internal admin panels, and
+"only an administrator can set it" limits who aims it rather than what it hits.
+
+Public endpoints (`https://api.openai.com/v1` and the rest) are unaffected.
+
 ---
 
 ## Classification
