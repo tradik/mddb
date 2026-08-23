@@ -12,8 +12,8 @@ import (
 	"mddb/internal/storage"
 	proto "mddb/proto"
 
-	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // ---- HTTP types for /v1/ingest ----
@@ -70,6 +70,14 @@ type IngestResponseHTTP struct {
 	// corpus loaded months ago can be explained without guessing which flags
 	// the caller happened to send.
 	Profile string `json:"profile,omitempty"`
+	// Sanitized counts documents whose text was not valid UTF-8 and had the
+	// undecodable bytes dropped (GO-036).
+	//
+	// A bulk import must not fail because one page of a 20 GB dump is in
+	// Windows-1250, but silently altering documents and reporting nothing is
+	// how a corpus quietly loses characters. Single-document writes refuse
+	// instead; see text_encoding.go.
+	Sanitized int `json:"sanitized,omitempty"`
 }
 
 // handleIngest handles POST /v1/ingest
@@ -133,7 +141,7 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	}
 
 	// Phase 1: Pre-process documents (key derivation, frontmatter, meta injection)
-	protoDocs, skippedIdx, errs := s.preProcessIngest(collection, docs, opts)
+	protoDocs, skippedIdx, errs, sanitized := s.preProcessIngest(collection, docs, opts)
 
 	resp := &IngestResponseHTTP{
 		Collection: collection,
@@ -141,6 +149,10 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 		Failed:     len(errs),
 		Errors:     errs,
 		Profile:    profile.Name,
+		// Set here rather than on the way out, so it is reported on every
+		// path — the first version assigned it only in the early return
+		// below, and every successful import reported zero.
+		Sanitized: sanitized,
 	}
 
 	if len(protoDocs) == 0 {
@@ -179,9 +191,10 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 // preProcessIngest transforms IngestDocumentHTTP into proto.BatchDocument,
 // applying URL key derivation, frontmatter extraction, metadata injection,
 // and optional deduplication.
-func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ([]*proto.BatchDocument, map[int]bool, []string) {
+func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ([]*proto.BatchDocument, map[int]bool, []string, int) {
 	var protoDocs []*proto.BatchDocument
 	var errs []string
+	var sanitized int
 	skippedIdx := make(map[int]bool)
 
 	// Build dedup map if needed
@@ -209,6 +222,16 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 		meta := d.Meta
 		if meta == nil {
 			meta = make(map[string][]string)
+		}
+
+		// GO-036: drop bytes protobuf cannot store, and count it. Sanitising
+		// here rather than refusing, because one badly encoded page must not
+		// abort an import of the other twenty thousand — but the response says
+		// how many were changed, which it previously did not.
+		if sanitizedContent, sanitizedMeta, changed := SanitizeDocumentText(content, meta); changed {
+			content = sanitizedContent
+			meta = sanitizedMeta
+			sanitized++
 		}
 
 		// Extract frontmatter
@@ -257,7 +280,7 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 		})
 	}
 
-	return protoDocs, skippedIdx, errs
+	return protoDocs, skippedIdx, errs, sanitized
 }
 
 // buildContentHashMap builds a map of docID → CRC32 content hash for existing docs.

@@ -526,6 +526,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A file in Latin-1 or Windows-1250 failed with a message about protobuf
+  (GO-036)** — documents are stored through protobuf, whose `string` fields must
+  be valid UTF-8, so a `.txt` in Windows-1250 — a large share of any archive
+  older than about 2010 — failed deep inside marshalling with an error saying
+  nothing about encoding and nothing about what to do. Found by
+  `FuzzDocRoundTrip`.
+
+  Somebody had already hit this and fixed it in the one place it hurt them, the
+  wiki importer, leaving every other write path unchanged. The two kinds of
+  write want opposite treatment, so both now exist:
+
+  - **A single document** — upload, add, import from a URL — is **refused**,
+    with an error naming the likely encoding and the `iconv` command that fixes
+    it. The user picked this file; silently dropping the bytes that would not
+    decode turns `café` into `caf` and tells nobody. Validated inside
+    `addDocument`, the same choke point GO-003 chose, so every transport
+    inherits it rather than five handlers each doing their own.
+  - **A bulk import** **sanitises and counts**. A 20 GB dump must not fail
+    because one page is in the wrong encoding, and the ingest response now
+    carries `sanitized` — the number of documents whose text was changed, which
+    it previously did not report at all.
+
+  The wiki importer's local copy is gone in favour of the shared one.
+
+  Behaviour change: a single-document write with undecodable text now returns
+  400 with a readable message rather than a 500-class protobuf error.
+
+
 - **A malformed JSON document could crash the server (GO-037)** — goccy/go-json
   panics where the standard library returns an error, and the fault is
   state-dependent rather than input-dependent: one bad document reproduces

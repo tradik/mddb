@@ -6,17 +6,16 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	json "mddb/internal/jsonx"
 	"io"
 	"log/slog"
 	"mddb/internal/envconf"
+	json "mddb/internal/jsonx"
 	"mddb/internal/wikitext"
 	proto "mddb/proto"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 )
 
 // wikiImportBatchSize is the number of pages buffered before flushing to storage.
@@ -287,9 +286,9 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 
 		// Validate UTF-8
 		text := page.Revision.Text
-		if !utf8.ValidString(text) {
-			text = strings.ToValidUTF8(text, "")
-		}
+		// GO-036: the shared sanitiser, not a local copy. This was the one
+		// place anybody had fixed, and every other write path kept the bug.
+		text, _, _ = SanitizeDocumentText(text, nil)
 
 		// Convert wikitext to markdown
 		markdown := wikitext.ToMarkdown(text)

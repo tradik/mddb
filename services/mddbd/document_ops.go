@@ -40,6 +40,17 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 			return storage.Doc{}, false, err
 		}
 	}
+	// GO-036: refuse text protobuf cannot store, here for the same reason as
+	// the schema check above — every transport goes through this function, and
+	// a check in a handler is a check the other five handlers do not have.
+	//
+	// Refusing rather than sanitising: a person picked this one file, and
+	// silently dropping the bytes that would not decode turns `café` into
+	// `caf` and tells nobody. Bulk paths sanitise and count instead; see
+	// text_encoding.go.
+	if err := ValidateDocumentText(contentMD, meta); err != nil {
+		return storage.Doc{}, false, err
+	}
 
 	now := time.Now().Unix()
 	docID := genID(collection, key, lang)

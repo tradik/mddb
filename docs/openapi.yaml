@@ -6288,6 +6288,14 @@ components:
           default: false
         profile:
           type: string
+        sanitized:
+          type: integer
+          description: >-
+            How many documents had undecodable bytes dropped because their text
+            was not valid UTF-8 (GO-036). A bulk import sanitises rather than
+            failing, so one page in Windows-1250 cannot abort the other twenty
+            thousand — but the count says how many were changed. Single-document
+            writes refuse instead, with an error naming the encoding.
           enum: [ default, fast ]
           default: default
           description: >
