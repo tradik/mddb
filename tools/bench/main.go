@@ -48,7 +48,7 @@ var tagPool = []string{
 //
 // #nosec G404 -- benchmark filler, not a security decision
 func randIntn(n int) int {
-	return rand.Intn(n) // #nosec G404 // NOSONAR -- benchmark filler; a CSPRNG here would measure the generator
+	return rand.Intn(n)
 }
 
 func randomWord() string {
