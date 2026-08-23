@@ -18,6 +18,7 @@ package httpclient
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -137,6 +138,27 @@ func validateOutboundURL(u *url.URL) error {
 		}
 	}
 	return nil
+}
+
+// ValidateOutboundURL checks a destination before a request is made.
+//
+// The pooled transport already refuses these addresses at dial time, so this
+// is defence in depth rather than the only guard — but it is worth having for
+// two reasons beyond redundancy. It fails with "destination address is not
+// allowed" instead of a dial error that reads like a network problem, and it
+// makes the check visible at the call site: a reader (and a static analyser)
+// can see the URL being validated, where a dialer buried in a transport is
+// invisible to both. CodeQL's go/request-forgery reported exactly that
+// blindness as three critical findings on guarded code.
+func ValidateOutboundURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("URL must be http or https, got %q", u.Scheme)
+	}
+	return validateOutboundURL(u)
 }
 
 // ssrfCheckRedirect is the http.Client.CheckRedirect that re-validates every

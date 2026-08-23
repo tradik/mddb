@@ -475,6 +475,18 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 	cronVars := BuildCronVars(webhook, cronID, cronName)
 	expandedURL, expandedHeaders := expandWebhookURLAndHeaders(webhook.URL, webhook.Headers, cronVars)
 
+	// The URL is a template, and expansion puts variables into it — so the
+	// destination is not fixed by the stored configuration alone. Validated
+	// once here rather than per retry attempt: the pooled transport refuses
+	// these addresses at dial time too, but a message naming the reason beats
+	// three identical dial failures, and a guard a reader can see beats one
+	// buried in a transport. CodeQL reported the second of these two sites as
+	// critical go/request-forgery; both have the same shape.
+	if err := httpclient.ValidateOutboundURL(expandedURL); err != nil {
+		slog.Warn("webhook destination refused", "iD", webhook.ID, "err", err) // #nosec G706 -- internal log
+		return
+	}
+
 	var finalStatus string
 	var lastHTTPStatus int
 	var lastError string
@@ -578,6 +590,18 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 	// Expand template variables in webhook URL and headers
 	triggerVars := BuildTriggerVars(webhook, trigger, doc, collection, score, sentimentScore)
 	expandedURL, expandedHeaders := expandWebhookURLAndHeaders(webhook.URL, webhook.Headers, triggerVars)
+
+	// The URL is a template, and expansion puts variables into it — so the
+	// destination is not fixed by the stored configuration alone. Validated
+	// once here rather than per retry attempt: the pooled transport refuses
+	// these addresses at dial time too, but a message naming the reason beats
+	// three identical dial failures, and a guard a reader can see beats one
+	// buried in a transport. CodeQL reported the second of these two sites as
+	// critical go/request-forgery; both have the same shape.
+	if err := httpclient.ValidateOutboundURL(expandedURL); err != nil {
+		slog.Warn("webhook destination refused", "iD", webhook.ID, "err", err) // #nosec G706 -- internal log
+		return
+	}
 
 	var finalStatus string
 	var lastHTTPStatus int

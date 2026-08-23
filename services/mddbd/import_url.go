@@ -80,6 +80,16 @@ func fetchURL(ctx context.Context, rawURL string) (string, error) {
 	// GO-034: carried through the request's context, so an import from a slow
 	// or hostile host is abandoned when the caller gives up rather than
 	// holding the connection for the full client timeout.
+	// Checked here as well as at dial time. The pooled transport already
+	// refuses these destinations, so this is defence in depth — but it fails
+	// with a message that names the reason instead of a dial error that reads
+	// like a network problem, and it puts the guard where a reader can see it.
+	// CodeQL reported this call as critical go/request-forgery precisely
+	// because a dialer inside a transport is invisible to it.
+	if err := httpclient.ValidateOutboundURL(rawURL); err != nil {
+		return "", err
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return "", err

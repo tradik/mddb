@@ -105,3 +105,73 @@ func TestIsLoopbackHost(t *testing.T) {
 		}
 	}
 }
+
+// --- ValidateOutboundURL ----------------------------------------------------
+//
+// The exported pre-request check (CodeQL go/request-forgery). The dialer
+// already refuses these, so this is defence in depth — but it fails with a
+// reason instead of a dial error, and it is visible at the call site, which a
+// dialer inside a transport is not.
+
+func TestValidateOutboundURLRefusesPrivateDestinations(t *testing.T) {
+	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "")
+
+	for _, raw := range []string{
+		"http://169.254.169.254/latest/meta-data/",
+		"http://10.0.0.5:8080/admin",
+		"https://192.168.1.1",
+		"http://172.16.0.2:9200",
+		"http://127.0.0.1:11434",
+		"http://[::1]:8080",
+	} {
+		if err := ValidateOutboundURL(raw); err == nil {
+			t.Errorf("%s was allowed", raw)
+		}
+	}
+}
+
+// Unlike ValidateServiceURL, loopback is NOT exempt here: this guards requests
+// to destinations a user names, where reaching this host is the attack rather
+// than the feature.
+func TestValidateOutboundURLDoesNotExemptLoopback(t *testing.T) {
+	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "")
+
+	if err := ValidateOutboundURL("http://localhost:8080/"); err == nil {
+		t.Error("loopback was allowed for an outbound request")
+	}
+	// ValidateServiceURL, which guards a service this deployment runs itself,
+	// does allow it — the two answer different questions.
+	if err := ValidateServiceURL("http://localhost:11434"); err != nil {
+		t.Errorf("ValidateServiceURL should still allow loopback: %v", err)
+	}
+}
+
+func TestValidateOutboundURLAllowsAPublicDestination(t *testing.T) {
+	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "")
+
+	if err := ValidateOutboundURL("https://example.com/webhook"); err != nil {
+		t.Errorf("a public destination was refused: %v", err)
+	}
+}
+
+func TestValidateOutboundURLRejectsWhatIsNotAnHTTPURL(t *testing.T) {
+	for name, raw := range map[string]string{
+		"file scheme": "file:///etc/passwd",
+		"gopher":      "gopher://127.0.0.1:11211/_stats",
+		"not a URL":   "://nonsense",
+		"empty":       "",
+		"no scheme":   "example.com/webhook",
+	} {
+		if err := ValidateOutboundURL(raw); err == nil {
+			t.Errorf("%s (%q) was allowed", name, raw)
+		}
+	}
+}
+
+func TestValidateOutboundURLHonoursTheOptIn(t *testing.T) {
+	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "true")
+
+	if err := ValidateOutboundURL("http://10.0.0.5:9000/hook"); err != nil {
+		t.Errorf("the opt-in did not take: %v", err)
+	}
+}

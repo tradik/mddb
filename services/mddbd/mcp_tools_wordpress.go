@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mddb/internal/httpclient"
 	"net/http"
 	"net/url"
 	"strings"
@@ -181,6 +182,21 @@ func (s *MCPToolServer) toolWordPressSetStatus(ctx context.Context, args map[str
 // wordpressPost sends one JSON request to the mddb-sync REST namespace and
 // returns the raw response body (bounded) on 2xx.
 func wordpressPost(ctx context.Context, target *WordPressTargetConfig, path string, payload map[string]interface{}) (string, error) {
+	// Checked here, at the point of use, not only where a target is stored:
+	// a configuration written before this validation existed would otherwise
+	// still be dialled (SEC-013, found by CodeQL go/request-forgery once the
+	// Go analysis started working at all).
+	//
+	// validateWordPressTarget above enforces the scheme and nothing else, so
+	// https://169.254.169.254/ passed it and was then dialled by a bare
+	// http.Client carrying no SSRF guard. Loopback still needs no opt-in — a
+	// WordPress on the same machine is the documented development setup —
+	// while anything else private needs MDDB_OUTBOUND_ALLOW_PRIVATE or the
+	// host allowlist, exactly as the embedding providers do.
+	if err := httpclient.ValidateServiceURL(target.URL); err != nil {
+		return "", fmt.Errorf("wordpress.url: %w", err)
+	}
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
