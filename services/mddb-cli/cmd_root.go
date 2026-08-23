@@ -27,7 +27,9 @@ func newRootCmd() *cobra.Command {
 		Short: "MDDB command-line client",
 		Long: `mddb-cli is a command-line client for MDDB (Markdown Database).
 It provides an interface similar to mysql-client for managing markdown documents.`,
-		Version: "1.0.0",
+		// OPS-019: the release workflow's -X main.Version had nothing to
+		// write to, so this literal was every released binary's answer.
+		Version: CurrentVersion(),
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&serverURL, "server", "s", defaultServerURL, "MDDB server URL")
@@ -44,6 +46,7 @@ It provides an interface similar to mysql-client for managing markdown documents
 		newWebhookCmd(), newSchemaCmd(), newValidateCmd(),
 		newLoginCmd(), newAPIKeyCmd(),
 		newGraphQLCmd(), newPlaygroundCmd(),
+		newSelfUpdateCmd(),
 	)
 
 	return rootCmd

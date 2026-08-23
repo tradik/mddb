@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`mddb-cli self-update`, and `mddbd --check-update` (OPS-019)** — MDDB ships
+  as a single binary, and someone who downloaded one onto a VPS had no way to
+  learn that a newer one exists. They stayed on the version they first
+  installed, security fixes included.
+
+  `mddb-cli self-update` fetches from a pinned GitHub URL, checks the SHA-256
+  against the release's `checksums.txt`, and only then writes. Nothing on disk
+  is touched until the download has been read to the end and matched, so an
+  interrupted download leaves a working binary in place; the replacement is a
+  rename within the same directory, which is atomic, and the previous binary is
+  kept as `.bak`. A binary installed through snap or running in a container is
+  reported on and then refused, with the right channel named — overwriting a
+  file a package manager owns leaves its records disagreeing with the disk.
+
+  **The checksum proves the download arrived intact, not that the release is
+  genuine**: whoever can publish a release can publish a matching checksum.
+  Artifact signing would close that and is not set up for this project; it is
+  said plainly in `docs/INSTALLATION.md` rather than left to be inferred.
+  `checksums.txt` is a new release asset — the workflow computed checksums only
+  for the Homebrew formula before.
+
+  **The daemon never replaces itself.** mddbd is a data server; an unexpected
+  restart is an incident. `mddbd --check-update` reports and exits — 0 up to
+  date, 10 an update exists, 1 the check failed, so a cron job can act on the
+  difference without parsing prose. The same check runs once in the background
+  after startup and its answer appears in `GET /health`, where an **absent**
+  `update` field means "we have not looked" rather than "nothing to report".
+  `MDDB_UPDATE_CHECK=0` turns it off.
+
+  Found while building it: the release workflow already passed
+  `-ldflags "-X main.Version=${VERSION}"` to mddb-cli, and **there was no
+  `main.Version` for it to write to**. Go's linker ignores `-X` for a symbol
+  that does not exist, silently, so every released mddb-cli reported the
+  `1.0.0` hardcoded into its command definition regardless of which release it
+  came from. Nothing caught it because nothing compared the two — until a
+  feature needed the binary to know its own version.
+
 - **A local embedding model is found without being configured (SRCH-001)** — a
   fresh install with no API key had no semantic search, which contradicts the
   "single binary, zero configuration" line this project takes everywhere else.

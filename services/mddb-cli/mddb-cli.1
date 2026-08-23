@@ -1,4 +1,4 @@
-.TH MDDB-CLI 1 "April 2026" "mddb-cli 2.9.16" "User Commands"
+.TH MDDB-CLI 1 "August 2026" "mddb-cli 2.12.0" "User Commands"
 .SH NAME
 mddb-cli \- command-line client for MDDB (Markdown Database)
 .SH SYNOPSIS
@@ -552,6 +552,34 @@ mddb-cli api-key delete abc123... --token $TOKEN
 mddb-cli --api-key mddb_live_xyz789... stats
 .fi
 .RE
+.SS self-update
+Update mddb-cli to the latest release.
+.PP
+.RS
+.nf
+mddb-cli self-update --check
+mddb-cli self-update
+.fi
+.RE
+.PP
+The release is fetched from a pinned GitHub URL and its SHA-256 checked against
+the release's checksums.txt before anything on disk is touched, so an
+interrupted or corrupted download leaves the working binary in place. The
+replacement is a rename within the same directory, which is atomic, and the
+previous binary is kept as
+.IR <path>.bak .
+.PP
+The checksum proves the download arrived intact. It does not prove the release
+is genuine: whoever can publish a release can publish a matching checksum.
+Artifact signing would close that and is not configured for this project.
+.PP
+A binary installed through snap or running inside a container is not replaced —
+the packaging channel owns it, and the command names the right one instead.
+.PP
+.B mddbd
+never replaces itself; see
+.B mddbd --check-update
+for the daemon's read-only equivalent.
 .SH GRAPHQL SUPPORT
 MDDB provides a GraphQL API alongside the REST API (disabled by default).
 .SS Enabling GraphQL on Server

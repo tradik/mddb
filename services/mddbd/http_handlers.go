@@ -523,6 +523,13 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if sessions := s.mcpSessionCounts(); sessions != nil {
 		body["mcpSessions"] = sessions
 	}
+	// OPS-019: the check runs once at startup, so this is a cached answer and
+	// costs the health endpoint nothing. Absent when the check is disabled or
+	// has not completed, which is how a monitoring system tells "no update" —
+	// available:false — from "we do not know".
+	if update := s.UpdateStatus; update != nil {
+		body["update"] = update
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)

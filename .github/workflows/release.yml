@@ -612,6 +612,25 @@ jobs:
           echo "--- release notes ---"
           head -40 release-notes.md
 
+      # OPS-019: `mddb-cli self-update` downloads a tarball and refuses to
+      # install it unless its SHA-256 matches this file. Names are flattened to
+      # basenames because that is how the downloader asks for them — it knows
+      # the artifact name, not which build job produced it.
+      #
+      # A checksum served from the same release as the binary proves the
+      # download arrived intact. It does not prove the release is genuine:
+      # whoever can publish a release can publish a matching checksum. Signing
+      # would close that and is not configured here; docs/INSTALLATION.md says
+      # so in the same words.
+      - name: Generate checksums.txt
+        run: |
+          find release-artifacts -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) \
+            -exec sha256sum {} + \
+            | sed 's#release-artifacts/[^ ]*/#*#' \
+            | sed 's#  \*#  #' > checksums.txt
+          echo "--- checksums.txt ---"
+          cat checksums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
@@ -624,6 +643,7 @@ jobs:
             release-artifacts/**/*.tar.gz
             release-artifacts/**/*.deb
             release-artifacts/**/*.rpm
+            checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

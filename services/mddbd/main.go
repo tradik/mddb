@@ -89,6 +89,10 @@ type Server struct {
 	QuantizedVecIndex *vector.QuantizedVectorIndex     // In-memory quantized vector index (int8/int4)
 	EmbeddingWorker   *EmbeddingWorker                 // Background embedding processor
 	Embedding         embedding.Provider               // Embedding generation provider
+	// UpdateStatus caches the startup release check (OPS-019). Nil when the
+	// check is disabled or has not finished, so /health can distinguish "no
+	// update" from "we have not looked".
+	UpdateStatus *UpdateStatus
 	// DetectedEmbedding records a provider found on this machine at startup
 	// rather than configured (SRCH-001). Nil whenever the provider came from
 	// the environment or from stored config, so /config can report where the
@@ -957,6 +961,11 @@ func main() {
 	// Mark server as ready — health check will now return "healthy" instead of "warming_up"
 	s.Ready = true
 	slog.Info("Server initialization complete — ready to serve")
+
+	// OPS-019: after ready, and in the background. Someone running a release
+	// with a security fix in it should not have to go looking to find that out,
+	// and a GitHub request must never delay a data server's startup.
+	_ = s.startUpdateCheck()
 
 	// Start HTTP server (with optional TLS). httpAddr may be a TCP host:port
 	// or a Unix Domain Socket (unix:/path/to/sock) — see listen_addr.go.
