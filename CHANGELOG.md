@@ -731,6 +731,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which is also why this is the v1-compatible surface and not
   `encoding/json/v2` directly.
 
+  Reported upstream with a minimised reproducer:
+  [goccy/go-json#604](https://github.com/goccy/go-json/issues/604). Our own
+  test replays six inputs over 20 000 iterations, which is evidence rather than
+  a bug report — narrowed for filing to **two inputs and ten iterations**,
+  deterministic across runs. Either input alone survives 20 000 iterations; the
+  pair alternating panics on the tenth call. It reproduces against a `struct`
+  and not against `map[string]any` or `any`, so it is `structDecoder`
+  specifically, reading past a buffer whose length appears to come from an
+  earlier call.
+
   Behaviour change: malformed input now returns an error where it previously
   crashed the process.
 
