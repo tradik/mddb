@@ -216,14 +216,14 @@ func (am *AutomationManager) evalHybrid(trigger *AutomationRule, doc *storage.Do
 		Collection: trigger.Collection,
 		Query:      trigger.Query,
 		TopK:       100,
-		Alpha:      0.5,
+		Alpha:      floatPtr(0.5),
 		Strategy:   "alpha",
 	}
 
 	// Override from searchParams if provided
 	if sp := trigger.SearchParams; sp != nil {
 		if v, ok := sp["alpha"].(float64); ok {
-			req.Alpha = v
+			req.Alpha = floatPtr(v)
 		}
 		if v, ok := sp["strategy"].(string); ok {
 			req.Strategy = v
@@ -262,7 +262,7 @@ func (am *AutomationManager) evalHybrid(trigger *AutomationRule, doc *storage.Do
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, req.RRFK, req.TopK)
 	default:
-		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, req.TopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(req.Alpha), req.TopK)
 	}
 
 	for _, m := range merged {
@@ -369,7 +369,7 @@ func (am *AutomationManager) runTriggerHybrid(trigger *AutomationRule) ([]Trigge
 		Collection:      trigger.Collection,
 		Query:           trigger.Query,
 		TopK:            100,
-		Alpha:           0.5,
+		Alpha:           floatPtr(0.5),
 		Strategy:        "alpha",
 		Algorithm:       "bm25",
 		VectorAlgorithm: "flat",
@@ -377,7 +377,7 @@ func (am *AutomationManager) runTriggerHybrid(trigger *AutomationRule) ([]Trigge
 
 	if sp := trigger.SearchParams; sp != nil {
 		if v, ok := sp["alpha"].(float64); ok {
-			req.Alpha = v
+			req.Alpha = floatPtr(v)
 		}
 		if v, ok := sp["strategy"].(string); ok {
 			req.Strategy = v
@@ -393,7 +393,7 @@ func (am *AutomationManager) runTriggerHybrid(trigger *AutomationRule) ([]Trigge
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, req.RRFK, req.TopK)
 	default:
-		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, req.TopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(req.Alpha), req.TopK)
 	}
 
 	var matches []TriggerMatch

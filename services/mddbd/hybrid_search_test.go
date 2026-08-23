@@ -2,9 +2,12 @@ package main
 
 import (
 	"math"
+	"testing"
+
+	json "github.com/goccy/go-json"
+
 	"mddb/internal/fts"
 	"mddb/internal/vector"
-	"testing"
 )
 
 // ---------- mergeAlpha ----------
@@ -271,6 +274,88 @@ func TestMergeRRF_TopKLimit(t *testing.T) {
 		if results[i].CombinedScore > results[i-1].CombinedScore {
 			t.Errorf("results not sorted: index %d (%.6f) > index %d (%.6f)",
 				i, results[i].CombinedScore, i-1, results[i-1].CombinedScore)
+		}
+	}
+}
+
+// SRCH-007. `alpha: 0` means pure keyword search. It is also what an omitted
+// field looks like in JSON, and the resolution used to be "treat it as
+// omitted" — so a client asking for zero semantics got 0.5, the opposite of
+// what it asked for, with nothing to indicate it had happened.
+func TestExplicitZeroAlphaIsHonoured(t *testing.T) {
+	_, srv, cleanup := directClientServer(t)
+	defer cleanup()
+
+	body := `{"collection":"c","query":"q","alpha":0,"strategy":"alpha"}`
+	var req HybridSearchRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatal(err)
+	}
+
+	if req.Alpha == nil {
+		t.Fatal("an explicit alpha of 0 parsed as absent")
+	}
+	if *req.Alpha != 0 {
+		t.Errorf("alpha = %v, want 0", *req.Alpha)
+	}
+	_ = srv
+}
+
+func TestOmittedAlphaIsDistinguishableFromZero(t *testing.T) {
+	var omitted HybridSearchRequest
+	if err := json.Unmarshal([]byte(`{"collection":"c","query":"q"}`), &omitted); err != nil {
+		t.Fatal(err)
+	}
+	if omitted.Alpha != nil {
+		t.Errorf("an omitted alpha parsed as %v, want absent", *omitted.Alpha)
+	}
+
+	var zero HybridSearchRequest
+	if err := json.Unmarshal([]byte(`{"collection":"c","query":"q","alpha":0}`), &zero); err != nil {
+		t.Fatal(err)
+	}
+	if zero.Alpha == nil {
+		t.Fatal("an explicit zero parsed as absent — the two are indistinguishable again")
+	}
+}
+
+func TestAlphaOrDefault(t *testing.T) {
+	if got := alphaOrDefault(nil); got != 0.5 {
+		t.Errorf("alphaOrDefault(nil) = %v, want the historical 0.5", got)
+	}
+	// Zero must survive: that is the whole point.
+	if got := alphaOrDefault(floatPtr(0)); got != 0 {
+		t.Errorf("alphaOrDefault(0) = %v, want 0", got)
+	}
+	if got := alphaOrDefault(floatPtr(0.75)); got != 0.75 {
+		t.Errorf("alphaOrDefault(0.75) = %v", got)
+	}
+}
+
+// mergeAlpha at 0 must return the keyword ranking and nothing else — the
+// behaviour a client asking for alpha 0 is actually after.
+func TestMergeAlphaAtZeroIsKeywordOnly(t *testing.T) {
+	fts := []fts.FTSResult{
+		{DocID: "keyword-winner", Score: 0.9},
+		{DocID: "keyword-second", Score: 0.4},
+	}
+	vectors := []vector.VectorResult{
+		{DocID: "vector-winner", Score: 0.99},
+	}
+
+	merged := mergeAlpha(fts, vectors, 0, 10)
+
+	if len(merged) == 0 {
+		t.Fatal("alpha 0 returned nothing")
+	}
+	if merged[0].Document.ID != "" && merged[0].FTSScore == 0 {
+		t.Errorf("the top result at alpha 0 carries no keyword score: %+v", merged[0])
+	}
+	// The vector-only document must not outrank the keyword winner when the
+	// vector side is weighted at zero.
+	for i, m := range merged {
+		if m.VectorScore > 0 && m.FTSScore == 0 && i == 0 {
+			t.Error("a vector-only match ranked first at alpha 0")
 		}
 	}
 }

@@ -7474,8 +7474,14 @@ components:
         alpha:
           type: number
           format: float
-          description: Alpha blending weight (0=keyword only, 1=semantic only, default
-            0.5). Only used with "alpha" strategy.
+          description: >-
+            Alpha blending weight: 0 = keyword only, 1 = semantic only. Used by
+            the "alpha" and "weighted" strategies.
+
+            Omit the field to take the collection's retrieval profile, or 0.5.
+            An explicit 0 means pure keyword search and is honoured as such
+            (SRCH-007) — it used to be indistinguishable from an omitted field
+            and was silently replaced with 0.5, the opposite of the request.
           minimum: 0
           maximum: 1
           default: 0.5

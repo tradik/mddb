@@ -526,6 +526,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`alpha: 0` was silently replaced with 0.5 (SRCH-007)** — zero means pure
+  keyword search, and it is also what an omitted field looks like in JSON. The
+  resolution treated it as omitted, so a client deliberately asking for zero
+  semantics got the opposite of its request with nothing to indicate it. There
+  was no way to ask for keyword-only through the `alpha` strategy at all; the
+  only workaround was `rrf`, which ranks differently. The field is now optional
+  in the request, so an explicit zero is distinguishable from silence — the
+  same distinction the collection profile already made with `hybridAlphaSet`.
+  The MCP surface still carries a plain number and is left as it was rather
+  than half-fixed, since bringing it along means a tool-schema change.
+
+
 - **33 dead links across the repository (DOC-013)** — README.md alone linked
   six pages that have never existed: `docs/PERFORMANCE.md`, `docs/AUTH.md`,
   `docs/FTS.md`, `docs/CLIENTS.md`, `docs/WEBHOOKS.md` and

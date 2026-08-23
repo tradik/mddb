@@ -799,7 +799,7 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		TopK:            topK,
 		Algorithm:       algo,
 		VectorAlgorithm: vectorAlgo,
-		Alpha:           alpha,
+		Alpha:           floatPtr(alpha),
 		Strategy:        strategy,
 		RRFK:            rrfK,
 		Fuzzy:           fuzzy,

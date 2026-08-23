@@ -680,7 +680,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		TopK:            req.TopK,
 		Algorithm:       req.Algorithm,
 		VectorAlgorithm: req.VectorAlgorithm,
-		Alpha:           req.Alpha,
+		Alpha:           floatPtr(req.Alpha),
 		Strategy:        req.Strategy,
 		RRFK:            req.RRFK,
 		Fuzzy:           req.Fuzzy,
@@ -713,8 +713,12 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if httpReq.RRFK <= 0 {
 		httpReq.RRFK = 60
 	}
-	if httpReq.Strategy == "alpha" && httpReq.Alpha == 0 {
-		httpReq.Alpha = 0.5
+	// SRCH-007: the MCP request carries a plain float, so this path cannot
+	// distinguish an omitted alpha from an explicit zero either. Left as it
+	// was rather than half-fixed — the HTTP surface now honours a zero, and
+	// bringing MCP with it means a shape change in the tool schema.
+	if httpReq.Strategy == "alpha" && httpReq.Alpha != nil && *httpReq.Alpha == 0 {
+		httpReq.Alpha = floatPtr(0.5)
 	}
 
 	var merged []HybridSearchResultItem
@@ -722,7 +726,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, httpReq.RRFK, httpReq.TopK)
 	default:
-		merged = mergeAlpha(ftsResults, vectorResults, httpReq.Alpha, httpReq.TopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(httpReq.Alpha), httpReq.TopK)
 	}
 
 	// Apply per-query boosts/demotions (metadata-based score multipliers).

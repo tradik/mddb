@@ -18,13 +18,20 @@ import (
 
 // HybridSearchRequest represents an HTTP hybrid search request.
 type HybridSearchRequest struct {
-	Collection      string  `json:"collection"`
-	Query           string  `json:"query"`
-	TopK            int     `json:"topK"`
-	Algorithm       string  `json:"algorithm"`       // FTS algorithm: "bm25" (default), "bm25f"
-	VectorAlgorithm string  `json:"vectorAlgorithm"` // vector algorithm: "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
-	Alpha           float64 `json:"alpha"`           // weight for alpha blending: 0=keyword only, 1=semantic only (default 0.5)
-	Strategy        string  `json:"strategy"`        // "alpha" (default), "rrf" or "weighted"
+	Collection      string `json:"collection"`
+	Query           string `json:"query"`
+	TopK            int    `json:"topK"`
+	Algorithm       string `json:"algorithm"`       // FTS algorithm: "bm25" (default), "bm25f"
+	VectorAlgorithm string `json:"vectorAlgorithm"` // vector algorithm: "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
+	// Alpha weights vector against keyword: 0 = keyword only, 1 = semantic
+	// only. Default 0.5.
+	//
+	// A pointer, because zero is meaningful here and JSON cannot tell an
+	// omitted number from a zero one (SRCH-007). Before this, a client asking
+	// for `alpha: 0` — pure keyword — was silently given 0.5, the opposite of
+	// what it asked for, with nothing to indicate it had happened.
+	Alpha    *float64 `json:"alpha,omitempty"`
+	Strategy string   `json:"strategy"` // "alpha" (default), "rrf" or "weighted"
 	// Signals configures the "weighted" strategy (SRCH-002). Ignored by the
 	// other strategies, so a request carrying both is not ambiguous — the
 	// strategy decides.
@@ -126,12 +133,21 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		req.VectorAlgorithm = "flat"
 	}
 	req.Strategy = s.ResolveHybridStrategy(req.Collection, req.Strategy, "alpha")
-	if req.Strategy == "alpha" && req.Alpha == 0 {
-		// The request cannot distinguish "alpha omitted" from "alpha 0"
-		// (see SRCH-010), so the profile slots in exactly where the
-		// hardcoded 0.5 sat — no behaviour change for a collection
-		// without one.
-		req.Alpha = s.ResolveHybridAlpha(req.Collection, 0, false, 0.5)
+	// alpha is resolved once here and used everywhere below, so the request
+	// struct stays the caller's words and never becomes a scratch pad.
+	var alpha float64
+	// Precedence: an explicit request alpha wins, then the collection's
+	// profile, then 0.5. An explicit 0 is a request, not an absence.
+	if req.Alpha != nil {
+		alpha = *req.Alpha
+	} else {
+		alpha = s.ResolveHybridAlpha(req.Collection, 0, false, 0.5)
+	}
+	if alpha < 0 {
+		alpha = 0
+	}
+	if alpha > 1 {
+		alpha = 1
 	}
 	if req.RRFK <= 0 {
 		req.RRFK = 60
@@ -239,10 +255,10 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		// SRCH-002: the base blend is alpha's, and the signals adjust it.
 		// Replacing the blend rather than adjusting it would throw away the
 		// keyword and vector scores that decide most of the ranking.
-		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, mergeTopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alpha, mergeTopK)
 		merged, signalBreakdowns = applyWeightedSignals(merged, req.Signals, time.Now())
 	default: // "alpha"
-		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, mergeTopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alpha, mergeTopK)
 	}
 
 	// Apply per-query boosts/demotions after merging — operates on CombinedScore.
@@ -309,13 +325,13 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		DistanceMetric:  distMetric,
 	}
 	if req.Strategy == "alpha" {
-		resp.Alpha = req.Alpha
+		resp.Alpha = alpha
 	}
 	if req.Strategy == "rrf" {
 		resp.RRFK = req.RRFK
 	}
 	if req.Strategy == "weighted" {
-		resp.Alpha = req.Alpha
+		resp.Alpha = alpha
 		resp.Signals = req.Signals.Defaults()
 		// The breakdown is trimmed alongside the results it explains: a
 		// breakdown for a result the caller never received explains nothing.
@@ -646,4 +662,19 @@ func (s *Server) loadHybridDocs(collection string, items []HybridSearchResultIte
 		return nil
 	})
 	return results
+}
+
+// floatPtr is how an internal caller states an alpha it means, as opposed to
+// one it left unset (SRCH-007).
+func floatPtr(v float64) *float64 { return &v }
+
+// alphaOrDefault reads an optional alpha, falling back to the historical 0.5.
+//
+// Used by callers that build a request in code rather than parsing one, where
+// "unset" is a programming choice rather than a client's silence.
+func alphaOrDefault(v *float64) float64 {
+	if v == nil {
+		return 0.5
+	}
+	return *v
 }
