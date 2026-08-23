@@ -526,6 +526,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A quoted phrase could not contain a quote (SRCH-008)** — in
+  `mode: "expression"`, an embedded quote closed the phrase early and the rest
+  of the query was reinterpreted as operators, so `"the "json" field"` searched
+  for something the user did not write and returned results with no sign
+  anything had gone wrong. `\"` and `\\` are now understood inside a phrase,
+  and a phrase with no closing quote is an error rather than a phrase silently
+  running to the end of the query.
+
+  The printer was fixed to match: `expr.String()` escapes what it emits, so a
+  logged query pasted back parses to the same expression. Restoring the
+  round-trip assertion in `FuzzQueryExpressionPrintReparses` immediately turned
+  up a second, unrelated case — the parser collapsed `NOT NOT x` to `x` but
+  kept `NOT(NOT x)` as a nested negation, so one query written two ways parsed
+  two ways. Double negation now collapses however it is written, and
+  `NOT(NOT 0)` is in the fuzz corpus as a regression seed. Ten million fuzz
+  executions since, with no failures; the parser file is at 97.6% coverage.
+
 - **A file in Latin-1 or Windows-1250 failed with a message about protobuf
   (GO-036)** — documents are stored through protobuf, whose `string` fields must
   be valid UTF-8, so a `.txt` in Windows-1250 — a large share of any archive
@@ -1096,6 +1113,8 @@ grace period — set the same if you run the image directly.
 - **Stale "What's New" and client-side version patching** — the homepage section now lists the actual v2.11.4 features, and every version string, download link and size figure is baked at build time from SSG `variables:` (`.Vars`) instead of being rewritten by inline JavaScript (2.1 KB of patching script removed; native changelog extraction tracked upstream as spagu/ssg#69).
 - **Size figures corrected** — the server binary is ~26MB (was advertised ~29MB) and the Docker image ~33MB; both are now `.Vars`-driven so they update in one place.
 - **Mermaid diagrams intermittently showing "Syntax error in text"** — the theme's copy-button script appended its "Copy" label into `pre.mermaid` blocks before the mermaid runtime read them; diagram blocks are now excluded from copy buttons.
+
+
 
 ## [2.11.4] - 2026-07-31
 

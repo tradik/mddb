@@ -85,7 +85,10 @@ func TestTokenize_Basics(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
-			got := tokenize(tc.in)
+			got, err := tokenize(tc.in)
+			if err != nil {
+				t.Fatalf("tokenize(%q): %v", tc.in, err)
+			}
 			if len(got) != len(tc.out) {
 				t.Fatalf("len(tokens)=%d want %d: %+v", len(got), len(tc.out), got)
 			}
@@ -98,11 +101,17 @@ func TestTokenize_Basics(t *testing.T) {
 	}
 }
 func TestTokenize_FuzzyAndProximityPayload(t *testing.T) {
-	toks := tokenize("color~2")
+	toks, err := tokenize("color~2")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(toks) < 1 || toks[0].typ != tokFuzzy || toks[0].s != "color" || toks[0].n != 2 {
 		t.Errorf("fuzzy payload mismatch: %+v", toks[0])
 	}
-	toks = tokenize(`"rust systems"~7`)
+	toks, err = tokenize(`"rust systems"~7`)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(toks) < 1 || toks[0].typ != tokProximity || toks[0].s != "rust systems" || toks[0].n != 7 {
 		t.Errorf("proximity payload mismatch: %+v", toks[0])
 	}

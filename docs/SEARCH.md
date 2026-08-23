@@ -141,6 +141,18 @@ Supported atoms inside an expression:
 
 Precedence from tightest to loosest: `NOT` > `AND` > `OR`. So `a AND b OR c` parses as `(a AND b) OR c`, while `a OR b AND c` parses as `a OR (b AND c)`.
 
+**Quotes inside a phrase** are escaped with a backslash, and a literal backslash is doubled:
+
+| Query | Phrase searched for |
+|---|---|
+| `"the \"json\" field"` | `the "json" field` |
+| `"a \\ b"` | `a \ b` |
+| `"unterminated` | error: *unterminated phrase: expected a closing quote* |
+
+Before v2.12.0 an embedded quote ended the phrase early and the rest of the query was reinterpreted as operators, so `"the "json" field"` silently searched for something else. A phrase with no closing quote is now an error rather than a phrase running to the end of the query.
+
+The parser normalises what it reads, so `expr.String()` returns a query that parses back to the same expression — worth knowing when a query is logged and pasted back. Double negation collapses (`NOT NOT rust` and `NOT(NOT rust)` are both `rust`), implicit AND is printed explicitly, and grouping is printed where precedence needs it.
+
 Examples:
 
 ```text

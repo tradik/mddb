@@ -72,16 +72,16 @@ func FuzzParseQueryExpression(f *testing.F) {
 	})
 }
 
-// FuzzQueryExpressionPrintReparses asserts the property the code actually
-// promises: whatever String() prints, the parser accepts.
+// FuzzQueryExpressionPrintReparses asserts that printing an expression is
+// idempotent: String() → parse → String() gives the same text.
 //
-// It deliberately does NOT assert that printing is idempotent. It is not, and
-// the reason is a real limitation rather than a bug in String(): the parser has
-// no escape syntax, so a phrase containing a double quote cannot be expressed
-// at all — `"say \"hi\" now"` is silently read as three AND-ed fragments
-// rather than rejected. Printing such a phrase and re-reading it therefore
-// yields a different expression. Found here, filed as SRCH-008; asserting
-// idempotence would just fail forever without fixing anything.
+// This target originally asserted only the weaker "whatever String() prints,
+// the parser accepts", because idempotence was false and the reason was a real
+// limitation: the parser had no escape syntax, so a phrase containing a double
+// quote could not be expressed at all — `"say \"hi\" now"` was silently read
+// as three AND-ed fragments rather than rejected, and printing it produced a
+// different expression. Filed as SRCH-008 and fixed there; the stronger
+// assertion is what SRCH-008 asked to have restored.
 func FuzzQueryExpressionPrintReparses(f *testing.F) {
 	for _, s := range []string{"cat AND dog", `"phrase"~3`, "NOT (a OR b)", "term~2", "wild*"} {
 		f.Add(s)
@@ -106,6 +106,13 @@ func FuzzQueryExpressionPrintReparses(f *testing.F) {
 		}
 		if reparsed == nil {
 			t.Fatalf("re-parsing %q returned no expression", printed)
+		}
+
+		// SRCH-008: the round trip must be stable. A second pass that differs
+		// means String() and the parser disagree about the syntax, which is
+		// how a logged query pasted back becomes a different query.
+		if again := reparsed.String(); again != printed {
+			t.Fatalf("printing is not idempotent:\n input:  %q\n first:  %q\n second: %q", q, printed, again)
 		}
 	})
 }

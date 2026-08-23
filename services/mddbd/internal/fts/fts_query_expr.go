@@ -41,7 +41,12 @@ type token struct {
 // permissive: malformed phrases (missing closing quote) consume to EOL
 // rather than returning an error, because search UX expects best-effort
 // parsing — a user mid-typing "machine learn should still get hits.
-func tokenize(q string) []token {
+// tokenize splits a query into tokens.
+//
+// Returns an error where the input cannot be tokenised at all — today only an
+// unterminated phrase (SRCH-008). Everything else the tokenizer meets has a
+// reading, and giving it one is better than refusing a query a person typed.
+func tokenize(q string) ([]token, error) {
 	var out []token
 	runes := []rune(q)
 	i := 0
@@ -69,23 +74,47 @@ func tokenize(q string) []token {
 				i++
 			}
 		case r == '"':
+			// SRCH-008: a phrase containing a quote used to be unexpressible.
+			// `"say \"hi\" now"` was not rejected — it was silently parsed as
+			// three fragments joined by an implicit AND, so the caller got
+			// results for a different query with no way to notice.
+			//
+			// The escape syntax is deliberately two sequences and no more:
+			// `\"` is a literal quote, `\\` is a literal backslash. A
+			// backslash before anything else stays a backslash, because
+			// Windows paths and regex-looking terms are common in the corpora
+			// this searches and inventing meanings for `\d` would break them.
 			i++
-			start := i
-			for i < len(runes) && runes[i] != '"' {
+			var phrase strings.Builder
+			terminated := false
+			for i < len(runes) {
+				if runes[i] == '\\' && i+1 < len(runes) &&
+					(runes[i+1] == '"' || runes[i+1] == '\\') {
+					phrase.WriteRune(runes[i+1])
+					i += 2
+					continue
+				}
+				if runes[i] == '"' {
+					terminated = true
+					break
+				}
+				phrase.WriteRune(runes[i])
 				i++
 			}
-			phrase := string(runes[start:i])
-			if i < len(runes) {
-				i++ // consume closing quote
+			if !terminated {
+				// An unterminated phrase used to parse as something else
+				// entirely. Reporting it is the only way a caller finds out.
+				return nil, fmt.Errorf("unterminated phrase: expected a closing quote")
 			}
+			i++ // consume closing quote
 			// Check for proximity suffix: "..."~N
 			if i < len(runes) && runes[i] == '~' {
 				i++
 				n, consumed := readInt(runes[i:])
 				i += consumed
-				out = append(out, token{typ: tokProximity, s: phrase, n: n})
+				out = append(out, token{typ: tokProximity, s: phrase.String(), n: n})
 			} else {
-				out = append(out, token{typ: tokPhrase, s: phrase})
+				out = append(out, token{typ: tokPhrase, s: phrase.String()})
 			}
 		default:
 			// Bare word: read until whitespace / special char.
@@ -121,7 +150,7 @@ func tokenize(q string) []token {
 		}
 	}
 	out = append(out, token{typ: tokEOF})
-	return out
+	return out, nil
 }
 
 // keywordToken recognizes reserved words case-insensitively. Returns a
@@ -204,14 +233,38 @@ func (p *PhraseExpr) exprNode()    {}
 func (p *ProximityExpr) exprNode() {}
 func (w *WildcardExpr) exprNode()  {}
 
-func (a *AndExpr) String() string       { return "(" + a.Left.String() + " AND " + a.Right.String() + ")" }
-func (o *OrExpr) String() string        { return "(" + o.Left.String() + " OR " + o.Right.String() + ")" }
-func (n *NotExpr) String() string       { return "NOT " + n.Inner.String() }
-func (t *TermExpr) String() string      { return t.Term }
-func (f *FuzzyExpr) String() string     { return fmt.Sprintf("%s~%d", f.Term, f.Distance) }
-func (p *PhraseExpr) String() string    { return fmt.Sprintf("%q", p.Phrase) }
-func (p *ProximityExpr) String() string { return fmt.Sprintf("%q~%d", p.Phrase, p.Distance) }
-func (w *WildcardExpr) String() string  { return w.Pattern }
+func (a *AndExpr) String() string    { return "(" + a.Left.String() + " AND " + a.Right.String() + ")" }
+func (o *OrExpr) String() string     { return "(" + o.Left.String() + " OR " + o.Right.String() + ")" }
+func (n *NotExpr) String() string    { return "NOT " + n.Inner.String() }
+func (t *TermExpr) String() string   { return t.Term }
+func (f *FuzzyExpr) String() string  { return fmt.Sprintf("%s~%d", f.Term, f.Distance) }
+func (p *PhraseExpr) String() string { return quotePhrase(p.Phrase) }
+func (p *ProximityExpr) String() string {
+	return fmt.Sprintf("%s~%d", quotePhrase(p.Phrase), p.Distance)
+}
+
+// quotePhrase renders a phrase so the parser reads it back unchanged.
+//
+// Not %q: Go's quoting escapes control characters as \x03 and \n, sequences
+// this parser does not understand, so String() produced output it could not
+// re-parse. Only the two characters the escape syntax defines are escaped, and
+// everything else — including control characters — is written literally,
+// because a phrase is matched against document text where those bytes appear
+// as themselves.
+func quotePhrase(phrase string) string {
+	var b strings.Builder
+	b.Grow(len(phrase) + 2)
+	b.WriteByte('"')
+	for _, r := range phrase {
+		if r == '"' || r == '\\' {
+			b.WriteByte('\\')
+		}
+		b.WriteRune(r)
+	}
+	b.WriteByte('"')
+	return b.String()
+}
+func (w *WildcardExpr) String() string { return w.Pattern }
 
 // --- Parser ---
 
@@ -243,7 +296,11 @@ func ParseQueryExpression(q string) (QueryExpr, error) {
 	if q == "" {
 		return nil, ErrEmptyQueryExpression
 	}
-	p := &parser{tokens: tokenize(q)}
+	tokens, err := tokenize(q)
+	if err != nil {
+		return nil, err
+	}
+	p := &parser{tokens: tokens}
 	expr, err := p.parseOr()
 	if err != nil {
 		return nil, err
@@ -328,9 +385,23 @@ func (p *parser) parseNot() (QueryExpr, error) {
 		return nil, err
 	}
 	if negated {
-		return &NotExpr{Inner: atom}, nil
+		return negate(atom), nil
 	}
 	return atom, nil
+}
+
+// negate wraps an expression in NOT, collapsing a double negation.
+//
+// SRCH-008: the loop above already collapses adjacent NOTs, so `NOT NOT x`
+// parsed to `x`. Parentheses hid it — `NOT(NOT x)` produced a nested NotExpr
+// for the same logic, so two ways of writing one query parsed differently and
+// printing the second was not idempotent. Found by
+// FuzzQueryExpressionPrintReparses once the stronger assertion went back in.
+func negate(expr QueryExpr) QueryExpr {
+	if inner, ok := expr.(*NotExpr); ok {
+		return inner.Inner
+	}
+	return &NotExpr{Inner: expr}
 }
 
 // parseAtom handles the leaf forms: term / phrase / wildcard / fuzzy and
