@@ -587,6 +587,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Document keys are case-insensitive, and now say so (DOC-016)** — `genID`
+  lowercases when it builds a document's identifier, so `README.md`,
+  `readme.md` and `ReadMe.md` are one document. Deliberate, sensible for
+  URL-shaped keys, and documented nowhere. Ingesting a source repository is
+  where it bites: `Makefile` and `makefile`, `README` and `readme` are separate
+  files on disk and one document here, and the second import replaced the
+  first's content without a word.
+
+  Checking it rather than reading it turned up worse than the ticket described.
+  The key index stores the key **exactly as written** while the identifier is
+  normalised, so storage is case-insensitive and lookup is case-sensitive —
+  two answers to the same question in one code path. Written as `README.md`,
+  looked up as `readme.md`: not found, though both keys name the same
+  identifier.
+
+  `/v1/ingest` now returns `keyCollisions` naming the spellings involved, in
+  arrival order, so which write replaced which is visible. The write still
+  happens — refusing a 200 000 document import over a spelling would be worse —
+  but it is no longer silent. A key sent twice verbatim is an ordinary
+  overwrite and is not reported, or every re-import would cry wolf.
+
+  Deleting a collection now clears its key entries by prefix in one cursor pass
+  rather than one spelling per document, so nothing can survive it; batch
+  deletes clear the requested spelling and the stored one, which is the pair
+  that actually occurs. Aligning the index with the identifier would fix all of
+  this by construction and is not done here: the index key is on-disk format,
+  there is no migration machinery in the tree, and rewriting a format without
+  one is the upgrade failure this project says it does not ship.
+
 - **gRPC saw half a collection's configuration (GO-035)** —
   `CollectionConfigProto` carried 8 of `CollectionConfig`'s 18 fields, so a
   gRPC client could neither read nor set `storageBackend`, `storageConfig`,

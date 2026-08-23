@@ -78,6 +78,16 @@ type IngestResponseHTTP struct {
 	// how a corpus quietly loses characters. Single-document writes refuse
 	// instead; see text_encoding.go.
 	Sanitized int `json:"sanitized,omitempty"`
+	// KeyCollisions reports input keys that differ only in letter case and
+	// therefore name one document (DOC-016).
+	//
+	// Document identifiers are case-insensitive, the key index is not, and the
+	// gap is silent: the later write replaces the earlier one's content, both
+	// spellings still resolve, and the response otherwise reports two
+	// successful writes. Silence is the worst available behaviour here, so the
+	// collisions are named — importing a repository holding both `README.md`
+	// and `readme.md` should not be something you find out about later.
+	KeyCollisions []string `json:"keyCollisions,omitempty"`
 }
 
 // handleIngest handles POST /v1/ingest
@@ -153,6 +163,8 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 		// path — the first version assigned it only in the early return
 		// below, and every successful import reported zero.
 		Sanitized: sanitized,
+		// DOC-016: reported on every path, including the empty one below.
+		KeyCollisions: describeKeyCollisions(docs),
 	}
 
 	if len(protoDocs) == 0 {

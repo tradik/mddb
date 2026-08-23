@@ -420,10 +420,31 @@ Upload files via multipart/form-data. Files are auto-converted to Markdown and s
 - `file` or `files[]` (required): One or more files to upload. Supported formats: `.md`, `.txt`, `.html`, `.htm`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.yaml`, `.yml`, `.log`, `.lex`, `.tex`, `.latex`
 - `collection` (required): Target collection name
 - `lang` (required): Document language code (e.g. `en_US`, `pl_PL`)
-- `key` (optional): Document key — if empty, derived from filename (lowercase, spaces→hyphens, extension stripped)
+- `key` (optional): Document key — if empty, derived from filename (lowercase, spaces→hyphens, extension stripped). **Keys resolve case-insensitively** — see below
 - `meta` (optional): JSON-encoded metadata map, e.g. `{"category":["docs"]}`
 - `ttl` (optional): Time-to-live in seconds (0 = no expiry)
 - `maxSize` (optional): Per-file size limit in bytes (default: 10MB, max: 100MB)
+
+### Document keys are case-insensitive
+
+A document's identity is built by lowercasing the collection, key and language,
+so **`README.md`, `readme.md` and `ReadMe.md` are one document**. This is
+deliberate and suits URL-shaped keys, but it has consequences worth stating
+plainly, because none of them announce themselves:
+
+- Writing two spellings leaves **one** document holding whichever content
+  arrived last. The earlier content is gone.
+- `/v1/ingest` reports this in a `keyCollisions` array when a batch contains
+  keys differing only in case. The write still happens — refusing a 200 000
+  document import over a spelling would be worse — but it is no longer silent.
+- Ingesting a source repository is where this bites: `Makefile` and `makefile`,
+  `README` and `readme`, `Dockerfile` and `dockerfile` are distinct files on a
+  case-sensitive filesystem and one document here.
+
+The **key index**, unlike the identifier, stores the key exactly as written. So
+a document written as `README.md` is fetched by that spelling; fetching
+`readme.md` finds it only if that spelling was also written at some point.
+Aligning the two is an on-disk format change and is tracked separately.
 
 **Format Conversion**:
 | Format | Extension | Conversion |

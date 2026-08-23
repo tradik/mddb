@@ -6307,6 +6307,19 @@ components:
             explicitly overrides the preset, so `fast` plus `saveRevision: true`
             keeps revisions. An unknown name is rejected with 400 rather than
             falling back silently.
+        keyCollisions:
+          type: array
+          items:
+            type: string
+          description: |
+            (v2.12.0+) Input keys that differ only in letter case and therefore
+            name one document — `README.md` and `readme.md` are the same
+            document, and the last write wins.
+
+            The write still happens; refusing a large import over a spelling
+            would be worse. Absent when there are no collisions.
+          example:
+            - '"README.md" and "readme.md" name one document (keys are case-insensitive); the last write wins'
         textOnly:
           type: boolean
           default: false

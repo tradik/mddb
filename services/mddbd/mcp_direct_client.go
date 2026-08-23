@@ -396,9 +396,6 @@ func (c *DirectClient) DeleteCollection(ctx context.Context, req *MCPDeleteColle
 			if err := bDocs.Delete(k); err != nil {
 				return err
 			}
-			if err := bByK.Delete(storage.ByKeyKey(req.Collection, doc.Key, doc.Lang)); err != nil {
-				return err
-			}
 
 			rc := bRev.Cursor()
 			rp := storage.RevPrefix(req.Collection, doc.ID)
@@ -419,7 +416,11 @@ func (c *DirectClient) DeleteCollection(ctx context.Context, req *MCPDeleteColle
 
 			deletedCount++
 		}
-		return nil
+
+		// DOC-016: every key-index entry for this collection, cleared by
+		// prefix rather than one spelling per document — see
+		// document_key_case.go.
+		return deleteCollectionByKeyEntries(bByK, req.Collection, nil)
 	})
 	if err != nil {
 		return nil, err
