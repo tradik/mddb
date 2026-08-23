@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A benchmark for the vector batch kernel (SRCH-009)** — `internal/vector`
+  ships two implementations of its maths behind build tags, scalar and
+  NEON/SME, and both export a batch kernel the search path never calls. The
+  ticket asked whether wiring it up was worth the storage-layout change it
+  needs. Measured rather than assumed: on the scalar build the batch kernel
+  *is* the per-vector loop, and the two come out within 1% at every size from
+  1 000 to 100 000 candidates. Not rewired; the benchmark is in the tree so the
+  arm64 measurement is one command on hardware that can show a difference.
+
+  The measurement also killed a plausible-looking optimisation before it
+  shipped. `CosineSimilarity` recomputes the query's norm for every candidate,
+  which looks like a third of the arithmetic given away — hoisting it out is
+  worth **1.5%**. The candidate's bytes are the bottleneck, not the multiplies,
+  so doing fewer multiplies over the same bytes changes nothing.
+
 - **A scenario's display name is finally used (RUST-001)** — a chat scenario has
   two names: the TOML table key (`[scenarios.assistant]`) that a client sends to
   open a session, and `name`, the label people read. Nothing read the second, so
