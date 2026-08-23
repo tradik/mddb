@@ -18,17 +18,21 @@ import (
 
 // HybridSearchRequest represents an HTTP hybrid search request.
 type HybridSearchRequest struct {
-	Collection      string              `json:"collection"`
-	Query           string              `json:"query"`
-	TopK            int                 `json:"topK"`
-	Algorithm       string              `json:"algorithm"`       // FTS algorithm: "bm25" (default), "bm25f"
-	VectorAlgorithm string              `json:"vectorAlgorithm"` // vector algorithm: "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
-	Alpha           float64             `json:"alpha"`           // weight for alpha blending: 0=keyword only, 1=semantic only (default 0.5)
-	Strategy        string              `json:"strategy"`        // "alpha" (default) or "rrf"
-	RRFK            int                 `json:"rrfK"`            // RRF parameter k (default 60)
-	Fuzzy           int                 `json:"fuzzy"`           // typo tolerance: 0, 1, 2
-	Threshold       float64             `json:"threshold"`       // min vector similarity 0-1
-	DistanceMetric  string              `json:"distanceMetric"`  // "cosine" (default), "dot_product", "euclidean"
+	Collection      string  `json:"collection"`
+	Query           string  `json:"query"`
+	TopK            int     `json:"topK"`
+	Algorithm       string  `json:"algorithm"`       // FTS algorithm: "bm25" (default), "bm25f"
+	VectorAlgorithm string  `json:"vectorAlgorithm"` // vector algorithm: "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
+	Alpha           float64 `json:"alpha"`           // weight for alpha blending: 0=keyword only, 1=semantic only (default 0.5)
+	Strategy        string  `json:"strategy"`        // "alpha" (default), "rrf" or "weighted"
+	// Signals configures the "weighted" strategy (SRCH-002). Ignored by the
+	// other strategies, so a request carrying both is not ambiguous — the
+	// strategy decides.
+	Signals         FusionSignals       `json:"signals,omitempty"`
+	RRFK            int                 `json:"rrfK"`           // RRF parameter k (default 60)
+	Fuzzy           int                 `json:"fuzzy"`          // typo tolerance: 0, 1, 2
+	Threshold       float64             `json:"threshold"`      // min vector similarity 0-1
+	DistanceMetric  string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
 	FilterMeta      map[string][]string `json:"filterMeta"`
 	Geo             *HybridGeoFilter    `json:"geo,omitempty"` // optional spatial pre-filter
 	IncludeContent  bool                `json:"includeContent"`
@@ -72,14 +76,20 @@ type HybridSearchResultItem struct {
 
 // HybridSearchResponse represents the response from hybrid search.
 type HybridSearchResponse struct {
-	Results         []HybridSearchResultItem `json:"results"`
-	Total           int                      `json:"total"`
-	Strategy        string                   `json:"strategy"`
-	Alpha           float64                  `json:"alpha,omitempty"`
-	RRFK            int                      `json:"rrfK,omitempty"`
-	FTSAlgorithm    string                   `json:"ftsAlgorithm"`
-	VectorAlgorithm string                   `json:"vectorAlgorithm"`
-	DistanceMetric  string                   `json:"distanceMetric"`
+	Results []HybridSearchResultItem `json:"results"`
+	Total   int                      `json:"total"`
+	// Signals echoes the weights the "weighted" strategy applied, defaults
+	// filled in, so a caller can see what it actually got (SRCH-002).
+	Signals FusionSignals `json:"signals,omitempty"`
+	// SignalBreakdown reports each signal's contribution per result, in the
+	// same order. A reranking nobody can explain is a reranking nobody trusts.
+	SignalBreakdown []SignalBreakdown `json:"signalBreakdown,omitempty"`
+	Strategy        string            `json:"strategy"`
+	Alpha           float64           `json:"alpha,omitempty"`
+	RRFK            int               `json:"rrfK,omitempty"`
+	FTSAlgorithm    string            `json:"ftsAlgorithm"`
+	VectorAlgorithm string            `json:"vectorAlgorithm"`
+	DistanceMetric  string            `json:"distanceMetric"`
 	// ContextTruncated reports that the collection's contextTokenBudget
 	// dropped results from the tail (RAG-001).
 	ContextTruncated bool         `json:"contextTruncated,omitempty"`
@@ -134,7 +144,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate strategy
-	if req.Strategy != "alpha" && req.Strategy != "rrf" {
+	if req.Strategy != "alpha" && req.Strategy != "rrf" && req.Strategy != "weighted" {
 		bad(w, fmt.Errorf("unknown strategy: %s, available: alpha, rrf", req.Strategy))
 		return
 	}
@@ -221,9 +231,16 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var merged []HybridSearchResultItem
+	var signalBreakdowns []SignalBreakdown
 	switch req.Strategy {
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, req.RRFK, mergeTopK)
+	case "weighted":
+		// SRCH-002: the base blend is alpha's, and the signals adjust it.
+		// Replacing the blend rather than adjusting it would throw away the
+		// keyword and vector scores that decide most of the ranking.
+		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, mergeTopK)
+		merged, signalBreakdowns = applyWeightedSignals(merged, req.Signals, time.Now())
 	default: // "alpha"
 		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, mergeTopK)
 	}
@@ -296,6 +313,15 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Strategy == "rrf" {
 		resp.RRFK = req.RRFK
+	}
+	if req.Strategy == "weighted" {
+		resp.Alpha = req.Alpha
+		resp.Signals = req.Signals.Defaults()
+		// The breakdown is trimmed alongside the results it explains: a
+		// breakdown for a result the caller never received explains nothing.
+		if len(signalBreakdowns) >= len(items) {
+			resp.SignalBreakdown = signalBreakdowns[:len(items)]
+		}
 	}
 	resp.ContextTruncated = contextTruncated
 

@@ -941,7 +941,7 @@ paths:
 
         Results are ranked by cosine similarity score. Use `threshold` to filter out low-relevance results. Use `filterMeta` to narrow results by metadata before ranking.
 
-        Use `algorithm` to select the search strategy: `flat` (exact), `hnsw` (fast approximate), `ivf` (clustered), or `pq` (compressed). See [Search Algorithms](SEARCH.md) for details.
+        Use `algorithm` to select the search strategy: `flat` (exact), `hnsw` (fast approximate), `ivf` (clustered), or one of the quantized indexes `pq`/`opq`/`sq`/`sq4`/`bq` (compressed, smallest first). See [Search Algorithms](SEARCH.md) for details.
       operationId: vectorSearch
       requestBody:
         required: true
@@ -1637,7 +1637,7 @@ paths:
 
         **FTS algorithms:** `bm25` (default), `bm25f` (field-weighted).
 
-        **Vector algorithms:** `flat` (default), `hnsw`, `ivf`, `pq`, `sq`.
+        **Vector algorithms:** `flat` (default), `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`.
 
         Use `filterMeta` to pre-filter by metadata before both FTS and vector scoring.
       operationId: hybridSearch
@@ -6544,13 +6544,21 @@ components:
           example: false
         algorithm:
           type: string
-          enum: [ flat, hnsw, ivf, pq, opq, sq, bq, quantized ]
+          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq, quantized ]
           description: |
             Search algorithm to use (default "flat").
             - **flat**: Exact brute-force cosine similarity (most accurate, slower for large datasets)
             - **hnsw**: Hierarchical Navigable Small World graph (fast approximate, best general-purpose)
             - **ivf**: Inverted File Index with k-means clustering (good for large datasets)
             - **pq**: Product Quantization (compressed, lowest memory, slightly less accurate)
+            - **opq**: Optimised Product Quantization — PQ with a learned rotation
+            - **sq**: Scalar Quantization to 8 bits per dimension (4x smaller than float32)
+            - **sq4**: Scalar Quantization to 4 bits, two dimensions per byte (8x smaller).
+              Measured at 99.5% of `sq`'s recall@10 for half its storage — see
+              `TestQuantizerRecallCurve`. Reach for it when a collection no longer
+              fits in RAM at `sq`.
+            - **bq**: Binary Quantization to 1 bit per dimension (32x smaller, much coarser)
+            - **quantized**: Follows the collection's own `quantization` setting
           default: flat
           example: flat
         distanceMetric:
@@ -7375,17 +7383,22 @@ components:
           example: bm25
         vectorAlgorithm:
           type: string
-          enum: [ flat, hnsw, ivf, pq, opq, sq, bq ]
+          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq ]
           description: Vector search algorithm (default "flat")
           default: flat
           example: flat
+        signals:
+          $ref: "#/components/schemas/FusionSignals"
         strategy:
           type: string
-          enum: [ alpha, rrf ]
+          enum: [ alpha, rrf, weighted ]
           description: |
             Fusion strategy (default "alpha").
             - **alpha**: Weighted blending — `combined = (1-alpha) * normalizedFTS + alpha * vectorScore`
             - **rrf**: Reciprocal Rank Fusion — `score = 1/(k + rank_fts) + 1/(k + rank_vector)`
+            - **weighted** (SRCH-002): alpha's blend, then adjusted by the
+              signals in `signals`. Nothing changes unless a weight is set, and
+              `alpha`/`rrf` are unaffected.
           default: alpha
           example: alpha
         alpha:
@@ -7634,6 +7647,79 @@ components:
           type: integer
           format: int64
       required: [ collection, query ]
+
+    FusionSignals:
+      type: object
+      description: |
+        Ranking signals for the `weighted` hybrid strategy (SRCH-002).
+
+        **A weight is a fraction of the result's own score**: `proximity: 0.1`
+        means "up to 10% better", `diversity: 0.8` means "up to 80% worse".
+        That keeps the signals scale-free, and makes large weights genuinely
+        powerful — at 1.0 a proximity bonus can carry a result past one scoring
+        half again as much. Weights are clamped to [0, 1].
+
+        Every weight defaults to 0, so a `weighted` request with no signals
+        behaves exactly like `alpha`.
+      properties:
+        diversity:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Penalise a result that is a near-copy of a higher-ranked one,
+            measured by text overlap. A vector score cannot do this: near-copies
+            have near-identical embeddings, so similarity rewards the
+            duplication. Suggested range 0.5-1.0.
+          example: 0.8
+        diversityThreshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.5
+          description: Overlap below which two documents count as unrelated.
+        proximity:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Reward a result whose key shares a directory with a higher-ranked
+            one. Suggested range 0.05-0.15.
+          example: 0.1
+        freshness:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Reward recently updated documents on an exponential decay. Off by
+            default because it is wrong for reference material — an API
+            specification does not become less true with age. Suggested range
+            0.05-0.2.
+          example: 0.1
+        freshnessHalfLifeDays:
+          type: number
+          default: 180
+          description: How long the freshness bonus takes to halve.
+
+    SignalBreakdown:
+      type: object
+      description: >-
+        What each signal contributed to one result, in the same order as
+        `results`. Returned by the `weighted` strategy, because a reranking
+        nobody can explain is a reranking nobody trusts.
+      properties:
+        base:
+          type: number
+          description: The score before any signal applied
+        diversity:
+          type: number
+          description: Negative — the near-duplicate penalty
+        proximity:
+          type: number
+        freshness:
+          type: number
+        final:
+          type: number
 
     PersistenceStatus:
       type: object
@@ -8619,7 +8705,7 @@ components:
           description: Granularity — whole document, matching passage, or passage with neighbours.
         hybridStrategy:
           type: string
-          enum: [ alpha, rrf ]
+          enum: [ alpha, rrf, weighted ]
           description: Hybrid fusion strategy.
         hybridAlpha:
           type: number
@@ -9030,10 +9116,19 @@ components:
           description: Collection to scan
         mode:
           type: string
-          enum: [ exact, similar, both ]
+          enum: [ exact, similar, minhash, both ]
           default: both
-          description: "Detection mode: exact (content hash), similar (embedding
-            similarity), or both"
+          description: |
+            Detection mode.
+            - **exact**: identical content hashes
+            - **similar**: close embeddings — finds documents on the same
+              topic, and needs an embedding provider configured
+            - **minhash**: overlapping text (SRCH-002) — finds a page that was
+              forked and lightly edited, which `exact` misses and `similar`
+              cannot distinguish from two independent pages on one subject.
+              Needs no embeddings.
+            - **both**: exact and similar. Deliberately excludes `minhash`,
+              which reads every document body.
         threshold:
           type: number
           minimum: 0
@@ -9087,7 +9182,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [ exact, similar ]
+          enum: [ exact, similar, minhash ]
         documents:
           type: array
           items:

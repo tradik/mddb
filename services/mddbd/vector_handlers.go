@@ -26,7 +26,7 @@ type VectorSearchRequest struct {
 	Threshold      float64             `json:"threshold"`
 	FilterMeta     map[string][]string `json:"filterMeta"`
 	IncludeContent bool                `json:"includeContent"`
-	Algorithm      string              `json:"algorithm"`      // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
+	Algorithm      string              `json:"algorithm"`      // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	DistanceMetric string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
 	RetrievalMode  string              `json:"retrievalMode"`  // "parent" (default), "chunk", "window"
 	WindowSize     int                 `json:"windowSize"`     // neighbor chunks per side in "window" mode (default 1)

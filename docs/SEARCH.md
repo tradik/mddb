@@ -630,6 +630,43 @@ Compresses vectors by quantizing each float32 dimension to uint8 (8-bit). Simple
 
 **When to use:** Medium to large collections where you need memory savings with better accuracy than PQ. Good middle ground between flat and PQ.
 
+### SQ4 (4-bit Scalar Quantization)
+
+Half of SQ's storage: four bits per dimension, two dimensions packed into each
+byte. Fills the gap between `sq` (4x smaller than float32) and `bq` (32x
+smaller but much coarser).
+
+| Property | Value |
+|----------|-------|
+| Accuracy | **99.5% of `sq`'s recall@10** — measured, see below |
+| Speed | Fast (16-entry distance table per dimension) |
+| Memory | **8x compression** (0.5 bytes per dimension) |
+| Build time | O(n log n) — per-dimension percentiles |
+| Parameters | Automatic calibration |
+
+Two design decisions distinguish it from a naive 4-bit quantizer:
+
+- **Percentile boundaries, not min/max.** With only sixteen levels, one outlier
+  stretching the range collapses every ordinary value into two or three codes.
+  The range is clipped at the 1st and 99th percentile per dimension, which
+  costs accuracy on the 2% outside and buys it back on the 98% inside.
+- **Asymmetric distances.** The query stays float32; only stored vectors are
+  quantized, so the query contributes no quantization error of its own.
+
+Measured on 2 000 clustered 384-dimension vectors, 200 queries, recall@10
+against exact cosine search (`go test ./internal/vector -run
+TestQuantizerRecallCurve -v`):
+
+| Quantizer | recall@10 | bytes/vector | vs float32 |
+|---|---|---|---|
+| `flat` (float32) | 1.000 | 1536 | 1x |
+| `sq` (int8) | 1.000 | 384 | 4x |
+| **`sq4` (int4)** | **0.995** | **192** | **8x** |
+| `bq` (1 bit) | 0.581 | 48 | 32x |
+
+**When to use:** a collection that no longer fits in RAM at `sq`. The recall
+difference is within a rounding error of int8; the storage is half.
+
 ### BQ (Binary Quantization)
 
 Extreme compression by converting each float32 dimension to a single bit (1 if positive, 0 if negative). Uses Hamming distance for fast comparison.
@@ -928,7 +965,7 @@ score = 1/(k + rank_fts) + 1/(k + rank_vector)
 | `alpha` | `0.5` | Weight for alpha blending (0-1) |
 | `rrfK` | `60` | RRF k parameter |
 | `algorithm` | `"bm25"` | FTS algorithm: `"bm25"`, `"bm25f"`, `"pmisparse"` |
-| `vectorAlgorithm` | `"flat"` | Vector algorithm: `"flat"`, `"hnsw"`, `"ivf"`, `"pq"`, `"opq"`, `"sq"`, `"bq"` |
+| `vectorAlgorithm` | `"flat"` | Vector algorithm: `"flat"`, `"hnsw"`, `"ivf"`, `"pq"`, `"opq"`, `"sq"`, `"sq4"`, `"bq"` |
 | `topK` | `10` | Number of results to return |
 | `fuzzy` | `0` | Typo tolerance for FTS (0, 1, 2) |
 | `threshold` | `0.0` | Minimum vector similarity |
@@ -1047,6 +1084,64 @@ curl -X POST http://localhost:11023/v1/hybrid-search \
 }
 ```
 
+### Weighted (multi-signal fusion, v2.12.0+)
+
+`alpha` and `rrf` both answer one question: how well does this document match
+the query. There are cheap signals they cannot see, and the one that matters
+most is duplication.
+
+If a runbook was forked per environment, the four copies score almost
+identically — and a vector score makes it worse, because near-copies have
+near-identical embeddings, so similarity *rewards* the duplication. An agent
+reading the top four results reads the same document four times.
+
+`weighted` takes alpha's blend and adjusts it:
+
+```bash
+curl -s -X POST "$MDDB/v1/hybrid-search" -d '{
+  "collection": "runbooks",
+  "query": "restart the service",
+  "strategy": "weighted",
+  "alpha": 0.5,
+  "signals": {
+    "diversity": 0.8,
+    "proximity": 0.1
+  }
+}'
+```
+
+| Signal | What it does | Suggested |
+|---|---|---|
+| `diversity` | Penalises a near-copy of a higher-ranked result, by **text overlap** (MinHash), not embedding distance | 0.5–1.0 |
+| `proximity` | Rewards a result sharing a directory with a higher-ranked one | 0.05–0.15 |
+| `freshness` | Rewards recently updated documents, exponential decay | 0.05–0.2 |
+
+**A weight is a fraction of the result's own score.** `proximity: 0.1` means
+"up to 10% better". That keeps the signals scale-free, and makes large weights
+genuinely powerful — at 1.0 a proximity bonus can carry a result past one
+scoring half again as much. Weights are clamped to [0, 1].
+
+Measured on a corpus with one document forked into four near-copies plus three
+distinct answers (`go test -run TestDiversitySignalImprovesTopKCoverage -v`):
+
+| | Distinct documents in the top 4 |
+|---|---|
+| Without the signal | **1** |
+| `diversity: 0.8` | **4** |
+
+The response carries a `signalBreakdown` in the same order as the results, so
+what each signal contributed is visible rather than inferred:
+
+```json
+{ "base": 0.94, "diversity": -0.71, "final": 0.23 }
+```
+
+Freshness is off by default and should stay off for reference material: an API
+specification does not become less true with age.
+
+**Nothing changes unless you ask.** `alpha` and `rrf` are untouched, and a
+`weighted` request with no signals behaves exactly like `alpha`.
+
 ### Strategy Selection Guide
 
 ```
@@ -1061,6 +1156,9 @@ Queries are natural language questions?
 
 FTS and vector score ranges differ significantly?
   → Use RRF (rank-based, ignores score magnitudes)
+
+Top results keep repeating the same document?
+  → Use Weighted with diversity=0.8 (demotes near-copies by text overlap)
 
 Not sure?
   → Start with Alpha Blending at 0.5, adjust based on results

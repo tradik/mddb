@@ -373,12 +373,16 @@ func main() {
 		return vector.ParseQuantization(cfg.Quantization)
 	})
 	s.VectorSearchers = map[string]vector.VectorSearcher{
-		"flat":      s.VectorIndex,
-		"hnsw":      vector.NewHNSWIndex(16, 200, 100),
-		"ivf":       vector.NewIVFIndex(10, 20),
-		"pq":        vector.NewPQIndex(8, 256, 20),
-		"opq":       vector.NewOPQIndex(8, 256, 20, 5),
-		"sq":        vector.NewSQIndex(),
+		"flat": s.VectorIndex,
+		"hnsw": vector.NewHNSWIndex(16, 200, 100),
+		"ivf":  vector.NewIVFIndex(10, 20),
+		"pq":   vector.NewPQIndex(8, 256, 20),
+		"opq":  vector.NewOPQIndex(8, 256, 20, 5),
+		"sq":   vector.NewSQIndex(),
+		// SRCH-003: 4 bits per dimension, two dimensions per byte. Keeps
+		// 99.5% of int8's recall at half its storage — measured, not assumed;
+		// see TestQuantizerRecallCurve.
+		"sq4":       vector.NewSQ4Index(),
 		"bq":        vector.NewBQIndex(bqRerank),
 		"quantized": s.QuantizedVecIndex,
 	}

@@ -164,7 +164,7 @@ Two independent mechanisms share the "quantization" vocabulary:
 - **Storage quantization** (this document): `int8`/`int4` per collection —
   compresses what is *stored and held in memory*.
 - **Index algorithms** (`algorithm` on `/v1/vector-search`): `flat`, `hnsw`,
-  `ivf`, `pq`, `opq`, `sq`, `bq` — change *how candidates are found*. PQ/OPQ/
+  `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq` — change *how candidates are found*. PQ/OPQ/
   SQ/BQ are themselves compression-based indexes; HNSW and IVF are
   graph/cluster-based approximate indexes. See
   [SEARCH.md](SEARCH.md#vector-search) for per-algorithm characteristics.
@@ -232,6 +232,7 @@ MDDB offers multiple approaches to reduce vector search cost:
 | Approach | Compression | Speed | Accuracy | Configurable Per-Collection |
 |----------|-------------|-------|----------|----------------------------|
 | **Scalar Quantization (this)** | 4-8x storage + RAM | Faster | ~98-99% | Yes |
+| SQ4 index (`algorithm: "sq4"`) | 8x RAM only | Fast | 99.5% of int8 (measured) | Yes |
 | PQ (Product Quantization) | 8-32x RAM only | Much faster | ~95% | No (global) |
 | SQ (Index-level SQ) | 4x RAM only | Faster | ~98% | No (global) |
 | BQ (Binary Quantization) | 32x RAM only | Fastest | ~90% | No (global) |

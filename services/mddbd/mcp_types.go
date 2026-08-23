@@ -383,7 +383,7 @@ type MCPHybridSearchRequest struct {
 	Query           string              `json:"query"`
 	TopK            int                 `json:"topK,omitempty"`
 	Algorithm       string              `json:"algorithm,omitempty"`       // FTS: "bm25", "bm25f"
-	VectorAlgorithm string              `json:"vectorAlgorithm,omitempty"` // Vector: "flat", "hnsw", "ivf", "pq", "opq", "sq", "bq"
+	VectorAlgorithm string              `json:"vectorAlgorithm,omitempty"` // Vector: "flat", "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	Alpha           float64             `json:"alpha,omitempty"`           // 0-1, default 0.5
 	Strategy        string              `json:"strategy,omitempty"`        // "alpha" or "rrf"
 	RRFK            int                 `json:"rrfK,omitempty"`            // RRF k parameter
