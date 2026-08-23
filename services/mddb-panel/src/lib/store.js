@@ -72,6 +72,9 @@ export const useStore = create((set, get) => ({
   hybridAlpha: 0.5,
   hybridStrategy: 'alpha',
   hybridRrfK: 60,
+  // SRCH-002: every weight starts at zero, so selecting "weighted" without
+  // touching a slider behaves exactly like "alpha".
+  hybridSignals: { diversity: 0, proximity: 0, freshness: 0 },
   hybridFtsAlgorithm: 'bm25',
   hybridVectorAlgorithm: 'flat',
   hybridFuzzy: 0,
@@ -205,6 +208,7 @@ export const useStore = create((set, get) => ({
   setHybridTopK: (v) => set({ hybridTopK: v }),
   setHybridAlpha: (v) => set({ hybridAlpha: v }),
   setHybridStrategy: (v) => set({ hybridStrategy: v }),
+  setHybridSignals: (v) => set({ hybridSignals: v }),
   setHybridRrfK: (v) => set({ hybridRrfK: v }),
   setHybridFtsAlgorithm: (v) => set({ hybridFtsAlgorithm: v }),
   setHybridVectorAlgorithm: (v) => set({ hybridVectorAlgorithm: v }),

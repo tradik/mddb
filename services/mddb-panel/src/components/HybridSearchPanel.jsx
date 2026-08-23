@@ -13,6 +13,7 @@ export default function HybridSearchPanel() {
     hybridAlpha, setHybridAlpha,
     hybridStrategy, setHybridStrategy,
     hybridRrfK, setHybridRrfK,
+    hybridSignals, setHybridSignals,
     hybridFtsAlgorithm, setHybridFtsAlgorithm,
     hybridVectorAlgorithm, setHybridVectorAlgorithm,
     hybridLang, setHybridLang,
@@ -78,6 +79,7 @@ export default function HybridSearchPanel() {
         alpha: hybridAlpha,
         strategy: hybridStrategy,
         rrfK: hybridRrfK,
+        signals: hybridStrategy === 'weighted' ? hybridSignals : undefined,
         fuzzy: hybridFuzzy,
         threshold: hybridThreshold,
         includeContent,
@@ -171,10 +173,11 @@ export default function HybridSearchPanel() {
             >
               <option value="alpha">Alpha Blending</option>
               <option value="rrf">RRF (Reciprocal Rank Fusion)</option>
+              <option value="weighted">Weighted (alpha + signals)</option>
             </select>
           </div>
 
-          {hybridStrategy === 'alpha' && (
+          {(hybridStrategy === 'alpha' || hybridStrategy === 'weighted') && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">
                 Alpha: {hybridAlpha.toFixed(2)}
@@ -210,6 +213,73 @@ export default function HybridSearchPanel() {
             </div>
           )}
         </div>
+
+        {/* SRCH-002: the signals the weighted strategy adds on top of alpha's
+            blend. Diversity is the one that earns its keep on most corpora —
+            a document copied and edited scores almost identically to its
+            original, and a vector score rewards the duplication rather than
+            noticing it. */}
+        {hybridStrategy === 'weighted' && (
+          <div className="grid grid-cols-3 gap-3 rounded-lg bg-gray-50 p-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Diversity: {hybridSignals.diversity.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(hybridSignals.diversity * 100)}
+                onChange={(e) =>
+                  setHybridSignals({ ...hybridSignals, diversity: parseInt(e.target.value) / 100 })
+                }
+                className="w-full accent-primary-600"
+                aria-describedby="signal-diversity-help"
+              />
+              <p id="signal-diversity-help" className="text-[10px] text-gray-500 mt-0.5">
+                Demotes near-copies of higher results
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Proximity: {hybridSignals.proximity.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(hybridSignals.proximity * 100)}
+                onChange={(e) =>
+                  setHybridSignals({ ...hybridSignals, proximity: parseInt(e.target.value) / 100 })
+                }
+                className="w-full accent-primary-600"
+                aria-describedby="signal-proximity-help"
+              />
+              <p id="signal-proximity-help" className="text-[10px] text-gray-500 mt-0.5">
+                Rewards the same directory
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Freshness: {hybridSignals.freshness.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(hybridSignals.freshness * 100)}
+                onChange={(e) =>
+                  setHybridSignals({ ...hybridSignals, freshness: parseInt(e.target.value) / 100 })
+                }
+                className="w-full accent-primary-600"
+                aria-describedby="signal-freshness-help"
+              />
+              <p id="signal-freshness-help" className="text-[10px] text-gray-500 mt-0.5">
+                Rewards recent edits — wrong for reference material
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Algorithms */}
         <div className="grid grid-cols-4 gap-3">
@@ -250,7 +320,8 @@ export default function HybridSearchPanel() {
               <option value="ivf">IVF (Clustered)</option>
               <option value="pq">PQ (Compressed)</option>
               <option value="opq">OPQ (Optimized PQ)</option>
-              <option value="sq">SQ (Scalar Quantized)</option>
+              <option value="sq">SQ (int8, 4x smaller)</option>
+              <option value="sq4">SQ4 (int4, 8x smaller)</option>
               <option value="bq">BQ (Binary Quantized)</option>
             </select>
           </div>
@@ -547,6 +618,7 @@ export default function HybridSearchPanel() {
           alpha: hybridAlpha,
           strategy: hybridStrategy,
           rrfK: hybridRrfK,
+          signals: hybridStrategy === 'weighted' ? hybridSignals : undefined,
           fuzzy: hybridFuzzy,
           threshold: hybridThreshold,
           distanceMetric: hybridDistanceMetric,

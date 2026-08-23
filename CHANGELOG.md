@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The panel represents this release's features** — a search index nobody can
+  select from the UI is a feature only the API has. Added: a **Search Advisor**
+  view that measures a collection and shows what it found, what it recommends
+  and why, with an "apply to collection" button that stores the advice as the
+  retrieval profile; `sq4` in every vector-algorithm picker (hybrid, vector and
+  cross search); the `weighted` fusion strategy with sliders for diversity,
+  proximity and freshness, each labelled with what it does; `graph` retrieval
+  mode and the `weighted` strategy in the collection config. Every weight
+  starts at zero, so selecting "weighted" without touching a slider behaves
+  exactly like "alpha".
+
+  The panel also gained a CI job. It had none — lint, tests and build all ran
+  nowhere, and a panel that does not build is a release with no UI.
+
+
 - **`langchain-mddb` — a LangChain VectorStore and Retriever (INT-017)** — a
   developer choosing a retrieval backend inside LangChain picks from the list
   that has an adapter, so MDDB was not chosen regardless of what the engine

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Folder, Database, Trash2, Brain, Server, Settings, Network, Users, UsersIcon, Upload, FolderPlus, Sliders, GitBranch, PanelLeftClose, BookOpen, Ban, Zap, Globe, Image, Music, FileText, Settings2, Shuffle, Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart } from 'lucide-react';
+import { Folder, Database, Trash2, Brain, Server, Settings, Network, Users, UsersIcon, Upload, FolderPlus, Sliders, GitBranch, PanelLeftClose, BookOpen, Ban, Zap, Globe, Image, Music, FileText, Settings2, Shuffle, Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import UploadModal from './UploadModal';
@@ -304,6 +304,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
           <NavButton mode="geo" icon={Globe} label="Geo Search" />
           <NavButton mode="vectors" icon={Database} label="Vector Search" />
           <NavButton mode="vectorSpace" icon={ScatterChart} label="Vector Space" />
+          <NavButton mode="searchAdvisor" icon={Compass} label="Search Advisor" />
           <NavButton mode="embeddings" icon={Brain} label="Embedding Models" />
           <NavButton mode="synonyms" icon={BookOpen} label="Synonyms" />
           <NavButton mode="stopwords" icon={Ban} label="Stop Words" />

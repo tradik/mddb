@@ -512,6 +512,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                       <option value="parent">Whole document</option>
                       <option value="chunk">Matching passage</option>
                       <option value="window">Passage with neighbours</option>
+                      {/* SRCH-006: the only mode that changes which documents
+                          are reached, rather than what a result looks like. */}
+                      <option value="graph">Whole document + graph neighbours</option>
                     </select>
                   </div>
 
@@ -525,6 +528,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                       <option value="">MDDB default (alpha)</option>
                       <option value="alpha">Alpha blend</option>
                       <option value="rrf">Reciprocal rank fusion</option>
+                      <option value="weighted">Weighted (alpha + signals)</option>
                     </select>
                   </div>
 
