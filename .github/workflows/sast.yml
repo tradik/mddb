@@ -118,6 +118,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # CodeQL's Go autobuilder discovers "Go projects" by looking for files on
+      # disk, and go.work in the root makes it treat the ROOT as one. The root
+      # is not a module and holds no packages, so extraction there fails with
+      # "build flag -mod=readonly only valid when using modules" — and the
+      # autobuilder counts that as a failure for every module it found,
+      # including the five that would have built.
+      #
+      # GOWORK=off does not help: it changes how `go` behaves, not which files
+      # the discovery step sees. go.work itself says it is for local
+      # development only, so removing it from the checkout costs nothing here.
+      - name: Take the workspace file out of the checkout
+        if: matrix.language == 'go'
+        run: rm -f go.work go.work.sum
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
         with:
