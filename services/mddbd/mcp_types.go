@@ -249,6 +249,10 @@ type MCPVectorSearchResponse struct {
 	Dimensions     int                     `json:"dimensions"`
 	Algorithm      string                  `json:"algorithm"`
 	DistanceMetric string                  `json:"distanceMetric"`
+	// ContextTruncated reports that the collection's contextTokenBudget cut
+	// results from this answer (RAG-001). A caller assembling a prompt needs
+	// to know it is holding part of the answer, not all of it.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
 	// ResponsePrompt is the collection's formatting instruction (RAG-002),
 	// present only when one is configured. Returned with the results so an
 	// agent gets it in the same round trip that fetched what to say.
@@ -339,6 +343,10 @@ type MCPFTSSearchResponse struct {
 	Algorithm string         `json:"algorithm"`
 	Fuzzy     int            `json:"fuzzy"`
 	Lang      string         `json:"lang,omitempty"`
+	// ContextTruncated reports that the collection's contextTokenBudget cut
+	// results from this answer (RAG-001). A caller assembling a prompt needs
+	// to know it is holding part of the answer, not all of it.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
 	// ResponsePrompt is the collection's formatting instruction (RAG-002),
 	// present only when one is configured. Returned with the results so an
 	// agent gets it in the same round trip that fetched what to say.
@@ -410,6 +418,10 @@ type MCPHybridSearchResponse struct {
 	FTSAlgorithm    string                  `json:"ftsAlgorithm"`
 	VectorAlgorithm string                  `json:"vectorAlgorithm"`
 	DistanceMetric  string                  `json:"distanceMetric"`
+	// ContextTruncated reports that the collection's contextTokenBudget cut
+	// results from this answer (RAG-001). A caller assembling a prompt needs
+	// to know it is holding part of the answer, not all of it.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
 	// ResponsePrompt is the collection's formatting instruction (RAG-002),
 	// present only when one is configured. Returned with the results so an
 	// agent gets it in the same round trip that fetched what to say.

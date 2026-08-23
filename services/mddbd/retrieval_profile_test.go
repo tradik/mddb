@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"mddb/internal/fts"
 	proto "mddb/proto"
 )
 
@@ -447,5 +449,95 @@ func TestRESTSetConfigRejectsAnInvalidProfile(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("an unknown search type gave %d, want 400: %s", w.Code, w.Body.String())
+	}
+}
+
+// RAG-001 caps the context a collection hands back, and the MCP paths — the
+// agents the cap exists for — resolved topK from the profile, returned its
+// responsePrompt, and never applied the budget. An agent that asked for
+// document bodies was the one caller that could be handed more than its model
+// holds.
+func TestMCPSearchesRespectTheContextBudget(t *testing.T) {
+	client, srv, cleanup := directClientServer(t)
+	defer cleanup()
+
+	// Ten documents of roughly 100 characters each — about 25 tokens apiece.
+	body := strings.Repeat("restart the service carefully ", 4)
+	docs := make([]*proto.BatchDocument, 0, 10)
+	for i := 0; i < 10; i++ {
+		docs = append(docs, makeBatchDoc(fmt.Sprintf("doc-%d", i), "en", body, nil, false))
+	}
+	srv.FTSIndex = fts.NewFTSIndex(srv.DB)
+	if err := srv.FTSIndex.EnsureBuckets(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewBatchProcessor(srv, 2).ProcessBatch(context.Background(), "runbooks", docs); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := srv.CollectionManager.Set("runbooks", &CollectionConfig{
+		Type: "default",
+		Retrieval: &RetrievalProfileDef{
+			TopK: 10,
+			// Room for roughly two documents.
+			ContextTokenBudget: 60,
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := client.FTSSearch(context.Background(), &MCPFTSSearchRequest{
+		Collection: "runbooks",
+		Query:      "restart",
+		// The budget caps the content a search hands over. Without
+		// includeContent an MCP result carries no body at all (GO-022), so
+		// there is nothing to cap and nothing to cut.
+		IncludeContent: true,
+	})
+	if err != nil {
+		t.Fatalf("FTSSearch: %v", err)
+	}
+
+	if len(resp.Results) == 0 {
+		t.Skip("the FTS index returned nothing for this fixture")
+	}
+	if len(resp.Results) >= 10 {
+		t.Errorf("the budget was ignored: %d results came back under a 60-token cap", len(resp.Results))
+	}
+	if !resp.ContextTruncated {
+		t.Error("results were dropped and contextTruncated was not set — the caller cannot tell it holds a partial answer")
+	}
+	// Total must describe what the caller received, not what was found before
+	// the cut.
+	if resp.Total != len(resp.Results) {
+		t.Errorf("total = %d but %d results were returned", resp.Total, len(resp.Results))
+	}
+}
+
+// A collection with no budget must be unaffected.
+func TestMCPSearchWithoutABudgetIsUnchanged(t *testing.T) {
+	client, srv, cleanup := directClientServer(t)
+	defer cleanup()
+
+	docs := []*proto.BatchDocument{
+		makeBatchDoc("a", "en", "restart the service", nil, false),
+		makeBatchDoc("b", "en", "restart the other service", nil, false),
+	}
+	srv.FTSIndex = fts.NewFTSIndex(srv.DB)
+	if err := srv.FTSIndex.EnsureBuckets(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := NewBatchProcessor(srv, 2).ProcessBatch(context.Background(), "plain", docs); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := client.FTSSearch(context.Background(), &MCPFTSSearchRequest{
+		Collection: "plain", Query: "restart",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.ContextTruncated {
+		t.Error("a collection with no budget reported truncation")
 	}
 }

@@ -181,6 +181,14 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		resp.Dimensions = s.Embedding.Dimensions()
 	}
 
+	// RAG-001: cap what this collection hands back. The MCP paths resolved
+	// topK from the profile and returned its responsePrompt, and then skipped
+	// the budget — so the caller the cap exists for, an agent assembling a
+	// prompt, was the one path that never had it applied.
+	resp.Results, resp.ContextTruncated = applyContextBudget(s, req.Collection, resp.Results,
+		func(r MCPVectorSearchResult) int { return approxTokens(r.Document.ContentMD) })
+	resp.Total = len(resp.Results)
+
 	return resp, nil
 }
 
@@ -567,6 +575,13 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		}
 		return nil
 	})
+	// RAG-001: cap what this collection hands back. The MCP paths resolved
+	// topK from the profile and returned its responsePrompt, and then skipped
+	// the budget — so the caller the cap exists for, an agent assembling a
+	// prompt, was the one path that never had it applied.
+	resp.Results, resp.ContextTruncated = applyContextBudget(c.server, req.Collection, resp.Results,
+		func(r MCPFTSResult) int { return approxTokens(r.Document.ContentMD) })
+
 	resp.Total = len(resp.Results)
 
 	return resp, nil
@@ -740,6 +755,13 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 			Rank:          item.Rank,
 		})
 	}
+	// RAG-001: cap what this collection hands back. The MCP paths resolved
+	// topK from the profile and returned its responsePrompt, and then skipped
+	// the budget — so the caller the cap exists for, an agent assembling a
+	// prompt, was the one path that never had it applied.
+	resp.Results, resp.ContextTruncated = applyContextBudget(c.server, req.Collection, resp.Results,
+		func(r MCPHybridSearchResult) int { return approxTokens(r.Document.ContentMD) })
+
 	resp.Total = len(resp.Results)
 
 	return resp, nil

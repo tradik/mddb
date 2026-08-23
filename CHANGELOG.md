@@ -387,6 +387,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The context budget skipped the callers it exists for (RAG-001)** — a
+  collection's `contextTokenBudget` was applied on the HTTP, hybrid and vector
+  handlers and on none of the MCP paths. `full_text_search`, `semantic_search`
+  and `hybrid_search` resolved `topK` from the profile and returned its
+  `responsePrompt`, then handed back every document body the caller asked for,
+  uncapped — and an agent assembling a prompt is exactly who the cap was
+  written for. All three now apply it and report `contextTruncated`, so a
+  caller can tell it is holding part of the answer. Results without content
+  (the default: MCP drops bodies nobody asked for) are unaffected, because
+  there is nothing to cap.
+
+
 - **Five package manifests still declared 2.11.4 (DOC-011)** — the Node and
   Python clients, the panel and both language extensions were bumped by hand at
   2.11.4 and nothing bumped them since, because `check-version.sh` did not
