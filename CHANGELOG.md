@@ -694,6 +694,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Backup restore can no longer destroy the database it restores over
+  (SEC-015, SEC-016)** — both restore transports rewrote the database file
+  with nothing standing between a bad backup and the live data. HTTP
+  `POST /v1/restore` closed the database outside the restore lock (racing
+  every in-flight transaction) and, when the copy or reopen failed, returned
+  an error with the database closed — or already overwritten by an unusable
+  file. The gRPC `Restore` RPC was quieter and worse: it copied the backup
+  underneath the still-open handle, so the server kept serving the old data,
+  reported success, and buried every post-"restore" write at the next process
+  restart.
+
+  One implementation now backs both transports: the backup must open cleanly
+  as a database *before* the live file is touched; the current file is kept
+  as a snapshot until the swap is proven; close → copy → reopen happens under
+  the restore write lock; and every failure path rolls the snapshot back, so
+  the server never ends up without a working database. The swap also rebuilds
+  the derived in-memory state — FTS, synonyms, stop words, vector store,
+  schemas, webhooks, and all read caches now re-point at the restored
+  database (previously FTS kept a closed handle after a replication snapshot
+  restore, erroring every search until restart) — and resets the binlog on
+  the gRPC path too, which used to skip it, leaving followers applying their
+  old LSN stream onto restored data. Found by the Windows-port fork
+  (Rajendertyagi/mddb), where the file semantics make the misordering
+  impossible to ignore; verified and fixed here at the root.
+
+- **gRPC UpdateDocument updates what the server serves, not just what it
+  stores (GO-038)** — the gRPC update path committed the write and walked
+  away: no read-cache invalidation (a gRPC `Get` kept serving the pre-update
+  document for up to the 5-minute cache TTL), no FTS reindex (search kept
+  matching the deleted content and never learned the new), no geo reindex, no
+  `doc.updated` webhook, no metrics. PATCH `/v1/update` had the same
+  cache gap. Both transports now run one shared post-update pipeline —
+  `runPostUpdateHooks`, the update-side sibling of GO-001's
+  `runPostWriteHooks` — so cache invalidation, embedding, TTL, FTS, geo,
+  webhooks, triggers and metrics behave identically no matter which API
+  performed the update. The gRPC update path thereby gains the `doc.updated`
+  webhook and `doc_update` metric it always should have fired.
+
+- **Audit events survive coarse clocks (GO-039)** — the audit batcher
+  allocated one BoltDB sequence per *batch* and numbered events with a loop
+  offset, so consecutive batches reused overlapping sequence ranges. Keys are
+  `(timestamp, sequence)` pairs: whenever timestamps repeated — tight write
+  loops, coarse clocks, VMs — later events silently overwrote earlier ones,
+  in the one subsystem whose whole job is not losing records. Each event now
+  takes its own `NextSequence()` inside the same transaction, making keys
+  globally unique and strictly monotonic regardless of clock resolution.
+
+- **SSE streams work with metrics enabled (GO-040)** — the metrics
+  middleware wraps every route in a `statusRecorder` that implemented neither
+  `Flush` nor `Unwrap`, so the `http.Flusher` assertion in `/v1/events`, the
+  MCP SSE transport and the MCP streamable transport failed behind it —
+  turning metrics on answered every streaming request with
+  `{"error":"streaming not supported"}` 500. Both middleware wrappers
+  (metrics and access log) now forward `Flush` and expose `Unwrap`, and the
+  three streaming handlers resolve their flusher through an Unwrap-walking
+  helper, the same way `http.ResponseController` does — so a future wrapper
+  that exposes only `Unwrap` keeps streaming intact too.
+
 - **Document keys are case-insensitive, and now say so (DOC-016)** — `genID`
   lowercases when it builds a document's identifier, so `README.md`,
   `readme.md` and `ReadMe.md` are one document. Deliberate, sensible for
