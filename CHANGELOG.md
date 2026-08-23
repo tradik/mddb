@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Static analysis in CI (OPS-008)** — CI scanned dependencies for known CVEs
+  and never looked at the code. gosec was in the repository's conventions and
+  in `.gitignore`: used locally, enforced nowhere. A new SAST workflow runs
+  gosec across all four Go modules and CodeQL over Go and JavaScript/TypeScript
+  — the panel, the chat widget and three integrations had no security analysis
+  of any kind. Both write SARIF to the Security tab, so a finding has somewhere
+  to live besides a red job. The gosec gate blocks at medium severity **from
+  the first run**, because every module is already clean at that level;
+  generated `proto/` is excluded, since its findings belong to the generator
+  and a `#nosec` there would be erased by the next `buf generate`.
+  golangci-lint now also covers `mddb-cli` and `tools/bench`, which nothing was
+  linting.
+
+
+- **Rust dependencies are scanned (OPS-008)** — `cargo audit` runs alongside
+  govulncheck. mddb-chat is a shipped service and its dependency graph had
+  never been looked at: the first run found **four vulnerabilities**, including
+  an unbounded-empty-DATA-frame denial of service in `h2` and a reachable panic
+  plus two certificate-validation flaws in `rustls-webpki`. All four are fixed
+  by upgrades in this release.
+
+
+- **Every GitHub Action is pinned to a commit SHA (OPS-018)** — all 129
+  references across 12 workflows, with the version kept in a trailing comment
+  so Dependabot can still propose upgrades. A tag is a mutable pointer:
+  `tj-actions/changed-files` had every one of its tags repointed at a commit
+  that dumped CI secrets into build logs, and thousands of repositories picked
+  it up within hours without changing a line of their own.
+  `scripts/check-action-pins.sh` fails on any reference that is not a
+  40-character SHA, with its own seven-case test suite, and runs in CI and
+  `make ci`.
+
+
 - **VERSIONING.md** — which components move with a release and which keep their
   own version, why each is on its list, and what a patch, minor or major bump
   actually promises. Five components sit at `0.1.0` and have never been bumped;

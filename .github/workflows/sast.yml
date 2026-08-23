@@ -1,0 +1,139 @@
+name: SAST
+
+# OPS-008: CI scanned dependencies for known CVEs (govulncheck) and never
+# analysed the code itself. gosec was in the repository's conventions and in
+# .gitignore — used locally, enforced nowhere — so a hardcoded credential, a
+# path traversal or a weak cipher could reach main with nothing objecting.
+#
+# Two scanners, because they see different things:
+#   * gosec reads Go source for known-dangerous shapes and is fast enough to
+#     block a pull request.
+#   * CodeQL follows data flow across a whole program and covers the panel and
+#     the integrations, which had no security analysis of any kind.
+#
+# Both write SARIF to the Security tab, so a finding has somewhere to live
+# besides a red job.
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  # Rules improve between releases; a weekly run finds what last week's
+  # ruleset missed in code nobody has touched since.
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  GO_VERSION: "1.27.0"
+  # Scan each module in isolation, mirroring the Tests and Vulnerability
+  # workflows: what matters is what each module's own dependency graph makes
+  # reachable, not the workspace-merged one.
+  GOWORK: "off"
+
+jobs:
+  gosec:
+    name: gosec (${{ matrix.module.name }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - name: mddbd
+            path: services/mddbd
+          - name: mddb-cli
+            path: services/mddb-cli
+          - name: go-client
+            path: clients/go/mddb
+          - name: bench
+            path: tools/bench
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: ${{ matrix.module.path }}/go.sum
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.28.0 # NOSONAR -- immutable, explicitly pinned tool version
+
+      # Reporting pass. -no-fail so the SARIF always reaches the Security tab,
+      # including on the run that finds something: a finding that only exists
+      # in a failed job's log is a finding nobody triages.
+      - name: Scan (SARIF for the Security tab)
+        working-directory: ${{ matrix.module.path }}
+        run: gosec -no-fail -exclude-dir=proto -fmt sarif -out gosec.sarif ./...
+
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        with:
+          sarif_file: ${{ matrix.module.path }}/gosec.sarif
+          category: gosec-${{ matrix.module.name }}
+
+      # Gating pass. Every Go module is clean at medium and above today, which
+      # is why this blocks from the first run rather than reporting for a while
+      # first — there is no backlog to work down.
+      #
+      # proto/ is excluded because it is generated: its findings are the
+      # generator's (G101 on gRPC method-name constants, G103 on protobuf's
+      # unsafe string handling), and a #nosec annotation there would be erased
+      # by the next `buf generate`.
+      - name: Gate on medium and above
+        working-directory: ${{ matrix.module.path }}
+        run: gosec -exclude-dir=proto -severity=medium ./...
+
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      packages: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: autobuild
+          # The panel, the chat widget and three integrations. None of this
+          # had any security analysis before OPS-008.
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # security-extended adds the rules that need more analysis time than
+          # the default set; a weekly cron can afford them.
+          queries: security-extended
+
+      - name: Autobuild
+        if: matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        env:
+          GOWORK: "off"
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
+        with:
+          category: /language:${{ matrix.language }}

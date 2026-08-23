@@ -36,10 +36,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: ${{ matrix.node-version }}
           cache: npm
@@ -65,7 +65,7 @@ jobs:
 
       - name: Upload coverage artifact
         if: matrix.node-version == '24'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: chrome-ext-coverage
           path: ${{ env.WORKING_DIR }}/coverage
@@ -73,7 +73,7 @@ jobs:
 
       - name: Upload extension zip
         if: matrix.node-version == '24'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: chrome-ext-zip
           path: ${{ env.WORKING_DIR }}/dist/*.zip
@@ -88,10 +88,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           cache: npm
@@ -110,7 +110,7 @@ jobs:
 
     steps:
       - name: Download extension zip
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: chrome-ext-zip
           path: artifact
@@ -145,7 +145,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Derive version from tag
         id: version
@@ -161,7 +161,7 @@ jobs:
           echo "minor=chrome-ext-v${MAJOR}.${MINOR}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js 24
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           cache: npm
@@ -207,7 +207,7 @@ jobs:
           git push origin "${{ steps.version.outputs.minor }}" --force
 
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: 'MDDB Browser Extension ${{ steps.version.outputs.version }}'

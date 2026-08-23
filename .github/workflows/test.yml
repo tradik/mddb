@@ -59,10 +59,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddbd/go.sum
@@ -137,8 +137,18 @@ jobs:
       - name: Run coverage-floor guard test suite
         run: bash scripts/tests/test-coverage-areas.sh
 
+      # OPS-018: a tag is a mutable pointer. tj-actions/changed-files had every
+      # one of its tags repointed at a secret-dumping commit in March 2025, and
+      # thousands of repositories picked it up within hours. A SHA cannot be
+      # repointed.
+      - name: Every action is pinned to a commit SHA
+        run: bash scripts/check-action-pins.sh
+
+      - name: Run action-pin guard test suite
+        run: bash scripts/tests/test-action-pins.sh
+
       - name: Upload coverage
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
         with:
           files: ./services/mddbd/coverage.out
           flags: unittests
@@ -150,10 +160,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddbd/go.sum
@@ -172,17 +182,35 @@ jobs:
           echo "All Go files are gofmt-formatted."
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: latest
           working-directory: services/mddbd
           args: --timeout=5m
 
       - name: Run golangci-lint (shared Go client)
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: latest
           working-directory: clients/go/mddb
+          args: --timeout=5m
+
+      # OPS-008: these two were linted by nobody. mddb-cli was a single
+      # untestable main() until TEST-001 and tools/bench had three helpers
+      # under test; both now carry real code, and gosec runs inside
+      # golangci-lint as well as in the SAST workflow.
+      - name: Run golangci-lint (mddb-cli)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: latest
+          working-directory: services/mddb-cli
+          args: --timeout=5m
+
+      - name: Run golangci-lint (tools/bench)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: latest
+          working-directory: tools/bench
           args: --timeout=5m
 
   proto:
@@ -191,14 +219,14 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # buf breaking needs the full history of the target branch to
           # compare against.
           fetch-depth: 0
 
       - name: Set up buf
-        uses: bufbuild/buf-setup-action@v1
+        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
           version: "1.72.0"
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -259,7 +287,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Guards against Go toolchain version drift (DOC-003): every pinned
       # `toolchain goX.Y.Z` (go.work + each go.mod), every `GO_VERSION:`
@@ -301,10 +329,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
           cache: npm
@@ -335,10 +363,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: '3.12'
 
@@ -366,7 +394,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Rust
         run: |
@@ -374,7 +402,7 @@ jobs:
           rustup component add clippy rustfmt
 
       - name: Cache cargo
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: |
             ~/.cargo/registry
@@ -408,10 +436,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -440,10 +468,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: test/go.sum
