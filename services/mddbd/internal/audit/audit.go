@@ -206,18 +206,7 @@ func (a *AuditManager) flushBatch(batch []AuditEvent) error {
 		if b == nil {
 			return errors.New("audit bucket missing")
 		}
-		seq, _ := b.NextSequence()
-		for i, ev := range batch {
-			payload, err := json.Marshal(ev)
-			if err != nil {
-				continue
-			}
-			key := auditKey(ev.Timestamp, seq+uint64(i))
-			if err := b.Put(key, payload); err != nil {
-				return err
-			}
-		}
-		return nil
+		return writeAuditBatch(b, batch)
 	}); err != nil {
 		return err
 	}
@@ -225,6 +214,28 @@ func (a *AuditManager) flushBatch(batch []AuditEvent) error {
 	// best-effort; failures never roll back the BoltDB record.
 	for _, ev := range batch {
 		a.fanOut(ev)
+	}
+	return nil
+}
+
+// writeAuditBatch persists one drained batch inside an open transaction.
+// GO-039: each event takes its own NextSequence. A single sequence plus a loop
+// offset hands the next batch a starting number inside this batch's range, and
+// when timestamps repeat (coarse clocks, tight write loops) the colliding
+// (ts, seq) keys silently overwrite earlier audit events.
+func writeAuditBatch(b *bolt.Bucket, batch []AuditEvent) error {
+	for _, ev := range batch {
+		payload, err := json.Marshal(ev)
+		if err != nil {
+			continue
+		}
+		seq, err := b.NextSequence()
+		if err != nil {
+			return err
+		}
+		if err := b.Put(auditKey(ev.Timestamp, seq), payload); err != nil {
+			return err
+		}
 	}
 	return nil
 }
