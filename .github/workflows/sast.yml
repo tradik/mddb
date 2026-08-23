@@ -107,13 +107,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Manual, not autobuild. The autobuilder walks every Go module it
-          # can find and dies on tools/bench, which has a go.mod and no
-          # go.sum because it has no dependencies: it runs `go mod tidy -e`,
-          # then stats a go.sum that was never going to exist and gives up on
-          # every module including the ones that were fine.
           - language: go
-            build-mode: manual
+            build-mode: autobuild
           # The panel, the chat widget and three integrations. None of this
           # had any security analysis before OPS-008.
           - language: javascript-typescript
@@ -132,34 +127,11 @@ jobs:
           # the default set; a weekly cron can afford them.
           queries: security-extended
 
-      - name: Set up Go
-        if: matrix.build-mode == 'manual'
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version: '1.27.0'
-          # No restored build cache. CodeQL learns what the code is by
-          # watching it compile, and a cached build compiles nothing — the
-          # first attempt at manual mode built all four modules successfully
-          # and then reported "could not process any code written in Go".
-          cache: false
-
-      # Each module is built on its own because GOWORK is off, and each one is
-      # named because a module missed here is a module nobody analyses. The
-      # build is what CodeQL traces, so this list is the analysis scope.
-      - name: Build the Go modules
-        if: matrix.build-mode == 'manual'
+      - name: Autobuild
+        if: matrix.build-mode == 'autobuild'
+        uses: github/codeql-action/autobuild@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
         env:
           GOWORK: "off"
-        run: |
-          # Belt and braces with cache: false above — the runner image ships
-          # its own warm build cache, and anything already in it is a package
-          # CodeQL never sees compile.
-          go clean -cache
-          for module in services/mddbd services/mddb-cli clients/go/mddb tools/bench; do
-            echo "::group::$module"
-            (cd "$module" && go build ./...)
-            echo "::endgroup::"
-          done
 
       - name: Analyze
         uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
