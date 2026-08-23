@@ -89,8 +89,14 @@ jobs:
       # 0.22.2 and not older: cargo-audit 0.21 cannot parse a CVSS 4.0 vector
       # and dies loading today's advisory database, which reads as "no
       # vulnerabilities" to anyone not reading the log carefully.
+      # --force because the runner image already ships a cargo-audit, and
+      # `cargo install` refuses rather than replacing it: "binary
+      # `cargo-audit` already exists in destination". Without it the step
+      # fails before auditing anything, which is the worst way for a security
+      # job to fail — red for a reason that has nothing to do with the
+      # dependencies it was meant to check.
       - name: Install cargo-audit
-        run: cargo install cargo-audit --version 0.22.2 --locked # NOSONAR -- immutable, explicitly pinned tool version
+        run: cargo install cargo-audit --version 0.22.2 --locked --force # NOSONAR -- immutable, explicitly pinned tool version
 
       - name: Audit dependencies
         working-directory: services/mddb-chat
