@@ -4,7 +4,7 @@ import (
 	"mddb/internal/cache"
 	"mddb/internal/envconf"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // Search-result caching (GO-031).

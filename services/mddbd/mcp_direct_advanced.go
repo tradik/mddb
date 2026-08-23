@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
 )
 

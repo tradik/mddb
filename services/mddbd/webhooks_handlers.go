@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // --- HTTP handlers ---

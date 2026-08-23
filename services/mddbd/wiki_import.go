@@ -6,7 +6,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 	"io"
 	"log/slog"
 	"mddb/internal/envconf"

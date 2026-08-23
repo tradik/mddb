@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // WebhookExporter delivers each audit event as a JSON POST to a fixed

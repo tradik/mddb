@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // Job events over SSE (GO-030).

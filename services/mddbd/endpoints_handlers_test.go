@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // ---------- 1. handleEndpoints - GET success ----------

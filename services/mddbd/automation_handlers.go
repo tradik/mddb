@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // handleAutomation dispatches GET (list) and POST (create) for /v1/automation.

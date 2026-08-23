@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // SRCH-010: an endpoint that answers "how should I search this collection?"

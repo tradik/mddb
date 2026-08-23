@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // CohereProvider generates embeddings using Cohere API

@@ -526,6 +526,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A malformed JSON document could crash the server (GO-037)** — goccy/go-json
+  panics where the standard library returns an error, and the fault is
+  state-dependent rather than input-dependent: one bad document reproduces
+  nothing, while a mixed sequence fires on roughly 5% of calls because the
+  fault depends on state the previous decode left behind. `FuzzLoadDoc` found
+  it by killing the machine it was running on. v0.10.6 is the latest release,
+  so an upgrade does not fix it, and the tracker carries eight open panic
+  reports.
+
+  Rather than classify 73 files by hand, `internal/jsonx` picks the
+  implementation **per direction**: encoding stays on goccy, which is twice as
+  fast and cannot be handed malformed input because this process built the
+  value; decoding uses the standard library, unconditionally, because those
+  bytes came from an HTTP body, a replication entry, a restored database or a
+  remote provider. **The package does not export a goccy decoder**, so the rule
+  is enforced by construction rather than by review — 108 files switched with
+  one import change each and no edits at any of the 124 call sites.
+
+  Measured cost: decoding is **2.0–2.1× slower** (20 000 iterations × 3 runs),
+  exactly what GO-026 predicted. Encoding is unchanged. Byte-for-byte output
+  and map-key ordering are both pinned by tests, the second because the
+  replication binlog depends on identical input producing identical bytes —
+  which is also why this is the v1-compatible surface and not
+  `encoding/json/v2` directly.
+
+  Behaviour change: malformed input now returns an error where it previously
+  crashed the process.
+
+
 - **`alpha: 0` was silently replaced with 0.5 (SRCH-007)** — zero means pure
   keyword search, and it is also what an omitted field looks like in JSON. The
   resolution treated it as omitted, so a client deliberately asking for zero

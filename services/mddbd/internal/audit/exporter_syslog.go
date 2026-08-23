@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // SyslogExporter writes each audit event as an RFC 5424 message to a

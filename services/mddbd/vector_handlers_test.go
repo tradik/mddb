@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // mockEmbedding is a minimal embedding.Provider for testing.

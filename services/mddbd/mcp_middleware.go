@@ -3,7 +3,7 @@ package main
 import (
 	"crypto/subtle"
 	"fmt"
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 	"log/slog"
 	"net/http"
 	"os"

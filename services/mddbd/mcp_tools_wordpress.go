@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // Outbound half of the MCP → WordPress publishing bridge. The tools below

@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // OllamaProvider generates embeddings using local Ollama server.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // ImportURLRequest represents a request to import a document from a URL

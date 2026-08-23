@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 func TestPCA2DSeparatesClusters(t *testing.T) {

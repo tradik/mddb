@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 func TestValidRetrievalMode(t *testing.T) {

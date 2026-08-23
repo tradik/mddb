@@ -8,7 +8,7 @@ import (
 
 	proto "mddb/proto"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // BulkIngestSubmitRequest is the HTTP body for POST /v1/bulk-ingest-job.

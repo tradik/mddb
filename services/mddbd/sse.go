@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 	"log/slog"
 	"net"
 	"net/http"

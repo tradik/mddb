@@ -7,7 +7,7 @@ import (
 
 	proto "mddb/proto"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // GO-030: a client waiting for a large import used to poll its status

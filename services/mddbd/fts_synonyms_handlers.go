@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // SynonymRequest is the HTTP request for synonym CRUD.

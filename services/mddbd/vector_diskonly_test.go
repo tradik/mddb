@@ -5,7 +5,7 @@ import (
 
 	vec "mddb/internal/vector"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 func TestCollectionDiskOnly(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // toolMemoryStartSession creates a new memory/conversation session via MCP.

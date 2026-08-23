@@ -10,7 +10,7 @@ import (
 
 	proto "mddb/proto"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // submitOneDoc wires the single-document flow used by the HTTP handler tests.

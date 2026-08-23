@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 	"mddb/internal/schema"
 )
 

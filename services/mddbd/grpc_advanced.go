@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

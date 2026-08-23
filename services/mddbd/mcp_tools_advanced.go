@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // --- Collection Config Tools ---

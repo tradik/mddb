@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 	"log/slog"
 	"mddb/internal/automationlog"
 	"mddb/internal/httpclient"

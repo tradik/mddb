@@ -13,7 +13,7 @@ import (
 	"mddb/internal/temporal"
 	proto "mddb/proto"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // ---- HTTP types for /v1/add-batch ----
