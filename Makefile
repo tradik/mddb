@@ -63,12 +63,25 @@ dev-shell-server: ## Open shell in MDDB server container
 dev-shell-panel: ## Open shell in MDDB panel container
 	docker compose -f docker-compose.dev.yml exec mddb-panel sh
 
-test: ## Run all tests
+test: ## Run all Go tests
 	@echo "🧪 Running backend tests..."
 	cd services/mddbd && go test -v -timeout 5m ./...
 	cd clients/go/mddb && go test -timeout 5m ./...
 	cd services/mddb-cli && go test -timeout 5m ./...
+	cd tools/bench && go test -timeout 5m ./...
 	@echo "✅ Tests passed!"
+
+test-clients: ## Run the Node.js and Python client tests (TEST-001)
+	@echo "🧪 Running Node.js client tests..."
+	cd clients/nodejs && npm test
+	@echo "🧪 Running Python client tests..."
+	cd clients/python && python3 -m pytest -q
+	@echo "✅ Client tests passed!"
+
+test-chat: ## Run the mddb-chat (Rust) tests
+	@echo "🧪 Running mddb-chat tests..."
+	cd services/mddb-chat && cargo test
+	@echo "✅ Chat tests passed!"
 
 test-coverage: ## Run tests with coverage
 	@echo "🧪 Running tests with coverage..."
@@ -120,7 +133,7 @@ test-graphql: ## Run GraphQL tests with coverage
 lint-all: fmt vet sec lint ## Run all linters
 	@echo "✅ All linting passed!"
 
-test-all: test test-graphql ## Run all tests
+test-all: test test-graphql test-clients ## Run every test suite in the monorepo
 	@echo "✅ All tests passed!"
 
 ci: check-go-version fmt-check lint-all test-all ## Run full CI pipeline (lint + test)

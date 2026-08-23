@@ -58,3 +58,19 @@ func formatUnix(v interface{}) string {
 	}
 	return time.Unix(int64(f), 0).Format(time.RFC3339)
 }
+
+// shorten trims a long identifier for display, appending an ellipsis only when
+// something was actually cut.
+//
+// GO-005 again, found by TEST-001: the api-key listing wrote keyHash[:16],
+// which panics with a stack trace on any hash shorter than that — an empty
+// field, a truncated response, or a server that shortens its hashes. Slicing a
+// string by a length nobody checked is the same crash the safe accessors above
+// exist to prevent; this one was missed because it is a string, not a type
+// assertion.
+func shorten(s string, n int) string {
+	if n <= 0 || len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
+}

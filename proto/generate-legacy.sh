@@ -87,8 +87,15 @@ if command -v python3 &> /dev/null; then
         --grpc_python_out=clients/python/mddb_client \
         ${PROTO_DIR}/${PROTO_FILE} 2>/dev/null || echo "  ⚠️  Python generation skipped (install grpcio-tools)"
     
-    # Create __init__.py
-    touch clients/python/mddb_client/__init__.py
+    # TEST-001: the gRPC plugin emits `import mddb_pb2`, which only resolves
+    # when the generated files are on sys.path directly. Inside a package it
+    # raises ModuleNotFoundError, so `import mddb_client` had never worked.
+    sed -i 's/^import mddb_pb2 as mddb__pb2$/from . import mddb_pb2 as mddb__pb2/' \
+        clients/python/mddb_client/mddb_pb2_grpc.py 2>/dev/null || true
+
+    # __init__.py is hand-written (it exports MddbClient); only create it if
+    # the package is being generated from scratch.
+    [ -f clients/python/mddb_client/__init__.py ] || touch clients/python/mddb_client/__init__.py
     
     echo "  ✅ Python code generated in clients/python/mddb_client/"
 else

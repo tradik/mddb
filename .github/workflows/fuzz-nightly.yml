@@ -88,7 +88,7 @@ jobs:
       # repository — otherwise the next run rediscovers it from scratch.
       - name: Upload crashers
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-crasher-${{ matrix.target }}
           path: services/mddbd/**/testdata/fuzz/**

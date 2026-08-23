@@ -85,12 +85,19 @@ jobs:
         working-directory: clients/go/mddb
         run: go test -race ./...
 
+      # TEST-001: the CLI had one test file covering four helpers (0.9% of the
+      # module) because every command was an anonymous closure inside a
+      # 1447-line main(). The commands are now testable, and the floor keeps
+      # them tested — raise it when you improve the area, never lower it.
       - name: Build & test mddb-cli
         working-directory: services/mddb-cli
         run: |
           go mod tidy
           go build ./...
-          go test ./...
+          go test -race -coverprofile=coverage.out ./...
+          pct=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          echo "mddb-cli coverage: ${pct}%"
+          awk -v p="$pct" 'BEGIN { if (p+0 < 88) { print "coverage " p "% is below the 88% floor"; exit 1 } }'
 
       # TEST-003: every saved crasher is replayed on every run — that is what
       # `go test` does with testdata/fuzz corpora, so a bug found once can
@@ -315,6 +322,44 @@ jobs:
         working-directory: clients/nodejs
         run: npm audit --omit=dev --audit-level=high
 
+      # TEST-001: the package had no tests and no importable client — `main`
+      # pointed at example.js, so requiring it ran a demo against localhost.
+      # These start a gRPC server in-process; no MDDB instance is needed.
+      - name: Run client tests
+        working-directory: clients/nodejs
+        run: npm test
+
+  clients-python:
+    name: Python client
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # TEST-001: `import mddb_client` raised ModuleNotFoundError, because the
+      # generated stub used an absolute `import mddb_pb2` that only resolves
+      # when the files sit on sys.path directly. The package had never been
+      # importable, and nothing noticed because nothing imported it.
+      - name: Install the client and its test extra
+        working-directory: clients/python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: The package imports at all
+        working-directory: clients/python
+        run: python -c "from mddb_client import MddbClient, mddb_pb2; print(MddbClient)"
+
+      - name: Run client tests
+        working-directory: clients/python
+        run: pytest -q
+
   build:
     name: Build Binaries
     runs-on: ubuntu-latest
@@ -377,3 +422,16 @@ jobs:
       - name: Vet benchmark binaries
         working-directory: test
         run: go vet ./...
+
+      # TEST-001: tools/bench had one test file covering three arithmetic
+      # helpers. The numbers this tool prints are the ones people quote, so a
+      # division that yields +Inf is a wrong answer stated with authority.
+      - name: Build & test tools/bench
+        working-directory: tools/bench
+        run: |
+          go build ./...
+          go vet ./...
+          go test -race -coverprofile=coverage.out ./...
+          pct=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          echo "tools/bench coverage: ${pct}%"
+          awk -v p="$pct" 'BEGIN { if (p+0 < 68) { print "coverage " p "% is below the 68% floor"; exit 1 } }

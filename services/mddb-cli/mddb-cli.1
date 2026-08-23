@@ -335,45 +335,80 @@ Manage JSON Schema validation for collections (v2.3.1+).
 .B mddb-cli schema
 \fISUBCOMMAND\fR [\fIOPTIONS\fR]
 .PP
+The collection is named with
+.BR \-\-collection ,
+not positionally.
+.PP
 Subcommands:
 .TP
 .B set
 Set JSON Schema for a collection
 .RS
 .TP
-.BR \-f ", " \-\-file =\fIFILE\fR
-JSON Schema file
+.BR \-c ", " \-\-collection =\fINAME\fR
+Collection name (required)
+.TP
+.BR \-\-schema =\fIJSON\fR
+The schema itself, as a JSON string (required). There is no
+.B \-s
+shorthand: that is
+.B \-\-server
+on every command.
 .RE
 .TP
 .B get
 Get JSON Schema for a collection
+.RS
+.TP
+.BR \-c ", " \-\-collection =\fINAME\fR
+Collection name (required)
+.RE
 .TP
 .B delete
 Remove JSON Schema from a collection
+.RS
+.TP
+.BR \-c ", " \-\-collection =\fINAME\fR
+Collection name (required)
+.RE
+.TP
+.B list
+List every collection that carries a schema
 .PP
 Examples:
 .RS
 .nf
-# Set schema from file
-mddb-cli schema set blog -f blog-schema.json
+# Set a schema from a file
+mddb-cli schema set --collection blog --schema "$(cat blog-schema.json)"
 
-# Get schema
-mddb-cli schema get blog
+# Get a schema
+mddb-cli schema get --collection blog
 
-# Delete schema
-mddb-cli schema delete blog
+# Delete a schema
+mddb-cli schema delete --collection blog
+
+# List collections with schemas
+mddb-cli schema list
 .fi
 .RE
 .SS validate
-Validate a document against its collection's JSON Schema (v2.3.1+).
+Validate metadata against a collection's JSON Schema (v2.3.1+).
 .PP
 .B mddb-cli validate
-\fICOLLECTION\fR \fIKEY\fR \fILANG\fR
+.BR \-\-collection =\fINAME\fR
+.BR \-\-meta =\fIJSON\fR
+.PP
+Checks a block of metadata, not a stored document, so a schema can be tried
+before anything is written.
+.B \-\-meta
+is JSON here, unlike the
+.B key=val1|val2
+syntax the document commands use.
 .PP
 Examples:
 .RS
 .nf
-mddb-cli validate blog post-1 en_US
+mddb-cli validate --collection blog --meta '{"tag":["go"],"status":"draft"}'
 .fi
 .RE
 .SS backup

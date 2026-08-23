@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The Node.js and Python packages have a client (TEST-001)** — both shipped
+  as example scripts. `@tradik/mddb-client` pointed `main` at `example.js`, so
+  requiring the package executed a demo that connected to localhost and wrote
+  documents; `mddb-client` for Python exported nothing at all, and its
+  generated stub used an absolute `import mddb_pb2` that only resolves when the
+  files sit on `sys.path` directly — **`import mddb_client` raised
+  ModuleNotFoundError**, so the published package had never been importable.
+  Both now export a client whose methods are taken from the service definition,
+  so every unary RPC in `mddb.proto` is available under its own name and a new
+  RPC works the moment the proto carries it. Each carries API-key and JWT
+  metadata, a per-call deadline, an explicit TLS switch (INT-011) and a
+  `waitForReady` so an unreachable server is reported as a refused connection
+  rather than a timeout on the first call. `proto/generate.sh` rewrites the
+  Python import, so the defect cannot come back on the next regeneration.
+
+
+- **CI runs the new suites (TEST-001)** — the mddb-cli job built and tested
+  without measuring; it now enforces an 88% coverage floor. `tools/bench` had
+  no job at all and now builds, vets and tests behind a 68% floor. The Node
+  client job installed and audited a package with no tests and now runs them; a
+  new job installs the Python client, asserts that importing it works, and runs
+  its tests. Both client suites start a gRPC server in-process, so neither
+  needs a live MDDB.
+
+
 - **`/v1/export` no longer calls itself over HTTP (GO-021)** — the handler
   answered by POSTing to its own `/v1/search` on
   `localhost:$MDDB_ADDR`, a full round-trip through the stack to reach a
@@ -278,6 +303,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   behaviour cannot differ by transport. Only new writes are enriched; re-save an
   existing code collection to populate it.
 
+### Changed
+
+- **The mddb-cli command tree left `main()` (TEST-001)** — 31 commands were
+  anonymous `RunE` closures inside a 1447-line `main()`, where no test could
+  reach one: the module sat at 0.9% coverage, and the two bugs above had been
+  there since the commands were written. `main()` is now three lines,
+  `newRootCmd()` assembles the tree, and the commands live in nine files by
+  area. The `key=val1|val2` flag parser had been written out five times and is
+  now one function with its own tests. Coverage: **0.9% → 92.3%**, with the
+  commands exercised against an httptest server the way a shell exercises them
+  against a real one. `tools/bench` got the same treatment — the benchmark loop
+  left `main()`, where it called `os.Exit` on the first failed write and could
+  not report what it had measured: **3.4% → 71.9%**.
+
+
 ### Removed
 
 - **Dead helpers and unfinished stubs (GO-020, GO-021)** — the dead-function
@@ -298,6 +338,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+
+- **`mddb-cli schema set` panicked on every invocation (TEST-001)** — it
+  defined `-s` for `--schema` while the root command uses `-s` for `--server`,
+  and pflag panics when a subcommand redefines an inherited shorthand. Every
+  call crashed with a stack trace, `--help` included, so the command had never
+  worked. The shorthand is gone; `--schema` is unchanged and `-s` keeps meaning
+  `--server` as it does everywhere else. A test now walks the whole command
+  tree and fails on any subcommand that redefines a global shorthand, and
+  another renders every command's help.
+
+
+- **`mddb-cli api-key list` crashed on a short hash (TEST-001)** — it sliced
+  `keyHash[:16]` without checking the length, so an empty or truncated field
+  panicked. This is the GO-005 class of crash the safe accessors were added to
+  prevent, missed because it is a string slice rather than a type assertion.
+
+
+- **The benchmark reported non-numbers (TEST-001)** — GO-013 guarded
+  `perSecond` and the SVG coordinates against a zero interval and left the
+  headline average as a bare division, so a run with no batches reported `NaN`
+  docs/sec and the slowest batch as `1.7976931348623157e+308`, the sentinel the
+  scan starts from. Chart coordinates are also clamped to the plot area: a bar
+  computed outside the viewBox renders as nothing at all, which reads as a
+  missing measurement rather than an off-scale one.
+
+
+- **Benchmark documents carried duplicate tags (TEST-001)** — tags were drawn
+  with replacement, so a document could be written with the same tag twice.
+  The benchmark exists to measure metadata indexing, and a repeated value
+  indexes once; the run reported a tag count it had not written.
+
 
 - **Pooled buffers were never actually pooled (GO-020)** — `NewZeroCopyReader`
   and `NewZeroCopyWriter` each built a private `BufferPool`, so every buffer was
