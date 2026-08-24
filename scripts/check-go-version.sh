@@ -71,7 +71,13 @@ while IFS= read -r match; do
 	file="${match%%:*}"
 	track="$(printf '%s' "${match#*:}" | grep -oE 'go/[0-9]+\.[0-9]+/' | grep -oE '[0-9]+\.[0-9]+')"
 	[[ -n "${track}" ]] && snap_pins+=("${file}=${track}")
-done < <(grep -rHnE 'go/[0-9]+\.[0-9]+/(stable|candidate|beta|edge)' --include='snapcraft.yaml' . 2>/dev/null || true)
+# grep -v on a leading-# line: a comment mentioning a channel is prose, not a
+# pin. Without this the guard read its own explanation — the note left in
+# snapcraft.yaml about why the build-snap was removed contains the channel
+# string, and the guard counted it as a live pin that would have failed the
+# next time Go moved.
+done < <(grep -rHnE 'go/[0-9]+\.[0-9]+/(stable|candidate|beta|edge)' --include='snapcraft.yaml' . 2>/dev/null |
+	grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
 
 if [[ ${#sources[@]} -eq 0 ]]; then
 	echo "check-go-version: no Go version pins found — nothing to verify" >&2

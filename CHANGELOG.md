@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Snap packages have failed to build for two releases** — the snap compiled
+  from source inside its own sandbox against `build-snaps: [go/…/stable]`, and
+  the store has no track for the Go version this project pins. Its newest is a
+  minor behind, so the version guard and the snap store could not both be
+  satisfied. Confirmed at the source rather than inferred: `snap info go` lists
+  no such track.
+
+  The snap now packages the binary the release workflow builds, exactly as the
+  DEB and RPM do. That removes the disagreement instead of resolving it, and the
+  snap ships the same bytes that were built and tested rather than a second
+  compilation nobody checked. It also retires a `go mod vendor` step that
+  existed only because the sandbox could not resolve mddb-cli's local `replace`
+  onto the shared client — building in the checkout, where that module is,
+  makes it unnecessary. Verified: mddb-cli builds without the vendor directory.
+
+  Every other job in the 2.13.0 release run succeeded; the 19 published
+  artifacts are complete apart from the snaps.
+
+- **The Go version guard was reading its own explanation** — it greps every
+  `snapcraft.yaml` for a `go/<version>/stable` channel, and the comment left
+  behind explaining why the build-snap was removed contains that string. It
+  counted the prose as a live pin. Passing today because the versions matched;
+  it would have failed the next time Go moved, pointing at a comment. Comment
+  lines are skipped now.
+
 ## [2.13.0] - 2026-08-24
 
 ### Changed

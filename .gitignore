@@ -172,3 +172,8 @@ tools/bench/soak/soak
 tools/bench/soak/mddb-soak
 /mddb-soak
 soak-report/
+
+# Binaries staged for snap packaging by the release workflow (see the
+# snapcraft.yaml files: the snap installs these rather than compiling).
+services/mddbd/snapbuild/
+services/mddb-cli/snapbuild/

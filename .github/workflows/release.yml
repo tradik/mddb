@@ -846,6 +846,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/mddbd/go.sum
+
+      # The snap packages this binary rather than compiling its own. Building
+      # inside the snap sandbox needed `build-snaps: [go/1.27/stable]`, and the
+      # go snap has no 1.27 track — its newest is 1.26 — so the snap jobs failed
+      # for two releases while everything else in the run succeeded. The runner
+      # has 1.27 through setup-go, the same toolchain the DEB and RPM are built
+      # with, and this runs on a native runner per architecture so no
+      # cross-compilation is involved.
+      - name: Build the binary the snap packages
+        working-directory: services/mddbd
+        env:
+          CGO_ENABLED: "0"
+          GOWORK: "off"
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          mkdir -p snapbuild
+          # The ldflags match the release job's byte for byte so the snap ships
+          # what was published. -X main.Version is a no-op for this binary —
+          # mddbd carries `const VERSION`, not a variable — and is kept only so
+          # the two build commands do not silently diverge. See OPS-022.
+          go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" -o snapbuild/mddbd .
+          test -x snapbuild/mddbd
+
       - name: Build snap
         id: build
         uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
@@ -883,19 +911,25 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddb-cli/go.sum
 
-      - name: Vendor dependencies (self-contained snap build)
+      # The snap packages this binary rather than compiling its own — see the
+      # mddbd job above for why (the go snap has no 1.27 track).
+      #
+      # This replaces a `go mod vendor` step that existed only because the snap
+      # sandbox could not resolve mddb-cli's local `replace` onto the shared
+      # client (GO-015). Building in the checkout, where that module is, makes
+      # the vendoring unnecessary rather than working around its absence.
+      - name: Build the binary the snap packages
         working-directory: services/mddb-cli
         env:
+          CGO_ENABLED: "0"
           GOWORK: "off"
         run: |
-          # GO-015: mddb-cli pins the shared client via a local
-          # `replace mddb-client => ../../clients/go/mddb`, which is NOT visible
-          # inside the snapcraft build sandbox (source: . copies only this dir),
-          # so the sandbox `go build` failed with "replacement directory
-          # ../../clients/go/mddb does not exist". Vendor here in the full
-          # checkout (where the shared module exists) so the snap builds
-          # self-contained — `go build` then uses vendor/ with no path resolution.
-          go mod vendor
+          VERSION=${GITHUB_REF#refs/tags/}
+          mkdir -p snapbuild
+          go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" -o snapbuild/mddb .
+          # mddb-cli does carry `var Version`, so this proves the injection
+          # worked rather than just that a file exists.
+          ./snapbuild/mddb --version
 
       - name: Build snap
         id: build

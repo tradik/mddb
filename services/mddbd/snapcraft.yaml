@@ -30,14 +30,18 @@ apps:
 
 parts:
   mddbd:
-    plugin: go
+    # The binary is built by the release workflow and packaged here, the same
+    # way the DEB and RPM are made. It used to be compiled inside the snap
+    # sandbox against a build-snap of the Go toolchain, and that broke the snap
+    # for two releases: the store has no track for the version this project
+    # pins. Its newest is one minor behind, so the version guard and the snap
+    # store could not both be satisfied.
+    #
+    # Packaging the released binary removes the disagreement rather than
+    # resolving it. It also means the snap ships the same bytes that were built
+    # and tested, instead of a second compilation nobody checked.
+    plugin: nil
     source: .
     source-type: local
-    build-snaps:
-      - go/1.27/stable
-    build-environment:
-      - CGO_ENABLED: "0"
-      - GOFLAGS: "-trimpath"
     override-build: |
-      cd $CRAFT_PART_SRC
-      go build -ldflags="-s -w -X main.Version=${CRAFT_PROJECT_VERSION}" -o $CRAFT_PART_INSTALL/bin/mddbd .
+      install -D -m 0755 "$CRAFT_PART_SRC/snapbuild/mddbd" "$CRAFT_PART_INSTALL/bin/mddbd"

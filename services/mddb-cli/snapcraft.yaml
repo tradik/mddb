@@ -25,17 +25,16 @@ apps:
 
 parts:
   mddb-cli:
-    plugin: go
+    # As in services/mddbd/snapcraft.yaml: the binary comes from the release
+    # workflow rather than being compiled in the sandbox, because the store has
+    # no Go track for the version this project pins.
+    #
+    # This also retires the `go mod vendor` step the workflow used to run. That
+    # existed solely because the sandbox could not resolve mddb-cli's local
+    # `replace` onto the shared client — a problem that disappears when the
+    # build happens in the checkout, where the shared module is.
+    plugin: nil
     source: .
     source-type: local
-    build-snaps:
-      - go/1.27/stable
-    build-environment:
-      - CGO_ENABLED: "0"
-      - GOFLAGS: "-trimpath"
     override-build: |
-      cd $CRAFT_PART_SRC
-      # -mod=vendor: mddb-cli pins the shared client via a local replace that is
-      # not present in the sandbox; the release workflow vendors deps beforehand
-      # so the build is self-contained (see .github/workflows/release.yml).
-      go build -mod=vendor -ldflags="-s -w -X main.Version=${CRAFT_PROJECT_VERSION}" -o $CRAFT_PART_INSTALL/bin/mddb .
+      install -D -m 0755 "$CRAFT_PART_SRC/snapbuild/mddb" "$CRAFT_PART_INSTALL/bin/mddb"
