@@ -158,6 +158,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directory made unwritable with mode bits that do not restrict the owner on
   Windows. They skip there, each with the reason.
 
+  The second run moved the failures to `mddb-cli` and answered a question the
+  first could not: `ReplaceBinary` works on Windows. It renames the running
+  binary aside before moving the new one in, and Windows permits renaming a
+  running executable even though it forbids overwriting or deleting one — so
+  the sequence written for Unix atomicity happens to be the only sequence that
+  works there. What failed were two assertions about POSIX: an execute bit
+  Windows does not have, and a directory made unwritable with mode bits that do
+  not restrain its owner.
+
   And one finding that contradicts what this release claimed. WIN-002
   concluded that `os.Rename` replaces an existing file on every platform Go
   supports. True, but not under concurrency: Windows must delete the target
