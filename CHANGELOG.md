@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Deleting a user now deletes it, and the name comes back (#213)** —
+  `DELETE /v1/auth/users/:username` answered `{"status":"deleted"}` while the
+  account stayed, marked disabled. The name stayed taken with it: registering it
+  again answered `409 user already exists`, so delete-then-register — the
+  natural way to rotate a tenant's credentials — could not work for any name
+  that had ever been used.
+
+  **This is a behaviour change.** A client that reads the disabled record back
+  after deleting will no longer find one. `GET /v1/auth/users` no longer lists
+  deleted accounts.
+
+  The alternative was to keep the soft delete and let `register` re-enable a
+  disabled account. That is the smaller change and the more dangerous one: the
+  record carries the user's permissions and group memberships, so a name that
+  looked free would have handed whoever claimed it the privileges of whoever
+  held it before. The deletion clears all four places a user is referenced — the
+  record, its API keys, its per-collection permissions and its group memberships
+  — and the tests check each of them after a reload, because clearing the
+  in-memory caches and leaving the database is a fix that lasts until restart.
+
+  The audit log is untouched. That is where the record of who existed and who
+  removed them belongs, and it outlives the account by design.
+
+- **An API key sent as `Authorization: Bearer` is accepted (#212)** — it was
+  parsed as a JWT and refused with `401 {"error":"invalid token"}`, a message
+  about the credential when the problem was the header. The MCP middleware next
+  door has always taken the key in either place, so two surfaces of one server
+  disagreed and clients met the stricter one first. API keys carry the
+  `mddb_live_` prefix, which decides it outright: nothing is validated twice,
+  and a JWT can never be mistaken for a key.
+
+- **A fresh named volume no longer restart-loops on first start (#211)** — the
+  image created `/app/data` and the repository's own `docker-compose.yml` mounts
+  a volume at `/data`. Docker copies an image directory's contents *and its
+  ownership* into a fresh named volume only where that path exists in the image;
+  `/data` did not, so it was created root-owned, the server runs as uid 1000,
+  and the first start died with `bolt.Open: open /data/mddb.db: permission
+  denied`. The image now creates `/data` owned by the runtime user. Verified by
+  reproducing the loop and then watching the container come up healthy with the
+  database created.
+
 - **Vector maths runs on AVX2 on amd64, 3.7-6.3x faster (SRCH-011)** — the build
   tags split vector maths two ways: NEON through cgo on arm64, and pure Go
   everywhere else. There was no third branch, so on amd64 — most of the servers

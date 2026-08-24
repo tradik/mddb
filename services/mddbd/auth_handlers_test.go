@@ -507,13 +507,14 @@ func TestHandleAuthDeleteUser_Success(t *testing.T) {
 		t.Errorf("Expected status 'deleted', got '%s'", resp["status"])
 	}
 
-	// Verify user is disabled (soft-delete)
-	user, err := s.AuthManager.GetUser("todelete")
-	if err != nil {
-		t.Fatalf("GetUser failed after delete: %v", err)
+	// The response says "deleted" and now means it (#213): the record is gone
+	// and the name is free, rather than held by a disabled user that every
+	// later registration collided with.
+	if _, err := s.AuthManager.GetUser("todelete"); err == nil {
+		t.Error("the user still resolves after a delete that reported success")
 	}
-	if !user.Disabled {
-		t.Error("Expected user to be disabled after deletion")
+	if _, err := s.AuthManager.CreateUser("todelete", "a-new-password"); err != nil {
+		t.Errorf("the freed name could not be registered again: %v", err)
 	}
 }
 

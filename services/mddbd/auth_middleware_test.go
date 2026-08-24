@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -500,5 +501,85 @@ func TestHTTPMiddleware_MetricsPublicOptIn(t *testing.T) {
 	code, reached := metricsProbe(t)
 	if code != http.StatusOK || !reached {
 		t.Errorf("GET /metrics with opt-in: got code=%d reached=%v, want 200 true", code, reached)
+	}
+}
+
+// #212: an API key sent as `Authorization: Bearer` used to be parsed as a JWT
+// and refused with "invalid token" — a message about the credential when the
+// problem was the header. The MCP middleware next door has always accepted the
+// key in either place, so two surfaces of one server disagreed and clients met
+// the stricter one first.
+func TestAuthMiddleware_APIKeyInEitherHeader(t *testing.T) {
+	am, cleanup := authMwSetup(t)
+	defer cleanup()
+
+	key, err := am.CreateAPIKey("admin", "test key", 0)
+	if err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	if !strings.HasPrefix(key, APIKeyPrefix) {
+		t.Fatalf("generated key %q does not carry the prefix the middleware keys on", key)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		header string
+		value  string
+	}{
+		{"X-API-Key", "X-API-Key", key},
+		{"Authorization: Bearer", "Authorization", "Bearer " + key},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := am.HTTPMiddleware(authMwDummyHandler())
+			req := httptest.NewRequest("GET", "/v1/docs/test", nil)
+			req.Header.Set(tc.header, tc.value)
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, req)
+
+			if w.Code != http.StatusOK {
+				t.Errorf("expected 200, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// The prefix decides between a key and a JWT, so neither can be mistaken for
+// the other. A bearer value that is not a key must still take the JWT path and
+// be refused on its own terms.
+func TestAuthMiddleware_BearerWithoutKeyPrefixIsStillAJWT(t *testing.T) {
+	am, cleanup := authMwSetup(t)
+	defer cleanup()
+
+	handler := am.HTTPMiddleware(authMwDummyHandler())
+	req := httptest.NewRequest("GET", "/v1/docs/test", nil)
+	req.Header.Set("Authorization", "Bearer not-a-jwt-and-not-a-key")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "invalid token") {
+		t.Errorf("a non-key bearer value should be refused as a token, got %s", w.Body.String())
+	}
+}
+
+// An invalid API key must be refused as a key, whichever header carried it —
+// the routing decision is the prefix, and it must not change what happens next.
+func TestAuthMiddleware_InvalidAPIKeyInAuthorizationHeader(t *testing.T) {
+	am, cleanup := authMwSetup(t)
+	defer cleanup()
+
+	handler := am.HTTPMiddleware(authMwDummyHandler())
+	req := httptest.NewRequest("GET", "/v1/docs/test", nil)
+	req.Header.Set("Authorization", "Bearer "+APIKeyPrefix+"0000000000000000")
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "invalid api key") {
+		t.Errorf("expected the key error, not the token error, got %s", w.Body.String())
 	}
 }

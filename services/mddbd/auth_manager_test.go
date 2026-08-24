@@ -610,14 +610,11 @@ func TestAuthManager_DeleteUser(t *testing.T) {
 		t.Fatalf("DeleteUser failed: %v", err)
 	}
 
-	// Verify user is disabled
-	user, err = am.GetUser(username)
-	if err != nil {
-		t.Fatalf("GetUser failed after delete: %v", err)
-	}
-
-	if !user.Disabled {
-		t.Error("User should be disabled after delete")
+	// The user is gone, not disabled (#213). It used to stay, marked disabled,
+	// which held the name against every later registration while the response
+	// said "deleted".
+	if _, err = am.GetUser(username); err == nil {
+		t.Error("the user still resolves after deletion")
 	}
 
 	// Authentication should fail
@@ -1252,5 +1249,138 @@ func TestAuthManager_DeleteAPIKey_MultiplKeys(t *testing.T) {
 		if key.KeyHash == keyToDelete {
 			t.Error("Deleted key still in list")
 		}
+	}
+}
+
+// #213: DELETE answered {"status":"deleted"} while the user stayed, marked
+// disabled, and the name could never be registered again — so delete-then-
+// register, which is how a tenant's credentials get rotated, could not work for
+// any name that had ever been used.
+//
+// The deletion is now real, and these tests check all four places a user is
+// referenced. Leaving any one of them would make the deletion look complete
+// while remaining a way in, and the group and permission entries are the
+// dangerous ones: they are what a re-registered name would otherwise inherit.
+func TestDeleteUserRemovesEverythingThatGrantsAccess(t *testing.T) {
+	am, db, cleanup := setupTestAuthManager(t)
+	defer cleanup()
+
+	const victim = "tenant-admin"
+	if _, err := am.CreateUser(victim, "correct-horse-battery"); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	key, err := am.CreateAPIKey(victim, "rotation test", 0)
+	if err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	if err := am.SetPermission(&Permission{
+		Username: victim, Collection: "secrets", Read: true, Write: true, Admin: true,
+	}); err != nil {
+		t.Fatalf("SetPermission: %v", err)
+	}
+	if _, err := am.CreateGroup("editors", "", []string{victim, "admin"}); err != nil {
+		t.Fatalf("CreateGroup: %v", err)
+	}
+
+	if err := am.DeleteUser(victim); err != nil {
+		t.Fatalf("DeleteUser: %v", err)
+	}
+
+	t.Run("the record is gone", func(t *testing.T) {
+		if _, err := am.GetUser(victim); err == nil {
+			t.Error("the user still resolves after deletion")
+		}
+	})
+
+	t.Run("the API key no longer authenticates", func(t *testing.T) {
+		if _, err := am.ValidateAPIKey(key); err == nil {
+			t.Error("an API key belonging to a deleted user still validates")
+		}
+	})
+
+	t.Run("permissions are gone", func(t *testing.T) {
+		if perms := am.GetPermissions(victim); len(perms) != 0 {
+			t.Errorf("deleted user still holds %d permissions: %+v", len(perms), perms)
+		}
+	})
+
+	t.Run("group membership is gone", func(t *testing.T) {
+		g, err := am.GetGroup("editors")
+		if err != nil {
+			t.Fatalf("GetGroup: %v", err)
+		}
+		for _, m := range g.Members {
+			if m == victim {
+				t.Fatal("deleted user is still a member of editors — a name " +
+					"registered again would inherit the group's grants")
+			}
+		}
+		if len(g.Members) != 1 || g.Members[0] != "admin" {
+			t.Errorf("removing one member disturbed the rest: %v", g.Members)
+		}
+	})
+
+	// The caches are rebuilt from the database on every start, so an entry left
+	// on disk comes back after a restart even when the in-memory state looks
+	// clean. Checking both is the only way to know which one was cleared.
+	t.Run("nothing survives on disk", func(t *testing.T) {
+		fresh := NewAuthManager(db, am.config)
+		if err := fresh.LoadAll(); err != nil {
+			t.Fatalf("LoadAll: %v", err)
+		}
+		if _, err := fresh.GetUser(victim); err == nil {
+			t.Error("the user came back after reloading from the database")
+		}
+		if _, err := fresh.ValidateAPIKey(key); err == nil {
+			t.Error("the API key came back after reloading from the database")
+		}
+		if perms := fresh.GetPermissions(victim); len(perms) != 0 {
+			t.Errorf("permissions came back after reloading: %+v", perms)
+		}
+		g, err := fresh.GetGroup("editors")
+		if err != nil {
+			t.Fatalf("GetGroup after reload: %v", err)
+		}
+		for _, m := range g.Members {
+			if m == victim {
+				t.Error("group membership came back after reloading")
+			}
+		}
+	})
+}
+
+// The sequence the issue is about: delete then register the same name. It must
+// work, and the new user must start with nothing the old one had.
+func TestDeletedUsernameCanBeRegisteredAgainWithoutInheriting(t *testing.T) {
+	am, _, cleanup := setupTestAuthManager(t)
+	defer cleanup()
+
+	const name = "rotated"
+	if _, err := am.CreateUser(name, "first-password"); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if err := am.SetPermission(&Permission{
+		Username: name, Collection: "secrets", Read: true, Write: true, Admin: true,
+	}); err != nil {
+		t.Fatalf("SetPermission: %v", err)
+	}
+
+	if err := am.DeleteUser(name); err != nil {
+		t.Fatalf("DeleteUser: %v", err)
+	}
+
+	if _, err := am.CreateUser(name, "second-password"); err != nil {
+		t.Fatalf("registering a deleted name failed: %v — this is the 409 in #213", err)
+	}
+
+	if perms := am.GetPermissions(name); len(perms) != 0 {
+		t.Errorf("the re-registered user inherited %d permissions from the one "+
+			"deleted before it: %+v", len(perms), perms)
+	}
+	if _, err := am.Authenticate(name, "first-password"); err == nil {
+		t.Error("the old password still authenticates the new user")
+	}
+	if _, err := am.Authenticate(name, "second-password"); err != nil {
+		t.Errorf("the new password does not authenticate: %v", err)
 	}
 }

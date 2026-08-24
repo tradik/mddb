@@ -45,9 +45,21 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /build/mddbd /app/mddbd
 
-# Create data directory
-RUN mkdir -p /app/data && \
-    chown -R mddb:mddb /app
+# Create data directories.
+#
+# /app/data is where MDDB_PATH points by default. /data exists for a different
+# reason: docker-compose.yml mounts a named volume there, and Docker copies an
+# image directory's contents *and its ownership* into a fresh named volume only
+# when that path exists in the image. Without this line the volume is created
+# root-owned, the server runs as uid 1000, and a first start from this
+# repository's own compose file dies with
+#
+#   bolt.Open: open /data/mddb.db: permission denied
+#
+# which is issue #211. Creating the directory here costs nothing and is what
+# hands the volume the right owner.
+RUN mkdir -p /app/data /data && \
+    chown -R mddb:mddb /app /data
 
 # Switch to non-root user
 USER mddb

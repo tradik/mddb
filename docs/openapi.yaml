@@ -3018,7 +3018,20 @@ paths:
       tags:
         - Users
       summary: Delete user
-      description: Delete (disable) a user account. Requires admin authentication.
+      description: |
+        Permanently deletes a user account and everything that grants it access:
+        the record, its API keys, its per-collection permissions and its group
+        memberships. The username becomes available again.
+
+        Changed in 2.13.0. This used to disable the account and keep it, which
+        held the name against every later registration while answering
+        `{"status":"deleted"}`. A client that read the disabled record back
+        after deleting will no longer find it.
+
+        The audit log is unaffected — that is where the record of who existed
+        and who removed them lives.
+
+        Requires admin authentication.
       operationId: authDeleteUser
       security:
         - BearerAuth: []
