@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Vector maths runs on AVX2 on amd64, 3.7-6.3x faster (SRCH-011)** — the build
+  tags split vector maths two ways: NEON through cgo on arm64, and pure Go
+  everywhere else. There was no third branch, so on amd64 — most of the servers
+  this runs on — every vector comparison went through a scalar loop. The file is
+  named `vector_math_scalar.go`, which reads like a fallback and was the
+  production path for the dominant architecture.
+
+  Measured with the same benchmark as the original observation, dims=768,
+  median of five runs:
+
+  | Candidates | Scalar | AVX2 | |
+  |---|---|---|---|
+  | 1,000 | 6.8 GB/s | **43.0 GB/s** | 6.3× |
+  | 10,000 | 6.7 GB/s | 36.0 GB/s | 5.4× |
+  | 100,000 | 6.8 GB/s | 24.8 GB/s | 3.7× |
+
+  The shape matters as much as the multiplier. The scalar path was *flat* — the
+  same 6.8 GB/s whether the working set fit in cache or was fifteen times
+  larger. Memory-bound code does not do that. It was bound by instruction
+  throughput, which is why the two earlier attempts to speed it up both failed:
+  a batch kernel measured within noise of the loop, and hoisting the query norm
+  out of it predicted 33% and delivered 1.5%. Both reduced arithmetic over the
+  same bytes. AVX2 reduces instructions per byte, and now the code degrades with
+  size like memory-bound code should.
+
+  Go assembly rather than cgo, decided by one line in `release.yml`: releases
+  build with `CGO_ENABLED=0`, so a cgo kernel would compile on a developer's
+  machine and never ship. Selection is a runtime CPU check, not a build tag —
+  there is one amd64 build of MDDB, and it has to start on a machine without
+  AVX2.
+
 - **Sustained-load memory measured, and the answer is no leak (GO-041)** — a
   downstream fork reported RSS going from 42 MB to 153 MB under load. That
   number alone decides nothing: RSS includes bbolt's memory map of the database

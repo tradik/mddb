@@ -9,9 +9,9 @@ import (
 
 func TestVectorMathTier(t *testing.T) {
 	tier := vectorMathTier()
-	valid := map[string]bool{"scalar": true, "neon": true, "sme": true}
+	valid := map[string]bool{"scalar": true, "neon": true, "sme": true, "avx2": true}
 	if !valid[tier] {
-		t.Errorf("vectorMathTier() = %q, want one of scalar/neon/sme", tier)
+		t.Errorf("vectorMathTier() = %q, want one of scalar/neon/sme/avx2", tier)
 	}
 	t.Logf("vector math tier: %s", tier)
 }

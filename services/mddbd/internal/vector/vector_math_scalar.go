@@ -1,4 +1,4 @@
-//go:build !arm64 || nosme || !cgo
+//go:build (!arm64 || nosme || !cgo) && (!amd64 || noasm)
 
 package vector
 
@@ -7,8 +7,12 @@ import "math"
 // vectorMathTier returns the active SIMD acceleration tier.
 //
 // Read only by tests and benchmarks: they run the same vectors through this
-// file and through vector_math_arm64.go and require identical results, so the
-// tier has to be reportable to say which half ran.
+// file and through vector_math_arm64.go or vector_math_amd64.go and require
+// identical results, so the tier has to be reportable to say which half ran.
+//
+// This file is the oracle the accelerated paths are checked against, and the
+// implementation for everything else: arm64 without cgo, amd64 built with
+// -tags noasm, and every other architecture.
 func vectorMathTier() string { return "scalar" }
 
 // CosineSimilarity computes cosine similarity between two vectors.
