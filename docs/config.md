@@ -450,6 +450,8 @@ MDDB_GRPC_ADDR=:11024 \
 
 TLS is automatically disabled on UDS listeners (peer is authenticated by filesystem permissions; API keys / JWT still apply on top). Per-IP rate limits in SSE collapse to a single bucket on UDS — apply application-level rate limiting if you need to differentiate clients.
 
+**Not available on Windows.** The security model above rests on the `0600` mode bits, and Windows cannot express them: `os.Chmod` there toggles the read-only attribute and nothing more. Windows 10 does support `AF_UNIX`, so the socket would bind and serve — with the access restriction silently absent. MDDB refuses the listener instead and says why. Use `tcp://127.0.0.1:<port>` on Windows.
+
 Clients with native UDS support:
 
 | Client | Address form |

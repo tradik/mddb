@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Windows file-replacement semantics, and what turned out not to need fixing
+  (WIN-002)** — the plan was a `replaceFile` helper split by platform, because
+  `os.Rename` is documented as not overwriting on Windows. It does. Go's
+  `os.Rename` there is `MoveFileEx` with `MOVEFILE_REPLACE_EXISTING`, verified in
+  the Go 1.27 source rather than assumed, so the helper would have wrapped
+  `MoveFileEx(REPLACE_EXISTING)` in a call to `MoveFileEx(REPLACE_EXISTING)`. It
+  was not written.
+
+  What is real on Windows is the other half: a file held open cannot be renamed
+  over or deleted, because Go opens files with `FILE_SHARE_READ|FILE_SHARE_WRITE`
+  and no `FILE_SHARE_DELETE`. Every one of the four rename sites and nine removal
+  sites already closes its file first, so the audit found no breakage there —
+  but it did find three things behind them, below.
+
+  **Unix domain sockets are now refused on Windows** with an explanation rather
+  than served. Windows 10 supports `AF_UNIX` and `net.Listen("unix", …)`
+  succeeds, which is what makes this worth refusing: `os.Chmod` on Windows
+  toggles the read-only attribute and cannot express "owner only", so the
+  single-user IPC guarantee the listener documents would have quietly not
+  applied. An unprotected IPC channel that does not say it is unprotected is
+  worse than one that will not start.
+
 - **The server and CLI cross-compile for Windows (WIN-001)** — `GOOS=windows`
   failed on three files using Unix-only syscalls: `syscall.Getrusage` for the
   CPU sampler and `syscall.Statfs` for disk space, in two places.
@@ -138,6 +160,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction. The four documents that linked to it now say so.
 
 ### Security
+
+- **Restore via the MCP tool could destroy the database with no way back
+  (SEC-017)** — `restore_backup.go` describes itself as "the single
+  implementation behind POST /v1/restore and the gRPC Restore RPC". It was, for
+  those two. The MCP tool was a third entry point with its own
+  close-copy-reopen: no check that the backup was a database, no restore lock,
+  no rollback, no cache rebuild, no binlog reset.
+
+  An agent calling the tool with any readable file inside the backup directory
+  overwrote the live database with it. The file did not have to be a database —
+  the copy succeeds on bytes, and only the reopen fails, by which point the
+  original is gone. Measured against the unchanged code:
+
+  ```
+  --- FAIL: TestDirectClientRestore_FailureLeavesTheDatabaseServing
+      write after a failed MCP restore failed: database not open
+  ```
+
+  Worth noting how it presented: the read after the failure still succeeded,
+  served from cache. The dead database looked healthy until the first write.
+
+- **A truncated replication snapshot destroyed the follower's data (SEC-018)** —
+  the snapshot install was a third hand-rolled swap. It renamed the received
+  file over the live database without checking it was a database, so a
+  half-received stream was indistinguishable from a good one until the reopen.
+  Any failure left the follower holding a closed handle until the process was
+  restarted. It also reopened with hand-written bolt options instead of the
+  tuned ones, so a follower that had ever taken a snapshot ran with a different
+  mmap and lock configuration than the rest of the process — silently.
+
+  All three callers now share one contract, `swapDatabase(source, install)`:
+  validate, close, move the live file aside, install, reopen, roll back on any
+  failure. The two callers differ only in `install` — a restore copies, because
+  a backup must survive being restored from; a replication snapshot is renamed,
+  because it is a temp file the follower owns and copying a multi-gigabyte file
+  in order to delete the original is waste.
+
+- **The restore rollback had never run (SEC-018)** — found while testing the
+  above. Coverage put `swapDatabase`'s entire rollback closure and both of its
+  call sites at **zero executions**. Every existing failure test supplied a
+  source that validation rejected, so the swap returned before touching the live
+  file: the code whose only job is to save the database when a restore goes
+  wrong had not been exercised since it was written for SEC-015.
+
+  Reaching it needs a source that validates and an install that then fails,
+  which is exactly what making `install` a parameter allows. Two tests now do,
+  taking the function from 64.5% to 83.9%; the remainder is the "the rollback
+  also failed" branches. Both are mutation-checked — removing the restoring
+  rename fails one, removing the reopen after rollback fails both with
+  `database not writable: database not open`.
 
 - **`npm audit` reports zero across the integrations** — the GitHub Action,
   the Chrome extension and the Grafana datasource carried eleven open

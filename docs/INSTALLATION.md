@@ -275,9 +275,10 @@ release artifacts, and no CI job runs the test suite on Windows yet, so nothing
 has proven the binaries behave correctly once they start — only that they
 build. Treat it as something to try, not something to run a database on.
 
-Two areas are known to differ and are not yet addressed: replacing a file that
-another process holds open behaves differently on Windows than on Unix, and
-Unix domain sockets compile but are not exercised. Configure a TCP listener.
+One difference is deliberate: **Unix domain sockets are refused on Windows**.
+The listener's security model is owner-only `0600` mode bits, which Windows
+cannot express, so a socket there would serve without the restriction it
+documents. Configure a TCP listener — `tcp://127.0.0.1:<port>`.
 
 ```powershell
 git clone https://github.com/tradik/mddb.git

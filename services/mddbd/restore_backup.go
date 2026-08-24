@@ -29,20 +29,16 @@ import (
 
 // restoreFromBackup replaces the live database with the backup at safeFrom
 // (already validated by safeBackupPath) and rebuilds derived in-memory state.
+//
+// The backup is copied rather than moved: it belongs to whoever made it and
+// must survive being restored from, twice if they like.
 func (s *Server) restoreFromBackup(safeFrom string) error {
-	// The backup must be a database bolt can open at all — checked read-only,
-	// before the live file is touched, so a truncated or non-bbolt file can
-	// never destroy the current database.
-	check, err := bolt.Open(safeFrom, 0600, &bolt.Options{ReadOnly: true, Timeout: time.Second})
-	if err != nil {
-		return fmt.Errorf("backup %s is not a usable database: %w", filepath.Base(safeFrom), err)
-	}
-	_ = check.Close()
-
 	// The swap drains every in-flight DBView/DBUpdate (GO-004) so no handler
 	// observes a closed or half-swapped *bolt.DB.
 	if err := s.withRestoreLock(func() error {
-		return s.swapDatabaseFile(safeFrom)
+		return s.swapDatabase(safeFrom, func(dst string) error {
+			return copyFile(safeFrom, dst)
+		})
 	}); err != nil {
 		return err
 	}
@@ -57,9 +53,29 @@ func (s *Server) restoreFromBackup(safeFrom string) error {
 	return nil
 }
 
-// swapDatabaseFile performs snapshot -> close -> copy -> reopen with rollback.
+// swapDatabase replaces the live database with the one at source.
+//
+// Contract (SEC-015 / SEC-016 / SEC-018): the source is proven openable before
+// the live file is touched, the live file is kept as a rollback snapshot until
+// the swap is proven, and this never returns with s.DB in a state other than
+// "open and serving" — on any failure the previous database comes back.
+//
+// install puts the source database at dst. It is a parameter because the two
+// callers differ only there: a restore copies, because the backup must survive;
+// a replication snapshot is renamed, because it is a temp file the follower
+// owns and copying a multi-gigabyte file it is about to delete is waste.
+//
 // MUST be called while holding the restore write lock.
-func (s *Server) swapDatabaseFile(safeFrom string) error {
+func (s *Server) swapDatabase(source string, install func(dst string) error) error {
+	// The source must be a database bolt can open at all — checked read-only,
+	// before the live file is touched, so a truncated file or a half-received
+	// stream can never destroy the current database.
+	check, err := bolt.Open(source, 0600, &bolt.Options{ReadOnly: true, Timeout: time.Second})
+	if err != nil {
+		return fmt.Errorf("%s is not a usable database: %w", filepath.Base(source), err)
+	}
+	_ = check.Close()
+
 	reopen := func() error {
 		db, err := bolt.Open(s.Path, 0600, getOptimizedBoltOptions())
 		if err != nil {
@@ -84,7 +100,9 @@ func (s *Server) swapDatabaseFile(safeFrom string) error {
 	}
 
 	rollback := func(cause error, stage string) error {
-		_ = os.Remove(s.Path) // drop the failed copy, if any
+		// No os.Remove of s.Path first: os.Rename replaces an existing file on
+		// every platform Go supports, Windows included, and removing it first
+		// would open a window in which neither database is at s.Path.
 		if rbErr := os.Rename(snapshot, s.Path); rbErr != nil {
 			return fmt.Errorf("%s: %w (rollback rename failed: %v — database preserved at %s)", stage, cause, rbErr, snapshot)
 		}
@@ -94,11 +112,11 @@ func (s *Server) swapDatabaseFile(safeFrom string) error {
 		return fmt.Errorf("%s (previous database restored): %w", stage, cause)
 	}
 
-	if err := copyFile(safeFrom, s.Path); err != nil {
-		return rollback(err, "restore copy failed")
+	if err := install(s.Path); err != nil {
+		return rollback(err, "installing the new database failed")
 	}
 	if err := reopen(); err != nil {
-		return rollback(err, "restored database failed to open")
+		return rollback(err, "new database failed to open")
 	}
 
 	_ = os.Remove(snapshot)
