@@ -23,6 +23,18 @@ on:
       - 'scripts/check-coverage-areas.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
+      # These jobs exist in this workflow and were unreachable: the filter
+      # listed only Go paths, so a change to the panel, the widget, mddb-chat
+      # or a client ran none of the jobs written to cover it. Dependency
+      # updates were the visible symptom — a lockfile bump arrived with two
+      # green checks (Sonar and gitleaks) and nothing that built or tested
+      # what it changed.
+      - 'services/mddb-panel/**'
+      - 'services/mddb-chat/**'
+      - 'services/mddb-chat-widget/**'
+      - 'integrations/langchain-mddb/**'
+      - 'clients/python/**'
+      - 'clients/nodejs/**'
   pull_request:
     branches: [main, develop]
     paths:
@@ -41,6 +53,18 @@ on:
       - 'scripts/check-coverage-areas.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
+      # These jobs exist in this workflow and were unreachable: the filter
+      # listed only Go paths, so a change to the panel, the widget, mddb-chat
+      # or a client ran none of the jobs written to cover it. Dependency
+      # updates were the visible symptom — a lockfile bump arrived with two
+      # green checks (Sonar and gitleaks) and nothing that built or tested
+      # what it changed.
+      - 'services/mddb-panel/**'
+      - 'services/mddb-chat/**'
+      - 'services/mddb-chat-widget/**'
+      - 'integrations/langchain-mddb/**'
+      - 'clients/python/**'
+      - 'clients/nodejs/**'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
