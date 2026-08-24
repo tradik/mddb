@@ -35,10 +35,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bundle is what actually runs, so a lock that no longer matches it means the
   published Action is built from dependencies nobody reviewed.
 
-  One is deliberately left: `react-router` (moderate, transitive through
-  `@grafana/ui`), whose only available fix downgrades `@grafana/ui` to an
-  older major. Trading a moderate advisory for a downgrade of a direct
-  dependency is not an improvement.
+  Two `react-router` advisories are dismissed as not applicable rather than
+  fixed, and the reasoning is worth stating because "moderate, transitive" is
+  not on its own a reason to ignore anything. One needs a user-controlled URL
+  routed through `<Link>` or `useNavigate`; the other needs SSR hydration.
+  **This plugin does none of it** — `src/` has no react-router import, no
+  `<Link>`, no `useNavigate` and no SSR. It is a datasource: a config editor
+  and a query editor rendered inside Grafana, which owns the routing.
+  react-router is only present inside `@grafana/ui`'s own tree.
+
+  The available fix is react-router 7, a major that breaks the
+  `react-router-dom-v5-compat` 6.30.6 that `@grafana/ui` 13.2.0 depends on;
+  `npm audit fix --force` instead proposes downgrading `@grafana/ui` by two
+  majors, to 11.2.10.
 
   Verified: 63 tests for the Action and its bundle loads, 103 for the Chrome
   extension, 45 and a clean webpack build for the datasource.
