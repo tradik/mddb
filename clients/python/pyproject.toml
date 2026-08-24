@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mddb-client"
-version = "2.12.0"
+version = "2.13.0"
 description = "Python gRPC client for MDDB (Markdown Database)."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
