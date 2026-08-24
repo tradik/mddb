@@ -39,18 +39,37 @@ cd "${ROOT}"
 # file : sed expression. Each anchors on the same line shape the guard reads, so
 # a version number appearing elsewhere in the file — a changelog entry, a docs
 # example, a dependency pin — is not touched.
+# bump <file> <anchor-regex> <replacement-template>
+#
+# The anchor and the replacement are separate arguments rather than one sed
+# expression, so "the anchor matched nothing" and "the anchor matched a line
+# already at the target version" can be told apart. They look identical to a
+# before/after comparison, and only one of them is a problem: re-running a bump
+# after fixing a file by hand is ordinary, and reporting it as a broken anchor
+# sends the reader hunting for something that is not there.
+#
+# The anchor is written against the line shape check-version.sh reads, so a
+# version number elsewhere in the file — a changelog entry, a docs example, a
+# dependency pin — is left alone.
 bump() {
-	local file="$1" expr="$2"
+	local file="$1" anchor="$2" repl="$3"
 	if [[ ! -f "${file}" ]]; then
 		echo "  skip ${file} (not present)"
 		return 0
 	fi
-	local before after
-	before="$(cat "${file}")"
-	after="$(printf '%s\n' "${before}" | sed -E "${expr}")"
-	if [[ "${before}" == "${after}" ]]; then
+
+	if ! grep -qE "${anchor}" "${file}"; then
 		echo "  ---- ${file} (no line matched — check the anchor)"
 		return 1
+	fi
+
+	local before after
+	before="$(cat "${file}")"
+	after="$(printf '%s\n' "${before}" | sed -E "s|${anchor}|${repl}|")"
+
+	if [[ "${before}" == "${after}" ]]; then
+		echo "  same ${file} (already ${NEW})"
+		return 0
 	fi
 	if [[ "${DRY_RUN}" == true ]]; then
 		echo "  would ${file}"
@@ -63,25 +82,77 @@ bump() {
 V='[0-9]+\.[0-9]+\.[0-9]+'
 FAILED=0
 
-bump "services/mddbd/main.go"                 "s|^const VERSION = \"${V}\"|const VERSION = \"${NEW}\"|" || FAILED=1
-bump "docs/openapi.yaml"                      "s|^  version: \"${V}\"|  version: \"${NEW}\"|" || FAILED=1
-bump "services/mddbd/snapcraft.yaml"          "s|^version: \"${V}\"|version: \"${NEW}\"|" || FAILED=1
-bump "services/mddb-cli/snapcraft.yaml"       "s|^version: \"${V}\"|version: \"${NEW}\"|" || FAILED=1
-bump "services/mddb-panel/snapcraft.yaml"     "s|^version: \"${V}\"|version: \"${NEW}\"|" || FAILED=1
-bump ".env.example"                           "s|^MDDB_VERSION=${V}|MDDB_VERSION=${NEW}|" || FAILED=1
-bump ".ssg.yaml"                              "s|^  mddbVersion: \"${V}\"|  mddbVersion: \"${NEW}\"|" || FAILED=1
-bump "clients/nodejs/package.json"            "s|^  \"version\": \"${V}\"|  \"version\": \"${NEW}\"|" || FAILED=1
-bump "services/mddb-panel/package.json"       "s|^  \"version\": \"${V}\"|  \"version\": \"${NEW}\"|" || FAILED=1
-bump "services/php-extension/composer.json"   "s|^  \"version\": \"${V}\"|  \"version\": \"${NEW}\"|" || FAILED=1
-bump "clients/python/pyproject.toml"          "s|^version = \"${V}\"|version = \"${NEW}\"|" || FAILED=1
-bump "services/python-extension/pyproject.toml" "s|^version = \"${V}\"|version = \"${NEW}\"|" || FAILED=1
-bump "docker-compose.yml"                     "s|(image: tradik/mddb:.*MDDB_VERSION:-)${V}|\\1${NEW}|" || FAILED=1
+bump "services/mddbd/main.go" \
+	"^const VERSION = \"${V}\"" \
+	"const VERSION = \"${NEW}\"" || FAILED=1
+bump "docs/openapi.yaml" \
+	"^  version: \"${V}\"" \
+	"  version: \"${NEW}\"" || FAILED=1
+bump "services/mddbd/snapcraft.yaml" \
+	"^version: \"${V}\"" \
+	"version: \"${NEW}\"" || FAILED=1
+bump "services/mddb-cli/snapcraft.yaml" \
+	"^version: \"${V}\"" \
+	"version: \"${NEW}\"" || FAILED=1
+bump "services/mddb-panel/snapcraft.yaml" \
+	"^version: \"${V}\"" \
+	"version: \"${NEW}\"" || FAILED=1
+bump ".env.example" \
+	"^MDDB_VERSION=${V}" \
+	"MDDB_VERSION=${NEW}" || FAILED=1
+bump ".ssg.yaml" \
+	"^  mddbVersion: \"${V}\"" \
+	"  mddbVersion: \"${NEW}\"" || FAILED=1
+bump "clients/nodejs/package.json" \
+	"^  \"version\": \"${V}\"" \
+	"  \"version\": \"${NEW}\"" || FAILED=1
+bump "services/mddb-panel/package.json" \
+	"^  \"version\": \"${V}\"" \
+	"  \"version\": \"${NEW}\"" || FAILED=1
+bump "services/php-extension/composer.json" \
+	"^  \"version\": \"${V}\"" \
+	"  \"version\": \"${NEW}\"" || FAILED=1
+bump "clients/python/pyproject.toml" \
+	"^version = \"${V}\"" \
+	"version = \"${NEW}\"" || FAILED=1
+bump "services/python-extension/pyproject.toml" \
+	"^version = \"${V}\"" \
+	"version = \"${NEW}\"" || FAILED=1
+bump "integrations/langchain-mddb/pyproject.toml" \
+	"^version = \"${V}\"" \
+	"version = \"${NEW}\"" || FAILED=1
+bump "integrations/langchain-mddb/pyproject.toml" \
+	"^client = \\[\"mddb-client>=${V}\"\\]" \
+	"client = [\"mddb-client>=${NEW}\"]" || FAILED=1
+bump "docker-compose.yml" \
+	"(image: tradik/mddb:.*MDDB_VERSION:-)${V}" \
+	"\\1${NEW}" || FAILED=1
 
 if [[ "${FAILED}" -eq 1 ]]; then
 	echo
 	echo "bump-version: at least one anchor matched nothing — the file moved or the format changed." >&2
 	echo "Fix the anchor here and in scripts/check-version.sh, which reads the same lines." >&2
 	exit 1
+fi
+
+# The uv lockfiles record each project's own version, so a bump invalidates
+# them and CI's `uv sync --locked` refuses to proceed. They are regenerated
+# rather than edited: uv is the only thing that knows the format it will accept,
+# and the version pinned here is the one CI uses.
+if [[ "${DRY_RUN}" == false ]]; then
+	if command -v uv >/dev/null 2>&1; then
+		for dir in clients/python integrations/langchain-mddb; do
+			(cd "${dir}" && uv lock >/dev/null 2>&1) && echo "  lock ${dir}/uv.lock" \
+				|| echo "  ---- ${dir}/uv.lock (uv lock failed — run it by hand)"
+		done
+	else
+		echo
+		echo "uv is not installed, so the lockfiles were NOT regenerated." >&2
+		echo "CI runs uv sync --locked and will refuse them. Install the version" >&2
+		echo ".github/workflows/test.yml pins, then:" >&2
+		echo "  (cd clients/python && uv lock)" >&2
+		echo "  (cd integrations/langchain-mddb && uv lock)" >&2
+	fi
 fi
 
 echo

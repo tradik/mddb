@@ -391,7 +391,7 @@ wheels = [
 
 [[package]]
 name = "langchain-mddb"
-version = "2.12.0"
+version = "2.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "langchain-core" },
@@ -455,7 +455,7 @@ wheels = [
 
 [[package]]
 name = "mddb-client"
-version = "2.12.0"
+version = "2.13.0"
 source = { directory = "../../clients/python" }
 dependencies = [
     { name = "grpcio" },
