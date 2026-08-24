@@ -111,9 +111,17 @@ func (tm *TemporalManager) RecordAsync(collection, docID string, et TemporalEven
 	}
 }
 
+// flushInterval is how often buffered events are written. Batching is the
+// point: recording an access per read would turn every search into a write.
+//
+// A variable rather than a literal so tests can shorten it. At 500 ms every
+// test that records an event waits out a tick, which was most of this
+// package's test time and none of its coverage (TEST-004).
+var flushInterval = 500 * time.Millisecond
+
 // run drains the job channel and persists events using db.Batch for efficiency.
 func (tm *TemporalManager) run() {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(flushInterval)
 	defer ticker.Stop()
 
 	var pending []temporalJob

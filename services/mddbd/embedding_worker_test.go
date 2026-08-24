@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"mddb/internal/testsync"
 	"mddb/internal/vector"
 	"path/filepath"
 	"sync"
@@ -114,8 +115,13 @@ func TestEmbeddingWorker_Enqueue(t *testing.T) {
 		t.Error("Enqueue returned false, expected true")
 	}
 
-	// Wait for processing
-	time.Sleep(500 * time.Millisecond)
+	// The record, not the error: Get returns (nil, nil) for a document that
+	// has not been embedded yet, so waiting on err == nil would return before
+	// the worker had done anything.
+	testsync.Wait(t, "the embedding to be stored", func() bool {
+		rec, err := vs.Get("test-col", "doc-1")
+		return err == nil && rec != nil
+	})
 
 	// Verify the embedding was stored
 	rec, err := vs.Get("test-col", "doc-1")
@@ -191,8 +197,11 @@ func TestEmbeddingWorker_SkipUpToDateEmbedding(t *testing.T) {
 		ContentMD:  content,
 	})
 
-	// Wait for processing
-	time.Sleep(500 * time.Millisecond)
+	// Deliberate: this asserts the provider was NOT called, and absence
+	// cannot be polled for — only "not yet". The wait gives the worker room to
+	// have made the call it should not make. Kept short because the queue is
+	// otherwise idle here (TEST-004 triage: time passage, not synchronisation).
+	time.Sleep(200 * time.Millisecond)
 
 	// Provider should not have been called since embedding is up to date
 	if provider.getCallCount() != 0 {
@@ -223,7 +232,8 @@ func TestEmbeddingWorker_ReembedOnContentChange(t *testing.T) {
 		ContentMD:  "New content",
 	})
 
-	time.Sleep(500 * time.Millisecond)
+	testsync.WaitForCount(t, "the provider to be called for the changed content", 1,
+		provider.getCallCount)
 
 	// Provider should have been called since content changed
 	if provider.getCallCount() == 0 {
@@ -261,7 +271,8 @@ func TestEmbeddingWorker_MultipleJobs(t *testing.T) {
 		})
 	}
 
-	time.Sleep(2 * time.Second)
+	testsync.WaitForCount(t, "all ten documents to be embedded", 10,
+		func() int { return vi.CollectionSize("col") })
 
 	// All 10 should have been processed
 	size := vi.CollectionSize("col")

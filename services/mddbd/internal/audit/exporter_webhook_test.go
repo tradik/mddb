@@ -33,8 +33,16 @@ func TestWebhookExporter_DeliversAndIncludesHeaders(t *testing.T) {
 	defer we.Close()
 
 	we.Export(AuditEvent{Action: "login", Actor: "alice", Result: "ok"})
-	if !waitFor(t, func() bool { return got.Load() != nil }, time.Second) {
-		t.Fatal("server never received the request")
+
+	// Waiting for the server to have RECEIVED the request is not the same as
+	// the exporter having RECORDED the delivery — it increments Delivered
+	// after the response comes back. This test waited on the first and then
+	// asserted the second, and failed under -count=5 once the poll interval
+	// got short enough to catch the gap. Wait for the later of the two.
+	if !waitFor(t, func() bool {
+		return got.Load() != nil && we.Stats().Delivered > 0
+	}, 10*time.Second) {
+		t.Fatalf("delivery was never recorded: %+v", we.Stats())
 	}
 	hdr := *got.Load()
 	if hdr.Get("Authorization") != "Bearer xxx" {
@@ -160,7 +168,12 @@ func TestWebhookExporter_ConnRefused(t *testing.T) {
 	}
 }
 
-// waitFor polls cond until true or until the timeout, returning the result.
+// waitFor delegates to the shared helper, keeping this file's call sites as
+// they were.
+//
+// The local copy it replaces was one of several hand-rolled polling loops in
+// the tree, each with its own interval and deadline (TEST-004). The bool
+// return is kept because callers here phrase the failure themselves.
 func waitFor(t *testing.T, cond func() bool, timeout time.Duration) bool {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -168,7 +181,7 @@ func waitFor(t *testing.T, cond func() bool, timeout time.Duration) bool {
 		if cond() {
 			return true
 		}
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 	}
 	return cond()
 }

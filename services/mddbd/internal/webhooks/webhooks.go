@@ -256,10 +256,17 @@ func hookMatches(hook Webhook, event, collection string) bool {
 	return true
 }
 
+// retryBackoffs is the delay before each delivery attempt; the first is
+// immediate. A variable rather than a literal so a test of the retry
+// behaviour can shorten it: the schedule is what makes that test take six
+// real seconds, and six seconds of sleeping proves nothing the same test
+// cannot prove in milliseconds (TEST-004).
+var retryBackoffs = []time.Duration{0, 1 * time.Second, 5 * time.Second, 15 * time.Second}
+
 func fireWebhook(hook Webhook, payload WebhookPayload) {
 	data, _ := json.Marshal(payload)
 
-	backoffs := []time.Duration{0, 1 * time.Second, 5 * time.Second, 15 * time.Second}
+	backoffs := retryBackoffs
 	for attempt, backoff := range backoffs {
 		if backoff > 0 {
 			time.Sleep(backoff)

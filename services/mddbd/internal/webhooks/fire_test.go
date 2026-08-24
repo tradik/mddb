@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // ---------------------------------------------------------------------------
@@ -11,6 +12,14 @@ import (
 // ---------------------------------------------------------------------------
 
 func TestFireWebhook_RetryOnFailure(t *testing.T) {
+	// The real schedule is 0/1s/5s/15s, so this test slept for six seconds to
+	// observe three attempts. What it is asserting is that failures are
+	// retried, not how long the gaps are — and six seconds of that, on every
+	// run, is most of this package's test time.
+	restore := retryBackoffs
+	retryBackoffs = []time.Duration{0, time.Millisecond, 2 * time.Millisecond, 3 * time.Millisecond}
+	defer func() { retryBackoffs = restore }()
+
 	attempts := 0
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		attempts++

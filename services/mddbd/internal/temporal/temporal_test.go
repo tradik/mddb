@@ -1,6 +1,7 @@
 package temporal
 
 import (
+	"mddb/internal/testsync"
 	"os"
 	"testing"
 	"time"
@@ -50,20 +51,19 @@ func TestTemporalManager_RecordAndQuery(t *testing.T) {
 	tm.RecordAsync(collection, docID, EventAccess, "user1")
 	tm.RecordAsync(collection, docID, EventAccess, "user2")
 
-	// Poll for flush rather than sleep once — the background writer
-	// can take longer than 600 ms on congested CI runners.
-	var events []TemporalEvent
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		var err error
-		events, err = tm.QueryRange(collection, docID, now-60, now+60, "", 100)
-		if err != nil {
-			t.Fatalf("QueryRange: %v", err)
-		}
-		if len(events) >= 3 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
+	// Poll for flush rather than sleep once — the background writer can take
+	// longer than a fixed wait on a congested runner. This loop was already
+	// doing the right thing by hand; it now uses the shared helper, which
+	// reports "timed out waiting for …" instead of falling through to a
+	// count assertion that does not say what went wrong.
+	testsync.Wait(t, "all three recorded events to be queryable", func() bool {
+		ev, err := tm.QueryRange(collection, docID, now-60, now+60, "", 100)
+		return err == nil && len(ev) >= 3
+	})
+
+	events, err := tm.QueryRange(collection, docID, now-60, now+60, "", 100)
+	if err != nil {
+		t.Fatalf("QueryRange: %v", err)
 	}
 	if len(events) < 3 {
 		t.Errorf("expected at least 3 events, got %d", len(events))
@@ -90,7 +90,12 @@ func TestTemporalManager_HotDocs(t *testing.T) {
 		tm.RecordAsync(collection, "docB", EventAccess, "u")
 	}
 
-	time.Sleep(600 * time.Millisecond)
+	// RecordAsync is fire-and-forget, so the test waits for the recorder to
+	// have drained rather than for 600 ms to pass (TEST-004).
+	testsync.Wait(t, "both documents to appear in the hot list", func() bool {
+		got, err := tm.GetHotDocs(collection, 10, 0)
+		return err == nil && len(got) >= 2
+	})
 
 	entries, err := tm.GetHotDocs(collection, 10, 0)
 	if err != nil {
@@ -122,7 +127,12 @@ func TestTemporalManager_Histogram(t *testing.T) {
 	tm.RecordAsync(collection, "d1", EventAccess, "")
 	tm.RecordAsync(collection, "d2", EventAccess, "")
 
-	time.Sleep(600 * time.Millisecond)
+	// Wait for the recorder to have flushed, not for a duration.
+	testsync.Wait(t, "the recorded events to reach the histogram", func() bool {
+		now := time.Now().Unix()
+		b, err := tm.ComputeHistogram(collection, "access", "day", now-3600, now+3600)
+		return err == nil && len(b) > 0
+	})
 
 	now := time.Now().Unix()
 	buckets, err := tm.ComputeHistogram(collection, "access", "day", now-3600, now+3600)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"mddb/internal/binlog"
 	"mddb/internal/storage"
+	"mddb/internal/testsync"
 	"os"
 	"testing"
 	"time"
@@ -14,6 +15,18 @@ import (
 
 // TestIndexQueue_EnqueueFallbackWhenFull — GO-010: a full queue must NOT drop
 // the job; Enqueue indexes it synchronously (fallback) so it is never lost.
+// processedCount reports how many jobs the queue has finished, which is the
+// condition every assertion in this file is really waiting on. Polling it
+// replaced fixed sleeps of 100–500 ms: those passed here and failed on a
+// loaded runner, and they cost their full duration even when the queue had
+// already drained (TEST-004).
+func processedCount(iq *IndexQueue) func() int {
+	return func() int {
+		processed, _, _, _ := iq.Stats()
+		return testsync.CountOf(processed)
+	}
+}
+
 func TestIndexQueue_EnqueueFallbackWhenFull(t *testing.T) {
 	s, cleanup := newTestStore(t)
 	defer cleanup()
@@ -236,8 +249,7 @@ func TestIndexQueue_EnqueueAndProcess(t *testing.T) {
 
 	_ = iq.Enqueue(job)
 
-	// Wait for processing
-	time.Sleep(100 * time.Millisecond)
+	testsync.WaitForCount(t, "the job to be processed", 1, processedCount(iq))
 
 	processed, failed, _, _ := iq.Stats()
 	if processed != 1 {
@@ -297,7 +309,7 @@ func TestIndexQueue_EnqueueUpdateMeta(t *testing.T) {
 		NewMeta:    map[string][]string{"tag": {"go"}},
 	}
 	_ = iq.Enqueue(job1)
-	time.Sleep(100 * time.Millisecond)
+	testsync.WaitForCount(t, "the first job to be processed", 1, processedCount(iq))
 
 	// Second: update metadata (remove "go", add "python")
 	job2 := &IndexJob{
@@ -307,7 +319,7 @@ func TestIndexQueue_EnqueueUpdateMeta(t *testing.T) {
 		NewMeta:    map[string][]string{"tag": {"python"}},
 	}
 	_ = iq.Enqueue(job2)
-	time.Sleep(100 * time.Millisecond)
+	testsync.WaitForCount(t, "the second job to be processed", 2, processedCount(iq))
 
 	processed, failed, _, _ := iq.Stats()
 	if processed != 2 {
@@ -368,7 +380,7 @@ func TestIndexQueue_ProcessJob_DeleteOldMeta(t *testing.T) {
 		NewMeta:    map[string][]string{"cat": {"science"}},
 	}
 	_ = iq.Enqueue(job)
-	time.Sleep(100 * time.Millisecond)
+	testsync.WaitForCount(t, "the job to be indexed", 1, processedCount(iq))
 
 	err = srv.DB.View(func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
@@ -418,7 +430,7 @@ func TestIndexQueue_ProcessJob_NilNewMeta(t *testing.T) {
 		NewMeta:    nil,
 	}
 	_ = iq.Enqueue(job)
-	time.Sleep(100 * time.Millisecond)
+	testsync.WaitForCount(t, "the job to be indexed", 1, processedCount(iq))
 
 	err = srv.DB.View(func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
@@ -449,7 +461,7 @@ func TestIndexQueue_ProcessJob_NilOldMeta(t *testing.T) {
 		NewMeta:    map[string][]string{"type": {"article"}},
 	}
 	_ = iq.Enqueue(job)
-	time.Sleep(100 * time.Millisecond)
+	testsync.WaitForCount(t, "the job to be indexed", 1, processedCount(iq))
 
 	err := srv.DB.View(func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
@@ -483,8 +495,7 @@ func TestIndexQueue_MultipleJobs(t *testing.T) {
 		_ = iq.Enqueue(job)
 	}
 
-	// Wait for all to process
-	time.Sleep(500 * time.Millisecond)
+	testsync.WaitForCount(t, "all twenty jobs to be processed", 20, processedCount(iq))
 
 	processed, failed, _, _ := iq.Stats()
 	if processed != 20 {
@@ -645,7 +656,7 @@ func TestIndexQueue_StatsAfterProcessing(t *testing.T) {
 		})
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	testsync.WaitForCount(t, "all five jobs to be processed", 5, processedCount(iq))
 
 	processed, failed, _, qLen := iq.Stats()
 	if processed != 5 {

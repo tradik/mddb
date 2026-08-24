@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Tests wait for work to finish instead of guessing how long it takes
+  (TEST-004)** — the queue, webhook, temporal and audit suites synchronised
+  with fixed `time.Sleep` calls of 100–700 ms and then asserted. That passes on
+  a developer's machine and fails on a loaded runner, which is the worst shape
+  a test can have: green where it is cheap to run and red where it matters.
+  Eight of the twenty-seven patches in a downstream Windows fork were nothing
+  but this, on our tests.
+
+  `internal/testsync` polls instead, and polling helps at both ends: a
+  condition already true returns immediately, so the suite gets *faster* on a
+  fast machine as well as reliable on a slow one. Measured with
+  `go test -race -count=20`:
+
+  | Package | Before | After |
+  |---|---|---|
+  | `internal/indexqueue` | 30 s | 5 s |
+  | `internal/webhooks` | 40 s | 4 s |
+  | `internal/temporal` | 60 s | 3.5 s |
+  | `internal/audit` | 244 s | 5 s |
+
+  Three production timings became variables so tests can shorten them — the
+  webhook retry schedule, the audit exporter's retry schedule and the temporal
+  flush interval. Two tests spent 21 real seconds each waiting out a
+  0/1s/5s/15s backoff to assert *that* a failure is counted, which the same
+  code path proves in milliseconds.
+
+  Not every sleep went. Some assert that something did **not** happen, and
+  absence cannot be polled for — you can only ever say "not yet". Where a
+  positive signal existed, the tests now wait for that instead: two webhook
+  tests register a second endpoint that *does* match, so the non-delivery is
+  established by the dispatcher having run rather than by a timer expiring.
+  Where no such signal exists, the sleep stays with a comment saying why.
+
+  It also turned up a real race. `TestWebhookExporter_DeliversAndIncludesHeaders`
+  waited for the server to *receive* the request and then asserted the exporter
+  had *recorded* the delivery — two different events, with the counter
+  incremented after the response returns. It only failed once the poll interval
+  got short enough to catch the gap.
+
 ### Removed
 
 - **`docs/ROADMAP.md`** — it described **v2.9 as current** while v2.12.0 was

@@ -2,10 +2,10 @@ package audit
 
 import (
 	"errors"
+	"mddb/internal/testsync"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -59,15 +59,13 @@ func TestExporterCore_StatsRoundtrip(t *testing.T) {
 	for i := 0; i < 6; i++ {
 		c.pushOrDrop(AuditEvent{Action: "a"})
 	}
-	// Wait for drain.
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
+	// A 2 s hand-rolled deadline that fell through to a confusing assertion
+	// failure; the helper waits longer and says "timed out waiting for …"
+	// instead (TEST-004).
+	testsync.WaitForCount(t, "all six events to be delivered or failed", 6, func() int {
 		st := c.Stats()
-		if st.Delivered+st.Failed >= 6 {
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+		return testsync.CountOf(st.Delivered + st.Failed)
+	})
 	st := c.Stats()
 	if st.Delivered+st.Failed != 6 {
 		t.Errorf("delivered+failed=%d, want 6", st.Delivered+st.Failed)
@@ -145,13 +143,9 @@ func TestAuditManagerFanOut(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		am.Record(AuditEvent{Action: "fan-out", Result: "ok"})
 	}
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if stub.delivered.Load() >= 5 {
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	testsync.WaitForCount(t, "all five events to fan out", 5,
+		func() int { return int(stub.delivered.Load()) })
+
 	if got := stub.delivered.Load(); got != 5 {
 		t.Errorf("stub delivered=%d, want 5", got)
 	}

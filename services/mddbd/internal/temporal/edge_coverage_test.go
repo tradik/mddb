@@ -1,6 +1,7 @@
 package temporal
 
 import (
+	"mddb/internal/testsync"
 	"testing"
 	"time"
 )
@@ -19,13 +20,10 @@ func TestTemporalQueryRangeExcludesOutOfWindow(t *testing.T) {
 
 	now := time.Now().Unix()
 	tm.RecordAsync("col", "d1", EventAccess, "u")
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if ev, _ := tm.QueryRange("col", "d1", now-60, now+60, "", 100); len(ev) >= 1 {
-			break
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
+	testsync.Wait(t, "the recorded event to be queryable", func() bool {
+		ev, _ := tm.QueryRange("col", "d1", now-60, now+60, "", 100)
+		return len(ev) >= 1
+	})
 
 	// A future window excludes the just-recorded event (ts < from -> continue).
 	ev, err := tm.QueryRange("col", "d1", now+1000, now+2000, "", 100)

@@ -2,8 +2,8 @@ package indexqueue
 
 import (
 	"errors"
+	"mddb/internal/testsync"
 	"testing"
-	"time"
 
 	"mddb/internal/binlog"
 
@@ -18,17 +18,15 @@ func (failStore) DBUpdate(func(*bolt.Tx) error) error { return errors.New("db do
 func (failStore) IdxMetaBucket() []byte               { return []byte("idxmeta") }
 func (failStore) Binlog() *binlog.Binlog              { return nil }
 
-// waitFor polls until cond() or the deadline; fails the test on timeout.
+// waitFor delegates to the shared helper, keeping this file's call sites as
+// they were (TEST-004).
+//
+// The loop it replaces was the third hand-rolled copy in the tree, each with
+// its own interval and its own deadline — this one 2 s, which is the sort of
+// number that holds on a developer's machine and not on a loaded runner.
 func waitFor(t *testing.T, cond func() bool, msg string) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	t.Fatal(msg)
+	testsync.Wait(t, msg, cond)
 }
 
 // TestSetStoreWiresPersistence covers SetStore: the queue is built before the

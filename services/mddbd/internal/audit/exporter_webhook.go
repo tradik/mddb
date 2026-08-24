@@ -32,6 +32,12 @@ type WebhookExporter struct {
 // NewWebhookExporter builds an exporter from environment-derived
 // inputs. headerCSV is "Authorization: Splunk xxx,X-MDDB-Source: prod"
 // — comma-separated header pairs.
+// webhookRetryBackoffs is the delay before each delivery attempt; the first is
+// immediate. A variable rather than a literal so tests can shorten it — the
+// full schedule adds 21 s to each of two tests that assert *that* a failure is
+// counted, not how long the waiting takes (TEST-004).
+var webhookRetryBackoffs = []time.Duration{0, 1 * time.Second, 5 * time.Second, 15 * time.Second}
+
 func NewWebhookExporter(url, headerCSV string, bufSize int, insecureSkipTLSVerify bool) (*WebhookExporter, error) {
 	if strings.TrimSpace(url) == "" {
 		return nil, errors.New("webhook url required")
@@ -64,7 +70,7 @@ func (w *WebhookExporter) deliver(ev AuditEvent) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	backoffs := []time.Duration{0, 1 * time.Second, 5 * time.Second, 15 * time.Second}
+	backoffs := webhookRetryBackoffs
 	var lastErr error
 	for attempt, backoff := range backoffs {
 		if backoff > 0 {

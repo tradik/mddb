@@ -1,6 +1,7 @@
 package temporal
 
 import (
+	"mddb/internal/testsync"
 	"testing"
 	"time"
 )
@@ -25,14 +26,10 @@ func TestTemporalQueriesCoverage(t *testing.T) {
 	tm.RecordAsync("zcol", "z1", EventAccess, "u1") // 2nd collection -> prefix-break branch
 
 	// Poll for the async writer to flush (mirrors the existing tests).
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
+	testsync.Wait(t, "three events to be queryable", func() bool {
 		ev, _ := tm.QueryRange("col", "d1", now-60, now+60, "", 100)
-		if len(ev) >= 3 {
-			break
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+		return len(ev) >= 3
+	})
 
 	// QueryRange with an event-type filter and a tight limit.
 	if _, err := tm.QueryRange("col", "d1", now-60, now+60, "access", 1); err != nil {

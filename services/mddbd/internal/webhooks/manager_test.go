@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"io"
 	"mddb/internal/storage"
+	"mddb/internal/testsync"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -387,8 +387,8 @@ func TestWebhookFire(t *testing.T) {
 
 	wm.Fire("doc.added", "blog", "test-key", "en", doc)
 
-	// Wait for async delivery
-	time.Sleep(500 * time.Millisecond)
+	testsync.WaitForCount(t, "the webhook to be delivered", 1,
+		func() int { return int(atomic.LoadInt32(&received)) })
 
 	if atomic.LoadInt32(&received) != 1 {
 		t.Errorf("expected 1 webhook delivery, got %d", atomic.LoadInt32(&received))
@@ -421,13 +421,28 @@ func TestWebhookFireNoMatch(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	// A second endpoint that DOES match, so the test can wait for something
+	// instead of a duration. "Nothing happened" cannot be polled for — you can
+	// only ever say "not yet" — so the delivery that should happen becomes the
+	// signal. Fire evaluates every registered webhook, so once this one has
+	// arrived the non-matching one has necessarily been considered and
+	// rejected. That is a fact about the dispatcher, not about the clock.
+	var matched int32
+	matchedTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&matched, 1)
+		w.WriteHeader(200)
+	}))
+	defer matchedTS.Close()
+
 	// Register for doc.deleted only
 	_, _ = wm.Register(ts.URL, []string{"doc.deleted"}, "")
+	_, _ = wm.Register(matchedTS.URL, []string{"doc.added"}, "")
 
-	// Fire doc.added - should not match
+	// Fire doc.added - should not match the first
 	wm.Fire("doc.added", "blog", "key", "en", nil)
 
-	time.Sleep(300 * time.Millisecond)
+	testsync.WaitForCount(t, "the matching webhook to be delivered", 1,
+		func() int { return int(atomic.LoadInt32(&matched)) })
 
 	if atomic.LoadInt32(&received) != 0 {
 		t.Errorf("expected 0 deliveries for non-matching event, got %d", atomic.LoadInt32(&received))
@@ -445,13 +460,26 @@ func TestWebhookFireCollectionFilter(t *testing.T) {
 	}))
 	defer ts.Close()
 
+	// Same trick as TestWebhookFireNoMatch: an endpoint registered for the
+	// collection being fired gives the test a delivery to wait for, so the
+	// absence of the other one is established by the dispatcher having run
+	// rather than by a timer having expired.
+	var matched int32
+	matchedTS := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&matched, 1)
+		w.WriteHeader(200)
+	}))
+	defer matchedTS.Close()
+
 	// Register for blog collection only
 	_, _ = wm.Register(ts.URL, []string{"doc.added"}, "blog")
+	_, _ = wm.Register(matchedTS.URL, []string{"doc.added"}, "docs")
 
-	// Fire for docs collection - should not match
+	// Fire for docs collection - should not match the first
 	wm.Fire("doc.added", "docs", "key", "en", nil)
 
-	time.Sleep(300 * time.Millisecond)
+	testsync.WaitForCount(t, "the matching webhook to be delivered", 1,
+		func() int { return int(atomic.LoadInt32(&matched)) })
 
 	if atomic.LoadInt32(&received) != 0 {
 		t.Errorf("expected 0 deliveries for wrong collection, got %d", atomic.LoadInt32(&received))
@@ -475,7 +503,8 @@ func TestWebhookFireMultipleHooks(t *testing.T) {
 
 	wm.Fire("doc.added", "blog", "key", "en", nil)
 
-	time.Sleep(500 * time.Millisecond)
+	testsync.WaitForCount(t, "both webhooks to be delivered", 2,
+		func() int { return int(atomic.LoadInt32(&received)) })
 
 	if atomic.LoadInt32(&received) != 2 {
 		t.Errorf("expected 2 deliveries for multiple matching hooks, got %d", atomic.LoadInt32(&received))
@@ -486,6 +515,7 @@ func TestWebhookFireNilDocument(t *testing.T) {
 	wm, cleanup := newTestWebhookManager(t)
 	defer cleanup()
 
+	var received int32
 	var receivedPayload WebhookPayload
 	var mu sync.Mutex
 
@@ -494,6 +524,10 @@ func TestWebhookFireNilDocument(t *testing.T) {
 		mu.Lock()
 		_ = json.Unmarshal(body, &receivedPayload)
 		mu.Unlock()
+		// Incremented last, after the payload is stored: the counter is what
+		// the test waits on, so it must not become non-zero before the thing
+		// the test then reads is there.
+		atomic.AddInt32(&received, 1)
 		w.WriteHeader(200)
 	}))
 	defer ts.Close()
@@ -502,7 +536,8 @@ func TestWebhookFireNilDocument(t *testing.T) {
 
 	wm.Fire("doc.deleted", "blog", "key", "en", nil)
 
-	time.Sleep(500 * time.Millisecond)
+	testsync.WaitForCount(t, "the delete webhook to be delivered", 1,
+		func() int { return int(atomic.LoadInt32(&received)) })
 
 	mu.Lock()
 	if receivedPayload.Document != nil {
@@ -515,6 +550,7 @@ func TestWebhookFireHeaders(t *testing.T) {
 	wm, cleanup := newTestWebhookManager(t)
 	defer cleanup()
 
+	var received int32
 	var gotContentType, gotEvent, gotWebhookID string
 	var mu sync.Mutex
 
@@ -524,6 +560,8 @@ func TestWebhookFireHeaders(t *testing.T) {
 		gotEvent = r.Header.Get("X-MDDB-Event")
 		gotWebhookID = r.Header.Get("X-MDDB-Webhook-ID")
 		mu.Unlock()
+		// Last, after the headers are captured: see TestWebhookFireNilDocument.
+		atomic.AddInt32(&received, 1)
 		w.WriteHeader(200)
 	}))
 	defer ts.Close()
@@ -531,7 +569,8 @@ func TestWebhookFireHeaders(t *testing.T) {
 	wh, _ := wm.Register(ts.URL, []string{"doc.added"}, "")
 	wm.Fire("doc.added", "blog", "key", "en", nil)
 
-	time.Sleep(500 * time.Millisecond)
+	testsync.WaitForCount(t, "the webhook to be delivered", 1,
+		func() int { return int(atomic.LoadInt32(&received)) })
 
 	mu.Lock()
 	if gotContentType != "application/json" {
