@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -288,12 +287,10 @@ func (rc *ReplicationClient) requestSnapshot(ctx context.Context) error {
 	// to live readers (GO-004). The restore write lock drains in-flight
 	// DBView/DBUpdate calls and blocks new ones, so no handler observes a
 	// closed or half-swapped *bolt.DB.
+	// swapDatabase rebuilds the derived in-memory state as part of reopening,
+	// so there is no separate rebuild here.
 	if err := rc.server.withRestoreLock(func() error {
-		if err := rc.replaceDatabase(tmpPath); err != nil {
-			return err
-		}
-		rc.server.rebuildInMemoryState()
-		return nil
+		return rc.replaceDatabase(tmpPath)
 	}); err != nil {
 		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to replace database: %w", err)
@@ -307,29 +304,24 @@ func (rc *ReplicationClient) requestSnapshot(ctx context.Context) error {
 	return nil
 }
 
-// replaceDatabase swaps the current database with the snapshot
+// replaceDatabase swaps the live database for a received snapshot.
+//
+// SEC-018: this used to be a third hand-rolled close-rename-reopen. It did not
+// check that the snapshot was a database, so a truncated stream was
+// indistinguishable from a good one until the reopen — by which point the live
+// database had already been renamed over. Any failure left the follower holding
+// a closed handle with no way back, and it reopened with hand-written bolt
+// options rather than the tuned ones, so a follower that had ever taken a
+// snapshot ran with a different mmap and lock configuration than everything
+// else in the process.
+//
+// The snapshot is renamed rather than copied: it is a temp file this client
+// created and is about to delete, and copying a multi-gigabyte file to throw
+// the original away is waste.
 func (rc *ReplicationClient) replaceDatabase(snapshotPath string) error {
-	// Close current database
-	if err := rc.server.DB.Close(); err != nil {
-		return fmt.Errorf("failed to close current database: %w", err)
-	}
-
-	// Rename snapshot to database path
-	if err := os.Rename(snapshotPath, rc.server.Path); err != nil {
-		return fmt.Errorf("failed to rename snapshot: %w", err)
-	}
-
-	// Reopen database
-	db, err := bolt.Open(rc.server.Path, 0600, &bolt.Options{
-		NoFreelistSync: true,
-		FreelistType:   bolt.FreelistMapType,
+	return rc.server.swapDatabase(snapshotPath, func(dst string) error {
+		return os.Rename(snapshotPath, dst)
 	})
-	if err != nil {
-		return fmt.Errorf("failed to reopen database: %w", err)
-	}
-
-	rc.server.DB = db
-	return nil
 }
 
 // ackLoop periodically sends LSN acknowledgments to the leader

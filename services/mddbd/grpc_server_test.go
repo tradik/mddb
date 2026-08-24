@@ -129,9 +129,16 @@ func newTestGRPCServer(t *testing.T) (*GRPCServer, *Server, func()) {
 
 	gs := NewGRPCServer(s)
 
+	// s.DB, not db: a restore replaces the handle — swapDatabase closes the old
+	// one and installs a new one — so closing the captured db leaves the live
+	// database open. On Unix the file is removed anyway; on Windows the temp
+	// directory cannot be removed and the test fails in cleanup, which is where
+	// this was found (TestGRPCRestore_Success).
 	cleanup := func() {
 		s.IndexQueue.Shutdown()
-		_ = db.Close()
+		if s.DB != nil {
+			_ = s.DB.Close()
+		}
 	}
 
 	return gs, s, cleanup

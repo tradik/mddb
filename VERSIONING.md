@@ -25,11 +25,18 @@ workflow before anything is tagged.
 | `services/mddb-panel/package.json` | the panel |
 | `services/php-extension/composer.json` | the PHP extension |
 | `services/python-extension/pyproject.toml` | the Python extension |
+| `integrations/langchain-mddb/pyproject.toml` | the LangChain adapter, and the `mddb-client>=` floor it declares |
 
 The clients and extensions are on this list because they speak the server's
 protocol. A published `@tradik/mddb-client@2.11.4` built from a 2.12.0 tree is
 worse than a stale number: it names a server it was not built against, and
 anyone diagnosing a protocol mismatch starts from the wrong assumption.
+
+The two `uv.lock` files are absent from the guard on purpose: they are derived,
+they record their project's own version, and CI's `uv sync --locked` already
+refuses a lock that disagrees with its `pyproject.toml`. `scripts/bump-version.sh`
+regenerates them, because uv is the only thing that knows the lock format it
+will accept.
 
 The **git tag** is deliberately absent from the guard. A tag is created after
 the guard passes; checking it there would fail for the whole window between

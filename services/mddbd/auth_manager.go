@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -322,29 +323,134 @@ func (am *AuthManager) GetUser(username string) (*User, error) {
 }
 
 // DeleteUser soft-deletes a user
+// DeleteUser removes a user and everything that grants them access.
+//
+// It used to set Disabled and keep the record, while answering
+// {"status":"deleted"} and leaving the name permanently taken — a subsequent
+// register for it returned 409, so delete-then-register, which is how a
+// tenant's credentials are rotated, could not work for any name that had ever
+// been used (#213).
+//
+// Re-enabling the disabled record on register would have been the smaller
+// change and is the more dangerous one: the record carries the user's
+// permissions and group memberships, so a name that looked free would hand
+// whoever claimed it the privileges of whoever held it before. A hard delete
+// gives register a genuinely new user with nothing attached.
+//
+// Four things reference a user, and leaving any of them is what would make the
+// deletion look complete while remaining a way in:
+//
+//	auth_users        the record itself
+//	auth_apikeys      credentials that authenticate as them
+//	auth_permissions  per-collection grants, keyed by username
+//	auth_groups       membership, which carries the group's grants
+//
+// The audit log is deliberately untouched: it is where the record of who
+// existed and who removed them belongs, and it outlives the user by design.
 func (am *AuthManager) DeleteUser(username string) error {
 	am.mu.RLock()
-	user, exists := am.users[username]
+	_, exists := am.users[username]
+	var ownedKeyHashes []string
+	for hash, key := range am.apiKeys {
+		if key.Username == username {
+			ownedKeyHashes = append(ownedKeyHashes, hash)
+		}
+	}
+	memberOf := make([]string, 0, len(am.groups))
+	for name, group := range am.groups {
+		for _, member := range group.Members {
+			if member == username {
+				memberOf = append(memberOf, name)
+				break
+			}
+		}
+	}
 	am.mu.RUnlock()
 
 	if !exists {
 		return ErrUserNotFound
 	}
 
-	user.Disabled = true
-
-	// Update database
-	data, _ := json.Marshal(user)
+	// One transaction: a delete that half-succeeds leaves a user without a
+	// record but with the keys and grants that let them in.
 	if err := am.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketAuthUsers)
-		return b.Put([]byte("user|"+username), data)
+		if err := tx.Bucket(bucketAuthUsers).Delete([]byte("user|" + username)); err != nil {
+			return err
+		}
+
+		keys := tx.Bucket(bucketAuthAPIKeys)
+		for _, hash := range ownedKeyHashes {
+			if err := keys.Delete([]byte("apikey|" + hash)); err != nil {
+				return err
+			}
+		}
+
+		// Permissions are keyed perm|<username>|<collection>, so the user's
+		// grants are a prefix range rather than a known set.
+		perms := tx.Bucket(bucketAuthPerms)
+		prefix := []byte("perm|" + username + "|")
+		cur := perms.Cursor()
+		var doomed [][]byte
+		for k, _ := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = cur.Next() {
+			doomed = append(doomed, append([]byte(nil), k...))
+		}
+		for _, k := range doomed {
+			if err := perms.Delete(k); err != nil {
+				return err
+			}
+		}
+
+		groups := tx.Bucket(bucketAuthGroups)
+		for _, name := range memberOf {
+			// Groups are keyed by bare name, unlike users and permissions.
+			// Assuming the "group|" prefix the other buckets use would have
+			// found nothing here and left the membership — and the grants that
+			// come with it — in place, silently.
+			raw := groups.Get([]byte(name))
+			if raw == nil {
+				continue
+			}
+			var g Group
+			if err := json.Unmarshal(raw, &g); err != nil {
+				return err
+			}
+			members := g.Members[:0]
+			for _, member := range g.Members {
+				if member != username {
+					members = append(members, member)
+				}
+			}
+			g.Members = members
+			data, err := json.Marshal(&g)
+			if err != nil {
+				return err
+			}
+			if err := groups.Put([]byte(name), data); err != nil {
+				return err
+			}
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
 
-	// Update cache
 	am.mu.Lock()
-	am.users[username] = user
+	delete(am.users, username)
+	delete(am.permissions, username)
+	for _, hash := range ownedKeyHashes {
+		delete(am.apiKeys, hash)
+	}
+	for _, name := range memberOf {
+		if g, ok := am.groups[name]; ok {
+			members := make([]string, 0, len(g.Members))
+			for _, member := range g.Members {
+				if member != username {
+					members = append(members, member)
+				}
+			}
+			g.Members = members
+		}
+	}
 	am.mu.Unlock()
 
 	return nil

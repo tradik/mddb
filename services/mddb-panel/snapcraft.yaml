@@ -1,6 +1,6 @@
 name: mddb-panel
 title: MDDB Panel
-version: "2.12.0"
+version: "2.13.0"
 summary: Web admin panel for MDDB Markdown Database
 description: |
   MDDB Panel is a React-based web administration interface for MDDB.

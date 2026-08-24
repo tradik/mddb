@@ -92,10 +92,12 @@ func openListener(addr string) (net.Listener, error) {
 		}
 		// Restrict to owner-only so the socket behaves as a single-user IPC
 		// channel. Auth middleware still enforces API keys / JWT on top.
-		if err := os.Chmod(address, 0o600); err != nil {
+		// Platform-split: Windows cannot express this, and says so rather than
+		// listening without it (WIN-002).
+		if err := restrictSocketToOwner(address); err != nil {
 			_ = lis.Close()
 			_ = os.Remove(address)
-			return nil, fmt.Errorf("chmod unix socket %q: %w", address, err)
+			return nil, err
 		}
 		return lis, nil
 	}

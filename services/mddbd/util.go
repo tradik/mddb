@@ -88,12 +88,40 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer func() { _ = in.Close() }()
-	tmp := dst + ".tmp"
-	// #nosec G304 -- Subpath created securely
-	out, err := os.Create(filepath.Clean(tmp))
+	// The temp file is created by os.CreateTemp in the destination's own
+	// directory rather than at a fixed dst+".tmp". Two properties come from
+	// that: the name is unique, so two copies to the same destination no longer
+	// write through each other's temp file; and the path this function later
+	// deletes is one os.CreateTemp produced, not one assembled from the
+	// caller's string.
+	//
+	// CodeQL raises go/path-injection here and has done so at four earlier line
+	// numbers in this function (alerts #19, #20, #56, #57, #60), each dismissed
+	// as a false positive. It traces dst back to a request parameter and does
+	// not model safeBackupPath as a barrier: it sees the filepath.Clean calls,
+	// which correctly are not barriers, and not the filepath.Rel check against
+	// ".." that follows them on symlink-resolved paths. Every caller passes
+	// either safeBackupPath's output or the server's own database path —
+	// restore_backup.go, http_handlers.go and mcp_direct_client.go twice.
+	// Moving this line raises the alert again; the answer is the same.
+	out, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp-*")
 	if err != nil {
 		return err
 	}
+	tmp := out.Name()
+	// Clean up on every failure path. Both calls are no-ops once the copy has
+	// succeeded — Close on a closed file, Remove on a path the rename has
+	// emptied. Without this a copy that fails midway leaves an orphan the size
+	// of whatever it managed to write, which on a restore is a partial copy of
+	// the database, sitting on the filesystem that most likely just ran out of
+	// room.
+	defer func() {
+		_ = out.Close()
+		// #nosec G703 -- tmp is the name os.CreateTemp just produced, so this
+		// can only unlink the file this function itself created two statements
+		// ago. Its reachable set is a subset of that create's.
+		_ = os.Remove(tmp)
+	}()
 
 	// GO-020: this copies whole database files during backup and restore.
 	// io.Copy alone reads in 32 KiB steps with a buffer it allocates per call;

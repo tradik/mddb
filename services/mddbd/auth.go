@@ -115,13 +115,26 @@ func VerifyPassword(password, hash string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
+// APIKeyPrefix is what every generated API key starts with.
+//
+// It exists as a constant because two places need to agree on it: the generator
+// below, and the HTTP middleware, which uses it to tell an API key sent as
+// `Authorization: Bearer` apart from a JWT sent the same way (#212). A prefix
+// makes that decision exact — no validating the credential twice to see which
+// one it is, and no guessing from its shape.
+// #nosec G101 -- a namespace, not a secret. Every generated key starts with
+// these ten characters and the remaining 96 are the credential; publishing the
+// prefix is how a reader tells one of our keys from a JWT, which is exactly
+// what the middleware does with it.
+const APIKeyPrefix = "mddb_live_"
+
 // GenerateAPIKey generates a new API key with format: mddb_live_{48 hex chars}
 func GenerateAPIKey() (string, error) {
 	b := make([]byte, 24) // 24 bytes = 48 hex chars
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	return "mddb_live_" + hex.EncodeToString(b), nil
+	return APIKeyPrefix + hex.EncodeToString(b), nil
 }
 
 // HashAPIKey hashes an API key using SHA256

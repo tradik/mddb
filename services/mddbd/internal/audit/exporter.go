@@ -110,10 +110,14 @@ func (c *exporterCore) run(deliver func(AuditEvent) error) {
 
 func (c *exporterCore) handleOne(deliver func(AuditEvent) error, ev AuditEvent) {
 	if err := deliver(ev); err != nil {
-		atomic.AddUint64(&c.failed, 1)
+		// lastErr before the counter, not after. The counter is what anyone
+		// watching this exporter polls on — a test, or a monitor scraping
+		// Stats() — and incrementing it first publishes "one delivery failed"
+		// while LastError still says whatever it said before, or nothing.
 		c.mu.Lock()
 		c.lastErr = err.Error()
 		c.mu.Unlock()
+		atomic.AddUint64(&c.failed, 1)
 		return
 	}
 	atomic.AddUint64(&c.delivered, 1)

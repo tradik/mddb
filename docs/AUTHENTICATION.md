@@ -402,12 +402,30 @@ Get user permissions.
 #### DELETE /v1/auth/users/:username
 Delete user (admin only).
 
+Removes the account and everything that grants it access — the record, its API
+keys, its per-collection permissions, and its membership of any group. The
+username is free immediately, so rotating a tenant's credentials by deleting and
+registering the same name works.
+
 **Response:**
 ```json
 {
   "status": "deleted"
 }
 ```
+
+> **Changed in 2.13.0.** This used to disable the account and keep it. The name
+> stayed taken — registering it again answered `409 user already exists` — while
+> the response said `deleted`. If you have a client that reads the disabled
+> record back after deleting, it will no longer find one.
+>
+> Group membership and permissions are removed rather than carried over
+> deliberately. Had the record been reused on re-registration instead, a name
+> that looked free would have handed whoever claimed it the privileges of
+> whoever held it before.
+>
+> The audit log is untouched: that is where the record of who existed, and who
+> removed them, belongs.
 
 ### Public Endpoints (No Authentication Required)
 

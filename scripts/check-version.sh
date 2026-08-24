@@ -67,6 +67,12 @@ extract "clients/nodejs/package.json"        "npm version"      "^  \"version\":
 extract "services/mddb-panel/package.json"   "npm version"      "^  \"version\": \"${version_re}\""
 extract "services/php-extension/composer.json" "composer version" "^  \"version\": \"${version_re}\""
 extract "clients/python/pyproject.toml"      "pypi version"     "^version = \"${version_re}\""
+# The LangChain adapter wraps mddb-client, so it speaks the server's protocol
+# and belongs on this list by the same reasoning as the clients. It was missing
+# until 2.13.0, where bumping the client invalidated its uv.lock and failed CI
+# — the gap announced itself rather than being noticed.
+extract "integrations/langchain-mddb/pyproject.toml" "pypi version" "^version = \"${version_re}\""
+extract "integrations/langchain-mddb/pyproject.toml" "mddb-client floor" "^client = \[\"mddb-client>=${version_re}\"\]"
 extract "services/python-extension/pyproject.toml" "pypi version" "^version = \"${version_re}\""
 
 # The compose default must match too: it is what `docker compose up` pulls.

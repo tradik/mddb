@@ -84,9 +84,14 @@ func replTestServer(t *testing.T) (*Server, *binlog.Binlog, func()) {
 	}
 	s.Binlog = bl
 
+	// s.DB, not db: a restore replaces the handle, so closing the captured one
+	// leaves the live database open and Windows refuses to remove the temp
+	// directory around it.
 	cleanup := func() {
 		_ = bl.Close()
-		_ = db.Close()
+		if s.DB != nil {
+			_ = s.DB.Close()
+		}
 	}
 	return s, bl, cleanup
 }

@@ -481,12 +481,48 @@ ps aux | grep mddbd
 sudo systemctl stop mddb
 ```
 
-**High memory usage**:
+**RSS grows under sustained load — is that a leak?**
+
+Usually not, and the way to tell is to stop looking at RSS.
+
+MDDB stores its data in a bbolt file that the process memory-maps. Those pages
+count towards RSS and grow with the database, but they are file-backed and
+reclaimable: the kernel drops them under pressure and reads them back from disk.
+A process holding a 160 MB database will show a couple of hundred MB of RSS and
+be using almost none of it as heap.
+
+What distinguishes the two is `memoryHeap` — Go's `HeapInuse`, which counts only
+what the program has allocated and not returned:
+
 ```bash
-# Check database size
+curl -s http://localhost:11023/v1/system/info | jq '{memoryHeap, memorySystem, numGoroutines}'
+```
+
+Measured over 45 minutes of mixed traffic — 1.26 million operations of adds,
+updates, reads, keyword and hybrid search — against a database that grew to
+160 MB:
+
+| | Start | After 45 min |
+|---|---|---|
+| RSS | 190 MB | 247 MB |
+| **Heap in use** | **43 MB** | **47 MB** |
+| Goroutines | 38 | 42 |
+
+RSS rose 57 MB and flattened; the heap did not move outside its normal
+oscillation, and the largest single allocator grew during the first half and
+*shrank* during the second — a buffer reaching steady state. The reproduction is
+`tools/bench/soak` if you want to run it against your own workload.
+
+**Watch the heap and the goroutine count, not RSS.** A heap that climbs across
+successive readings hours apart, or a goroutine count that only goes up, is
+worth reporting. RSS tracking the database file is the design working.
+
+If the database itself is larger than you expect, old revisions are the usual
+reason:
+
+```bash
 ls -lh /var/lib/mddb/mddb.db
 
-# Truncate old revisions
 curl -X POST http://localhost:11023/v1/truncate \
   -H 'Content-Type: application/json' \
   -d '{"collection":"blog","keepRevs":5}'

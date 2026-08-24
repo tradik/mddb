@@ -4,6 +4,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -56,7 +57,23 @@ func TestIsUnixAddr(t *testing.T) {
 	}
 }
 
+// requireUnixSockets skips a test that needs a working UDS listener.
+//
+// Not a blanket "skip on Windows": MDDB refuses to serve on a unix socket
+// there on purpose, because the listener's security model is owner-only 0600
+// mode bits and os.Chmod on Windows cannot express them (WIN-002). The refusal
+// itself is asserted in listen_addr_windows_test.go, so what is skipped here is
+// covered there — from the other side.
+func requireUnixSockets(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("MDDB refuses unix socket listeners on Windows by design; " +
+			"the refusal is asserted in TestOpenListenerUDSRefusedOnWindows")
+	}
+}
+
 func TestOpenListenerUDS(t *testing.T) {
+	requireUnixSockets(t)
 	dir := shortSocketDir(t)
 	path := filepath.Join(dir, "test.sock")
 	lis, err := openListener("unix:" + path)
@@ -80,6 +97,7 @@ func TestOpenListenerUDS(t *testing.T) {
 }
 
 func TestOpenListenerUDSStale(t *testing.T) {
+	requireUnixSockets(t)
 	dir := shortSocketDir(t)
 	path := filepath.Join(dir, "stale.sock")
 	// Create a stale file first — openListener should remove it before binding.
@@ -94,6 +112,7 @@ func TestOpenListenerUDSStale(t *testing.T) {
 }
 
 func TestCloseListenerRemovesSocket(t *testing.T) {
+	requireUnixSockets(t)
 	dir := shortSocketDir(t)
 	path := filepath.Join(dir, "cleanup.sock")
 	lis, err := openListener("unix:" + path)

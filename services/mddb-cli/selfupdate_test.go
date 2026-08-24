@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -204,12 +205,19 @@ func TestReplaceBinaryIsAtomicAndKeepsABackup(t *testing.T) {
 		t.Errorf("backup content is %q", kept)
 	}
 
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm()&0o111 == 0 {
-		t.Error("the installed binary is not executable")
+	// Windows has no execute bit — what makes a file runnable there is its
+	// extension, and Go synthesises Mode().Perm() from the read-only attribute
+	// alone, so this can never hold. That the mode is carried over from the
+	// binary being replaced is asserted by
+	// TestReplaceBinaryPreservesTheExistingMode, which does run there.
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm()&0o111 == 0 {
+			t.Error("the installed binary is not executable")
+		}
 	}
 
 	// No leftovers: an update that ran must not litter the directory it ran in.
@@ -222,6 +230,14 @@ func TestReplaceBinaryIsAtomicAndKeepsABackup(t *testing.T) {
 }
 
 func TestReplaceBinaryRefusesAnUnwritableDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// os.Chmod on Windows toggles the read-only attribute and does not
+		// take write access away from the owner, so the directory this test
+		// makes unwritable stays writable and the update rightly succeeds.
+		// Denying write access there needs an ACL, which is a different
+		// subject from the one this test is about.
+		t.Skip("Unix mode bits do not restrict the owner on Windows")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("running as root, which can write anywhere")
 	}

@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"mddb/internal/testsync"
 	"time"
 
 	proto "mddb/proto"
@@ -229,11 +231,24 @@ func TestJobLifecycleReachesSSEClients(t *testing.T) {
 	}
 	waitForStatus(t, m, job.ID, 5*time.Second, BulkJobCompleted, BulkJobFailed)
 
-	var seen []string
-	for _, e := range drain() {
-		if !strings.HasPrefix(e.Event, "job.") {
-			continue // an unfiltered client also hears doc.* events
+	// The status is not the signal. It is set before the terminal event reaches
+	// subscribers, so draining as soon as the job reports completion races the
+	// delivery — the first Windows CI run drained a stream ending in
+	// job.progress and failed here. drain() is non-blocking and returns
+	// whatever has arrived, so the events are accumulated until the terminal
+	// one shows up.
+	var events []SSEJobEvent
+	testsync.Wait(t, "the job's terminal event to reach the subscriber", func() bool {
+		for _, e := range drain() {
+			if strings.HasPrefix(e.Event, "job.") { // an unfiltered client also hears doc.*
+				events = append(events, e)
+			}
 		}
+		return len(events) > 0 && isTerminalJobEvent(events[len(events)-1].Event)
+	})
+
+	var seen []string
+	for _, e := range events {
 		if e.Job == nil || e.Job.ID != job.ID {
 			t.Errorf("event %q carries the wrong job: %+v", e.Event, e.Job)
 			continue

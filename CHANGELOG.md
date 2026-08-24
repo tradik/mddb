@@ -5,9 +5,191 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.13.0] - 2026-08-24
 
 ### Changed
+
+- **Deleting a user now deletes it, and the name comes back (#213)** —
+  `DELETE /v1/auth/users/:username` answered `{"status":"deleted"}` while the
+  account stayed, marked disabled. The name stayed taken with it: registering it
+  again answered `409 user already exists`, so delete-then-register — the
+  natural way to rotate a tenant's credentials — could not work for any name
+  that had ever been used.
+
+  **This is a behaviour change.** A client that reads the disabled record back
+  after deleting will no longer find one. `GET /v1/auth/users` no longer lists
+  deleted accounts.
+
+  The alternative was to keep the soft delete and let `register` re-enable a
+  disabled account. That is the smaller change and the more dangerous one: the
+  record carries the user's permissions and group memberships, so a name that
+  looked free would have handed whoever claimed it the privileges of whoever
+  held it before. The deletion clears all four places a user is referenced — the
+  record, its API keys, its per-collection permissions and its group memberships
+  — and the tests check each of them after a reload, because clearing the
+  in-memory caches and leaving the database is a fix that lasts until restart.
+
+  The audit log is untouched. That is where the record of who existed and who
+  removed them belongs, and it outlives the account by design.
+
+- **An API key sent as `Authorization: Bearer` is accepted (#212)** — it was
+  parsed as a JWT and refused with `401 {"error":"invalid token"}`, a message
+  about the credential when the problem was the header. The MCP middleware next
+  door has always taken the key in either place, so two surfaces of one server
+  disagreed and clients met the stricter one first. API keys carry the
+  `mddb_live_` prefix, which decides it outright: nothing is validated twice,
+  and a JWT can never be mistaken for a key.
+
+- **A fresh named volume no longer restart-loops on first start (#211)** — the
+  image created `/app/data` and the repository's own `docker-compose.yml` mounts
+  a volume at `/data`. Docker copies an image directory's contents *and its
+  ownership* into a fresh named volume only where that path exists in the image;
+  `/data` did not, so it was created root-owned, the server runs as uid 1000,
+  and the first start died with `bolt.Open: open /data/mddb.db: permission
+  denied`. The image now creates `/data` owned by the runtime user. Verified by
+  reproducing the loop and then watching the container come up healthy with the
+  database created.
+
+- **Vector maths runs on AVX2 on amd64, 3.7-6.3x faster (SRCH-011)** — the build
+  tags split vector maths two ways: NEON through cgo on arm64, and pure Go
+  everywhere else. There was no third branch, so on amd64 — most of the servers
+  this runs on — every vector comparison went through a scalar loop. The file is
+  named `vector_math_scalar.go`, which reads like a fallback and was the
+  production path for the dominant architecture.
+
+  Measured with the same benchmark as the original observation, dims=768,
+  median of five runs:
+
+  | Candidates | Scalar | AVX2 | |
+  |---|---|---|---|
+  | 1,000 | 6.8 GB/s | **43.0 GB/s** | 6.3× |
+  | 10,000 | 6.7 GB/s | 36.0 GB/s | 5.4× |
+  | 100,000 | 6.8 GB/s | 24.8 GB/s | 3.7× |
+
+  The shape matters as much as the multiplier. The scalar path was *flat* — the
+  same 6.8 GB/s whether the working set fit in cache or was fifteen times
+  larger. Memory-bound code does not do that. It was bound by instruction
+  throughput, which is why the two earlier attempts to speed it up both failed:
+  a batch kernel measured within noise of the loop, and hoisting the query norm
+  out of it predicted 33% and delivered 1.5%. Both reduced arithmetic over the
+  same bytes. AVX2 reduces instructions per byte, and now the code degrades with
+  size like memory-bound code should.
+
+  Go assembly rather than cgo, decided by one line in `release.yml`: releases
+  build with `CGO_ENABLED=0`, so a cgo kernel would compile on a developer's
+  machine and never ship. Selection is a runtime CPU check, not a build tag —
+  there is one amd64 build of MDDB, and it has to start on a machine without
+  AVX2.
+
+- **Sustained-load memory measured, and the answer is no leak (GO-041)** — a
+  downstream fork reported RSS going from 42 MB to 153 MB under load. That
+  number alone decides nothing: RSS includes bbolt's memory map of the database
+  file, which grows with the data and is reclaimable page cache rather than
+  anything the process is holding.
+
+  `tools/bench/soak` sustains mixed traffic and samples RSS beside `HeapInuse`,
+  because separating those is the whole question. Measured over 45 minutes:
+  1,261,570 operations (adds, updates, reads, keyword and hybrid search), zero
+  errors, against a database that grew to 160 MB.
+
+  | | Start | After 45 min |
+  |---|---|---|
+  | RSS | 190 MB | 247 MB |
+  | **Heap in use** | **43 MB** | **47 MB** |
+  | Goroutines | 38 | 42 |
+
+  RSS rose 57 MB and flattened; the heap stayed inside its normal oscillation.
+  Three heap profiles rather than two, because a start-to-end diff cannot tell
+  "grew early then settled" from "grew throughout" and those have opposite
+  verdicts — the largest allocator gained 6.7 MB in the first half and *lost*
+  2.6 MB in the second, which is a buffer reaching steady state.
+
+  The fork's observation was probably accurate and its conclusion wrong. The
+  troubleshooting entry in `docs/DEPLOYMENT.md` now says to watch `memoryHeap`
+  and the goroutine count rather than RSS, with these numbers behind it.
+
+- **The test suite runs on Windows (WIN-004)** — a `windows-latest` job runs
+  `go test ./...` for the server, the shared Go client and the CLI on every
+  push. It is the gate the native port needed: before it, everything known
+  about MDDB on Windows came from `GOOS=windows go vet` on a Linux machine,
+  which says the code compiles and nothing about whether a syscall returns what
+  the code assumes.
+
+  Green on three consecutive runs, the last two restoring a 198 MB module cache
+  — 3m52s with it against 4m47s without, so about a minute. Worth knowing why
+  the first runs had no cache to restore: `actions/setup-go` saves it in a
+  post-job step, so a job that fails never saves one.
+
+  Deliberately narrower than the Linux job: no lint, gosec, coverage upload or
+  fuzzing, and no `-race`. Those describe the code, not the platform, and the
+  Linux job already runs them.
+
+  Also a source-encoding guard, because PowerShell's `>` and `Out-File` write
+  UTF-16 LE with a byte order mark and Go answers such a file with "illegal
+  UTF-8 encoding" — an error naming no cause. `.gitattributes` normalises line
+  endings and says nothing about encoding. The check reads the leading bytes of
+  all 1165 tracked text files; its own suite covers nine cases, including that a
+  UTF-8 BOM is rejected in Go source, where it silently breaks a leading
+  `//go:build`, and tolerated in Markdown.
+
+- **Windows file-replacement semantics, and what turned out not to need fixing
+  (WIN-002)** — the plan was a `replaceFile` helper split by platform, because
+  `os.Rename` is documented as not overwriting on Windows. It does. Go's
+  `os.Rename` there is `MoveFileEx` with `MOVEFILE_REPLACE_EXISTING`, verified in
+  the Go 1.27 source rather than assumed, so the helper would have wrapped
+  `MoveFileEx(REPLACE_EXISTING)` in a call to `MoveFileEx(REPLACE_EXISTING)`. It
+  was not written.
+
+  What is real on Windows is the other half: a file held open cannot be renamed
+  over or deleted, because Go opens files with `FILE_SHARE_READ|FILE_SHARE_WRITE`
+  and no `FILE_SHARE_DELETE`. Every one of the four rename sites and nine removal
+  sites already closes its file first, so the audit found no breakage there —
+  but it did find three things behind them, below.
+
+  **Unix domain sockets are now refused on Windows** with an explanation rather
+  than served. Windows 10 supports `AF_UNIX` and `net.Listen("unix", …)`
+  succeeds, which is what makes this worth refusing: `os.Chmod` on Windows
+  toggles the read-only attribute and cannot express "owner only", so the
+  single-user IPC guarantee the listener documents would have quietly not
+  applied. An unprotected IPC channel that does not say it is unprotected is
+  worse than one that will not start.
+
+- **The server and CLI cross-compile for Windows (WIN-001)** — `GOOS=windows`
+  failed on three files using Unix-only syscalls: `syscall.Getrusage` for the
+  CPU sampler and `syscall.Statfs` for disk space, in two places.
+
+  Each is now one signature with two implementations behind a build tag —
+  `diskSpace` over `statfs` / `GetDiskFreeSpaceEx`, and `processCPUTime` over
+  `getrusage` / `GetProcessTimes`. No call site changed platform behaviour, and
+  the two disk callers that had been running near-identical block arithmetic now
+  share one primitive.
+
+  `make build-windows` produces `mddbd.exe` and `mddb-cli.exe` for
+  `windows/amd64`. `windows/arm64` is not built.
+
+  One thing the Windows implementation gets deliberately wrong-looking:
+  `windows.Filetime` has a `Nanoseconds` method, and calling it here would be a
+  bug. It subtracts the 1601-to-1970 epoch offset because it converts
+  *timestamps*, while `GetProcessTimes` returns *durations*. The result is worse
+  than a shifted number: for one second of CPU the subtraction reaches about
+  -1.16e19, an int64 stops at -9.22e18, and the multiply wraps to
+  `6802270474709551616` — a large positive value that reads like a plausible
+  measurement rather than an obvious error. There is a test asserting the method
+  is wrong for this input, so an edit reaching for the obvious call gets
+  stopped.
+
+  **This is not Windows support.** The binaries build and link; no CI job has
+  run the test suite on Windows, and no release ships a Windows artifact. Two
+  known gaps remain: replacing a file another process holds open behaves
+  differently there, and Unix domain sockets compile without being exercised.
+  WSL2 remains the supported route, and the installation guide now says so
+  explicitly rather than implying parity.
+
+  Verified on the full release matrix — `go vet` including test files passes for
+  `windows/amd64`, `linux/amd64`, `linux/arm64`, `freebsd/amd64`, `darwin/amd64`
+  and `darwin/arm64`. The new platform layer is at 100% statement coverage and
+  is now a tracked coverage area; the failure branches are reached by replacing
+  the syscall, since a working kernel does not fail `getrusage` on itself.
 
 - **The vector index no longer blocks a Windows build (WIN-003)** — MDDB's
   HNSW index comes from `github.com/coder/hnsw`, and that package does not
@@ -73,6 +255,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   incremented after the response returns. It only failed once the poll interval
   got short enough to catch the gap.
 
+### Fixed
+
+- **An eighth test waited on a guess (WIN-004)** — `audit_test.go` in the root
+  package synchronised with a fixed 700 ms sleep, seven times over. TEST-004
+  converted `internal/audit` and did not reach this file. A Windows run slower
+  than usual reported `want 3 events, got 0` and `want 200, got 64`; the batch is
+  what those tests assert on, so the batch is what they wait for now. The suite
+  is also faster where the flush has already landed.
+
+- **The Windows CI job found seven bugs on its first run (WIN-004)** — the
+  point of running the suite on `windows-latest` was to learn something that
+  `GOOS=windows go vet` on Linux cannot say. It did: 31 of 32 packages passed,
+  and the ninth failure in the remaining one was worth the job on its own.
+
+  Two more instances of waiting on a signal that precedes the asserted state,
+  bringing the total for this release to five. The embedding worker writes the
+  vector store and then the in-memory index; a test waited on the store and
+  asserted the index. A bulk job's status is set before its terminal event
+  reaches SSE subscribers; a test waited on the status and asserted the stream
+  ended on the event. Both windows existed on Linux too — only their width
+  changed.
+
+  Two test helpers closed the database handle they captured at setup, and a
+  restore replaces that handle. On Unix the file was removed regardless and
+  nobody noticed; on Windows the temporary directory could not be removed
+  around the still-open live database. `newTestServer` was worse than that: it
+  used `os.CreateTemp` in the system temp directory and ignored the error from
+  its own `os.Remove`, so it leaked a database per test and said nothing.
+
+  Three tests assert POSIX semantics — `/proc/self/mountinfo` parsing, and a
+  directory made unwritable with mode bits that do not restrict the owner on
+  Windows. They skip there, each with the reason.
+
+  The second run moved the failures to `mddb-cli` and answered a question the
+  first could not: `ReplaceBinary` works on Windows. It renames the running
+  binary aside before moving the new one in, and Windows permits renaming a
+  running executable even though it forbids overwriting or deleting one — so
+  the sequence written for Unix atomicity happens to be the only sequence that
+  works there. What failed were two assertions about POSIX: an execute bit
+  Windows does not have, and a directory made unwritable with mode bits that do
+  not restrain its owner.
+
+  And one finding that contradicts what this release claimed. WIN-002
+  concluded that `os.Rename` replaces an existing file on every platform Go
+  supports. True, but not under concurrency: Windows must delete the target
+  first, and deletion is not immediate there — a file with an open handle is
+  marked for deletion and persists until the last one closes. A rename landing
+  in that window fails with `Access is denied`. Concurrent copies to one
+  destination are therefore a caller error Windows reports and Unix quietly
+  resolves. What holds on both, and is what the test now asserts, is that the
+  destination is never a blend of two sources.
+
+- **Three tests waited on a signal that arrives before the state they assert
+  (TEST-004 follow-up)** — CI caught one: `Vector[0] = 0.100000, want 0.4`,
+  reading the pre-stored vector after the embedding provider's call count had
+  reached 1. The provider returning and the worker persisting the result are two
+  events, and waiting on the first races the second.
+
+  Auditing every `testsync` call site for the same shape found two more. A
+  webhook test incremented its received-counter before unmarshalling the payload
+  it then asserted on. And in production code, the audit exporter incremented
+  `Failed` before setting `LastError` — so anything polling `Stats()`, a monitor
+  as much as a test, could see a failure recorded with no error attached. The
+  counter is now the last thing to become visible in all three.
+
+  The other twenty-two call sites are sound: `indexqueue` increments `processed`
+  after `processJob` returns, and the rest wait on the end state itself.
+
+- **Two concurrent copies to the same destination could publish a blend of
+  both** — `copyFile` wrote to a fixed `dst.tmp`, so two backups requested with
+  the same `to` interleaved their bytes into one file before either renamed it
+  into place. It now uses `os.CreateTemp` in the destination's directory, which
+  gives each copy its own name. They still race on the final rename — one wins,
+  and that is the caller's business — but the winner is now one of the sources
+  rather than a mixture. Mutation-checked: restoring the shared name fails the
+  new test four times in five.
+
+- **A failed copy left an orphan the size of what it had written** —
+  `copyFile` removed its temp file on none of its three failure paths. After a
+  failed restore that orphan is a partial copy of the database, sitting on the
+  filesystem whose running out of room is the most likely reason the copy
+  failed in the first place.
+
+- **Nothing verified that a restore resets the binlog** — the branch that does
+  it had never executed: every server in the restore suite runs without a
+  binlog. Without the reset a follower applies its old LSN stream on top of a
+  database that no longer contains the rows those entries assume. Now covered,
+  and mutation-checked: removing the reset fails with `oldest LSN = 1 after
+  restore, want 0`.
+
+- **`make build` existed only in the README (WIN-001)** — the documented way to
+  build MDDB from source was `make build`, and the Makefile had no such target.
+  Added it, alongside `build-windows`.
+
+- **The Makefile reported version 2.11.4 through two releases** — `make version`
+  printed a hardcoded string that `scripts/check-version.sh` does not know about.
+  Thirteen other sources are guarded and stayed in step; this fourteenth one drifted
+  quietly. It now reads the version from `services/mddbd/main.go` instead of
+  keeping a copy, so the class of bug is gone rather than the instance.
+
 ### Removed
 
 - **`docs/ROADMAP.md`** — it described **v2.9 as current** while v2.12.0 was
@@ -92,6 +374,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   construction. The four documents that linked to it now say so.
 
 ### Security
+
+- **Restore via the MCP tool could destroy the database with no way back
+  (SEC-017)** — `restore_backup.go` describes itself as "the single
+  implementation behind POST /v1/restore and the gRPC Restore RPC". It was, for
+  those two. The MCP tool was a third entry point with its own
+  close-copy-reopen: no check that the backup was a database, no restore lock,
+  no rollback, no cache rebuild, no binlog reset.
+
+  An agent calling the tool with any readable file inside the backup directory
+  overwrote the live database with it. The file did not have to be a database —
+  the copy succeeds on bytes, and only the reopen fails, by which point the
+  original is gone. Measured against the unchanged code:
+
+  ```
+  --- FAIL: TestDirectClientRestore_FailureLeavesTheDatabaseServing
+      write after a failed MCP restore failed: database not open
+  ```
+
+  Worth noting how it presented: the read after the failure still succeeded,
+  served from cache. The dead database looked healthy until the first write.
+
+- **A truncated replication snapshot destroyed the follower's data (SEC-018)** —
+  the snapshot install was a third hand-rolled swap. It renamed the received
+  file over the live database without checking it was a database, so a
+  half-received stream was indistinguishable from a good one until the reopen.
+  Any failure left the follower holding a closed handle until the process was
+  restarted. It also reopened with hand-written bolt options instead of the
+  tuned ones, so a follower that had ever taken a snapshot ran with a different
+  mmap and lock configuration than the rest of the process — silently.
+
+  All three callers now share one contract, `swapDatabase(source, install)`:
+  validate, close, move the live file aside, install, reopen, roll back on any
+  failure. The two callers differ only in `install` — a restore copies, because
+  a backup must survive being restored from; a replication snapshot is renamed,
+  because it is a temp file the follower owns and copying a multi-gigabyte file
+  in order to delete the original is waste.
+
+- **The restore rollback had never run (SEC-018)** — found while testing the
+  above. Coverage put `swapDatabase`'s entire rollback closure and both of its
+  call sites at **zero executions**. Every existing failure test supplied a
+  source that validation rejected, so the swap returned before touching the live
+  file: the code whose only job is to save the database when a restore goes
+  wrong had not been exercised since it was written for SEC-015.
+
+  Reaching it needs a source that validates and an install that then fails,
+  which is exactly what making `install` a parameter allows. Two tests now do,
+  taking the function from 64.5% to 83.9%; the remainder is the "the rollback
+  also failed" branches. Both are mutation-checked — removing the restoring
+  rename fails one, removing the reopen after rollback fails both with
+  `database not writable: database not open`.
 
 - **`npm audit` reports zero across the integrations** — the GitHub Action,
   the Chrome extension and the Grafana datasource carried eleven open

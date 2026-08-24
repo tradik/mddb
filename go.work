@@ -27,4 +27,5 @@ use (
 	./services/mddbd
 	./test
 	./tools/bench
+	./tools/bench/soak
 )

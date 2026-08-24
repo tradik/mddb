@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "langchain-mddb"
-version = "2.12.0"
+version = "2.13.0"
 description = "LangChain VectorStore and Retriever backed by MDDB (Markdown Database)."
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -24,7 +24,7 @@ dependencies = [
 # installed from a checkout — see the README. The extra names the dependency
 # so the requirement is declared rather than implied; it does not make `pip
 # install "langchain-mddb[client]"` work on its own.
-client = ["mddb-client>=2.12.0"]
+client = ["mddb-client>=2.13.0"]
 test = ["pytest>=8.0", "langchain-core>=0.3"]
 
 [project.urls]

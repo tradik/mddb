@@ -1,4 +1,10 @@
-.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+# The release version, read from the one file that owns it. Never hardcode it
+# here: scripts/check-version.sh guards thirteen other sources and does not know
+# about this file, so a copy kept here drifts silently — as it had, at 2.11.4
+# through two releases.
+MDDB_VERSION := $(shell sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' services/mddbd/main.go | head -1)
+
+.PHONY: build build-windows soak check-source-encoding test-source-encoding docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -122,7 +128,10 @@ vet: ## Run go vet
 
 sec: ## Run security scanner (gosec)
 	@echo "🔒 Running security scan..."
-	cd services/mddbd && gosec -quiet -exclude-generated -exclude=G115 ./...
+	@# -tags noasm: internal/vector implements three functions in assembly, and a
+	@# declaration without a body is a type error to gosec's loader. Without the
+	@# tag it skips the package, and -quiet hides that it did (SRCH-011).
+	cd services/mddbd && gosec -quiet -tags noasm -exclude-generated -exclude=G115 ./...
 	cd clients/go/mddb && gosec -quiet -exclude-generated -exclude=G115 ./...
 	cd services/mddb-cli && gosec -quiet -exclude-generated -exclude=G115 ./...
 	@echo "✅ Security scan passed!"
@@ -139,7 +148,7 @@ lint-all: fmt vet sec lint ## Run all linters
 test-all: test test-graphql test-clients test-langchain ## Run every test suite in the monorepo
 	@echo "✅ All tests passed!"
 
-ci: check-go-version check-version check-action-pins check-repo-links fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
+ci: check-go-version check-version check-action-pins check-repo-links check-source-encoding fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
 	@echo "✅ CI pipeline complete!"
 
 dev-logs-chat: ## Show logs from chat server only
@@ -161,7 +170,28 @@ widget-dev: ## Run widget dev server
 	cd services/mddb-chat-widget && npm run dev
 
 version: ## Show current version
-	@echo "MDDB Version: 2.11.4"
+	@echo "MDDB Version: $(MDDB_VERSION)"
+
+build: ## Build the server and CLI for the host platform
+	@echo "Building $(MDDB_VERSION) for $$(go env GOOS)/$$(go env GOARCH)"
+	@set -e; \
+	cd services/mddbd && go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" -o mddbd . ; \
+	cd ../mddb-cli && go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" -o mddb-cli .
+	@echo "  services/mddbd/mddbd"
+	@echo "  services/mddb-cli/mddb-cli"
+
+build-windows: ## Cross-compile the Windows binaries into dist/windows-amd64 (WIN-001)
+	@# amd64 only. windows/arm64 is deliberately not built — see audit WIN-001.
+	@echo "Building $(MDDB_VERSION) for windows/amd64"
+	@mkdir -p dist/windows-amd64
+	@set -e; \
+	cd services/mddbd && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+		go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" \
+		-o ../../dist/windows-amd64/mddbd.exe . ; \
+	cd ../mddb-cli && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+		go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" \
+		-o ../../dist/windows-amd64/mddb-cli.exe .
+	@ls -l dist/windows-amd64
 
 check-go-version: ## Verify Go toolchain pins are consistent (go.work/go.mod/CI/Docker)
 	@bash scripts/check-go-version.sh --print
@@ -186,6 +216,21 @@ check-changelog: ## Verify the CHANGELOG has exactly one, leading [Unreleased]
 
 test-changelog: ## Run the CHANGELOG structure guard test suite
 	@bash scripts/tests/test-changelog.sh
+
+soak: ## Sustained mixed-load memory check against a running server (GO-041)
+	@echo "Needs a running mddbd with MDDB_PPROF_ENABLED=true."
+	@echo "  make soak SOAK_URL=http://localhost:11023 SOAK_PID=\$$(pgrep -x mddbd) SOAK_DURATION=45m"
+	@cd tools/bench/soak && go run . \
+		-url $(or $(SOAK_URL),http://localhost:11023) \
+		-pid $(or $(SOAK_PID),0) \
+		-duration $(or $(SOAK_DURATION),45m) \
+		-out $(or $(SOAK_OUT),soak-report)
+
+check-source-encoding: ## Verify every tracked text file is plain UTF-8 (no UTF-16, no BOM)
+	@bash scripts/check-source-encoding.sh
+
+test-source-encoding: ## Run the source-encoding guard test suite
+	@bash scripts/tests/test-source-encoding.sh
 
 check-proto-plugins: ## Verify the protobuf plugin pin matches the runtime in go.mod
 	@bash scripts/check-proto-plugins.sh --print

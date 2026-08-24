@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -18,7 +18,14 @@ import (
 // Returns the server, the database, and a cleanup function.
 func setupTestServer(t *testing.T) (*Server, *bolt.DB, func()) {
 	t.Helper()
-	dbPath := "/tmp/test_auth_handlers_" + t.Name() + ".db"
+	// WIN-004: t.TempDir rather than a fixed /tmp path. That path does not
+	// exist on Windows, and even on Unix it outlived the run — a second run
+	// inherited the first one's database, and two tests with the same name in
+	// different packages collided. The Close is registered here as well as in
+	// the returned cleanup: Windows refuses to remove a directory holding an
+	// open file, so a test that forgets `defer cleanup()` would fail the
+	// temp-directory removal rather than merely leak.
+	dbPath := filepath.Join(t.TempDir(), "auth.db")
 	db, err := bolt.Open(dbPath, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
@@ -40,7 +47,6 @@ func setupTestServer(t *testing.T) (*Server, *bolt.DB, func()) {
 	})
 	if err != nil {
 		_ = db.Close()
-		_ = os.Remove(dbPath)
 		t.Fatalf("Failed to create buckets: %v", err)
 	}
 
@@ -54,7 +60,6 @@ func setupTestServer(t *testing.T) (*Server, *bolt.DB, func()) {
 	am := NewAuthManager(db, config)
 	if err := am.EnsureBuckets(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(dbPath)
 		t.Fatalf("Failed to ensure auth buckets: %v", err)
 	}
 
@@ -65,7 +70,6 @@ func setupTestServer(t *testing.T) (*Server, *bolt.DB, func()) {
 
 	cleanup := func() {
 		_ = db.Close()
-		_ = os.Remove(dbPath)
 	}
 
 	return s, db, cleanup
@@ -503,13 +507,14 @@ func TestHandleAuthDeleteUser_Success(t *testing.T) {
 		t.Errorf("Expected status 'deleted', got '%s'", resp["status"])
 	}
 
-	// Verify user is disabled (soft-delete)
-	user, err := s.AuthManager.GetUser("todelete")
-	if err != nil {
-		t.Fatalf("GetUser failed after delete: %v", err)
+	// The response says "deleted" and now means it (#213): the record is gone
+	// and the name is free, rather than held by a disabled user that every
+	// later registration collided with.
+	if _, err := s.AuthManager.GetUser("todelete"); err == nil {
+		t.Error("the user still resolves after a delete that reported success")
 	}
-	if !user.Disabled {
-		t.Error("Expected user to be disabled after deletion")
+	if _, err := s.AuthManager.CreateUser("todelete", "a-new-password"); err != nil {
+		t.Errorf("the freed name could not be registered again: %v", err)
 	}
 }
 

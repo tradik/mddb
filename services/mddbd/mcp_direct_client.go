@@ -561,15 +561,15 @@ func (c *DirectClient) Restore(ctx context.Context, req *MCPRestoreRequest) (*MC
 	if err != nil {
 		return nil, err
 	}
-	_ = c.server.DB.Close()
-	if err := copyFile(safeFrom, c.server.Path); err != nil {
+	// SEC-017: the same contract HTTP and gRPC use — validate the backup before
+	// touching the live file, hold the restore lock, roll back on failure and
+	// rebuild the derived state. This used to be a fourth hand-rolled
+	// close-copy-reopen; when the copy or the reopen failed it left the server
+	// holding a closed database, and when it succeeded the caches still served
+	// the documents the backup did not have.
+	if err := c.server.restoreFromBackup(safeFrom); err != nil {
 		return nil, err
 	}
-	db, err := bolt.Open(c.server.Path, 0600, getOptimizedBoltOptions())
-	if err != nil {
-		return nil, err
-	}
-	c.server.DB = db
 	return &MCPRestoreResponse{Restored: safeFrom}, nil
 }
 

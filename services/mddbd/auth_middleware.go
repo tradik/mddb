@@ -48,9 +48,22 @@ func (am *AuthManager) HTTPMiddleware(next http.Handler) http.Handler {
 		// Try to extract token
 		token := extractTokenFromRequest(r)
 
+		// An API key sent as `Authorization: Bearer` is an API key, not a JWT.
+		//
+		// It used to be parsed as one and refused with "invalid token", which
+		// names the credential when the problem was the header — and the MCP
+		// middleware next door has always accepted the key in either place, so
+		// two surfaces of one server disagreed and clients met the stricter one
+		// first (#212). The prefix decides it outright: nothing is validated
+		// twice, and a JWT can never be mistaken for a key.
+		apiKey := r.Header.Get("X-API-Key")
+		if apiKey == "" && strings.HasPrefix(token, APIKeyPrefix) {
+			apiKey, token = token, ""
+		}
+
 		// If no bearer token, try API key
 		if token == "" {
-			if apiKey := r.Header.Get("X-API-Key"); apiKey != "" {
+			if apiKey != "" {
 				username, err := am.ValidateAPIKey(apiKey)
 				if err != nil {
 					am.auditAuth(r, "", "auth.apikey", "fail", err.Error())
