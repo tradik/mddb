@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The test suite runs on Windows (WIN-004)** — a `windows-latest` job runs
+  `go test ./...` for the server, the shared Go client and the CLI on every
+  push. It is the gate the native port needed: before it, everything known
+  about MDDB on Windows came from `GOOS=windows go vet` on a Linux machine,
+  which says the code compiles and nothing about whether a syscall returns what
+  the code assumes.
+
+  Green on three consecutive runs, the last two restoring a 198 MB module cache
+  — 3m52s with it against 4m47s without, so about a minute. Worth knowing why
+  the first runs had no cache to restore: `actions/setup-go` saves it in a
+  post-job step, so a job that fails never saves one.
+
+  Deliberately narrower than the Linux job: no lint, gosec, coverage upload or
+  fuzzing, and no `-race`. Those describe the code, not the platform, and the
+  Linux job already runs them.
+
+  Also a source-encoding guard, because PowerShell's `>` and `Out-File` write
+  UTF-16 LE with a byte order mark and Go answers such a file with "illegal
+  UTF-8 encoding" — an error naming no cause. `.gitattributes` normalises line
+  endings and says nothing about encoding. The check reads the leading bytes of
+  all 1165 tracked text files; its own suite covers nine cases, including that a
+  UTF-8 BOM is rejected in Go source, where it silently breaks a leading
+  `//go:build`, and tolerated in Markdown.
+
 - **Windows file-replacement semantics, and what turned out not to need fixing
   (WIN-002)** — the plan was a `replaceFile` helper split by platform, because
   `os.Rename` is documented as not overwriting on Windows. It does. Go's
