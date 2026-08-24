@@ -165,3 +165,9 @@ docs/metadata.json
 # Local audit findings — internal issue tracker, never pushed to the repo
 /audit/
 AUDIT_REPORT.md
+
+# GO-041: the soak tool's binary and its output (CSV + pprof profiles).
+# A report belongs in the ticket that asked for it, not in the tree.
+tools/bench/soak/soak
+tools/bench/soak/mddb-soak
+soak-report/

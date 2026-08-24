@@ -4,7 +4,7 @@
 # through two releases.
 MDDB_VERSION := $(shell sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' services/mddbd/main.go | head -1)
 
-.PHONY: build build-windows check-source-encoding test-source-encoding docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: build build-windows soak check-source-encoding test-source-encoding docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -213,6 +213,15 @@ check-changelog: ## Verify the CHANGELOG has exactly one, leading [Unreleased]
 
 test-changelog: ## Run the CHANGELOG structure guard test suite
 	@bash scripts/tests/test-changelog.sh
+
+soak: ## Sustained mixed-load memory check against a running server (GO-041)
+	@echo "Needs a running mddbd with MDDB_PPROF_ENABLED=true."
+	@echo "  make soak SOAK_URL=http://localhost:11023 SOAK_PID=\$$(pgrep -x mddbd) SOAK_DURATION=45m"
+	@cd tools/bench/soak && go run . \
+		-url $(or $(SOAK_URL),http://localhost:11023) \
+		-pid $(or $(SOAK_PID),0) \
+		-duration $(or $(SOAK_DURATION),45m) \
+		-out $(or $(SOAK_OUT),soak-report)
 
 check-source-encoding: ## Verify every tracked text file is plain UTF-8 (no UTF-16, no BOM)
 	@bash scripts/check-source-encoding.sh

@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Sustained-load memory measured, and the answer is no leak (GO-041)** — a
+  downstream fork reported RSS going from 42 MB to 153 MB under load. That
+  number alone decides nothing: RSS includes bbolt's memory map of the database
+  file, which grows with the data and is reclaimable page cache rather than
+  anything the process is holding.
+
+  `tools/bench/soak` sustains mixed traffic and samples RSS beside `HeapInuse`,
+  because separating those is the whole question. Measured over 45 minutes:
+  1,261,570 operations (adds, updates, reads, keyword and hybrid search), zero
+  errors, against a database that grew to 160 MB.
+
+  | | Start | After 45 min |
+  |---|---|---|
+  | RSS | 190 MB | 247 MB |
+  | **Heap in use** | **43 MB** | **47 MB** |
+  | Goroutines | 38 | 42 |
+
+  RSS rose 57 MB and flattened; the heap stayed inside its normal oscillation.
+  Three heap profiles rather than two, because a start-to-end diff cannot tell
+  "grew early then settled" from "grew throughout" and those have opposite
+  verdicts — the largest allocator gained 6.7 MB in the first half and *lost*
+  2.6 MB in the second, which is a buffer reaching steady state.
+
+  The fork's observation was probably accurate and its conclusion wrong. The
+  troubleshooting entry in `docs/DEPLOYMENT.md` now says to watch `memoryHeap`
+  and the goroutine count rather than RSS, with these numbers behind it.
+
 - **The test suite runs on Windows (WIN-004)** — a `windows-latest` job runs
   `go test ./...` for the server, the shared Go client and the CLI on every
   push. It is the gate the native port needed: before it, everything known
