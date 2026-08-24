@@ -216,6 +216,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An eighth test waited on a guess (WIN-004)** — `audit_test.go` in the root
+  package synchronised with a fixed 700 ms sleep, seven times over. TEST-004
+  converted `internal/audit` and did not reach this file. A Windows run slower
+  than usual reported `want 3 events, got 0` and `want 200, got 64`; the batch is
+  what those tests assert on, so the batch is what they wait for now. The suite
+  is also faster where the flush has already landed.
+
 - **The Windows CI job found seven bugs on its first run (WIN-004)** — the
   point of running the suite on `windows-latest` was to learn something that
   `GOOS=windows go vet` on Linux cannot say. It did: 31 of 32 packages passed,

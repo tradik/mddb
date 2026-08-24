@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"mddb/internal/audit"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+
+	"mddb/internal/testsync"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -31,8 +34,20 @@ func newAuditTestManager(t *testing.T, retention int) (*audit.AuditManager, func
 	return am, cleanup
 }
 
-func waitFlush(_ *audit.AuditManager) {
-	time.Sleep(700 * time.Millisecond)
+// waitFlush blocks until the audit manager has flushed at least want events.
+//
+// It was a fixed 700 ms sleep, which is a guess about how long a batch takes to
+// reach the database and was wrong on a loaded runner: the first Windows run
+// slower than usual reported "want 3 events, got 0" and "want 200, got 64".
+// The batch is what the tests assert on, so the batch is what to wait for —
+// and where it has already landed this returns at once rather than sleeping
+// out the rest of the guess.
+func waitFlush(t *testing.T, am *audit.AuditManager, want int) {
+	t.Helper()
+	testsync.Wait(t, fmt.Sprintf("%d audit events to be flushed", want), func() bool {
+		events, err := am.Query(audit.QueryFilter{Limit: want + 100})
+		return err == nil && len(events) >= want
+	})
 }
 
 func TestAuditRecordAndQuery(t *testing.T) {
@@ -42,7 +57,7 @@ func TestAuditRecordAndQuery(t *testing.T) {
 	am.Record(audit.AuditEvent{Actor: "alice", Action: "auth.login", Result: "ok"})
 	am.Record(audit.AuditEvent{Actor: "bob", Action: "auth.login", Result: "fail"})
 	am.Record(audit.AuditEvent{Actor: "alice", Action: "write./v1/add", Result: "ok"})
-	waitFlush(am)
+	waitFlush(t, am, 3)
 
 	events, err := am.Query(audit.QueryFilter{})
 	if err != nil {
@@ -91,7 +106,7 @@ func TestAuditPurgeOlderThan(t *testing.T) {
 
 	am.Record(audit.AuditEvent{Timestamp: past, Actor: "old", Action: "auth.login", Result: "ok"})
 	am.Record(audit.AuditEvent{Timestamp: now, Actor: "new", Action: "auth.login", Result: "ok"})
-	waitFlush(am)
+	waitFlush(t, am, 2)
 
 	cutoff := time.Now().Add(-5 * time.Hour).UnixNano()
 	if err := am.PurgeOlderThan(cutoff); err != nil {
@@ -147,7 +162,7 @@ func TestAuditHandlerRequiresAdmin(t *testing.T) {
 	am, cleanup := newAuditTestManager(t, 90)
 	defer cleanup()
 	am.Record(audit.AuditEvent{Actor: "alice", Action: "auth.login", Result: "ok"})
-	waitFlush(am)
+	waitFlush(t, am, 1)
 
 	s := &Server{AuditManager: am, AuthManager: &AuthManager{enabled: true}}
 
@@ -192,7 +207,7 @@ func TestAuditHandlerTimeRangeParsing(t *testing.T) {
 	am, cleanup := newAuditTestManager(t, 90)
 	defer cleanup()
 	am.Record(audit.AuditEvent{Actor: "alice", Action: "auth.login", Result: "ok"})
-	waitFlush(am)
+	waitFlush(t, am, 1)
 
 	s := &Server{AuditManager: am}
 	from := time.Now().Add(-time.Hour).Format(time.RFC3339)
@@ -253,7 +268,7 @@ func TestAuditQueryTimeWindow(t *testing.T) {
 	am.Record(audit.AuditEvent{Timestamp: base - int64(time.Hour), Actor: "a", Action: "x", Result: "ok"})
 	am.Record(audit.AuditEvent{Timestamp: base, Actor: "b", Action: "x", Result: "ok"})
 	am.Record(audit.AuditEvent{Timestamp: base + int64(time.Hour), Actor: "c", Action: "x", Result: "ok"})
-	waitFlush(am)
+	waitFlush(t, am, 3)
 	ev, _ := am.Query(audit.QueryFilter{FromNanos: base - int64(30*time.Minute), ToNanos: base + int64(30*time.Minute)})
 	if len(ev) != 1 || ev[0].Actor != "b" {
 		t.Fatalf("window filter: %+v", ev)
@@ -266,7 +281,7 @@ func TestAuditBatchFlushLarge(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		am.Record(audit.AuditEvent{Actor: "u", Action: "x", Result: "ok"})
 	}
-	waitFlush(am)
+	waitFlush(t, am, 200)
 	ev, _ := am.Query(audit.QueryFilter{Limit: 300})
 	if len(ev) != 200 {
 		t.Fatalf("want 200, got %d", len(ev))
@@ -298,7 +313,7 @@ func TestAuditHandlerRawNanosAndInvalidParams(t *testing.T) {
 	am, cleanup := newAuditTestManager(t, 90)
 	defer cleanup()
 	am.Record(audit.AuditEvent{Actor: "x", Action: "y", Result: "ok"})
-	waitFlush(am)
+	waitFlush(t, am, 1)
 	s := &Server{AuditManager: am}
 
 	req := httptest.NewRequest("GET", "/v1/audit?fromNanos=1&toNanos=9999999999999999999&limit=abc", nil)
