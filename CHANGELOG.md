@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- **`npm audit` reports zero across the integrations** — the GitHub Action,
+  the Chrome extension and the Grafana datasource carried eleven open
+  Dependabot alerts between them (`brace-expansion` across three major
+  versions in one lockfile, `js-yaml`, `js-cookie`). Fixed with
+  `npm audit fix`, and the Action's committed `dist/` rebuilt with them: the
+  bundle is what actually runs, so a lock that no longer matches it means the
+  published Action is built from dependencies nobody reviewed.
+
+  One is deliberately left: `react-router` (moderate, transitive through
+  `@grafana/ui`), whose only available fix downgrades `@grafana/ui` to an
+  older major. Trading a moderate advisory for a downgrade of a direct
+  dependency is not an improvement.
+
+  Verified: 63 tests for the Action and its bundle loads, 103 for the Chrome
+  extension, 45 and a clean webpack build for the datasource.
+
 - **The Python packages no longer resolve a 2017 `requests` (14 Dependabot
   alerts)** — `integrations/langchain-mddb/uv.lock` and
   `clients/python/uv.lock` were locked against `requires-python = ">=3.9"`,
