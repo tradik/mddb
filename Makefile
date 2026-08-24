@@ -4,7 +4,7 @@
 # through two releases.
 MDDB_VERSION := $(shell sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' services/mddbd/main.go | head -1)
 
-.PHONY: build build-windows docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: build build-windows check-source-encoding test-source-encoding docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -145,7 +145,7 @@ lint-all: fmt vet sec lint ## Run all linters
 test-all: test test-graphql test-clients test-langchain ## Run every test suite in the monorepo
 	@echo "✅ All tests passed!"
 
-ci: check-go-version check-version check-action-pins check-repo-links fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
+ci: check-go-version check-version check-action-pins check-repo-links check-source-encoding fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
 	@echo "✅ CI pipeline complete!"
 
 dev-logs-chat: ## Show logs from chat server only
@@ -213,6 +213,12 @@ check-changelog: ## Verify the CHANGELOG has exactly one, leading [Unreleased]
 
 test-changelog: ## Run the CHANGELOG structure guard test suite
 	@bash scripts/tests/test-changelog.sh
+
+check-source-encoding: ## Verify every tracked text file is plain UTF-8 (no UTF-16, no BOM)
+	@bash scripts/check-source-encoding.sh
+
+test-source-encoding: ## Run the source-encoding guard test suite
+	@bash scripts/tests/test-source-encoding.sh
 
 check-proto-plugins: ## Verify the protobuf plugin pin matches the runtime in go.mod
 	@bash scripts/check-proto-plugins.sh --print

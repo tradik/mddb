@@ -181,12 +181,78 @@ jobs:
       - name: Run repo-link guard test suite
         run: bash scripts/tests/test-repo-links.sh
 
+      # WIN-004: PowerShell's `>` and Out-File write UTF-16 LE with a BOM by
+      # default, and Go answers a file like that with "illegal UTF-8 encoding".
+      # .gitattributes normalises line endings and says nothing about encoding,
+      # so a file committed from a Windows machine could break the build with
+      # an error that names no cause.
+      - name: Source files are plain UTF-8
+        run: bash scripts/check-source-encoding.sh
+
+      - name: Run source-encoding guard test suite
+        run: bash scripts/tests/test-source-encoding.sh
+
       - name: Upload coverage
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
         with:
           files: ./services/mddbd/coverage.out
           flags: unittests
           name: codecov-umbrella
+
+  # WIN-004: the gate for the native Windows port. Until this job existed,
+  # everything known about MDDB on Windows came from `GOOS=windows go vet` on a
+  # Linux machine — that the code compiles and type-checks, and nothing about
+  # whether GetDiskFreeSpaceEx returns what the code assumes or whether a rename
+  # lands where it should.
+  #
+  # Deliberately narrower than the Linux job: no lint, no gosec, no coverage
+  # upload, no fuzzing. Those are platform-independent and running them twice
+  # buys nothing but minutes. What only this job can answer is whether the tests
+  # pass on Windows.
+  #
+  # amd64 only; windows/arm64 is not a target.
+  test-windows:
+    name: Run Tests (windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          # Without this the module cache is not restored and every run
+          # re-downloads the dependency graph.
+          cache-dependency-path: services/mddbd/go.sum
+
+      - name: Build server
+        working-directory: services/mddbd
+        run: go build ./...
+
+      - name: Build CLI
+        working-directory: services/mddb-cli
+        run: go build ./...
+
+      # No -race here. It needs cgo and a C toolchain, and the Linux job already
+      # runs the whole suite under the race detector — the detector finds data
+      # races, which are a property of the code rather than of the operating
+      # system. What this job is for is the platform behaviour underneath:
+      # file replacement semantics, the syscalls behind diskSpace and
+      # processCPUTime, and path handling.
+      - name: Run tests
+        working-directory: services/mddbd
+        run: go test ./...
+
+      - name: Test shared Go client
+        working-directory: clients/go/mddb
+        run: go test ./...
+
+      - name: Test mddb-cli
+        working-directory: services/mddb-cli
+        run: go test ./...
 
   lint:
     name: Lint Code

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,7 +11,14 @@ import (
 
 func setupTestAuthManager(t *testing.T) (*AuthManager, *bolt.DB, func()) {
 	// Create temp database
-	dbPath := "/tmp/test_auth_" + t.Name() + ".db"
+	// WIN-004: t.TempDir rather than a fixed /tmp path. That path does not
+	// exist on Windows, and even on Unix it outlived the run — a second run
+	// inherited the first one's database, and two tests with the same name in
+	// different packages collided. The Close is registered here as well as in
+	// the returned cleanup: Windows refuses to remove a directory holding an
+	// open file, so a test that forgets `defer cleanup()` would fail the
+	// temp-directory removal rather than merely leak.
+	dbPath := filepath.Join(t.TempDir(), "auth.db")
 	db, err := bolt.Open(dbPath, 0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
@@ -32,7 +39,6 @@ func setupTestAuthManager(t *testing.T) (*AuthManager, *bolt.DB, func()) {
 
 	cleanup := func() {
 		_ = db.Close()
-		_ = os.Remove(dbPath)
 	}
 
 	return am, db, cleanup

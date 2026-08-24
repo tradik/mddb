@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -19,9 +20,10 @@ import (
 func TestHandleBackup_RejectsTraversal(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
-	t.Setenv("MDDB_BACKUP_DIR", t.TempDir())
+	jail := t.TempDir()
+	t.Setenv("MDDB_BACKUP_DIR", jail)
 
-	for _, name := range []string{"../escape.db", "/etc/passwd", "foo/../../escape.db"} {
+	for _, name := range []string{"../escape.db", outsideJail(t, jail), "foo/../../escape.db"} {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/v1/backup?to="+name, nil)
 		s.handleBackup(rec, req)
@@ -37,9 +39,10 @@ func TestHandleBackup_RejectsTraversal(t *testing.T) {
 func TestHandleRestore_RejectsTraversal(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
-	t.Setenv("MDDB_BACKUP_DIR", t.TempDir())
+	jail := t.TempDir()
+	t.Setenv("MDDB_BACKUP_DIR", jail)
 
-	for _, name := range []string{"../etc/passwd", "/etc/passwd", "missing.db"} {
+	for _, name := range []string{"../etc/passwd", outsideJail(t, jail), "missing.db"} {
 		body := map[string]string{"from": name}
 		rec := doRequest(t, s.handleRestore, body)
 		if rec.Code != http.StatusBadRequest {
@@ -52,9 +55,10 @@ func TestHandleRestore_RejectsTraversal(t *testing.T) {
 func TestGRPCBackup_RejectsTraversal(t *testing.T) {
 	gs, _, cleanup := newTestGRPCServer(t)
 	defer cleanup()
-	t.Setenv("MDDB_BACKUP_DIR", t.TempDir())
+	jail := t.TempDir()
+	t.Setenv("MDDB_BACKUP_DIR", jail)
 
-	for _, name := range []string{"../escape.db", "/tmp/escape.db", "a/../../escape.db"} {
+	for _, name := range []string{"../escape.db", outsideJail(t, jail), "a/../../escape.db"} {
 		_, err := gs.Backup(context.Background(), &pb.BackupRequest{To: name})
 		if err == nil {
 			t.Errorf("name=%q: expected error, got nil", name)
@@ -71,9 +75,10 @@ func TestGRPCBackup_RejectsTraversal(t *testing.T) {
 func TestGRPCRestore_RejectsTraversal(t *testing.T) {
 	gs, _, cleanup := newTestGRPCServer(t)
 	defer cleanup()
-	t.Setenv("MDDB_BACKUP_DIR", t.TempDir())
+	jail := t.TempDir()
+	t.Setenv("MDDB_BACKUP_DIR", jail)
 
-	for _, name := range []string{"../etc/passwd", "/etc/passwd", "missing.db"} {
+	for _, name := range []string{"../etc/passwd", outsideJail(t, jail), "missing.db"} {
 		_, err := gs.Restore(context.Background(), &pb.RestoreRequest{From: name})
 		if err == nil {
 			t.Errorf("name=%q: expected error, got nil", name)
@@ -157,4 +162,24 @@ func TestHandleBackup_DefaultsToJail(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), bdir) && !strings.Contains(rec.Body.String(), "backup-") {
 		t.Errorf("expected default backup path inside jail, got: %s", rec.Body.String())
 	}
+}
+
+// outsideJail returns an absolute path that is not inside jail, on whatever
+// platform the test runs.
+//
+// These cases used to be the literal "/etc/passwd". That is the right shape on
+// Unix and the wrong one on Windows, where filepath.IsAbs("/etc/passwd") is
+// false — an absolute path there needs a volume. The jail would treat it as a
+// relative name, join it inside itself and legitimately accept it, so the test
+// would stop covering the absolute-path case without ever going red for it.
+func outsideJail(t *testing.T, jail string) string {
+	t.Helper()
+	abs, err := filepath.Abs(filepath.Join(filepath.Dir(jail), "escape.db"))
+	if err != nil {
+		t.Fatalf("building a path outside %s: %v", jail, err)
+	}
+	if !filepath.IsAbs(abs) {
+		t.Fatalf("%s is not absolute on this platform", abs)
+	}
+	return abs
 }
