@@ -115,12 +115,18 @@ func TestEmbeddingWorker_Enqueue(t *testing.T) {
 		t.Error("Enqueue returned false, expected true")
 	}
 
-	// The record, not the error: Get returns (nil, nil) for a document that
-	// has not been embedded yet, so waiting on err == nil would return before
-	// the worker had done anything.
-	testsync.Wait(t, "the embedding to be stored", func() bool {
+	// The index, not the store. Get returns (nil, nil) for a document that has
+	// not been embedded yet, so waiting on err == nil would return before the
+	// worker had done anything — but waiting on the stored record is not enough
+	// either: the worker writes the store first and the in-memory index after,
+	// and this test asserts both. The last write is the one to wait for.
+	//
+	// The store-only version passed on Linux for months and failed on the first
+	// Windows run with "VectorIndex size = 0, want 1". The window was always
+	// there; only its width changed.
+	testsync.Wait(t, "the embedding to reach the store and the index", func() bool {
 		rec, err := vs.Get("test-col", "doc-1")
-		return err == nil && rec != nil
+		return err == nil && rec != nil && vi.CollectionSize("test-col") > 0
 	})
 
 	// Verify the embedding was stored

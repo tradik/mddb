@@ -47,9 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   One thing the Windows implementation gets deliberately wrong-looking:
   `windows.Filetime` has a `Nanoseconds` method, and calling it here would be a
   bug. It subtracts the 1601-to-1970 epoch offset because it converts
-  *timestamps*, while `GetProcessTimes` returns *durations* — so a second of CPU
-  would read as roughly minus 369 years. There is a test asserting that method
-  is wrong for this input, so a future edit reaching for the obvious call gets
+  *timestamps*, while `GetProcessTimes` returns *durations*. The result is worse
+  than a shifted number: for one second of CPU the subtraction reaches about
+  -1.16e19, an int64 stops at -9.22e18, and the multiply wraps to
+  `6802270474709551616` — a large positive value that reads like a plausible
+  measurement rather than an obvious error. There is a test asserting the method
+  is wrong for this input, so an edit reaching for the obvious call gets
   stopped.
 
   **This is not Windows support.** The binaries build and link; no CI job has
@@ -130,6 +133,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   got short enough to catch the gap.
 
 ### Fixed
+
+- **The Windows CI job found seven bugs on its first run (WIN-004)** — the
+  point of running the suite on `windows-latest` was to learn something that
+  `GOOS=windows go vet` on Linux cannot say. It did: 31 of 32 packages passed,
+  and the ninth failure in the remaining one was worth the job on its own.
+
+  Two more instances of waiting on a signal that precedes the asserted state,
+  bringing the total for this release to five. The embedding worker writes the
+  vector store and then the in-memory index; a test waited on the store and
+  asserted the index. A bulk job's status is set before its terminal event
+  reaches SSE subscribers; a test waited on the status and asserted the stream
+  ended on the event. Both windows existed on Linux too — only their width
+  changed.
+
+  Two test helpers closed the database handle they captured at setup, and a
+  restore replaces that handle. On Unix the file was removed regardless and
+  nobody noticed; on Windows the temporary directory could not be removed
+  around the still-open live database. `newTestServer` was worse than that: it
+  used `os.CreateTemp` in the system temp directory and ignored the error from
+  its own `os.Remove`, so it leaked a database per test and said nothing.
+
+  Three tests assert POSIX semantics — `/proc/self/mountinfo` parsing, and a
+  directory made unwritable with mode bits that do not restrict the owner on
+  Windows. They skip there, each with the reason.
+
+  And one finding that contradicts what this release claimed. WIN-002
+  concluded that `os.Rename` replaces an existing file on every platform Go
+  supports. True, but not under concurrency: Windows must delete the target
+  first, and deletion is not immediate there — a file with an open handle is
+  marked for deletion and persists until the last one closes. A rename landing
+  in that window fails with `Access is denied`. Concurrent copies to one
+  destination are therefore a caller error Windows reports and Unix quietly
+  resolves. What holds on both, and is what the test now asserts, is that the
+  destination is never a blend of two sources.
 
 - **Three tests waited on a signal that arrives before the state they assert
   (TEST-004 follow-up)** — CI caught one: `Vector[0] = 0.100000, want 0.4`,

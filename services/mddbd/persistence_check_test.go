@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -30,7 +31,23 @@ func writeMountinfo(t *testing.T, mounts [][2]string) string {
 	return path
 }
 
+// requirePOSIXPaths skips a test whose subject is POSIX path and permission
+// semantics.
+//
+// filesystemType parses /proc/self/mountinfo and compares absolute paths.
+// On Windows filepath.Abs("/data") is "C:\\data", so no fixture entry can
+// match and the function returns "" — which is the honest production answer
+// there: MDDB does not know what filesystem it is on, and says so rather than
+// guessing. What cannot be asserted on Windows is the matching itself.
+func requirePOSIXPaths(t *testing.T, what string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skipf("%s is POSIX-specific; on Windows filesystemType returns \"\" by design", what)
+	}
+}
+
 func TestFilesystemTypePicksTheMostSpecificMount(t *testing.T) {
+	requirePOSIXPaths(t, "mountinfo path matching")
 	mi := writeMountinfo(t, [][2]string{
 		{"/", "overlay"},
 		{"/data", "ext4"},
@@ -60,6 +77,7 @@ func TestFilesystemTypeToleratesAMissingMountinfo(t *testing.T) {
 }
 
 func TestFilesystemTypeSkipsMalformedLines(t *testing.T) {
+	requirePOSIXPaths(t, "mountinfo path matching")
 	path := filepath.Join(t.TempDir(), "mountinfo")
 	content := "garbage\n" +
 		"1 2 0:5 / /data rw - ext4 none rw\n" +
@@ -106,6 +124,14 @@ func TestCheckPersistenceOnARealDirectory(t *testing.T) {
 }
 
 func TestCheckPersistenceReportsAnUnwritableDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// os.Chmod on Windows toggles the read-only attribute and does not
+		// remove write access for the owner, so the directory this test makes
+		// unwritable stays writable and isWritable is right to say so. Testing
+		// the same property there needs an ACL, which is a different subject
+		// from the one this test is about.
+		t.Skip("Unix mode bits do not restrict the owner on Windows")
+	}
 	if os.Geteuid() == 0 {
 		t.Skip("root can write to a read-only directory, so the check cannot be exercised")
 	}

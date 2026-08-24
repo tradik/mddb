@@ -3,7 +3,7 @@ package main
 import (
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
-	"os"
+	"path/filepath"
 	"testing"
 
 	bolt "go.etcd.io/bbolt"
@@ -11,20 +11,20 @@ import (
 
 func newTestServer(t *testing.T) (*Server, func()) {
 	t.Helper()
-	f, err := os.CreateTemp("", "repl_test_*.db")
+	// t.TempDir rather than os.CreateTemp in the system temp: the explicit
+	// os.Remove below ignored its error, so on Windows — where a file that is
+	// still open cannot be removed — this leaked a database per test and said
+	// nothing. t.TempDir fails loudly instead, which is how the wrong-handle
+	// bug below was found.
+	dbPath := filepath.Join(t.TempDir(), "repl_test.db")
+	db, err := bolt.Open(dbPath, 0600, nil)
 	if err != nil {
-		t.Fatal(err)
-	}
-	_ = f.Close()
-	db, err := bolt.Open(f.Name(), 0600, nil)
-	if err != nil {
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
 	s := &Server{
 		DB:   db,
-		Path: f.Name(),
+		Path: dbPath,
 		Mode: ModeRW,
 		BucketNames: BucketNames{
 			Docs:    []byte("docs"),
@@ -37,13 +37,18 @@ func newTestServer(t *testing.T) (*Server, func()) {
 
 	if err := s.ensureBuckets(); err != nil {
 		_ = db.Close()
-		_ = os.Remove(f.Name())
 		t.Fatal(err)
 	}
 
+	// s.DB, not db. A restore replaces the handle — swapDatabase closes the old
+	// one and installs a new one — so closing the captured db leaves the live
+	// handle open. On Unix that removes the file anyway and nobody notices; on
+	// Windows the temp directory cannot be removed and the test fails in
+	// cleanup, which is where this came from.
 	cleanup := func() {
-		_ = db.Close()
-		_ = os.Remove(f.Name())
+		if s.DB != nil {
+			_ = s.DB.Close()
+		}
 	}
 	return s, cleanup
 }

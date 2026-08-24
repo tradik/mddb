@@ -39,15 +39,29 @@ func TestFiletimeDurationNanos(t *testing.T) {
 }
 
 // The trap, asserted rather than described: windows.Filetime.Nanoseconds is
-// right there, reads like the obvious call, and returns a number roughly 369
-// years in the past for any realistic amount of CPU time. If a future edit
-// reaches for it, this is what should stop the edit.
+// right there and reads like the obvious call. If a future edit reaches for it,
+// this is what should stop the edit.
+//
+// The first version of this test asserted the method goes negative, on the
+// reasoning that subtracting the 1601 epoch from one second of CPU lands about
+// 369 years before 1970. CI said otherwise. That value is about -1.16e19 and an
+// int64 stops at -9.22e18, so the multiply by 100 wraps and the method returns
+// a large positive number — which is worse than a negative one, because a
+// negative CPU time is obviously broken and this looks like a reading.
 func TestFiletimeNanosecondsMethodIsWrongForDurations(t *testing.T) {
 	oneSecondOfCPU := windows.Filetime{LowDateTime: 10_000_000}
 
-	if got := oneSecondOfCPU.Nanoseconds(); got >= 0 {
-		t.Fatalf("Filetime.Nanoseconds returned %d for a one-second duration; "+
-			"it was expected to subtract the 1601 epoch and go negative, which is "+
-			"the whole reason filetimeDurationNanos exists", got)
+	const observed = 6802270474709551616 // measured on windows/amd64
+
+	got := oneSecondOfCPU.Nanoseconds()
+	if got == 1_000_000_000 {
+		t.Fatal("Filetime.Nanoseconds now returns the duration correctly; if the " +
+			"method has been fixed upstream, filetimeDurationNanos can go — but " +
+			"check every Go version this project supports first")
+	}
+	if got != observed {
+		t.Errorf("Filetime.Nanoseconds returned %d for a one-second duration, "+
+			"expected the wrapped %d. The method is still wrong for a duration "+
+			"either way; the arithmetic behind it has changed", got, observed)
 	}
 }

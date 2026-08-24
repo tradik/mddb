@@ -30,8 +30,14 @@ func processCPUTime() (userNs, systemNs int64, err error) {
 // windows.Filetime has a Nanoseconds method and it is the wrong one to call
 // here: it subtracts the 1601-to-1970 epoch offset, because it exists to
 // convert FILETIMEs that hold a point in time. The kernel and user values from
-// GetProcessTimes hold elapsed CPU time instead, so that subtraction would
-// turn a few milliseconds of CPU into roughly minus 369 years.
+// GetProcessTimes hold elapsed CPU time instead.
+//
+// The result is worse than a shifted number. For one second of CPU the
+// subtraction reaches about -1.16e19, which does not fit in an int64, so the
+// multiply by 100 wraps: the method returns 6802270474709551616 — a large
+// positive value that looks like a plausible reading rather than an obvious
+// error. Measured on windows/amd64, not reasoned about; see
+// TestFiletimeNanosecondsMethodIsWrongForDurations.
 //
 // FILETIME counts 100-nanosecond intervals either way, so the conversion is
 // the multiply without the offset.

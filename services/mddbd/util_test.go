@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -76,9 +77,20 @@ func assertNoTempLeftovers(t *testing.T, dst, after string) {
 }
 
 // Two copies to the same destination must not write through each other's temp
-// file. They race on the final rename either way — one of them wins and that is
-// the caller's problem — but with a shared fixed temp name they would interleave
-// their bytes into one file first, and the winner could publish a blend of both.
+// file. The invariant that holds on every platform is that the destination ends
+// up as exactly one of the sources, never a blend of several.
+//
+// Whether all of them *succeed* is platform-dependent, and finding that out is
+// what the Windows CI job is for. On Unix, rename replaces the target
+// atomically and every copy wins or is overwritten by the next. On Windows the
+// replacement has to delete the target first, and deletion there is not
+// immediate — a file with a handle still open is marked for deletion and stays
+// until the last one closes. A rename landing in that window fails with
+// "Access is denied", which is what the first run of this test reported.
+//
+// So concurrent copies to one destination are a caller error that Windows
+// reports and Unix quietly resolves. What must never happen anywhere is a
+// mixed file, and that is what is asserted for both.
 func TestCopyFile_ConcurrentCopiesDoNotShareATempFile(t *testing.T) {
 	dir := t.TempDir()
 	dst := filepath.Join(dir, "destination")
@@ -105,10 +117,19 @@ func TestCopyFile_ConcurrentCopiesDoNotShareATempFile(t *testing.T) {
 	}
 	wg.Wait()
 
+	succeeded := 0
 	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("copy %d: %v", i, err)
+		if err == nil {
+			succeeded++
+			continue
 		}
+		if runtime.GOOS != "windows" {
+			t.Fatalf("copy %d failed on a platform where rename replaces atomically: %v", i, err)
+		}
+		t.Logf("copy %d lost the rename race, as Windows permits: %v", i, err)
+	}
+	if succeeded == 0 {
+		t.Fatal("every concurrent copy failed; at least one must reach the destination")
 	}
 
 	got, err := os.ReadFile(dst) // #nosec G304 -- test-constructed path
