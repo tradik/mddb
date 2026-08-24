@@ -131,6 +131,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A failed copy left an orphan the size of what it had written** —
+  `copyFile` wrote to `dst.tmp` and renamed it into place, but removed it on
+  none of its three failure paths. After a failed restore that orphan is a
+  partial copy of the database, sitting on the filesystem whose running out of
+  room is the most likely reason the copy failed in the first place.
+
+- **Nothing verified that a restore resets the binlog** — the branch that does
+  it had never executed: every server in the restore suite runs without a
+  binlog. Without the reset a follower applies its old LSN stream on top of a
+  database that no longer contains the rows those entries assume. Now covered,
+  and mutation-checked: removing the reset fails with `oldest LSN = 1 after
+  restore, want 0`.
+
 - **`make build` existed only in the README (WIN-001)** — the documented way to
   build MDDB from source was `make build`, and the Makefile had no such target.
   Added it, alongside `build-windows`.

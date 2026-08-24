@@ -94,6 +94,18 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
+	// Clean up the temp file on every failure path. Both calls are no-ops once
+	// the copy has succeeded — Close on a closed file, Remove on a path the
+	// rename has emptied. Without this a copy that fails midway leaves an
+	// orphan the size of whatever it managed to write, which on a restore is a
+	// partial copy of the database, sitting on the filesystem that most likely
+	// just ran out of room.
+	defer func() {
+		_ = out.Close()
+		// #nosec G703 -- tmp is dst+".tmp"; every caller passes either a path
+		// from safeBackupPath or the server's own database path
+		_ = os.Remove(tmp)
+	}()
 
 	// GO-020: this copies whole database files during backup and restore.
 	// io.Copy alone reads in 32 KiB steps with a buffer it allocates per call;
