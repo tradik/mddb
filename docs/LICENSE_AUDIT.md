@@ -10,17 +10,20 @@ status: publish
 **Project:** MDDB (Markdown Database)  
 **Date:** 2026-03-10  
 **Tool:** [Trivy](https://trivy.dev/) — filesystem license scanner  
-**Scan command:** `trivy fs --scanners license .`
+**Scan command:** `trivy fs --scanners license .`  
+**Amended:** 2026-08-24 — `github.com/google/renameio` removed from
+`services/mddbd` (WIN-003); see the footnote on `github.com/coder/hnsw`. This is
+a targeted correction, not a re-scan: every other row is still as of the scan date.
 
 ---
 
 ## Executive Summary
 
-Scanned **4 targets** (Go modules + npm packages) with a total of **276 dependencies**.
+Scanned **4 targets** (Go modules + npm packages) with a total of **275 dependencies**.
 
 | Metric | Value |
 |--------|-------|
-| Total dependencies scanned | 276 |
+| Total dependencies scanned | 275 |
 | CRITICAL issues | 0 |
 | HIGH issues | 0 |
 | MEDIUM issues | 2 |
@@ -284,7 +287,7 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **276 dependen
 
 ### services/mddbd/go.mod
 
-**36 dependencies**
+**35 dependencies**
 
 | Package | License | Severity | Category |
 |---------|---------|----------|----------|
@@ -293,12 +296,11 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **276 dependen
 | github.com/bits-and-blooms/bitset | BSD-3-Clause | LOW | notice |
 | github.com/bits-and-blooms/bloom/v3 | BSD-2-Clause | LOW | notice |
 | github.com/chewxy/math32 | BSD-2-Clause | LOW | notice |
-| github.com/coder/hnsw | CC0-1.0 | LOW | unencumbered |
+| github.com/coder/hnsw [^hnsw-fork] | CC0-1.0 | LOW | unencumbered |
 | github.com/go-viper/mapstructure/v2 | MIT | LOW | notice |
 | github.com/goccy/go-json | MIT | LOW | notice |
 | github.com/golang-jwt/jwt/v5 | MIT | LOW | notice |
 | github.com/golang/snappy | BSD-3-Clause | LOW | notice |
-| github.com/google/renameio | Apache-2.0 | LOW | notice |
 | github.com/google/uuid | BSD-3-Clause | LOW | notice |
 | github.com/gorilla/websocket | BSD-2-Clause | LOW | notice |
 | github.com/hashicorp/golang-lru/v2 | MPL-2.0 | MEDIUM | reciprocal |
@@ -324,6 +326,16 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **276 dependen
 | google.golang.org/protobuf | BSD-3-Clause | LOW | notice |
 | gopkg.in/yaml.v3 | Apache-2.0 | LOW | notice |
 | gopkg.in/yaml.v3 | MIT | LOW | notice |
+
+
+[^hnsw-fork]: Resolved through a `replace` in `services/mddbd/go.mod` onto
+`github.com/tradik/hnsw`, a fork holding one commit: the one sent upstream as
+[coder/hnsw#24](https://github.com/coder/hnsw/pull/24). The licence is
+unchanged — CC0-1.0 is a public-domain dedication, so the fork carries no
+additional obligation. That commit is also what removed
+`github.com/google/renameio` (Apache-2.0) from this module: it was reachable
+only from the one hnsw function the patch rewrites, and it has no Windows
+build. The `replace` is temporary and tracked for removal once upstream merges.
 
 ### test/go.mod
 

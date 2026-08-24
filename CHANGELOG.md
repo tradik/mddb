@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The vector index no longer blocks a Windows build (WIN-003)** — MDDB's
+  HNSW index comes from `github.com/coder/hnsw`, and that package does not
+  compile for Windows. Its `SavedGraph.Save` uses `github.com/google/renameio`,
+  which has no Windows build in either v1 or v2. Go compiles a package as a
+  whole, so the failure applied to us even though we never call `Save` — MDDB
+  persists vectors itself in `internal/vector/vector_store.go`. One unreachable
+  function was making the whole target impossible.
+
+  Fixed upstream rather than worked around: [coder/hnsw#24](https://github.com/coder/hnsw/pull/24)
+  rewrites that call on the standard library — a temporary file in the target's
+  directory, `fsync`, then `os.Rename` over the target. The crash-safety
+  property is unchanged, because `os.Rename` replaces an existing file on every
+  platform Go supports (on Windows it compiles to `MoveFileEx` with
+  `MOVEFILE_REPLACE_EXISTING`). It also drops `renameio` as that package's only
+  non-test dependency.
+
+  Until upstream merges, `services/mddbd/go.mod` carries a `replace` onto a
+  fork holding exactly that one commit. The directive is commented with the
+  reason and the condition for removing it, tracked as its own task. A `replace`
+  applies only to the main module, so nothing downstream inherits the fork.
+
+  This does not make MDDB build on Windows — `GOOS=windows` now fails on
+  `syscall.Statfs` and `syscall.Getrusage` instead, which is the next task. It
+  removes the blocker that stood in front of that work.
+
 - **Tests wait for work to finish instead of guessing how long it takes
   (TEST-004)** — the queue, webhook, temporal and audit suites synchronised
   with fixed `time.Sleep` calls of 100–700 ms and then asserted. That passes on

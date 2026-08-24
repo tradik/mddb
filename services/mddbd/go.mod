@@ -33,7 +33,6 @@ require (
 	github.com/coder/websocket v1.8.15 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
-	github.com/google/renameio v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
@@ -58,3 +57,16 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
 	gopkg.in/ini.v1 v1.67.3 // indirect
 )
+
+// WIN-003. github.com/coder/hnsw does not compile for Windows: its
+// SavedGraph.Save uses github.com/google/renameio, which has no Windows build
+// (neither v1 nor v2 defines TempFile there). Go compiles a package as a whole,
+// so this blocks the whole hnsw package for us even though we never call Save —
+// we persist vectors ourselves in internal/vector/vector_store.go.
+//
+// The fork is a single commit against upstream main: it replaces that one call
+// with os.CreateTemp + fsync + os.Rename. Sent upstream as
+// https://github.com/coder/hnsw/pull/24.
+//
+// REMOVE THIS once that PR is merged and tagged — tracked as WIN-005.
+replace github.com/coder/hnsw => github.com/tradik/hnsw v0.6.2-0.20260824091751-ad04fee59f41
