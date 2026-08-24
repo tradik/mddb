@@ -319,7 +319,7 @@ Three things MDDB *deliberately* does not do; they are the operator's responsibi
 - Memory usage
 - Response time
 
-## Roadmap
+## What's next
 
-The roadmap lives in its own file and is updated per release: see [ROADMAP.md](ROADMAP.md) for current and planned work.
+Delivered work is recorded in the [changelog](https://github.com/tradik/mddb/blob/main/CHANGELOG.md), and requests live in [issues](https://github.com/tradik/mddb/issues). There is no separate roadmap file: the one that existed described v2.9 as current three releases later, and listed encryption at rest, the audit log and multi-tenancy as planned after all three had shipped.
 

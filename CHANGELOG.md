@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`docs/ROADMAP.md`** — it described **v2.9 as current** while v2.12.0 was
+  being tagged, and listed as planned, with a ⏳, several things that had
+  already shipped: encryption at rest (AES-256-GCM), the audit log, structured
+  JSON logging, key rotation, and multi-tenancy — the last of which was filed
+  under "v3.3 (2027)" and delivered in 2.11.4.
+
+  A reader following it would conclude the project lacks features it has. Its
+  file history shows one commit, a link-fixing sweep: nobody had updated the
+  content since it was written, which is the honest reason to drop it rather
+  than rewrite it — a roadmap is worth having only if someone maintains it per
+  release, and three releases of evidence say otherwise here.
+
+  What replaces it is what was already accurate: the CHANGELOG for what
+  shipped, issues and discussions for what is wanted. Both current by
+  construction. The four documents that linked to it now say so.
+
 ### Security
 
 - **`npm audit` reports zero across the integrations** — the GitHub Action,

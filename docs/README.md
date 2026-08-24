@@ -223,9 +223,9 @@ See [LICENSE](https://github.com/tradik/mddb/blob/main/LICENSE) file for details
 - Open new issue with details
 - Include version and OS information
 
-## 🗺️ Roadmap
+## 🗺️ What's next
 
-The roadmap is maintained per release in [ROADMAP.md](ROADMAP.md). Past releases live in [CHANGELOG.md](https://github.com/tradik/mddb/blob/main/CHANGELOG.md).
+Past releases live in [CHANGELOG.md](https://github.com/tradik/mddb/blob/main/CHANGELOG.md). Requests and proposals live in [issues](https://github.com/tradik/mddb/issues) and [discussions](https://github.com/tradik/mddb/discussions/categories/ideas).
 
 
 ---

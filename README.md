@@ -637,9 +637,12 @@ mddb-cli stats
 
 **[→ Detailed architecture](docs/ARCHITECTURE.md)**
 
-## 🗺️ Roadmap
+## 🗺️ What's next
 
-**[→ Full roadmap](docs/ROADMAP.md)**
+Shipped work is in **[CHANGELOG.md](CHANGELOG.md)**. What people are asking for
+is in **[Issues](https://github.com/tradik/mddb/issues)** and
+**[Discussions](https://github.com/tradik/mddb/discussions/categories/ideas)** —
+both current by construction, which a hand-written roadmap was not.
 
 ## 🤝 Contributing
 
