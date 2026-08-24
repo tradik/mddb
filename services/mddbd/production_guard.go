@@ -44,26 +44,30 @@ func IsProduction() bool {
 //
 // fatalf is injected so tests can assert fatal conditions without
 // actually exiting the process.
-func EnforceProductionGuards(logf, fatalf func(format string, args ...interface{})) {
+// EnforceProductionGuards reports on the production requirements. It takes the
+// two loggers rather than calling slog directly so tests can observe what it
+// decided; both have slog's (message, key/value...) shape, so callers pass
+// slog.Warn and logging.Fatal.
+func EnforceProductionGuards(warn, fatal func(msg string, args ...any)) {
 	if !IsProduction() {
 		missing := CheckProductionGuards()
 		if len(missing) > 0 {
-			logf("⚠️  Running with insecure defaults. Set MDDB_PRODUCTION=true for ISO 27001 / SOC 2 compliance. Missing: %s",
-				summariseRequirements(missing))
+			warn("running with insecure defaults — set MDDB_PRODUCTION=true for ISO 27001 / SOC 2 compliance",
+				"missing", summariseRequirements(missing))
 		}
 		return
 	}
 	missing := CheckProductionGuards()
 	if len(missing) == 0 {
-		logf("✓ Production guards satisfied (ISO 27001 / SOC 2)")
+		warn("production guards satisfied (ISO 27001 / SOC 2)")
 		return
 	}
 	var lines []string
 	for _, r := range missing {
-		lines = append(lines, fmt.Sprintf("  - %s: want %s (%s)", r.EnvVar, r.Want, r.Reason))
+		lines = append(lines, fmt.Sprintf("%s: want %s (%s)", r.EnvVar, r.Want, r.Reason))
 	}
-	fatalf("MDDB_PRODUCTION=true but %d requirement(s) missing:\n%s",
-		len(missing), strings.Join(lines, "\n"))
+	fatal("MDDB_PRODUCTION=true but requirements are missing",
+		"count", len(missing), "requirements", strings.Join(lines, "; "))
 }
 
 func productionRequirements() []ProductionRequirement {

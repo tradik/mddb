@@ -35,14 +35,22 @@ x-deploy-small: &deploy-small
 
 services:
   mddb:
-    image: tradik/mddb:latest
+    image: tradik/mddb:${MDDB_VERSION:-2.12.0}
     container_name: mddb-server
     restart: unless-stopped
     ports:
-      - "11023:11023" # HTTP API
-      - "11024:11024" # gRPC API
-      - "9000:9000" # MCP
-      - "11443:11443" # HTTP/3 (extreme mode)
+      # OPS-001/OPS-012: bound to loopback by default. Reverse proxies and
+      # cloudflared reach the server over mddb-network and need no published
+      # port at all; set MDDB_BIND_ADDR=0.0.0.0 only to expose it deliberately.
+      - "${MDDB_BIND_ADDR:-127.0.0.1}:11023:11023" # HTTP API
+      - "${MDDB_BIND_ADDR:-127.0.0.1}:11024:11024" # gRPC API
+      - "${MDDB_BIND_ADDR:-127.0.0.1}:9000:9000" # MCP
+      - "${MDDB_BIND_ADDR:-127.0.0.1}:11443:11443" # HTTP/3 (extreme mode)
+    # GO-034: the ordered shutdown drains the queues and has a 15s budget
+    # (MDDB_SHUTDOWN_TIMEOUT_SEC). Docker's default grace period is 10s, which
+    # would SIGKILL the server mid-drain — the very thing the drain exists to
+    # avoid. Give it room to finish and still stop promptly.
+    stop_grace_period: 20s
     volumes:
       - mddb-data:/data
       - ./backups:/backups
@@ -53,6 +61,16 @@ services:
       - MDDB_HTTP_PORT=11023
       - MDDB_GRPC_PORT=11024
       - MDDB_HTTP3_PORT=11443
+      # OPS-012: the image ships MDDB_AUTH_ENABLED="false" for a frictionless
+      # local start, so a production compose must turn it on explicitly — this
+      # file runs MDDB_MODE=wr and publishes HTTP/gRPC/MCP.
+      - MDDB_AUTH_ENABLED=true
+      # SEC-007: secrets come from .env (gitignored), never hardcoded here.
+      # Copy .env.example to .env and set these. Compose errors if unset.
+      - MDDB_AUTH_JWT_SECRET=${MDDB_AUTH_JWT_SECRET:?set MDDB_AUTH_JWT_SECRET in .env, see .env.example}
+      - MDDB_AUTH_JWT_EXPIRY=${MDDB_AUTH_JWT_EXPIRY:-24h}
+      - MDDB_AUTH_ADMIN_USERNAME=${MDDB_AUTH_ADMIN_USERNAME:-admin}
+      - MDDB_AUTH_ADMIN_PASSWORD=${MDDB_AUTH_ADMIN_PASSWORD:?set MDDB_AUTH_ADMIN_PASSWORD in .env, see .env.example}
       # - MDDB_PANEL_MODE=external  # internal (default, CORS enabled) or external (CORS disabled, panel proxies)
       - TZ=UTC
     networks:
@@ -67,7 +85,7 @@ services:
       start_period: 10s
     labels:
       - "com.mddb.description=MDDB - High-Performance Markdown Database"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
       - "com.mddb.performance=optimized"
 
   mddb-panel:
@@ -77,7 +95,7 @@ services:
     container_name: mddb-panel
     restart: unless-stopped
     ports:
-      - "3000:3000" # Web UI
+      - "${MDDB_BIND_ADDR:-127.0.0.1}:3000:3000" # Web UI
     environment:
       - MDDB_SERVER=http://mddb:11023
     networks:
@@ -89,7 +107,7 @@ services:
         condition: service_healthy
     labels:
       - "com.mddb.description=MDDB Panel - Web Admin Interface"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
 
   # MCP is built into the mddb server — runs on port 9000 by default
   # For stdio mode, use: docker run -i --rm -e MDDB_MCP_STDIO=true tradik/mddb:latest
@@ -101,10 +119,15 @@ services:
     container_name: mddb-chat
     restart: unless-stopped
     ports:
-      - "11030:11030"
+      - "${MDDB_BIND_ADDR:-127.0.0.1}:11030:11030"
     environment:
       - MDDB_CHAT_CONFIG=/etc/mddb-chat/config.toml
       - MDDB_CHAT_LLM_API_KEY=${MDDB_CHAT_LLM_API_KEY}
+      # OPS-012: mddbd now requires auth, so the chat backend has to present
+      # the same credentials (config.rs falls back to these when the TOML
+      # leaves mddb.auth_* empty).
+      - MDDB_CHAT_AUTH_USERNAME=${MDDB_AUTH_ADMIN_USERNAME:-admin}
+      - MDDB_CHAT_AUTH_PASSWORD=${MDDB_AUTH_ADMIN_PASSWORD:?set MDDB_AUTH_ADMIN_PASSWORD in .env, see .env.example}
     networks:
       - mddb-network
     logging: *default-logging
@@ -114,7 +137,7 @@ services:
         condition: service_healthy
     labels:
       - "com.mddb.description=MDDB Chat - AI Chat Support"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
 
   mddb-chat-widget:
     build:
@@ -123,14 +146,14 @@ services:
     container_name: mddb-chat-widget
     restart: unless-stopped
     ports:
-      - "11032:8080" # nginx-unprivileged listens on 8080 (OPS-006)
+      - "${MDDB_BIND_ADDR:-127.0.0.1}:11032:8080" # nginx-unprivileged listens on 8080 (OPS-006)
     networks:
       - mddb-network
     logging: *default-logging
     deploy: *deploy-small
     labels:
       - "com.mddb.description=MDDB Chat Widget - Embeddable JS chatbox"
-      - "com.mddb.version=${MDDB_VERSION:-2.11.4}"
+      - "com.mddb.version=${MDDB_VERSION:-2.12.0}"
 
 volumes:
   mddb-data:

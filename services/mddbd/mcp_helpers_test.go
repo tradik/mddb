@@ -22,9 +22,16 @@ func TestMcpGetMetaMap(t *testing.T) {
 	if !reflect.DeepEqual(got["tag"], []string{"go"}) {
 		t.Errorf("tag: got %v", got["tag"])
 	}
-	// non-string at index 2 stays as zero value ""
-	if len(got["authors"]) != 4 || got["authors"][0] != "a" || got["authors"][3] != "c" {
-		t.Errorf("authors: got %v", got["authors"])
+	// A non-string entry is dropped, not kept as "". An empty metadata value
+	// is indexed and searchable, so blanking one invents a value the caller
+	// never wrote — this used to leave a phantom at index 2 (TEST-002).
+	if len(got["authors"]) != 3 {
+		t.Errorf("authors: got %v, want the three strings with the non-string dropped", got["authors"])
+	}
+	for _, v := range got["authors"] {
+		if v == "" {
+			t.Errorf("authors contains a phantom empty value: %v", got["authors"])
+		}
 	}
 	if len(got["empty"]) != 0 {
 		t.Errorf("empty: got %v", got["empty"])
@@ -105,8 +112,12 @@ func TestMcpGetBool(t *testing.T) {
 	if mcpGetBool(in, "b") {
 		t.Error("b should be false")
 	}
-	if mcpGetBool(in, "c") {
-		t.Error("non-bool string must yield false")
+	// "yes" is true. mcpGetBool now delegates to mcpCoerceBool, which exists
+	// precisely because "silently ignoring a stringified bool would be a
+	// footgun" — its own words. This test pinned the opposite, so the file
+	// held two contradictory decisions about the same question (TEST-002).
+	if !mcpGetBool(in, "c") {
+		t.Error(`"yes" must be read as true — LLM clients send it`)
 	}
 	if mcpGetBool(in, "d") {
 		t.Error("non-bool int must yield false")

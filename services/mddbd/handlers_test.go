@@ -19,8 +19,8 @@ import (
 	"strings"
 	"testing"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // newHandlerTestServer creates a fully-initialised Server suitable for HTTP

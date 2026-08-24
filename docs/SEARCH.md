@@ -141,6 +141,18 @@ Supported atoms inside an expression:
 
 Precedence from tightest to loosest: `NOT` > `AND` > `OR`. So `a AND b OR c` parses as `(a AND b) OR c`, while `a OR b AND c` parses as `a OR (b AND c)`.
 
+**Quotes inside a phrase** are escaped with a backslash, and a literal backslash is doubled:
+
+| Query | Phrase searched for |
+|---|---|
+| `"the \"json\" field"` | `the "json" field` |
+| `"a \\ b"` | `a \ b` |
+| `"unterminated` | error: *unterminated phrase: expected a closing quote* |
+
+Before v2.12.0 an embedded quote ended the phrase early and the rest of the query was reinterpreted as operators, so `"the "json" field"` silently searched for something else. A phrase with no closing quote is now an error rather than a phrase running to the end of the query.
+
+The parser normalises what it reads, so `expr.String()` returns a query that parses back to the same expression — worth knowing when a query is logged and pasted back. Double negation collapses (`NOT NOT rust` and `NOT(NOT rust)` are both `rust`), implicit AND is printed explicitly, and grouping is printed where precedence needs it.
+
 Examples:
 
 ```text
@@ -510,6 +522,39 @@ curl -X POST http://localhost:11023/v1/fts \
 }
 ```
 
+## Result Caching
+
+Agents repeat identical queries in loops, and a repeated search redoes the full
+scoring pass for a result set that has not changed. Add `cacheTtl` (seconds) to
+a full-text search request to reuse a recent answer:
+
+```bash
+curl -X POST http://localhost:11023/v1/fts \
+  -H 'Content-Type: application/json' \
+  -d '{"collection":"docs","query":"golang","cacheTtl":60}'
+```
+
+The response carries `X-MDDB-Cache: hit` or `miss`.
+
+Caching is **opt-in per request**. A search without `cacheTtl` is neither
+served from the cache nor stored in it, so the default behaviour and the
+default freshness are exactly what they were — there is no silent staleness to
+reason about. The caller decides how stale an answer may be, per query.
+
+Two requests share an entry when they ask the same question of the same
+collection: the key covers the whole request except `cacheTtl` itself, so a
+caller willing to hold an answer for ten minutes and one willing to hold it for
+ten seconds still share one.
+
+**Writing to a collection invalidates its cached results immediately** — adds,
+updates, deletes, batch operations and FTS reindexing all do. Invalidation is a
+per-collection counter mixed into the key, so it costs nothing on the write
+path and never serves a result set from before your write.
+
+`cacheTtl` is capped at 3600 seconds. `MDDB_SEARCH_CACHE_SIZE=0` disables the
+cache for the whole server whatever requests ask for; see
+[config.md](config.md#logging).
+
 ## Vector Search
 
 Vector search embeds the query text into a high-dimensional vector and finds documents with the most similar embeddings using cosine similarity. Similarity computation is hardware-accelerated on ARM64 via NEON (all ARM64) and SME (Apple M4+) SIMD instructions, with automatic runtime detection and fallback to scalar Go on other platforms. Search is parallelized across multiple goroutines for collections above 2048 vectors (~2.5x speedup on 50K collections).
@@ -596,6 +641,43 @@ Compresses vectors by quantizing each float32 dimension to uint8 (8-bit). Simple
 | Parameters | Automatic calibration |
 
 **When to use:** Medium to large collections where you need memory savings with better accuracy than PQ. Good middle ground between flat and PQ.
+
+### SQ4 (4-bit Scalar Quantization)
+
+Half of SQ's storage: four bits per dimension, two dimensions packed into each
+byte. Fills the gap between `sq` (4x smaller than float32) and `bq` (32x
+smaller but much coarser).
+
+| Property | Value |
+|----------|-------|
+| Accuracy | **99.5% of `sq`'s recall@10** — measured, see below |
+| Speed | Fast (16-entry distance table per dimension) |
+| Memory | **8x compression** (0.5 bytes per dimension) |
+| Build time | O(n log n) — per-dimension percentiles |
+| Parameters | Automatic calibration |
+
+Two design decisions distinguish it from a naive 4-bit quantizer:
+
+- **Percentile boundaries, not min/max.** With only sixteen levels, one outlier
+  stretching the range collapses every ordinary value into two or three codes.
+  The range is clipped at the 1st and 99th percentile per dimension, which
+  costs accuracy on the 2% outside and buys it back on the 98% inside.
+- **Asymmetric distances.** The query stays float32; only stored vectors are
+  quantized, so the query contributes no quantization error of its own.
+
+Measured on 2 000 clustered 384-dimension vectors, 200 queries, recall@10
+against exact cosine search (`go test ./internal/vector -run
+TestQuantizerRecallCurve -v`):
+
+| Quantizer | recall@10 | bytes/vector | vs float32 |
+|---|---|---|---|
+| `flat` (float32) | 1.000 | 1536 | 1x |
+| `sq` (int8) | 1.000 | 384 | 4x |
+| **`sq4` (int4)** | **0.995** | **192** | **8x** |
+| `bq` (1 bit) | 0.581 | 48 | 32x |
+
+**When to use:** a collection that no longer fits in RAM at `sq`. The recall
+difference is within a rounding error of int8; the storage is half.
 
 ### BQ (Binary Quantization)
 
@@ -776,6 +858,78 @@ curl -X POST http://localhost:11023/v1/vector-search \
   applies across chunks, in `parent` mode across documents.
 - Also available on the `semantic_search` MCP tool (`mmr`, `mmr_lambda`).
 
+## Oversampling (v2.12.0+)
+
+Every search that post-processes its results — deduplicating chunks of one
+document, merging two rankings, rescoring quantized candidates — asks the index
+for more than it will return, then trims. That multiplier was the literal
+`topK * 3` in five places, so the recall/latency trade-off was fixed at whatever
+those constants said.
+
+`oversample` exposes it: how many candidates to fetch per requested result.
+
+```bash
+# A navigational lookup: cheapest path to the obvious answer.
+curl -X POST "$MDDB/v1/vector-search" -d '{"collection":"docs","query":"pricing","oversample":1}'
+
+# A question worth getting right: cast a wider net before deduplication.
+curl -X POST "$MDDB/v1/vector-search" -d '{"collection":"docs","query":"why did the migration fail","oversample":10}'
+```
+
+Range 1.0–10.0. Omitted, it uses the collection's `retrieval.oversample`
+profile, then MDDB's default of 3.0 — the constant the code has always used, so
+an unset parameter reproduces earlier results exactly. Out of range is a `422`
+(gRPC `InvalidArgument`), never a silent clamp: quietly halving a caller's
+recall setting is worse than telling them it was impossible.
+
+### What it actually buys, measured
+
+2,500 documents of 5 chunks each, `topK=10`, flat index:
+
+| `oversample` | Candidates fetched | Distinct documents returned | Latency |
+|---:|---:|---:|---:|
+| 1× | 20 | 5 | 1.75 ms |
+| 3× (default) | 30 | 9 | 1.74 ms |
+| 10× | 100 | 10 | 1.77 ms |
+
+Two things worth reading twice.
+
+**At 1× you get half the documents you asked for.** With chunk-level indexing,
+several chunks of the same document occupy the top of the ranking, and
+deduplication collapses them into one result. Without spare candidates there is
+nothing left to fill the gap — `topK=10` returns 5 documents. This is why the
+default is 3 and not 1.
+
+**On a flat index the latency cost is about 1%.** A flat search scans every
+vector regardless; `topK` only sizes the result heap. So raising `oversample`
+there is nearly free, and there is little reason to leave it low. The trade-off
+becomes real on approximate indexes — HNSW, IVF, and the quantized ones — where
+the candidate count drives graph traversal and rescoring work. Measure on the
+index you actually run.
+
+### Per-collection default
+
+A collection whose documents are long and heavily chunked wants a higher factor
+than one holding short notes. Set it once instead of on every query:
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -d '{
+  "collection": "handbook",
+  "retrieval": { "oversample": 6 }
+}'
+```
+
+Precedence is the same as every other retrieval setting: request parameter >
+collection profile > default.
+
+### What is not exposed
+
+HNSW's `efSearch` stays a build-time parameter. It lives on the graph object
+shared by every concurrent search, so setting it per query would have one
+request silently change another's beam width — a data race producing wrong
+results rather than a crash. Raising `oversample` moves HNSW recall through the
+requested neighbour count instead, which is per-call and safe.
+
 ## Hybrid Search (v2.6.5+)
 
 Hybrid search combines FTS (keyword) and vector (semantic) search into a single query, producing results ranked by a fused score. This gives you the best of both worlds: exact keyword matching plus semantic understanding.
@@ -823,7 +977,7 @@ score = 1/(k + rank_fts) + 1/(k + rank_vector)
 | `alpha` | `0.5` | Weight for alpha blending (0-1) |
 | `rrfK` | `60` | RRF k parameter |
 | `algorithm` | `"bm25"` | FTS algorithm: `"bm25"`, `"bm25f"`, `"pmisparse"` |
-| `vectorAlgorithm` | `"flat"` | Vector algorithm: `"flat"`, `"hnsw"`, `"ivf"`, `"pq"`, `"opq"`, `"sq"`, `"bq"` |
+| `vectorAlgorithm` | `"flat"` | Vector algorithm: `"flat"`, `"hnsw"`, `"ivf"`, `"pq"`, `"opq"`, `"sq"`, `"sq4"`, `"bq"` |
 | `topK` | `10` | Number of results to return |
 | `fuzzy` | `0` | Typo tolerance for FTS (0, 1, 2) |
 | `threshold` | `0.0` | Minimum vector similarity |
@@ -942,6 +1096,193 @@ curl -X POST http://localhost:11023/v1/hybrid-search \
 }
 ```
 
+## Which algorithm should I use? (v2.12.0+)
+
+MDDB offers eight vector algorithms, four ranking algorithms, three fusion
+strategies and four retrieval modes. That is a lot of menu and no basis for
+choosing — especially for an agent connecting over MCP, which sees the names
+and nothing else.
+
+Ask the server. It can measure the collection:
+
+```bash
+curl -s "$MDDB/v1/search-advisor?collection=theme"
+```
+
+```json
+{
+  "profile": {
+    "documents": 4,
+    "medianWords": 7,
+    "termsPerDocument": 5.0,
+    "codeDocuments": 4
+  },
+  "searchType": "fts",
+  "ftsAlgorithm": "bm25",
+  "retrievalMode": "graph",
+  "topK": 20,
+  "reasons": [
+    "No embedding provider is configured and no document has a vector, so keyword search is the only search available.",
+    "bm25 for ranking: this is code, where queries are identifiers and exact term matching matters more than query expansion.",
+    "retrievalMode graph: this is code, so the connection graph reaches the stylesheet a matching script touches — a document no score would have found."
+  ],
+  "retrievalProfile": { "defaultSearchType": "fts", "topK": 20, "retrievalMode": "graph" }
+}
+```
+
+Three collections on the same server, three different answers:
+
+| Collection | Shape | Recommendation |
+|---|---|---|
+| A theme (CSS/JS/HTML) | 4 documents, 7 words median, all code | `bm25`, `retrievalMode: graph` |
+| Manuals | 120 documents, 902 words median, 0.18 new terms each | `pmisparse`, `chunk`, topK 5 |
+| Status notes | 200 documents, 8 words median | `bm25`, `parent`, topK 20 |
+
+**What it measures, and why each thing matters:**
+
+| Measurement | Decides |
+|---|---|
+| Embedded documents vs total | Whether vector search is possible at all, and whether a partial reindex is silently hiding documents |
+| Median document length | `parent` vs `chunk`, and how many results fit a context window |
+| Terms per document | Whether keyword ranking can tell documents apart, or needs query expansion |
+| Documents carrying symbols | Whether the connection graph reaches documents a score cannot |
+| Vector bytes at float32 | Whether a quantized index is worth the recall it costs |
+
+**Terms per document, not type-token ratio.** Type-token ratio pooled over a
+corpus falls towards zero as the corpus grows — vocabulary saturates while
+tokens accumulate. The same text measured over 100 documents and over 100 000
+gives wildly different numbers, and every large collection would look
+repetitive. Vocabulary divided by document count is stable.
+
+**Every recommendation carries its reasons.** "Use bm25" is an instruction;
+"bm25, because a median document of 8 words is short and bm25's length
+normalisation is what stops a one-line note outranking a real answer" is
+something you can disagree with. Disagreeing with it is a legitimate outcome —
+this measures the corpus, not your queries.
+
+### Storing the answer
+
+`retrievalProfile` is the advice as a per-collection profile (RAG-001). Store
+it and every client inherits it without being told:
+
+```bash
+curl -s "$MDDB/v1/search-advisor?collection=theme&apply=true"
+```
+
+`apply` needs write permission, and merges into the existing configuration
+rather than replacing it — a collection's response prompt and encryption flag
+have nothing to do with retrieval and must survive.
+
+### For agents
+
+The same thing is the `search_advisor` MCP tool, annotated read-only. An agent
+should call it once per collection before its first search, rather than
+guessing from algorithm names or defaulting forever.
+
+## Graph retrieval (v2.12.0+)
+
+`parent`, `chunk` and `window` change the *shape* of a result. `graph` changes
+which documents are *reached*.
+
+A query about a checkout bug matches `checkout.js`. The stylesheet whose
+selector it manipulates and the template that loads it match nothing — and an
+agent has to notice the gap and ask again, two or three round trips to assemble
+what one traversal already knows.
+
+```bash
+curl -s -X POST "$MDDB/v1/vector-search" -d '{
+  "collection": "theme",
+  "query": "cart total not updating",
+  "retrievalMode": "graph",
+  "graphExpand": { "graphDepth": 1, "graphDecay": 0.5 }
+}'
+```
+
+Neighbours come back after the direct matches, each with the edge that
+justifies it:
+
+```json
+"graphExpansions": [
+  { "key": "css/site.css", "fromKey": "js/checkout.js",
+    "symbol": ".cart-total", "kind": "uses-selector", "depth": 1, "score": 0.45 }
+]
+```
+
+Without `fromKey` and `symbol` a caller sees a document that matched nothing
+and cannot tell whether the search is working.
+
+| Parameter | Default | Notes |
+|---|---|---|
+| `graphDepth` | 1 | Clamped to 3, for the same reason `/v1/code-graph` clamps it |
+| `graphDecay` | 0.5 | Fraction of the source's score a neighbour inherits per hop |
+| `graphMaxNeighbours` | 10 | Stops a hub document flooding the answer |
+| `graphDirection` | `both` | `in` = what depends on this, `out` = what it depends on |
+
+Neighbours are appended rather than merged into the ranking: a document that
+matched the query and one merely adjacent to a match are different kinds of
+answer, and sorting them together hides which is which.
+
+A collection with no edges — most prose — expands to nothing, which is the
+right answer rather than an error.
+
+### Weighted (multi-signal fusion, v2.12.0+)
+
+`alpha` and `rrf` both answer one question: how well does this document match
+the query. There are cheap signals they cannot see, and the one that matters
+most is duplication.
+
+If a runbook was forked per environment, the four copies score almost
+identically — and a vector score makes it worse, because near-copies have
+near-identical embeddings, so similarity *rewards* the duplication. An agent
+reading the top four results reads the same document four times.
+
+`weighted` takes alpha's blend and adjusts it:
+
+```bash
+curl -s -X POST "$MDDB/v1/hybrid-search" -d '{
+  "collection": "runbooks",
+  "query": "restart the service",
+  "strategy": "weighted",
+  "alpha": 0.5,
+  "signals": {
+    "diversity": 0.8,
+    "proximity": 0.1
+  }
+}'
+```
+
+| Signal | What it does | Suggested |
+|---|---|---|
+| `diversity` | Penalises a near-copy of a higher-ranked result, by **text overlap** (MinHash), not embedding distance | 0.5–1.0 |
+| `proximity` | Rewards a result sharing a directory with a higher-ranked one | 0.05–0.15 |
+| `freshness` | Rewards recently updated documents, exponential decay | 0.05–0.2 |
+
+**A weight is a fraction of the result's own score.** `proximity: 0.1` means
+"up to 10% better". That keeps the signals scale-free, and makes large weights
+genuinely powerful — at 1.0 a proximity bonus can carry a result past one
+scoring half again as much. Weights are clamped to [0, 1].
+
+Measured on a corpus with one document forked into four near-copies plus three
+distinct answers (`go test -run TestDiversitySignalImprovesTopKCoverage -v`):
+
+| | Distinct documents in the top 4 |
+|---|---|
+| Without the signal | **1** |
+| `diversity: 0.8` | **4** |
+
+The response carries a `signalBreakdown` in the same order as the results, so
+what each signal contributed is visible rather than inferred:
+
+```json
+{ "base": 0.94, "diversity": -0.71, "final": 0.23 }
+```
+
+Freshness is off by default and should stay off for reference material: an API
+specification does not become less true with age.
+
+**Nothing changes unless you ask.** `alpha` and `rrf` are untouched, and a
+`weighted` request with no signals behaves exactly like `alpha`.
+
 ### Strategy Selection Guide
 
 ```
@@ -956,6 +1297,9 @@ Queries are natural language questions?
 
 FTS and vector score ranges differ significantly?
   → Use RRF (rank-based, ignores score magnitudes)
+
+Top results keep repeating the same document?
+  → Use Weighted with diversity=0.8 (demotes near-copies by text overlap)
 
 Not sure?
   → Start with Alpha Blending at 0.5, adjust based on results

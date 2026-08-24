@@ -60,18 +60,49 @@ export function buildSettings(els: OptionsElements): Settings {
   };
 }
 
+function originPattern(serverUrl: string): string {
+  return new URL(serverUrl).origin + '/*';
+}
+
 async function requestHostPermission(serverUrl: string): Promise<boolean> {
-  const origin = new URL(serverUrl).origin + '/*';
   try {
-    const granted = await chrome.permissions.request({ origins: [origin] });
+    const granted = await chrome.permissions.request({ origins: [originPattern(serverUrl)] });
     return Boolean(granted);
   } catch {
     return false;
   }
 }
 
+/**
+ * Drop the host permission for a server the extension no longer points at
+ * (INT-015). Without this, every address the user ever saved stays granted,
+ * because `optional_host_permissions` covers all of http/https and nothing
+ * revokes the previous grant. Failure is non-fatal: the new settings are
+ * already saved and the stale grant is a privacy wart, not a broken state.
+ */
+async function revokeStaleHostPermission(previousUrl: string, nextUrl: string): Promise<void> {
+  let previous: string;
+  let next: string;
+  try {
+    previous = originPattern(previousUrl);
+    next = originPattern(nextUrl);
+  } catch {
+    return; // an unparseable stored URL grants nothing to revoke
+  }
+  if (previous === next) return;
+  try {
+    await chrome.permissions.remove({ origins: [previous] });
+  } catch {
+    /* revocation is best-effort */
+  }
+}
+
 export async function init(els = getElements()): Promise<void> {
   const settings = await loadSettings();
+  // Tracks the origin the extension currently holds a grant for, so a second
+  // save in the same session revokes the first save's origin rather than the
+  // one loaded at startup (INT-015).
+  let grantedFor = settings.serverUrl;
   els.url.value = settings.serverUrl;
   els.apiKey.value = settings.apiKey;
   els.panel.value = settings.panelUrl;
@@ -91,6 +122,8 @@ export async function init(els = getElements()): Promise<void> {
         return;
       }
       await saveSettings(next);
+      await revokeStaleHostPermission(grantedFor, next.serverUrl);
+      grantedFor = next.serverUrl;
       setStatus(els.status, 'Settings saved.', 'ok');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to save settings';

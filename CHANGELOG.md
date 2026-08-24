@@ -8,6 +8,1453 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- **A per-session token budget for mddb-chat (RAG-005)** — a scenario's
+  `max_turns` caps how many turns a conversation takes and says nothing about
+  what they cost. One turn carrying a large retrieval context through several
+  tool-calling rounds can be worth ten short ones, and on a publicly reachable
+  chat that is the dimension a budget actually runs out in.
+
+  `security.max_tokens_per_session` (0 = unlimited, so nothing changes for an
+  existing config) refuses the next message with a message rather than silence
+  once a session has spent its budget.
+
+  The measurement path is what was missing, not the caller: neither provider
+  parsed the `usage` block at all, and `ChatResponse` had nowhere to carry the
+  number — which is why `Session.total_tokens_used` was removed earlier in this
+  release rather than wired up. Both providers now read it —
+  `input_tokens`/`output_tokens` from Anthropic, `prompt_tokens`/`completion_tokens`
+  from OpenAI, two names for the same pair, which is exactly the kind of
+  difference that goes unnoticed until a budget silently stops counting on one
+  of them — and it is summed across **every round of a turn**, not only the
+  round that produced the answer.
+
+  Two limits, stated rather than hidden: a provider that omits its usage block
+  contributes zero for that call, because a budget must not depend on a field
+  the provider is free to leave out; and a turn that exhausts the tool-calling
+  rounds and falls through to the streaming path undercounts by its final
+  response, whose usage arrives in an SSE frame this server does not read.
+
+- **`mddb-cli self-update`, and `mddbd --check-update` (OPS-019)** — MDDB ships
+  as a single binary, and someone who downloaded one onto a VPS had no way to
+  learn that a newer one exists. They stayed on the version they first
+  installed, security fixes included.
+
+  `mddb-cli self-update` fetches from a pinned GitHub URL, checks the SHA-256
+  against the release's `checksums.txt`, and only then writes. Nothing on disk
+  is touched until the download has been read to the end and matched, so an
+  interrupted download leaves a working binary in place; the replacement is a
+  rename within the same directory, which is atomic, and the previous binary is
+  kept as `.bak`. A binary installed through snap or running in a container is
+  reported on and then refused, with the right channel named — overwriting a
+  file a package manager owns leaves its records disagreeing with the disk.
+
+  **The checksum proves the download arrived intact, not that the release is
+  genuine**: whoever can publish a release can publish a matching checksum.
+  Artifact signing would close that and is not set up for this project; it is
+  said plainly in `docs/INSTALLATION.md` rather than left to be inferred.
+  `checksums.txt` is a new release asset — the workflow computed checksums only
+  for the Homebrew formula before.
+
+  **The daemon never replaces itself.** mddbd is a data server; an unexpected
+  restart is an incident. `mddbd --check-update` reports and exits — 0 up to
+  date, 10 an update exists, 1 the check failed, so a cron job can act on the
+  difference without parsing prose. The same check runs once in the background
+  after startup and its answer appears in `GET /health`, where an **absent**
+  `update` field means "we have not looked" rather than "nothing to report".
+  `MDDB_UPDATE_CHECK=0` turns it off.
+
+  Found while building it: the release workflow already passed
+  `-ldflags "-X main.Version=${VERSION}"` to mddb-cli, and **there was no
+  `main.Version` for it to write to**. Go's linker ignores `-X` for a symbol
+  that does not exist, silently, so every released mddb-cli reported the
+  `1.0.0` hardcoded into its command definition regardless of which release it
+  came from. Nothing caught it because nothing compared the two — until a
+  feature needed the binary to know its own version.
+
+- **A local embedding model is found without being configured (SRCH-001)** — a
+  fresh install with no API key had no semantic search, which contradicts the
+  "single binary, zero configuration" line this project takes everywhere else.
+  The ticket asks for a model compiled into the binary; its spike concluded
+  that means a full transformer inference stack in pure Go — tokenizer, forward
+  pass, tens of megabytes of weights — and that a hash-based stand-in would
+  earn the words "offline semantic search" while failing the ticket's own
+  quality gate. That part is still open and still a project.
+
+  What was not the hard part: a great many machines with no semantic search
+  already had Ollama running on them. Nothing ever asked. MDDB now asks once at
+  startup, when nothing else is configured, and uses what it finds.
+
+  Only models whose dimensionality is known are picked — `nomic-embed-text`,
+  `mxbai-embed-large`, `snowflake-arctic-embed`, `bge-m3`, `all-minilm` —
+  because Ollama's `/api/tags` does not report embedding dimensions and a wrong
+  one writes vectors no later query can match. Preference order beats
+  installation order. An Ollama holding only chat models is left alone. Stored
+  configuration and `MDDB_EMBEDDING_PROVIDER` both take precedence, so this
+  never overrides a choice anyone made, and `MDDB_EMBEDDING_AUTODETECT=0`
+  skips it. `GET /config` reports `vectorConfig.source: "autodetected"`, so the
+  panel shows a configuration nobody remembers writing for what it is.
+
+- **A benchmark for the vector batch kernel (SRCH-009)** — `internal/vector`
+  ships two implementations of its maths behind build tags, scalar and
+  NEON/SME, and both export a batch kernel the search path never calls. The
+  ticket asked whether wiring it up was worth the storage-layout change it
+  needs. Measured rather than assumed: on the scalar build the batch kernel
+  *is* the per-vector loop, and the two come out within 1% at every size from
+  1 000 to 100 000 candidates. Not rewired; the benchmark is in the tree so the
+  arm64 measurement is one command on hardware that can show a difference.
+
+  The measurement also killed a plausible-looking optimisation before it
+  shipped. `CosineSimilarity` recomputes the query's norm for every candidate,
+  which looks like a third of the arithmetic given away — hoisting it out is
+  worth **1.5%**. The candidate's bytes are the bottleneck, not the multiplies,
+  so doing fewer multiplies over the same bytes changes nothing.
+
+- **A scenario's display name is finally used (RUST-001)** — a chat scenario has
+  two names: the TOML table key (`[scenarios.assistant]`) that a client sends to
+  open a session, and `name`, the label people read. Nothing read the second, so
+  an operator who set it saw no effect anywhere and the two silently disagreed.
+  `GET /config` now returns `scenario_labels` alongside `scenarios`, so a picker
+  can show "Documentation Assistant" and send `assistant`. The key is the
+  identifier, `name` is the label; the existing `scenarios` array is unchanged.
+
+- **Cross-database numbers in COMPARISON.md (DOC-013)** — the page shipped
+  without them because Docker was unavailable when it was rewritten, and
+  inventing figures for systems that were not run was not an option. Measured
+  now, same host, containers pinned in `test/docker-compose.benchmark.yml`:
+  3 000 single inserts gives MongoDB 2 358/s, PostgreSQL 1 368/s, MySQL 454/s
+  and CouchDB 202/s.
+
+  MDDB appears **twice**, because one row would be dishonest in both
+  directions: **502/s without a full-text index, 104/s with one**. None of the
+  other systems is building a search index in that table — a PostgreSQL row
+  with a GIN `tsvector` index would not be at 1 368 either — so the page says
+  which row to compare against what you are asking the other system to do. And
+  single inserts are the wrong way to load a corpus into MDDB at all: through
+  the batch API the same engine does 13 883/s unindexed and 562/s indexed.
+
+
+- **The panel represents this release's features** — a search index nobody can
+  select from the UI is a feature only the API has. Added: a **Search Advisor**
+  view that measures a collection and shows what it found, what it recommends
+  and why, with an "apply to collection" button that stores the advice as the
+  retrieval profile; `sq4` in every vector-algorithm picker (hybrid, vector and
+  cross search); the `weighted` fusion strategy with sliders for diversity,
+  proximity and freshness, each labelled with what it does; `graph` retrieval
+  mode and the `weighted` strategy in the collection config. Every weight
+  starts at zero, so selecting "weighted" without touching a slider behaves
+  exactly like "alpha".
+
+  The panel also gained a CI job. It had none — lint, tests and build all ran
+  nowhere, and a panel that does not build is a release with no UI.
+
+
+- **`langchain-mddb` — a LangChain VectorStore and Retriever (INT-017)** — a
+  developer choosing a retrieval backend inside LangChain picks from the list
+  that has an adapter, so MDDB was not chosen regardless of what the engine
+  does. Thin layer over `clients/python`; the adapter's whole job is mapping
+  one interface onto the other.
+
+  Two places where the two disagree, resolved deliberately. **MDDB embeds
+  server-side**, so `similarity_search_by_vector` raises rather than quietly
+  re-embedding your text with a different model — a caller reaching for that
+  method is usually trying to keep two systems in one vector space, and
+  silently using another model defeats exactly that. And **hybrid is the
+  default**, not vector: following LangChain's reading of `similarity_search`
+  would mean the adapter returns worse results than the same server queried
+  directly.
+
+  Filters translate equality and membership; operator forms raise rather than
+  being dropped, because a dropped condition silently widens the search.
+  Generated ids are derived from content, so re-running an ingest script
+  updates the collection instead of doubling it. `recommended_settings()`
+  exposes the search advisor, since choosing `search_type` by hand is guessing
+  while the server has measured.
+
+
+- **`SearchAdvisor` over gRPC** — added for parity after the HTTP endpoint and
+  the MCP tool. Found by running the new LangChain adapter against a real
+  server: the Python client speaks gRPC, so `recommended_settings()` could not
+  reach the advice at all. `CodeGraph` has the same gap and is left as it was —
+  it never claimed a gRPC surface.
+
+
+- **`search_advisor` — how should I search this collection? (SRCH-010)** — the
+  server offers eight vector algorithms, four ranking algorithms, three fusion
+  strategies and four retrieval modes, and an agent connecting over MCP sees a
+  list of names and nothing else. It defaults or guesses, and every algorithm
+  added since made the menu longer without making the choice easier.
+
+  The advisor measures the collection — how many documents, how long, how much
+  new vocabulary each contributes, whether they are embedded, whether they are
+  code — and recommends the search type, ranking algorithm, vector index,
+  fusion weights and result shape, **with a plain-language reason for every
+  choice**. Three collections on one server get three different answers: a
+  theme gets `bm25` + `retrievalMode: graph`, 900-word manuals get `pmisparse`
+  + `chunk` + topK 5, short status notes get `bm25` + `parent` + topK 20.
+
+  `GET /v1/search-advisor?collection=X`, the `search_advisor` MCP tool
+  (annotated read-only), and a returned `retrievalProfile` ready to store on
+  the collection so every client inherits it. `apply=true` stores it, merging
+  rather than replacing — a collection's response prompt and encryption flag
+  have nothing to do with retrieval and must survive.
+
+  It measures the corpus, not your queries, which is why it explains itself:
+  disagreeing with a reason is a legitimate outcome.
+
+
+- **`retrievalMode: "graph"` (SRCH-006)** — `parent`, `chunk` and `window`
+  change the *shape* of a result; this changes which documents are *reached*.
+  A query about a checkout bug matches `checkout.js`; the stylesheet whose
+  selector it manipulates and the template that loads it match nothing, and an
+  agent has to notice the gap and ask again. Graph mode follows the connection
+  graph out from the documents that did match, scoring each neighbour as a
+  decaying fraction of the result that reached it, and returns the edge that
+  justifies each one — `fromKey`, `symbol`, `kind`, `depth`. Without that a
+  caller sees a document that matched nothing and cannot tell whether the
+  search is working. Neighbours are appended after the direct matches rather
+  than merged into the ranking, because they are a different kind of answer.
+
+
+- **COMPARISON.md rewritten around measured numbers (DOC-013, DOC-015)** — the
+  page was 286 lines of "✅ Advantages" checklists with one performance table
+  whose numbers had no methodology, no date and no way to reproduce them. Every
+  figure now names the command that produces it again (`make bench-comparison`),
+  and the page states the host, the corpus, the transport and the measurement
+  date. `test/mddb-profile` is the harness: ingest throughput, search latency
+  percentiles, on-disk size and server RSS.
+
+  The most useful thing it measures is what full-text indexing costs. The same
+  5 000-document corpus ingests at 562 docs/s into 325 MiB with the index on,
+  and at **13 883 docs/s into 16 MiB with `skipFts`** — 25× the write
+  throughput and 20× the storage. That is the honest price of instant search
+  over every document, and it is a per-ingest choice.
+
+  A **"vs RAG wrappers"** section is new (DOC-015): where the trade actually
+  falls between an engine and a layer over somebody else's engine, framed as a
+  coupling decision rather than a feature list. Every comparison keeps its
+  "choose the other thing when…" section. [PMISparse](docs/PMISPARSE.md) and
+  the [FTS benchmark](docs/BENCHMARK.md) are linked from it, which they were
+  not.
+
+
+- **A guard for relative Markdown links (DOC-013)** — `check-docs-links.py`
+  validates the built site, so nothing checked README.md, CONTRIBUTING.md or
+  the CHANGELOG, which are read on GitHub where a dead link is a plain 404.
+  `scripts/check-repo-links.sh` walks every tracked Markdown file and fails on
+  a relative link that resolves to nothing. Schemes, anchors and site-absolute
+  paths are out of scope, each for a stated reason. Seven-case test suite;
+  runs in CI and `make ci`.
+
+
+- **Two release write-ups on the blog** — *What Breaks If I Change This?* on
+  the code connection graph, and *The Collection Knows How to Be Searched* on
+  per-collection retrieval profiles. Every number, command and JSON body in
+  both was produced against a running instance rather than written from
+  memory, which is how the RAG-001 gap above was found. Both carry the
+  frontmatter the current SSG understands (`type`, `tags`, `excerpt`, per-post
+  mermaid), and `blog/README.md` now documents that shape instead of the older
+  four-field one.
+
+
+- **Static analysis in CI (OPS-008)** — CI scanned dependencies for known CVEs
+  and never looked at the code. gosec was in the repository's conventions and
+  in `.gitignore`: used locally, enforced nowhere. A new SAST workflow runs
+  gosec across all four Go modules and CodeQL over Go and JavaScript/TypeScript
+  — the panel, the chat widget and three integrations had no security analysis
+  of any kind. Both write SARIF to the Security tab, so a finding has somewhere
+  to live besides a red job. The gosec gate blocks at medium severity **from
+  the first run**, because every module is already clean at that level;
+  generated `proto/` is excluded, since its findings belong to the generator
+  and a `#nosec` there would be erased by the next `buf generate`.
+  golangci-lint now also covers `mddb-cli` and `tools/bench`, which nothing was
+  linting.
+
+
+- **Rust dependencies are scanned (OPS-008)** — `cargo audit` runs alongside
+  govulncheck. mddb-chat is a shipped service and its dependency graph had
+  never been looked at: the first run found **four vulnerabilities**, including
+  an unbounded-empty-DATA-frame denial of service in `h2` and a reachable panic
+  plus two certificate-validation flaws in `rustls-webpki`. All four are fixed
+  by upgrades in this release.
+
+
+- **Every GitHub Action is pinned to a commit SHA (OPS-018)** — all 129
+  references across 12 workflows, with the version kept in a trailing comment
+  so Dependabot can still propose upgrades. A tag is a mutable pointer:
+  `tj-actions/changed-files` had every one of its tags repointed at a commit
+  that dumped CI secrets into build logs, and thousands of repositories picked
+  it up within hours without changing a line of their own.
+  `scripts/check-action-pins.sh` fails on any reference that is not a
+  40-character SHA, with its own seven-case test suite, and runs in CI and
+  `make ci`.
+
+
+- **VERSIONING.md** — which components move with a release and which keep their
+  own version, why each is on its list, and what a patch, minor or major bump
+  actually promises. Five components sit at `0.1.0` and have never been bumped;
+  that is now recorded as a fact about the past rather than an implied claim
+  that they are pre-release. RELEASING.md pointed at "any other version
+  references"; it now points at the guard.
+
+
+- **mddb-chat has tests beyond one file (TEST-001)** — 10 tests in 3 of 27
+  source files became 63 in 8, covering session admission and queueing, history
+  trimming, the rate limiter, error-to-status mapping and the webhook payload
+  contract. The three bugs above were found by writing them. `make test-chat`
+  runs the suite.
+
+
+- **The Node.js and Python packages have a client (TEST-001)** — both shipped
+  as example scripts. `@tradik/mddb-client` pointed `main` at `example.js`, so
+  requiring the package executed a demo that connected to localhost and wrote
+  documents; `mddb-client` for Python exported nothing at all, and its
+  generated stub used an absolute `import mddb_pb2` that only resolves when the
+  files sit on `sys.path` directly — **`import mddb_client` raised
+  ModuleNotFoundError**, so the published package had never been importable.
+  Both now export a client whose methods are taken from the service definition,
+  so every unary RPC in `mddb.proto` is available under its own name and a new
+  RPC works the moment the proto carries it. Each carries API-key and JWT
+  metadata, a per-call deadline, an explicit TLS switch (INT-011) and a
+  `waitForReady` so an unreachable server is reported as a refused connection
+  rather than a timeout on the first call. `proto/generate.sh` rewrites the
+  Python import, so the defect cannot come back on the next regeneration.
+
+
+- **CI runs the new suites (TEST-001)** — the mddb-cli job built and tested
+  without measuring; it now enforces an 88% coverage floor. `tools/bench` had
+  no job at all and now builds, vets and tests behind a 68% floor. The Node
+  client job installed and audited a package with no tests and now runs them; a
+  new job installs the Python client, asserts that importing it works, and runs
+  its tests. Both client suites start a gRPC server in-process, so neither
+  needs a live MDDB.
+
+
+- **`/v1/export` no longer calls itself over HTTP (GO-021)** — the handler
+  answered by POSTing to its own `/v1/search` on
+  `localhost:$MDDB_ADDR`, a full round-trip through the stack to reach a
+  database it already had open. It broke whenever the server was not reachable
+  at that guessed address — TLS, a unix socket, a different interface — and it
+  did not check whether the request succeeded: `res, _ :=` followed by
+  `res.Body.Close()` dereferenced a nil response and took the process down.
+  Both formats now run the query in-process through the direct client, and
+  NDJSON streams to the client instead of being built in memory first.
+
+
+- **MCP progress notifications are delivered (GO-021)** — the sender, the token
+  extractor and the transport's notification writer all existed and nothing
+  connected them, so a `vector_reindex` over a large collection was
+  indistinguishable from a hung call. The stdio and Streamable HTTP transports
+  now supply a delivery function, the handler supplies the client's progress
+  token, and the reindex reports as it embeds. A client that sent no token
+  still receives nothing, which is what the spec asks for.
+
+
+- **MCP log messages are delivered (GO-021)** — `logging/setLevel` was
+  accepted, validated and stored, and then never consulted: a client that set
+  the level to `debug` received exactly as much as one that set it to
+  `emergency`, namely nothing. Failing tool calls now reach the client's log at
+  error level, filtered by the level it asked for. Logging and progress are
+  separate subscriptions, so raising the log level works without a progress
+  token.
+
+
+- **Open MCP sessions are visible in `/health` (GO-021)** — both transports
+  counted their sessions and nothing ever read the count. A session a client
+  abandoned without closing lives until it times out, so `mcpSessions` is how
+  that leak becomes visible. The field is absent when MCP is disabled: an
+  absent field says "not running" where a zero would say "idle".
+
+
+- **Drift guards over the MCP tool table (TEST-002)** — tests now assert that
+  every one of the 80 advertised tools is reachable through the dispatcher and
+  that every dispatched name is advertised, in both directions. A tool present
+  in one list and missing from the other exists for discovery and not for
+  calling, or is dead code left by a rename. The read-only classification is
+  checked the same way: every tool must be annotated, writers must be refused
+  on a read-only server, readers must not be, and the MCP-only override must
+  still refuse writes on a writable one — that override is what hands an agent
+  a database it cannot damage.
+
+
+- **HTTP routes extracted from `main()` and tested (TEST-002)** — 107 route
+  registrations lived inside a 1089-line `main()`, where nothing could reach
+  them: the file carried the entire public surface of the server at 0.7%
+  coverage. `registerRoutes` is now a list in its own file, at 96%, and the
+  tests assert what a deployment actually exposes: that every endpoint the
+  server advertises is wired, that auth routes appear only when auth is on,
+  that write endpoints refuse in read-only mode, that health answers on both
+  its paths without auth, that pprof stays off unless asked for, and that
+  registering twice does not panic the process on boot.
+
+
+- **Per-area coverage floors (TEST-002)** — `go test ./...` reported one number
+  for a package of 150 files, and that number looked healthy while the surfaces
+  handling file uploads, 80 MCP tools and automation triggers sat at 22% between
+  them. `scripts/check-coverage-areas.sh` now reports coverage per source file
+  for the highest-risk areas and fails when one drops below its floor. The
+  floors are ratchets: raise one when you improve an area, never lower one to
+  make a build pass. It has its own 6-case guard suite, because a guard that
+  only ever sees the passing case proves nothing.
+
+  With it in place: **`upload_handler.go` went from 6.1% to 73.1%** and
+  `automation_trigger.go` from 38.3% to 58.7%, through behavioural tests rather
+  than exercise — the upload tests post real multipart bodies and assert what
+  key a file lands under and whether its text survives conversion; the trigger
+  tests run a real HTTP server and assert what actually goes out on the wire,
+  including that a webhook nobody can reach terminates instead of holding the
+  caller forever.
+
+
+- **Fuzz testing (TEST-003)** — the repository had no fuzz target at all. There
+  are now 12, over the parsers and decoders that read bytes MDDB did not write:
+  the FTS query expression parser, both embedding-record encodings, the
+  replication binlog entry and stream, the document compression codec, and
+  `loadDoc`. Each asserts the same narrow property — an input either decodes or
+  returns a typed error, never a panic and never a nil result with a nil error.
+  Round-trip targets additionally pin that what one side writes, the other
+  reads back unchanged.
+
+  Saved crashers live in `testdata/fuzz` and are replayed by `go test` on every
+  run, so a bug found once cannot come back quietly. CI spends 20 seconds per
+  target on pull requests and a nightly job spends ten minutes on each of the
+  twelve, uploading any new crasher as an artifact so a CI finding reaches the
+  repository instead of being rediscovered from scratch.
+
+  A thirteenth target fuzzes the store itself rather than a decoder: random
+  programs of writes, overwrites, deletes and reopens, with two invariants
+  checked after every step — every live document reads back with the content it
+  was written with, and no metadata index entry points at a document that does
+  not exist. That is the shape of GO-001 and GO-010, which never announce
+  themselves as crashes; they surface as a search returning a document that was
+  deleted, weeks later.
+
+  Four bugs surfaced within the first hour; they are listed under Fixed.
+
+- **Upgrade compatibility gate (TEST-003)** — nothing ships until the new build
+  proves it can open a database an older release wrote. `test/upgrade-fixtures/`
+  holds a real file produced by the v2.11.4 binary (four documents, metadata,
+  revisions, an FTS index), and the release workflow will not start a single
+  build job until the current code reads it back with its content and metadata
+  intact. The same check runs on pull requests, so a break surfaces where it is
+  introduced rather than weeks later when someone tries to tag.
+
+  Every other test in this repository writes with the current code and reads
+  with the current code. That proves the format is self-consistent, which is
+  exactly the property that stays true while compatibility quietly breaks — and
+  the failure it hides is the worst one a database can hand a user: a file the
+  new version refuses to open, with the old binary already replaced.
+
+
+- **Metadata lint for lost structure (DOC-012, issue #187)** — `ValidateDocument`
+  now returns a `warnings` list alongside `errors` on all four surfaces (REST,
+  gRPC, GraphQL, MCP) when a metadata value looks like Go's `%v` rendering of a
+  map or a list of maps. MDDB's meta is flat by design, so structured
+  frontmatter — an `faq:` list of objects, a `schema:` JSON-LD block — has
+  nowhere to go, and an importer reaching for `%v` produces
+  `map[answer:… question:…]`, which MDDB stores faithfully because it is a valid
+  string. The damage surfaced much later, in a template that could not render
+  it. A warning and never an error: rejecting the value would break callers
+  legitimately storing text about `map[string]int`, and MDDB has no business
+  deciding a string is not what its author meant. The lint runs even where no
+  schema is configured, which is exactly the case an unstructured import lands
+  in. `docs/API.md` gains "Structured frontmatter and flat meta" with the three
+  ways to handle it — JSON in one value, flattened leaf keys, or leaving the
+  block in the markdown body — and the SSG integration guide points at it.
+  `ValidateDocumentResponse` gains field 3 (`warnings`), which is
+  wire-compatible: older clients ignore it.
+
+- **`oversample` as a request parameter (SRCH-005)** — every search that
+  post-processes its results asks the index for more than it returns, and that
+  multiplier was the literal `topK * 3` in five separate places, so the
+  recall/latency trade-off every comparable engine exposes was fixed at whatever
+  those constants said. It is now a parameter on vector, hybrid and
+  cross-search across REST, gRPC, MCP and GraphQL, with a per-collection default
+  in the retrieval profile and the usual precedence — request > profile >
+  default. Range 1.0–10.0; out of range returns `422` (gRPC `InvalidArgument`)
+  rather than clamping, because quietly halving a caller's recall setting is
+  worse than telling them it was impossible. Unset reproduces earlier results
+  exactly: the default is the constant the code already used.
+
+  Measured on 2,500 five-chunk documents at `topK=10`: **at 1× a chunked
+  collection returns 5 of the 10 documents you asked for**, because several
+  chunks of one document fill the top of the ranking and deduplication collapses
+  them with nothing left to fill the gap. At 3× it returns 9, at 10× all 10 —
+  and on a flat index the latency difference across that whole range is about
+  1%, since a flat search scans every vector regardless. The cost becomes real
+  on approximate indexes, where the candidate count drives traversal.
+
+  HNSW's `efSearch` is deliberately not exposed per query: it lives on the graph
+  object shared by every concurrent search, so setting it per request would have
+  one query silently change another's beam width — a data race producing wrong
+  results rather than a crash.
+
+- **Named `fast` ingest profile (RAG-004)** — MDDB could always ingest faster by
+  skipping steps, but only as separate flags a caller had to discover one at a
+  time, and the wiki importer made the same choice a third way with a `skipFts`
+  comment reading "faster bulk import". `profile: "fast"` names the trade-off
+  once, across `/v1/ingest`, `/v1/upload` and `/v1/import-wiki`, and the response
+  records which profile applied so a corpus loaded months ago can be explained.
+  It selects text-only parsing, no revisions, no webhooks and duplicate skipping
+  — but deliberately **not** `skipEmbeddings` or `skipFts`: fast means cheaper
+  parsing and less bookkeeping, not a collection nobody can search. Any flag set
+  explicitly overrides the preset, and an unknown profile name is a 400 rather
+  than a silent fall back, because a caller who asked for `fast` and got default
+  behaviour would see a slow load and no reason why.
+
+  Measured, not assumed: text-only HTML is **43× faster** (132 ms → 3.2 ms on a
+  200-section document), while text-only DOCX is only 1.13× faster — its
+  Markdown converter was already efficient, so the value there is tolerance of
+  documents odd exporters produce, not speed. PDF gets no text-only variant at
+  all, because its extractor already produces plain text and a second name for
+  it would promise a speedup that does not exist.
+
+- **Per-collection answer formatting (RAG-002)** — a `responsePrompt` on the
+  collection says how answers drawn from it should be shaped: numbered steps for
+  runbooks, code blocks for API docs. That instruction used to live in the
+  client — a per-scenario system prompt in mddb-chat, and nothing at all for MCP
+  agents — so every consumer had to know separately what every collection
+  expected. mddb-chat now appends it to the scenario prompt, and MCP returns it
+  on `search_documents`, `vector_search` and `hybrid_search` results and folds it
+  into the `rag-pipeline` prompt, so an agent gets the instruction in the same
+  call that fetched what to say. `{{collection}}` and `{{query}}` expand through
+  the template mechanism the automation rules already use. Order in mddb-chat is
+  deliberate: the operator's scenario prompt is policy and comes first, so a
+  collection cannot talk its way past it by opening with an instruction of its
+  own. Capped at 4 KiB — it is prepended automatically, and an unbounded value
+  would quietly eat the context the answer needs. A collection without one
+  behaves exactly as before.
+
+- **Embedding cache (RAG-003)** — every vector, hybrid and memory-recall query
+  called the embedding provider with no cache at all: a network round trip and a
+  token charge even for a query asked seconds ago, and MCP agents repeat the same
+  phrase in a loop. Embeddings are now memoised by `(model, text)` in an LRU with
+  a TTL (`MDDB_EMBEDDING_CACHE_SIZE`, default 1024; `MDDB_EMBEDDING_CACHE_TTL`,
+  default 1h). It is a decorator around the existing `Provider` interface, so no
+  provider and no call site changed, and `MDDB_EMBEDDING_CACHE_SIZE=0` returns
+  the bare provider — "disabled" is the old code path, not a cache that always
+  misses. `EmbedBatch` asks the provider only for the texts it does not hold.
+  Hit/miss/size counters appear in `/metrics` as
+  `mddb_embedding_cache_{hits_total,misses_total,size}`.
+
+  Reindexing also reuses vectors per chunk. The worker already skipped a
+  document whose content was unchanged, but editing one paragraph of a
+  fifty-chunk document changed the document hash and re-embedded all fifty at
+  full provider cost. Each chunk's own hash is now stored with its vector, and
+  reuse is keyed by that hash rather than by chunk index — so a chunk that keeps
+  its text but shifts position, which is what any insertion above it causes, is
+  still recognised. Quantized vectors are excluded from reuse: they are lossy on
+  read, and reusing one would silently replace a full-precision vector with a
+  degraded copy.
+
+- **Per-collection retrieval profiles (RAG-001)** — retrieval settings now live
+  next to the data instead of being repeated by every client. Search type, topK,
+  granularity, hybrid strategy and a context token budget go in
+  `CollectionConfig.retrieval`, over REST, gRPC, the panel and mddb-chat.
+  Precedence is fixed everywhere — **explicit request parameter > collection
+  profile > MDDB's default for that endpoint** — so a caller passing its own
+  values notices nothing, and a collection without a profile behaves exactly as
+  before, which a regression test pins. This replaces defaults that were
+  scattered as constants across a dozen files with different numbers per path:
+  FTS returned 50 results, vector 5, hybrid 10, memory recall 10, and a caller
+  had to know MDDB's internals to get consistent behaviour. `contextTokenBudget`
+  caps the total context a search returns so a RAG caller cannot be handed more
+  than its model holds; it drops results from the tail rather than truncating
+  documents, because half a document still costs tokens and no longer says
+  anything reliable, and responses set `contextTruncated` when it applied.
+  Cross-collection search is deliberately excluded: it has no single collection
+  whose profile could own topK.
+
+- **Code connection graph (CODE-005)** — answers the relational questions
+  full-text search cannot: what breaks if `.hero-banner` changes, which pages
+  load `checkout.js`, what does nothing reference any more. Available as
+  `GET`/`POST /v1/code-graph`, the `code_graph` MCP tool (annotated read-only)
+  and the `codeGraph` GraphQL query; a test pins that the three agree, so they
+  cannot drift apart. No edges are stored — they are derived at query time from
+  the `defines`/`uses`/`imports` meta through the metadata index that already
+  backs `meta.*` filters. An edge is a statement about two documents, and
+  storing it means one copy per side that drift apart when someone edits only
+  one; deriving makes a reindex reproduce the graph exactly. Every edge carries
+  the symbol that justifies it, because "these two files are related" is not
+  actionable. Bounded by design: depth 1–3, at most 100 neighbours per node,
+  and a `truncated` flag — "nothing depends on this" is only safe to act on when
+  the walk was complete. Optional `lines=true` returns the first line each
+  symbol appears on, reusing the line index from CODE-002.
+
+- **Code symbols in meta (CODE-004)** — every code document now records what it
+  `defines`, `uses` and `imports`, extracted from its own content on each save.
+  Full-text search cannot tell a declaration from a mention, so searching a
+  theme for `.hero-banner` ranked the stylesheet that defines the selector
+  alongside every template that merely applies it — and the templates usually
+  won, because they repeat the name more often. The three keys are ordinary
+  values in the existing flat meta map, so `meta.defines=.hero-banner` answers
+  the question through the metadata filter already there: no new query surface,
+  no schema change. CSS contributes selectors, their component classes/ids and
+  `--custom-properties`; JS/TS contributes function, class and arrow-const names
+  plus import specifiers; HTML contributes `id`s as definitions, `class` and
+  `on*` handler names as uses, and local `src`/`href` as imports. Output is
+  deduplicated, sorted and capped at `MDDB_CODE_MAX_SYMBOLS` (default 512) —
+  deterministic because these bytes travel through the replication binlog. Both
+  write paths (single document and bulk) enrich through one call, so the
+  behaviour cannot differ by transport. Only new writes are enriched; re-save an
+  existing code collection to populate it.
+
+### Changed
+
+- **The mddb-cli command tree left `main()` (TEST-001)** — 31 commands were
+  anonymous `RunE` closures inside a 1447-line `main()`, where no test could
+  reach one: the module sat at 0.9% coverage, and the two bugs above had been
+  there since the commands were written. `main()` is now three lines,
+  `newRootCmd()` assembles the tree, and the commands live in nine files by
+  area. The `key=val1|val2` flag parser had been written out five times and is
+  now one function with its own tests. Coverage: **0.9% → 92.3%**, with the
+  commands exercised against an httptest server the way a shell exercises them
+  against a real one. `tools/bench` got the same treatment — the benchmark loop
+  left `main()`, where it called `os.Exit` on the first failed write and could
+  not report what it had measured: **3.4% → 71.9%**.
+
+
+### Removed
+
+- **`services/ssg-template/md-viewer.html`** — a client-side markdown viewer
+  that fetched `.md` files at runtime and rendered them in the browser. It made
+  sense when the docs were served from GitHub Pages as raw markdown; the site
+  is now built by SSG onto Cloudflare, which renders markdown to real pages at
+  build time.
+
+  `.ssg.yaml` settles it: `static_sources` lists exactly four files that reach
+  the site, and this was not one of them — so it had already stopped being
+  deployed. Nothing in the tree linked to it except itself, and a CHANGELOG
+  entry from an earlier release records removing the last reference to it from
+  `docs/README.md` as obsolete.
+
+  It was also the subject of the only open **high**-severity code-scanning
+  alert left in this area (`js/client-side-request-forgery` on its `?doc=`
+  parameter): a page that no longer exists cannot be aimed at anything.
+  `xss.test.mjs` went with it, since every one of its assertions was about that
+  file. `sri.test.mjs` did not: its subresource-integrity and mermaid
+  version-pinning checks now run over **every** template rather than one named
+  file, so a new page loading a CDN asset without SRI is caught rather than
+  missed for not being on a list.
+
+- **Dead code in mddb-chat (RUST-001)** — the Rust twin of GO-021.
+  `cargo clippy --all-targets -- -D warnings` now passes clean; it had 12
+  warnings.
+
+  Two of them were unfinished wiring rather than clutter. `build_messages` and
+  `build_context` belong to an earlier design where RAG context was fetched up
+  front and stuffed into the system prompt; the handler runs an agentic loop
+  where the model calls `search_docs` itself, so both were superseded rather
+  than forgotten. And `chat_stream` was the older-signature twin of
+  `chat_stream_raw`, which is the one that actually runs — with it went
+  `simple_messages` in both providers and `map_role` in the OpenAI one, which
+  existed only to serve it.
+
+  `llm.stream` went too. It was never read, and it defaulted to `true`, so
+  every deployment believed it had turned something on. Streaming is not
+  optional here — the handler streams the final response either way — which
+  made the setting purely misleading, the same shape as `cors_origins` before
+  it was fixed.
+
+  Also removed: `WebhookData::Message` (per-message webhooks were never
+  constructed and are promised nowhere), `AppError::WebhookError`,
+  `SearchResult.collection`, and `Session`'s `id` and `created_at` — `id` was a
+  second copy of the map key that nothing read, so it could only ever disagree
+  with it.
+
+  `Session.total_tokens_used` is gone as well, and that one is a deliberate
+  deferral rather than a deletion: it was never written *or* read, because no
+  provider parses the `usage` block and `ChatResponse` has nowhere to carry the
+  number. A cost counter that does not count implies a control that does not
+  exist. The per-session token budget it was reaching for is worth building —
+  `max_turns` caps how many turns a session takes, not what they cost — and is
+  filed as its own piece of work.
+
+  Kept, with a comment saying why: `ContentBlockStart`'s fields in the
+  Anthropic provider. Neither is read, but the enum is the documentation of
+  Anthropic's SSE event shape, and a variant carrying half its fields is a
+  worse reference than one carrying them all.
+
+- **Dead helpers and unfinished stubs (GO-020, GO-021)** — the dead-function
+  count in `services/mddbd` went from 83 to 9, and the nine that remain are
+  test-facing helpers, each now carrying a comment saying why it stays.
+  Removed: `DirectIO`, a stub that returned nil without enabling anything, so a
+  caller asking for unbuffered I/O silently got buffered I/O, plus
+  `AlignedBuffer` which existed only to feed it; `graphql/scalars.go`, written
+  for a gqlgen configuration this project did not adopt — `gqlgen.yml` maps
+  `Time` to `graphql.Int64`, so the generated code never referenced these;
+  `ComposeSystemPrompt`, a Go twin of `mddb-chat`'s Rust
+  `compose_system_prompt`, which is where prompts are actually composed and
+  where the tests for it already live; `rtfToText`, an alias for
+  `rtfToMarkdown`; `NewMCPHandler`, superseded by `NewMCPHandlerWithConfig`;
+  `GetCompressionStats`, which recompressed data to report a ratio nothing
+  read; and `mustJSON`, whose only caller was the loopback POST that
+  `/v1/export` no longer makes.
+
+
+### Fixed
+
+- **Backup restore can no longer destroy the database it restores over
+  (SEC-015, SEC-016)** — both restore transports rewrote the database file
+  with nothing standing between a bad backup and the live data. HTTP
+  `POST /v1/restore` closed the database outside the restore lock (racing
+  every in-flight transaction) and, when the copy or reopen failed, returned
+  an error with the database closed — or already overwritten by an unusable
+  file. The gRPC `Restore` RPC was quieter and worse: it copied the backup
+  underneath the still-open handle, so the server kept serving the old data,
+  reported success, and buried every post-"restore" write at the next process
+  restart.
+
+  One implementation now backs both transports: the backup must open cleanly
+  as a database *before* the live file is touched; the current file is kept
+  as a snapshot until the swap is proven; close → copy → reopen happens under
+  the restore write lock; and every failure path rolls the snapshot back, so
+  the server never ends up without a working database. The swap also rebuilds
+  the derived in-memory state — FTS, synonyms, stop words, vector store,
+  schemas, webhooks, and all read caches now re-point at the restored
+  database (previously FTS kept a closed handle after a replication snapshot
+  restore, erroring every search until restart) — and resets the binlog on
+  the gRPC path too, which used to skip it, leaving followers applying their
+  old LSN stream onto restored data. Found by the Windows-port fork
+  (Rajendertyagi/mddb), where the file semantics make the misordering
+  impossible to ignore; verified and fixed here at the root.
+
+- **gRPC UpdateDocument updates what the server serves, not just what it
+  stores (GO-038)** — the gRPC update path committed the write and walked
+  away: no read-cache invalidation (a gRPC `Get` kept serving the pre-update
+  document for up to the 5-minute cache TTL), no FTS reindex (search kept
+  matching the deleted content and never learned the new), no geo reindex, no
+  `doc.updated` webhook, no metrics. PATCH `/v1/update` had the same
+  cache gap. Both transports now run one shared post-update pipeline —
+  `runPostUpdateHooks`, the update-side sibling of GO-001's
+  `runPostWriteHooks` — so cache invalidation, embedding, TTL, FTS, geo,
+  webhooks, triggers and metrics behave identically no matter which API
+  performed the update. The gRPC update path thereby gains the `doc.updated`
+  webhook and `doc_update` metric it always should have fired.
+
+- **Audit events survive coarse clocks (GO-039)** — the audit batcher
+  allocated one BoltDB sequence per *batch* and numbered events with a loop
+  offset, so consecutive batches reused overlapping sequence ranges. Keys are
+  `(timestamp, sequence)` pairs: whenever timestamps repeated — tight write
+  loops, coarse clocks, VMs — later events silently overwrote earlier ones,
+  in the one subsystem whose whole job is not losing records. Each event now
+  takes its own `NextSequence()` inside the same transaction, making keys
+  globally unique and strictly monotonic regardless of clock resolution.
+
+- **SSE streams work with metrics enabled (GO-040)** — the metrics
+  middleware wraps every route in a `statusRecorder` that implemented neither
+  `Flush` nor `Unwrap`, so the `http.Flusher` assertion in `/v1/events`, the
+  MCP SSE transport and the MCP streamable transport failed behind it —
+  turning metrics on answered every streaming request with
+  `{"error":"streaming not supported"}` 500. Both middleware wrappers
+  (metrics and access log) now forward `Flush` and expose `Unwrap`, and the
+  three streaming handlers resolve their flusher through an Unwrap-walking
+  helper, the same way `http.ResponseController` does — so a future wrapper
+  that exposes only `Unwrap` keeps streaming intact too.
+
+- **Document keys are case-insensitive, and now say so (DOC-016)** — `genID`
+  lowercases when it builds a document's identifier, so `README.md`,
+  `readme.md` and `ReadMe.md` are one document. Deliberate, sensible for
+  URL-shaped keys, and documented nowhere. Ingesting a source repository is
+  where it bites: `Makefile` and `makefile`, `README` and `readme` are separate
+  files on disk and one document here, and the second import replaced the
+  first's content without a word.
+
+  Checking it rather than reading it turned up worse than the ticket described.
+  The key index stores the key **exactly as written** while the identifier is
+  normalised, so storage is case-insensitive and lookup is case-sensitive —
+  two answers to the same question in one code path. Written as `README.md`,
+  looked up as `readme.md`: not found, though both keys name the same
+  identifier.
+
+  `/v1/ingest` now returns `keyCollisions` naming the spellings involved, in
+  arrival order, so which write replaced which is visible. The write still
+  happens — refusing a 200 000 document import over a spelling would be worse —
+  but it is no longer silent. A key sent twice verbatim is an ordinary
+  overwrite and is not reported, or every re-import would cry wolf.
+
+  Deleting a collection now clears its key entries by prefix in one cursor pass
+  rather than one spelling per document, so nothing can survive it; batch
+  deletes clear the requested spelling and the stored one, which is the pair
+  that actually occurs. Aligning the index with the identifier would fix all of
+  this by construction and is not done here: the index key is on-disk format,
+  there is no migration machinery in the tree, and rewriting a format without
+  one is the upgrade failure this project says it does not ship.
+
+- **gRPC saw half a collection's configuration (GO-035)** —
+  `CollectionConfigProto` carried 8 of `CollectionConfig`'s 18 fields, so a
+  gRPC client could neither read nor set `storageBackend`, `storageConfig`,
+  `quantization`, `diskOnlyVectors`, `encrypted`, `trackAccess`, `trackHot`,
+  `spellCorrect`, `spellLang` or `wordpress`. A collection configured over REST
+  looked partly configured over gRPC, and an operational tool reporting "this
+  collection is not encrypted" because it asked over gRPC is worse than one
+  that reports nothing. All ten added; `buf breaking` passes, since they are
+  additions.
+
+  The new booleans are `optional` rather than plain proto3 bools, and that is
+  load-bearing. A plain bool cannot tell "the client did not mention
+  encryption" from "the client wants encryption off", and this handler merges
+  into the stored config — so closing the gap without presence would have
+  reintroduced the RAG-001 data-loss bug through the very fields being added.
+  Omitted now means "leave it alone" for every field on the RPC.
+
+  Found while wiring it: the MCP path assigned `cfg.WordPress = req.WordPress`
+  unconditionally, one line below the comment explaining why that shape is a
+  bug — so an agent editing a description deleted the collection's publishing
+  target.
+
+- **A quoted phrase could not contain a quote (SRCH-008)** — in
+  `mode: "expression"`, an embedded quote closed the phrase early and the rest
+  of the query was reinterpreted as operators, so `"the "json" field"` searched
+  for something the user did not write and returned results with no sign
+  anything had gone wrong. `\"` and `\\` are now understood inside a phrase,
+  and a phrase with no closing quote is an error rather than a phrase silently
+  running to the end of the query.
+
+  The printer was fixed to match: `expr.String()` escapes what it emits, so a
+  logged query pasted back parses to the same expression. Restoring the
+  round-trip assertion in `FuzzQueryExpressionPrintReparses` immediately turned
+  up a second, unrelated case — the parser collapsed `NOT NOT x` to `x` but
+  kept `NOT(NOT x)` as a nested negation, so one query written two ways parsed
+  two ways. Double negation now collapses however it is written, and
+  `NOT(NOT 0)` is in the fuzz corpus as a regression seed. Ten million fuzz
+  executions since, with no failures; the parser file is at 97.6% coverage.
+
+- **A file in Latin-1 or Windows-1250 failed with a message about protobuf
+  (GO-036)** — documents are stored through protobuf, whose `string` fields must
+  be valid UTF-8, so a `.txt` in Windows-1250 — a large share of any archive
+  older than about 2010 — failed deep inside marshalling with an error saying
+  nothing about encoding and nothing about what to do. Found by
+  `FuzzDocRoundTrip`.
+
+  Somebody had already hit this and fixed it in the one place it hurt them, the
+  wiki importer, leaving every other write path unchanged. The two kinds of
+  write want opposite treatment, so both now exist:
+
+  - **A single document** — upload, add, import from a URL — is **refused**,
+    with an error naming the likely encoding and the `iconv` command that fixes
+    it. The user picked this file; silently dropping the bytes that would not
+    decode turns `café` into `caf` and tells nobody. Validated inside
+    `addDocument`, the same choke point GO-003 chose, so every transport
+    inherits it rather than five handlers each doing their own.
+  - **A bulk import** **sanitises and counts**. A 20 GB dump must not fail
+    because one page is in the wrong encoding, and the ingest response now
+    carries `sanitized` — the number of documents whose text was changed, which
+    it previously did not report at all.
+
+  The wiki importer's local copy is gone in favour of the shared one.
+
+  Behaviour change: a single-document write with undecodable text now returns
+  400 with a readable message rather than a 500-class protobuf error.
+
+
+- **A malformed JSON document could crash the server (GO-037)** — goccy/go-json
+  panics where the standard library returns an error, and the fault is
+  state-dependent rather than input-dependent: one bad document reproduces
+  nothing, while a mixed sequence fires on roughly 5% of calls because the
+  fault depends on state the previous decode left behind. `FuzzLoadDoc` found
+  it by killing the machine it was running on. v0.10.6 is the latest release,
+  so an upgrade does not fix it, and the tracker carries eight open panic
+  reports.
+
+  Rather than classify 73 files by hand, `internal/jsonx` picks the
+  implementation **per direction**: encoding stays on goccy, which is twice as
+  fast and cannot be handed malformed input because this process built the
+  value; decoding uses the standard library, unconditionally, because those
+  bytes came from an HTTP body, a replication entry, a restored database or a
+  remote provider. **The package does not export a goccy decoder**, so the rule
+  is enforced by construction rather than by review — 108 files switched with
+  one import change each and no edits at any of the 124 call sites.
+
+  Measured cost: decoding is **2.0–2.1× slower** (20 000 iterations × 3 runs),
+  exactly what GO-026 predicted. Encoding is unchanged. Byte-for-byte output
+  and map-key ordering are both pinned by tests, the second because the
+  replication binlog depends on identical input producing identical bytes —
+  which is also why this is the v1-compatible surface and not
+  `encoding/json/v2` directly.
+
+  Reported upstream with a minimised reproducer:
+  [goccy/go-json#604](https://github.com/goccy/go-json/issues/604). Our own
+  test replays six inputs over 20 000 iterations, which is evidence rather than
+  a bug report — narrowed for filing to **two inputs and ten iterations**,
+  deterministic across runs. Either input alone survives 20 000 iterations; the
+  pair alternating panics on the tenth call. It reproduces against a `struct`
+  and not against `map[string]any` or `any`, so it is `structDecoder`
+  specifically, reading past a buffer whose length appears to come from an
+  earlier call.
+
+  Behaviour change: malformed input now returns an error where it previously
+  crashed the process.
+
+
+- **`alpha: 0` was silently replaced with 0.5 (SRCH-007)** — zero means pure
+  keyword search, and it is also what an omitted field looks like in JSON. The
+  resolution treated it as omitted, so a client deliberately asking for zero
+  semantics got the opposite of its request with nothing to indicate it. There
+  was no way to ask for keyword-only through the `alpha` strategy at all; the
+  only workaround was `rrf`, which ranks differently. The field is now optional
+  in the request, so an explicit zero is distinguishable from silence — the
+  same distinction the collection profile already made with `hybridAlphaSet`.
+  The MCP surface still carries a plain number and is left as it was rather
+  than half-fixed, since bringing it along means a tool-schema change.
+
+
+- **33 dead links across the repository (DOC-013)** — README.md alone linked
+  six pages that have never existed: `docs/PERFORMANCE.md`, `docs/AUTH.md`,
+  `docs/FTS.md`, `docs/CLIENTS.md`, `docs/WEBHOOKS.md` and
+  `docs/API_QUICK_REFERENCE.md`. It also embedded `docs/panel.png` and linked
+  `docs/swagger.html`, neither of which is at that path. The CHANGELOG carried
+  24 links to source files that moved into `internal/` packages during earlier
+  refactors — a historical entry naming a file should still reach it.
+  `docs/AUTH_IMPLEMENTATION_SUMMARY.md` linked `docs/AUTHENTICATION.md` from
+  inside `docs/`, which resolves to `docs/docs/`. All fixed, and the new guard
+  keeps them fixed.
+
+
+- **The published throughput figure could not be reproduced** — COMPARISON.md
+  claimed 29 810 docs/s. Nothing in this repository produces that against an
+  indexed corpus of real prose; it has the shape of a measurement taken with
+  tiny documents and no meaningful index work. Removed rather than adjusted,
+  and replaced with figures that name their corpus. The page's "~50MB memory"
+  and "15MB Docker image" were stale in the same way.
+
+
+- **The documentation site would not build** — `docs/MCP.md` linked
+  `../integrations/agent-instructions/`, a repository directory the site does
+  not publish, so the generator's link check failed and every docs deploy
+  after that page landed was blocked. It points at GitHub now.
+
+
+- **Three site figures were wrong** — the homepage advertised 79 MCP tools
+  (there are 80, counted from `tools/list` against a running server) and a
+  ~26MB binary (a release build with `-ldflags="-s -w"` is ~28MB; a plain
+  `go build` is ~40MB, which is not what anyone downloads). `mddbReleaseDate`
+  still reads 2.11.4's release day while `mddbVersion` says 2.12.0, so every
+  page dates this release to the previous one's; it is now commented as a
+  release-time step.
+
+
+- **The context budget skipped the callers it exists for (RAG-001)** — a
+  collection's `contextTokenBudget` was applied on the HTTP, hybrid and vector
+  handlers and on none of the MCP paths. `full_text_search`, `semantic_search`
+  and `hybrid_search` resolved `topK` from the profile and returned its
+  `responsePrompt`, then handed back every document body the caller asked for,
+  uncapped — and an agent assembling a prompt is exactly who the cap was
+  written for. All three now apply it and report `contextTruncated`, so a
+  caller can tell it is holding part of the answer. Results without content
+  (the default: MCP drops bodies nobody asked for) are unaffected, because
+  there is nothing to cap.
+
+
+- **Five package manifests still declared 2.11.4 (DOC-011)** — the Node and
+  Python clients, the panel and both language extensions were bumped by hand at
+  2.11.4 and nothing bumped them since, because `check-version.sh` did not
+  watch them. Publishing `@tradik/mddb-client@2.11.4` from a 2.12.0 tree is
+  worse than a stale number: it names a server it was not built against, so
+  anyone diagnosing a protocol mismatch starts from the wrong assumption. All
+  five now move with the release and the guard covers thirteen sources instead
+  of eight, with two new cases in its own test suite for the shape that got
+  past it.
+
+
+- **A queued chat visitor was double-booked, and at capacity 1 waited forever
+  (TEST-001)** — `admit_from_queue` created the session, inserted it into the
+  active map and then only *woke* the waiting task, which called `join()` again
+  and created a second session for the same person. Every admission from the
+  queue left an orphan holding a `max_concurrent` slot until its TTL expired.
+  With `max_concurrent = 1` the orphan took the slot that had just been freed,
+  so the visitor it was created for was re-queued behind a phantom of
+  themselves, waiting on a fresh notifier nobody held. The session id now
+  travels with the wake-up, so there is exactly one session per visitor, and a
+  visitor who closed their browser while queued is skipped rather than being
+  handed the slot.
+
+
+- **`server.cors_origins` was configured and ignored (TEST-001)** — the field
+  was parsed, defaulted and documented, and `main.rs` built its CORS layer with
+  `allow_origin(Any)` regardless. An operator who listed their own origins
+  still served `Access-Control-Allow-Origin: *` to every page on the internet.
+  The listed origins are now applied; `["*"]` remains the default and now logs
+  a warning, since it is only appropriate for a loopback deployment.
+
+
+- **A scenario's `max_turns` capped nothing (TEST-001)** — parsed from the TOML
+  and never read, so a public demo declaring a ten-turn limit served an
+  unbounded conversation and an unbounded LLM bill. Enforced now, answering
+  `403` rather than `429`: waiting does not lift the limit, so `Retry-After`
+  would be a lie. Turns count user messages only — counting the assistant's
+  replies would halve every configured limit.
+
+
+- **`mddb-cli schema set` panicked on every invocation (TEST-001)** — it
+  defined `-s` for `--schema` while the root command uses `-s` for `--server`,
+  and pflag panics when a subcommand redefines an inherited shorthand. Every
+  call crashed with a stack trace, `--help` included, so the command had never
+  worked. The shorthand is gone; `--schema` is unchanged and `-s` keeps meaning
+  `--server` as it does everywhere else. A test now walks the whole command
+  tree and fails on any subcommand that redefines a global shorthand, and
+  another renders every command's help.
+
+
+- **`mddb-cli api-key list` crashed on a short hash (TEST-001)** — it sliced
+  `keyHash[:16]` without checking the length, so an empty or truncated field
+  panicked. This is the GO-005 class of crash the safe accessors were added to
+  prevent, missed because it is a string slice rather than a type assertion.
+
+
+- **The benchmark reported non-numbers (TEST-001)** — GO-013 guarded
+  `perSecond` and the SVG coordinates against a zero interval and left the
+  headline average as a bare division, so a run with no batches reported `NaN`
+  docs/sec and the slowest batch as `1.7976931348623157e+308`, the sentinel the
+  scan starts from. Chart coordinates are also clamped to the plot area: a bar
+  computed outside the viewBox renders as nothing at all, which reads as a
+  missing measurement rather than an off-scale one.
+
+
+- **Benchmark documents carried duplicate tags (TEST-001)** — tags were drawn
+  with replacement, so a document could be written with the same tag twice.
+  The benchmark exists to measure metadata indexing, and a repeated value
+  indexes once; the run reported a tag count it had not written.
+
+
+- **Pooled buffers were never actually pooled (GO-020)** — `NewZeroCopyReader`
+  and `NewZeroCopyWriter` each built a private `BufferPool`, so every buffer was
+  returned to a pool that became garbage with the reader or writer that owned
+  it. Every call allocated a fresh buffer and the pooling was decorative. Pools
+  are now shared per buffer size. `BufferPool` itself stored `*[]byte` in `Put`
+  and asserted `[]byte` in `Get`, so the first reuse would have panicked —
+  nothing had ever reused a buffer, which is the only reason that was not in
+  production.
+
+
+- **`ZeroCopyReader` dropped data that arrived with an error (GO-020)** — a
+  reader is allowed to return bytes together with `io.EOF`, and this one
+  returned `(0, err)` in that case, discarding the last bytes of the stream,
+  where a truncation is hardest to notice. It now hands the buffered data over
+  before reporting the error. Backup and restore read through it, so the defect
+  would have silently truncated copies.
+
+
+- **GraphQL dated undated documents to the year 1 (GO-021)** — the adapter
+  called `.Unix()` on the timestamp directly, and `time.Time{}.Unix()` is
+  -62135596800. A legacy document written before timestamps existed sorted
+  ahead of every real one. `gql.TimeToInt64`, written to guard exactly this and
+  never called, is now used.
+
+
+- **RTF ignored the `textOnly` ingest option in its documentation (RAG-004)** —
+  the flag's comment listed rtf among the formats it changes, while the handler
+  had no text-only branch for it. RTF control words carry no structure to
+  rebuild, so the conversion already returns plain text; the documentation now
+  says which formats the flag actually changes.
+
+
+- **`storageBackend` was accepted, validated, documented — and ignored
+  (GO-021).** A collection configured for `memory` or `s3` had its documents
+  written to the local database like every other, while the API returned 200 and
+  `docs/API.md` and `openapi.yaml` both described it as working. An operator who
+  pointed a collection at S3, supplied credentials, saw success and then treated
+  the node's disk as disposable would have lost their data.
+
+  The cause was structural: the registry that routes collections to backends
+  takes a fallback backend, and no BoltDB implementation of the interface
+  existed — so the registry could never be constructed and `CreateBackend` had
+  no callers at all. The memory and S3 backends themselves were real and
+  complete.
+
+  Document bodies now go where the configuration says. Indexes, revisions and
+  the binlog stay local in every configuration, because they are written in one
+  transaction a remote store cannot join — that split is documented rather than
+  papered over. Bodies are written to the backend **before** the transaction
+  indexing them commits, so a crash between the two leaves an unreferenced
+  object rather than an index entry pointing at nothing. A backend that cannot
+  be reached is refused when configured, and one that fails later causes writes
+  to error instead of quietly landing on local disk.
+
+  Documents written under an earlier version are in the local database and will
+  be read from there until rewritten.
+
+
+- **Consistent hashing sent four times more keys to one shard than another.**
+  Virtual nodes were hashed as `"<shard>-<index>"`, so every replica of one
+  shard shared a prefix and FNV-1a placed them in long contiguous arcs — at the
+  production settings of 4 shards and 150 replicas, one shard owned a run of
+  **50 consecutive ring positions**, and key distribution ran from 39.6% to
+  160.8% of an even share. Swapping the two fields interleaves them: the longest
+  run drops to 5 and the spread to 91–111%. Found by giving an assertion to a
+  test that had computed the answer and thrown it away.
+
+- **GraphQL `vectorStats` returned its collections in a different order every
+  time**, because they came from map iteration with no sort. A UI list jumped on
+  refresh and any diff of two responses was meaningless.
+
+
+- **MCP boolean arguments sent as strings were silently ignored.** `mcpGetBool`
+  accepted only a real JSON bool, so an agent sending `"lines": "true"` — which
+  LLM clients do emit — got `false` and no indication why. The repository
+  already contained `mcpCoerceBool`, written to tolerate exactly those
+  spellings, with a comment calling the strict behaviour "a footgun"; the two
+  decisions sat in the same file contradicting each other, and one of them was
+  also pinned by a test. `mcpGetBool` delegates to it now, fixing
+  `saveRevision`, `highlight` and `lines` together.
+
+- **A non-string inside an MCP metadata array became an empty value.** It was
+  kept as `""` rather than dropped, and an empty metadata value is indexed and
+  searchable — so `["a", 1, "c"]` invented a phantom nobody wrote. Non-strings
+  are skipped now.
+
+- **`mcpGetInt` silently returned 0 for a Go `int`.** Harmless from JSON, where
+  every number is a float64, but an internal caller or a YAML default lost its
+  value without a word.
+
+
+- **Batch update erased the field you did not send.** `UpdateBatch` assigned
+  content and metadata unconditionally, so empty meant "clear it": an agent
+  updating tags across a hundred documents wiped the content of all of them,
+  and one updating content wiped their metadata. The single-document path
+  already distinguishes absent from empty by taking pointers; the batch types
+  cannot, so an empty value is now read as absent. A batch can no longer blank
+  a field deliberately — that is rare, and available on the single-document
+  endpoint. Silently destroying content nobody asked to change is not a trade
+  worth keeping. Found by the first test written against the batch path
+  (TEST-002).
+
+- **The custom-tool guard restated all 80 built-in names by hand.** A second
+  source of truth that happened to be in step, and would have drifted the first
+  time someone added a tool and forgot that file — letting a custom tool shadow
+  a built-in, which is a silent capability swap for any agent calling it. The
+  list is derived from the tool table now.
+
+
+- **`/v1/endpoints` advertised endpoints the server does not serve.** The
+  automation routes are registered only when automations are enabled
+  (`MDDB_AUTOMATIONS`), but the catalogue listed them unconditionally — a client
+  reading `/v1/endpoints` to discover capabilities was sent to a 404 with no
+  explanation. The catalogue now reflects the running server, and the temporal
+  and spell-correction endpoints, which it had simply omitted, are listed when
+  they are served. Found by the first test ever written against the route table
+  (TEST-002).
+
+
+- **`SchemaManager.Validate` and `Metrics.IncOp` panicked on a nil receiver.**
+  Half the call sites guarded the nil and half did not — five schema call sites
+  unguarded against four guarded, and one metrics call site out of thirty-eight.
+  Both now treat a nil receiver as the answer it already means: no schema
+  manager validates nothing, no metrics collector counts nothing. A counter is
+  never worth a crash, and handling it once makes the whole class impossible
+  rather than relying on every future caller remembering (TEST-002).
+
+- **`RunTrigger` returned `(nil, nil)` for an unknown search type** — no
+  matches and no error, indistinguishable from a trigger that matched nothing.
+  An operator who mistyped `hybrid` saw a rule that never fired and no reason
+  why. It returns `ErrUnknownSearchType` naming the offending value now. The
+  API refuses to create such a rule, but one stored by an older version or
+  edited outside the API arrives this way.
+
+- **A filename of `..` produced a document key of `..`.** Key derivation
+  rejected `.` but not `..`. MDDB itself stores keys in BoltDB, where this is
+  harmless — but consumers that write one file per document key (ssg,
+  wpexporter) resolve it against their output directory. A filename yielding a
+  path operator has no usable key, and inventing one puts the document
+  somewhere the caller cannot find it.
+
+
+- **Decompressing a document had no size limit.** A snappy payload states its
+  own decompressed length, and nothing checked it: **five bytes can claim two
+  gigabytes**, which the runtime then tries to allocate. zstd was unbounded the
+  same way. These bytes are not always ours — a follower decodes what a leader
+  replicated, and `loadDoc` reads whatever is in the database file, including
+  one restored from someone else's backup. Both codecs now refuse anything over
+  `MaxDecompressedSize` (256 MB, against a 100 MB upload cap), snappy by
+  checking the claim before allocating and zstd through `WithDecoderMaxMemory`.
+  Found by the new fuzz targets — the run took the developer's machine down
+  with it.
+
+- **`loadDoc` panicked on malformed stored documents.** `github.com/goccy/go-json`
+  v0.10.6 raises an index-out-of-range inside its struct decoder rather than
+  returning an error, and the fault depends on the state a previous decode left
+  behind — 1040 panics in 20000 decodes of a mixed sequence, and none when any
+  single input was replayed alone, which is why no offending document could be
+  isolated. The legacy JSON branch of `loadDoc` now uses `encoding/json`, which
+  rejects the same bytes cleanly. That branch reads pre-protobuf documents and
+  is not the throughput path, so the speed goccy was chosen for is not what was
+  at stake. The remaining 72 files using goccy are triaged in GO-037.
+
+- **Truncated embedding records panicked both decoders.** Each length prefix was
+  read before checking that four bytes remained, so a record cut short — by a
+  crash mid-write, a partial network read, a corrupt file — took the process
+  down instead of being rejected. Both formats now decode through a
+  bounds-checked reader, and a claimed dimension count is capped before it
+  reaches `make()`, closing an integer overflow in the old byte-count check.
+
+- **`ParseQueryExpression("")` returned `(nil, nil)`** — neither an expression
+  nor an error, so the obvious caller dereferences nil. The one existing caller
+  guarded it; the next would not. It returns `ErrEmptyQueryExpression` now, and
+  a whitespace-only `mode=expression` query gets a `400` instead of silently
+  returning an empty result set as though it had been asked a real question.
+
+
+- **gRPC `SetCollectionConfig` erased every field it could not express.**
+  `CollectionConfigProto` carries 7 of `CollectionConfig`'s ~15 fields, and the
+  handler built a fresh struct from them, so a gRPC client updating a
+  description silently cleared `storageBackend`, `storageConfig`,
+  `quantization`, `diskOnlyVectors`, `trackAccess`, `trackHot`, `spellCorrect`,
+  `spellLang` and — worst — `encrypted`, whose `false` value is pushed straight
+  into the encryptor, so the next document written to an encrypted collection
+  was plaintext. The handler now merges into the stored config: a field a client
+  omits means "leave it alone", not "clear it".
+
+- **MCP `set_collection_config` had the same defect**, found while wiring
+  RAG-002 through it: an agent updating a collection's description cleared its
+  storage backend, quantization, spell settings and encryption flag. Also merges
+  now.
+
+- **The panel's tracking and spell-correction toggles did nothing, and every
+  config save cleared them.** `trackAccess`, `trackHot`, `spellCorrect` and
+  `spellLang` exist in `CollectionConfig` and are read on every request, but were
+  missing from `SetCollectionConfigRequest` — so the panel sent values the REST
+  handler ignored, and because `PUT` replaces the stored config, each save also
+  wiped whatever had been set by other means. All four are now part of the
+  request.
+
+- **The protobuf plugin pin had drifted from its runtime.** `buf.gen.yaml`
+  generated code with `protocolbuffers/go` v1.36.11 while `go.mod` linked
+  against `google.golang.org/protobuf` v1.36.12 — the comment beside the pin
+  claimed they matched, and a dependency bump that touched only `go.mod` made it
+  untrue. Generated code disagreeing with its runtime surfaces as an
+  unmarshalling bug rather than a build error, so the comment is now a CI gate:
+  `scripts/check-proto-plugins.sh` (7/7 guard tests, `make check-proto-plugins`).
+  Both are on v1.36.12.
+
+- **`buf` CLI bumped 1.50.0 → 1.72.0** in CI and in the generation script's
+  requirements. Verified byte-identical output before and after: generated code
+  comes from the plugins pinned in `buf.gen.yaml`, not from the CLI.
+
+- **`proto/generate.sh` wrote generated Go code one directory too high** when
+  `buf` is not installed. The legacy protoc fallback still used the
+  pre-buf-migration layout (`services/mddbd`, not `services/mddbd/proto`), so a
+  developer without buf produced 700 KB of files next to the server sources,
+  with whatever `protoc-gen-go` happened to be on their machine instead of the
+  version pinned in `buf.gen.yaml`. They compile as the wrong package and are
+  invisible to the CI drift check. Path corrected, and the fallback now says
+  loudly that its plugin versions are unpinned.
+
+### Upgrading to 2.12.0
+
+This release makes seven changes that need action or attention. They are why
+this is 2.12.0 and not a patch.
+
+**1. The production compose refuses to start without secrets.** `docker
+compose up` now stops with an error naming `MDDB_AUTH_JWT_SECRET` or
+`MDDB_AUTH_ADMIN_PASSWORD` if either is unset. Copy `.env.example` to `.env`
+and set them. This is deliberate: the previous behaviour was to start an open,
+writable database with an unauthenticated MCP endpoint.
+
+**2. Published ports moved to loopback.** Every service now publishes on
+`${MDDB_BIND_ADDR:-127.0.0.1}`. A reverse proxy or cloudflared reaches the
+containers over `mddb-network` and needs no published port; if you were
+reaching MDDB from another host, set `MDDB_BIND_ADDR=0.0.0.0` — deliberately,
+and with authentication on.
+
+**3. The log format changed completely.** The operational log is now
+structured (`log/slog`): severity is a `level` field rather than a prefix in
+the message, timestamps are RFC 3339, and message texts were rewritten. Any
+alert, grep or Loki query matching the old text will stop matching.
+`MDDB_LOG_FORMAT=json` is the default in the Docker image.
+
+**4. `keyPrefix` in `/v1/mcp/keys` no longer carries key material.** It used to
+return `mcp_` plus the first eight characters of the key — 32 bits of the
+secret, in an API response and in the log. It now returns the scheme marker
+alone, and a new `fingerprint` field (four bytes of SHA-256) identifies a key.
+Anything matching on `keyPrefix` should move to `fingerprint`.
+
+**5. The Grafana datasource now requires Grafana 13.** `peerDependencies` and
+`grafanaDependency` said 11 while the plugin was compiled and type-checked
+against 13, so 13-only APIs would have failed at runtime on the version it
+claimed to support. Both now say 13.
+
+**7. `storageBackend` now does what it said.** If any collection is configured
+with `memory` or `s3`, its documents were being written to the local database
+anyway — the setting was ignored before this release. From 2.12.0 the setting is
+honoured, so those collections start writing to the configured backend while
+their existing documents remain in the local file. Either rewrite them, or set
+the collection back to `boltdb` if the earlier behaviour was what you actually
+wanted. A collection whose backend cannot be reached now refuses writes rather
+than falling back to local disk.
+
+**6. Re-embed collections holding source, and re-save them for the graph.**
+Code documents are now chunked on bracket depth rather than on paragraphs, and
+chunks are re-derived rather than stored — so a document embedded before this
+release and read after it returns the wrong passage. Run `vector_reindex` on any
+collection holding source. Prose collections are untouched: their segmentation is
+byte-for-byte unchanged, which a test pins.
+
+Separately, symbols (`defines`/`uses`/`imports`) are extracted on write, so
+documents stored before this release have none and the connection graph will
+report them as orphans. Re-save or bulk re-ingest a code collection to populate
+it — reading is unaffected either way.
+
+The stored vector format gained a trailing per-chunk hash field. No migration
+is needed and none is offered: a 2.12.0 server reads pre-2.12.0 records (they
+simply have no per-chunk reuse), and an older server or replica reading a
+2.12.0 record ignores the trailing field, which the previous format already
+did. Both directions are pinned by tests, because getting this wrong would
+corrupt a database in place.
+
+Also worth knowing: heavy queries can return `503` with `Retry-After` under
+load, where they previously all ran and risked exhausting memory
+(`MDDB_SEARCH_MAX_CONCURRENT`); the Go client module now requires Go 1.27; and
+graceful shutdown drains its queues, so both compose files allow a 20s stop
+grace period — set the same if you run the image directly.
+
+### Security
+- **`/v1/geo-reindex` opened any file the process could, and checked nothing
+  (CodeQL `go/path-injection`)** — the endpoint takes a `csvPath` per country
+  and handed it straight to `os.Open`. Its gRPC twin at least required write
+  permission on a collection; the HTTP one required **nothing at all**, so the
+  same operation was gated two different ways depending on which port it
+  arrived at.
+
+  Neither gate was the right one. Writing documents to a collection is not
+  authority to read the filesystem. The path is now confined to
+  `MDDB_GEO_DATA_DIR` (default `./geodata`) — a name relative to it, with
+  anything resolving outside refused, symlinks included — and the HTTP handler
+  checks admin permission before loading anything.
+
+  The confinement is `safeBackupPath`'s, generalised rather than copied: both
+  the jail root and the candidate are symlink-resolved before being compared,
+  and a path that does not exist yet has its parent resolved instead. That
+  handling is the part worth not writing twice, and a symlink planted inside
+  the directory is exactly what a naive prefix check misses — there is a test
+  for it.
+
+- **An embedding provider's `apiUrl` no longer reaches the whole private
+  network, and stops reading it back (SEC-013)** — the field deliberately
+  bypasses the SSRF guard, because a local Ollama on `http://localhost:11434`
+  is exactly what that guard refuses. The exemption is the feature; its width
+  was not. An `apiUrl` of `http://169.254.169.254/latest/meta-data/` is not an
+  embedding service, and admin permission gates who aims the field rather than
+  what it can hit — while a configuration replicated to another node carries
+  the aim along with it.
+
+  Loopback still needs no opt-in: it reaches only the machine running mddbd.
+  Any other private or reserved address is now refused when the configuration
+  is saved, unless `MDDB_OUTBOUND_ALLOW_PRIVATE=true` or the host is in
+  `MDDB_OUTBOUND_ALLOWLIST` — the same two switches the rest of the outbound
+  policy already uses, rather than a third one meaning the same thing. **An
+  Ollama running on another machine on your network now needs one of them set.**
+
+  Separately, all four providers read a failing response in full and put it in
+  the returned error, so a URL aimed at something that was not an embedding
+  service answered with its own body and that body came back to the caller —
+  which is what turns a blind request primitive into a readable one. The body
+  is now capped at 512 bytes: enough to carry Ollama's own "model not found",
+  not enough to return a page.
+
+- **A full rate-limiter map no longer resets everyone's budget (SEC-014)** —
+  `cleanup()` cleared the whole per-address map once it passed 10 000 entries,
+  handing every address a fresh quota including whichever one filled it: an
+  address that had just been refused could start over. governor's own state
+  carries no last-used timestamp, so there had been nothing to evict on. One is
+  now kept alongside it.
+
+  Idle entries go first, at a threshold of one full refill window — past that
+  point an entry says nothing a fresh one would not, so dropping it changes no
+  decision. Only if more than 10 000 addresses are still active does the least
+  recently seen get evicted, down to the cap. That ordering is what makes the
+  cap safe to reach: to lose its own entry an address has to become the least
+  recently seen, which means it stopped sending requests, which is what the
+  limiter wanted from it.
+
+- **Rate limits are per visitor behind a reverse proxy (SEC-014)** — the limit
+  is charged to the TCP peer, which cannot be forged by a header. Behind the
+  reverse proxy `docs/DEPLOYMENT.md` and `docker-compose.yml` describe, the TCP
+  peer *is* the proxy: every visitor shared one bucket, the first noisy one
+  locked out the rest, and `rate_limit_per_minute` stopped meaning what it said.
+
+  A new `security.trusted_proxies` (addresses or CIDRs, empty by default —
+  behaviour is unchanged for a directly exposed server) makes
+  `X-Forwarded-For` believable from those peers only. The address taken is the
+  rightmost one the trusted chain did not vouch for: entries to its left were
+  written by whoever is being limited, so a client prepending its own header
+  cannot choose which bucket it lands in.
+
+- **Collection credentials were readable by anyone who could read the
+  collection (GO-035)** — a collection config can hold an S3 secret key and an
+  mddb-sync publish key, and every read returned both in full, over REST, gRPC
+  and MCP. Reading a collection's configuration requires read permission on
+  that collection: permission to read its documents, not to collect the
+  credentials for the bucket underneath them, which reach every other
+  collection sharing it. The MCP path is the sharpest case, since it answers an
+  LLM that may repeat what it is given into a transcript or a reply.
+
+  Reads now return an empty credential and a `secretKeySet` / `apiKeySet` flag
+  saying whether one is stored — masked is not the same as absent, and someone
+  configuring a collection has to be able to tell those apart. Writes treat an
+  empty credential as "keep the stored one", so the read-modify-write loop a UI
+  performs no longer erases it; send a new value to replace it, or remove the
+  block to clear it. The presence flags are output-only and are stripped on the
+  way in.
+
+  **This changes what reads return.** A client that relied on
+  `/v1/collection-config` handing back a usable S3 secret will get an empty
+  string. The panel shows "a secret is stored, leave blank to keep it" in place
+  of a blank field that used to look like no credential at all.
+
+- **The server says when its storage cannot keep what it accepts** — bbolt fsyncs every commit, so an acknowledged write survives a crash; verified rather than assumed, by writing over REST, sending `kill -9` with no shutdown hooks, and finding the document and its full-text index intact after restart. But that promise is only worth what the storage under it is worth, and a container started without a volume writes to its own overlay layer: accepted, fsynced, gone when the container is removed. The data directory is now checked before the first write is accepted — for ephemeral filesystems (tmpfs, ramfs, overlay), for real writability (by creating a file, since a read-only mount or a user mismatch looks writable in the mode bits) and for free space against `MDDB_DISK_MIN_FREE` — and each finding is logged as a WARN carrying a code, so a collector can alert on `ephemeral_storage` rather than on prose. `GET /health` reports the same as `persistence` plus a computed `durable`, and `docs/DEPLOYMENT.md` now states per surface what is guaranteed and what is not — async bulk jobs and embeddings are queued, not written, and say so.
+- **The extreme-mode log stopped promising a durability mode that does not exist** — it announced "WAL initialized (SyncPeriodic)", but nothing in the tree writes to that WAL: it opens a file, starts a flusher goroutine and receives nothing, while durability actually comes from bbolt's per-commit fsync. The line now says what is true. Whether the subsystem should be wired up or removed is a separate decision — a write-ahead log in front of a store that already fsyncs adds cost rather than a guarantee.
+
+- **Vector search stopped returning deleted documents, and stopped crashing on collections with churn** — two defects in `coder/hnsw` v0.6.1, both reproducible in isolation. `Graph.Delete` reports success and `Len()` drops, yet `Search` keeps handing the deleted node back — so any HNSW collection was quietly answering with documents the caller had removed. And past roughly half a 1000-vector collection deleted, `Search` dereferences a nil node and panics; `HNSWIndex.Search` had no recover, so a gRPC or MCP query would have taken the server down (only HTTP was shielded, by the panic middleware). That is precisely the shape agent memory and TTL-expiring collections reach on their own. Results are now checked against the live-vector map the index already kept, the graph is rebuilt from live vectors once a fifth of a collection has been deleted (`Compact` and `DeletedSince` expose it), and a recover in the search path falls back to brute force rather than losing the process. Compaction also recovers recall: before it, deleted nodes occupy slots in the graph's top-K and vanish when the results are filtered, so a search for five could return three.
+
+- **The production compose refuses to start without credentials, and binds to loopback** — `docker-compose.yml` ran the server read-write with HTTP, gRPC, MCP and HTTP/3 published on every interface while setting no `MDDB_AUTH_*` variable at all; since the image defaults to `MDDB_AUTH_ENABLED="false"`, `docker compose up -d` from a fresh clone started an open, writable database with an unauthenticated MCP endpoint. Authentication is now on in the file itself, with the JWT secret and admin password read as `${VAR:?...}` so compose stops naming the missing variable instead of quietly starting open, and mddb-chat carries the same credentials so it can still reach a server that now demands them. Every published port goes through `${MDDB_BIND_ADDR:-127.0.0.1}`: a reverse proxy or cloudflared reaches the containers over `mddb-network` and needs no published port at all, so exposing the stack on the host's interfaces is a deliberate act rather than the default.
+- **MCP API keys are identified by fingerprint, never by a slice of the key** — creating or deleting a key logged `key[:12]`, which is 32 bits of the 128-bit secret written to whatever collects stdout, and the same slice left the process again through `List()`'s `keyPrefix` field. Both now carry four bytes of SHA-256 instead; `keyPrefix` keeps its place in the response shape but holds only the `mcp_` scheme marker, and a new `fingerprint` field is the identifier to display. A regression test captures the log around a create/delete cycle and fails on any run of the key's random half reaching it.
+- **The extension gives back host permissions it no longer uses** — saving settings requested access to the new server origin and never revoked the old one, so with `optional_host_permissions` covering all of http and https, every address a user had ever typed stayed granted. The revocation compares against the origin currently held rather than the one read at startup, so a second save in the same session cannot leave the first save's grant behind.
+
+### Changed
+- **Code is chunked where code ends, not where a sentence does** — embedding chunks are what a vector search returns, and the prose chunker falls back to sentence boundaries, where a period inside `url(a.png)` is not one. A split there leaves half a declaration in each chunk: a passage that reads as nothing and embeds as noise. Source now splits only where `{}`, `()` and `[]` are balanced, with braces inside strings and comments ignored, so one chunk is roughly one rule or one function. Where a construct is larger than the chunk budget, the budget yields — an oversized chunk costs tokens, a meaningless one costs the answer — and only a minified single line is cut by size, and even then after the last balanced `}` within budget. The mode follows the document's kind, with `MDDB_EMBEDDING_CHUNK_MODE` to force it for collections ingested without the convention. Prose segmentation is unchanged byte for byte, which a test pins; collections holding source need re-embedding, since chunks are re-derived rather than stored.
+
+- **Search results say where, not just which file** (issue #192) — a hit named the document and left an agent to read it to find the place, which is how a one-line CSS change came to cost thousands of tokens. Every highlight now carries the 1-based line range it occupies, and so does every chunk in `chunk` and `window` retrieval modes, widened with the window. The answer becomes `css/style.css:158-163` plus the fragment: under 800 bytes for a 164-line stylesheet, against roughly 20 000 tokens for the same search returning whole documents. Nothing is stored for this — the ranges are derived from content on the way out, so existing indexes need no migration. Two gaps only showed up against a running server: the MCP `full_text_search` tool did not accept `highlight` at all, so the lines reached REST but not the surface the issue is about; and a `fields` projection discarded the highlights, which is precisely the combination that makes the pattern work — do not send the body, say where to look. Both are fixed, and fragments are now extracted before the body is dropped rather than after.
+
+- **Source code is searchable as source, not as prose** — storing a stylesheet or a script needed no new document type, table or endpoint, only a convention on the flat meta map every transport already carries: `kind: ["code"]`, with `language` and `path` alongside it. What changes is tokenisation. The prose tokeniser stems (`classes` becomes `class`), drops stop words — which in a language are its keywords — and splits on every punctuation mark, leaving `.hero-banner` findable only as two unrelated words. The code tokeniser keeps the whole identifier and emits its parts across camelCase, snake_case and kebab-case, holding acronyms together (`XMLHttpRequest` gives `xml`, `http`, `request`, not letters), and keeps single characters and digits because `a` is a selector and `h2` is a name. Because both the whole name and its parts are indexed, a code collection answers ordinary queries: nothing else in the search path had to change and no prose collection needs reindexing. The convention is optional — a document whose key or path ends in a known source extension is treated as code with no meta at all, so a theme ingested by an existing tool works as it stands, while an explicit `kind` always wins in both directions.
+
+- **Release notes come from the changelog** — every tag published the same hand-written text, with benchmark figures from one historical measurement ("29,810 docs/sec", "5.75x faster than MongoDB") that no longer described anything in particular. `scripts/release-notes.py` extracts the section for the version being tagged and adds the installation block, which is the one part that genuinely repeats. The same stale figures are gone from the deb and rpm package descriptions. The generator refuses a version the tree does not declare: falling back to `[Unreleased]` is only safe for the version `const VERSION` reports, or a typo in a tag would publish this release's notes under a version nobody built.
+- **The release version cannot drift again** — it is written in eight places by hand, and one of them (`.ssg.yaml`, which the documentation site reads) was not even on the list this was thought to cover. `scripts/check-version.sh` collects all eight and fails if they disagree, with a test suite covering the exact shape this went wrong in before: one source left behind during a bump. The git tag is deliberately not checked, since it is created after the guard passes; instead the guard reports whether the CHANGELOG section for this version is still under `[Unreleased]` or dated and ready to tag.
+
+- **Agent instructions ship with the tools** — an agent connecting over MCP gets 79 tool schemas and no idea which one fits a question, or that asking for a projection instead of whole documents changes the cost by more than an order of magnitude. Measured through MCP: the same `full_text_search` over five 12 KB documents returns ~19 700 tokens by default and ~327 with `fields: ["key"]`. `integrations/agent-instructions/` now carries that guidance — a decision tree for choosing between full-text, semantic and hybrid search, the parameters that cut tokens, the anti-patterns (starting with fetching a whole document to change one line of it, the issue #192 case) and the `memory_*` working loop. One source, `AGENTS.md`, generates the Claude Code skill, the Cursor rule and the Windsurf rule, because four hand-maintained copies drift on the first edit. Two guards keep it honest: CI fails if a variant was edited instead of the source, and a test fails if the instructions name a tool the code does not define — which it did immediately, on a tool name that never existed.
+
+- **Shutdown drains what it accepted** — seven subsystems shipped a `Stop`, `Close` or `Shutdown` that nothing ever called: the WAL, the bulk-ingest worker, the cron scheduler, the index queue, the temporal manager, MVCC and the HTTP/3 listener, whose handle only ever existed as a local inside a goroutine and so could not be closed at all. At process exit the kernel reclaims goroutines and descriptors either way — the cost was what those subsystems were still holding: queued index jobs, an in-flight bulk job, a buffered WAL write, all abandoned rather than finished. One ordered sequence replaces the scattered closes, in the reverse of the dependency order: stop accepting work, drain the queues, stop the periodic workers, close what the queues were writing to, caches last. It runs under `MDDB_SHUTDOWN_TIMEOUT_SEC`, and a step that wedges is named in the log rather than holding the process open until the operator's SIGKILL. A test starts, exercises and stops the subsystems three times and fails if goroutines are left behind — verified by removing one step and watching it catch the leak.
+- **Resource-lifecycle linters, and a fetch that can be cancelled** — `bodyclose` and `sqlclosecheck` are enabled; their three hits were all the same false positive, since neither can see through `httpclient.DrainAndClose`, so those are excluded with the reason written down rather than blanket-suppressed. `noctx` is deliberately not enabled: it flags 19 places, and turning on a gate that has to be silenced wholesale is worse than leaving it off. The one finding that could genuinely hang was fixed instead — `fetchURL` now takes a context from the REST, gRPC and MCP callers, so importing from a slow or hostile host is abandoned when the caller gives up rather than holding a connection for the full client timeout.
+
+- **Range filtering costs what you asked for, not what the collection holds** — `SearchRange` collected every matching document into a map, materialised the lot into a slice, sorted it, and only then applied the limit, so returning 50 results from a 10 000-document collection allocated the same 12.5 MB as returning 500. The cursor already walks documents in the order the results are returned — `doc|<collection>|<docID>` in byte order is docID ascending — so matches are now appended as they are found and the scan stops at the caller's limit. The same query takes 63 µs and 57.7 KB instead of 15.4 ms and 12.5 MB, and the cost finally scales with the page rather than the collection. A test proves the answer is unchanged by comparing it against the behaviour it replaced across seven query shapes.
+- **Heavy queries queue instead of piling up** — a single-binary server has nowhere to shed load, and past some width parallel searches stop slowing down and start exhausting memory. FTS, vector, hybrid and aggregate now pass through a semaphore sized to the CPU count by default (`MDDB_SEARCH_MAX_CONCURRENT`); a query beyond it waits up to `MDDB_SEARCH_QUEUE_TIMEOUT_MS` and then receives `503` with `Retry-After` — something a client can act on, unlike an OOM that takes every other request with it. A client that cancels its own request gets `408` and is not counted as a rejection, because it was not one.
+
+- **Opt-in search-result caching** — agents repeat identical queries in loops, and each repeat redid the full scoring pass over a result set that had not changed. A full-text search may now set `cacheTtl` (seconds) to reuse a recent answer, with `X-MDDB-Cache: hit|miss` on the response. It is opt-in per request on purpose: a search without `cacheTtl` is neither served from the cache nor stored in it, so the default behaviour and the default freshness are untouched and there is no silent staleness to reason about — the caller decides, per query, how stale an answer may be. Writes invalidate a collection's cached results immediately, through a per-collection generation counter mixed into the key, which costs nothing on the write path and cannot leave a result set from before your write reachable. The key covers the whole request except `cacheTtl` itself, so two callers asking the same question share an answer even when one is willing to hold it far longer than the other. `MDDB_SEARCH_CACHE_SIZE=0` turns it off server-wide.
+
+- **Async jobs report themselves over SSE** — a client waiting for a bulk import had to poll its status endpoint. The hub that already carries document events now carries `job.started`, `job.progress`, `job.completed`, `job.failed` and `job.cancelled` too, on the same connection with the same authentication and per-IP limits, and `?job=<id>` narrows a stream to one job the way `?collection=` narrows documents. The payload is the record `GET /v1/bulk/jobs/{id}` returns, so counters have one shape either way. Events are emitted from the single place a job changes state, which means a new transition cannot forget to announce itself, and `job.progress` is capped at one per second per job — a chunked import would otherwise put hundreds of events on every listening connection to say what the next one says anyway. A connection filtered to a job receives that job's events only, not the document traffic the import itself generates.
+
+- **Bulk ingest is 29x faster, because the indexes stopped committing per document** — indexing a document touches three full-text indexes, and each entry point opened its own BoltDB write transaction, so a batch paid three commits per document. Measured on this tree, 1000 documents took 4.20s with indexing and 21ms without: the commits, not the work, were 99.5% of the cost. The three transaction bodies are now shared helpers, `fts.IndexDocs` runs a whole batch inside one transaction, and tokenisation happens before it opens so the write lock is not held through pure CPU work. The same 1000 documents now take 0.14s — 238 docs/s to 6 996 — and allocate 68MB instead of 452MB. The batched index is byte-for-byte identical to the per-document one, which a test checks by comparing every entry in every FTS bucket rather than asking whether search still returns something; a single unindexable document still cannot take a batch down, because the batch falls back to per-document indexing.
+- **The full-text index is deterministic** — writing the equivalence test above surfaced something older: indexing the same document twice produced different bytes, because the reverse-index term lists were built by ranging over a Go map. Two identical runs of the existing per-document path differed in 15 of 213 entries. The lists are now sorted — order never meant anything there, they are only split to clear a document's previous terms — so identical content yields identical bytes. That matters beyond tidiness: those bytes travel through the replication binlog and underpin content hashing.
+
+- **The operational log is structured** — the server logged through the standard library's `log` package: plain text, local time without a zone, no level field, and severity spelled into the message (`ERROR: …`, `WARNING: …`, `⚠️  SECURITY: …`). A collector could not filter that by level without matching prose, which left the operational log — the one that shows dropped embedding jobs and replication failures — below the audit trail the product already exports as RFC 5424 syslog and SIEM webhooks. All 236 call sites across 35 files move to `log/slog`: the level is now a field, the values that used to be interpolated into the sentence are key/value pairs (`"collection", c, "docID", k, "err", err`), and the emoji are gone. `MDDB_LOG_FORMAT` picks `text` or `json` — the container image sets `json` — and `MDDB_LOG_LEVEL` sets the threshold. `logging.Fatal` replaces `log.Fatal`, keeping the exit explicit rather than hiding it in a severity name; the 32 bare `log.Fatal(err)` calls in startup now name the step that failed (`"step", "FTSIndex.EnsureBuckets"`). Anything still reaching the `log` package — a dependency, a straggler — is carried through the same handler rather than escaping as loose text.
+- **Optional HTTP access log** — `MDDB_ACCESS_LOG=true` emits one line per request with method, path, status, bytes, elapsed and remote address, at a level that follows the status (5xx error, 4xx warn, otherwise info). Off by default, because the volume is the operator's decision. The query string is deliberately never logged: the search endpoints carry user content there.
+
+- **Remaining floating image tags are pinned** — nginx-unprivileged, node across the panel and widget, ollama in the dev compose, and `tradik/mddb:latest` in the production compose, which now follows `${MDDB_VERSION}` like the labels beside it. Node deliberately stays on 26 rather than walking back to an LTS major two months before 26 becomes one; `debian:bookworm-slim` deliberately stays a codename tag, because it keeps receiving security updates and a dated snapshot would cut those off.
+- **The Grafana plugin declares the version it is actually built against** — `peerDependencies` claimed `@grafana/* ^11` while the plugin compiled and type-checked against `^13`, so 13-only APIs passed typecheck and would have broken on the version the plugin advertised. Both sides and `grafanaDependency` now say 13, matching the `grafana/grafana:13.1.2` image in the compose file.
+- **The docs deploy forces Node 24 for JavaScript actions** — it was the only workflow without `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` while running three JS actions.
+- **Dependency sweep — resolves #185, #188, #189, #190, #191** — one consolidated pass over every ecosystem instead of five separate merges, taken to the newest release of each rather than to what Dependabot had proposed days earlier. **Go:** grpc 1.82.1→1.83.1, which stops the server reading from a connection flooded with HTTP/2 frames (`GRPC_GO_EXPERIMENTAL_CONTROL_BUFFER_THROTTLE_LIMIT`, 100 by default) — Dependabot's PR stopped at 1.83.0 and missed the RBAC header-matcher fixes that followed; minio-go 7.2.1→7.3.0, which verifies checksums end to end on `GetObject` and fixes the OOM that `TraceOn` hit on large objects, and which Dependabot's group had skipped entirely; klauspost/compress 1.19.1→1.19.2, fixing a zstd arm64 assembly crash that our arm64 snaps build straight into; plus x/crypto 0.55.0, x/net 0.58.0, x/text 0.41.0, protobuf 1.36.12, rtree 1.11.1, bitset 1.25.0 and cpuid 2.4.0. **npm:** vite 8.2.2 and 9 packages across the panel and the chat widget. **Rust:** async-trait 0.1.92 and the futures 0.3.34 family in mddb-chat. **Images and actions:** grafana 13.1.2, docker/login-action 4.6.0. No deprecated API is called (`PutObjectFanOut`, `ParseCapsule`), and the suites, `govulncheck`, `golangci-lint`, the widget's 14 tests and the panel build are all green afterwards.
+- **The docs generator pin moves to ssg 1.8.47, both halves of it** — the deploy step names its version twice, once as the action ref and once as the `version:` input, and Dependabot can only see the ref. Its bump would have left the action at 1.8.31 fetching a 1.8.21 binary, the exact mismatch the pin exists to make loud. Both now read 1.8.47, with a comment saying so, and the jump was verified locally rather than on trust: a full build on 1.8.47 passes every strict gate (links, image alts, page metadata, orphans) and the redirect linkcheck over all 61 pages.
+- **Go 1.27.0 across the monorepo** — all five modules (`go.work` plus `clients/go/mddb`, `services/mddb-cli`, `services/mddbd`, `test`, `tools/bench`), the three `GO_VERSION` workflow envs, the three `golang:` builder images and the two snap `go/X.Y/stable` channels move from 1.26.5 to 1.27.0, which also picks up the two 1.26 security patches we had skipped. Build, vet, the full test suite, `govulncheck` and `golangci-lint` are green on the new toolchain with no source changes required: both risks worth naming turned out to be non-issues — quic-go 0.61.0 already ships a `tls_config_go127.go`, and nothing in the tree pinned a `godebug`/`//go:debug` setting that 1.27 removed. What the runtime gains without further work: size-specialized allocation for objects under 80 bytes (up to 30% off each such allocation, which is most of what FTS, chunking and JSON decoding do), a `goroutineleak` profile now generally available at `/debug/pprof/goroutineleak` when `MDDB_PPROF_ENABLED=true`, a significantly faster `encoding/json` unmarshal path, and Unicode 17 tables under the full-text tokenizer.
+- **The Go version guard also covers snap channels** — `scripts/check-go-version.sh` compared `toolchain`, `GO_VERSION` and `golang:` image pins, but not the `go/X.Y/stable` build-snap each snapcraft.yaml pulls its compiler from. That pin carries a track rather than a patch version, so it was invisible to a check built around `X.Y.Z` and would have let the snaps build on 1.26 while CI verified 1.27. Snap channels are now collected separately and checked against the toolchain's own track — 14 pins verified instead of 12 — with two cases added to `scripts/tests/test-go-version.sh` covering a matching and a stale channel.
+
+### Fixed
+- **`verify-ssl: false` in the GitHub Action does something again** — the client built a permissive `node:https.Agent` and attached it as `init.agent`, but the production fetcher is Node's global fetch, which is undici: it ignores `agent` and reads `dispatcher`. The documented escape hatch for self-signed dev instances had therefore never worked, and the test asserted the broken shape, so it passed throughout. The client now passes an undici `Agent` as `dispatcher`, which makes undici a runtime dependency (Node ships it internally but exposes no public `Agent`) and takes the bundle from 536 KB to 1.1 MB.
+- **The Rust builder was pinned before it broke the image** — `rust:latest` was the last unpinned base in the repo and had already drifted to Debian 13 (glibc 2.41) while the runtime stage stayed on `debian:bookworm-slim` (glibc 2.36). The image still built; the container would have failed to start on a missing `GLIBC_2.38` at the next cache-cold build. Pinning `rust:1.98-slim-bookworm` puts builder and runtime back on the same glibc, verified by running the binary out of the built image.
+- **`make docs-build` works from a clean checkout** — SSG wants `docs/metadata.json`, which only the deploy workflow ever wrote, and the file is gitignored: a fresh clone had none and the build stopped on "no such file or directory". A `docs-metadata` target writes the same empty JSON the workflow does.
+- **The Node client has a lockfile and an audit** — `clients/nodejs` was the only JavaScript package in the repo without one, so its installs resolved differently run to run and `npm audit` refused to run at all. A CI job now runs `npm ci` (which fails on a missing or drifted lockfile) and audits production dependencies, matching the other packages.
+
+- **Two per-document string allocations in aggregation cursors** — the time-histogram and facet-count loops each built a `docID` string solely to look up a membership map, allocating once per document scanned. Indexing the map with the conversion inline lets the compiler elide the allocation entirely (staticcheck SA6001). Behaviour is unchanged; both loops walk every document in a collection, so the saving scales with collection size.
+
+### Added
 - **Blog feeds in both formats** — `/feed.xml` (Atom) and `/rss.xml` (RSS 2.0), 20 most recent posts each, with a visible subscribe link on `/blog/`. Declared through SSG's `feeds:` rather than `feed: true`, which names the Atom feed after the bare hostname; SSG injects the autodiscovery `<link rel="alternate">` tags into every page itself, so the theme adds none. `feeds:` is undocumented upstream — reported as spagu/ssg#92, with spagu/ssg#93 asking for a way to opt out of the injection.
 
 ### Changed
@@ -46,6 +1493,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stale "What's New" and client-side version patching** — the homepage section now lists the actual v2.11.4 features, and every version string, download link and size figure is baked at build time from SSG `variables:` (`.Vars`) instead of being rewritten by inline JavaScript (2.1 KB of patching script removed; native changelog extraction tracked upstream as spagu/ssg#69).
 - **Size figures corrected** — the server binary is ~26MB (was advertised ~29MB) and the Docker image ~33MB; both are now `.Vars`-driven so they update in one place.
 - **Mermaid diagrams intermittently showing "Syntax error in text"** — the theme's copy-button script appended its "Copy" label into `pre.mermaid` blocks before the mermaid runtime read them; diagram blocks are now excluded from copy buttons.
+
+
 
 ## [2.11.4] - 2026-07-31
 
@@ -177,9 +1626,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Stop committing dev secrets; add secret scanning** ([.gitignore](.gitignore), [docker-compose.dev.yml](docker-compose.dev.yml), [services/mddb-chat/config.example.toml](services/mddb-chat/config.example.toml), [services/mddb-chat/src/config.rs](services/mddb-chat/src/config.rs), [.gitleaks.toml](.gitleaks.toml), [.github/workflows/secret-scan.yml](.github/workflows/secret-scan.yml)) — the git-tracked `services/mddb-chat/config.toml` held real credentials (`auth_password = "admin123"`) and `docker-compose.dev.yml` hard-coded a dev JWT secret + `admin123` inline — a strong copy-paste-deploy footgun (a known JWT secret allows forging admin tokens) and a permanent entry in git history. `config.toml` is now untracked (`git rm --cached`) and gitignored; mddb-chat reads `MDDB_CHAT_AUTH_USERNAME`/`MDDB_CHAT_AUTH_PASSWORD` from the environment when the config's values are blank (matching the existing LLM-key/webhook-secret env override, with a Rust test for precedence); `docker-compose.dev.yml` pulls `MDDB_AUTH_JWT_SECRET`/`MDDB_AUTH_ADMIN_PASSWORD` from `.env` (compose errors if unset) and passes the admin creds through to the chat service; `config.example.toml` ships empty placeholders. A new `secret-scan.yml` workflow runs **gitleaks 8.30.1** on every push/PR (working tree + PR commit range), with `.gitleaks.toml` allowlisting the legitimate example/test/manpage/vendored values so the scan is clean (0 findings). **Note:** if `admin123` or that dev JWT secret were ever used beyond local dev, rotate them — the values remain in pre-fix git history.
 - **Validate the chat widget's WebSocket endpoint** ([services/mddb-chat-widget/src/utils/serverUrl.ts](services/mddb-chat-widget/src/utils/serverUrl.ts), [services/mddb-chat-widget/src/index.ts](services/mddb-chat-widget/src/index.ts), [services/mddb-chat-widget/README.md](services/mddb-chat-widget/README.md)) — **high**. The widget passed the `data-server` script attribute straight to `new WebSocket()` behind only a null-check — no scheme/URL validation — so a tampered DOM attribute (or an integrator typo) could redirect the whole chat session (messages + `sessionId`) to an arbitrary host, including over unencrypted `ws://`. A new `validateServerUrl` now accepts only `wss://` (any host) or `ws://` to a loopback host (dev); a public `ws://`, a relative path, or a non-WebSocket scheme (`http:`, `javascript:`, `data:`, …) is rejected and the widget refuses to start with a clear error. Added the first widget `README.md` (attribute table + a `connect-src` CSP example) and unit tests for the validator. `ws://localhost` dev usage is unchanged.
 - **Block `javascript:` (and other unsafe-scheme) links in the chat widget** ([services/mddb-chat-widget/src/utils/markdown.ts](services/mddb-chat-widget/src/utils/markdown.ts), [services/mddb-chat-widget/tsconfig.json](services/mddb-chat-widget/tsconfig.json)) — **critical**. The widget's `renderMarkdown` escaped HTML but then built `<a href="$2">` from the message's link URL with **no scheme check**, and the result is injected via `innerHTML` — so an assistant/LLM message (prompt-injectable from knowledge-base documents) containing `[click](javascript:alert(document.cookie))` produced a clickable `javascript:` link executing in the **host page's** origin. Link rendering now goes through an `isSafeUrl` allowlist: only `http(s)`/`mailto` URLs or relative references (`/`, `#`, `./`, `../`) become anchors — `javascript:`, `data:`, `vbscript:`, `blob:`, `file:` (and case/whitespace-obfuscated variants, since browsers ignore control chars in schemes) are dropped, keeping the link text only. New `markdown.test.ts` covers the malicious schemes, the safe ones, and that `rel="noopener noreferrer"` is preserved. Also fixed a latent build break: `tsconfig.json` now excludes `*.test.ts` from the `tsc` build (tests run via `node --test` type-stripping), so the widget `npm run build` passes again.
-- **XSS hardening for the SSG markdown viewer** ([services/ssg-template/md-viewer.html](services/ssg-template/md-viewer.html)) — **critical**. `md-viewer.html` rendered `marked.parse()` output straight into `innerHTML` with no sanitization, glued mermaid code-block bodies into HTML unescaped, and fed the `?doc=` query parameter directly to `fetch()` — so inline HTML in any served `.md` ran as script (stored XSS), and a crafted link like `?doc=https://evil/x.md` made the viewer fetch and render attacker-controlled markdown in the docs origin (reflected XSS). Fixes: rendered HTML now passes through **DOMPurify 3.4.10** (pinned + `sha384` SRI; upgraded past the v3.4.0 CVE-2026-41240 fix per the `versions` MCP); mermaid block bodies are `escapeHtml()`-escaped before injection (diagrams still render — `mermaid.run()` reads `textContent`); a `resolveDocParam()` accepts only same-origin relative `*.md` paths and rejects absolute/`//`/`..`/scheme values with a `QUICKSTART.md` fallback; the error panel escapes its message; and a defense-in-depth CSP (`connect-src 'self'`, `object-src 'none'`, `base-uri 'self'`) blocks remote-markdown fetches even if validation is bypassed. A `node --test` suite (`xss.test.mjs`) exercises `escapeHtml`/`resolveDocParam` behaviorally and asserts the DOMPurify/CSP wiring; a new `deploy-docs.yml` step gates the docs deploy on it.
+- **XSS hardening for the SSG markdown viewer** ([services/ssg-template/md-viewer.html](https://github.com/tradik/mddb/blob/v2.11.4/services/ssg-template/md-viewer.html)) — **critical**. `md-viewer.html` rendered `marked.parse()` output straight into `innerHTML` with no sanitization, glued mermaid code-block bodies into HTML unescaped, and fed the `?doc=` query parameter directly to `fetch()` — so inline HTML in any served `.md` ran as script (stored XSS), and a crafted link like `?doc=https://evil/x.md` made the viewer fetch and render attacker-controlled markdown in the docs origin (reflected XSS). Fixes: rendered HTML now passes through **DOMPurify 3.4.10** (pinned + `sha384` SRI; upgraded past the v3.4.0 CVE-2026-41240 fix per the `versions` MCP); mermaid block bodies are `escapeHtml()`-escaped before injection (diagrams still render — `mermaid.run()` reads `textContent`); a `resolveDocParam()` accepts only same-origin relative `*.md` paths and rejects absolute/`//`/`..`/scheme values with a `QUICKSTART.md` fallback; the error panel escapes its message; and a defense-in-depth CSP (`connect-src 'self'`, `object-src 'none'`, `base-uri 'self'`) blocks remote-markdown fetches even if validation is bypassed. A `node --test` suite (`xss.test.mjs`) exercises `escapeHtml`/`resolveDocParam` behaviorally and asserts the DOMPurify/CSP wiring; a new `deploy-docs.yml` step gates the docs deploy on it.
 - **Replication gRPC streams now authenticated** ([services/mddbd/replication_server.go](services/mddbd/replication_server.go), [services/mddbd/replication_client.go](services/mddbd/replication_client.go), [services/mddbd/grpc_server.go](services/mddbd/grpc_server.go)) — **critical**. `RequestSnapshot` streamed the **entire BoltDB** (including the `auth_users` bcrypt hashes and `auth_apikeys` buckets) and `StreamBinlog` live-tailed every write, with **no authentication** — the only check was `follower_id != ""`. Because the auth interceptor is unary-only, both streaming RPCs were reachable regardless of `MDDB_AUTH_ENABLED`, so any host with network access to the gRPC port could exfiltrate the whole database or wiretap all writes in one call. A new `authorizeReplication(ctx)` gate now runs at the very top of both handlers (before the binlog-nil check and any DB access) and accepts, in order: a dedicated replication secret (`MDDB_REPLICATION_SECRET` vs the `x-mddb-replication-secret` gRPC metadata, compared with `crypto/subtle.ConstantTimeCompare`), a verified mTLS client certificate, or an admin-authenticated context when main auth is on — refusing with `PermissionDenied` when none is configured rather than exposing the database. The follower attaches the secret via `withReplicationSecret`, and the leader logs a loud startup warning when replication is exposed with no auth/secret/mTLS. `MDDB_REPLICATION_SECRET` documented in [.env.example](.env.example). Tests cover no-config deny, secret mismatch/match, missing metadata, and anonymous `RequestSnapshot`/`StreamBinlog` → `PermissionDenied`.
-- **Subresource Integrity for SSG CDN assets** ([services/ssg-template/md-viewer.html](services/ssg-template/md-viewer.html), [services/ssg-template/page.html](services/ssg-template/page.html), [services/ssg-template/index-section-replication.html](services/ssg-template/index-section-replication.html)) — the markdown viewer loaded `marked`, `mermaid` and the github-markdown CSS from public CDNs with no `integrity`/`crossorigin`, and `mermaid` was pinned to a floating major (`@10`) that any 10.x publish could silently replace — a CDN/account/MITM compromise would execute arbitrary JS on the docs site. All three CDN resources now carry verified `sha384` SRI hashes + `crossorigin="anonymous"`; `mermaid` is upgraded from the outdated `@10` to a pinned `@11.15.0` (the viewer already uses the v11 `mermaid.run()` API), and the floating `@11` ESM imports in the other templates are pinned to `@11.15.0` too. A `node:test` asserts every CDN tag has SRI and that no floating mermaid pin remains.
+- **Subresource Integrity for SSG CDN assets** ([services/ssg-template/md-viewer.html](https://github.com/tradik/mddb/blob/v2.11.4/services/ssg-template/md-viewer.html), [services/ssg-template/page.html](services/ssg-template/page.html), [services/ssg-template/index-section-replication.html](services/ssg-template/index-section-replication.html)) — the markdown viewer loaded `marked`, `mermaid` and the github-markdown CSS from public CDNs with no `integrity`/`crossorigin`, and `mermaid` was pinned to a floating major (`@10`) that any 10.x publish could silently replace — a CDN/account/MITM compromise would execute arbitrary JS on the docs site. All three CDN resources now carry verified `sha384` SRI hashes + `crossorigin="anonymous"`; `mermaid` is upgraded from the outdated `@10` to a pinned `@11.15.0` (the viewer already uses the v11 `mermaid.run()` API), and the floating `@11` ESM imports in the other templates are pinned to `@11.15.0` too. A `node:test` asserts every CDN tag has SRI and that no floating mermaid pin remains.
 - **WordPress plugin data hygiene (logs + release notes)** ([integrations/wordpress-plugin/includes/class-client.php](integrations/wordpress-plugin/includes/class-client.php), [integrations/wordpress-plugin/includes/class-updater.php](integrations/wordpress-plugin/includes/class-updater.php)) — the client logged the **entire** untrusted server response body to `error_log()` (log spam / CR-LF forging / payload disclosure); it now truncates to a single 200-char snippet. The updater rendered GitHub release notes as **unsanitised HTML** in the wp-admin "View details" modal; they now pass through `wp_kses_post()`. New PHPUnit tests cover both. See the plugin [CHANGELOG](integrations/wordpress-plugin/CHANGELOG.md).
 - **Airbyte destination: stop leaking response bodies and tokens to logs** ([integrations/airbyte-destination/destination_mddb/client.py](integrations/airbyte-destination/destination_mddb/client.py)) — `ping()` and `addDocument()` exceptions embedded raw server response fragments (`resp.text[:200]`/`[:300]`), which Airbyte logs and shows in the connection UI — untrusted server content (potentially other tenants' data or secrets) in platform logs. Exceptions now carry only the HTTP status (and, for adds, our own `key`). Additionally a `_RedactingFilter` on the `airbyte` logger scrubs `Bearer <token>` from any log record, so the API key can't leak through a future request dump/refactor. Tests cover the body omission and the token redaction.
 - **Airbyte destination: bound document keys and sanitize meta-key names** ([integrations/airbyte-destination/destination_mddb/client.py](integrations/airbyte-destination/destination_mddb/client.py)) — `_extractKey()` did `str(raw)` on the source key field with no length/charset limit (a multi-MB or binary key field created a pathological document key), and `_flattenToStringLists()` copied untrusted upstream field names **verbatim** as MDDB meta keys. Keys over 512 chars or containing control characters now fall back to the existing stable content hash; meta-key names are stripped of control characters and the `|` index-key separator and bounded to 128 chars (empty results are dropped). Unit tests cover oversize/control-char keys and meta-key sanitization.
@@ -187,7 +1636,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **PHP client: explicit cURL timeouts and TLS verification** ([services/php-extension/mddb.php](services/php-extension/mddb.php)) — **high**. All three HTTP paths created cURL handles with no `CURLOPT_TIMEOUT`/`CURLOPT_CONNECTTIMEOUT`, so a hung server or network black hole could block the PHP process indefinitely (DoS), and none set `CURLOPT_SSL_VERIFYPEER`/`CURLOPT_SSL_VERIFYHOST` explicitly — relying on defaults that some distros/`php.ini` disable globally. A shared `applyCurlDefaults()` now sets a 5 s connect / 30 s total timeout and forces TLS peer + host verification on every handle. A no-framework smoke test (`mddb.test.php`) asserts the constants, the helper, and that all three paths wire it.
 - **GitHub Action no longer logs server response bodies** ([integrations/github-action/src/main.ts](integrations/github-action/src/main.ts)) — **high**. On an HTTP error the action logged `err.body.slice(0, 200)` via `core.warning()`. Actions logs on public repos are world-readable and persistent, so a misbehaving/compromised MDDB server's body (echoed headers, stack traces with secrets, other tenants' data) would leak publicly. It now logs only the action's own message and the HTTP status code. New test asserts a secret body is never logged while the status still is; `dist/` rebundled.
 - **Session tokens moved out of `localStorage`** ([services/mddb-panel/src/lib/auth.js](services/mddb-panel/src/lib/auth.js), [services/mddb-chat-widget/src/store/session.ts](services/mddb-chat-widget/src/store/session.ts)) — **high**. The panel stored its JWT and the chat widget stored `sessionId` + full message history in `localStorage`, which is readable by any JavaScript on the origin: a single XSS could exfiltrate the admin token with one call, and the data persisted on disk indefinitely. Both now use `sessionStorage` (per-tab, not persisted, not shared across tabs/extensions): the panel migrates any existing on-disk token into `sessionStorage` on startup then scrubs it from `localStorage`; the widget does the same for its session and caps the stored transcript at `MAX_STORED_MESSAGES = 50`. `node:test` cases cover the message cap. (A future hardening step is an `HttpOnly` cookie issued by the backend.)
-- **SSRF protection for outbound HTTP** ([services/mddbd/ssrf_guard.go](services/mddbd/ssrf_guard.go), [services/mddbd/http_pool.go](services/mddbd/http_pool.go), [services/mddbd/bulk_ingest_job.go](services/mddbd/bulk_ingest_job.go), [.env.example](.env.example)) — **high**. Four paths dialled user-controlled URLs with no address checks: `import-url` (and returned the response body), webhook delivery, bulk-ingest callbacks, and automation triggers. An attacker could read cloud-metadata (`169.254.169.254` → IAM creds), reach internal admin panels, or port-scan the cluster (blind SSRF). The shared pooled transport now uses a `safeDialContext` that resolves the host, refuses private/loopback/link-local/unspecified targets, and dials the **pre-resolved IP** to defeat DNS rebinding; an `ssrfCheckRedirect` re-applies the policy on every redirect hop (max 5). The bulk-ingest callback was switched from a bare `&http.Client{}` to the guarded pooled client. Internal embedding providers (Ollama/OpenAI/…) keep their own clients and are unaffected. Trusted-intranet opt-outs: `MDDB_OUTBOUND_ALLOW_PRIVATE=true` or `MDDB_OUTBOUND_ALLOWLIST=host1,host2`. The misleading `#nosec … validated above` comment was corrected. Unit tests cover the IP policy, URL validation, redirect checks, and the dialer's block path.
+- **SSRF protection for outbound HTTP** ([services/mddbd/ssrf_guard.go](services/mddbd/internal/httpclient/ssrf.go), [services/mddbd/http_pool.go](services/mddbd/internal/httpclient/pool.go), [services/mddbd/bulk_ingest_job.go](services/mddbd/bulk_ingest_job.go), [.env.example](.env.example)) — **high**. Four paths dialled user-controlled URLs with no address checks: `import-url` (and returned the response body), webhook delivery, bulk-ingest callbacks, and automation triggers. An attacker could read cloud-metadata (`169.254.169.254` → IAM creds), reach internal admin panels, or port-scan the cluster (blind SSRF). The shared pooled transport now uses a `safeDialContext` that resolves the host, refuses private/loopback/link-local/unspecified targets, and dials the **pre-resolved IP** to defeat DNS rebinding; an `ssrfCheckRedirect` re-applies the policy on every redirect hop (max 5). The bulk-ingest callback was switched from a bare `&http.Client{}` to the guarded pooled client. Internal embedding providers (Ollama/OpenAI/…) keep their own clients and are unaffected. Trusted-intranet opt-outs: `MDDB_OUTBOUND_ALLOW_PRIVATE=true` or `MDDB_OUTBOUND_ALLOWLIST=host1,host2`. The misleading `#nosec … validated above` comment was corrected. Unit tests cover the IP policy, URL validation, redirect checks, and the dialer's block path.
 - **Wiki import bz2 decompression-bomb guard** ([services/mddbd/wiki_import.go](services/mddbd/wiki_import.go), [.env.example](.env.example)) — `/v1/import-wiki` fed `bzip2.NewReader` straight into the XML parser with a 1 GB multipart cap but **no limit on decompressed bytes** and `MaxPages=0` (unlimited) by default. bz2 expands 10–50×, so a small upload could drive tens of GB of XML — CPU exhaustion and runaway BoltDB/FTS/disk growth (possible volume-fill outage). A new `cappedReader` now bounds decompressed bytes and stops the parse with a **controlled error** (`413`, with partial counts) instead of silently truncating; the page count is clamped to a server default. Both limits are configurable: `MDDB_WIKI_MAX_DECOMPRESSED_BYTES` (default 4 GiB) and `MDDB_WIKI_MAX_PAGES` (default 500000). Tests cover the cap directly and through the streaming XML decoder.
 - **Global request body size limit on JSON endpoints** ([services/mddbd/main.go](services/mddbd/main.go), [.env.example](.env.example)) — `MaxBytesReader` was applied only piecemeal (MCP, `/v1/upload`), while the main JSON handlers (`/v1/add`, `/v1/add-batch`, `/v1/search`, `/v1/update`, …) decoded `r.Body` with no cap — a multi-GB body would be allocated in memory (`ReadTimeout` bounds time, not size), enabling a trivial OOM DoS. A new `withMaxBody` middleware now caps every request: a declared `Content-Length` over the limit is rejected with `413` up front, and the body is otherwise wrapped in `http.MaxBytesReader` so reads can never exceed the limit even without/with a lying `Content-Length`. `/v1/upload` and `/v1/import-wiki` (which stream large files and enforce their own caps) are exempt. Configurable via `MDDB_MAX_BODY_BYTES` (default 32 MiB). `withMaxBody` is 100% covered.
 - **Stored XSS via FTS highlight fragments in the admin panel** ([services/mddb-panel/src/components/FTSSearchPanel.jsx](services/mddb-panel/src/components/FTSSearchPanel.jsx), [services/mddb-panel/src/lib/highlight.js](services/mddb-panel/src/lib/highlight.js)) — **critical**. `FTSSearchPanel` rendered server highlight fragments with `dangerouslySetInnerHTML`. The server builds each fragment by wrapping matches in `<mark>` inside the **raw, unescaped** document body, so anyone able to store a document (e.g. `<img src=x onerror=…>`) got arbitrary JS execution in the admin's session when that fragment appeared in search results — chained with the JWT in `localStorage`, full admin-session takeover. The fragment is now rendered as **escaped React text** split on the `<mark>` markers via a new `splitHighlightFragment()` helper: only our own `<mark>` element is emitted, every other byte of document content is shown literally and never parsed as markup. No `dangerouslySetInnerHTML` remains in `mddb-panel/src`. Covered by dependency-free `node:test` cases (incl. `<img onerror>` and `<script>` payloads); a `test` npm script was added to the panel.
@@ -198,12 +1647,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/metrics` no longer public when auth is enabled** ([services/mddbd/auth_middleware.go](services/mddbd/auth_middleware.go), [services/mddbd/auth_manager.go](services/mddbd/auth_manager.go), [docs/TELEMETRY.md](docs/TELEMETRY.md), [.env.example](.env.example)) — `/metrics` was hard-coded into the auth-exempt set (`"/metrics": true, // configurable later`), so with `MDDB_AUTH_ENABLED=true` the Prometheus counters (per-endpoint operation tallies, collection labels, traffic volumes, build version) were readable by anonymous callers — reconnaissance against an otherwise-gated API. The exempt set is now built at `AuthManager` construction by `buildPublicEndpoints()`, which includes `/metrics` **only** when `MDDB_METRICS_PUBLIC=true`. Default with auth on: unauthenticated `GET /metrics` → `401`. Auth off: unchanged (no auth layer runs). `isPublicEndpoint` became an `AuthManager` method that fails closed on a nil set. TELEMETRY.md documents Bearer-token scraping for Prometheus and the full `MDDB_AUTH_ENABLED × MDDB_METRICS_PUBLIC` matrix; `.env.example` gains `MDDB_METRICS_PUBLIC=false`. New tests cover the env-driven set, the gating matrix, and the middleware 401/200 paths.
 
 ### Fixed
-- **DocumentCache: atomic Stats, shutdown Close, honest eviction comment** ([services/mddbd/cache.go](services/mddbd/cache.go), [services/mddbd/main.go](services/mddbd/main.go)) — completes the cache hardening begun in (which added the stoppable cleanup goroutine via `Close()`/`stopCh`). `Stats()` read `hits`/`misses` non-atomically while `Get` increments them with `atomic.AddUint64` under only a shared `RLock` — a real data race under `-race`; `Stats()` now uses `atomic.LoadUint64`. The server's SIGINT/SIGTERM shutdown now calls `s.Cache.Close()` (alongside the existing `LockFreeCache`/`AdaptiveIndex` closes) so the cleanup goroutine doesn't outlive the process in tests. The eviction comment claiming "simple FIFO" is corrected — Go map iteration is randomized, so it evicts an arbitrary entry (neither FIFO nor LRU). New `-race` test drives concurrent `Get` + `Stats`, plus an idempotent-`Close` test.
+- **DocumentCache: atomic Stats, shutdown Close, honest eviction comment** ([services/mddbd/cache.go](services/mddbd/internal/cache/cache.go), [services/mddbd/main.go](services/mddbd/main.go)) — completes the cache hardening begun in (which added the stoppable cleanup goroutine via `Close()`/`stopCh`). `Stats()` read `hits`/`misses` non-atomically while `Get` increments them with `atomic.AddUint64` under only a shared `RLock` — a real data race under `-race`; `Stats()` now uses `atomic.LoadUint64`. The server's SIGINT/SIGTERM shutdown now calls `s.Cache.Close()` (alongside the existing `LockFreeCache`/`AdaptiveIndex` closes) so the cleanup goroutine doesn't outlive the process in tests. The eviction comment claiming "simple FIFO" is corrected — Go map iteration is randomized, so it evicts an arbitrary entry (neither FIFO nor LRU). New `-race` test drives concurrent `Get` + `Stats`, plus an idempotent-`Close` test.
 - **Chat markdown code blocks now render in the SSG home page** ([services/ssg-template/index.html](services/ssg-template/index.html)) — the inline `md()` renderer's triple-backtick code-fence regex was over-escaped (`\\w` / `\\n` / `[\\s\\S]` — literal backslash sequences in a regex literal, not the `\w`/`\n`/`[\s\S]` character classes), so multi-line ` ``` ` code blocks in chat replies never converted to `<pre><code>` and showed the raw backticks. Corrected to single escaping. (Not a security bug — `md()` escapes `<`/`>`/`&` before transforming — discovered while doing.) A `node --test` extracts `md()` and asserts code blocks render and stay escaped.
 - **Validate the GitHub Action `key-prefix` input** ([integrations/github-action/src/inputs.ts](integrations/github-action/src/inputs.ts), [integrations/github-action/action.yml](integrations/github-action/action.yml)) — `key-prefix` was read with no validation and concatenated directly onto every document key, so control characters, spaces, a multi-KB string or traversal-like sequences would pollute the collection's key space and surface only as confusing server-side errors (every other input — `collection`, `concurrency`, `timeout-seconds` — was already validated). A new `assertKeyPrefix` now enforces `/^[A-Za-z0-9._/-]{0,100}$/` and fails the action fast with a clear message before any files are scanned. `inputs.ts` is at 100% coverage; `dist/` rebuilt; the `${{ github.repository }}/` example remains valid.
-- **Data race during replication snapshot restore** ([services/mddbd/server_restore.go](services/mddbd/server_restore.go), [services/mddbd/replication_client.go](services/mddbd/replication_client.go), [services/mddbd/cache.go](services/mddbd/cache.go), [services/mddbd/schema.go](services/mddbd/schema.go), [services/mddbd/webhooks.go](services/mddbd/webhooks.go)) — **high**. When a follower restored a snapshot it closed and replaced `Server.DB` and swapped the `Cache`/`SchemaManager`/`WebhookManager` pointers with **no synchronization**, while HTTP/gRPC handlers read those fields concurrently — a formal data race, and in-flight requests could run `DB.View` on the just-closed `*bolt.DB` (panic / "database not open"); each restore also leaked the new cache's cleanup goroutine. A new `restoreMu sync.RWMutex` now guards database access: every production BoltDB call goes through `DBView`/`DBUpdate` (read lock; 110 call sites migrated), and the restore runs the whole swap under `withRestoreLock` (write lock) so in-flight reads drain before the old handle closes and the new one is published atomically. The caches/managers are reloaded **in place** (`DocumentCache.Clear()`, `SchemaManager.reload`, `WebhookManager.reload`) so the `Server` pointers never change — removing the field race entirely — and `DocumentCache` gained a `Close()` (stop channel + `sync.Once`) so the cleanup goroutine no longer leaks per restore. Covered by `-race` tests driving concurrent reads/writes against repeated DB swaps plus a goroutine-leak check.
+- **Data race during replication snapshot restore** ([services/mddbd/server_restore.go](services/mddbd/server_restore.go), [services/mddbd/replication_client.go](services/mddbd/replication_client.go), [services/mddbd/cache.go](services/mddbd/internal/cache/cache.go), [services/mddbd/schema.go](services/mddbd/internal/schema/schema.go), [services/mddbd/webhooks.go](services/mddbd/internal/webhooks/webhooks.go)) — **high**. When a follower restored a snapshot it closed and replaced `Server.DB` and swapped the `Cache`/`SchemaManager`/`WebhookManager` pointers with **no synchronization**, while HTTP/gRPC handlers read those fields concurrently — a formal data race, and in-flight requests could run `DB.View` on the just-closed `*bolt.DB` (panic / "database not open"); each restore also leaked the new cache's cleanup goroutine. A new `restoreMu sync.RWMutex` now guards database access: every production BoltDB call goes through `DBView`/`DBUpdate` (read lock; 110 call sites migrated), and the restore runs the whole swap under `withRestoreLock` (write lock) so in-flight reads drain before the old handle closes and the new one is published atomically. The caches/managers are reloaded **in place** (`DocumentCache.Clear()`, `SchemaManager.reload`, `WebhookManager.reload`) so the `Server` pointers never change — removing the field race entirely — and `DocumentCache` gained a `Close()` (stop channel + `sync.Once`) so the cleanup goroutine no longer leaks per restore. Covered by `-race` tests driving concurrent reads/writes against repeated DB swaps plus a goroutine-leak check.
 - **`test/` benchmark module now builds and is covered by CI** ([test/](test/), [go.work](go.work), [.github/workflows/test.yml](.github/workflows/test.yml)) — the cross-database benchmark binaries all lived in one package as six files each declaring `package main` with duplicate symbols, so the module didn't compile and was explicitly excluded from `go.work` and CI — letting it rot against server/proto API drift, and hiding ignored-error/leaked-connection bugs inside. Each benchmark is split into its own sub-package (`test/{couchdb,mysql,postgres,mongodb,grpc-perf,grpc-batch}/main.go`, moved with `git mv`), so `go build ./...`/`go vet ./...` are green both in workspace mode and standalone (`GOWORK=off`). `./test` is added to `go.work` and a new `bench` CI job builds + vets it (path filters broadened `test/go.mod` → `test/**`). Along the way: `couchdb` now error-checks every `http.NewRequest`/`json.Marshal` and drains+closes every response body via a `drainClose` helper; `grpc-perf` replaces three ignored-error `ioutil.ReadFile` calls with a `mustReadFile` that aborts instead of silently benchmarking empty documents; deprecated `io/ioutil` is removed from all six files (`os.ReadFile`); the `compare-*.sh` scripts and `test/README.md` are updated to the new `go build -o … ./<dir>` / `go run ./<dir>` layout.
-- **Drain outbound response bodies before close so pooled connections are reused** ([services/mddbd/http_pool.go](services/mddbd/http_pool.go), [services/mddbd/webhooks.go](services/mddbd/webhooks.go), [services/mddbd/automation_trigger.go](services/mddbd/automation_trigger.go), [services/mddbd/bulk_ingest_job.go](services/mddbd/bulk_ingest_job.go), [services/mddbd/audit_exporter_webhook.go](services/mddbd/audit_exporter_webhook.go)) — webhook delivery, cron/automation triggers, the bulk-ingest callback and the audit webhook exporter all called `resp.Body.Close()` **without** reading the body first. On the shared pooled (keep-alive) transport, a body that isn't drained to EOF stops the underlying TCP/TLS connection from returning to the pool, so each delivery — inside retry loops of up to 4 attempts — paid a fresh connection plus a full TLS handshake (and grew `TIME_WAIT` sockets on both ends). A new shared `drainAndClose` helper reads the remainder (capped at 64 KiB via `io.LimitReader`, nil-safe) then closes; all five pooled-client sites now use it (two more than the audit flagged). A behavioral Go test (`httptest` + `ConnState`/`StateNew` counter) proves 4 successive deliveries reuse a single connection.
+- **Drain outbound response bodies before close so pooled connections are reused** ([services/mddbd/http_pool.go](services/mddbd/internal/httpclient/pool.go), [services/mddbd/webhooks.go](services/mddbd/internal/webhooks/webhooks.go), [services/mddbd/automation_trigger.go](services/mddbd/automation_trigger.go), [services/mddbd/bulk_ingest_job.go](services/mddbd/bulk_ingest_job.go), [services/mddbd/audit_exporter_webhook.go](services/mddbd/internal/audit/exporter_webhook.go)) — webhook delivery, cron/automation triggers, the bulk-ingest callback and the audit webhook exporter all called `resp.Body.Close()` **without** reading the body first. On the shared pooled (keep-alive) transport, a body that isn't drained to EOF stops the underlying TCP/TLS connection from returning to the pool, so each delivery — inside retry loops of up to 4 attempts — paid a fresh connection plus a full TLS handshake (and grew `TIME_WAIT` sockets on both ends). A new shared `drainAndClose` helper reads the remainder (capped at 64 KiB via `io.LimitReader`, nil-safe) then closes; all five pooled-client sites now use it (two more than the audit flagged). A behavioral Go test (`httptest` + `ConnState`/`StateNew` counter) proves 4 successive deliveries reuse a single connection.
 - **Schema & required-field validation now applies to every transport** ([services/mddbd/main.go](services/mddbd/main.go), [services/mddbd/batch.go](services/mddbd/batch.go), [services/mddbd/batch_final.go](services/mddbd/batch_final.go)) — **high**. Validation lived in the transport adapters: gRPC `Add` and HTTP `handleAdd` validated, but `DirectClient.Add` (MCP — and via it GraphQL `addDocument`) called the write path with **no checks**, and the batch processors validated only `key`/`lang`, skipping schema validation entirely. So a registered collection schema could be bypassed through MCP, GraphQL or `add-batch`. Required-field (`collection`/`key`/`lang`) + `SchemaManager.Validate` now run inside the single `addDocument` write path (covering MCP/GraphQL and all internal callers — schema validation is opt-in, so a no-op without a registered schema), and both batch processors validate each document's schema. Tests cover the single-path enforcement and per-document batch rejection.
 - **`mddb-cli` no longer panics on unexpected server JSON** ([services/mddb-cli/main.go](services/mddb-cli/main.go)) — **high**. The CLI parsed responses into `map[string]interface{}` and used bare type assertions (`doc["addedAt"].(float64)`, `r.(map[string]interface{})`, `t.(string)`), so any missing/`null`/renamed field — or an error object returned with HTTP 200 — crashed the CLI with `panic: interface conversion` and a stack trace instead of a readable message. All 16+ unguarded assertions across the `add`, `stats`, semantic-search, FTS, embedding-stats, schema and key-list paths were replaced with safe accessors (`asFloat`/`asString`/`asMap`/`formatUnix`) that degrade to a zero value. Added `main_test.go` — the **first tests** for the `mddb-cli` module — covering the helpers and asserting degenerate payloads (missing fields, `null`, an error object) don't panic.
 - **Panel SPA fallback works on Express 5** ([services/mddb-panel/server.js](services/mddb-panel/server.js)) — the catch-all route was `'{*path}'` (no leading slash), invalid for Express 5 / path-to-regexp v8, so SPA deep links (a refresh on `/documents/123`, or opening a sub-route directly) fell through to a 404 instead of `index.html` (static files masked it for asset requests). Corrected to `'/{*path}'`. A dependency-free `node:test` guards the pattern and ordering (full supertest deep-link test runs in CI).
@@ -211,12 +1660,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`FTSReindex` honours read-only mode and reports failures** ([services/mddbd/grpc_server.go](services/mddbd/grpc_server.go)) — the FTS reindex RPC (a write) lacked the `isReadOnly()` gate every other mutating RPC has, so a read-only replica could clobber its FTS index and race the applier. It also swallowed every error: `_ = DB.View(...)` and `_ = FTSIndex.Index...()`, counting failed docs as `reindexed` and always returning `Status: "ok"` even on partial failure or a mid-restore read error. Now: read-only → `PermissionDenied`; a `DB.View` error propagates as `Internal`; per-doc indexing errors are counted (failed docs don't increment `reindexed`, are folded into `skipped`, and any failure downgrades `Status` to `"partial"`). Tests cover the read-only denial and the happy path.
 - **`tools/bench`: handle errors and guard divisions** ([tools/bench/main.go](tools/bench/main.go)) — the benchmark ignored the report file's `Close`/`Execute` errors (a truncated HTML report "succeeded" silently) and divided throughput/SVG coordinates with no zero guard (`+Inf`/`NaN` on a sub-microsecond batch or empty data). Report write now propagates `Execute`/`Close` errors; a `perSecond()` helper and `maxY<=0` guards in the `barHeight`/`barY`/`lineY` template funcs eliminate the divisions by zero. First tests for the module.
 - **Removed dead `WorkerPool` with a latent panic** (`services/mddbd/worker_pool.go`, `services/mddbd/worker_pool_test.go`) — `WorkerPool` had no production caller (only its own definition + tests), yet its `Close()` did `cancel()` then `close(p.jobs)`, so a goroutine blocked sending in `Submit` could `panic: send on closed channel`. Per YAGNI the type and its tests were deleted (recoverable via VCS if ever needed) rather than carrying maintained-but-unused code with a race.
-- **`exporterCore.Close` is now genuinely thread-safe** ([services/mddbd/audit_exporter.go](services/mddbd/audit_exporter.go)) — `Close` advertised idempotency but used a check-then-act on `stopCh`: two goroutines closing concurrently could both pass the `default:` branch and both run `close(c.stopCh)` → `panic: close of closed channel`. Replaced with `sync.Once`. A new `-race` test calls `Close` from 32 goroutines at once.
+- **`exporterCore.Close` is now genuinely thread-safe** ([services/mddbd/audit_exporter.go](services/mddbd/internal/audit/exporter.go)) — `Close` advertised idempotency but used a check-then-act on `stopCh`: two goroutines closing concurrently could both pass the `default:` branch and both run `close(c.stopCh)` → `panic: close of closed channel`. Replaced with `sync.Once`. A new `-race` test calls `Close` from 32 goroutines at once.
 - **Panel GraphQL client reads the correct auth token** ([services/mddb-panel/src/lib/graphql.js](services/mddb-panel/src/lib/graphql.js), [services/mddb-panel/src/lib/auth.js](services/mddb-panel/src/lib/auth.js), [services/mddb-panel/src/lib/token.js](services/mddb-panel/src/lib/token.js)) — the GraphQL client read `localStorage['token']` / `['apiKey']`, but `auth.js` stores the JWT under `mddb_auth_token`, so the `Authorization` header was **never set** (GraphQL-backed panel features ran unauthenticated, or risked sending a stale token left under the old key). A new `token.js` module is the single source of truth for the storage key and a JWT-shape validator; `graphql.js` now uses `authManager.getToken()` and only attaches a well-formed JWT; the stale `token`/`apiKey` keys are cleared on startup. Covered by `node:test` cases for the key and shape validation.
 - **`AdaptiveIndexManager` optimization worker is now stoppable** ([services/mddbd/adaptive_index.go](services/mddbd/adaptive_index.go), [services/mddbd/main.go](services/mddbd/main.go)) — `NewAdaptiveIndexManager` started a `for range ticker.C` goroutine with no `done` channel and no `Close()`, so it leaked for the process lifetime — and one per `Server` built in tests, blocking `goleak`-style CI checks. It now follows the same `done`/`Close()` pattern as `LockFreeCache`: the worker `select`s on `done`, `Close()` is idempotent (`sync.Once`) and nil-safe, and the server shutdown path calls `AdaptiveIndex.Close()`. Tests verify the worker goroutine exits after `Close()` and that double/nil close is safe.
 - **Document read cache is now invalidated on write/delete** ([services/mddbd/main.go](services/mddbd/main.go), [services/mddbd/grpc_server.go](services/mddbd/grpc_server.go), [services/mddbd/replication_applier.go](services/mddbd/replication_applier.go)) — **high**. The `DocumentCache` (5-min TTL) feeds the gRPC `Get` path, but `Server.addDocument` (HTTP/MCP/GraphQL writes) never refreshed it and **no delete path invalidated it**, so a gRPC `Get` could serve a stale or already-deleted document for up to 5 minutes — a transport-dependent consistency bug. `addDocument` now refreshes both caches after commit (keyed by `BuildCacheKey(collection, key, lang)`, replacing the duplicate cache-write the gRPC adapter did), and `deleteDocumentInternal` deletes the entry from both caches. The replication applier's `invalidateDocCache` was also broken — it built `collection|docID` from an over-split key that never matched anything; it now `SplitN`s correctly and derives the exact `BuildCacheKey` from the replicated doc (via `loadDoc`). New integration tests: HTTP delete → gRPC `Get` is `NotFound` immediately; HTTP update → gRPC `Get` returns the new content.
-- **`IndexQueue.Enqueue` no longer silently drops jobs** ([services/mddbd/indexqueue.go](services/mddbd/indexqueue.go), [services/mddbd/batchupdate.go](services/mddbd/batchupdate.go), [services/mddbd/main.go](services/mddbd/main.go), [docs/openapi.yaml](docs/openapi.yaml)) — when the 1000-job buffer was full, `Enqueue` hit a `default:` branch that **dropped the job with only a log line**. The batch-update path relied solely on this queue for metadata indexing, so a burst could leave documents permanently missing from meta queries (stale entries never removed either) with a `Status: ok` returned to the client. `Enqueue` now **never drops**: a full queue triggers synchronous in-line indexing (fallback), and it returns an `error` (`ErrQueueClosed` during shutdown) that callers handle. Because the fallback opens its own write transaction, `BatchUpdater.commitUpdate` now collects index jobs during its tx and enqueues them **after commit** (avoiding a BoltDB single-writer deadlock). `Shutdown` no longer closes the channel (removing a send-on-closed-channel panic window). A `fallbacks` counter joins `processed`/`failed` in `Stats()` and is surfaced under `indexQueue` in `GET /v1/stats`. Tests cover the full-queue fallback (job indexed synchronously), the fallback error path, and post-shutdown `ErrQueueClosed`.
-- **`parallelScore` panic on small vector collections** ([services/mddbd/vector_parallel.go](services/mddbd/vector_parallel.go)) — when the configured worker count exceeded the number of non-empty chunks, a later worker received a start index past `n` (`start > end`), so `scoreRange`'s `make([]VectorResult, 0, min(end-start, topK*2))` got a negative capacity and panicked with `makeslice: cap out of range`, crashing the process on an ordinary vector search. `scoreRange` now guards `start >= end` (and `topK <= 0`) before allocating, and `parallelScore` skips workers whose range is empty. Regression tests cover the inverted/empty range and the small-N-many-workers path. (Surfaced while verifying; tracked and fixed independently.)
+- **`IndexQueue.Enqueue` no longer silently drops jobs** ([services/mddbd/indexqueue.go](services/mddbd/internal/indexqueue/indexqueue.go), [services/mddbd/batchupdate.go](services/mddbd/batchupdate.go), [services/mddbd/main.go](services/mddbd/main.go), [docs/openapi.yaml](docs/openapi.yaml)) — when the 1000-job buffer was full, `Enqueue` hit a `default:` branch that **dropped the job with only a log line**. The batch-update path relied solely on this queue for metadata indexing, so a burst could leave documents permanently missing from meta queries (stale entries never removed either) with a `Status: ok` returned to the client. `Enqueue` now **never drops**: a full queue triggers synchronous in-line indexing (fallback), and it returns an `error` (`ErrQueueClosed` during shutdown) that callers handle. Because the fallback opens its own write transaction, `BatchUpdater.commitUpdate` now collects index jobs during its tx and enqueues them **after commit** (avoiding a BoltDB single-writer deadlock). `Shutdown` no longer closes the channel (removing a send-on-closed-channel panic window). A `fallbacks` counter joins `processed`/`failed` in `Stats()` and is surfaced under `indexQueue` in `GET /v1/stats`. Tests cover the full-queue fallback (job indexed synchronously), the fallback error path, and post-shutdown `ErrQueueClosed`.
+- **`parallelScore` panic on small vector collections** ([services/mddbd/vector_parallel.go](services/mddbd/internal/vector/vector_parallel.go)) — when the configured worker count exceeded the number of non-empty chunks, a later worker received a start index past `n` (`start > end`), so `scoreRange`'s `make([]VectorResult, 0, min(end-start, topK*2))` got a negative capacity and panicked with `makeslice: cap out of range`, crashing the process on an ordinary vector search. `scoreRange` now guards `start >= end` (and `topK <= 0`) before allocating, and `parallelScore` skips workers whose range is empty. Regression tests cover the inverted/empty range and the small-N-many-workers path. (Surfaced while verifying; tracked and fixed independently.)
 - **Unified document write path across transports** ([services/mddbd/main.go](services/mddbd/main.go), [services/mddbd/grpc_server.go](services/mddbd/grpc_server.go), [services/mddbd/batch.go](services/mddbd/batch.go), [services/mddbd/batch_final.go](services/mddbd/batch_final.go), [services/mddbd/batch_handler.go](services/mddbd/batch_handler.go)) — gRPC `Add`/`AddBatch` re-implemented the BoltDB insert and indexed metadata lazily via the (lossy) `IndexQueue`, **silently skipping FTS, geo, webhooks, SSE, temporal tracking and revision trimming**. A document added over gRPC was therefore invisible to full-text and geo search and fired no live events — behaviour diverged by transport (a DRY/SRP violation and a data-consistency trap). `GRPCServer.Add` is now a thin adapter over the shared `Server.addDocument` single write path (meta index in-tx; revisions + `MaxRevisions` trim; then the shared `runPostWriteHooks` pipeline), keeping the gRPC read cache coherent and still honouring the per-request `SaveRevision` flag (now threaded through `addDocument`). Both batch processors (standard + extreme) run the shared `firePostBatchHooks` after commit — which also gained the previously-missing **geo + temporal** steps, so the HTTP batch path benefits too — and trim revisions to `MaxRevisions`. New parity tests assert a gRPC-written doc (single and batch) is immediately FTS-indexed and meta-indexed, and that `SaveRevision` is respected.
 
 - **Go toolchain drift in `go.work`** ([go.work](go.work), [scripts/check-go-version.sh](scripts/check-go-version.sh), [.github/workflows/test.yml](.github/workflows/test.yml), [Makefile](Makefile), [RELEASING.md](RELEASING.md)) — the 2.9.17 security bump to `go1.26.3` updated every `go.mod`, both Dockerfiles, and all CI `GO_VERSION` envs, but **`go.work` was left pinned to the unpatched `toolchain go1.26.2`**. Local workspace builds (`GOWORK` on) could therefore compile with a toolchain missing the four stdlib CVE fixes that the bump shipped. `go.work` is now consistent with the rest of the repo (all 11 pins identical — see the `go1.26.4` bump below). To stop the drift recurring, a new guard `scripts/check-go-version.sh` collects every `toolchain` directive, `GO_VERSION:` env, and `golang:X.Y.Z` base image and fails on any mismatch; it runs in CI as the `go-version` job, is wired into `make ci` (target `make check-go-version`), and is covered by `scripts/tests/test-go-version.sh` (consistent → exit 0, drifted → exit 1, no pins → exit 2). A new RELEASING.md checklist item documents updating **all** Go-version locations atomically on future bumps.
@@ -226,7 +1675,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Go dependency refresh** ([services/mddbd/go.mod](services/mddbd/go.mod), [test/go.mod](test/go.mod)) — `go get -u ./...` + `go mod tidy` across every module brings 50 direct/indirect dependencies to their latest minor/patch, including security-relevant ones: `golang.org/x/crypto` v0.50.0 → v0.53.0, `golang.org/x/net` → v0.56.0, `google.golang.org/grpc` → v1.81.1, `github.com/quic-go/quic-go` → v0.60.0, `github.com/minio/minio-go/v7` → v7.2.0, `github.com/klauspost/compress` → v1.18.6, plus `gqlgen`/`gqlparser`. The Go toolchain pins are unchanged (still 1.26.4, guard green); the full `mddbd` suite, `mddb-cli`, and `tools/bench` tests pass against the upgraded graph.
 - **Correct the built-in MCP tool count (67 → 77) + drift guard** ([README.md](README.md), [docs/MCP.md](docs/MCP.md), [services/mddbd/mcp_tool_count_doc_test.go](services/mddbd/mcp_tool_count_doc_test.go), [Makefile](Makefile)) — the docs hard-coded **67** built-in MCP tools in six places while `mcpBuiltinTools()` actually defines **77** (verified via `len()`), under-selling the server by ten tools and guaranteed to drift again on every new tool. All six phrasings now read 77, and a new `TestMCPToolCountDocsInSync` (runs in the normal `go test ./...`) parses the count out of README.md / docs/MCP.md and fails if it ever diverges from `len(mcpBuiltinTools())` — so the number can't silently rot again. A `make mcp-tools-count` target runs the same check locally.
 - **DRY YAML anchors in Compose** ([docker-compose.ring.yml](docker-compose.ring.yml), [docker-compose.yml](docker-compose.yml), [.env.example](.env.example)) — the cluster-ring compose repeated the identical `build:` block 3× (leader + 2 followers) and re-typed the same follower `environment`/`depends_on` keys, and the production compose hard-coded `com.mddb.version=2.9.17` in 4 separate service labels (a release bump had to touch all four or images would carry mismatched versions). The ring file now defines `&mddbd-build`, `&mddbd-env`, `&follower-env` (merged via `<<:`) and `&leader-healthy` anchors; the version label is a single `${MDDB_VERSION:-2.10.0}` interpolation (default added to `.env.example`). The refactor is purely structural — the rendered config is byte-for-byte equivalent (verified by expanding the anchors/merge-keys, since Docker isn't available in this environment).
-- **gofmt all Go code + enforce a CI formatting gate** ([services/mddbd/fts_query_expr.go](services/mddbd/fts_query_expr.go), [services/mddbd/fts_query_expr_test.go](services/mddbd/fts_query_expr_test.go), [services/mddbd/tls_config_test.go](services/mddbd/tls_config_test.go), [.github/workflows/test.yml](.github/workflows/test.yml), [Makefile](Makefile)) — `gofmt -l` reported unformatted files, meaning no CI gate enforced the standard toolchain. The three remaining offenders are reformatted with `gofmt -s` (the other four from the audit list were already handled this branch — `tools/bench/main.go` under, the three `test/*.go` under). A new `lint`-job step fails the build (listing offenders) when `gofmt -s -l services/ tools/ test/` is non-empty, and the `Makefile` gains a repo-wide `fmt` target plus a `fmt-check` target (wired into `ci`) that runs the identical command locally.
+- **gofmt all Go code + enforce a CI formatting gate** ([services/mddbd/fts_query_expr.go](services/mddbd/internal/fts/fts_query_expr.go), [services/mddbd/fts_query_expr_test.go](services/mddbd/internal/fts/fts_query_expr_test.go), [services/mddbd/tls_config_test.go](services/mddbd/tls_config_test.go), [.github/workflows/test.yml](.github/workflows/test.yml), [Makefile](Makefile)) — `gofmt -l` reported unformatted files, meaning no CI gate enforced the standard toolchain. The three remaining offenders are reformatted with `gofmt -s` (the other four from the audit list were already handled this branch — `tools/bench/main.go` under, the three `test/*.go` under). A new `lint`-job step fails the build (listing offenders) when `gofmt -s -l services/ tools/ test/` is non-empty, and the `Makefile` gains a repo-wide `fmt` target plus a `fmt-check` target (wired into `ci`) that runs the identical command locally.
 - **Log-rotation and resource limits in Compose** ([docker-compose.yml](docker-compose.yml), [docker-compose.dev.yml](docker-compose.dev.yml)) — no compose file set a `logging:` cap or `deploy.resources`, violating the project conventions (10 MB log cap + resource limits/reservations). Both the production and dev compose now define reusable YAML anchors (`x-logging`, `x-deploy-server/medium/small`) and apply `logging` (`max-size: 10m`, `max-file: 3`) and `deploy.resources` (limits + reservations) to every service. (The specialized `docker-compose.ring.yml` and `test/docker-compose.benchmark.yml` harnesses can adopt the same anchors as a follow-up.)
 - **Removed the GitHub Pages `docs/CNAME` relic** (`docs/CNAME`) — the docs site is deployed to **Cloudflare Pages** (`wrangler pages deploy` in `.github/workflows/deploy-docs.yml`); the `CNAME` file is GitHub Pages' custom-domain mechanism and was a dead relic from the previous host. Removed (Cloudflare custom domains are configured in the dashboard).
 - **Least-privilege `permissions:` on all workflows** ([.github/workflows/test.yml](.github/workflows/test.yml), [.github/workflows/release.yml](.github/workflows/release.yml), [.github/workflows/airbyte-destination.yml](.github/workflows/airbyte-destination.yml)) — `test.yml` had **no** `permissions:` block (GITHUB_TOKEN defaulted to broad repo perms), and `release.yml`/`airbyte-destination.yml` set permissions only per-job. Added a restrictive top-level `permissions: contents: read` to the three; jobs that publish (create-release, docker-server/panel, build-and-push) keep their explicit `contents/packages/id-token/attestations: write` elevations. All **8** workflows now declare explicit permissions.
@@ -256,8 +1705,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.9.16] - 2026-05-01
 
 ### Added
-- **Encryption key rotation** ([services/mddbd/encryption.go](services/mddbd/encryption.go), [services/mddbd/encryption_rotate.go](services/mddbd/encryption_rotate.go), [services/mddbd/encryption_handlers.go](services/mddbd/encryption_handlers.go)) — ISO 27001 A.8.24 / SOC 2 CC6.7. The 2.9.15 at-rest encryption shipped with a single static `MDDB_ENCRYPTION_KEY`. Compliance frameworks expect a key can be retired and replaced without losing access to historical data. New wire format **V2** prefixes the ciphertext with a 1-byte keyID: `MDDB_ENC_V2\x00 (12B) | keyID (1B) | nonce (12B) | ciphertext+tag`. V1 payloads continue to decrypt under the current primary so the upgrade is non-breaking. Configuration: `MDDB_ENCRYPTION_KEY` is the primary (unchanged), `MDDB_ENCRYPTION_KEY_ID` (1..255, default 1) stamps new writes, `MDDB_ENCRYPTION_KEYS_PREVIOUS` is a JSON array of `{id, key}` for read-only rotation history. Admin endpoints: `GET /v1/encryption/status` (per-collection counts of withPrimary/withLegacy/plaintext/unknownKey), `POST /v1/encryption/rotate` (start a re-encryption job, optional `{"collection":"..."}` to scope it), `GET /v1/encryption/jobs[/:id]` (list/single progress). The rotation worker walks docs and rev buckets with short-lived per-entry transactions so writers never block behind a giant tx; plaintext and already-primary entries are skipped, errors are counted, and the job state surfaces the last error. Audit hook fires `encryption.rotation_started` / `_completed` / `_failed` for the existing audit trail. Admin panel grows an **Encryption** sidebar entry rendering keyID, previous keys, per-collection coverage, the job table, and a "Start rotation" control with collection-scope optional input.
-- **Audit log export — SIEM webhook + syslog** ([services/mddbd/audit_exporter.go](services/mddbd/audit_exporter.go), [services/mddbd/audit_exporter_webhook.go](services/mddbd/audit_exporter_webhook.go), [services/mddbd/audit_exporter_syslog.go](services/mddbd/audit_exporter_syslog.go)) — ISO 27001 A.8.15 / SOC 2 CC7.2. The audit log lived only in BoltDB and was reachable through `GET /v1/audit`; that fails the "tamper-evident, off-host" expectation auditors apply. AuditManager now holds a list of `AuditExporter` and fans out each batch immediately after the durable BoltDB write — best-effort delivery, sink failures never roll back the audit record. **WebhookExporter** POSTs each event as JSON (decorated with `_mddb_event_type:audit`) to a single URL with arbitrary headers from `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER` so Splunk HEC, Datadog Logs, ELK Bearer auth all work; retry sequence 0s/1s/5s/15s mirrors the existing webhooks subsystem. **SyslogExporter** writes RFC 5424 framed messages over UDP (default) or TCP to host:port; severity flips to "warning" when result=fail, structured-data block (`mddb@32473`) carries actor/action/result/collection so collectors can index without parsing the JSON body. Both sinks can be enabled simultaneously. Configuration: `MDDB_AUDIT_EXPORT_WEBHOOK_URL`, `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER`, `MDDB_AUDIT_EXPORT_WEBHOOK_INSECURE_TLS`, `MDDB_AUDIT_EXPORT_SYSLOG_ADDR`, `MDDB_AUDIT_EXPORT_SYSLOG_FACILITY`, `MDDB_AUDIT_EXPORT_BUFFER`. New `GET /v1/audit/exporters` surfaces per-sink delivered/failed/dropped counters and last error; the SecurityDashboard panel adds an **Audit log export** card pulling that endpoint with masked webhook URLs.
+- **Encryption key rotation** ([services/mddbd/encryption.go](services/mddbd/internal/encryption/encryption.go), [services/mddbd/encryption_rotate.go](services/mddbd/encryption_rotate.go), [services/mddbd/encryption_handlers.go](services/mddbd/encryption_handlers.go)) — ISO 27001 A.8.24 / SOC 2 CC6.7. The 2.9.15 at-rest encryption shipped with a single static `MDDB_ENCRYPTION_KEY`. Compliance frameworks expect a key can be retired and replaced without losing access to historical data. New wire format **V2** prefixes the ciphertext with a 1-byte keyID: `MDDB_ENC_V2\x00 (12B) | keyID (1B) | nonce (12B) | ciphertext+tag`. V1 payloads continue to decrypt under the current primary so the upgrade is non-breaking. Configuration: `MDDB_ENCRYPTION_KEY` is the primary (unchanged), `MDDB_ENCRYPTION_KEY_ID` (1..255, default 1) stamps new writes, `MDDB_ENCRYPTION_KEYS_PREVIOUS` is a JSON array of `{id, key}` for read-only rotation history. Admin endpoints: `GET /v1/encryption/status` (per-collection counts of withPrimary/withLegacy/plaintext/unknownKey), `POST /v1/encryption/rotate` (start a re-encryption job, optional `{"collection":"..."}` to scope it), `GET /v1/encryption/jobs[/:id]` (list/single progress). The rotation worker walks docs and rev buckets with short-lived per-entry transactions so writers never block behind a giant tx; plaintext and already-primary entries are skipped, errors are counted, and the job state surfaces the last error. Audit hook fires `encryption.rotation_started` / `_completed` / `_failed` for the existing audit trail. Admin panel grows an **Encryption** sidebar entry rendering keyID, previous keys, per-collection coverage, the job table, and a "Start rotation" control with collection-scope optional input.
+- **Audit log export — SIEM webhook + syslog** ([services/mddbd/audit_exporter.go](services/mddbd/internal/audit/exporter.go), [services/mddbd/audit_exporter_webhook.go](services/mddbd/internal/audit/exporter_webhook.go), [services/mddbd/audit_exporter_syslog.go](services/mddbd/internal/audit/exporter_syslog.go)) — ISO 27001 A.8.15 / SOC 2 CC7.2. The audit log lived only in BoltDB and was reachable through `GET /v1/audit`; that fails the "tamper-evident, off-host" expectation auditors apply. AuditManager now holds a list of `AuditExporter` and fans out each batch immediately after the durable BoltDB write — best-effort delivery, sink failures never roll back the audit record. **WebhookExporter** POSTs each event as JSON (decorated with `_mddb_event_type:audit`) to a single URL with arbitrary headers from `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER` so Splunk HEC, Datadog Logs, ELK Bearer auth all work; retry sequence 0s/1s/5s/15s mirrors the existing webhooks subsystem. **SyslogExporter** writes RFC 5424 framed messages over UDP (default) or TCP to host:port; severity flips to "warning" when result=fail, structured-data block (`mddb@32473`) carries actor/action/result/collection so collectors can index without parsing the JSON body. Both sinks can be enabled simultaneously. Configuration: `MDDB_AUDIT_EXPORT_WEBHOOK_URL`, `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER`, `MDDB_AUDIT_EXPORT_WEBHOOK_INSECURE_TLS`, `MDDB_AUDIT_EXPORT_SYSLOG_ADDR`, `MDDB_AUDIT_EXPORT_SYSLOG_FACILITY`, `MDDB_AUDIT_EXPORT_BUFFER`. New `GET /v1/audit/exporters` surfaces per-sink delivered/failed/dropped counters and last error; the SecurityDashboard panel adds an **Audit log export** card pulling that endpoint with masked webhook URLs.
 - **Backup path jail** ([services/mddbd/backup_path.go](services/mddbd/backup_path.go)) — backup/restore endpoints across HTTP, gRPC, and DirectClient now run every user-supplied `to`/`from` parameter through `safeBackupPath()`, which enforces a single jail rooted at `MDDB_BACKUP_DIR` (default `./backups`): rejects empty/NUL/absolute paths, follows symlinks, and verifies the resolved target stays inside the jail. Restore additionally requires the target file to exist and be a regular file. With admin credentials this previously allowed reading or overwriting arbitrary files; the change closes that gap.
 
 ### Changed
@@ -267,12 +1716,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Incident events via the existing webhook channel** ([services/mddbd/incident_detector.go](services/mddbd/incident_detector.go)) — ISO 27001 A.8.16 / SOC 2 CC7.3–7.4. Five new event names now deliver through `/v1/webhooks`: `security.auth_failure_burst` (sliding-window detector on repeated auth failures per actor+IP), `security.rate_limit_exceeded` (fired by the HTTP/gRPC limiter on rejection), `ops.replication_lag_high` (follower lag monitor), `ops.panic_recovered` (new panic-recovery middleware wrapping the HTTP handler chain — a crash becomes a 500 + event instead of a process kill), `ops.disk_usage_high` (periodic `syscall.Statfs` on the DB path). `WebhookPayload` gains a `detail map[string]interface{}` so incident payloads carry structured data (lag ms, IP, counts, disk pct) without repurposing the document fields. Each detector has its own threshold / interval / cooldown envs (`MDDB_INCIDENT_*`); all are opt-in by threshold configuration, no breaking change. Register with e.g. `{"events":["security.auth_failure_burst","ops.panic_recovered"]}` on `/v1/webhooks` — retries, backoff, `X-MDDB-Event` and `X-MDDB-Webhook-ID` headers are shared with the document-lifecycle delivery path.
-- **At-rest encryption (opt-in per collection)** ([services/mddbd/encryption.go](services/mddbd/encryption.go)) — ISO 27001 A.8.24 / SOC 2 CC6.7. AES-256-GCM on document and revision values. Activation requires both `MDDB_ENCRYPTION_KEY` (32 bytes, base64) and `CollectionConfig.encrypted=true` per collection; either alone is a no-op. Ciphertext format: `MDDB_ENC_V1\x00` magic (12 B) + nonce (12 B) + AES-GCM ciphertext + auth tag. Transparent backward compat at read time — legacy plaintext documents remain readable after a collection is flipped to encrypted. FTS and vector indexes stay plaintext by design (queryable structures cannot be encrypted without breaking search) — document in your threat model. Startup refuses to continue if any collection is flagged as encrypted but the key is missing. Reusable write path: new `marshalAndEncrypt()` helper replaces `marshalDoc()` at every write call site (HTTP add/update, gRPC Add/Update, batch/final-batch processors, memory RAG, MCP direct client); read path remains untouched — `loadDoc()` detects the magic prefix and decrypts transparently.
+- **At-rest encryption (opt-in per collection)** ([services/mddbd/encryption.go](services/mddbd/internal/encryption/encryption.go)) — ISO 27001 A.8.24 / SOC 2 CC6.7. AES-256-GCM on document and revision values. Activation requires both `MDDB_ENCRYPTION_KEY` (32 bytes, base64) and `CollectionConfig.encrypted=true` per collection; either alone is a no-op. Ciphertext format: `MDDB_ENC_V1\x00` magic (12 B) + nonce (12 B) + AES-GCM ciphertext + auth tag. Transparent backward compat at read time — legacy plaintext documents remain readable after a collection is flipped to encrypted. FTS and vector indexes stay plaintext by design (queryable structures cannot be encrypted without breaking search) — document in your threat model. Startup refuses to continue if any collection is flagged as encrypted but the key is missing. Reusable write path: new `marshalAndEncrypt()` helper replaces `marshalDoc()` at every write call site (HTTP add/update, gRPC Add/Update, batch/final-batch processors, memory RAG, MCP direct client); read path remains untouched — `loadDoc()` detects the magic prefix and decrypts transparently.
 - **Rate limiting (HTTP + gRPC)** ([services/mddbd/ratelimit.go](services/mddbd/ratelimit.go)) — ISO 27001 A.5.30 / SOC 2 CC6.6. Single sliding-window limiter shared by the HTTP and gRPC transports so both consume one per-client budget. Opt-in via `MDDB_RATE_LIMIT_ENABLED=true`; tunable by `MDDB_RATE_LIMIT_REQUESTS` (default 100), `MDDB_RATE_LIMIT_WINDOW` (default 60s), `MDDB_RATE_LIMIT_BURST` (default 50), `MDDB_RATE_LIMIT_BY` (`ip` default, or `user` with IP fallback for anonymous traffic). HTTP responses add `X-RateLimit-{Limit,Remaining,Reset}`; rejected requests return 429 with `Retry-After` and a JSON body. gRPC unary + stream interceptors return `codes.ResourceExhausted`. `/health`, `/v1/health`, `/metrics` are exempt so monitoring never trips the limiter. The pre-existing `MDDB_MCP_RATE_LIMIT_*` budget for MCP endpoints is untouched — MCP keeps its own dedicated limiter.
 - **Production hardening switch** ([services/mddbd/production_guard.go](services/mddbd/production_guard.go)) — ISO 27001 A.5.15/A.8.9 / SOC 2 CC6.1. Setting `MDDB_PRODUCTION=true` requires every compliance guardrail to be satisfied before the server accepts connections: `MDDB_AUTH_ENABLED=true`, JWT secret ≥32 bytes, `MDDB_TLS_ENABLED=true` (or explicit `MDDB_TLS_INSECURE_OK=true` opt-out for dev), `MDDB_CORS_ORIGIN` not `*`, `MDDB_AUDIT_ENABLED=true`, `MDDB_RATE_LIMIT_ENABLED=true`. Missing items abort startup with a per-variable checklist pointing at the failing control. When `MDDB_PRODUCTION` is unset the guard emits a single WARN and continues with the existing defaults — **no breaking change** for current deployments.
 - **Admin panel — compliance surface** ([services/mddb-panel/src/components/AuditLogPanel.jsx](services/mddb-panel/src/components/AuditLogPanel.jsx), [WebhooksPanel.jsx](services/mddb-panel/src/components/WebhooksPanel.jsx), [SecurityDashboard.jsx](services/mddb-panel/src/components/SecurityDashboard.jsx), [ComplianceBanner.jsx](services/mddb-panel/src/components/ComplianceBanner.jsx), [CollectionConfigModal.jsx](services/mddb-panel/src/components/CollectionConfigModal.jsx)). The panel now surfaces every 2.9.15 compliance control as a first-class UI, so admins do not have to curl their way through the new endpoints. **AuditLogPanel** renders the `GET /v1/audit` stream with actor / action / result / time-range filters, newest-first pagination, and a visible `dropped` counter that highlights in red when the in-memory buffer is under pressure. **WebhooksPanel** lists every registered webhook with per-row event-name pills and delivery status; it carries a dedicated "Incident events" section that one-click-subscribes to the five new `security.*` / `ops.*` event names introduced by the incident detector. **SecurityDashboard** is a single-pane status view stitching together the compliance state (`GET /v1/compliance-status`), live auth-failure and rate-limit counters pulled from `/metrics`, recent `ops.panic_recovered` incidents from the audit stream, and replication lag — so an operator can confirm at a glance that the fleet is green. **ComplianceBanner** mounts above the existing sidebar and turns amber when `compliant=false`, with a per-variable link into the docs so a misconfiguration on deploy is visible before the first query. The existing **CollectionConfigModal** grows an "Encrypted" checkbox that flips `CollectionConfig.encrypted=true` via `PUT /v1/collection-config`; the field is disabled (with explanatory tooltip) if `MDDB_ENCRYPTION_KEY` is not configured on the server, so the UI never invites a state that the server would reject at startup. All four new panels slot into the existing sidebar under a new **Security** heading, reuse the shared `mddb-client.js` data layer (so they work identically in REST and GraphQL modes), and inherit the existing WCAG 2.2 contrast tokens.
 - **`/v1/compliance-status` endpoint** ([services/mddbd/production_guard.go](services/mddbd/production_guard.go)) — unauthenticated HTTP probe that returns the live state of the production-hardening guard as `{production, compliant, missing:[{envVar,want,reason}], missingCount}`. Exposed for operator liveness/readiness probes, the new **ComplianceBanner** in the panel, and external monitors that must detect configuration drift before traffic lands on a non-compliant server. Documented in [docs/API.md](docs/API.md) and [docs/openapi.yaml](docs/openapi.yaml) with the same voice as `/v1/audit`.
-- **Audit log** ([services/mddbd/audit.go](services/mddbd/audit.go)) — ISO 27001 A.8.15 / SOC 2 CC7.2 compliance. `AuditManager` buffers structured JSON events `{ts, actor, action, resource, collection, key, result, ip, userAgent, detail}` and flushes them asynchronously to a dedicated `audit` BoltDB bucket; no hot-path handler blocks on disk I/O. Retention is configurable via `MDDB_AUDIT_RETENTION_DAYS` (default 90) with an hourly background trimmer. Authentication attempts (JWT, API key, login, missing/invalid/disabled user) are recorded from [auth_middleware.go](services/mddbd/auth_middleware.go) and [auth_handlers.go](services/mddbd/auth_handlers.go); every write endpoint is audited automatically via the `guardWrite` wrapper in [main.go](services/mddbd/main.go). Admin-only `GET /v1/audit` query endpoint supports `from`/`to` (RFC3339 or raw nanos), `actor`, `action`, `result`, `limit`. Feature is opt-in via `MDDB_AUDIT_ENABLED=true`; when disabled the manager is a no-op and the endpoint returns 404.
+- **Audit log** ([services/mddbd/audit.go](services/mddbd/internal/audit/audit.go)) — ISO 27001 A.8.15 / SOC 2 CC7.2 compliance. `AuditManager` buffers structured JSON events `{ts, actor, action, resource, collection, key, result, ip, userAgent, detail}` and flushes them asynchronously to a dedicated `audit` BoltDB bucket; no hot-path handler blocks on disk I/O. Retention is configurable via `MDDB_AUDIT_RETENTION_DAYS` (default 90) with an hourly background trimmer. Authentication attempts (JWT, API key, login, missing/invalid/disabled user) are recorded from [auth_middleware.go](services/mddbd/auth_middleware.go) and [auth_handlers.go](services/mddbd/auth_handlers.go); every write endpoint is audited automatically via the `guardWrite` wrapper in [main.go](services/mddbd/main.go). Admin-only `GET /v1/audit` query endpoint supports `from`/`to` (RFC3339 or raw nanos), `actor`, `action`, `result`, `limit`. Feature is opt-in via `MDDB_AUDIT_ENABLED=true`; when disabled the manager is a no-op and the endpoint returns 404.
 
 ### Changed
 - **Timing-safe auth error** ([services/mddbd/auth_middleware.go](services/mddbd/auth_middleware.go)) — "user disabled or not found" now returns the same `invalid token` response as a bad JWT to prevent user-existence enumeration.
@@ -281,7 +1730,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.9.14] - 2026-04-19
 
 ### Added
-- **Inline facets on search** ([services/mddbd/facets.go](services/mddbd/facets.go), [services/mddbd/fts.go](services/mddbd/fts.go), [services/mddbd/hybrid_search.go](services/mddbd/hybrid_search.go)). `POST /v1/fts` and `POST /v1/hybrid-search` accept a new `facetBy` array of metadata keys; the response grows a `facets` map with per-value counts aggregated over the matched documents. Optional `facetMaxValues` caps per-key bucket count. Counts are computed post-filter / post-boost / post-curation so UIs stay in sync with what the user actually sees; missing keys produce an empty bucket list so UIs can render a stable group layout. gRPC `FTSRequest.facet_by`/`facet_max_values` (fields 9/10) and `HybridSearchRequest.facet_by`/`facet_max_values` (fields 17/18) added backwards-compatibly; responses carry a new `map<string, FacetBucketList> facets`. MCP `full_text_search` and `hybrid_search` tools expose the same parameters.
+- **Inline facets on search** ([services/mddbd/facets.go](services/mddbd/facets.go), [services/mddbd/fts.go](services/mddbd/internal/fts/fts.go), [services/mddbd/hybrid_search.go](services/mddbd/hybrid_search.go)). `POST /v1/fts` and `POST /v1/hybrid-search` accept a new `facetBy` array of metadata keys; the response grows a `facets` map with per-value counts aggregated over the matched documents. Optional `facetMaxValues` caps per-key bucket count. Counts are computed post-filter / post-boost / post-curation so UIs stay in sync with what the user actually sees; missing keys produce an empty bucket list so UIs can render a stable group layout. gRPC `FTSRequest.facet_by`/`facet_max_values` (fields 9/10) and `HybridSearchRequest.facet_by`/`facet_max_values` (fields 17/18) added backwards-compatibly; responses carry a new `map<string, FacetBucketList> facets`. MCP `full_text_search` and `hybrid_search` tools expose the same parameters.
 - **Curation rules — pinned & hidden results** ([services/mddbd/curation.go](services/mddbd/curation.go), [services/mddbd/curation_apply.go](services/mddbd/curation_apply.go), [services/mddbd/curation_handlers.go](services/mddbd/curation_handlers.go), [services/mddbd/grpc_curation.go](services/mddbd/grpc_curation.go), [services/mddbd/mcp_tools_curation.go](services/mddbd/mcp_tools_curation.go)). New REST `/v1/curation` (GET/POST/PUT/DELETE), gRPC RPCs `ListCurationRules` / `CreateCurationRule` / `UpdateCurationRule` / `DeleteCurationRule`, and MCP tools with matching names. Each rule targets a collection + trigger query with `matchMode: "exact"` (default) or `"contains"`. Pinned documents are spliced into fixed 1-based positions (pins with `position<=0` append after organic results); hidden documents are dropped by key. Rules are applied inside the FTS + Hybrid pipelines after scoring, boost, and filtering, but before pagination and facet counting — so facets reflect post-curation visible results. Result items carry `"pinned": true` when injected. Persistence lives in a dedicated `curation` BoltDB bucket with a per-collection in-memory cache, rehydrated on startup; binlog-integrated for follower replication.
 - **Per-collection revision retention** ([services/mddbd/revision_retention.go](services/mddbd/revision_retention.go), [services/mddbd/collection_config.go](services/mddbd/collection_config.go), [services/mddbd/main.go](services/mddbd/main.go)). `CollectionConfig.maxRevisions` (REST `PUT /v1/collection-config`, gRPC `SetCollectionConfig.max_revisions`, MCP `set_collection_config.max_revisions`, Admin Panel field) enforces a synchronous cap on revision history: every `addDocument` writes a new revision, then `trimRevisions` deletes the oldest entries inside the same BoltDB transaction so total stays at most `N`. `0` (default) preserves the existing unlimited behavior. Trimmed keys are mirrored into the binlog so followers converge on the same pruned state. Applies to `restoreRevision` too.
 - **Admin panel** ([services/mddb-panel/src/components/CurationPanel.jsx](services/mddb-panel/src/components/CurationPanel.jsx), [services/mddb-panel/src/components/CollectionConfigModal.jsx](services/mddb-panel/src/components/CollectionConfigModal.jsx), [services/mddb-panel/src/components/FTSSearchPanel.jsx](services/mddb-panel/src/components/FTSSearchPanel.jsx)). New sidebar entry **Curation Rules** lists/creates/edits/deletes rules with pin-and-hide editors. Collection Settings modal gains a **Revision History Retention** field. FTS Search panel gains a comma-separated `Facets:` input and renders per-key value-count chips above the result list; pinned results are badged `PINNED` for visual distinction.
@@ -290,9 +1739,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Geo distance sort on hybrid search** ([services/mddbd/hybrid_search.go](services/mddbd/hybrid_search.go)). `POST /v1/hybrid-search` accepts a new `sort` field. With `sort: "distance"` and a `geo` filter attached, the post-merge result set is re-ordered by `distanceMeters` ascending so the nearest matching documents surface first; `sort: "combined"` (the default) keeps the existing score-based ordering. Validation rejects `sort: "distance"` without a `geo` filter and unknown sort values. gRPC `HybridSearch` carries the new field but only accepts `combined` — distance sort is HTTP-only because the gRPC request has no geo payload.
-- **GeoJSON polygon and multi-polygon containment** ([services/mddbd/geo_polygon.go](services/mddbd/geo_polygon.go), [services/mddbd/geo_handlers.go](services/mddbd/geo_handlers.go)). New endpoint `POST /v1/geo-polygon` accepts a GeoJSON `Polygon` (outer ring + optional holes) or a `MultiPolygon` (union of polygons) and returns every indexed point inside the shape. Implementation does a bounding-box R-tree prefilter then ray-casts each candidate; response time tracks the polygon's bbox rather than the whole collection. Coordinate order is `[lng, lat]` per RFC 7946; rings may be open or closed. Exposed as read-only MCP tool `geo_polygon`.
-- **Query string DSL with nested grouping** ([services/mddbd/fts_query_expr.go](services/mddbd/fts_query_expr.go)). New FTS `mode: "expression"` runs through a proper recursive-descent parser that handles parenthesized grouping, operator precedence (NOT > AND > OR), implicit AND between adjacent atoms, and mixed atom types in one query — terms, fuzzy (`term~2`), phrases, proximity (`"phrase"~5`), wildcards, and NOT. Evaluator reuses the existing per-atom scorers (`SearchBM25`, `SearchPhrase`, `SearchProximity`, `SearchWildcard`, `SearchBM25Fuzzy`), so scores stay consistent with single-mode results. Legacy flat `"boolean"` mode is unchanged.
-- **Search-result highlighting with context fragments** ([services/mddbd/fts_highlight.go](services/mddbd/fts_highlight.go)). `POST /v1/fts` with `highlight: true` returns a `highlights[]` array per result — snippets taken from the raw `ContentMD` around matched terms, with each match wrapped in a caller-configurable tag (default `<mark>…</mark>`). Adjacent hits cluster into one fragment, clusters rank by hit count, the top `maxHighlights` (default 3) are kept, then re-sorted by document offset so UIs render in reading flow. Boundaries snap to word edges; ellipsis markers flag truncation. Works uniformly across every FTS mode including the new `expression` mode.
+- **GeoJSON polygon and multi-polygon containment** ([services/mddbd/geo_polygon.go](services/mddbd/internal/geo/geo_polygon.go), [services/mddbd/geo_handlers.go](services/mddbd/geo_handlers.go)). New endpoint `POST /v1/geo-polygon` accepts a GeoJSON `Polygon` (outer ring + optional holes) or a `MultiPolygon` (union of polygons) and returns every indexed point inside the shape. Implementation does a bounding-box R-tree prefilter then ray-casts each candidate; response time tracks the polygon's bbox rather than the whole collection. Coordinate order is `[lng, lat]` per RFC 7946; rings may be open or closed. Exposed as read-only MCP tool `geo_polygon`.
+- **Query string DSL with nested grouping** ([services/mddbd/fts_query_expr.go](services/mddbd/internal/fts/fts_query_expr.go)). New FTS `mode: "expression"` runs through a proper recursive-descent parser that handles parenthesized grouping, operator precedence (NOT > AND > OR), implicit AND between adjacent atoms, and mixed atom types in one query — terms, fuzzy (`term~2`), phrases, proximity (`"phrase"~5`), wildcards, and NOT. Evaluator reuses the existing per-atom scorers (`SearchBM25`, `SearchPhrase`, `SearchProximity`, `SearchWildcard`, `SearchBM25Fuzzy`), so scores stay consistent with single-mode results. Legacy flat `"boolean"` mode is unchanged.
+- **Search-result highlighting with context fragments** ([services/mddbd/fts_highlight.go](services/mddbd/internal/fts/fts_highlight.go)). `POST /v1/fts` with `highlight: true` returns a `highlights[]` array per result — snippets taken from the raw `ContentMD` around matched terms, with each match wrapped in a caller-configurable tag (default `<mark>…</mark>`). Adjacent hits cluster into one fragment, clusters rank by hit count, the top `maxHighlights` (default 3) are kept, then re-sorted by document offset so UIs render in reading flow. Boundaries snap to word edges; ellipsis markers flag truncation. Works uniformly across every FTS mode including the new `expression` mode.
 
 ### Changed
 - **Proto `HybridSearchRequest.sort` field (16)** added — backwards compatible, pre-2.9.13 clients simply omit it. Regenerated for Go / Python / Node.js / PHP via `buf`.
@@ -310,7 +1759,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GET /v1/bulk-ingest-jobs?collection=X` — list jobs newest-first
 
   Jobs are drained FIFO by a single worker in 500-document chunks; payloads live in an in-memory queue while status records are persisted to the new `bulk_jobs` BoltDB bucket. A startup recovery pass flips any orphan `pending`/`processing` job from a crashed run to `failed` so observers never see stale non-terminal status. Optional `callbackUrl` receives a `POST` with the final job record on completion. MCP tools `bulk_ingest_submit` / `_status` / `_list` / `_cancel` expose the same surface.
-- **Prefix autocomplete** ([services/mddbd/fts_autocomplete.go](services/mddbd/fts_autocomplete.go)). New `GET /v1/autocomplete?collection=X&q=mar[&field=title&topN=10]` returns top-N terms starting with the given prefix, ranked by document frequency. The implementation scans the existing FTS inverted index (`fts` bucket for global, `ftsf` for field-scoped) so no additional indexing is required; scan is bounded at 10000 entries to keep pathological prefixes fast. The panel's FTS search input gains a debounced (150ms) dropdown of suggestions with doc-count badges, and the MCP `autocomplete` tool mirrors the HTTP API.
+- **Prefix autocomplete** ([services/mddbd/fts_autocomplete.go](services/mddbd/internal/fts/fts_autocomplete.go)). New `GET /v1/autocomplete?collection=X&q=mar[&field=title&topN=10]` returns top-N terms starting with the given prefix, ranked by document frequency. The implementation scans the existing FTS inverted index (`fts` bucket for global, `ftsf` for field-scoped) so no additional indexing is required; scan is bounded at 10000 entries to keep pathological prefixes fast. The panel's FTS search input gains a debounced (150ms) dropdown of suggestions with doc-count badges, and the MCP `autocomplete` tool mirrors the HTTP API.
 
 ### Changed
 - **Proto `FTSRequest` / `HybridSearchRequest` each gain a `map<string, double> boost`** field — field 8 on FTSRequest, field 15 on HybridSearchRequest. All language clients (Go, Python, Node.js, PHP) regenerated via `buf generate`.
@@ -392,7 +1841,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - MCP tool surface: `geo_search`, `geo_within`, `geo_stats`, `geo_encode`, `geo_decode` (all read-only).
   - **`/v1/hybrid-search` extended** with an optional `geo: {lat, lng, radiusMeters}` field that spatially pre-filters the FTS+vector candidate pool and attaches `distanceMeters` to each result item.
   - **Panel UI**: new "Geo Search" tab with a Leaflet + OpenStreetMap map, click-to-set query center, radius slider, algorithm switch (R-tree / geohash), metadata filter composition, and result pins that open documents in the shared viewer. Adds `leaflet` as a panel dep.
-  - **New files**: [services/mddbd/geo_index.go](services/mddbd/geo_index.go), [geo_store.go](services/mddbd/geo_store.go), [geo_postcodes.go](services/mddbd/geo_postcodes.go), [geo_hash.go](services/mddbd/geo_hash.go), [geohash_index.go](services/mddbd/geohash_index.go), [geo_handlers.go](services/mddbd/geo_handlers.go), [geo_grpc.go](services/mddbd/geo_grpc.go), [mcp_direct_client_geo.go](services/mddbd/mcp_direct_client_geo.go), [mcp_tools_geo.go](services/mddbd/mcp_tools_geo.go), + tests for each.
+  - **New files**: [services/mddbd/geo_index.go](services/mddbd/internal/geo/geo_index.go), [geo_store.go](services/mddbd/internal/geo/geo_store.go), [geo_postcodes.go](services/mddbd/internal/geo/geo_postcodes.go), [geo_hash.go](services/mddbd/internal/geo/geo_hash.go), [geohash_index.go](services/mddbd/internal/geo/geohash_index.go), [geo_handlers.go](services/mddbd/geo_handlers.go), [geo_grpc.go](services/mddbd/geo_grpc.go), [mcp_direct_client_geo.go](services/mddbd/mcp_direct_client_geo.go), [mcp_tools_geo.go](services/mddbd/mcp_tools_geo.go), + tests for each.
   - **Dependency**: `github.com/tidwall/rtree v1.10.0` (pure Go, no cgo).
   - Reserved metadata keys: `geo_lat`, `geo_lng`, `geo_hash`, `geo_postcode`, `geo_country`.
   - Out of scope (deferred to a follow-up): anti-meridian crossing bboxes, 3D/altitude, automatic postcode dataset downloads, GeoJSON ingest.
@@ -411,9 +1860,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Added `govulncheck` GitHub Actions workflow** (`.github/workflows/govulncheck.yml`) — scans all three Go modules on push/PR and nightly (06:00 UTC) with `GOWORK=off` to mirror the isolation of the Tests workflow.
 
 ### Fixed
-- **Wiki table row separator rendering** ([services/mddbd/wikitext.go](services/mddbd/wikitext.go)) — `|-` row separators in wiki tables were previously unreachable: the more-generic `|` data-row branch ran first and swallowed them as empty `| |` rows. Reordered so `|-` is checked first. Surfaced by `staticcheck SA4017` during the Go 1.26.2 upgrade.
+- **Wiki table row separator rendering** ([services/mddbd/wikitext.go](services/mddbd/internal/wikitext/wikitext.go)) — `|-` row separators in wiki tables were previously unreachable: the more-generic `|` data-row branch ran first and swallowed them as empty `| |` rows. Reordered so `|-` is checked first. Surfaced by `staticcheck SA4017` during the Go 1.26.2 upgrade.
 - **`TestCharsetReader_UTF8`** ([services/mddbd/wiki_import_test.go](services/mddbd/wiki_import_test.go)) — replaced an empty `if r != nil { /* comment */ }` branch with a real `t.Errorf` so UTF-8 pass-through regressions actually fail the test (`staticcheck SA9003`).
-- **`swapParallelConfig`/`MinSize`/`Workers` test helpers** ([services/mddbd/vector_parallel_test.go](services/mddbd/vector_parallel_test.go)) — take `int32` directly (matching the underlying `atomic.Int32`) instead of `int`+conversion, eliminating `gosec G115` overflow warnings.
+- **`swapParallelConfig`/`MinSize`/`Workers` test helpers** ([services/mddbd/internal/vector/vector_parallel_test.go](services/mddbd/internal/vector/vector_parallel_test.go)) — take `int32` directly (matching the underlying `atomic.Int32`) instead of `int`+conversion, eliminating `gosec G115` overflow warnings.
 
 ### Chore
 - **License consistency sweep — BSD-3-Clause everywhere** — the canonical `LICENSE` file at the repo root declares BSD-3-Clause, but documentation, packaging metadata, and even distributed artifacts had drifted to claim MIT in several places. Audited and fixed all of them in one pass:
@@ -1007,19 +2456,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **User experience** - Immediate feedback when clicking documents
 - **Error recovery** - Users can always access document content in some form
 - **Development workflow** - Added panel to development Docker setup
-
-## [Unreleased]
-
-### Added
-- **Blog feeds in both formats** — `/feed.xml` (Atom) and `/rss.xml` (RSS 2.0), 20 most recent posts each, with a visible subscribe link on `/blog/`. Declared through SSG's `feeds:` rather than `feed: true`, which names the Atom feed after the bare hostname; SSG injects the autodiscovery `<link rel="alternate">` tags into every page itself, so the theme adds none. `feeds:` is undocumented upstream — reported as spagu/ssg#92, with spagu/ssg#93 asking for a way to opt out of the injection.
-
-### Changed
-- **The generator validates its own output; the local scripts stopped duplicating it** — SSG 1.8.19 ships the checks requested in spagu/ssg#74–#78, so `.ssg.yaml` now enables `check_links`, `check_images`, `check_meta` and `check_orphans` in strict mode, `content_exclude` drops the front-matter sample that never parsed as a page, and `static_sources` copies swagger/openapi/404/og-image **during** the build instead of a `make` step afterwards — while those were staged after the build, the generator saw every link to them as dead. `scripts/prune-sitemap.py` is deleted (SSG prunes `noindex` pages from the sitemap itself) and `check-docs-links.py` shrinks to the one thing SSG cannot see: links that resolve only through a Cloudflare Pages redirect (requested as spagu/ssg#87).
-- **The `/index/` duplicate is gone at the source** — it was an artefact, never a page anyone wanted: `docs/index.md` carries only the homepage's front matter, and leaving it in `content_dir` also rendered a near-empty second page with the same title. `content_exclude` removes it; `/` is unaffected, because the homepage renders from the template rather than the slug. The `noindex`/canonical workaround in `page.html` is dropped with it, and `/index/` now 301s to `/`. Marking it `noindex` is in fact no longer safe: SSG excludes sitemap entries per page rather than per URL, so it took the site root out of the sitemap along with the duplicate (reported as spagu/ssg#88).
-- **The SSG version is pinned** — the deploy resolved `latest`, which had already moved three releases during one afternoon. The build now depends on 1.8.18+ validation and 1.8.19 `static_sources`, so it pins both the action and the binary at 1.8.19.
-- **`webp_keep_original`** — the webp pass covers the whole output tree and replaces each original, but deliberately leaves absolute URLs alone. Our `og:image` is absolute, so replace mode deleted the PNG it points at; originals are now kept alongside the `.webp`.
-
-### Added
 - **Web Admin Panel (mddb-panel)** - Modern React-based admin interface
   - Server statistics dashboard
   - Collection browser with document count

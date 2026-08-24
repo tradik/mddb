@@ -65,6 +65,27 @@ xychart-beta
     bar [87, 40, 74, 38, 76, 36, 54, 32]
 ```
 
+## Bulk Ingest Throughput
+
+Indexing a document touches three full-text indexes, and each entry point used
+to open its own BoltDB write transaction — so a batch paid three commits per
+document. Batching a whole chunk into one transaction (GO-027) leaves the work
+unchanged and removes the commits.
+
+| | Before | After |
+|---|---|---|
+| 1000 documents, indexed | 4.20 s (**238 docs/s**) | 0.14 s (**6 996 docs/s**) |
+| Allocated | 452 MB | 68 MB |
+
+Measured with `go test -bench BenchmarkBulkIngest -benchmem -run '^$' .` in
+`services/mddbd`. The same benchmark with `SkipFTS` reports ~57 000 docs/s,
+which is the cost of the document writes alone — indexing was 99.5% of the
+time before this change.
+
+The batched index is byte-for-byte identical to the per-document one; a test
+compares every FTS bucket entry between the two paths rather than checking
+that search still returns something.
+
 ## Result Counts per Query
 
 Shows how many documents each algorithm returns (limit=10) to verify they all find relevant results.
@@ -100,7 +121,7 @@ Benchmark tool for measuring MDDB document insertion throughput. Inserts documen
 ## Prerequisites
 
 - MDDB server running (default `http://localhost:7890`)
-- Go 1.26+
+- Go 1.27+
 
 ## Build
 

@@ -5,7 +5,7 @@ import (
 	"mddb/internal/spell"
 	"net/http"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // SpellSuggestRequest is the HTTP request body for spell suggestions.

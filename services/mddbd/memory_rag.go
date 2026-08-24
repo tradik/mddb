@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // Memory RAG collection naming convention.
@@ -99,6 +99,9 @@ type MemoryRecallResponse struct {
 	Total    int                      `json:"total"`
 	Strategy string                   `json:"strategy"`
 	Query    string                   `json:"query"`
+	// ContextTruncated reports that the messages collection's
+	// contextTokenBudget dropped results from the tail (RAG-001).
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
 }
 
 // MemorySummarizeRequest is the request body for summarizing a session.
@@ -330,10 +333,9 @@ func (s *Server) handleMemoryRecall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	topK := req.TopK
-	if topK <= 0 {
-		topK = defaultRecallTopK
-	}
+	// RAG-001: memory recall always searches the fixed messages collection,
+	// so a profile set on it configures recall for every caller.
+	topK := s.ResolveTopK(memoryMessagesCollection, req.TopK, defaultRecallTopK)
 	strategy := req.Strategy
 	if strategy == "" {
 		strategy = "hybrid"
@@ -372,11 +374,17 @@ func (s *Server) handleMemoryRecall(w http.ResponseWriter, r *http.Request) {
 		results = s.memoryRecallHybrid(r.Context(), req.Query, topK, req.Threshold, req.Alpha, filterMeta, req.IncludeContent)
 	}
 
+	// RAG-001: recall feeds a model's context directly, which is the case the
+	// budget exists for. Capped against the messages collection's profile.
+	results, contextTruncated := applyContextBudget(s, memoryMessagesCollection, results,
+		func(it MemoryRecallResultItem) int { return approxTokens(it.Document.ContentMD) })
+
 	resp := MemoryRecallResponse{
-		Results:  results,
-		Total:    len(results),
-		Strategy: strategy,
-		Query:    req.Query,
+		Results:          results,
+		Total:            len(results),
+		Strategy:         strategy,
+		Query:            req.Query,
+		ContextTruncated: contextTruncated,
 	}
 	ok(w, resp)
 }

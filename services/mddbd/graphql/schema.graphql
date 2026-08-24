@@ -126,6 +126,11 @@ type Schema {
 type ValidationResult {
   valid: Boolean!
   errors: [String!]!
+  """
+  Advisory findings that do not make the document invalid (DOC-012) — today,
+  metadata values that look like a structure lost on the way in.
+  """
+  warnings: [String!]
 }
 
 # Authentication types
@@ -210,6 +215,12 @@ input VectorSearchInput {
   threshold: Float
   filterMeta: [MetaInput!]
   includeContent: Boolean
+  """
+  Recall/latency knob (SRCH-005): candidates fetched per requested result
+  before deduplication trims them. 1.0-10.0; omit to use the collection's
+  retrieval profile, then MDDB's default of 3.0.
+  """
+  oversample: Float
 }
 
 input FTSInput {
@@ -318,6 +329,14 @@ type Query {
   # Full-text search
   fts(input: FTSInput!): FTSResponse @auth
 
+  # Code connection graph (CODE-005)
+  #
+  # The ticket proposed `neighbors` as a field on Document, but Document
+  # carries no collection and edges only resolve within one — threading the
+  # collection through would change a type every query returns. A Query field
+  # matches how `fts` and `vectorSearch` already take their scope.
+  codeGraph(input: CodeGraphInput!): CodeGraph @auth
+
   # Stats
   stats: Stats @auth
 
@@ -379,4 +398,56 @@ type Mutation {
   updateGroup(name: String!, description: String!, members: [String!]!): Group! @auth @hasRole(role: ADMIN)
   deleteGroup(name: String!): Boolean! @auth @hasRole(role: ADMIN)
   setGroupPermission(input: SetGroupPermissionInput!): Boolean! @auth @hasRole(role: ADMIN)
+}
+
+# Code connection graph (CODE-005). Edges are derived from the defines/uses/
+# imports metadata of code documents; nothing is stored, so a reindex
+# reproduces the graph exactly.
+input CodeGraphInput {
+  collection: String!
+  key: String!
+  """in = what depends on this document, out = what it depends on, both (default)"""
+  direction: String
+  """Hops to follow, 1-3 (default: 1)"""
+  depth: Int
+  """Maximum neighbours per node, 1-100 (default: 100)"""
+  maxDegree: Int
+  """
+  Include the first line each edge's symbol appears on, both sides. Reads
+  document content, which a traversal otherwise never does.
+  """
+  lines: Boolean
+}
+
+type CodeGraph {
+  collection: String!
+  root: String!
+  direction: String!
+  depth: Int!
+  nodes: [CodeGraphNode!]!
+  edges: [CodeGraphEdge!]!
+  """True when a depth or degree limit cut the walk short."""
+  truncated: Boolean!
+}
+
+type CodeGraphNode {
+  key: String!
+  docId: String!
+  lang: String
+  language: String
+  depth: Int!
+}
+
+type CodeGraphEdge {
+  from: String!
+  to: String!
+  """uses-selector or imports"""
+  kind: String!
+  """The symbol or path that justifies this edge."""
+  symbol: String!
+  direction: String!
+  """First occurrence of the symbol in the source document, 0 if not literal."""
+  fromLine: Int
+  """First occurrence of the symbol in the target document, 0 if not literal."""
+  toLine: Int
 }

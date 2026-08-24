@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 )
 
@@ -57,7 +57,7 @@ func (m *MCPHTTPServer) handleResources(w http.ResponseWriter, r *http.Request) 
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"resources": resources,
 	}); err != nil {
-		log.Printf("error encoding resources response: %v", err)
+		slog.Error("encoding resources response", "err", err)
 	}
 }
 
@@ -86,7 +86,7 @@ func (m *MCPHTTPServer) handleResourceRead(w http.ResponseWriter, r *http.Reques
 			},
 		},
 	}); err != nil {
-		log.Printf("error encoding resource read response: %v", err)
+		slog.Error("encoding resource read response", "err", err)
 	}
 }
 
@@ -95,7 +95,7 @@ func (m *MCPHTTPServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"tools": mcpAllTools(m.customTools),
 	}); err != nil {
-		log.Printf("error encoding tools response: %v", err)
+		slog.Error("encoding tools response", "err", err)
 	}
 }
 
@@ -123,6 +123,6 @@ func (m *MCPHTTPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 			},
 		},
 	}); err != nil {
-		log.Printf("error encoding tool call response: %v", err)
+		slog.Error("encoding tool call response", "err", err)
 	}
 }

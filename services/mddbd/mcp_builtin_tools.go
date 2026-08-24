@@ -113,6 +113,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"mmr_lambda":      map[string]interface{}{"type": "number", "description": "MMR relevance/diversity balance 0-1; 1.0 = pure relevance, 0.0 = max diversity (default: 0.5)"},
 					"include_content": map[string]interface{}{"type": "boolean", "description": mcpIncludeContentDesc},
 					"fields":          map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": mcpFieldsDesc},
+					"oversample":      map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication or merging (1.0-10.0, default 3.0). Higher finds more, costs more."},
 				},
 				"required": []string{"collection", "query"},
 			},
@@ -183,6 +184,10 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"facet_max_values": map[string]interface{}{"type": "integer", "description": "(v2.9.14+) Cap per-key bucket count; 0 = unlimited."},
 					"include_content":  map[string]interface{}{"type": "boolean", "description": mcpIncludeContentDesc},
 					"fields":           map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": mcpFieldsDesc},
+					"highlight":        map[string]interface{}{"type": "boolean", "description": "(v2.12.0+) Return the matching fragments with the 1-based line range each occupies (startLine/endLine). Use this to locate a passage instead of reading the document: a result becomes \"css/style.css lines 41-58\"."},
+					"highlight_tag":    map[string]interface{}{"type": "string", "description": "(v2.12.0+) Tag wrapping each match in a fragment; default \"<mark>\"."},
+					"max_highlights":   map[string]interface{}{"type": "integer", "description": "(v2.12.0+) Fragments per result; default 3."},
+					"fragment_size":    map[string]interface{}{"type": "integer", "description": "(v2.12.0+) Approximate characters per fragment; default 150. Lower it for source, whose lines are short — 150 bytes covers roughly fifteen lines of CSS."},
 				},
 				"required": []string{"collection", "query"},
 			},
@@ -433,6 +438,45 @@ func mcpBuiltinToolsCore() []MCPTool {
 			},
 		},
 		{
+			Name: "search_advisor",
+			Description: "Ask how to search a collection before searching it. Measures the collection — " +
+				"how many documents, how long, how varied the vocabulary, whether they are embedded, " +
+				"whether they are code — and recommends the search type, ranking algorithm, vector index, " +
+				"fusion weights and result shape, with a plain-language reason for each choice. " +
+				"Call this once per collection instead of guessing from algorithm names; the returned " +
+				"retrievalProfile can be stored on the collection so every client inherits it.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"collection": map[string]interface{}{"type": "string", "description": "Collection to profile"},
+				},
+				"required": []string{"collection"},
+			},
+		},
+		{
+			Name: "code_graph",
+			Description: "Code connection graph. Answers what a document depends on and what depends on it: " +
+				"which stylesheet declares a selector a template applies, which pages load a script, " +
+				"what breaks if this file changes. Edges are derived from the defines/uses/imports " +
+				"metadata of code documents, resolved within one collection.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"collection": map[string]interface{}{"type": "string", "description": "Collection name"},
+					"key":        map[string]interface{}{"type": "string", "description": "Document key, e.g. theme/style.css"},
+					"direction": map[string]interface{}{
+						"type":        "string",
+						"enum":        []string{"in", "out", "both"},
+						"description": "in = what depends on this document, out = what it depends on, both (default)",
+					},
+					"depth":      map[string]interface{}{"type": "integer", "description": "Hops to follow, 1-3 (default: 1)"},
+					"max_degree": map[string]interface{}{"type": "integer", "description": "Maximum neighbours per node, 1-100 (default: 100)"},
+					"lines":      map[string]interface{}{"type": "boolean", "description": "Include the first line each edge's symbol appears on, both sides (reads document content; default: false)"},
+				},
+				"required": []string{"collection", "key"},
+			},
+		},
+		{
 			Name:        "classify_document",
 			Description: "Zero-shot document classification. Given candidate labels and either a document reference or raw text, ranks labels by semantic similarity using embeddings. No training data required.",
 			InputSchema: map[string]interface{}{
@@ -552,6 +596,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"sort":             map[string]interface{}{"type": "string", "description": "Result ordering: \"combined\" (default, by fused score) or \"distance\" (by proximity ascending — requires a geo filter on the HTTP path)"},
 					"facet_by":         map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "(v2.9.14+) Metadata keys to aggregate into response.facets."},
 					"facet_max_values": map[string]interface{}{"type": "integer", "description": "(v2.9.14+) Cap per-key bucket count; 0 = unlimited."},
+					"oversample":       map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication (1.0-10.0, default 3.0). Higher finds more, costs more."},
 				},
 				"required": []string{"collection", "query"},
 			},
@@ -904,6 +949,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"algorithm":          map[string]interface{}{"type": "string", "description": "Vector algorithm: flat (default), hnsw, ivf, pq, sq, bq"},
 					"distance_metric":    map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"include_content":    map[string]interface{}{"type": "boolean", "description": "Include document content in results"},
+					"oversample":         map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication or merging (1.0-10.0, default 3.0). Higher finds more, costs more."},
 				},
 				"required": []string{"target_collections"},
 			},

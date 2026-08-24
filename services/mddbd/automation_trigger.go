@@ -3,16 +3,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"mddb/internal/automationlog"
 	"mddb/internal/httpclient"
+	json "mddb/internal/jsonx"
 	"mddb/internal/sentiment"
 	"mddb/internal/storage"
 	"net/http"
 	"time"
-
-	json "github.com/goccy/go-json"
 )
 
 // TriggerMatch represents a document that matched a trigger's search criteria.
@@ -157,7 +157,7 @@ func (am *AutomationManager) evalFTS(trigger *AutomationRule, doc *storage.Doc) 
 
 	results, err := s.FTSIndex.Search(trigger.Collection, trigger.Query, 100)
 	if err != nil {
-		log.Printf("trigger %s: FTS search error: %v", trigger.ID, err) // #nosec G706 -- internal log
+		slog.Warn("trigger FTS search error", "iD", trigger.ID, "err", err) // #nosec G706 -- internal log
 		return 0, false
 	}
 
@@ -190,7 +190,7 @@ func (am *AutomationManager) evalVector(trigger *AutomationRule, doc *storage.Do
 
 	queryVector, err := s.Embedding.Embed(ctx, trigger.Query)
 	if err != nil {
-		log.Printf("trigger %s: embedding error: %v", trigger.ID, err) // #nosec G706 -- internal log
+		slog.Warn("trigger embedding error", "iD", trigger.ID, "err", err) // #nosec G706 -- internal log
 		return 0, false
 	}
 
@@ -216,14 +216,14 @@ func (am *AutomationManager) evalHybrid(trigger *AutomationRule, doc *storage.Do
 		Collection: trigger.Collection,
 		Query:      trigger.Query,
 		TopK:       100,
-		Alpha:      0.5,
+		Alpha:      floatPtr(0.5),
 		Strategy:   "alpha",
 	}
 
 	// Override from searchParams if provided
 	if sp := trigger.SearchParams; sp != nil {
 		if v, ok := sp["alpha"].(float64); ok {
-			req.Alpha = v
+			req.Alpha = floatPtr(v)
 		}
 		if v, ok := sp["strategy"].(string); ok {
 			req.Strategy = v
@@ -246,14 +246,14 @@ func (am *AutomationManager) evalHybrid(trigger *AutomationRule, doc *storage.Do
 	// Run FTS
 	ftsResults, err := s.runFTSSearch(req)
 	if err != nil {
-		log.Printf("trigger %s: hybrid FTS error: %v", trigger.ID, err) // #nosec G706 -- internal log
+		slog.Warn("trigger hybrid FTS error", "iD", trigger.ID, "err", err) // #nosec G706 -- internal log
 	}
 
 	// Run vector
 	ctx := context.Background()
 	vectorResults, err := s.runVectorSearch(ctx, req)
 	if err != nil {
-		log.Printf("trigger %s: hybrid vector error: %v", trigger.ID, err) // #nosec G706 -- internal log
+		slog.Warn("trigger hybrid vector error", "iD", trigger.ID, "err", err) // #nosec G706 -- internal log
 	}
 
 	// Merge
@@ -262,7 +262,7 @@ func (am *AutomationManager) evalHybrid(trigger *AutomationRule, doc *storage.Do
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, req.RRFK, req.TopK)
 	default:
-		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, req.TopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(req.Alpha), req.TopK)
 	}
 
 	for _, m := range merged {
@@ -279,6 +279,14 @@ func (am *AutomationManager) evalHybrid(trigger *AutomationRule, doc *storage.Do
 
 // RunTrigger executes a trigger's search and returns all matches above threshold.
 // Used by cron scheduler and manual test endpoint.
+// ErrUnknownSearchType reports a trigger configured with a search type MDDB
+// does not implement.
+//
+// This used to return (nil, nil): no matches and no error, indistinguishable
+// from a trigger that simply matched nothing. An operator who mistyped
+// "hybrid" would see a rule that never fires and no reason why (TEST-002).
+var ErrUnknownSearchType = errors.New("unknown trigger search type")
+
 func (am *AutomationManager) RunTrigger(trigger *AutomationRule) ([]TriggerMatch, error) {
 	if am.server == nil {
 		return nil, nil
@@ -292,7 +300,7 @@ func (am *AutomationManager) RunTrigger(trigger *AutomationRule) ([]TriggerMatch
 	case "hybrid":
 		return am.runTriggerHybrid(trigger)
 	default:
-		return nil, nil
+		return nil, fmt.Errorf("%w: %q (want fts, vector or hybrid)", ErrUnknownSearchType, trigger.SearchType)
 	}
 }
 
@@ -361,7 +369,7 @@ func (am *AutomationManager) runTriggerHybrid(trigger *AutomationRule) ([]Trigge
 		Collection:      trigger.Collection,
 		Query:           trigger.Query,
 		TopK:            100,
-		Alpha:           0.5,
+		Alpha:           floatPtr(0.5),
 		Strategy:        "alpha",
 		Algorithm:       "bm25",
 		VectorAlgorithm: "flat",
@@ -369,7 +377,7 @@ func (am *AutomationManager) runTriggerHybrid(trigger *AutomationRule) ([]Trigge
 
 	if sp := trigger.SearchParams; sp != nil {
 		if v, ok := sp["alpha"].(float64); ok {
-			req.Alpha = v
+			req.Alpha = floatPtr(v)
 		}
 		if v, ok := sp["strategy"].(string); ok {
 			req.Strategy = v
@@ -385,7 +393,7 @@ func (am *AutomationManager) runTriggerHybrid(trigger *AutomationRule) ([]Trigge
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, req.RRFK, req.TopK)
 	default:
-		merged = mergeAlpha(ftsResults, vectorResults, req.Alpha, req.TopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(req.Alpha), req.TopK)
 	}
 
 	var matches []TriggerMatch
@@ -407,13 +415,13 @@ func (am *AutomationManager) runTriggerHybrid(trigger *AutomationRule) ([]Trigge
 func (am *AutomationManager) RunTriggerAndFire(trigger *AutomationRule) {
 	webhook := am.GetWebhook(trigger.WebhookID)
 	if webhook == nil || !webhook.Enabled {
-		log.Printf("trigger %s: webhook %s not found or disabled", trigger.ID, trigger.WebhookID)
+		slog.Info("trigger webhook not found or disabled", "iD", trigger.ID, "webhookID", trigger.WebhookID)
 		return
 	}
 
 	matches, err := am.RunTrigger(trigger)
 	if err != nil {
-		log.Printf("trigger %s: search error: %v", trigger.ID, err)
+		slog.Warn("trigger search error", "iD", trigger.ID, "err", err)
 		return
 	}
 
@@ -422,7 +430,7 @@ func (am *AutomationManager) RunTriggerAndFire(trigger *AutomationRule) {
 	}
 
 	if len(matches) > 0 {
-		log.Printf("trigger %s: fired webhook %s for %d matches", trigger.ID, webhook.ID, len(matches))
+		slog.Info("trigger fired webhook matches", "iD", trigger.ID, "iD2", webhook.ID, "matchesCount", len(matches))
 	}
 }
 
@@ -454,7 +462,7 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 
 	data, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("cron %s: marshal error: %v", cronID, err)
+		slog.Warn("cron marshal error", "cronID", cronID, "err", err)
 		return
 	}
 
@@ -466,6 +474,20 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 	// Expand template variables in webhook URL and headers
 	cronVars := BuildCronVars(webhook, cronID, cronName)
 	expandedURL, expandedHeaders := expandWebhookURLAndHeaders(webhook.URL, webhook.Headers, cronVars)
+
+	// The URL is a template, and expansion puts variables into it — so the
+	// destination is not fixed by the stored configuration alone. Validated
+	// once here rather than per retry attempt: the pooled transport refuses
+	// these addresses at dial time too, but a message naming the reason beats
+	// three identical dial failures, and a guard a reader can see beats one
+	// buried in a transport. CodeQL reported the second of these two sites as
+	// critical go/request-forgery; both have the same shape.
+	safeURL, err := httpclient.ValidateOutboundURL(expandedURL)
+	if err != nil {
+		slog.Warn("webhook destination refused", "iD", webhook.ID, "err", err) // #nosec G706 -- internal log
+		return
+	}
+	expandedURL = safeURL
 
 	var finalStatus string
 	var lastHTTPStatus int
@@ -481,7 +503,7 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 
 		req, err := http.NewRequest(method, expandedURL, bytes.NewReader(data))
 		if err != nil {
-			log.Printf("cron %s → webhook %s: request error: %v", cronID, webhook.ID, err)
+			slog.Warn("cron webhook request error", "cronID", cronID, "iD", webhook.ID, "err", err)
 			lastError = err.Error()
 			finalStatus = "error"
 			break
@@ -497,7 +519,7 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 
 		resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req)
 		if err != nil {
-			log.Printf("cron %s → webhook %s: attempt %d failed: %v", cronID, webhook.ID, attempt+1, err)
+			slog.Warn("cron webhook attempt failed", "cronID", cronID, "iD", webhook.ID, "attempt", attempt+1, "err", err)
 			lastError = err.Error()
 			finalStatus = "error"
 			continue
@@ -510,7 +532,7 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 			lastError = ""
 			break
 		}
-		log.Printf("cron %s → webhook %s: attempt %d got status %d", cronID, webhook.ID, attempt+1, resp.StatusCode)
+		slog.Info("cron webhook attempt returned an error status", "cronID", cronID, "iD", webhook.ID, "attempt", attempt+1, "statusCode", resp.StatusCode)
 		lastError = fmt.Sprintf("HTTP %d", resp.StatusCode)
 		finalStatus = "error"
 	}
@@ -519,7 +541,7 @@ func fireCronWebhook(webhook *AutomationRule, cronID, cronName string, logStore 
 		finalStatus = "error"
 	}
 	if finalStatus == "error" {
-		log.Printf("cron %s → webhook %s: all retries exhausted", cronID, webhook.ID)
+		slog.Info("cron webhook all retries exhausted", "cronID", cronID, "iD", webhook.ID)
 	}
 
 	if logStore != nil {
@@ -558,7 +580,7 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 
 	data, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("trigger %s: marshal error: %v", trigger.ID, err) // #nosec G706 -- internal log
+		slog.Warn("trigger marshal error", "iD", trigger.ID, "err", err) // #nosec G706 -- internal log
 		return
 	}
 
@@ -570,6 +592,20 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 	// Expand template variables in webhook URL and headers
 	triggerVars := BuildTriggerVars(webhook, trigger, doc, collection, score, sentimentScore)
 	expandedURL, expandedHeaders := expandWebhookURLAndHeaders(webhook.URL, webhook.Headers, triggerVars)
+
+	// The URL is a template, and expansion puts variables into it — so the
+	// destination is not fixed by the stored configuration alone. Validated
+	// once here rather than per retry attempt: the pooled transport refuses
+	// these addresses at dial time too, but a message naming the reason beats
+	// three identical dial failures, and a guard a reader can see beats one
+	// buried in a transport. CodeQL reported the second of these two sites as
+	// critical go/request-forgery; both have the same shape.
+	safeURL, err := httpclient.ValidateOutboundURL(expandedURL)
+	if err != nil {
+		slog.Warn("webhook destination refused", "iD", webhook.ID, "err", err) // #nosec G706 -- internal log
+		return
+	}
+	expandedURL = safeURL
 
 	var finalStatus string
 	var lastHTTPStatus int
@@ -585,7 +621,7 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 
 		req, err := http.NewRequest(method, expandedURL, bytes.NewReader(data)) // #nosec G704 -- URL from internal webhook config
 		if err != nil {
-			log.Printf("trigger %s → webhook %s: request error: %v", trigger.ID, webhook.ID, err) // #nosec G706 -- internal log
+			slog.Warn("trigger webhook request error", "iD", trigger.ID, "iD2", webhook.ID, "err", err) // #nosec G706 -- internal log
 			lastError = err.Error()
 			finalStatus = "error"
 			break
@@ -601,7 +637,7 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 
 		resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req) // #nosec G704 -- URL from internal webhook config
 		if err != nil {
-			log.Printf("trigger %s → webhook %s: attempt %d failed: %v", trigger.ID, webhook.ID, attempt+1, err) // #nosec G706 -- internal log
+			slog.Warn("trigger webhook attempt failed", "iD", trigger.ID, "iD2", webhook.ID, "attempt", attempt+1, "err", err) // #nosec G706 -- internal log
 			lastError = err.Error()
 			finalStatus = "error"
 			continue
@@ -614,7 +650,7 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 			lastError = ""
 			break
 		}
-		log.Printf("trigger %s → webhook %s: attempt %d got status %d", trigger.ID, webhook.ID, attempt+1, resp.StatusCode) // #nosec G706 -- internal log
+		slog.Info("trigger webhook attempt returned an error status", "iD", trigger.ID, "iD2", webhook.ID, "attempt", attempt+1, "statusCode", resp.StatusCode) // #nosec G706 -- internal log
 		lastError = fmt.Sprintf("HTTP %d", resp.StatusCode)
 		finalStatus = "error"
 	}
@@ -623,7 +659,7 @@ func fireAutomationWebhook(webhook *AutomationRule, trigger *AutomationRule, doc
 		finalStatus = "error"
 	}
 	if finalStatus == "error" {
-		log.Printf("trigger %s → webhook %s: all retries exhausted", trigger.ID, webhook.ID) // #nosec G706 -- internal log
+		slog.Info("trigger webhook all retries exhausted", "iD", trigger.ID, "iD2", webhook.ID) // #nosec G706 -- internal log
 	}
 
 	if logStore != nil {

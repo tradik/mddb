@@ -39,7 +39,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/css/tradik-tokens.css">
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/landing.css">
 
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
@@ -61,7 +61,7 @@
       "description": "AI-native knowledge base with built-in MCP server, vector search, RAG support, and semantic retrieval for AI agents and LLM workflows",
       "softwareVersion": "2.11.4",
       "featureList": [
-        "Built-in MCP server (2025-11-25) with 79 tools, tool annotations, prompts, completion, structured output — stdio, Streamable HTTP, SSE transports for Claude, Cursor, Windsurf, ChatGPT, Ollama, DeepSeek",
+        "Built-in MCP server (2025-11-25) with 81 tools, tool annotations, prompts, completion, structured output — stdio, Streamable HTTP, SSE transports for Claude, Cursor, Windsurf, ChatGPT, Ollama, DeepSeek",
         "Vector/semantic search with 7 index algorithms: Flat, HNSW, IVF, PQ, OPQ, SQ, BQ + per-collection int8/int4 quantization (OpenAI, Ollama, Cohere, Voyage AI)",
         "Hybrid search combining sparse BM25 + dense vector with alpha blending and Reciprocal Rank Fusion",
         "Full-text search with TF-IDF, BM25, BM25F, PMISparse scoring, 7 search modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy), multi-language stemming (18 languages), typo tolerance, per-query metadata boost/demote, and prefix autocomplete",
@@ -417,6 +417,23 @@
 
             function esc(t) { const d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
+            // A character scan, not replace(/<[^>]*>/g, ''). That regex needs a
+            // closing > to match, so an unterminated tag survives it whole:
+            // "hi <img src=x onerror=alert(1)" comes out unchanged. This scan
+            // drops everything from a < onward until a > closes it, or to the
+            // end if none does. Same algorithm as the server's
+            // strip_html_tags, so the message echoed here matches what the
+            // server stores.
+            function stripTags(t) {
+                let out = '', inTag = false;
+                for (const ch of t) {
+                    if (ch === '<') inTag = true;
+                    else if (ch === '>' && inTag) inTag = false;
+                    else if (!inTag) out += ch;
+                }
+                return out;
+            }
+
             // --- WebSocket ---
             function wsConnect() {
                 if (ws && ws.readyState === WebSocket.OPEN) return;
@@ -565,7 +582,7 @@
 
             function sendMsg() {
                 if (state.isStreaming || !state.isJoined) return;
-                const content = inputEl.value.replace(/<[^>]*>/g, '').trim().slice(0, 2000);
+                const content = stripTags(inputEl.value).trim().slice(0, 2000);
                 if (!content) return;
                 inputEl.value = ''; inputEl.style.height = 'auto';
                 state.messages.push({ role: 'user', content });

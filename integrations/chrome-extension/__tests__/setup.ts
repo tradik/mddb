@@ -101,6 +101,7 @@ const chromeMock = {
   },
   permissions: {
     request: jest.fn(async () => true),
+    remove: jest.fn(async () => true),
   },
 };
 
@@ -116,6 +117,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   chromeMock.runtime.lastError = undefined;
   chromeMock.permissions.request.mockImplementation(async () => true);
+  chromeMock.permissions.remove.mockImplementation(async () => true);
   chromeMock.runtime.sendMessage.mockImplementation(
     (msg: unknown, cb?: (resp: unknown) => void) => {
       if (cb) cb({ status: null });

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // ---------- 1. handleReplicationStatus - standalone (empty role) ----------

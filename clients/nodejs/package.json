@@ -1,7 +1,7 @@
 {
   "name": "@tradik/mddb-client",
-  "version": "2.11.4",
-  "description": "Node.js gRPC client example for MDDB (Markdown Database).",
+  "version": "2.12.0",
+  "description": "Node.js gRPC client for MDDB (Markdown Database).",
   "license": "BSD-3-Clause",
   "author": "tradik",
   "homepage": "https://github.com/tradik/mddb",
@@ -11,12 +11,22 @@
     "directory": "clients/nodejs"
   },
   "type": "commonjs",
-  "main": "example.js",
+  "main": "index.js",
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
     "@grpc/proto-loader": "^0.7.13"
+  },
+  "files": [
+    "index.js",
+    "proto/",
+    "example.js",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test \"test/*.test.js\"",
+    "example": "node example.js"
   }
 }

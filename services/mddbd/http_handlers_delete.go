@@ -3,14 +3,13 @@ package main
 import (
 	"bytes"
 	"errors"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/binlog"
+	json "mddb/internal/jsonx"
 	"mddb/internal/storage"
 	"net/http"
 	"strings"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 // handleDelete deletes a single document from a collection
@@ -149,13 +148,6 @@ func (s *Server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) 
 			}
 			bo.Delete("docs", k)
 
-			// Delete from bykey index
-			bykKey := storage.ByKeyKey(req.Collection, doc.Key, doc.Lang)
-			if err := bByK.Delete(bykKey); err != nil {
-				return err
-			}
-			bo.Delete("bykey", bykKey)
-
 			// Delete all revisions
 			rc := bRev.Cursor()
 			rp := storage.RevPrefix(req.Collection, doc.ID)
@@ -178,6 +170,14 @@ func (s *Server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) 
 			}
 
 			deletedCount++
+		}
+
+		// DOC-016: every key-index entry for this collection, cleared by
+		// prefix. The per-document delete above named one spelling, so a
+		// document written as "README.md" and again as "readme.md" left the
+		// other entry pointing at a document that no longer exists.
+		if err := deleteCollectionByKeyEntries(bByK, req.Collection, &bo); err != nil {
+			return err
 		}
 
 		return nil
@@ -213,6 +213,6 @@ func (s *Server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) 
 		"collection":   req.Collection,
 		"deletedCount": deletedCount,
 	}); err != nil {
-		log.Printf("Error encoding delete collection response: %v", err)
+		slog.Error("encoding delete collection response", "err", err)
 	}
 }

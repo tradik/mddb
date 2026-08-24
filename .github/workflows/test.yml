@@ -17,7 +17,11 @@ on:
       - 'go.work'
       - 'tools/bench/**'
       - 'test/**'
+      - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'
+      - 'scripts/check-proto-plugins.sh'
+      - 'scripts/check-coverage-areas.sh'
+      - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
   pull_request:
     branches: [main, develop]
@@ -31,12 +35,16 @@ on:
       - 'go.work'
       - 'tools/bench/**'
       - 'test/**'
+      - 'test/upgrade-fixtures/**'
       - 'scripts/check-go-version.sh'
+      - 'scripts/check-proto-plugins.sh'
+      - 'scripts/check-coverage-areas.sh'
+      - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.27.0"
   # Disable Go workspace mode in CI so each module builds/tests in isolation.
   # This catches missing `require` entries that go.work would hide by
   # transparently resolving sibling modules. Developers get the workspace
@@ -51,10 +59,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddbd/go.sum
@@ -77,15 +85,80 @@ jobs:
         working-directory: clients/go/mddb
         run: go test -race ./...
 
+      # TEST-001: the CLI had one test file covering four helpers (0.9% of the
+      # module) because every command was an anonymous closure inside a
+      # 1447-line main(). The commands are now testable, and the floor keeps
+      # them tested — raise it when you improve the area, never lower it.
       - name: Build & test mddb-cli
         working-directory: services/mddb-cli
         run: |
           go mod tidy
           go build ./...
-          go test ./...
+          go test -race -coverprofile=coverage.out ./...
+          pct=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          echo "mddb-cli coverage: ${pct}%"
+          awk -v p="$pct" 'BEGIN { if (p+0 < 88) { print "coverage " p "% is below the 88% floor"; exit 1 } }'
+
+      # TEST-003: every saved crasher is replayed on every run — that is what
+      # `go test` does with testdata/fuzz corpora, so a bug found once can
+      # never come back silently. The short fuzz budget below looks for new
+      # ones; it is deliberately small so a PR is not held up by luck.
+      # TEST-003: a database written by an older release must still open.
+      # Runs here as well as in the release workflow, because a compatibility
+      # break should surface in the pull request that causes it rather than
+      # weeks later when someone tries to tag.
+      - name: Upgrade compatibility (older release fixtures)
+        working-directory: services/mddbd
+        run: go test -run 'TestOpensFixturesFromOlderReleases|TestFixtureContentIsUnchanged' ./
+
+      - name: Run fuzz corpus (regressions)
+        working-directory: services/mddbd
+        run: go test -run 'Fuzz' ./...
+
+      - name: Fuzz (short budget, new inputs)
+        working-directory: services/mddbd
+        run: |
+          set -e
+          # One target per package, 20s each. Nightly runs the long budgets.
+          go test -run='^$' -fuzz='^FuzzParseQueryExpression$'    -fuzztime=20s ./internal/fts/
+          go test -run='^$' -fuzz='^FuzzUnmarshalEmbeddingRecord$' -fuzztime=20s ./internal/vector/
+          go test -run='^$' -fuzz='^FuzzUnmarshalBinlogEntry$'     -fuzztime=20s ./internal/binlog/
+          go test -run='^$' -fuzz='^FuzzDecompressDoc$'            -fuzztime=20s ./internal/compression/
+          go test -run='^$' -fuzz='^FuzzLoadDoc$'                  -fuzztime=20s ./
+          go test -run='^$' -fuzz='^FuzzPersistenceRoundTrip$'   -fuzztime=20s ./
+
+      # TEST-002: one number for a package of 150 files looked healthy while
+      # the surfaces handling uploads, 80 MCP tools and automation triggers sat
+      # at 22% between them. The floors are ratchets — raise one when you
+      # improve an area, never lower one to make a build pass.
+      - name: Per-area coverage floors
+        run: bash scripts/check-coverage-areas.sh
+
+      - name: Run coverage-floor guard test suite
+        run: bash scripts/tests/test-coverage-areas.sh
+
+      # OPS-018: a tag is a mutable pointer. tj-actions/changed-files had every
+      # one of its tags repointed at a secret-dumping commit in March 2025, and
+      # thousands of repositories picked it up within hours. A SHA cannot be
+      # repointed.
+      - name: Every action is pinned to a commit SHA
+        run: bash scripts/check-action-pins.sh
+
+      - name: Run action-pin guard test suite
+        run: bash scripts/tests/test-action-pins.sh
+
+      # DOC-013: check-docs-links.py checks the built site, so nothing checked
+      # README.md — which is what most people read first, and which linked six
+      # pages that never existed. 33 dead links across the tree on the first
+      # run.
+      - name: Relative Markdown links resolve
+        run: bash scripts/check-repo-links.sh
+
+      - name: Run repo-link guard test suite
+        run: bash scripts/tests/test-repo-links.sh
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v7
+        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7
         with:
           files: ./services/mddbd/coverage.out
           flags: unittests
@@ -97,10 +170,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddbd/go.sum
@@ -119,17 +192,35 @@ jobs:
           echo "All Go files are gofmt-formatted."
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: latest
           working-directory: services/mddbd
           args: --timeout=5m
 
       - name: Run golangci-lint (shared Go client)
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: latest
           working-directory: clients/go/mddb
+          args: --timeout=5m
+
+      # OPS-008: these two were linted by nobody. mddb-cli was a single
+      # untestable main() until TEST-001 and tools/bench had three helpers
+      # under test; both now carry real code, and gosec runs inside
+      # golangci-lint as well as in the SAST workflow.
+      - name: Run golangci-lint (mddb-cli)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: latest
+          working-directory: services/mddb-cli
+          args: --timeout=5m
+
+      - name: Run golangci-lint (tools/bench)
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: latest
+          working-directory: tools/bench
           args: --timeout=5m
 
   proto:
@@ -138,17 +229,28 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           # buf breaking needs the full history of the target branch to
           # compare against.
           fetch-depth: 0
 
       - name: Set up buf
-        uses: bufbuild/buf-setup-action@v1
+        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
         with:
-          version: "1.50.0"
+          version: "1.72.0"
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The protocolbuffers/go plugin in buf.gen.yaml generates the code that
+      # links against google.golang.org/protobuf in go.mod. The two drifted
+      # once already (plugin v1.36.11, runtime v1.36.12) because a dependency
+      # bump touched go.mod alone — a mismatch that surfaces as an
+      # unmarshalling bug rather than a build error.
+      - name: Verify protobuf plugin and runtime agree
+        run: bash scripts/check-proto-plugins.sh --print
+
+      - name: Run proto plugin guard test suite
+        run: bash scripts/tests/test-proto-plugins.sh
 
       - name: Lint proto files
         run: buf lint
@@ -195,7 +297,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Guards against Go toolchain version drift (DOC-003): every pinned
       # `toolchain goX.Y.Z` (go.work + each go.mod), every `GO_VERSION:`
@@ -208,6 +310,233 @@ jobs:
       - name: Run guard test suite
         run: bash scripts/tests/test-go-version.sh
 
+      # DOC-014: the CHANGELOG grew a second [Unreleased] section mid-history,
+      # so recent work sat between 2025 releases and anything reading "the
+      # Unreleased section" could pick the wrong one.
+      - name: Verify CHANGELOG structure
+        run: bash scripts/check-changelog.sh
+
+      - name: Run CHANGELOG guard test suite
+        run: bash scripts/tests/test-changelog.sh
+
+      # DOC-011: the release version is written in eight places by hand and has
+      # drifted before — the CHANGELOG once described a version the binary did
+      # not report and no tag existed for.
+      - name: Verify the release version is consistent
+        run: bash scripts/check-version.sh --print
+
+      - name: Run release-version guard test suite
+        run: bash scripts/tests/test-version.sh
+
+      # INT-018: the per-tool instruction files are generated from AGENTS.md.
+      # Editing a copy instead of the source is how four of them drift apart.
+      - name: Verify agent instructions are generated from their source
+        run: python3 scripts/gen-agent-instructions.py --check
+
+  clients-nodejs:
+    name: Node client (lockfile + audit)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: clients/nodejs/package-lock.json
+
+      # INT-016: the client shipped without a lockfile, so its builds were not
+      # reproducible and `npm audit` refused to run at all. `npm ci` fails if
+      # the lockfile is missing or out of sync with package.json, which keeps
+      # both properties true from here on.
+      - name: Install from lockfile
+        working-directory: clients/nodejs
+        # --ignore-scripts: `npm ci` runs lifecycle scripts from every
+        # transitive dependency, which is arbitrary code execution on a
+        # runner holding repository credentials. Nothing here needs one.
+        run: npm ci --ignore-scripts
+
+      - name: npm audit (production, high+)
+        working-directory: clients/nodejs
+        run: npm audit --omit=dev --audit-level=high
+
+      # TEST-001: the package had no tests and no importable client — `main`
+      # pointed at example.js, so requiring it ran a demo against localhost.
+      # These start a gRPC server in-process; no MDDB instance is needed.
+      - name: Run client tests
+        working-directory: clients/nodejs
+        run: npm test
+
+  clients-python:
+    name: Python client
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      # The generated stubs are gitignored, so a fresh checkout does not have
+      # them and `from mddb_client import mddb_pb2` cannot resolve. This job
+      # was added in this release and had never passed for exactly that
+      # reason — it tested an import of a module the checkout did not contain.
+      - name: Set up buf
+        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+        with:
+          version: "1.72.0"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # generate.sh, not `buf generate`: the Python gRPC plugin emits an
+      # absolute `import mddb_pb2`, and the rewrite to a relative import lives
+      # in that script. Calling buf directly here would regenerate the very
+      # bug TEST-001 fixed.
+      - name: Generate the client stubs
+        run: ./proto/generate.sh
+
+      # TEST-001: `import mddb_client` raised ModuleNotFoundError, because the
+      # generated stub used an absolute `import mddb_pb2` that only resolves
+      # when the files sit on sys.path directly. The package had never been
+      # importable, and nothing noticed because nothing imported it.
+      # uv sync --locked, not pip install: every version comes from the
+      # committed uv.lock and the run fails if the lock and pyproject.toml
+      # disagree. A CI job that resolves dependencies afresh on every run is
+      # a job whose result depends on what PyPI published this morning.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+
+      - name: Install the client and its test extra
+        working-directory: clients/python
+        run: uv sync --locked --extra test
+
+      - name: The package imports at all
+        working-directory: clients/python
+        run: uv run --no-sync python -c "from mddb_client import MddbClient, mddb_pb2; print(MddbClient)"
+
+      - name: Run client tests
+        working-directory: clients/python
+        run: uv run --no-sync pytest -q
+
+  panel:
+    name: Panel (build + tests)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: services/mddb-panel/package-lock.json
+
+      - name: Install from lockfile
+        working-directory: services/mddb-panel
+        # --ignore-scripts: `npm ci` runs lifecycle scripts from every
+        # transitive dependency, which is arbitrary code execution on a
+        # runner holding repository credentials. Nothing here needs one.
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        working-directory: services/mddb-panel
+        run: npm run lint
+
+      - name: Test
+        working-directory: services/mddb-panel
+        run: npm test
+
+      # A panel that does not build is a release with no UI, and nothing was
+      # checking it.
+      - name: Build
+        working-directory: services/mddb-panel
+        run: npm run build
+
+  langchain-adapter:
+    name: LangChain adapter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: '3.12'
+
+      # INT-017: the adapter is a mapping between two interfaces, and what
+      # breaks it is a field named differently on the two sides. The suite runs
+      # against a fake client, so no MDDB instance is needed — but the fake has
+      # to match the real signatures, which is why one of its tests exists.
+      # Same reasoning as the Python client job: versions come from the
+      # committed uv.lock rather than from whatever resolves today.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.4"
+
+      - name: Install
+        working-directory: integrations/langchain-mddb
+        run: uv sync --locked --extra test
+
+      - name: Run tests
+        working-directory: integrations/langchain-mddb
+        run: uv run --no-sync pytest -q
+
+  chat:
+    name: mddb-chat (Rust)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup component add clippy rustfmt
+
+      - name: Cache cargo
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            services/mddb-chat/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('services/mddb-chat/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+
+      # TEST-001: the crate had 10 tests in 3 of 27 files. Writing the rest
+      # surfaced a queue that double-booked every admission, a CORS setting
+      # that was ignored, and a turn limit that capped nothing.
+      # mddb-chat's build script runs prost-build, which shells out to protoc.
+      # The runner does not ship one, so this job could never get as far as a
+      # test — it failed in the build script every time.
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Run tests
+        working-directory: services/mddb-chat
+        run: cargo test --all-targets
+
+      - name: Check formatting
+        working-directory: services/mddb-chat
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: services/mddb-chat
+        run: cargo clippy --all-targets
+
   build:
     name: Build Binaries
     runs-on: ubuntu-latest
@@ -218,10 +547,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: |
@@ -250,10 +579,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: test/go.sum
@@ -270,3 +599,24 @@ jobs:
       - name: Vet benchmark binaries
         working-directory: test
         run: go vet ./...
+
+      # TEST-001: tools/bench had one test file covering three arithmetic
+      # helpers. The numbers this tool prints are the ones people quote, so a
+      # division that yields +Inf is a wrong answer stated with authority.
+      - name: Build & test tools/bench
+        working-directory: tools/bench
+        run: |
+          go build ./...
+          go vet ./...
+          go test -race -coverprofile=coverage.out ./...
+          pct=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          echo "tools/bench coverage: ${pct}%"
+          # The guard used to be an awk one-liner with an unterminated quote,
+          # so the step exited 2 on every run whatever the coverage was — it
+          # printed the number and then failed regardless of it.
+          awk -v p="$pct" 'BEGIN {
+            if (p + 0 < 68) {
+              printf "::error::tools/bench coverage %s%% is below the 68%% floor\n", p
+              exit 1
+            }
+          }'

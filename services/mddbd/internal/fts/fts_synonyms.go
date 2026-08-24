@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 var bucketSynonyms = []byte("synonyms")
@@ -34,6 +34,15 @@ func (sm *SynonymManager) SetBinlog(bl *binlog.Binlog) {
 }
 
 // EnsureBucket creates the synonyms bucket if it doesn't exist.
+// Reload points the manager at a freshly swapped database handle after a
+// restore and rebuilds its cache from it (SEC-015/SEC-016).
+func (sm *SynonymManager) Reload(db *bolt.DB) error {
+	sm.mu.Lock()
+	sm.db = db
+	sm.mu.Unlock()
+	return sm.LoadAll()
+}
+
 func (sm *SynonymManager) EnsureBucket() error {
 	return sm.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists(bucketSynonyms)

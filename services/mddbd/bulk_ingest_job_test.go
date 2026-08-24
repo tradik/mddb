@@ -10,8 +10,8 @@ import (
 
 	proto "mddb/proto"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // protoBatchDoc is a one-liner helper for tests that need a pointer to a

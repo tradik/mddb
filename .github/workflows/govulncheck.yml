@@ -22,7 +22,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: "1.26.5"
+  GO_VERSION: "1.27.0"
   # Scan each module in isolation — mirrors the Tests workflow so we catch
   # vulnerabilities reachable from each module's declared deps, not the
   # workspace-merged graph.
@@ -48,10 +48,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: ${{ matrix.module.path }}/go.sum
@@ -62,3 +62,42 @@ jobs:
       - name: Run govulncheck
         working-directory: ${{ matrix.module.path }}
         run: govulncheck ./...
+
+  # OPS-008: mddb-chat is a shipped service whose dependency graph had never
+  # been scanned — govulncheck only knows Go, and nothing else looked at Rust.
+  cargo-audit:
+    name: cargo audit (mddb-chat)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Rust
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Cache cargo
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+          key: cargo-audit-${{ runner.os }}-${{ hashFiles('services/mddb-chat/Cargo.lock') }}
+          restore-keys: cargo-audit-${{ runner.os }}-
+
+      # 0.22.2 and not older: cargo-audit 0.21 cannot parse a CVSS 4.0 vector
+      # and dies loading today's advisory database, which reads as "no
+      # vulnerabilities" to anyone not reading the log carefully.
+      # --force because the runner image already ships a cargo-audit, and
+      # `cargo install` refuses rather than replacing it: "binary
+      # `cargo-audit` already exists in destination". Without it the step
+      # fails before auditing anything, which is the worst way for a security
+      # job to fail — red for a reason that has nothing to do with the
+      # dependencies it was meant to check.
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --version 0.22.2 --locked --force # NOSONAR -- immutable, explicitly pinned tool version
+
+      - name: Audit dependencies
+        working-directory: services/mddb-chat
+        run: cargo audit

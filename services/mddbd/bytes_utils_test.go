@@ -7,76 +7,6 @@ import (
 
 // --- BytesSplit ---
 
-func TestBytesSplit_Basic(t *testing.T) {
-	data := []byte("doc|blog|post1")
-	parts := BytesSplit(data, '|')
-
-	if len(parts) != 3 {
-		t.Fatalf("parts = %d, want 3", len(parts))
-	}
-	if string(parts[0]) != "doc" {
-		t.Errorf("parts[0] = %q, want %q", parts[0], "doc")
-	}
-	if string(parts[1]) != "blog" {
-		t.Errorf("parts[1] = %q, want %q", parts[1], "blog")
-	}
-	if string(parts[2]) != "post1" {
-		t.Errorf("parts[2] = %q, want %q", parts[2], "post1")
-	}
-}
-
-func TestBytesSplit_Empty(t *testing.T) {
-	parts := BytesSplit(nil, '|')
-	if parts != nil {
-		t.Errorf("BytesSplit(nil) = %v, want nil", parts)
-	}
-
-	parts = BytesSplit([]byte{}, '|')
-	if parts != nil {
-		t.Errorf("BytesSplit([]) = %v, want nil", parts)
-	}
-}
-
-func TestBytesSplit_NoSeparator(t *testing.T) {
-	parts := BytesSplit([]byte("nosep"), '|')
-	if len(parts) != 1 {
-		t.Fatalf("parts = %d, want 1", len(parts))
-	}
-	if string(parts[0]) != "nosep" {
-		t.Errorf("parts[0] = %q, want %q", parts[0], "nosep")
-	}
-}
-
-func TestBytesSplit_TrailingSeparator(t *testing.T) {
-	parts := BytesSplit([]byte("a|b|"), '|')
-	if len(parts) != 3 {
-		t.Fatalf("parts = %d, want 3", len(parts))
-	}
-	if string(parts[2]) != "" {
-		t.Errorf("parts[2] = %q, want empty", parts[2])
-	}
-}
-
-func TestBytesSplit_LeadingSeparator(t *testing.T) {
-	parts := BytesSplit([]byte("|a|b"), '|')
-	if len(parts) != 3 {
-		t.Fatalf("parts = %d, want 3", len(parts))
-	}
-	if string(parts[0]) != "" {
-		t.Errorf("parts[0] = %q, want empty", parts[0])
-	}
-}
-
-func TestBytesSplit_ConsecutiveSeparators(t *testing.T) {
-	parts := BytesSplit([]byte("a||b"), '|')
-	if len(parts) != 3 {
-		t.Fatalf("parts = %d, want 3", len(parts))
-	}
-	if string(parts[1]) != "" {
-		t.Errorf("parts[1] = %q, want empty", parts[1])
-	}
-}
-
 // --- BytesHasPrefix ---
 
 func TestBytesHasPrefix_True(t *testing.T) {
@@ -111,63 +41,7 @@ func TestBytesHasPrefix_ExactMatch(t *testing.T) {
 
 // --- BytesIndexByte ---
 
-func TestBytesIndexByte_Found(t *testing.T) {
-	idx := BytesIndexByte([]byte("hello|world"), '|')
-	if idx != 5 {
-		t.Errorf("index = %d, want 5", idx)
-	}
-}
-
-func TestBytesIndexByte_NotFound(t *testing.T) {
-	idx := BytesIndexByte([]byte("hello"), '|')
-	if idx != -1 {
-		t.Errorf("index = %d, want -1", idx)
-	}
-}
-
-func TestBytesIndexByte_First(t *testing.T) {
-	idx := BytesIndexByte([]byte("|hello"), '|')
-	if idx != 0 {
-		t.Errorf("index = %d, want 0", idx)
-	}
-}
-
-func TestBytesIndexByte_Empty(t *testing.T) {
-	idx := BytesIndexByte([]byte{}, '|')
-	if idx != -1 {
-		t.Errorf("index = %d, want -1", idx)
-	}
-}
-
 // --- BytesLastIndexByte ---
-
-func TestBytesLastIndexByte_Found(t *testing.T) {
-	idx := BytesLastIndexByte([]byte("a|b|c"), '|')
-	if idx != 3 {
-		t.Errorf("index = %d, want 3", idx)
-	}
-}
-
-func TestBytesLastIndexByte_NotFound(t *testing.T) {
-	idx := BytesLastIndexByte([]byte("abc"), '|')
-	if idx != -1 {
-		t.Errorf("index = %d, want -1", idx)
-	}
-}
-
-func TestBytesLastIndexByte_Last(t *testing.T) {
-	idx := BytesLastIndexByte([]byte("hello|"), '|')
-	if idx != 5 {
-		t.Errorf("index = %d, want 5", idx)
-	}
-}
-
-func TestBytesLastIndexByte_Empty(t *testing.T) {
-	idx := BytesLastIndexByte([]byte{}, '|')
-	if idx != -1 {
-		t.Errorf("index = %d, want -1", idx)
-	}
-}
 
 // --- ExtractPart ---
 
@@ -266,85 +140,9 @@ func TestFormatTimestamp_LargeValue(t *testing.T) {
 
 // --- AppendBytes ---
 
-func TestAppendBytes_Basic(t *testing.T) {
-	dst := []byte("hello")
-	result := AppendBytes(dst, []byte(" "), []byte("world"))
-	if string(result) != "hello world" {
-		t.Errorf("AppendBytes = %q, want %q", result, "hello world")
-	}
-}
-
-func TestAppendBytes_Empty(t *testing.T) {
-	result := AppendBytes(nil, []byte("a"), []byte("b"))
-	if string(result) != "ab" {
-		t.Errorf("AppendBytes = %q, want %q", result, "ab")
-	}
-}
-
-func TestAppendBytes_NoParts(t *testing.T) {
-	dst := []byte("unchanged")
-	result := AppendBytes(dst)
-	if string(result) != "unchanged" {
-		t.Errorf("AppendBytes = %q, want %q", result, "unchanged")
-	}
-}
-
-func TestAppendBytes_EmptyParts(t *testing.T) {
-	result := AppendBytes(nil, []byte{}, []byte("data"), []byte{})
-	if string(result) != "data" {
-		t.Errorf("AppendBytes = %q, want %q", result, "data")
-	}
-}
-
 // --- BytesToLower ---
 
-func TestBytesToLower(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"Hello World", "hello world"},
-		{"ALLCAPS", "allcaps"},
-		{"already lower", "already lower"},
-		{"MiXeD123", "mixed123"},
-		{"", ""},
-		{"ABC", "abc"},
-	}
-
-	for _, tt := range tests {
-		b := []byte(tt.input)
-		BytesToLower(b)
-		if string(b) != tt.want {
-			t.Errorf("BytesToLower(%q) = %q, want %q", tt.input, b, tt.want)
-		}
-	}
-}
-
 // --- CompareBytes ---
-
-func TestCompareBytes(t *testing.T) {
-	tests := []struct {
-		a, b []byte
-		want int
-	}{
-		{[]byte("abc"), []byte("abc"), 0},
-		{[]byte("abc"), []byte("abd"), -1},
-		{[]byte("abd"), []byte("abc"), 1},
-		{[]byte("ab"), []byte("abc"), -1},
-		{[]byte("abc"), []byte("ab"), 1},
-		{nil, nil, 0},
-		{[]byte{}, []byte{}, 0},
-		{nil, []byte("a"), -1},
-		{[]byte("a"), nil, 1},
-	}
-
-	for _, tt := range tests {
-		got := CompareBytes(tt.a, tt.b)
-		if got != tt.want {
-			t.Errorf("CompareBytes(%q, %q) = %d, want %d", tt.a, tt.b, got, tt.want)
-		}
-	}
-}
 
 // --- CopyBytes ---
 

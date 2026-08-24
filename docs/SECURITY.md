@@ -124,6 +124,30 @@ Request Forgery:
 - `MDDB_OUTBOUND_ALLOWLIST=host1,host2` restricts outbound requests to an
   explicit set of hostnames; anything else is refused regardless of IP class.
 
+### Embedding provider endpoints (v2.12.0+)
+
+An embedding provider's `apiUrl` is the one field that deliberately sits
+outside the dialer above, because the headline use — a local Ollama on
+`http://localhost:11434` — is exactly what the guard refuses. Providers build
+their own HTTP client, so the exemption is real rather than nominal.
+
+It is now bounded at both ends:
+
+- **Loopback needs no opt-in.** It reaches only the machine running mddbd,
+  which whoever configures the server already controls.
+- **Every other private or reserved address is refused** at configuration time
+  unless `MDDB_OUTBOUND_ALLOW_PRIVATE=true` or the host is in
+  `MDDB_OUTBOUND_ALLOWLIST`. An `apiUrl` of `http://169.254.169.254/…` is not
+  an embedding service, and setting it through this field was Server-Side
+  Request Forgery whatever the field is called. Admin permission gates who can
+  aim it, not what it can reach — and a configuration replicated to another
+  node carries the aim with it.
+- **A failing provider's response body is capped at 512 bytes** in the error it
+  produces. Enough to carry Ollama's own "model not found"; not enough to
+  return a page. Before this, a request aimed at something that was not an
+  embedding service answered with its own body and that body came back to the
+  caller — which is what turns a blind request primitive into a readable one.
+
 Related request-size guards: `MDDB_MAX_BODY_BYTES` caps HTTP request bodies
 (default 32 MB), and `MDDB_WIKI_MAX_PAGES` / `MDDB_WIKI_MAX_DECOMPRESSED_BYTES`
 bound wiki-dump imports against decompression bombs.

@@ -5,17 +5,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/envconf"
+	json "mddb/internal/jsonx"
 	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	"net/http"
 	"strings"
 	"time"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 // VectorSearchRequest represents an HTTP vector search request.
@@ -27,12 +26,19 @@ type VectorSearchRequest struct {
 	Threshold      float64             `json:"threshold"`
 	FilterMeta     map[string][]string `json:"filterMeta"`
 	IncludeContent bool                `json:"includeContent"`
-	Algorithm      string              `json:"algorithm"`      // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
+	Algorithm      string              `json:"algorithm"`      // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	DistanceMetric string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
-	RetrievalMode  string              `json:"retrievalMode"`  // "parent" (default), "chunk", "window"
-	WindowSize     int                 `json:"windowSize"`     // neighbor chunks per side in "window" mode (default 1)
-	MMR            bool                `json:"mmr"`            // diversify results via Maximal Marginal Relevance
-	MMRLambda      float64             `json:"mmrLambda"`      // relevance/diversity balance, 0..1 (default 0.5)
+	RetrievalMode  string              `json:"retrievalMode"`  // "parent" (default), "chunk", "window", "graph"
+	// GraphExpand tunes retrievalMode "graph" (SRCH-006). Ignored in the other
+	// modes, so a request carrying both is not ambiguous.
+	GraphExpand GraphExpandOptions `json:"graphExpand,omitempty"`
+	WindowSize  int                `json:"windowSize"` // neighbor chunks per side in "window" mode (default 1)
+	MMR         bool               `json:"mmr"`        // diversify results via Maximal Marginal Relevance
+	MMRLambda   float64            `json:"mmrLambda"`  // relevance/diversity balance, 0..1 (default 0.5)
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication trims them.
+	// 1.0-10.0; 0 = use the collection profile, then the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -42,6 +48,11 @@ type VectorSearchResultItem struct {
 	Rank       int         `json:"rank"`
 	ChunkIndex *int        `json:"chunkIndex,omitempty"` // set in chunk/window retrieval modes
 	ChunkText  string      `json:"chunkText,omitempty"`  // matching passage (chunk/window modes)
+	// StartLine and EndLine are 1-based and inclusive, locating the passage in
+	// the parent document (CODE-002). Without them a caller knows which
+	// document matched and has to read it to find where.
+	StartLine int `json:"startLine,omitempty"`
+	EndLine   int `json:"endLine,omitempty"`
 }
 
 // VectorSearchResponseHTTP represents the response from vector search.
@@ -53,6 +64,13 @@ type VectorSearchResponseHTTP struct {
 	Algorithm      string                   `json:"algorithm"`
 	DistanceMetric string                   `json:"distanceMetric"`
 	Stats          *SearchStats             `json:"searchStats,omitempty"`
+	// ContextTruncated reports that the collection's contextTokenBudget
+	// dropped results from the tail (RAG-001).
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
+	// GraphExpansions lists documents added by retrievalMode "graph" and the
+	// edge that justifies each (SRCH-006). Present only in that mode: a
+	// document that matched nothing needs to say why it is here.
+	GraphExpansions []GraphExpansion `json:"graphExpansions,omitempty"`
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -68,7 +86,7 @@ func (s *Server) loadVectorIndex() {
 	// Get all collections with vectors
 	counts, err := s.VectorStore.CountByCollection()
 	if err != nil {
-		log.Printf("ERROR: failed to count vector collections: %v", err)
+		slog.Error("failed to count vector collections", "err", err)
 		s.VectorIndex.SetReady()
 		for _, searcher := range s.VectorSearchers {
 			searcher.SetReady()
@@ -80,7 +98,7 @@ func (s *Server) loadVectorIndex() {
 	for collection, count := range counts {
 		records, err := s.VectorStore.LoadCollection(collection)
 		if err != nil {
-			log.Printf("ERROR: failed to load vectors for collection %q: %v", collection, err)
+			slog.Error("failed to load vectors for collection", "collection", collection, "err", err)
 			continue
 		}
 
@@ -125,8 +143,9 @@ func (s *Server) loadVectorIndex() {
 	for _, searcher := range s.VectorSearchers {
 		searcher.SetReady()
 	}
-	log.Printf("Vector index loaded: %d documents across %d collections in %v (algorithms: flat, hnsw, ivf, pq)",
-		totalLoaded, len(counts), time.Since(start))
+	slog.Info("vector index loaded",
+		"documents", totalLoaded, "collections", len(counts), "elapsed", time.Since(start),
+		"algorithms", "flat, hnsw, ivf, pq")
 }
 
 // handleVectorSearch handles POST /v1/vector-search
@@ -143,6 +162,12 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Query == "" && len(req.QueryVector) == 0 {
 		bad(w, errors.New("either query or queryVector is required"))
+		return
+	}
+	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
+	// number is the problem.
+	if err := ValidateOversample(req.Oversample); err != nil {
+		unprocessable(w, err)
 		return
 	}
 	if !validRetrievalMode(req.RetrievalMode) {
@@ -195,10 +220,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	topK := req.TopK
-	if topK <= 0 {
-		topK = 5
-	}
+	// RAG-001: request > collection profile > this path's historical default.
+	topK := s.ResolveTopK(req.Collection, req.TopK, 5)
 
 	// Resolve distance metric
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
@@ -207,11 +230,10 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		metricName = "cosine"
 	}
 
-	// Oversample for chunk deduplication: search for more results, then deduplicate
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample for chunk deduplication: search for more results, then
+	// deduplicate. SRCH-005 makes the multiplier a request parameter — it was
+	// the fixed `topK * 3` here and in four other places.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	// Search: with or without metadata filter
 	var results []vec.VectorResult
@@ -296,7 +318,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 			if chunkMode {
 				idx := chunkIndex
 				item.ChunkIndex = &idx
-				item.ChunkText = chunkPassage(doc.ContentMD, chunkIndex, windowSize)
+				item.ChunkText, item.StartLine, item.EndLine =
+					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize, ChunkModeFor(&doc))
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""
@@ -307,11 +330,34 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
+	// RAG-001: cap the total context this collection hands back. In chunk and
+	// window modes the passage is what the caller receives, so that is what
+	// counts against the budget — charging the whole parent document would
+	// make the cap meaningless for exactly the modes RAG uses.
+	items, contextTruncated := applyContextBudget(s, req.Collection, items,
+		func(it VectorSearchResultItem) int {
+			if it.ChunkText != "" {
+				return approxTokens(it.ChunkText)
+			}
+			return approxTokens(it.Document.ContentMD)
+		})
+
+	// SRCH-006: reach documents the query matches on no term, by following the
+	// edges the matching documents already have. Applied after the budget so
+	// expansion cannot be trimmed away by a cap it was not counted against,
+	// and before the response so its documents arrive with the rest.
+	var expansions []GraphExpansion
+	if req.RetrievalMode == RetrievalModeGraph {
+		expansions, items = s.appendGraphNeighbours(req.Collection, items, req.GraphExpand, req.IncludeContent)
+	}
+
 	resp := VectorSearchResponseHTTP{
-		Results:        items,
-		Total:          len(items),
-		Algorithm:      algo,
-		DistanceMetric: metricName,
+		Results:          items,
+		Total:            len(items),
+		Algorithm:        algo,
+		DistanceMetric:   metricName,
+		ContextTruncated: contextTruncated,
+		GraphExpansions:  expansions,
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()
@@ -372,6 +418,10 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 	type docEntry struct {
 		ID        string
 		ContentMD string
+		// Mode has to travel with the document: reindexing must segment it
+		// exactly as the embedding worker did, or the stored chunk indices
+		// stop pointing at the passages they named (CODE-003).
+		Mode ChunkMode
 	}
 	var docs []docEntry
 
@@ -387,7 +437,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: ChunkModeFor(d)})
 		}
 		return nil
 	})
@@ -420,7 +470,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 		// Split into chunks
 		var chunks []string
 		if chunkEnabled {
-			chunks = ChunkText(d.ContentMD, chunkSize)
+			chunks = chunkTextsMode(d.ContentMD, chunkSize, d.Mode)
 		} else {
 			chunks = []string{d.ContentMD}
 		}

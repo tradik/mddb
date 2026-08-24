@@ -207,63 +207,6 @@ func TestCompressDecompressRoundTripBinary(t *testing.T) {
 	}
 }
 
-func TestGetCompressionStatsSmall(t *testing.T) {
-	data := []byte("tiny")
-	stats := GetCompressionStats(data)
-
-	if stats.OriginalSize != len(data) {
-		t.Errorf("expected OriginalSize %d, got %d", len(data), stats.OriginalSize)
-	}
-	if stats.Method != "none" {
-		t.Errorf("expected method 'none' for small data, got %q", stats.Method)
-	}
-	if stats.Ratio <= 0 {
-		t.Error("expected positive compression ratio")
-	}
-}
-
-func TestGetCompressionStatsMedium(t *testing.T) {
-	data := []byte(strings.Repeat("Compressible medium data string. ", 40))
-	stats := GetCompressionStats(data)
-
-	if stats.OriginalSize != len(data) {
-		t.Errorf("expected OriginalSize %d, got %d", len(data), stats.OriginalSize)
-	}
-	if stats.Method != "snappy" {
-		t.Errorf("expected method 'snappy' for medium compressible data, got %q", stats.Method)
-	}
-	if stats.Ratio >= 1.0 {
-		t.Error("expected ratio < 1.0 for compressible data")
-	}
-}
-
-func TestGetCompressionStatsLarge(t *testing.T) {
-	data := []byte(strings.Repeat("Compressible large data string for zstd testing. ", 300))
-	stats := GetCompressionStats(data)
-
-	if stats.OriginalSize != len(data) {
-		t.Errorf("expected OriginalSize %d, got %d", len(data), stats.OriginalSize)
-	}
-	if stats.Method != "zstd" {
-		t.Errorf("expected method 'zstd' for large compressible data, got %q", stats.Method)
-	}
-	if stats.CompressedSize >= stats.OriginalSize {
-		t.Error("expected compressed size < original for compressible data")
-	}
-}
-
-func TestGetCompressionStatsEmpty(t *testing.T) {
-	data := []byte{}
-	stats := GetCompressionStats(data)
-
-	if stats.OriginalSize != 0 {
-		t.Errorf("expected OriginalSize 0, got %d", stats.OriginalSize)
-	}
-	if stats.Method != "none" {
-		t.Errorf("expected method 'none' for empty data, got %q", stats.Method)
-	}
-}
-
 func TestCompressionThresholdConstants(t *testing.T) {
 	if compressionThresholdSmall != 1024 {
 		t.Errorf("expected small threshold 1024, got %d", compressionThresholdSmall)

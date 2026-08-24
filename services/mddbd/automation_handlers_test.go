@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
@@ -13,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // newTestServerForAutomation creates a Server with AutomationManager and FTSIndex for testing.
@@ -518,13 +519,19 @@ func TestRunTrigger_UnknownSearchType(t *testing.T) {
 	s, cleanup := newTestServerForAutomation(t)
 	defer cleanup()
 
+	// This used to return (nil, nil): no matches and no error, which reads
+	// exactly like a trigger that matched nothing. An operator who mistyped
+	// "hybrid" saw a rule that never fired and no reason why (TEST-002).
 	trigger := &AutomationRule{SearchType: "unknown"}
 	matches, err := s.AutomationManager.RunTrigger(trigger)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if !errors.Is(err, ErrUnknownSearchType) {
+		t.Fatalf("error = %v, want ErrUnknownSearchType", err)
+	}
+	if !strings.Contains(err.Error(), "unknown") {
+		t.Errorf("the error does not name the offending type: %v", err)
 	}
 	if matches != nil {
-		t.Errorf("expected nil matches for unknown searchType, got %v", matches)
+		t.Errorf("expected nil matches alongside the error, got %v", matches)
 	}
 }
 

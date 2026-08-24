@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // ttlExtraTestServer creates a minimal Server with TTLManager for HTTP handler tests.

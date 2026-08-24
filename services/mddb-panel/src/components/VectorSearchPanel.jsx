@@ -198,7 +198,8 @@ export default function VectorSearchPanel() {
               <option value="ivf">IVF (Clustered)</option>
               <option value="pq">PQ (Compressed)</option>
               <option value="opq">OPQ (Optimized PQ)</option>
-              <option value="sq">SQ (Scalar Quantized)</option>
+              <option value="sq">SQ (int8, 4x smaller)</option>
+              <option value="sq4">SQ4 (int4, 8x smaller)</option>
               <option value="bq">BQ (Binary Quantized)</option>
             </select>
           </div>

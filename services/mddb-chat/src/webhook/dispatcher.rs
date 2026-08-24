@@ -104,8 +104,8 @@ fn compute_signature(body: &str, secret: &str) -> String {
         return String::new();
     }
 
-    let mut mac = HmacSha256::new_from_slice(secret.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC can take key of any size");
     mac.update(body.as_bytes());
     let result = mac.finalize();
     hex::encode(result.into_bytes())

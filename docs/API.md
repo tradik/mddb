@@ -322,6 +322,8 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
   - `skipWebhooks` (optional): Skip webhook firing for this batch
   - `autoConfigureCollection` (optional): Auto-configure collection as "scraping" type if it doesn't exist
   - `saveRevision` (optional): Save revision history for all documents in this batch
+  - `profile` (optional, v2.12.0+): `default` or `fast` — see below
+  - `textOnly` (optional, v2.12.0+): Extract plain text from html/docx/odt instead of rebuilding Markdown structure. Implied by `profile: fast`.
 
 **Response**:
 ```json
@@ -332,9 +334,57 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
   "failed": 0,
   "errors": [],
   "collection": "imported",
-  "durationMs": 45
+  "durationMs": 45,
+  "profile": "fast"
 }
 ```
+
+#### The `fast` ingest profile (v2.12.0+)
+
+MDDB could always ingest faster by skipping steps — the flags existed — but only
+as separate switches a caller had to discover one at a time, and the wiki
+importer made the same choice a third way with a `skipFts` comment reading
+"faster bulk import". The trade-off was available and undiscoverable.
+
+`profile: fast` names it. It applies to `/v1/ingest`, `/v1/upload` (multipart
+field `profile`) and `/v1/import-wiki`, and the response records which profile
+actually applied — so a corpus loaded months ago can be explained without
+guessing which flags the caller sent.
+
+| | `default` | `fast` |
+|---|---|---|
+| Heavy-format parsing | Full Markdown structure | Plain text |
+| Revisions | As requested | Off |
+| Webhooks | Fired | Skipped |
+| Duplicates | As requested | Skipped |
+| **Embeddings** | On | **On** |
+| **Full-text index** | On | **On** |
+
+The last two rows are the point. `fast` means cheaper parsing and less
+bookkeeping — not a collection you cannot search. Skipping embeddings or FTS
+stays a separate decision with its own flag, because folding it in would make
+`fast` mean something the caller did not ask for.
+
+**Any flag set explicitly overrides the preset**, so `{"profile": "fast",
+"saveRevision": true}` gives fast ingest with revisions kept. An unknown profile
+name is a `400`, never a silent fall back to `default` — a caller who asked for
+`fast` and got default behaviour would see a slow load and no reason why.
+
+**What text-only actually buys, measured** (200-section documents, `-benchtime=2s`):
+
+| Format | Full conversion | Text-only | |
+|---|---:|---:|---|
+| HTML | 132 ms | 3.2 ms | **43× faster** |
+| DOCX | 147 µs | 130 µs | 1.13× faster |
+| PDF | — | — | no variant |
+
+HTML is where the win is: its Markdown converter makes repeated case-insensitive
+passes over the whole document for every tag type. The DOCX converter was
+already efficient, so text-only is barely faster there — its value for `.docx`
+is tolerance of documents that odd exporters produce, not speed. **PDF has no
+text-only variant at all**: `pdfToMarkdown` already extracts raw text from
+content streams and builds no structure, so a second name for it would promise
+a speedup that does not exist.
 
 **Features**:
 - **URL key derivation**: If `key` is empty, a deterministic key is derived from the URL path
@@ -370,10 +420,31 @@ Upload files via multipart/form-data. Files are auto-converted to Markdown and s
 - `file` or `files[]` (required): One or more files to upload. Supported formats: `.md`, `.txt`, `.html`, `.htm`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.yaml`, `.yml`, `.log`, `.lex`, `.tex`, `.latex`
 - `collection` (required): Target collection name
 - `lang` (required): Document language code (e.g. `en_US`, `pl_PL`)
-- `key` (optional): Document key — if empty, derived from filename (lowercase, spaces→hyphens, extension stripped)
+- `key` (optional): Document key — if empty, derived from filename (lowercase, spaces→hyphens, extension stripped). **Keys resolve case-insensitively** — see below
 - `meta` (optional): JSON-encoded metadata map, e.g. `{"category":["docs"]}`
 - `ttl` (optional): Time-to-live in seconds (0 = no expiry)
 - `maxSize` (optional): Per-file size limit in bytes (default: 10MB, max: 100MB)
+
+### Document keys are case-insensitive
+
+A document's identity is built by lowercasing the collection, key and language,
+so **`README.md`, `readme.md` and `ReadMe.md` are one document**. This is
+deliberate and suits URL-shaped keys, but it has consequences worth stating
+plainly, because none of them announce themselves:
+
+- Writing two spellings leaves **one** document holding whichever content
+  arrived last. The earlier content is gone.
+- `/v1/ingest` reports this in a `keyCollisions` array when a batch contains
+  keys differing only in case. The write still happens — refusing a 200 000
+  document import over a spelling would be worse — but it is no longer silent.
+- Ingesting a source repository is where this bites: `Makefile` and `makefile`,
+  `README` and `readme`, `Dockerfile` and `dockerfile` are distinct files on a
+  case-sensitive filesystem and one document here.
+
+The **key index**, unlike the identifier, stores the key exactly as written. So
+a document written as `README.md` is fetched by that spelling; fetching
+`readme.md` finds it only if that spelling was also written at some point.
+Aligning the two is an on-disk format change and is tracked separately.
 
 **Format Conversion**:
 | Format | Extension | Conversion |
@@ -1274,6 +1345,14 @@ curl -X POST http://localhost:11023/v1/restore \
 - This operation replaces the current database
 - The server briefly closes and reopens the database connection
 - All current data will be replaced with the backup
+
+**Safety** (v2.12.0): the backup is validated (it must open as a database)
+before the live file is touched, the current database is kept as a snapshot
+until the swap succeeds, and any failure rolls back — the server never ends up
+with a closed or destroyed database. A failed restore returns `500` with the
+previous data still being served. The gRPC `Restore` RPC follows the same
+contract and, like this endpoint, resets the binlog so replication followers
+re-snapshot.
 
 ---
 
@@ -2222,6 +2301,47 @@ curl "http://localhost:11023/v1/collection-config?collection=blog"
 
 Also supports **PUT** to set config and **DELETE** to remove config for a collection.
 
+##### Credentials are masked on read (v2.12.0+)
+
+A collection config can hold two credentials: `storageConfig.secretKey` and
+`wordpress.apiKey`. Reads — REST, gRPC and MCP alike — return them empty and
+set a presence flag instead:
+
+```json
+{
+  "storageConfig": { "bucket": "docs", "accessKey": "AKIA", "secretKeySet": true },
+  "wordpress":     { "url": "https://blog.example.com", "apiKeySet": true }
+}
+```
+
+Reading a collection's configuration requires read permission on that
+collection. That is permission to read its documents — not to collect the
+credentials for the bucket underneath them, which reach every other collection
+sharing it.
+
+On write, an **empty credential keeps the stored one**, so the read-modify-write
+loop a UI performs does not erase it. Send a new value to replace it; remove the
+whole `storageConfig` or `wordpress` block to clear it. `secretKeySet` and
+`apiKeySet` are output-only and ignored on write.
+
+##### gRPC carries the same fields as REST (v2.12.0+)
+
+`CollectionConfigProto` used to carry 8 of the 18 fields `CollectionConfig`
+holds, so a gRPC client saw a partially configured collection and could not tell
+that from a collection that really was partially configured. It now carries all
+of them: `storage_backend`, `storage_config`, `quantization`,
+`disk_only_vectors`, `encrypted`, `track_access`, `track_hot`, `spell_correct`,
+`spell_lang` and `wordpress`.
+
+The booleans in `SetCollectionConfigRequest` are declared `optional`, which is
+load-bearing rather than stylistic: a plain proto3 bool cannot tell "the client
+did not mention encryption" from "the client wants encryption off". Since the
+handler merges into the stored config, an unset bool arriving as `false` would
+switch encryption off on a collection whose owner only wanted a new icon —
+after which the next document is written as plaintext. Presence keeps that from
+happening. **Omitted means "leave it alone" for every field on this RPC**,
+strings included.
+
 #### PUT /v1/collection-config
 
 Set or update collection configuration including storage backend.
@@ -2235,9 +2355,150 @@ Set or update collection configuration including storage backend.
 | `icon` | string | No | Emoji icon |
 | `color` | string | No | Hex color code |
 | `customMeta` | object | No | Custom key-value metadata |
-| `storageBackend` | string | No | Storage backend: `boltdb` (default), `memory`, `s3` |
+| `storageBackend` | string | No | Where this collection's document bodies are stored: `boltdb` (default), `memory`, `s3` — see below |
 | `storageConfig` | object | No | Backend-specific settings (required for `s3`) |
 | `maxRevisions` | integer | No | (v2.9.14+) Revision retention cap. `0` (default) = unlimited; `N > 0` keeps only the newest N revisions per document. Older entries are trimmed inside the same transaction as every write. |
+| `retrieval` | object | No | (v2.12.0+) Per-collection retrieval defaults — see below |
+| `responsePrompt` | string | No | (v2.12.0+) How to format answers from this collection — see below (max 4 KiB) |
+| `trackAccess` | boolean | No | Record per-read access events for temporal analytics |
+| `trackHot` | boolean | No | Maintain a hot-documents leaderboard |
+| `spellCorrect` | boolean | No | Auto-correct FTS queries using the spell checker |
+| `spellLang` | string | No | Override language for spell correction |
+
+##### Storage backends (v2.12.0+)
+
+A collection can keep its **document bodies** somewhere other than the server's
+own database file:
+
+| Backend | Holds documents in | Use for |
+|---|---|---|
+| `boltdb` (default) | The server's database file | Everything, unless you have a reason not to |
+| `memory` | Process memory, lost on restart | Scratch collections, tests, caches you can rebuild |
+| `s3` | Any S3-compatible object store | Large corpora whose bodies should not live on the node's disk |
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d '{
+  "collection": "archive",
+  "storageBackend": "s3",
+  "storageConfig": {
+    "endpoint": "s3.example.com",
+    "bucket": "mddb-archive",
+    "region": "eu-central-1",
+    "accessKey": "...", "secretKey": "..."
+  }
+}'
+```
+
+**What moves and what does not.** The backend holds document bodies. The
+metadata index, revisions, the full-text and vector indexes, and the replication
+binlog stay in the server's database in every configuration. That is not a
+limitation to be lifted later: those are written inside a single transaction
+alongside each other, and a remote object store cannot join it. Splitting them
+would trade a correctness guarantee for a storage location.
+
+So an `s3` collection still needs its local database, and that database still
+needs to survive — it holds everything needed to find a document, just not the
+document.
+
+**Ordering, and what a crash leaves behind.** A body is written to the backend
+before the transaction that indexes it commits. The two cannot be atomic, so the
+failure is chosen deliberately: a crash in between leaves an object nothing
+references — wasted space, harmless to readers — rather than an index entry
+pointing at a document that is not there, which is what people experience as
+data loss.
+
+**A backend that cannot be reached refuses writes.** Configuring an unreachable
+S3 endpoint is rejected at configuration time, and a backend that fails later
+causes writes to that collection to error rather than falling back to local
+disk. Silently writing elsewhere is how an operator loses data they believed was
+in object storage.
+
+> Before v2.12.0 this setting was accepted, validated and **ignored** — every
+> document went to the local database regardless. If you set `memory` or `s3` on
+> an earlier version, your documents are in the local file, and the collection
+> will keep reading them from there until they are rewritten.
+
+##### Retrieval defaults (v2.12.0+)
+
+Retrieval settings used to be constants scattered across MDDB's internals — FTS
+returned 50 results, vector 5, hybrid 10, memory recall 10 — so a caller had to
+know those numbers to get consistent behaviour, and a collection of prose could
+not be tuned differently from a collection of source.
+
+They now live next to the data. **Precedence is fixed everywhere: an explicit
+request parameter wins, then this profile, then MDDB's default for that
+endpoint.** A collection without a profile behaves exactly as before.
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d '{
+  "collection": "handbook",
+  "retrieval": {
+    "defaultSearchType": "hybrid",
+    "topK": 40,
+    "retrievalMode": "chunk",
+    "contextTokenBudget": 8000
+  }
+}'
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `defaultSearchType` | string | `fts` \| `vector` \| `hybrid`. Read by clients (mddb-chat, MCP agents) to pick an endpoint; the server does not reroute a request because of it. |
+| `topK` | integer | Results per search, 1–1000 |
+| `retrievalMode` | string | `parent` (whole document) \| `chunk` (matching passage) \| `window` (passage with neighbours) |
+| `hybridStrategy` | string | `alpha` \| `rrf` |
+| `hybridAlpha` | number | 0 = keyword only, 1 = semantic only. Requires `hybridAlphaSet: true`, because 0.0 is a real weight and cannot double as "unset". |
+| `oversample` | number | 1.0–10.0. Candidates fetched per requested result before deduplication or merging — see [SEARCH.md](SEARCH.md#oversampling-v2120) for measured effect |
+| `contextTokenBudget` | integer | Cap on total returned context, in tokens |
+
+**The context budget drops results, it does not truncate them.** Half a document
+still costs tokens and no longer says anything reliable, so the budget trims the
+tail of an already-ranked list and the response sets `contextTruncated: true`.
+The first result is always kept, even when it alone exceeds the budget —
+returning nothing would read as "no matches" rather than as a budget too small
+for the corpus. Token counts are approximated as bytes÷4; a real tokeniser would
+tie the budget to one model family, and this is a guard rail, not accounting.
+
+Applies to `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`, `/v1/search` and
+`/v1/memory/recall`, over REST, gRPC and MCP alike. Cross-collection search is
+deliberately excluded: it has no single collection whose profile could own
+`topK`, and picking one of N arbitrarily would be worse than a fixed default.
+
+##### Answer formatting (v2.12.0+)
+
+A collection of runbooks wants numbered steps; a collection of API docs wants
+code blocks and key references. That instruction used to live in the client — a
+per-scenario system prompt in mddb-chat, and nothing at all for MCP agents — so
+every consumer had to know, separately, what every collection expected.
+
+`responsePrompt` puts it with the data:
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d '{
+  "collection": "runbooks",
+  "responsePrompt": "Answer as numbered steps. Quote the exact command for each step and name the file it belongs in. If the runbook does not cover the question, say so instead of improvising."
+}'
+```
+
+It is picked up in two places, without a second round trip:
+
+- **mddb-chat** appends it to the scenario's system prompt. Order is deliberate:
+  the scenario is the operator's policy — who the assistant is, what it may say
+  — and the collection prompt is about the shape of its data. Policy comes
+  first, so a collection cannot talk its way past it by opening with "ignore
+  your previous instructions".
+- **MCP** returns it as `responsePrompt` on `search_documents`,
+  `vector_search` and `hybrid_search` results, and folds it into the
+  `rag-pipeline` prompt. An agent gets the instruction in the same call that
+  fetched what to say.
+
+`{{collection}}` and `{{query}}` are expanded through the same template
+mechanism the automation rules use. The value is plain text for a model, capped
+at 4 KiB — it is prepended to prompts automatically, so an unbounded one would
+quietly eat the context the answer needs — and the panel renders it as text,
+never as markup.
+
+A collection without a `responsePrompt` behaves exactly as before.
 
 **storageConfig fields (for S3):**
 | Field | Type | Required | Description |
@@ -3011,7 +3272,7 @@ curl http://localhost:11023/v1/system/info
   "os": "linux",
   "arch": "amd64",
   "numCPU": 4,
-  "goVersion": "go1.26.5",
+  "goVersion": "go1.27.0",
   "version": "2.11.4",
   "uptimeSeconds": 3600,
   "memoryTotal": 134217728,
@@ -3273,6 +3534,313 @@ curl "http://localhost:11023/v1/auth/group-permissions?group=editors"
 - Common metadata keys: `category`, `author`, `tags`, `status`, etc.
 
 ---
+
+## Code Documents
+
+MDDB stores source the same way it stores prose: one document per file, with no
+new type, table or endpoint. What changes is how the text is tokenised, and
+that is decided by a convention on the ordinary flat `meta` map.
+
+| Meta key | Value | Effect |
+|---|---|---|
+| `kind` | `code` | Index with the source-aware tokeniser |
+| `language` | `css`, `html`, `javascript`, … | The source language; inferred from the extension when absent |
+| `path` | `css/style.css` | The original path, when the document key is a slug |
+
+```json
+{
+  "collection": "theme",
+  "key": "css/style.css",
+  "lang": "en",
+  "contentMd": ".hero-banner { background: url(hero.png); }",
+  "meta": { "kind": ["code"], "language": ["css"] }
+}
+```
+
+**The convention is optional.** A document whose key or `path` ends in a known
+source extension (`.css`, `.html`, `.js`, `.ts`, `.go`, `.py`, …) is treated as
+code without any meta at all, so a theme ingested by an existing tool indexes
+usefully as it stands. An explicit `kind` always wins, in both directions: set
+`kind: ["prose"]` on a `.css` document and it is tokenised as prose.
+
+### Finding the place, not just the file
+
+A search result that names the document answers "which file". The question an
+agent has is "where" — and answering it by reading the file is what makes a
+one-line change cost thousands of tokens (issue #192).
+
+Ask for `highlight: true` and every fragment carries the lines it occupies:
+
+```json
+{
+  "results": [{
+    "document": { "key": "css/style.css" },
+    "highlights": [{
+      "fragment": "…}\n\n.hero-banner {\n  <mark>background</mark>: url(hero.png);",
+      "startLine": 158,
+      "endLine": 163,
+      "startOffset": 4021,
+      "endOffset": 4104
+    }]
+  }]
+}
+```
+
+`startLine` and `endLine` are 1-based and inclusive. Byte offsets are still
+there for callers doing their own markup on the same bytes.
+
+**Combine it with a projection.** `fields` drops the document body, `highlight`
+says where to look; together they answer without carrying the file. The whole
+response above is under 800 bytes for a 164-line stylesheet. The two are
+deliberately compatible — a projection keeps the fragments.
+
+`fragmentSize` is a byte budget tuned for prose. Source lines are short, so 150
+bytes covers roughly fifteen lines of CSS against two or three of prose; lower
+it when searching code.
+
+Vector and hybrid hits carry the same information: in `chunk` and `window`
+retrieval modes each result reports `startLine`/`endLine` for the passage it
+matched, widened along with the passage when a window is requested.
+
+### Chunking
+
+Embedding chunks are the unit a vector search returns, and the prose chunker
+splits on paragraphs with a sentence fallback. A period inside `url(a.png)` is
+not the end of a sentence, so a split there leaves half a declaration in each
+chunk — a passage that reads as nothing and embeds as noise.
+
+Code documents are segmented on bracket depth instead: a chunk may only end
+where `{}`, `()` and `[]` are balanced, so one chunk is roughly one CSS rule or
+one function. Braces inside strings and comments do not count.
+
+| Source | Boundary preferred |
+|---|---|
+| Blank line at depth zero | A rule or function just ended — the cleanest cut |
+| Any line end at depth zero | Over budget, but the construct closed |
+| A construct larger than the budget | **Kept whole and oversized** — half a function is worth nothing |
+| A minified single line | Cut after the last balanced `}` within budget |
+
+Mode selection follows the document: `kind: ["code"]` (or a known source
+extension) chunks as code, anything else as prose.
+`MDDB_EMBEDDING_CHUNK_MODE=code|prose` overrides it for a whole server, for
+collections whose documents were ingested without the convention.
+
+> **Re-embed code collections after upgrading.** Chunks are re-derived rather
+> than stored — only the index is kept — so a document embedded under prose
+> chunking and read under code chunking will return the wrong passage. Run
+> `vector_reindex` (or `POST /v1/vector-reindex`) on any collection holding
+> source. Prose collections are unaffected: their segmentation is unchanged,
+> byte for byte.
+
+### Structured frontmatter and flat meta
+
+MDDB's metadata is flat, on purpose: `map<string, repeated string>`, the same
+shape in proto, REST, GraphQL and MCP. Every filter, facet and index in the
+system assumes it.
+
+Structured frontmatter does not fit. An SSG page with
+
+```yaml
+faq:
+  - question: Is it free?
+    answer: Yes, it is free.
+  - question: Is there a trial?
+    answer: No.
+```
+
+has nowhere to go, and an importer that reaches for Go's `%v` produces
+
+```
+faq: ["[map[answer:Yes, it is free. question:Is it free?] map[answer:No. question:Is there a trial?]]"]
+```
+
+MDDB stores that faithfully — it is a valid string — and the damage surfaces
+much later, in a template that cannot render it ([issue #187](https://github.com/tradik/mddb/issues/187)).
+
+**Three ways to handle it.** Pick by what you need to query, not by what is
+least work at import time:
+
+| Pattern | Looks like | Round-trip | Filterable |
+|---|---|---|---|
+| **JSON in one value** | `faq: ["[{\"question\":…}]"]` | Lossless | No — one opaque string |
+| **Flattened keys** | `faq.0.question: ["Is it free?"]` | Lossless if the shape is fixed | Yes, per leaf |
+| **Leave it in the body** | The markdown keeps its frontmatter | Lossless | No, but full-text searchable |
+
+JSON in one value is the usual answer: nothing is lost, and the consumer parses
+it once. Flatten only the leaves you actually filter on — `faq.0.question` is
+queryable, but the numbering makes reordering the source a metadata migration.
+Leaving the block in the markdown body costs nothing and stays findable through
+full-text search; choose it when nothing queries the structure.
+
+**The validator warns, it does not reject.** `POST /v1/validate` (and the gRPC,
+GraphQL and MCP equivalents) returns a `warnings` list alongside `errors` when a
+value looks like Go stringification:
+
+```json
+{
+  "valid": true,
+  "errors": [],
+  "warnings": ["meta.faq: looks like a Go-stringified list of objects (`[map[...] map[...]]`). …"]
+}
+```
+
+It stays a warning because such a value is a valid string, and MDDB has no
+business deciding a string is not what its author meant — a caller storing prose
+about `map[string]int` is doing nothing wrong. The lint runs even when a
+collection has no schema, which is precisely the case an unstructured import
+lands in.
+
+### Symbols: which file declares this?
+
+Full-text search cannot tell a declaration from a mention. Search a theme for
+`.hero-banner` and the stylesheet that defines it ranks alongside every template
+that merely applies it — and the template usually wins, because it repeats the
+name more often.
+
+Every code document therefore gets three extra meta keys, filled from its own
+content on each save:
+
+| Key | Holds | Example (CSS) |
+|---|---|---|
+| `defines` | What this file declares | `.hero-banner`, `#nav`, `--brand` |
+| `uses` | What it references but does not declare | `/images/hero.png` |
+| `imports` | What it pulls in | `reset.css` |
+
+They are ordinary values in the existing flat meta map, so the metadata filter
+already answers the question — no new query surface, no schema change:
+
+```bash
+# The file that declares the selector, not the twelve that apply it.
+curl -s "$MDDB/v1/fts?collection=theme&q=hero-banner&meta.defines=.hero-banner"
+
+# Everything that would break if that stylesheet were deleted.
+curl -s "$MDDB/v1/fts?collection=theme&q=*&meta.uses=.hero-banner"
+```
+
+What each language contributes:
+
+| Language | `defines` | `uses` | `imports` |
+|---|---|---|---|
+| CSS / SCSS / LESS | Selectors, their component classes and ids, `--custom-properties` | `url(...)` targets | `@import` targets |
+| JavaScript / TypeScript | Function, class, and arrow-const names | — | `import` and `require` specifiers |
+| HTML | `id` attributes | `class` names, `on*` handler names | Local `src` / `href` targets |
+
+Three deliberate limits:
+
+- **The extractor owns these keys.** They are rewritten on every save and
+  removed when a document stops being code, so they always describe the current
+  content. A hand-supplied `defines` will not survive the next write — a stale
+  one would point graph queries at a document that no longer exists.
+- **Scanners, not parsers.** Regex and a brace walker, which is why minified
+  files, `@media` blocks, and SCSS nesting all work, and why a class name built
+  at runtime (`` `btn-${size}` ``) is not found. A missing edge costs a search;
+  a wrong one costs trust.
+- **Capped and sorted.** At most `MDDB_CODE_MAX_SYMBOLS` (default 512) per key,
+  deduplicated and sorted. The output is deterministic because these bytes
+  travel through the replication binlog: the same document must produce the same
+  meta on every replica.
+
+Only new writes are enriched. Re-save (or bulk re-ingest) an existing code
+collection to populate symbols for documents stored before this version.
+
+### The connection graph
+
+Symbols answer "which file declares this". The graph answers the questions that
+follow: **what breaks if I change `.hero-banner`, which pages load
+`checkout.js`, what does nothing reference any more.**
+
+Nothing is stored. Edges are derived at query time from the `defines`/`uses`/
+`imports` meta through the same metadata index — `uses` on one side matched
+against `defines` on the other, an import path matched against a document key.
+That is deliberate: an edge is a statement about two documents, and storing it
+means one copy per side, which drift apart the moment someone edits only one of
+them. Deriving makes a reindex reproduce the graph exactly.
+
+```bash
+# What breaks if this stylesheet changes?
+curl -s "$MDDB/v1/code-graph?collection=theme&key=theme/style.css&direction=in"
+
+# What does this page pull in, two hops out?
+curl -s "$MDDB/v1/code-graph?collection=theme&key=theme/index.html&direction=out&depth=2"
+```
+
+```json
+{
+  "root": "theme/style.css",
+  "nodes": [
+    { "key": "theme/style.css",  "language": "css",  "depth": 0 },
+    { "key": "theme/index.html", "language": "html", "depth": 1 }
+  ],
+  "edges": [
+    { "from": "theme/index.html", "to": "theme/style.css",
+      "kind": "uses-selector", "symbol": ".hero-banner", "direction": "in" }
+  ],
+  "truncated": false
+}
+```
+
+Every edge carries **the symbol that justifies it**. Without it the answer is
+only "these two files are related", which is not actionable; with it, the caller
+knows what to look at. Add `&lines=true` to get the first line the symbol
+appears on for both sides — off by default, because it is the only part of a
+traversal that reads document content.
+
+Two kinds of edge:
+
+| Kind | Meaning | Derived from |
+|---|---|---|
+| `uses-selector` | A template applies a class or id a stylesheet declares | `uses` ↔ `defines` |
+| `imports` | A document pulls another in by path | `imports` ↔ document key |
+
+Import paths are resolved against the referring document when it is stored, so
+`href="style.css"` inside `theme/index.html` is recorded as `theme/style.css`
+and matches a key directly. One language-specific rule: in HTML and CSS a bare
+path is relative to the document — which is what makes `<link>` and `@import`
+produce edges at all — while in JavaScript a bare `import "lodash"` names a
+package, and rewriting it to `theme/lodash` would invent an edge to a document
+that will never exist.
+
+Three limits, and one of them is reported back:
+
+- **Depth 1–3**, default 1. A value above the maximum is clamped, not rejected.
+- **At most 100 neighbours per node.** A selector such as `.title` appears in
+  nearly every template, so an unbounded walk of a real theme returns the theme.
+- **`truncated`** says whether a limit cut the walk short. "Nothing depends on
+  this" is only safe to act on when `truncated` is `false` — which is exactly
+  the answer you need before deleting a file.
+
+Resolution stays inside one collection: a theme is a collection, and a selector
+shared with an unrelated collection is a coincidence, not a dependency.
+
+The same traversal is available through all three surfaces — `GET`/`POST
+/v1/code-graph`, the `code_graph` MCP tool (annotated read-only), and the
+`codeGraph` GraphQL query — and a test pins that they agree, so they cannot
+drift apart in what the graph says.
+
+### Why the tokeniser differs
+
+The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,
+`class` — the keywords of the language being searched) and splits on every
+punctuation mark, which leaves `.hero-banner` findable only as two unrelated
+words. The code tokeniser keeps the whole identifier **and** emits its parts,
+across camelCase, snake_case and kebab-case:
+
+| In the source | Indexed as |
+|---|---|
+| `.hero-banner` | `hero-banner`, `hero`, `banner` |
+| `checkoutHandler` | `checkouthandler`, `checkout`, `handler` |
+| `XMLHttpRequest` | `xmlhttprequest`, `xml`, `http`, `request` |
+| `MAX_RETRY_COUNT` | `max_retry_count`, `max`, `retry`, `count` |
+
+Because both the whole name and its parts are indexed, a code collection is
+searchable with ordinary queries — nothing in the search path needs to know the
+collection holds source. The one asymmetry is stemming on the query side: a
+search for `classes` stems to `class` and will not match an unstemmed `classes`
+in a code index. Searching source for an English plural is rare enough to
+accept; searching it for `class` finds every declaration.
+
+Single characters and digits are kept, unlike in prose: `a` is a real selector
+and `h2` and `utf8` are real names.
 
 ## Error Handling
 

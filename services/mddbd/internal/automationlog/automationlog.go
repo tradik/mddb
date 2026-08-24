@@ -4,13 +4,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
+	json "mddb/internal/jsonx"
 	"strconv"
 	"strings"
 	"time"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 var bucketAutomationLog = []byte("automation_log")
@@ -241,7 +240,7 @@ func (ls *Store) cleanup() {
 		return nil
 	})
 	if deleted > 0 {
-		log.Printf("Automation logs: cleaned up %d expired entries", deleted)
+		slog.Info("Automation logs cleaned up expired entries", "deleted", deleted)
 	}
 }
 

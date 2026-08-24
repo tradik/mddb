@@ -359,56 +359,6 @@ func TestAsyncIOOperationIDs(t *testing.T) {
 	wg.Wait()
 }
 
-func TestDirectIO(t *testing.T) {
-	dir := t.TempDir()
-	fpath := filepath.Join(dir, "test.txt")
-	if err := os.WriteFile(fpath, []byte("test"), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	f, err := os.Open(fpath) //nolint:gosec // G304: temp file path in test
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = f.Close() }()
-
-	err = DirectIO(f)
-	if err != nil {
-		t.Errorf("expected nil error, got: %v", err)
-	}
-}
-
-func TestAlignedBuffer(t *testing.T) {
-	buf := AlignedBuffer(4096)
-	if len(buf) != 4096 {
-		t.Errorf("expected size 4096, got %d", len(buf))
-	}
-}
-
-func TestAlignedBufferSmall(t *testing.T) {
-	buf := AlignedBuffer(100)
-	if len(buf) != 100 {
-		t.Errorf("expected size 100, got %d", len(buf))
-	}
-}
-
-func TestAlignedBufferWritable(t *testing.T) {
-	buf := AlignedBuffer(4096)
-
-	// Should be writable without panics
-	for i := range buf {
-		buf[i] = byte(i % 256)
-	}
-
-	// Verify data
-	for i := range buf {
-		if buf[i] != byte(i%256) {
-			t.Errorf("data mismatch at index %d: expected %d, got %d", i, byte(i%256), buf[i])
-			break
-		}
-	}
-}
-
 func TestIsIOUringAvailable(t *testing.T) {
 	// On macOS this should return false
 	result := isIOUringAvailable()

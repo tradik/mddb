@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 func TestVoyageEmbeddingProvider_New(t *testing.T) {

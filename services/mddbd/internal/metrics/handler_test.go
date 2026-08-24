@@ -13,7 +13,10 @@ func (stubStats) Mode() string                    { return "rw" }
 func (stubStats) VectorIndexReady() bool          { return true }
 func (stubStats) EmbeddingConfigured() bool       { return true }
 func (stubStats) EmbeddingQueueSize() (int, bool) { return 3, true }
-func (stubStats) ReplicationRole() string         { return "leader" }
+func (stubStats) EmbeddingCacheStats() (uint64, uint64, int, bool) {
+	return 42, 7, 12, true
+}
+func (stubStats) ReplicationRole() string { return "leader" }
 func (stubStats) BinlogStats() (BinlogStatsView, bool) {
 	return BinlogStatsView{CurrentLSN: 5, FileSize: 100, OldestLSN: 1, Subscribers: 2}, true
 }
@@ -89,4 +92,14 @@ func TestStatusRecorderWrite(t *testing.T) {
 	if rec.Body.String() != "body" {
 		t.Errorf("body = %q", rec.Body.String())
 	}
+}
+
+// A nil collector counts nothing rather than panicking: a counter is never
+// worth a crash, and the server has call sites that do not guard the nil
+// (TEST-002).
+func TestIncOpOnANilCollector(t *testing.T) {
+	var m *Metrics
+	m.IncOp("upload")                    // must not panic
+	m.IncOp("search", "collection", "x") // nor with labels
+	m.IncOp()                            // nor with none
 }

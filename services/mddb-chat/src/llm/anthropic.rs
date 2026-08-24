@@ -6,9 +6,9 @@ use tracing::debug;
 use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::llm::provider::{
-    ApiMsg, ChatResponse, ChunkStream, LlmProvider, ToolCall, ToolCallFunction, ToolDef,
+    ApiMsg, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall,
+    ToolCallFunction, ToolDef,
 };
-use crate::session::types::{ChatMessage, MessageRole};
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
@@ -48,6 +48,18 @@ struct MessagesResponse {
     content: Vec<ContentBlock>,
     #[allow(dead_code)]
     stop_reason: Option<String>,
+    /// RAG-005. Optional because a budget must not depend on a field the
+    /// provider is free to omit: a missing block counts as zero and is logged,
+    /// rather than failing the turn over accounting.
+    usage: Option<AnthropicUsage>,
+}
+
+#[derive(Deserialize)]
+struct AnthropicUsage {
+    #[serde(default)]
+    input_tokens: u64,
+    #[serde(default)]
+    output_tokens: u64,
 }
 
 #[derive(Deserialize)]
@@ -75,8 +87,13 @@ enum StreamEvent {
     },
     #[serde(rename = "content_block_start")]
     ContentBlockStart {
+        // RUST-001: neither field is read — the stream is consumed for its
+        // text deltas alone. They stay because this enum is the documentation
+        // of Anthropic's SSE event shape, and a variant missing half its
+        // fields is a worse reference than one carrying them.
         #[allow(dead_code)]
         index: usize,
+        #[allow(dead_code)]
         content_block: serde_json::Value,
     },
     #[serde(rename = "content_block_delta")]
@@ -127,10 +144,7 @@ impl AnthropicProvider {
     }
 
     fn api_url(&self) -> String {
-        format!(
-            "{}/messages",
-            self.config.api_url.trim_end_matches('/')
-        )
+        format!("{}/messages", self.config.api_url.trim_end_matches('/'))
     }
 
     fn request_builder(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
@@ -177,13 +191,13 @@ impl AnthropicProvider {
                         let mut content: Vec<serde_json::Value> = Vec::new();
 
                         // Add text if present
-                        if let Some(text) = &msg.content {
-                            if !text.is_empty() {
-                                content.push(serde_json::json!({
-                                    "type": "text",
-                                    "text": text,
-                                }));
-                            }
+                        if let Some(text) = &msg.content
+                            && !text.is_empty()
+                        {
+                            content.push(serde_json::json!({
+                                "type": "text",
+                                "text": text,
+                            }));
                         }
 
                         // Convert OpenAI-format tool_calls to Anthropic tool_use blocks
@@ -222,14 +236,13 @@ impl AnthropicProvider {
                     });
 
                     // Merge consecutive tool results into one user message
-                    if let Some(last) = result.last_mut() {
-                        if last["role"] == "user" {
-                            if let Some(arr) = last["content"].as_array_mut() {
-                                // Already an array of tool_results, append
-                                arr.push(tool_result);
-                                continue;
-                            }
-                        }
+                    if let Some(last) = result.last_mut()
+                        && last["role"] == "user"
+                        && let Some(arr) = last["content"].as_array_mut()
+                    {
+                        // Already an array of tool_results, append
+                        arr.push(tool_result);
+                        continue;
                     }
 
                     result.push(serde_json::json!({
@@ -244,36 +257,6 @@ impl AnthropicProvider {
         }
 
         result
-    }
-
-    /// Convert simple ChatMessages to Anthropic format
-    fn simple_messages(messages: &[ChatMessage]) -> (Option<String>, Vec<serde_json::Value>) {
-        let mut system = None;
-        let mut result = Vec::new();
-        for msg in messages {
-            match msg.role {
-                MessageRole::System => {
-                    let text = msg.content.clone();
-                    system = Some(match system {
-                        Some(existing) => format!("{}\n\n{}", existing, text),
-                        None => text,
-                    });
-                }
-                MessageRole::User => {
-                    result.push(serde_json::json!({
-                        "role": "user",
-                        "content": msg.content,
-                    }));
-                }
-                MessageRole::Assistant => {
-                    result.push(serde_json::json!({
-                        "role": "assistant",
-                        "content": msg.content,
-                    }));
-                }
-            }
-        }
-        (system, result)
     }
 
     /// Convert ToolDef (OpenAI format) to Anthropic tool format
@@ -309,13 +292,10 @@ impl AnthropicProvider {
                         match serde_json::from_str::<StreamEvent>(data) {
                             Ok(event) => match event {
                                 StreamEvent::ContentBlockDelta { delta, .. } => {
-                                    if let DeltaBlock::TextDelta { text } = delta {
-                                        if !text.is_empty() {
-                                            return Some((
-                                                Ok(text),
-                                                (byte_stream, buffer),
-                                            ));
-                                        }
+                                    if let DeltaBlock::TextDelta { text } = delta
+                                        && !text.is_empty()
+                                    {
+                                        return Some((Ok(text), (byte_stream, buffer)));
                                     }
                                     continue;
                                 }
@@ -354,48 +334,13 @@ impl AnthropicProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for AnthropicProvider {
-    async fn chat_stream(
-        &self,
-        messages: &[ChatMessage],
-        temperature: f32,
-        max_tokens: u32,
-    ) -> Result<ChunkStream, AppError> {
-        let (system, msgs) = Self::simple_messages(messages);
-
-        let request = MessagesRequest {
-            model: self.config.model.clone(),
-            max_tokens,
-            system,
-            messages: msgs,
-            tools: None,
-            temperature: Some(temperature),
-            stream: true,
-        };
-
-        let req = self.client.post(&self.api_url()).json(&request);
-        let req = self.request_builder(req);
-
-        let response = req
-            .send()
-            .await
-            .map_err(|e| AppError::LlmError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("Anthropic API {status}: {body}")));
-        }
-
-        Ok(self.build_sse_stream(response))
-    }
-
     async fn chat_with_tools(
         &self,
         messages: &[ApiMsg],
         tools: &[ToolDef],
         temperature: f32,
         max_tokens: u32,
-    ) -> Result<ChatResponse, AppError> {
+    ) -> Result<ChatTurn, AppError> {
         let (system, filtered) = Self::extract_system(messages);
         let converted = Self::convert_messages(&filtered);
 
@@ -415,7 +360,7 @@ impl LlmProvider for AnthropicProvider {
             stream: false,
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.request_builder(req);
 
         let response = req
@@ -425,8 +370,13 @@ impl LlmProvider for AnthropicProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("Anthropic API {status}: {body}")));
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "unknown".to_string());
+            return Err(AppError::LlmError(format!(
+                "Anthropic API {status}: {body}"
+            )));
         }
 
         let resp: MessagesResponse = response
@@ -455,12 +405,25 @@ impl LlmProvider for AnthropicProvider {
             }
         }
 
-        if !tool_calls.is_empty() {
+        let usage = match &resp.usage {
+            Some(u) => TokenUsage {
+                input: u.input_tokens,
+                output: u.output_tokens,
+            },
+            None => {
+                debug!("Anthropic returned no usage block; this call counts as zero");
+                TokenUsage::default()
+            }
+        };
+
+        let response = if !tool_calls.is_empty() {
             debug!(count = tool_calls.len(), "Anthropic returned tool calls");
-            Ok(ChatResponse::ToolCalls { tool_calls })
+            ChatResponse::ToolCalls { tool_calls }
         } else {
-            Ok(ChatResponse::Content(text_parts.join("")))
-        }
+            ChatResponse::Content(text_parts.join(""))
+        };
+
+        Ok(ChatTurn { response, usage })
     }
 
     async fn chat_stream_raw(
@@ -482,7 +445,7 @@ impl LlmProvider for AnthropicProvider {
             stream: true,
         };
 
-        let req = self.client.post(&self.api_url()).json(&request);
+        let req = self.client.post(self.api_url()).json(&request);
         let req = self.request_builder(req);
 
         let response = req
@@ -492,10 +455,64 @@ impl LlmProvider for AnthropicProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let body = response.text().await.unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("Anthropic API {status}: {body}")));
+            let body = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "unknown".to_string());
+            return Err(AppError::LlmError(format!(
+                "Anthropic API {status}: {body}"
+            )));
         }
 
         Ok(self.build_sse_stream(response))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // RAG-005: the usage block is the whole measurement path, and until now
+    // neither provider parsed it. These tests pin the shape each one sends,
+    // because a field renamed upstream would otherwise show up as a session
+    // that costs nothing.
+
+    #[test]
+    fn usage_is_read_from_the_response() {
+        let body = r#"{
+            "content": [{"type": "text", "text": "hello"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 1234, "output_tokens": 56}
+        }"#;
+
+        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
+        let usage = parsed.usage.expect("usage block");
+
+        assert_eq!(usage.input_tokens, 1234);
+        assert_eq!(usage.output_tokens, 56);
+    }
+
+    #[test]
+    fn a_response_without_usage_still_parses() {
+        // A budget must not depend on a field the provider is free to omit:
+        // the turn succeeds and simply contributes nothing.
+        let body = r#"{"content": [{"type": "text", "text": "hi"}]}"#;
+
+        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
+        assert!(parsed.usage.is_none());
+    }
+
+    #[test]
+    fn a_partial_usage_block_counts_what_it_reports() {
+        let body = r#"{
+            "content": [],
+            "usage": {"output_tokens": 7}
+        }"#;
+
+        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
+        let usage = parsed.usage.expect("usage block");
+
+        assert_eq!(usage.input_tokens, 0);
+        assert_eq!(usage.output_tokens, 7);
     }
 }

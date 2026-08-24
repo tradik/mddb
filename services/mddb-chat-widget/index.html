@@ -4,6 +4,37 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MDDB Chat Widget - Dev Preview</title>
+
+  <meta name="description"
+    content="Development preview of the embeddable MDDB chat widget: a single script tag that adds a chat box backed by an MDDB collection.">
+  <!-- A local dev harness, never a public page — keep it out of indexes. -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="MDDB Chat Widget - Dev Preview">
+  <meta property="og:description"
+    content="Embeddable chat widget for MDDB, loaded from a single script tag.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="MDDB Chat Widget - Dev Preview">
+  <meta name="twitter:description"
+    content="Embeddable chat widget for MDDB, loaded from a single script tag.">
+
+  <!-- Google Tag Manager — inert until a container is configured. Set
+       VITE_GTM_ID at build time to enable it; with the variable unset Vite
+       leaves the %VITE_GTM_ID% placeholder and the guard returns before any
+       request is made, so nothing is sent to a non-existent container. -->
+  <script>
+    (function (w, d, s, l, i) {
+      if (!i || i.charAt(0) === '%' || i === 'GTM-XXXXXXX') return;
+      w[l] = w[l] || [];
+      w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+      var f = d.getElementsByTagName(s)[0],
+        j = d.createElement(s),
+        dl = l != 'dataLayer' ? '&l=' + l : '';
+      j.async = true;
+      j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+      f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', '%VITE_GTM_ID%');
+  </script>
   <style>
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

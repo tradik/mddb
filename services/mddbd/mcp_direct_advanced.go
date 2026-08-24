@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // --- Automation ---
@@ -205,7 +205,11 @@ func (c *DirectClient) GetCollectionConfig(ctx context.Context, collection strin
 	}
 	return &MCPCollectionConfigResponse{
 		Collection: collection,
-		Config:     cfg,
+		// GO-035: credentials masked. This path answers an LLM, which may
+		// repeat what it is given into a transcript, a log or a reply — the
+		// one audience for which handing over an S3 secret key is least
+		// recoverable.
+		Config:     redactCollectionConfig(cfg),
 		Configured: found,
 	}, nil
 }
@@ -215,14 +219,52 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 	if err := validateWordPressTarget(req.WordPress); err != nil {
 		return err
 	}
-	cfg := &CollectionConfig{
-		Type:         req.Type,
-		Description:  req.Description,
-		Icon:         req.Icon,
-		Color:        req.Color,
-		CustomMeta:   req.CustomMeta,
-		MaxRevisions: req.MaxRevisions,
-		WordPress:    req.WordPress,
+	// Merge into the stored config rather than replacing it.
+	//
+	// MCPSetCollectionConfigRequest covers 9 of CollectionConfig's ~18 fields,
+	// and CollectionManager.Set writes whatever struct it is handed. Building
+	// a fresh one erased storageBackend, quantization, spell settings and —
+	// worst — Encrypted, whose false value goes straight into the encryptor,
+	// so an agent updating a description left the next document in an
+	// encrypted collection stored as plaintext. Same defect as the gRPC path
+	// fixed in RAG-001; this is the MCP one.
+	cfg := &CollectionConfig{}
+	if existing, found := c.server.CollectionManager.Get(req.Collection); found && existing != nil {
+		*cfg = *existing
+	}
+	cfg.Type = req.Type
+	cfg.Description = req.Description
+	cfg.Icon = req.Icon
+	cfg.Color = req.Color
+	cfg.CustomMeta = req.CustomMeta
+	cfg.MaxRevisions = req.MaxRevisions
+	// GO-035: a nil target means "not sent". Assigning it unconditionally
+	// deleted a configured publishing target whenever an agent touched
+	// anything else — the same shape as the bug the merge above exists to
+	// stop, one line below the comment describing it.
+	if req.WordPress != nil {
+		cfg.WordPress = req.WordPress
+	}
+
+	if req.Retrieval != nil {
+		if err := req.Retrieval.Validate(); err != nil {
+			return err
+		}
+		cfg.Retrieval = req.Retrieval
+	}
+	if req.ResponsePrompt != "" {
+		if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
+			return err
+		}
+		cfg.ResponsePrompt = req.ResponsePrompt
+	}
+
+	// GO-035: an agent that read this config back saw masked credentials, so
+	// an empty one means "unchanged".
+	if stored, found := c.server.CollectionManager.Get(req.Collection); found {
+		carryOverSecrets(cfg, stored)
+	} else {
+		carryOverSecrets(cfg, nil)
 	}
 	return c.server.CollectionManager.Set(req.Collection, cfg)
 }
@@ -289,9 +331,14 @@ func (c *DirectClient) DeleteCurationRule(ctx context.Context, id string) error 
 // ListCollectionConfigs returns all collection configurations via the direct client.
 func (c *DirectClient) ListCollectionConfigs(ctx context.Context) (*MCPCollectionConfigListResponse, error) {
 	all := c.server.CollectionManager.ListAll()
+	// GO-035: masked, same reasoning as the single-config read.
+	redacted := make(map[string]*CollectionConfig, len(all))
+	for collection, cfg := range all {
+		redacted[collection] = redactCollectionConfig(cfg)
+	}
 	return &MCPCollectionConfigListResponse{
-		Configs: all,
-		Total:   len(all),
+		Configs: redacted,
+		Total:   len(redacted),
 	}, nil
 }
 
@@ -351,10 +398,10 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		metricName = "cosine"
 	}
 
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample per collection for better merging (SRCH-005). No single
+	// collection profile can own the factor across targets, so only the
+	// request parameter and the default apply.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
 	// Search each target collection
 	type taggedResult struct {

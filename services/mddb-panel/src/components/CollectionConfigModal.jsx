@@ -37,6 +37,15 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
   const [spellLang, setSpellLang] = useState('');
   const [maxRevisions, setMaxRevisions] = useState(0);
   const [encrypted, setEncrypted] = useState(false);
+  // Retrieval profile (RAG-001). Empty values mean "not configured" — the
+  // caller's request parameter or MDDB's own default applies.
+  const [retrievalSearchType, setRetrievalSearchType] = useState('');
+  const [retrievalTopK, setRetrievalTopK] = useState('');
+  const [retrievalMode, setRetrievalMode] = useState('');
+  const [hybridStrategy, setHybridStrategy] = useState('');
+  const [hybridAlpha, setHybridAlpha] = useState('');
+  const [contextTokenBudget, setContextTokenBudget] = useState('');
+  const [responsePrompt, setResponsePrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -71,6 +80,16 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         setSpellLang(cfg.spellLang || '');
         setMaxRevisions(cfg.maxRevisions || 0);
         setEncrypted(cfg.encrypted === true);
+        const r = cfg.retrieval || {};
+        setRetrievalSearchType(r.defaultSearchType || '');
+        setRetrievalTopK(r.topK || '');
+        setRetrievalMode(r.retrievalMode || '');
+        setHybridStrategy(r.hybridStrategy || '');
+        // hybridAlpha 0 is a real weight (pure keyword), so it is only
+        // "unset" when the server says it was never configured.
+        setHybridAlpha(r.hybridAlphaSet ? String(r.hybridAlpha ?? 0) : '');
+        setContextTokenBudget(r.contextTokenBudget || '');
+        setResponsePrompt(cfg.responsePrompt || '');
       }
     } catch (err) {
       setError(err.message);
@@ -105,6 +124,21 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         maxRevisions: Number(maxRevisions) > 0 ? Number(maxRevisions) : undefined,
         encrypted: encrypted || undefined,
       };
+
+      // Send the retrieval block only when something in it is set: an empty
+      // profile and no profile must mean the same thing to the server.
+      const retrieval = {};
+      if (retrievalSearchType) retrieval.defaultSearchType = retrievalSearchType;
+      if (Number(retrievalTopK) > 0) retrieval.topK = Number(retrievalTopK);
+      if (retrievalMode) retrieval.retrievalMode = retrievalMode;
+      if (hybridStrategy) retrieval.hybridStrategy = hybridStrategy;
+      if (hybridAlpha !== '') {
+        retrieval.hybridAlpha = Number(hybridAlpha);
+        retrieval.hybridAlphaSet = true;
+      }
+      if (Number(contextTokenBudget) > 0) retrieval.contextTokenBudget = Number(contextTokenBudget);
+      if (Object.keys(retrieval).length > 0) payload.retrieval = retrieval;
+      if (responsePrompt.trim()) payload.responsePrompt = responsePrompt.trim();
       if (storageBackend === 's3') {
         payload.storageConfig = storageConfig;
       }
@@ -310,9 +344,18 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                         type="password"
                         value={storageConfig.secretKey}
                         onChange={(e) => setStorageConfig({ ...storageConfig, secretKey: e.target.value })}
-                        placeholder="wJalrXUtnFEMI/K7MDENG..."
+                        placeholder={storageConfig.secretKeySet ? 'Stored — leave blank to keep' : 'wJalrXUtnFEMI/K7MDENG...'}
+                        aria-describedby="storage-secret-hint"
                         className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
+                      {/* GO-035: the server never sends a stored secret back,
+                          so an empty field means "unchanged", not "none". Say
+                          so, or saving looks like it silently dropped one. */}
+                      <p id="storage-secret-hint" className="mt-0.5 text-[11px] text-gray-600">
+                        {storageConfig.secretKeySet
+                          ? 'A secret is stored. Leave blank to keep it, or type a new one to replace it.'
+                          : 'No secret stored yet.'}
+                      </p>
                     </div>
                   </div>
                   <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
@@ -428,6 +471,132 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   Older revisions are trimmed synchronously on every write so history can&apos;t grow unbounded on high-churn collections.
+                </p>
+              </div>
+
+              {/* Retrieval profile (RAG-001, v2.12.0+) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Retrieval Defaults</label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Search settings stored with the collection instead of repeated by every client.
+                  A request that passes its own value always wins; leave a field empty to keep MDDB&apos;s default.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Default search type</label>
+                    <select
+                      value={retrievalSearchType}
+                      onChange={(e) => setRetrievalSearchType(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">MDDB default</option>
+                      <option value="fts">Full-text</option>
+                      <option value="vector">Vector</option>
+                      <option value="hybrid">Hybrid</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Results per search (topK)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1000"
+                      value={retrievalTopK}
+                      onChange={(e) => setRetrievalTopK(e.target.value)}
+                      placeholder="per-endpoint default"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Granularity</label>
+                    <select
+                      value={retrievalMode}
+                      onChange={(e) => setRetrievalMode(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">MDDB default (whole document)</option>
+                      <option value="parent">Whole document</option>
+                      <option value="chunk">Matching passage</option>
+                      <option value="window">Passage with neighbours</option>
+                      {/* SRCH-006: the only mode that changes which documents
+                          are reached, rather than what a result looks like. */}
+                      <option value="graph">Whole document + graph neighbours</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Hybrid fusion</label>
+                    <select
+                      value={hybridStrategy}
+                      onChange={(e) => setHybridStrategy(e.target.value)}
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">MDDB default (alpha)</option>
+                      <option value="alpha">Alpha blend</option>
+                      <option value="rrf">Reciprocal rank fusion</option>
+                      <option value="weighted">Weighted (alpha + signals)</option>
+                    </select>
+                  </div>
+
+                  {hybridStrategy !== 'rrf' && (
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">
+                        Keyword ↔ semantic balance {hybridAlpha !== '' && `(${hybridAlpha})`}
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={hybridAlpha}
+                        onChange={(e) => setHybridAlpha(e.target.value)}
+                        placeholder="0.5"
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <p className="text-xs text-gray-400 mt-0.5">0 = keyword only, 1 = semantic only</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-0.5">Context budget (tokens)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={contextTokenBudget}
+                      onChange={(e) => setContextTokenBudget(e.target.value)}
+                      placeholder="no cap"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Drops results from the tail once the total would exceed this. Approximate, not tokenised.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Response prompt (RAG-002, v2.12.0+) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Answer Formatting</label>
+                <p className="text-xs text-gray-500 mb-2">
+                  How answers drawn from this collection should be shaped — numbered steps for runbooks,
+                  code blocks for API docs. Applied automatically by the chat service and handed to MCP agents
+                  with their search results, so it travels with the data instead of living in every client.
+                  Use <code className="px-1 bg-gray-100 rounded">{'{{collection}}'}</code> and{' '}
+                  <code className="px-1 bg-gray-100 rounded">{'{{query}}'}</code> as placeholders.
+                </p>
+                <textarea
+                  value={responsePrompt}
+                  onChange={(e) => setResponsePrompt(e.target.value.slice(0, 4096))}
+                  rows={4}
+                  placeholder="e.g. Answer as numbered steps. Quote the exact command for each step and name the file it belongs in."
+                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <p className={`text-xs mt-0.5 ${responsePrompt.length > 3800 ? 'text-amber-600' : 'text-gray-400'}`}>
+                  {responsePrompt.length} / 4096 characters
+                  {responsePrompt.length > 3800 && ' — this is prepended to every prompt, so it competes with the answer for context'}
                 </p>
               </div>
 

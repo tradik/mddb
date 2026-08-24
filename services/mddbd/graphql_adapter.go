@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	gql "mddb/graphql"
@@ -142,8 +143,12 @@ func mcpDocToGQL(d *MCPDocument) *gql.Document {
 		Lang:      d.Lang,
 		Meta:      gql.MapMetaToGraphQL(d.Meta),
 		ContentMd: d.ContentMD,
-		AddedAt:   d.AddedAt.Unix(),
-		UpdatedAt: d.UpdatedAt.Unix(),
+		// gql.TimeToInt64 rather than .Unix(): a document with no timestamp —
+		// a legacy record written before they existed — has the zero time,
+		// and time.Time{}.Unix() is -62135596800. A client sorting by
+		// addedAt would put those first, dated the year 1.
+		AddedAt:   gql.TimeToInt64(d.AddedAt),
+		UpdatedAt: gql.TimeToInt64(d.UpdatedAt),
 	}
 	if out.ID == "" {
 		out.ID = fmt.Sprintf("%s|%s", d.Key, d.Lang)
@@ -164,6 +169,10 @@ func mcpVectorStatsToGQL(s *MCPVectorStatsResponse) *gql.VectorStats {
 			EmbeddedDocuments: c.EmbeddedDocuments,
 		})
 	}
+	// Sorted, because these come from map iteration: the same query returned
+	// its collections in a different order every time, which makes a UI list
+	// jump on refresh and any diff of two responses meaningless (TEST-002).
+	sort.Slice(cols, func(i, j int) bool { return cols[i].Collection < cols[j].Collection })
 	provider := s.Provider
 	model := s.Model
 	dims := s.Dimensions

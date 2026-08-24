@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::chat::{scenario, tools};
 use crate::error::AppError;
-use crate::llm::provider::{ApiMsg, ChatResponse};
+use crate::llm::provider::{ApiMsg, ChatResponse, TokenUsage};
 use crate::session::manager::JoinResult;
 use crate::session::types::{MessageRole, WsIncoming, WsOutgoing};
 use crate::state::AppState;
@@ -68,17 +68,26 @@ pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: Strin
             WsIncoming::Resume { session_id: sid } => {
                 if state.session_manager.get_session(&sid).is_some() {
                     session_id = Some(sid.clone());
-                    send_json(&sender, &WsOutgoing::Session {
-                        id: sid,
-                        scenario: String::new(),
-                    }).await;
+                    send_json(
+                        &sender,
+                        &WsOutgoing::Session {
+                            id: sid,
+                            scenario: String::new(),
+                        },
+                    )
+                    .await;
                 } else {
                     send_error(&sender, "session not found or expired").await;
                 }
             }
-            WsIncoming::Feedback { rating, question, answer } => {
+            WsIncoming::Feedback {
+                rating,
+                question,
+                answer,
+            } => {
                 let sid_str = session_id.as_deref().unwrap_or("unknown");
-                let user_name = session_id.as_ref()
+                let user_name = session_id
+                    .as_ref()
                     .and_then(|sid| state.session_manager.get_session(sid))
                     .map(|s| s.name.clone())
                     .unwrap_or_default();
@@ -108,9 +117,9 @@ pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: Strin
                             .unwrap_or_default()
                     };
                     state.session_manager.remove_session(&sid).await;
-                    state.webhook_dispatcher.dispatch(WebhookPayload::session_end(
-                        &sid, &name, &scenario_name,
-                    ));
+                    state
+                        .webhook_dispatcher
+                        .dispatch(WebhookPayload::session_end(&sid, &name, &scenario_name));
                     info!(session_id = sid, name = name, "session ended by user");
                 }
                 send_json(&sender, &WsOutgoing::Ended).await;
@@ -131,9 +140,9 @@ pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: Strin
         };
 
         state.session_manager.remove_session(&sid).await;
-        state.webhook_dispatcher.dispatch(WebhookPayload::session_end(
-            &sid, &name, &scenario_name,
-        ));
+        state
+            .webhook_dispatcher
+            .dispatch(WebhookPayload::session_end(&sid, &name, &scenario_name));
         info!(session_id = sid, name = name, "session ended");
     }
 }
@@ -158,38 +167,76 @@ async fn handle_join(
         return Err(AppError::RateLimited);
     }
 
-    match state.session_manager.join(name.clone(), scenario_name.clone()).await {
+    match state
+        .session_manager
+        .join(name.clone(), scenario_name.clone())
+        .await
+    {
         JoinResult::Admitted { session_id } => {
-            info!(session_id = session_id, name = name, scenario = scenario_name, "session started");
-            state.webhook_dispatcher.dispatch(WebhookPayload::session_start(
-                &session_id, &name, &scenario_name,
-            ));
-            send_json(sender, &WsOutgoing::Session {
-                id: session_id.clone(),
-                scenario: scenario_name,
-            }).await;
-            Ok(session_id)
-        }
-        JoinResult::Queued { position, notify } => {
-            info!(name = name, position = position, "user queued");
-            send_json(sender, &WsOutgoing::Queued { position }).await;
-            notify.notified().await;
-            let result = state.session_manager.join(name.clone(), scenario_name.clone()).await;
-            if let JoinResult::Admitted { session_id } = result {
-                send_json(sender, &WsOutgoing::Session {
+            info!(
+                session_id = session_id,
+                name = name,
+                scenario = scenario_name,
+                "session started"
+            );
+            state
+                .webhook_dispatcher
+                .dispatch(WebhookPayload::session_start(
+                    &session_id,
+                    &name,
+                    &scenario_name,
+                ));
+            send_json(
+                sender,
+                &WsOutgoing::Session {
                     id: session_id.clone(),
                     scenario: scenario_name,
-                }).await;
-                Ok(session_id)
-            } else {
-                Err(AppError::SessionFull)
+                },
+            )
+            .await;
+            Ok(session_id)
+        }
+        JoinResult::Queued { position, admitted } => {
+            info!(name = name, position = position, "user queued");
+            send_json(sender, &WsOutgoing::Queued { position }).await;
+
+            // The manager creates the session and sends its id here. This used
+            // to wake up and call join() again, which created a second session
+            // for the same visitor — see QueueEntry::admitted.
+            match admitted.await {
+                Ok(session_id) => {
+                    info!(
+                        session_id = session_id,
+                        name = name,
+                        "queued session started"
+                    );
+                    state
+                        .webhook_dispatcher
+                        .dispatch(WebhookPayload::session_start(
+                            &session_id,
+                            &name,
+                            &scenario_name,
+                        ));
+                    send_json(
+                        sender,
+                        &WsOutgoing::Session {
+                            id: session_id.clone(),
+                            scenario: scenario_name,
+                        },
+                    )
+                    .await;
+                    Ok(session_id)
+                }
+                Err(_) => Err(AppError::SessionFull),
             }
         }
         JoinResult::Full => {
-            state.webhook_dispatcher.dispatch(WebhookPayload::queue_full(
-                state.session_manager.queue_len().await,
-                state.session_manager.active_count(),
-            ));
+            state
+                .webhook_dispatcher
+                .dispatch(WebhookPayload::queue_full(
+                    state.session_manager.queue_len().await,
+                    state.session_manager.active_count(),
+                ));
             Err(AppError::SessionFull)
         }
     }
@@ -209,6 +256,30 @@ async fn handle_message(
             .get_session_mut(session_id)
             .ok_or(AppError::SessionNotFound)?;
 
+        // TEST-001: a scenario's max_turns was parsed and never consulted, so
+        // a demo capped at ten turns served an unbounded conversation — and an
+        // unbounded LLM bill. Checked before the message is recorded, so a
+        // refused turn does not count against the limit it was refused by.
+        if let Some(scenario) = state.config.get_scenario(&session.scenario)
+            && !scenario.allows_another_turn(session.user_turns)
+        {
+            return Err(AppError::TurnLimitReached(
+                scenario.max_turns.unwrap_or(session.user_turns),
+            ));
+        }
+
+        // RAG-005: the second limit, and the one a budget actually runs out
+        // in. max_turns caps how many turns a session takes; it says nothing
+        // about what they cost, and one turn carrying a large RAG context
+        // through several tool-calling rounds can be worth ten short ones.
+        //
+        // Checked before the message is recorded, for the same reason as
+        // above: a refused turn should not count against the limit that
+        // refused it.
+        if !session.within_token_budget(state.config.security.max_tokens_per_session) {
+            return Err(AppError::TokenBudgetExceeded(session.total_tokens_used));
+        }
+
         session.add_message(MessageRole::User, content.clone());
         session.trim_history(state.config.session.max_history_length);
 
@@ -225,6 +296,12 @@ async fn handle_message(
     let collection = scenario::get_collection(&state.config, &scenario_name);
     let temperature = scenario::get_temperature(&state.config, &scenario_name);
     let max_tokens = state.config.llm.max_tokens;
+
+    // RAG-002: the collection states how answers drawn from it should be
+    // formatted, and that instruction travels with the data rather than being
+    // repeated in every client's TOML.
+    let collection_prompt = state.mddb_client.clone().response_prompt(&collection).await;
+    let system_prompt = scenario::compose_system_prompt(&system_prompt, &collection_prompt);
 
     // Build initial API messages
     let mut api_messages: Vec<ApiMsg> = Vec::new();
@@ -249,7 +326,8 @@ async fn handle_message(
                 MessageRole::User => "user",
                 MessageRole::Assistant => "assistant",
                 MessageRole::System => "system",
-            }.to_string(),
+            }
+            .to_string(),
             content: Some(msg.content.clone()),
             tool_calls: None,
             tool_call_id: None,
@@ -259,16 +337,25 @@ async fn handle_message(
     let tool_defs = tools::tool_definitions();
     let mut mddb_client = state.mddb_client.clone();
 
+    // Accumulated across every round of this turn and charged to the session
+    // once, whichever way the loop ends (RAG-005).
+    let mut spent = TokenUsage::default();
+
     // Agentic loop: let LLM call tools until it produces a final response
     for round in 0..MAX_TOOL_ROUNDS {
         debug!(round = round, "tool-calling round");
 
-        let response = state
+        let turn = state
             .llm_provider
             .chat_with_tools(&api_messages, &tool_defs, temperature, max_tokens)
             .await?;
 
-        match response {
+        // RAG-005: charged per round, not per turn. The loop calls the model
+        // once per tool-calling round, and a budget that counted only the round
+        // that produced the answer would miss most of what was spent.
+        spent += turn.usage;
+
+        match turn.response {
             ChatResponse::ToolCalls { tool_calls } => {
                 debug!(count = tool_calls.len(), "LLM requested tool calls");
 
@@ -296,10 +383,15 @@ async fn handle_message(
 
                 // Execute each tool and add results
                 for tc in &tool_calls {
-                    let result = tools::execute_tool(&mut mddb_client, tc, &collection).await
+                    let result = tools::execute_tool(&mut mddb_client, tc, &collection)
+                        .await
                         .unwrap_or_else(|e| format!("Tool error: {e}"));
 
-                    debug!(tool = tc.function.name, result_len = result.len(), "tool result");
+                    debug!(
+                        tool = tc.function.name,
+                        result_len = result.len(),
+                        "tool result"
+                    );
 
                     api_messages.push(ApiMsg {
                         role: "tool".to_string(),
@@ -320,6 +412,7 @@ async fn handle_message(
 
                 if let Some(mut session) = state.session_manager.get_session_mut(session_id) {
                     session.add_message(MessageRole::Assistant, text);
+                    session.add_tokens(spent);
                 }
                 return Ok(());
             }
@@ -341,9 +434,13 @@ async fn handle_message(
             Ok(text) => {
                 full_response.push_str(&text);
                 if full_response.len() > state.config.session.max_response_length {
-                    send_json(sender, &WsOutgoing::Chunk {
-                        content: "\n\n[Response truncated]".to_string(),
-                    }).await;
+                    send_json(
+                        sender,
+                        &WsOutgoing::Chunk {
+                            content: "\n\n[Response truncated]".to_string(),
+                        },
+                    )
+                    .await;
                     break;
                 }
                 send_json(sender, &WsOutgoing::Chunk { content: text }).await;
@@ -360,6 +457,15 @@ async fn handle_message(
 
     if let Some(mut session) = state.session_manager.get_session_mut(session_id) {
         session.add_message(MessageRole::Assistant, full_response);
+        // RAG-005: the tool-calling rounds are charged here too, so a turn that
+        // exhausted MAX_TOOL_ROUNDS costs what it cost.
+        //
+        // The streaming call above is NOT counted: its usage arrives in the SSE
+        // message_delta frame, which this reader discards along with everything
+        // that is not a text delta. So a turn that reaches this path undercounts
+        // by its final response. Stated rather than hidden, because a budget
+        // that quietly misses a case is worse than one that says which.
+        session.add_tokens(spent);
     }
 
     Ok(())
@@ -378,7 +484,11 @@ async fn send_error(
     sender: &Arc<Mutex<futures::stream::SplitSink<WebSocket, Message>>>,
     message: &str,
 ) {
-    send_json(sender, &WsOutgoing::Error {
-        message: message.to_string(),
-    }).await;
+    send_json(
+        sender,
+        &WsOutgoing::Error {
+            message: message.to_string(),
+        },
+    )
+    .await;
 }

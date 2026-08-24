@@ -9,7 +9,9 @@
 # Run from the repository root.
 #
 # Requirements:
-#   - buf CLI >= 1.50.0 (https://buf.build/docs/installation)
+#   - buf CLI >= 1.72.0 (https://buf.build/docs/installation)
+#     Install the exact version CI uses:
+#       go install github.com/bufbuild/buf/cmd/buf@v1.72.0
 #
 # Fallback: if buf is not installed, falls through to the legacy
 # protoc-based script (proto/generate-legacy.sh), which uses locally
@@ -37,6 +39,16 @@ if command -v buf &> /dev/null; then
     echo ""
     echo "📎 Syncing proto/mddb.proto → clients/nodejs/proto/mddb.proto"
     cp proto/mddb.proto clients/nodejs/proto/mddb.proto
+
+    # TEST-001: the Python gRPC plugin emits `import mddb_pb2`, an absolute
+    # import that only resolves when the generated files sit on sys.path
+    # directly. Inside a package it raises ModuleNotFoundError, so
+    # `import mddb_client` had never worked. Rewrite it to a relative import.
+    echo "📎 Making the Python stub's import relative (mddb_pb2_grpc.py)"
+    python_grpc="clients/python/mddb_client/mddb_pb2_grpc.py"
+    if [ -f "${python_grpc}" ]; then
+        sed -i 's/^import mddb_pb2 as mddb__pb2$/from . import mddb_pb2 as mddb__pb2/' "${python_grpc}"
+    fi
 
     echo ""
     echo "═══════════════════════════════════════════════════════════"

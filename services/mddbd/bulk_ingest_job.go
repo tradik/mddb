@@ -4,18 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
+	"mddb/internal/httpclient"
+	json "mddb/internal/jsonx"
+	proto "mddb/proto"
 	"net/http"
 	"sort"
 	"strings"
 	"sync"
 	"time"
-
-	"mddb/internal/httpclient"
-	proto "mddb/proto"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 var bucketBulkJobs = []byte("bulk_jobs")
@@ -71,11 +69,12 @@ type bulkWorkItem struct {
 // queued jobs. A single worker keeps BoltDB writes serialised and removes
 // the need for per-job locking on status transitions.
 type BulkIngestManager struct {
-	server *Server
-	queue  chan bulkWorkItem
-	stop   chan struct{}
-	wg     sync.WaitGroup
-	mu     sync.Mutex // guards job status transitions
+	server    *Server
+	queue     chan bulkWorkItem
+	stop      chan struct{}
+	wg        sync.WaitGroup
+	mu        sync.Mutex // guards job status transitions
+	jobEvents *jobEventThrottle
 }
 
 // NewBulkIngestManager constructs a manager with a buffered queue. BufferSize
@@ -86,9 +85,10 @@ func NewBulkIngestManager(server *Server, bufferSize int) *BulkIngestManager {
 		bufferSize = 64
 	}
 	return &BulkIngestManager{
-		server: server,
-		queue:  make(chan bulkWorkItem, bufferSize),
-		stop:   make(chan struct{}),
+		server:    server,
+		queue:     make(chan bulkWorkItem, bufferSize),
+		stop:      make(chan struct{}),
+		jobEvents: newJobEventThrottle(),
 	}
 }
 
@@ -98,7 +98,7 @@ func (m *BulkIngestManager) Start() {
 	m.recoverOrphans()
 	m.wg.Add(1)
 	go m.worker()
-	log.Printf("Bulk ingest worker started (queue buffer=%d)", cap(m.queue))
+	slog.Info("Bulk ingest worker started (queue)", "cap", cap(m.queue))
 }
 
 // Stop waits for the in-flight job to complete and then returns. Queued jobs
@@ -241,6 +241,7 @@ func (m *BulkIngestManager) process(item bulkWorkItem) {
 	job.Status = BulkJobProcessing
 	job.StartedAt = time.Now().Unix()
 	_ = m.saveJob(job)
+	m.publishJobEvent(SSEJobStarted, job)
 
 	ctx := context.Background()
 	for i := 0; i < len(item.docs); i += bulkJobChunkSize {
@@ -265,6 +266,7 @@ func (m *BulkIngestManager) process(item bulkWorkItem) {
 		}
 		job.Processed = i + len(chunk)
 		_ = m.saveJob(job)
+		m.publishJobEvent(SSEJobProgress, job)
 	}
 
 	if job.Failed == job.Total {
@@ -274,6 +276,7 @@ func (m *BulkIngestManager) process(item bulkWorkItem) {
 	}
 	job.CompletedAt = time.Now().Unix()
 	_ = m.saveJob(job)
+	m.publishJobEvent(eventForStatus(job.Status), job)
 
 	if job.CallbackURL != "" {
 		go m.fireCallback(job)
@@ -310,7 +313,13 @@ func (m *BulkIngestManager) transitionStatus(jobID string, status BulkJobStatus,
 	} else {
 		job.CompletedAt = time.Now().Unix()
 	}
-	return m.saveJob(job)
+	if err := m.saveJob(job); err != nil {
+		return err
+	}
+	// Announced here rather than at each call site: this is the single place a
+	// job changes state, so a new transition cannot forget to emit (GO-030).
+	m.publishJobEvent(eventForStatus(status), job)
+	return nil
 }
 
 // markTerminal is the mutex-guarded version used during shutdown drain.
@@ -342,7 +351,7 @@ func (m *BulkIngestManager) recoverOrphans() {
 		_ = m.transitionStatus(id, BulkJobFailed, "server restarted mid-job", 0)
 	}
 	if len(orphans) > 0 {
-		log.Printf("Bulk ingest: marked %d orphan jobs as failed", len(orphans))
+		slog.Info("Bulk ingest marked orphan jobs as failed", "orphansCount", len(orphans))
 	}
 }
 
@@ -352,12 +361,12 @@ func (m *BulkIngestManager) recoverOrphans() {
 func (m *BulkIngestManager) fireCallback(job *BulkIngestJob) {
 	payload, err := json.Marshal(job)
 	if err != nil {
-		log.Printf("bulk ingest callback: marshal failed for %s: %v", job.ID, err)
+		slog.Warn("bulk ingest callback marshal failed", "iD", job.ID, "err", err)
 		return
 	}
 	req, err := http.NewRequest(http.MethodPost, job.CallbackURL, bytes.NewReader(payload))
 	if err != nil {
-		log.Printf("bulk ingest callback: bad URL %s: %v", job.CallbackURL, err)
+		slog.Warn("bulk ingest callback bad URL", "callbackURL", job.CallbackURL, "err", err)
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -365,7 +374,7 @@ func (m *BulkIngestManager) fireCallback(job *BulkIngestJob) {
 	// SEC-004: use the SSRF-guarded pooled client (callback URL is user-supplied).
 	resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req)
 	if err != nil {
-		log.Printf("bulk ingest callback: POST to %s failed: %v", job.CallbackURL, err)
+		slog.Warn("bulk ingest callback POST failed", "callbackURL", job.CallbackURL, "err", err)
 		return
 	}
 	httpclient.DrainAndClose(resp.Body)

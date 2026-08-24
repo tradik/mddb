@@ -414,7 +414,7 @@ class MDDBClient {
   /**
    * Hybrid search (sparse + dense)
    */
-  async hybridSearch({ collection, query, topK = 10, algorithm = 'bm25', vectorAlgorithm = 'flat', alpha = 0.5, strategy = 'alpha', rrfK = 60, fuzzy = 0, threshold = 0.0, filterMeta = {}, includeContent = false, distanceMetric = 'cosine', lang, boost, geo, sort, signal }) {
+  async hybridSearch({ collection, query, topK = 10, algorithm = 'bm25', vectorAlgorithm = 'flat', alpha = 0.5, strategy = 'alpha', rrfK = 60, fuzzy = 0, threshold = 0.0, filterMeta = {}, includeContent = false, distanceMetric = 'cosine', lang, boost, geo, sort, signals, signal }) {
     const body = {
       collection,
       query,
@@ -432,6 +432,12 @@ class MDDBClient {
     };
     if (lang) {
       body.lang = lang;
+    }
+    // SRCH-002: sent only when a weight is set, so a "weighted" request with
+    // no signals behaves exactly like "alpha" rather than carrying an empty
+    // object the server has to interpret.
+    if (signals && Object.values(signals).some((v) => Number(v) > 0)) {
+      body.signals = signals;
     }
     if (boost && Object.keys(boost).length > 0) {
       body.boost = boost;
@@ -855,6 +861,21 @@ class MDDBClient {
   /**
    * Get collection configuration
    */
+  // SRCH-010: ask the server how a collection should be searched, instead of
+  // making the operator choose between eight vector algorithms by name.
+  async searchAdvisor(collection, { apply = false } = {}) {
+    const params = new URLSearchParams({ collection });
+    if (apply) params.set('apply', 'true');
+    return this.request(`/search-advisor?${params.toString()}`);
+  }
+
+  // CODE-005: what depends on this document, and what it depends on.
+  async codeGraph({ collection, key, direction = 'both', depth = 1, maxDegree = 100, lines = false }) {
+    const params = new URLSearchParams({ collection, key, direction, depth: String(depth), maxDegree: String(maxDegree) });
+    if (lines) params.set('lines', 'true');
+    return this.request(`/code-graph?${params.toString()}`);
+  }
+
   async getCollectionConfig(collection) {
     return this.request(`/collection-config?collection=${encodeURIComponent(collection)}`);
   }

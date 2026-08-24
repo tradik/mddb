@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"mddb/internal/webhooks"
 	"net/http"
 	"os"
@@ -102,7 +102,7 @@ func PanicRecoveryMiddleware(wm *webhooks.WebhookManager, next http.Handler) htt
 				return
 			}
 			stack := string(debug.Stack())
-			log.Printf("panic recovered on %s %s: %v\n%s", r.Method, r.URL.Path, rec, stack) // #nosec G706 -- method/path are already validated by net/http router; safe to log
+			slog.Error("panic recovered", "method", r.Method, "path", r.URL.Path, "rec", rec, "stack", stack) // #nosec G706 -- method/path are already validated by net/http router; safe to log
 			if wm != nil {
 				wm.FireEvent(webhooks.EventPanicRecovered, map[string]interface{}{
 					"method": r.Method,

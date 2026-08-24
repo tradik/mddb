@@ -117,6 +117,12 @@ service MDDB {
   // Zero-shot document classification using embedding similarity
   rpc Classify(ClassifyRequest) returns (ClassifyResponse);
 
+  // SearchAdvisor measures a collection and recommends how to search it
+  // (SRCH-010), so a client picks an algorithm from evidence rather than from
+  // the names. Added for gRPC parity: the HTTP endpoint and the MCP tool
+  // already existed, and the Python client speaks gRPC.
+  rpc SearchAdvisor(SearchAdvisorRequest) returns (SearchAdvisorResponse);
+
   // Delete a single document
   rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
 
@@ -416,6 +422,7 @@ message VectorSearchRequest {
   map<string, MetaValues> filter_meta = 6;       // optional metadata pre-filter
   bool include_content = 7;                      // include full content_md in results
   string algorithm = 8;                          // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
+  double oversample = 9;                         // (SRCH-005) candidates per result before dedup; 1.0-10.0, 0 = collection profile then default
 }
 
 // Vector search result
@@ -677,6 +684,11 @@ message ValidateDocumentRequest {
 message ValidateDocumentResponse {
   bool valid = 1;
   repeated string errors = 2;
+  // Advisory findings that do not fail validation (DOC-012). Today: metadata
+  // values that look like a structure lost on the way in — Go's `%v` rendering
+  // of a map or a list of maps. A warning, never an error: rejecting the value
+  // would break every caller legitimately storing text that looks like this.
+  repeated string warnings = 3;
 }
 
 // --- Partial Update ---
@@ -961,6 +973,51 @@ message GetAutomationLogsResponse {
 
 // --- Collection Config ---
 
+// RetrievalProfileProto is a collection's retrieval defaults (RAG-001).
+//
+// Every field is optional and an unset field means "not configured", so the
+// caller's request parameter or MDDB's global default applies. Precedence is
+// fixed: request parameter > collection profile > global default.
+message RetrievalProfileProto {
+  string default_search_type = 1;   // fts|vector|hybrid
+  int32 top_k = 2;
+  string retrieval_mode = 3;        // parent|chunk|window
+  string hybrid_strategy = 4;       // alpha|rrf
+  double hybrid_alpha = 5;          // 0.0-1.0; see hybrid_alpha_set
+  // hybrid_alpha 0.0 is a meaningful weight (pure keyword), so it cannot
+  // double as "unset" — this says whether the value above was configured.
+  bool hybrid_alpha_set = 6;
+  int32 context_token_budget = 7;   // cap on total returned context, in tokens
+  double oversample = 8;            // (SRCH-005) candidates per result before dedup/merge/rescore; 1.0-10.0
+}
+
+// NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.
+// storage_backend, storage_config, quantization, disk_only_vectors, encrypted,
+// track_access, track_hot, spell_correct, spell_lang and wordpress exist over
+// REST and are invisible over gRPC — a gRPC client cannot read or write them.
+// Tracked separately; retrieval is added here because RAG-001 needs it.
+// StorageConfigProto is the backend-specific half of a collection's storage
+// settings (GO-035). `secret_key` is never populated on read — see
+// `secret_key_set`.
+message StorageConfigProto {
+  string endpoint = 1;
+  string bucket = 2;
+  string region = 3;
+  string access_key = 4;
+  string secret_key = 5;                         // write-only; reads return empty, see secret_key_set
+  string prefix = 6;
+  bool use_tls = 7;
+  bool secret_key_set = 8;                       // read-only: a secret is stored, its value is withheld
+}
+
+// WordPressTargetProto is the outbound publishing target (GO-035). `api_key`
+// is never populated on read — see `api_key_set`.
+message WordPressTargetProto {
+  string url = 1;
+  string api_key = 2;                            // write-only; reads return empty, see api_key_set
+  bool api_key_set = 3;                          // read-only: a key is stored, its value is withheld
+}
+
 message CollectionConfigProto {
   string type = 1;
   string description = 2;
@@ -968,6 +1025,21 @@ message CollectionConfigProto {
   string color = 4;
   map<string, string> custom_meta = 5;
   int32 max_revisions = 6;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
+  RetrievalProfileProto retrieval = 7;           // (v2.12.0+) per-collection retrieval defaults
+  string response_prompt = 8;                    // (v2.12.0+) how to format answers from this collection (RAG-002); max 4 KiB
+  // (v2.12.0+, GO-035) The rest of CollectionConfig. Until these existed a
+  // gRPC client saw a partially configured collection and could not tell that
+  // from a partially configured one.
+  string storage_backend = 9;                    // "boltdb" (default), "memory", "s3"
+  StorageConfigProto storage_config = 10;        // backend-specific settings (required for s3)
+  string quantization = 11;                      // "float32" (default), "int8", "int4"
+  bool disk_only_vectors = 12;                   // RAM holds only quantized vectors; full vectors stay on disk
+  bool encrypted = 13;                           // AES-256-GCM at rest
+  bool track_access = 14;                        // record per-read access events
+  bool track_hot = 15;                           // maintain hot-docs leaderboard
+  bool spell_correct = 16;                       // auto-correct FTS queries
+  string spell_lang = 17;                        // override language for spell correction
+  WordPressTargetProto wordpress = 18;           // outbound publishing target (mddb-sync plugin)
 }
 
 message GetCollectionConfigRequest {
@@ -988,6 +1060,26 @@ message SetCollectionConfigRequest {
   string color = 5;
   map<string, string> custom_meta = 6;
   int32 max_revisions = 7;                       // (v2.9.14+) per-collection revision cap; 0 = unlimited
+  RetrievalProfileProto retrieval = 8;           // (v2.12.0+) per-collection retrieval defaults
+  string response_prompt = 9;                    // (v2.12.0+) how to format answers from this collection (RAG-002)
+  // (v2.12.0+, GO-035) The remaining CollectionConfig fields.
+  //
+  // The booleans are `optional` deliberately. A plain proto3 bool cannot tell
+  // "the client did not mention encryption" from "the client wants encryption
+  // off", and this handler merges into the stored config — so an unset bool
+  // would arrive as false and turn off encryption on a collection whose owner
+  // only wanted to change the icon. That exact shape was the RAG-001 data-loss
+  // bug; presence keeps it from coming back through a different door.
+  string storage_backend = 10;                   // "" leaves the stored backend alone
+  StorageConfigProto storage_config = 11;        // nil leaves the stored settings alone
+  string quantization = 12;                      // "" leaves the stored setting alone
+  optional bool disk_only_vectors = 13;
+  optional bool encrypted = 14;
+  optional bool track_access = 15;
+  optional bool track_hot = 16;
+  optional bool spell_correct = 17;
+  string spell_lang = 18;                        // "" leaves the stored setting alone
+  WordPressTargetProto wordpress = 19;           // nil leaves the stored target alone
 }
 
 message SetCollectionConfigResponse {
@@ -1456,4 +1548,45 @@ message DeleteCurationRuleRequest {
 message DeleteCurationRuleResponse {
   string status = 1;
   string id = 2;
+}
+
+// SearchAdvisorRequest asks how a collection should be searched (SRCH-010).
+message SearchAdvisorRequest {
+  string collection = 1;
+}
+
+// CollectionProfile is what the advisor measured.
+message CollectionProfile {
+  string collection = 1;
+  int32 documents = 2;
+  int32 sampled = 3;
+  int32 embedded_documents = 4;
+  int32 vector_dimensions = 5;
+  int32 median_words = 6;
+  double long_document_ratio = 7;
+  int32 distinct_terms = 8;
+  // How much new vocabulary each document contributes. This, and not the
+  // type-token ratio, decides whether keyword search can discriminate: TTR
+  // pooled over a corpus falls towards zero as the corpus grows.
+  double terms_per_document = 9;
+  double type_token_ratio = 10;
+  int32 code_documents = 11;
+  int64 estimated_vector_bytes = 12;
+}
+
+// SearchAdvisorResponse is the advice, with the reasons for it.
+message SearchAdvisorResponse {
+  CollectionProfile profile = 1;
+  string search_type = 2;
+  string fts_algorithm = 3;
+  string vector_algorithm = 4;
+  string hybrid_strategy = 5;
+  double hybrid_alpha = 6;
+  string retrieval_mode = 7;
+  int32 top_k = 8;
+  // One line per decision, in plain language. A recommendation nobody can
+  // argue with is one nobody should follow.
+  repeated string reasons = 9;
+  // What would stop the recommendation working.
+  repeated string warnings = 10;
 }

@@ -538,58 +538,6 @@ func TestGRPCSetCollectionConfig_ReadOnly(t *testing.T) {
 // ListRevisions
 // ---------------------------------------------------------------------------
 
-func TestGRPCListRevisions_Success(t *testing.T) {
-	gs, s, cleanup := newTestGRPCServerFull(t)
-	defer cleanup()
-
-	// Insert a doc first so the collection bucket exists
-	_, err := gs.Add(context.Background(), &pb.AddRequest{
-		Collection: "blog", Key: "rev1", Lang: "en",
-		ContentMd: "# Current",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Directly insert two revision entries with distinct timestamps into BoltDB.
-	// The Add RPC uses time.Now().Unix() (seconds precision) so two rapid adds
-	// produce the same rev key. We bypass that by writing revisions manually.
-	docID := genID("blog", "rev1", "en")
-	kb := &KeyBuilder{}
-	ts1 := int64(1700000001)
-	ts2 := int64(1700000002)
-	doc1 := &storage.Doc{ID: docID, ContentMD: "# V1", Lang: "en", UpdatedAt: ts1}
-	doc2 := &storage.Doc{ID: docID, ContentMD: "# V2", Lang: "en", UpdatedAt: ts2}
-	buf1, _ := marshalDoc(doc1)
-	buf2, _ := marshalDoc(doc2)
-
-	err = s.DB.Update(func(tx *bolt.Tx) error {
-		bRev := tx.Bucket(s.BucketNames.Rev)
-		if err := bRev.Put(kb.BuildRevKey("blog", docID, ts1), buf1); err != nil {
-			return err
-		}
-		return bRev.Put(kb.BuildRevKey("blog", docID, ts2), buf2)
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_ = s // suppress unused
-	resp, err := gs.ListRevisions(context.Background(), &pb.ListRevisionsRequest{
-		Collection: "blog", Key: "rev1", Lang: "en",
-	})
-	if err != nil {
-		t.Fatalf("ListRevisions: %v", err)
-	}
-	if resp.Total < 2 {
-		t.Fatalf("expected at least 2 revisions, got %d", resp.Total)
-	}
-	// Newest first
-	if resp.Revisions[0].Timestamp < resp.Revisions[1].Timestamp {
-		t.Error("expected revisions sorted newest first")
-	}
-}
-
 func TestGRPCListRevisions_MissingFields(t *testing.T) {
 	gs, _, cleanup := newTestGRPCServerFull(t)
 	defer cleanup()

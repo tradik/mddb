@@ -73,7 +73,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 79 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 81 built-in tools (only custom tools exposed) |
 
 ### API Key Authentication
 
@@ -172,9 +172,57 @@ Logs are written to stderr in JSON format:
 {"timestamp":"2026-03-26T10:30:00Z","method":"POST","path":"/mcp","status":200,"duration_ms":45,"client_ip":"1.2.3.4","key_name":"claude-prod","session_id":"abc123","user_agent":"claude-code/1.0"}
 ```
 
+## Agent Instructions
+
+The tool schemas say what each tool accepts; they do not say which one fits a
+question, or that asking for a projection instead of whole documents changes
+the cost by more than an order of magnitude. Measured on this engine, the same
+`full_text_search` over five 12 KB documents returns ~19 700 tokens by default
+and ~327 with `fields: ["key"]`.
+
+[`integrations/agent-instructions/`](https://github.com/tradik/mddb/tree/main/integrations/agent-instructions)
+ships that guidance in the formats agents read:
+
+| File | For |
+|---|---|
+| `AGENTS.md` | Paste into a project; the source every other variant is generated from |
+| `claude-code/SKILL.md` | Claude Code skill |
+| `cursor/mddb.mdc` | Cursor rule |
+| `windsurf/mddb.md` | Windsurf rule |
+
+Edit `AGENTS.md` and run `make agent-instructions`; CI fails if a variant was
+edited directly, and a test fails if the instructions name a tool that no
+longer exists.
+
+## Locating a Match
+
+`full_text_search` accepts `highlight: true` (v2.12.0+), which returns each
+matching fragment with the lines it occupies:
+
+```json
+{"name": "full_text_search", "arguments": {
+  "collection": "theme", "query": "background",
+  "highlight": true, "fragment_size": 80, "fields": ["key"]
+}}
+```
+
+```
+css/style.css:158-163
+"…}\n\n.hero-banner {\n  <mark>background</mark>: url(hero.png);"
+```
+
+`fields` drops the document body and `highlight` says where to look, so the two
+together answer the question without carrying the file — under 800 bytes for a
+164-line stylesheet, against ~20 000 tokens for the same search returning whole
+documents. Projections keep the fragments deliberately: dropping them would
+leave a caller with neither the text nor its location.
+
+Lower `fragment_size` for source. The default of 150 is a byte budget tuned for
+prose; code lines are short, so it covers about fifteen lines of CSS.
+
 ## Built-in Tool Catalog
 
-All 79 built-in tools, grouped by area. Tool inputs are self-describing via
+All 81 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -323,6 +371,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `restore_backup` | Restore the MDDB database from a backup file. |
 | `update_document` | Partially update a document. |
 | `get_document_meta` | Get document metadata without content. |
+| `code_graph` | Code connection graph: what a document depends on and what depends on it (which stylesheet declares a selector, which pages load a script). |
 | `delete_collection` | Delete an entire collection and all its documents, revisions, and metadata indices. |
 | `get_collection_config` | Get configuration attributes for a collection (type, description, icon, color, custom metadata). |
 | `set_collection_config` | Set or update configuration attributes for a collection. |

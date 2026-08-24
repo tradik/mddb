@@ -1,4 +1,4 @@
-import * as https from 'node:https';
+import { Agent, type Dispatcher } from 'undici';
 import type { MddbDocument } from './document.js';
 
 export interface MddbClientOptions {
@@ -36,7 +36,7 @@ export class MddbClient {
   private readonly apiKey: string;
   private readonly timeoutMs: number;
   private readonly fetchImpl: typeof fetch;
-  private readonly agent: https.Agent | undefined;
+  private readonly dispatcher: Dispatcher | undefined;
   private readonly maxAttempts: number;
   private readonly backoffMs: number;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -49,7 +49,12 @@ export class MddbClient {
     this.maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
     this.backoffMs = opts.backoffMs ?? DEFAULT_BACKOFF_MS;
     this.sleep = opts.sleepImpl ?? defaultSleep;
-    this.agent = opts.verifySsl ? undefined : new https.Agent({ rejectUnauthorized: false });
+    // Node's global fetch is undici, which ignores the `agent` option a
+    // node:https.Agent would provide and honours `dispatcher` instead — so a
+    // permissive https.Agent silently did nothing here (INT-013).
+    this.dispatcher = opts.verifySsl
+      ? undefined
+      : new Agent({ connect: { rejectUnauthorized: false } });
   }
 
   /**
@@ -113,8 +118,8 @@ export class MddbClient {
           body: JSON.stringify(body),
           signal: controller.signal,
         };
-        if (this.agent) {
-          (init as RequestInit & { agent?: https.Agent }).agent = this.agent;
+        if (this.dispatcher) {
+          (init as RequestInit & { dispatcher?: Dispatcher }).dispatcher = this.dispatcher;
         }
         const res = await this.fetchImpl(url, init);
         const text = await res.text();

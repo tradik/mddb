@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // Global variable to track server start time

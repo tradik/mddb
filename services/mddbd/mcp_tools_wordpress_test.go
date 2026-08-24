@@ -212,3 +212,60 @@ func TestWordPressToolsAreNotReadOnly(t *testing.T) {
 		}
 	}
 }
+
+// SEC-013 / CodeQL go/request-forgery. validateWordPressTarget enforces the
+// scheme and nothing else, so an https:// URL pointing at a cloud metadata
+// endpoint or a cluster address passed it — and was then dialled by a bare
+// http.Client that carries no SSRF guard. The check moved to the point of use
+// so a target stored before it existed is covered too.
+func TestWordPressRefusesAPrivateTarget(t *testing.T) {
+	// TestMain enables the opt-in for the whole binary, because most tests
+	// dial httptest servers on 127.0.0.1. Turn it back off to assert blocking,
+	// the same way internal/httpclient's own tests do.
+	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "")
+
+	blocked := []string{
+		"https://169.254.169.254/latest/meta-data/",
+		"https://10.0.0.5",
+		"https://192.168.1.1",
+		"https://172.16.0.2:8080",
+	}
+
+	for _, raw := range blocked {
+		_, err := wordpressPost(context.Background(),
+			&WordPressTargetConfig{URL: raw}, "/publish", map[string]interface{}{})
+		if err == nil {
+			t.Errorf("%s was dialled", raw)
+			continue
+		}
+		if !strings.Contains(err.Error(), "wordpress.url") {
+			t.Errorf("%s: refusal does not name the field: %v", raw, err)
+		}
+	}
+}
+
+func TestWordPressAllowsLoopbackWithoutOptIn(t *testing.T) {
+	// A WordPress on the same machine is the documented development setup, so
+	// it must not need an environment variable. Nothing is listening, so the
+	// call fails at the dial — which is the point: it got past validation.
+	_, err := wordpressPost(context.Background(),
+		&WordPressTargetConfig{URL: "http://127.0.0.1:1"}, "/publish", map[string]interface{}{})
+
+	if err == nil {
+		t.Fatal("expected a connection failure")
+	}
+	if strings.Contains(err.Error(), "wordpress.url") {
+		t.Errorf("loopback was refused by validation: %v", err)
+	}
+}
+
+func TestWordPressHonoursTheOutboundOptIn(t *testing.T) {
+	t.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "true")
+
+	_, err := wordpressPost(context.Background(),
+		&WordPressTargetConfig{URL: "https://10.0.0.5:1"}, "/publish", map[string]interface{}{})
+
+	if err != nil && strings.Contains(err.Error(), "wordpress.url") {
+		t.Errorf("the opt-in did not take: %v", err)
+	}
+}

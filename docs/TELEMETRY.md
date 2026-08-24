@@ -126,6 +126,9 @@ Database metrics are cached for 15 seconds to avoid excessive BoltDB scans.
 | `mddb_vector_index_ready` | gauge | -- | 1 if index is loaded, 0 if loading |
 | `mddb_embedding_provider_configured` | gauge | -- | 1 if embedding provider is set |
 | `mddb_embedding_queue_size` | gauge | -- | Pending embedding jobs in queue |
+| `mddb_embedding_cache_hits_total` | counter | -- | (v2.12.0+) Embedding requests served from cache |
+| `mddb_embedding_cache_misses_total` | counter | -- | (v2.12.0+) Embedding requests that reached the provider |
+| `mddb_embedding_cache_size` | gauge | -- | (v2.12.0+) Embeddings currently held in cache |
 
 ### Webhooks & Schema
 
@@ -239,6 +242,15 @@ mddb_vector_embeddings_total / mddb_documents_total * 100
 ```promql
 mddb_embedding_queue_size
 ```
+
+**Embedding cache hit rate — how much of the provider bill the cache is saving:**
+```promql
+rate(mddb_embedding_cache_hits_total[5m])
+  / (rate(mddb_embedding_cache_hits_total[5m]) + rate(mddb_embedding_cache_misses_total[5m]))
+```
+A rate near zero on a busy server usually means the cache is too small for the
+query mix (`MDDB_EMBEDDING_CACHE_SIZE`) rather than that queries are all
+distinct. The metric is absent entirely when caching is disabled.
 
 **Memory usage:**
 ```promql

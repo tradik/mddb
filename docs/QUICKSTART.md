@@ -10,7 +10,7 @@ status: publish
 ## Installation
 
 ### Prerequisites
-- Go 1.26 or later
+- Go 1.27 or later
 - Make (optional)
 
 ### Build from Source

@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use axum::routing::get;
 use axum::Router;
+use axum::routing::get;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::info;
@@ -25,6 +25,7 @@ use grpc::client::MddbClient;
 use llm::anthropic::AnthropicProvider;
 use llm::openai::OpenAiProvider;
 use llm::provider::LlmProvider;
+use security::client_ip::TrustedProxies;
 use security::rate_limiter::RateLimiter;
 use security::sanitizer::Sanitizer;
 use session::manager::SessionManager;
@@ -66,9 +67,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // all use OpenAI-compatible API format
         _ => Arc::new(OpenAiProvider::new(config.llm.clone())),
     };
-    let webhook_dispatcher =
-        WebhookDispatcher::new(config.webhooks.clone(), config.security.webhook_secret.clone());
+    let webhook_dispatcher = WebhookDispatcher::new(
+        config.webhooks.clone(),
+        config.security.webhook_secret.clone(),
+    );
     let rate_limiter = RateLimiter::new(config.security.rate_limit_per_minute);
+    // SEC-014: parsed once, not per connection. An empty list charges the rate
+    // limit to the TCP peer, which is right for a directly exposed server and
+    // wrong behind the reverse proxy this is documented to run behind.
+    let trusted_proxies = TrustedProxies::parse(&config.security.trusted_proxies);
+    if trusted_proxies.is_empty() {
+        tracing::info!("no trusted proxies configured; rate limits are charged to the TCP peer");
+    }
     let sanitizer = Sanitizer::new(config.security.clone());
 
     let state = Arc::new(AppState {
@@ -79,6 +89,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         webhook_dispatcher,
         rate_limiter,
         sanitizer,
+        trusted_proxies,
     });
 
     // Session cleanup task
@@ -92,11 +103,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    // Build CORS layer
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+    // CORS from the configuration, not a hardcoded wildcard.
+    //
+    // TEST-001: this used to be `allow_origin(Any)` unconditionally, so
+    // `server.cors_origins` was read from the TOML, defaulted, and then had no
+    // effect — an operator who listed their own origins still served
+    // `Access-Control-Allow-Origin: *` to every page on the internet.
+    let cors = if config.server.allows_any_origin() {
+        tracing::warn!(
+            "CORS allows any origin; set server.cors_origins for a deployment \
+             a browser can reach"
+        );
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    } else {
+        let origins = config.server.allowed_origins();
+        tracing::info!(
+            count = origins.len(),
+            "CORS restricted to configured origins"
+        );
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods(Any)
+            .allow_headers(Any)
+    };
 
     // Build router
     let app = Router::new()

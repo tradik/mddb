@@ -204,64 +204,9 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Post-update hooks
-	if hasContent && s.EmbeddingWorker != nil && saved.ContentMD != "" {
-		s.EmbeddingWorker.Enqueue(EmbeddingJob{
-			Collection: collection,
-			DocID:      saved.ID,
-			ContentMD:  saved.ContentMD,
-		})
-	}
-
-	if s.TTLManager != nil {
-		if saved.ExpiresAt > 0 {
-			_ = s.TTLManager.Set(collection, saved.ID, saved.ExpiresAt)
-		} else if hasTTL {
-			_ = s.TTLManager.Remove(collection, saved.ID)
-		}
-	}
-
-	if hasContent && s.FTSIndex != nil && saved.ContentMD != "" {
-		_ = s.FTSIndex.IndexWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
-		_ = s.FTSIndex.IndexPositionsWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
-		fields := map[string]string{"content": saved.ContentMD}
-		for k, vals := range saved.Meta {
-			if len(vals) > 0 {
-				fields["meta."+k] = strings.Join(vals, " ")
-			}
-		}
-		_ = s.FTSIndex.IndexFieldsWithLang(collection, saved.ID, fields, saved.Lang)
-	}
-
-	// Geo re-index on partial update. Mirrors the Add/Upsert path above:
-	// if meta now contains a usable point, upsert it into both indexes;
-	// otherwise drop any stale points.
-	if s.GeoIndex != nil && s.GeoStore != nil {
-		if lat, lng, ok := s.GeoIndex.AddFromMeta(collection, saved.ID, saved.Meta); ok {
-			_ = s.GeoStore.Put(collection, saved.ID, lat, lng)
-			if s.GeoHashIndex != nil {
-				s.GeoHashIndex.Add(collection, saved.ID, lat, lng)
-			}
-		} else {
-			s.GeoIndex.Remove(collection, saved.ID)
-			if s.GeoHashIndex != nil {
-				s.GeoHashIndex.Remove(collection, saved.ID)
-			}
-			_ = s.GeoStore.Delete(collection, saved.ID)
-		}
-	}
-
-	if s.WebhookManager != nil {
-		s.WebhookManager.Fire("doc.updated", collection, key, lang, &saved)
-	}
-
-	if s.AutomationManager != nil && env("MDDB_TRIGGERS", "false") == "true" {
-		go s.AutomationManager.EvaluateTriggers(collection, saved, "update")
-	}
-
-	if s.Metrics != nil {
-		s.Metrics.IncOp("doc_update")
-	}
+	// Post-update side effects (cache invalidation, embedding, TTL, FTS, geo,
+	// webhooks, triggers, metrics) — shared with gRPC UpdateDocument (GO-038).
+	s.runPostUpdateHooks(collection, key, lang, saved, hasContent, hasTTL)
 
 	ok(w, saved)
 }

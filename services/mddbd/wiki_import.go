@@ -7,18 +7,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
+	"mddb/internal/envconf"
+	json "mddb/internal/jsonx"
+	"mddb/internal/wikitext"
+	proto "mddb/proto"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
-
-	"mddb/internal/envconf"
-	"mddb/internal/wikitext"
-	proto "mddb/proto"
-
-	json "github.com/goccy/go-json"
 )
 
 // wikiImportBatchSize is the number of pages buffered before flushing to storage.
@@ -64,9 +61,13 @@ type WikiImportRequest struct {
 	Lang          string `json:"lang"`
 	Namespaces    []int  `json:"namespaces,omitempty"` // default [0] (articles only)
 	SkipRedirects bool   `json:"skipRedirects,omitempty"`
-	SkipFTS       bool   `json:"skipFts,omitempty"`   // skip FTS indexing (faster bulk import)
-	MaxPages      int    `json:"maxPages,omitempty"`  // 0 = unlimited
-	BatchSize     int    `json:"batchSize,omitempty"` // default 500
+	SkipFTS       bool   `json:"skipFts,omitempty"` // skip FTS indexing (faster bulk import)
+	// Profile names the same trade-off `skipFts` has always expressed here,
+	// alongside the other ingest paths (RAG-004). `skipFts` still works and
+	// still wins when set.
+	Profile   string `json:"profile,omitempty"`
+	MaxPages  int    `json:"maxPages,omitempty"`  // 0 = unlimited
+	BatchSize int    `json:"batchSize,omitempty"` // default 500
 }
 
 // WikiImportResponse is the JSON response for /v1/import-wiki.
@@ -77,6 +78,7 @@ type WikiImportResponse struct {
 	Errors     []string `json:"errors,omitempty"`
 	Collection string   `json:"collection"`
 	DurationMs int64    `json:"durationMs"`
+	Profile    string   `json:"profile,omitempty"`
 }
 
 // MediaWiki XML structures for streaming parse.
@@ -136,6 +138,22 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// RAG-004: `profile=fast` maps onto the SkipFTS this path has always used
+	// for "faster bulk import" — same trade-off, now with the same name it
+	// has everywhere else. An explicit skipFts still wins.
+	wikiProfile, err := ResolveIngestProfile(&IngestOptionsHTTP{
+		Profile: req.Profile,
+		SkipFTS: req.SkipFTS,
+	})
+	if err != nil {
+		bad(w, err)
+		return
+	}
+	if wikiProfile.Name == IngestProfileFast {
+		req.SkipFTS = true
+	}
+	req.SkipFTS = req.SkipFTS || wikiProfile.SkipFTS
+
 	// Auth check
 	if s.AuthManager != nil {
 		if err := s.AuthManager.CheckPermission(r.Context(), req.Collection, PermWrite); err != nil {
@@ -177,7 +195,7 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		nsAllow[ns] = true
 	}
 
-	resp := WikiImportResponse{Collection: req.Collection}
+	resp := WikiImportResponse{Collection: req.Collection, Profile: wikiProfile.Name}
 
 	// Streaming XML parse
 	decoder := xml.NewDecoder(bufio.NewReaderSize(xmlReader, 256*1024)) // #nosec G709 -- trusted wiki XML input, streaming parse
@@ -215,8 +233,9 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		if totalProcessed%wikiProgressInterval < batchSize || time.Since(lastProgress) > 30*time.Second {
 			elapsed := time.Since(start)
 			rate := float64(totalProcessed) / elapsed.Seconds()
-			log.Printf("[wiki-import] progress: %d pages (imported=%d skipped=%d failed=%d) %.0f pages/sec elapsed=%s",
-				totalProcessed, resp.Imported, resp.Skipped, resp.Failed, rate, elapsed.Round(time.Second))
+			slog.Info("wiki import progress",
+				"processed", totalProcessed, "imported", resp.Imported, "skipped", resp.Skipped,
+				"failed", resp.Failed, "pagesPerSec", rate, "elapsed", elapsed.Round(time.Second))
 			lastProgress = time.Now()
 		}
 	}
@@ -267,9 +286,9 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 
 		// Validate UTF-8
 		text := page.Revision.Text
-		if !utf8.ValidString(text) {
-			text = strings.ToValidUTF8(text, "")
-		}
+		// GO-036: the shared sanitiser, not a local copy. This was the one
+		// place anybody had fixed, and every other write path kept the bug.
+		text, _, _ = SanitizeDocumentText(text, nil)
 
 		// Convert wikitext to markdown
 		markdown := wikitext.ToMarkdown(text)
@@ -327,8 +346,9 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		resp.Errors = nil
 	}
 
-	log.Printf("[wiki-import] collection=%s imported=%d skipped=%d failed=%d duration=%dms",
-		req.Collection, resp.Imported, resp.Skipped, resp.Failed, resp.DurationMs)
+	slog.Info("wiki import finished",
+		"collection", req.Collection, "imported", resp.Imported, "skipped", resp.Skipped,
+		"failed", resp.Failed, "durationMs", resp.DurationMs)
 
 	s.Metrics.IncOp("import-wiki")
 
@@ -365,6 +385,7 @@ func (s *Server) parseWikiImportRequest(r *http.Request) (WikiImportRequest, io.
 		req.Lang = r.FormValue("lang")
 		req.SkipRedirects = r.FormValue("skipRedirects") == "true"
 		req.SkipFTS = r.FormValue("skipFts") == "true"
+		req.Profile = r.FormValue("profile")
 
 		if v := r.FormValue("maxPages"); v != "" {
 			if n, err := strconv.Atoi(v); err == nil {
@@ -405,6 +426,7 @@ func (s *Server) parseWikiImportRequest(r *http.Request) (WikiImportRequest, io.
 	req.Lang = q.Get("lang")
 	req.SkipRedirects = q.Get("skipRedirects") == "true"
 	req.SkipFTS = q.Get("skipFts") == "true"
+	req.Profile = q.Get("profile")
 	if v := q.Get("maxPages"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil {
 			req.MaxPages = n

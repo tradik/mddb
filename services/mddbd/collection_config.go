@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"sync"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 var bucketColMeta = []byte("colmeta")
@@ -49,12 +49,24 @@ type CollectionConfig struct {
 	// mddb-sync plugin with "Remote publishing" enabled; APIKey is that
 	// plugin's publish key (sent as Authorization: Bearer).
 	WordPress *WordPressTargetConfig `json:"wordpress,omitempty"`
+	// Retrieval settings for this collection (RAG-001). nil = today's
+	// behaviour: every search path keeps its own historical default. See
+	// retrieval_profile.go for the precedence rule.
+	Retrieval *RetrievalProfileDef `json:"retrieval,omitempty"`
+	// ResponsePrompt is how answers drawn from this collection should be
+	// formatted (RAG-002) — numbered steps for runbooks, code blocks for API
+	// docs. Applied automatically by mddb-chat and returned to MCP agents, so
+	// the instruction travels with the data instead of living in every client.
+	// Plain text for a model, never rendered as markup. Max 4 KiB.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // WordPressTargetConfig holds the outbound publishing endpoint for a collection.
 type WordPressTargetConfig struct {
 	URL    string `json:"url"`              // site base URL, e.g. https://blog.example.com
 	APIKey string `json:"apiKey,omitempty"` // mddb-sync publish key
+	// APIKeySet is an output-only flag; see StorageConfigDef.SecretKeySet.
+	APIKeySet bool `json:"apiKeySet,omitempty"`
 }
 
 // StorageConfigDef holds backend-specific configuration for non-default storage backends.
@@ -67,6 +79,11 @@ type StorageConfigDef struct {
 	SecretKey string `json:"secretKey,omitempty"`
 	Prefix    string `json:"prefix,omitempty"`
 	UseTLS    bool   `json:"useTLS,omitempty"`
+	// SecretKeySet is an output-only flag (GO-035). Reads blank SecretKey and
+	// set this instead, so a client can tell "a credential is configured" from
+	// "none is" without being handed the credential. It is never true in
+	// storage — only on the copy the read handlers render.
+	SecretKeySet bool `json:"secretKeySet,omitempty"`
 }
 
 // CollectionManager manages per-collection configuration in a dedicated BoltDB bucket.
@@ -223,6 +240,16 @@ type SetCollectionConfigRequest struct {
 	MaxRevisions    int                    `json:"maxRevisions,omitempty"`    // keep last N revisions per doc (0 = unlimited)
 	Encrypted       bool                   `json:"encrypted,omitempty"`       // opt collection into AES-256-GCM at-rest encryption
 	WordPress       *WordPressTargetConfig `json:"wordpress,omitempty"`       // outbound publishing target (mddb-sync plugin)
+	Retrieval       *RetrievalProfileDef   `json:"retrieval,omitempty"`       // per-collection retrieval defaults (RAG-001)
+	ResponsePrompt  string                 `json:"responsePrompt,omitempty"`  // how to format answers from this collection (RAG-002)
+	// Temporal tracking and spell correction. These live in CollectionConfig
+	// and are read on every request, but were missing here — so the panel's
+	// toggles sent values the handler ignored, and every config save silently
+	// cleared whatever had been set by other means.
+	TrackAccess  bool   `json:"trackAccess,omitempty"`
+	TrackHot     bool   `json:"trackHot,omitempty"`
+	SpellCorrect bool   `json:"spellCorrect,omitempty"`
+	SpellLang    string `json:"spellLang,omitempty"`
 }
 
 func (s *Server) handleCollectionConfig(w http.ResponseWriter, r *http.Request) {
@@ -263,7 +290,8 @@ func (s *Server) handleCollectionConfigGet(w http.ResponseWriter, r *http.Reques
 	}
 	ok(w, map[string]interface{}{
 		"collection": collection,
-		"config":     cfg,
+		// GO-035: credentials are masked; see collection_config_secrets.go.
+		"config":     redactCollectionConfig(cfg),
 		"configured": found,
 	})
 }
@@ -329,6 +357,20 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// RAG-001: a profile is stored data, so a value that cannot mean anything
+	// is refused here rather than surfacing as a strange result months later.
+	if err := req.Retrieval.Validate(); err != nil {
+		bad(w, err)
+		return
+	}
+
+	// RAG-002: this text is prepended to prompts automatically, so an
+	// unbounded value would silently eat the context the answer needs.
+	if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
+		bad(w, err)
+		return
+	}
+
 	cfg := &CollectionConfig{
 		Type:            req.Type,
 		Description:     req.Description,
@@ -342,7 +384,32 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		MaxRevisions:    req.MaxRevisions,
 		Encrypted:       req.Encrypted,
 		WordPress:       req.WordPress,
+		Retrieval:       req.Retrieval,
+		TrackAccess:     req.TrackAccess,
+		TrackHot:        req.TrackHot,
+		SpellCorrect:    req.SpellCorrect,
+		SpellLang:       req.SpellLang,
+		ResponsePrompt:  req.ResponsePrompt,
 	}
+	// GO-035: a client that read this config back saw masked credentials, so
+	// an empty one means "unchanged", not "remove it". Runs before the backend
+	// is applied — connecting to S3 with a blanked secret would fail here for
+	// a reason that has nothing to do with the config being wrong.
+	if stored, found := s.CollectionManager.Get(req.Collection); found {
+		carryOverSecrets(cfg, stored)
+	} else {
+		carryOverSecrets(cfg, nil)
+	}
+
+	// GO-021: create or drop the storage backend this config asks for, before
+	// storing it — a config that names a backend which cannot be reached
+	// should be refused rather than accepted and silently ignored, which is
+	// what this whole change exists to stop.
+	if err := s.ApplyStorageBackend(req.Collection, cfg); err != nil {
+		bad(w, err)
+		return
+	}
+
 	if err := s.CollectionManager.Set(req.Collection, cfg); err != nil {
 		bad(w, err)
 		return
@@ -407,7 +474,9 @@ func (s *Server) handleCollectionConfigList(w http.ResponseWriter, r *http.Reque
 		if !CollectionInTenant(tenant, col) {
 			continue
 		}
-		result = append(result, configInfo{Collection: col, Config: cfg})
+		// GO-035: masked here too. A listing that leaked what the single-config
+		// read withholds would make the masking decorative.
+		result = append(result, configInfo{Collection: col, Config: redactCollectionConfig(cfg)})
 	}
 	if result == nil {
 		result = []configInfo{}

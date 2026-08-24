@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // --- HTTP handlers ---

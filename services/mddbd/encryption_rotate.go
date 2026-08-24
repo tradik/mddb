@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // Rotation job statuses.

@@ -22,6 +22,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   WRANGLER_VERSION: '4.80.0'
   CLOUDFLARE_PROJECT: mddb-docs
 
@@ -32,12 +33,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
 
@@ -51,13 +52,17 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@v1.8.21
+        uses: spagu/ssg@739101baa3407dce488d7f746b156780eb32059c # v1.8.47
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19 and
           # declared feeds (feeds:, RSS) from 1.8.20. The pin is also what made
           # the last mismatch obvious rather than intermittent.
-          version: 'v1.8.21'
+          #
+          # Both pins move together. Dependabot only sees the `uses:` ref, so a
+          # bare dependabot bump leaves `version:` behind and the action then
+          # fetches a binary older than itself — check both when bumping.
+          version: 'v1.8.47'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'

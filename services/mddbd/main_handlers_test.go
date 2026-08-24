@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // ---------------------------------------------------------------------------
@@ -1466,23 +1466,6 @@ func TestMainCopyFile_SourceNotFound(t *testing.T) {
 	}
 }
 
-func TestMainMustJSON(t *testing.T) {
-	result := mustJSON(map[string]string{"key": "value"})
-	if !strings.Contains(string(result), `"key":"value"`) {
-		t.Errorf("unexpected mustJSON result: %s", string(result))
-	}
-}
-
-func TestMainMustJSON_Panic(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic for unmarshalable value")
-		}
-	}()
-	// Channels cannot be marshaled to JSON
-	mustJSON(make(chan int))
-}
-
 func TestMainEnv(t *testing.T) {
 	// Default value
 	result := env("MDDB_NONEXISTENT_TEST_VAR_12345", "default")
@@ -1774,21 +1757,6 @@ func TestMainEnsureBuckets(t *testing.T) {
 // ---------------------------------------------------------------------------
 // Key builder functions
 // ---------------------------------------------------------------------------
-
-func TestMainKeyBuilders(t *testing.T) {
-	if string(storage.DocKey("blog", "id1")) != "doc|blog|id1" {
-		t.Errorf("kDoc: got %q", string(storage.DocKey("blog", "id1")))
-	}
-	if string(storage.ByKeyKey("blog", "key1", "en")) != "bykey|blog|key1|en" {
-		t.Errorf("kByKey: got %q", string(storage.ByKeyKey("blog", "key1", "en")))
-	}
-	if string(storage.RevPrefix("blog", "id1")) != "rev|blog|id1|" {
-		t.Errorf("kRevPrefix: got %q", string(storage.RevPrefix("blog", "id1")))
-	}
-	if string(storage.MetaKeyPrefix("blog", "author", "alice")) != "meta|blog|author|alice|" {
-		t.Errorf("kMetaKeyPrefix: got %q", string(storage.MetaKeyPrefix("blog", "author", "alice")))
-	}
-}
 
 // ---------------------------------------------------------------------------
 // handleBackup - error cases

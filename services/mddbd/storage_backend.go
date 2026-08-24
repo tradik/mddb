@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
@@ -37,11 +38,23 @@ type StorageBackend interface {
 	Name() string
 }
 
+// Bucket-missing errors, shared by the default backend. A missing bucket means
+// the database was never initialised, which is a startup fault rather than a
+// per-document one.
+var (
+	errDocsBucketMissing  = errors.New("docs bucket not found")
+	errByKeyBucketMissing = errors.New("bykey bucket not found")
+)
+
 // BackendRegistry maps collections to their storage backends.
 type BackendRegistry struct {
 	mu       sync.RWMutex
 	backends map[string]StorageBackend
 	fallback StorageBackend // default backend (BoltDB)
+	// failed records collections whose configured backend could not be
+	// created, so writes are refused rather than silently redirected to the
+	// fallback.
+	failed map[string]error
 }
 
 // NewBackendRegistry creates a new registry with the given default backend.
@@ -60,6 +73,40 @@ func (br *BackendRegistry) Get(collection string) StorageBackend {
 		return b
 	}
 	return br.fallback
+}
+
+// MarkFailed records that a collection's configured backend could not be
+// created.
+//
+// Without this, a failed S3 connection would fall through to the default
+// backend and quietly write to local disk — which is exactly the behaviour
+// this registry exists to remove. A collection whose backend failed refuses
+// writes until it is fixed.
+func (br *BackendRegistry) MarkFailed(collection string, err error) {
+	br.mu.Lock()
+	defer br.mu.Unlock()
+	if br.failed == nil {
+		br.failed = make(map[string]error)
+	}
+	br.failed[collection] = err
+}
+
+// Failed reports why a collection's backend is unavailable, or nil.
+func (br *BackendRegistry) Failed(collection string) error {
+	br.mu.RLock()
+	defer br.mu.RUnlock()
+	return br.failed[collection]
+}
+
+// Registered returns the collections with a non-default backend.
+func (br *BackendRegistry) Registered() map[string]StorageBackend {
+	br.mu.RLock()
+	defer br.mu.RUnlock()
+	out := make(map[string]StorageBackend, len(br.backends))
+	for k, v := range br.backends {
+		out[k] = v
+	}
+	return out
 }
 
 // Register sets a specific backend for a collection.

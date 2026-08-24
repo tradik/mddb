@@ -1,4 +1,4 @@
-.TH MDDB-CLI 1 "April 2026" "mddb-cli 2.9.16" "User Commands"
+.TH MDDB-CLI 1 "August 2026" "mddb-cli 2.12.0" "User Commands"
 .SH NAME
 mddb-cli \- command-line client for MDDB (Markdown Database)
 .SH SYNOPSIS
@@ -335,45 +335,80 @@ Manage JSON Schema validation for collections (v2.3.1+).
 .B mddb-cli schema
 \fISUBCOMMAND\fR [\fIOPTIONS\fR]
 .PP
+The collection is named with
+.BR \-\-collection ,
+not positionally.
+.PP
 Subcommands:
 .TP
 .B set
 Set JSON Schema for a collection
 .RS
 .TP
-.BR \-f ", " \-\-file =\fIFILE\fR
-JSON Schema file
+.BR \-c ", " \-\-collection =\fINAME\fR
+Collection name (required)
+.TP
+.BR \-\-schema =\fIJSON\fR
+The schema itself, as a JSON string (required). There is no
+.B \-s
+shorthand: that is
+.B \-\-server
+on every command.
 .RE
 .TP
 .B get
 Get JSON Schema for a collection
+.RS
+.TP
+.BR \-c ", " \-\-collection =\fINAME\fR
+Collection name (required)
+.RE
 .TP
 .B delete
 Remove JSON Schema from a collection
+.RS
+.TP
+.BR \-c ", " \-\-collection =\fINAME\fR
+Collection name (required)
+.RE
+.TP
+.B list
+List every collection that carries a schema
 .PP
 Examples:
 .RS
 .nf
-# Set schema from file
-mddb-cli schema set blog -f blog-schema.json
+# Set a schema from a file
+mddb-cli schema set --collection blog --schema "$(cat blog-schema.json)"
 
-# Get schema
-mddb-cli schema get blog
+# Get a schema
+mddb-cli schema get --collection blog
 
-# Delete schema
-mddb-cli schema delete blog
+# Delete a schema
+mddb-cli schema delete --collection blog
+
+# List collections with schemas
+mddb-cli schema list
 .fi
 .RE
 .SS validate
-Validate a document against its collection's JSON Schema (v2.3.1+).
+Validate metadata against a collection's JSON Schema (v2.3.1+).
 .PP
 .B mddb-cli validate
-\fICOLLECTION\fR \fIKEY\fR \fILANG\fR
+.BR \-\-collection =\fINAME\fR
+.BR \-\-meta =\fIJSON\fR
+.PP
+Checks a block of metadata, not a stored document, so a schema can be tried
+before anything is written.
+.B \-\-meta
+is JSON here, unlike the
+.B key=val1|val2
+syntax the document commands use.
 .PP
 Examples:
 .RS
 .nf
-mddb-cli validate blog post-1 en_US
+mddb-cli validate --collection blog --meta '{"tag":["go"],"status":"draft"}'
 .fi
 .RE
 .SS backup
@@ -517,6 +552,34 @@ mddb-cli api-key delete abc123... --token $TOKEN
 mddb-cli --api-key mddb_live_xyz789... stats
 .fi
 .RE
+.SS self-update
+Update mddb-cli to the latest release.
+.PP
+.RS
+.nf
+mddb-cli self-update --check
+mddb-cli self-update
+.fi
+.RE
+.PP
+The release is fetched from a pinned GitHub URL and its SHA-256 checked against
+the release's checksums.txt before anything on disk is touched, so an
+interrupted or corrupted download leaves the working binary in place. The
+replacement is a rename within the same directory, which is atomic, and the
+previous binary is kept as
+.IR <path>.bak .
+.PP
+The checksum proves the download arrived intact. It does not prove the release
+is genuine: whoever can publish a release can publish a matching checksum.
+Artifact signing would close that and is not configured for this project.
+.PP
+A binary installed through snap or running inside a container is not replaced —
+the packaging channel owns it, and the command names the right one instead.
+.PP
+.B mddbd
+never replaces itself; see
+.B mddbd --check-update
+for the daemon's read-only equivalent.
 .SH GRAPHQL SUPPORT
 MDDB provides a GraphQL API alongside the REST API (disabled by default).
 .SS Enabling GraphQL on Server

@@ -9,8 +9,8 @@ import (
 	"sort"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // ClassifyHTTPRequest is the HTTP JSON request for zero-shot classification.
@@ -136,6 +136,36 @@ func (s *Server) classifyDocument(ctx context.Context, collection, key, lang, te
 
 // loadDocByRef loads a document by collection, key, lang from BoltDB.
 func (s *Server) loadDocByRef(collection, key, lang string) (*storage.Doc, error) {
+	// GO-021: for a collection on an external backend the id is resolved from
+	// the local index and the payload fetched afterwards — never inside the
+	// transaction, where a network round trip would hold the view open.
+	if s.usesExternalBackend(collection) {
+		var docID string
+		if err := s.DBView(func(tx *bolt.Tx) error {
+			bByK := tx.Bucket([]byte("bykey"))
+			if bByK == nil {
+				return errors.New("not found")
+			}
+			if v := bByK.Get(storage.ByKeyKey(collection, key, lang)); v != nil {
+				docID = string(v)
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+		if docID == "" {
+			return nil, errors.New("not found")
+		}
+		d, err := s.LoadDocFromBackend(collection, docID)
+		if err != nil {
+			return nil, err
+		}
+		if d == nil {
+			return nil, errors.New("not found")
+		}
+		return d, nil
+	}
+
 	var doc storage.Doc
 	err := s.DBView(func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))

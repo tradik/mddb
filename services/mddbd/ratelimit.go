@@ -3,7 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
+	"log/slog"
 	"mddb/internal/webhooks"
 	"net/http"
 	"os"
@@ -11,11 +15,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/peer"
-	"google.golang.org/grpc/status"
 )
 
 // RateLimiter is a per-client sliding-window limiter used by both
@@ -106,8 +105,8 @@ func NewRateLimiter() *RateLimiter {
 		rl.by = "ip"
 	}
 	// #nosec G706 -- all values come from env config, not request data
-	log.Printf("Rate limiting enabled (%d req/%ds, burst=%d, by=%s)",
-		rl.limit, windowSec, rl.burst, rl.by)
+	slog.Info("rate limiting enabled",
+		"limit", rl.limit, "windowSec", windowSec, "burst", rl.burst, "by", rl.by)
 	return rl
 }
 

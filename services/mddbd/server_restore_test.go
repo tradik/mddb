@@ -193,7 +193,7 @@ func TestRebuildInMemoryState_InPlace(t *testing.T) {
 	rc := &ReplicationClient{server: s}
 
 	if err := s.withRestoreLock(func() error {
-		rc.rebuildInMemoryState()
+		rc.server.rebuildInMemoryState()
 		return nil
 	}); err != nil {
 		t.Fatalf("rebuild: %v", err)

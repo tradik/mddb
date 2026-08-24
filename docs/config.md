@@ -48,6 +48,10 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_OUTBOUND_ALLOW_PRIVATE` | `"false"` | bool | Allow outbound HTTP requests to private/loopback IP ranges (disabled by default to block SSRF pivoting) |
 | `MDDB_WIKI_MAX_PAGES` | `500000` | int | Maximum pages processed by a single `/v1/import-wiki` run (DoS guard) |
 | `MDDB_WIKI_MAX_DECOMPRESSED_BYTES` | `4294967296` (4 GiB) | int | Maximum decompressed XML volume for a wiki import (zip-bomb guard) |
+| `MDDB_SHUTDOWN_TIMEOUT_SEC` | `15` | int | Deadline for the ordered shutdown; a subsystem that does not finish is named in the log and left behind |
+| `MDDB_SEARCH_MAX_CONCURRENT` | CPU count | int | Maximum heavy queries (FTS, vector, hybrid, aggregate) running at once. Further queries queue, then receive `503` with `Retry-After`. `0` disables the limit |
+| `MDDB_SEARCH_QUEUE_TIMEOUT_MS` | `2000` | int | How long a query waits for a slot before the `503` |
+| `MDDB_SEARCH_CACHE_SIZE` | `500` | int | Maximum cached search responses; `0` disables the cache regardless of what a request asks for. Caching is opt-in per request via `cacheTtl` — see [SEARCH.md](SEARCH.md#result-caching) |
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |
 
@@ -280,6 +284,7 @@ export MDDB_AUDIT_EXPORT_SYSLOG_ADDR="tcp://logs.papertrailapp.com:12345"
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
 | `MDDB_BACKUP_DIR` | `./backups` | path | Directory backups are written to and restored from. Symlinks that escape the jail are rejected; absolute paths and `../` traversal are rejected; empty / NUL bytes are rejected. |
+| `MDDB_GEO_DATA_DIR` | `"geodata"` | path | Directory postcode CSVs must live in. `/v1/geo-reindex` and its gRPC twin accept a name relative to it and refuse anything that resolves outside, symlinks included — the path used to be taken from the request and opened as given |
 
 No further configuration required — the jail is always on.
 
@@ -341,13 +346,18 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_EMBEDDING_PROVIDER` | `""` (disabled) | string | Provider: `"openai"`, `"ollama"`, `"voyage"`, `"cohere"`, or `""` |
+| `MDDB_EMBEDDING_PROVIDER` | `""` (disabled) | string | Provider: `"openai"`, `"ollama"`, `"voyage"`, `"cohere"`, or `""`. When empty and nothing is stored, MDDB probes a local Ollama once at startup — see `MDDB_EMBEDDING_AUTODETECT` |
+| `MDDB_UPDATE_CHECK` | `"1"` | bool | Set to `0` to skip the startup release check. One GET to a pinned GitHub URL, carrying nothing about this installation; the answer is cached in `/health` |
+| `MDDB_EMBEDDING_AUTODETECT` | `"1"` | bool | Set to `0` to skip the startup probe for a local Ollama. The probe is one `GET localhost:11434/api/tags` with a two-second budget, and only runs when no provider is configured |
+| `OLLAMA_HOST` | `http://localhost:11434` | string | Where the autodetection probe looks. Accepted with or without a scheme |
 | `MDDB_EMBEDDING_API_KEY` | `""` | string | API key (for openai/voyage/cohere) |
 | `MDDB_EMBEDDING_API_URL` | *(see below)* | string | API base URL |
 | `MDDB_EMBEDDING_MODEL` | *(see below)* | string | Embedding model name |
 | `MDDB_EMBEDDING_DIMENSIONS` | *(see below)* | int | Vector dimensionality |
 | `MDDB_EMBEDDING_CHUNK_ENABLED` | `true` | bool | Enable text chunking before embedding |
 | `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters |
+| `MDDB_EMBEDDING_CACHE_SIZE` | `1024` | int | (v2.12.0+) Embeddings held in the query cache; `0` disables caching and restores the pre-2.12.0 path exactly |
+| `MDDB_EMBEDDING_CACHE_TTL` | `3600` | int | (v2.12.0+) Cache entry lifetime in seconds |
 
 ### Provider Defaults
 
@@ -449,6 +459,33 @@ Clients with native UDS support:
 | Python gRPC (`clients/python/`) | `grpc.insecure_channel('unix:/var/run/mddb/grpc.sock')` |
 | Node gRPC (`clients/nodejs/`) | `new MDDBClient('unix:/var/run/mddb/grpc.sock', creds)` |
 | `curl` | `curl --unix-socket /var/run/mddb/http.sock http://localhost/v1/healthz` |
+
+---
+
+## Logging
+
+The operational log is structured. `text` is the readable default for a
+terminal; `json` emits one object per line — `time` (RFC 3339), `level`, `msg`
+and the event's own fields — which is what a collector wants, so the container
+image sets it. Severity lives in the `level` field, never in the message, so
+`level=error` is a filter rather than a regular expression over prose.
+
+This is separate from the **audit trail**, which has its own retention,
+RFC 5424 syslog export and SIEM webhooks — see
+[SECURITY.md](SECURITY.md) and the `MDDB_AUDIT_*` variables.
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_LOG_FORMAT` | `text` (`json` in the Docker image) | string | Output encoding: `text` or `json` |
+| `MDDB_LOG_LEVEL` | `info` | string | Minimum level emitted: `debug`, `info`, `warn`, `error` |
+| `MDDB_ACCESS_LOG` | `false` | bool | One line per HTTP request: method, path, status, bytes, elapsed, remote address. The query string is deliberately omitted — search endpoints carry user content there |
+
+Access log lines take their level from the status: 5xx is `error`, 4xx is
+`warn`, everything else `info`.
+
+```json
+{"time":"2026-08-21T14:03:11.412Z","level":"ERROR","msg":"embedding failed after all attempts","collection":"docs","docID":"intro","chunk":2,"err":"context deadline exceeded"}
+```
 
 ---
 

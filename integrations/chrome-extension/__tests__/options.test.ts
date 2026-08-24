@@ -1,5 +1,6 @@
 import { MddbApiError } from '../src/client';
 import { buildSettings, getElements, init, parseRefresh } from '../src/options';
+import { loadSettings, saveSettings } from '../src/storage';
 
 const optionsHtml = `
   <form id="settings-form">
@@ -70,6 +71,58 @@ describe('options init', () => {
     els.form.dispatchEvent(new Event('submit', { cancelable: true }));
     await new Promise((r) => setTimeout(r, 0));
     expect(els.status.textContent).toMatch(/Settings saved/);
+  });
+
+  // INT-015: switching servers used to leave the old origin granted forever,
+  // because optional_host_permissions covers all of http/https and nothing
+  // ever revoked the previous grant.
+  it('revokes the previous origin when the server changes', async () => {
+    await saveSettings({ ...(await loadSettings()), serverUrl: 'https://old.test' });
+    await init();
+    const els = getElements();
+    els.url.value = 'https://new.test';
+    els.refresh.value = '60';
+
+    els.form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(els.status.textContent).toMatch(/Settings saved/);
+    expect(chrome.permissions.remove).toHaveBeenCalledWith({
+      origins: ['https://old.test/*'],
+    });
+  });
+
+  it('keeps the grant when the server is unchanged', async () => {
+    await saveSettings({ ...(await loadSettings()), serverUrl: 'https://same.test' });
+    await init();
+    const els = getElements();
+    els.url.value = 'https://same.test';
+    els.refresh.value = '60';
+
+    els.form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(els.status.textContent).toMatch(/Settings saved/);
+    expect(chrome.permissions.remove).not.toHaveBeenCalled();
+  });
+
+  it('revokes against the last saved origin, not the one loaded at startup', async () => {
+    await saveSettings({ ...(await loadSettings()), serverUrl: 'https://first.test' });
+    await init();
+    const els = getElements();
+
+    els.url.value = 'https://second.test';
+    els.refresh.value = '60';
+    els.form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    els.url.value = 'https://third.test';
+    els.form.dispatchEvent(new Event('submit', { cancelable: true }));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(chrome.permissions.remove).toHaveBeenLastCalledWith({
+      origins: ['https://second.test/*'],
+    });
   });
 
   it('reports permission denial', async () => {

@@ -118,8 +118,8 @@ func TestEnforceProductionGuards_DevModeWarns(t *testing.T) {
 	var logs []string
 	var fatals []string
 	EnforceProductionGuards(
-		func(f string, a ...interface{}) { logs = append(logs, fmt.Sprintf(f, a...)) },
-		func(f string, a ...interface{}) { fatals = append(fatals, fmt.Sprintf(f, a...)) },
+		func(m string, a ...any) { logs = append(logs, m+fmt.Sprint(a...)) },
+		func(m string, a ...any) { fatals = append(fatals, m+fmt.Sprint(a...)) },
 	)
 	if len(fatals) != 0 {
 		t.Fatalf("dev mode must not fatal: %v", fatals)
@@ -139,7 +139,7 @@ func TestEnforceProductionGuards_DevModeFullyConfiguredNoWarn(t *testing.T) {
 	// guard only warns on missing pieces. Passing == silent.
 	var logs []string
 	EnforceProductionGuards(
-		func(f string, a ...interface{}) { logs = append(logs, fmt.Sprintf(f, a...)) },
+		func(m string, a ...any) { logs = append(logs, m+fmt.Sprint(a...)) },
 		func(f string, a ...interface{}) { t.Fatalf("unexpected fatal: "+f, a...) },
 	)
 	if len(logs) != 0 {
@@ -153,7 +153,7 @@ func TestEnforceProductionGuards_ProdFatalsOnMissing(t *testing.T) {
 	var fatals []string
 	EnforceProductionGuards(
 		func(string, ...interface{}) {},
-		func(f string, a ...interface{}) { fatals = append(fatals, fmt.Sprintf(f, a...)) },
+		func(m string, a ...any) { fatals = append(fatals, m+fmt.Sprint(a...)) },
 	)
 	if len(fatals) != 1 {
 		t.Fatalf("expected one fatal, got %v", fatals)
@@ -169,7 +169,7 @@ func TestEnforceProductionGuards_ProdHappyPath(t *testing.T) {
 	t.Setenv("MDDB_PRODUCTION", "true")
 	var logs []string
 	EnforceProductionGuards(
-		func(f string, a ...interface{}) { logs = append(logs, fmt.Sprintf(f, a...)) },
+		func(m string, a ...any) { logs = append(logs, m+fmt.Sprint(a...)) },
 		func(f string, a ...interface{}) { t.Fatalf("unexpected fatal: "+f, a...) },
 	)
 	if len(logs) != 1 || !strings.Contains(logs[0], "satisfied") {

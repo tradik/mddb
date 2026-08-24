@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"mddb/internal/automationlog"
+	"mddb/internal/fts"
 	"mddb/internal/storage"
 	"time"
 )
@@ -219,6 +220,11 @@ type MCPVectorSearchRequest struct {
 	WindowSize     int                 `json:"windowSize,omitempty"`    // neighbor chunks per side in "window" mode
 	MMR            bool                `json:"mmr,omitempty"`           // diversify results via Maximal Marginal Relevance
 	MMRLambda      float64             `json:"mmrLambda,omitempty"`     // relevance/diversity balance, 0..1 (default 0.5)
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication, merging or
+	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
+	// the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -228,6 +234,11 @@ type MCPVectorSearchResult struct {
 	Rank       int         `json:"rank"`
 	ChunkIndex *int        `json:"chunkIndex,omitempty"` // set in chunk/window retrieval modes
 	ChunkText  string      `json:"chunkText,omitempty"`  // matching passage (chunk/window modes)
+	// StartLine and EndLine are 1-based and inclusive, locating the passage in
+	// the parent document (CODE-002) — what an agent needs to edit a place
+	// rather than read a file.
+	StartLine int `json:"startLine,omitempty"`
+	EndLine   int `json:"endLine,omitempty"`
 }
 
 // MCPVectorSearchResponse represents vector search results.
@@ -238,6 +249,14 @@ type MCPVectorSearchResponse struct {
 	Dimensions     int                     `json:"dimensions"`
 	Algorithm      string                  `json:"algorithm"`
 	DistanceMetric string                  `json:"distanceMetric"`
+	// ContextTruncated reports that the collection's contextTokenBudget cut
+	// results from this answer (RAG-001). A caller assembling a prompt needs
+	// to know it is holding part of the answer, not all of it.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
+	// ResponsePrompt is the collection's formatting instruction (RAG-002),
+	// present only when one is configured. Returned with the results so an
+	// agent gets it in the same round trip that fetched what to say.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // MCPVectorReindexRequest represents a reindex request.
@@ -298,6 +317,13 @@ type MCPFTSSearchRequest struct {
 	Boost      map[string]float64 `json:"boost,omitempty"`
 	// IncludeContent — see MCPSearchRequest (GO-022).
 	IncludeContent bool `json:"includeContent,omitempty"`
+	// Highlight asks for the matching fragments and, with them, the lines they
+	// occupy (CODE-002). This is the answer shape issue #192 asked for: a
+	// place to edit rather than a document to read.
+	Highlight     bool   `json:"highlight,omitempty"`
+	HighlightTag  string `json:"highlightTag,omitempty"`
+	MaxHighlights int    `json:"maxHighlights,omitempty"`
+	FragmentSize  int    `json:"fragmentSize,omitempty"`
 }
 
 // MCPFTSResult represents a single FTS result.
@@ -305,6 +331,9 @@ type MCPFTSResult struct {
 	Document     MCPDocument `json:"document"`
 	Score        float64     `json:"score"`
 	MatchedTerms []string    `json:"matchedTerms"`
+	// Highlights carry each matching fragment with the 1-based, inclusive line
+	// range it occupies (CODE-002).
+	Highlights []fts.Highlight `json:"highlights,omitempty"`
 }
 
 // MCPFTSSearchResponse represents full-text search results.
@@ -314,6 +343,14 @@ type MCPFTSSearchResponse struct {
 	Algorithm string         `json:"algorithm"`
 	Fuzzy     int            `json:"fuzzy"`
 	Lang      string         `json:"lang,omitempty"`
+	// ContextTruncated reports that the collection's contextTokenBudget cut
+	// results from this answer (RAG-001). A caller assembling a prompt needs
+	// to know it is holding part of the answer, not all of it.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
+	// ResponsePrompt is the collection's formatting instruction (RAG-002),
+	// present only when one is configured. Returned with the results so an
+	// agent gets it in the same round trip that fetched what to say.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // MCPFTSReindexRequest represents a request to reindex FTS for a collection.
@@ -346,7 +383,7 @@ type MCPHybridSearchRequest struct {
 	Query           string              `json:"query"`
 	TopK            int                 `json:"topK,omitempty"`
 	Algorithm       string              `json:"algorithm,omitempty"`       // FTS: "bm25", "bm25f"
-	VectorAlgorithm string              `json:"vectorAlgorithm,omitempty"` // Vector: "flat", "hnsw", "ivf", "pq", "opq", "sq", "bq"
+	VectorAlgorithm string              `json:"vectorAlgorithm,omitempty"` // Vector: "flat", "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	Alpha           float64             `json:"alpha,omitempty"`           // 0-1, default 0.5
 	Strategy        string              `json:"strategy,omitempty"`        // "alpha" or "rrf"
 	RRFK            int                 `json:"rrfK,omitempty"`            // RRF k parameter
@@ -356,6 +393,11 @@ type MCPHybridSearchRequest struct {
 	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`
 	Boost           map[string]float64  `json:"boost,omitempty"`
 	Sort            string              `json:"sort,omitempty"` // "combined" (default) or "distance"
+	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
+	// the index per requested result, before deduplication, merging or
+	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
+	// the default.
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -376,6 +418,14 @@ type MCPHybridSearchResponse struct {
 	FTSAlgorithm    string                  `json:"ftsAlgorithm"`
 	VectorAlgorithm string                  `json:"vectorAlgorithm"`
 	DistanceMetric  string                  `json:"distanceMetric"`
+	// ContextTruncated reports that the collection's contextTokenBudget cut
+	// results from this answer (RAG-001). A caller assembling a prompt needs
+	// to know it is holding part of the answer, not all of it.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
+	// ResponsePrompt is the collection's formatting instruction (RAG-002),
+	// present only when one is configured. Returned with the results so an
+	// agent gets it in the same round trip that fetched what to say.
+	ResponsePrompt string `json:"responsePrompt,omitempty"`
 }
 
 // MCPGeoSearchRequest represents a geo radius search.
@@ -478,6 +528,8 @@ type MCPValidateRequest struct {
 type MCPValidateResponse struct {
 	Valid  bool     `json:"valid"`
 	Errors []string `json:"errors"`
+	// Warnings are advisory and never make a document invalid (DOC-012).
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // MCPUpdateDocumentRequest represents request to partially update a document.
@@ -605,6 +657,10 @@ type MCPSetCollectionConfigRequest struct {
 	CustomMeta   map[string]string      `json:"customMeta,omitempty"`
 	MaxRevisions int                    `json:"maxRevisions,omitempty"`
 	WordPress    *WordPressTargetConfig `json:"wordpress,omitempty"`
+	// Retrieval and ResponsePrompt are nil/empty when the caller did not
+	// mention them, and are then left as stored (RAG-001, RAG-002).
+	Retrieval      *RetrievalProfileDef `json:"retrieval,omitempty"`
+	ResponsePrompt string               `json:"responsePrompt,omitempty"`
 }
 
 // MCPCollectionConfigListResponse is the response for list_collection_configs.
@@ -627,6 +683,8 @@ type MCPCrossSearchRequest struct {
 	DistanceMetric    string              `json:"distanceMetric"`
 	FilterMeta        map[string][]string `json:"filterMeta"`
 	IncludeContent    bool                `json:"includeContent"`
+	// Oversample is the recall/latency knob (SRCH-005).
+	Oversample float64 `json:"oversample,omitempty"`
 }
 
 // MCPCrossSearchResponse is the response for cross_search.
@@ -762,6 +820,11 @@ type MCPClient interface {
 	ValidateDocument(ctx context.Context, req *MCPValidateRequest) (*MCPValidateResponse, error)
 	UpdateDocument(ctx context.Context, req *MCPUpdateDocumentRequest) (*MCPDocument, error)
 	GetDocumentMeta(ctx context.Context, req *MCPGetDocMetaRequest) (*MCPDocMetaResponse, error)
+	CodeGraph(ctx context.Context, req *MCPCodeGraphRequest) (*GraphResult, error)
+	// SearchAdvisor measures a collection and recommends how to search it
+	// (SRCH-010), so an agent picks an algorithm from evidence rather than
+	// from the names.
+	SearchAdvisor(ctx context.Context, collection string) (*SearchRecommendation, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)
 	// Synonyms
 	ListSynonyms(ctx context.Context, collection string) (*MCPSynonymListResponse, error)
@@ -817,4 +880,14 @@ func docToMCPDocument(d storage.Doc) MCPDocument {
 		AddedAt:   time.Unix(d.AddedAt, 0),
 		UpdatedAt: time.Unix(d.UpdatedAt, 0),
 	}
+}
+
+// MCPCodeGraphRequest is one code-graph traversal over MCP (CODE-005).
+type MCPCodeGraphRequest struct {
+	Collection string `json:"collection"`
+	Key        string `json:"key"`
+	Direction  string `json:"direction"`
+	Depth      int    `json:"depth"`
+	MaxDegree  int    `json:"max_degree"`
+	Lines      bool   `json:"lines"`
 }

@@ -40,6 +40,15 @@ func (swm *StopWordManager) SetLangRegistry(r *LangRegistry) {
 }
 
 // EnsureBucket creates the stopwords bucket if it doesn't exist.
+// Reload points the manager at a freshly swapped database handle after a
+// restore and rebuilds its cache from it (SEC-015/SEC-016).
+func (swm *StopWordManager) Reload(db *bolt.DB) error {
+	swm.mu.Lock()
+	swm.db = db
+	swm.mu.Unlock()
+	return swm.LoadAll()
+}
+
 func (swm *StopWordManager) EnsureBucket() error {
 	return swm.db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists(bucketStopWords)

@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // TemporalQueryRequest is the HTTP request body for querying document events.

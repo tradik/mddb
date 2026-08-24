@@ -151,14 +151,23 @@ func mcpGetPrompt(ctx context.Context, client MCPClient, name string, args map[s
 		if model == "" {
 			model = "claude"
 		}
+
+		text := fmt.Sprintf("Design a RAG pipeline using MDDB collection %q as the knowledge base, targeting %s.\n"+
+			"Check: vector_stats (embedding coverage), get_collection_config (settings).\n"+
+			"Recommend: embedding model, search strategy (semantic vs hybrid), chunk strategy, and example queries.",
+			collection, model)
+
+		// RAG-002: a collection that states how its answers should be
+		// formatted has already answered part of this question, and designing
+		// a pipeline against it without knowing that produces advice the
+		// operator has to undo.
+		if prompt := collectionResponsePrompt(ctx, client, collection); prompt != "" {
+			text += fmt.Sprintf("\n\nThis collection states how answers drawn from it should be formatted. "+
+				"Treat it as a requirement of the pipeline, not a suggestion:\n\n%s", prompt)
+		}
+
 		return []MCPPromptMessage{
-			{Role: "user", Content: map[string]interface{}{
-				"type": "text",
-				"text": fmt.Sprintf("Design a RAG pipeline using MDDB collection %q as the knowledge base, targeting %s.\n"+
-					"Check: vector_stats (embedding coverage), get_collection_config (settings).\n"+
-					"Recommend: embedding model, search strategy (semantic vs hybrid), chunk strategy, and example queries.",
-					collection, model),
-			}},
+			{Role: "user", Content: map[string]interface{}{"type": "text", "text": text}},
 		}, "RAG pipeline for: " + collection, nil
 
 	default:
@@ -277,4 +286,22 @@ func MCPLogMessage(level MCPLogLevel, logger, message string) map[string]interfa
 // mcpShouldLog returns true if the given level meets the minimum threshold.
 func mcpShouldLog(level, minLevel MCPLogLevel) bool {
 	return mcpLogLevelOrder[level] >= mcpLogLevelOrder[minLevel]
+}
+
+// collectionResponsePrompt reads a collection's formatting instruction
+// (RAG-002), returning "" when there is none or the lookup fails.
+//
+// A prompt is an enhancement: failing to fetch it must degrade the answer, not
+// the request.
+func collectionResponsePrompt(ctx context.Context, client MCPClient, collection string) string {
+	if client == nil || collection == "" {
+		return ""
+	}
+	resp, err := client.GetCollectionConfig(ctx, collection)
+	if err != nil || resp == nil || resp.Config == nil {
+		return ""
+	}
+	return ExpandTemplate(resp.Config.ResponsePrompt, map[string]string{
+		"collection": collection,
+	})
 }

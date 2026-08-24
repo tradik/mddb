@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 func (s *MCPToolServer) toolAddDocument(ctx context.Context, args map[string]interface{}) (string, error) {
@@ -212,6 +212,7 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		DistanceMetric: mcpGetString(args, "distance_metric"),
 		RetrievalMode:  mcpGetString(args, "retrieval_mode"),
 		WindowSize:     mcpGetInt(args, "window_size"),
+		Oversample:     mcpGetFloat(args, "oversample"),
 	}
 	if mmr, ok := args["mmr"].(bool); ok {
 		req.MMR = mmr
@@ -315,6 +316,12 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		Lang:           mcpGetString(args, "lang"),
 		Boost:          mcpGetFloat64Map(args, "boost"),
 		IncludeContent: includeContent,
+		// CODE-002: highlights carry the line range, which is what lets an
+		// agent edit a place instead of reading a file.
+		Highlight:     mcpGetBool(args, "highlight"),
+		HighlightTag:  mcpGetString(args, "highlight_tag"),
+		MaxHighlights: mcpGetInt(args, "max_highlights"),
+		FragmentSize:  mcpGetInt(args, "fragment_size"),
 	}
 
 	resp, err := s.client.FTSSearch(ctx, req)
@@ -362,6 +369,7 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		Strategy:        mcpGetString(args, "strategy"),
 		RRFK:            mcpGetInt(args, "rrf_k"),
 		Fuzzy:           mcpGetInt(args, "fuzzy"),
+		Oversample:      mcpGetFloat(args, "oversample"),
 		DistanceMetric:  mcpGetString(args, "distance_metric"),
 		FilterMeta:      mcpGetMetaMap(args, "filter_meta"),
 		Boost:           mcpGetFloat64Map(args, "boost"),
@@ -537,6 +545,23 @@ func (s *MCPToolServer) toolGetDocumentMeta(ctx context.Context, args map[string
 	return string(data), nil
 }
 
+func (s *MCPToolServer) toolCodeGraph(ctx context.Context, args map[string]interface{}) (string, error) {
+	resp, err := s.client.CodeGraph(ctx, &MCPCodeGraphRequest{
+		Collection: mcpGetString(args, "collection"),
+		Key:        mcpGetString(args, "key"),
+		Direction:  mcpGetString(args, "direction"),
+		Depth:      mcpGetInt(args, "depth"),
+		MaxDegree:  mcpGetInt(args, "max_degree"),
+		Lines:      mcpGetBool(args, "lines"),
+	})
+	if err != nil {
+		return "", err
+	}
+
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return string(data), nil
+}
+
 func (s *MCPToolServer) toolClassifyDocument(ctx context.Context, args map[string]interface{}) (string, error) {
 	req := &MCPClassifyRequest{
 		Collection: mcpGetString(args, "collection"),
@@ -562,6 +587,17 @@ func (s *MCPToolServer) toolClassifyDocument(ctx context.Context, args map[strin
 	}
 
 	resp, err := s.client.Classify(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return string(data), nil
+}
+
+// toolSearchAdvisor answers "how should I search this collection?" (SRCH-010).
+func (s *MCPToolServer) toolSearchAdvisor(ctx context.Context, args map[string]interface{}) (string, error) {
+	resp, err := s.client.SearchAdvisor(ctx, mcpGetString(args, "collection"))
 	if err != nil {
 		return "", err
 	}

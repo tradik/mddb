@@ -17,9 +17,9 @@
 // so the module builds cleanly and is included here. Its go.mod keeps
 // `replace mddb => ../services/mddbd` so it also builds standalone.
 
-go 1.26
+go 1.27
 
-toolchain go1.26.5
+toolchain go1.27.0
 
 use (
 	./clients/go/mddb

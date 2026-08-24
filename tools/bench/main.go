@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"math"
 	"math/rand"
 	"net/http"
@@ -38,8 +39,20 @@ var tagPool = []string{
 	"cloud", "linux", "architecture", "monitoring", "ci-cd", "rust", "python",
 }
 
+// randIntn returns a pseudo-random index.
+//
+// Deliberately math/rand and not crypto/rand: this generates lorem-ipsum
+// benchmark payloads, where reproducible-looking filler is the point and a
+// cryptographic source would only make the generator the thing being measured.
+// Routed through one function so the exemption is stated once.
+//
+// #nosec G404 -- benchmark filler, not a security decision
+func randIntn(n int) int {
+	return rand.Intn(n)
+}
+
 func randomWord() string {
-	return loremWords[rand.Intn(len(loremWords))]
+	return loremWords[randIntn(len(loremWords))]
 }
 
 func capitalize(s string) string {
@@ -50,7 +63,7 @@ func capitalize(s string) string {
 }
 
 func randomSentence() string {
-	n := 8 + rand.Intn(8)
+	n := 8 + randIntn(8)
 	words := make([]string, n)
 	for i := range words {
 		words[i] = randomWord()
@@ -60,7 +73,7 @@ func randomSentence() string {
 }
 
 func randomParagraph() string {
-	n := 3 + rand.Intn(4)
+	n := 3 + randIntn(4)
 	sentences := make([]string, n)
 	for i := range sentences {
 		sentences[i] = randomSentence()
@@ -69,7 +82,7 @@ func randomParagraph() string {
 }
 
 func randomTitle() string {
-	n := 3 + rand.Intn(4)
+	n := 3 + randIntn(4)
 	words := make([]string, n)
 	for i := range words {
 		words[i] = capitalize(randomWord())
@@ -77,18 +90,30 @@ func randomTitle() string {
 	return strings.Join(words, " ")
 }
 
+// randomTags picks 1-3 distinct tags.
+//
+// TEST-001: this used to draw with replacement, so a document could carry the
+// same tag twice. The benchmark exists to measure metadata indexing, and a
+// repeated value indexes once — the run then reported a tag count it had not
+// actually written.
 func randomTags() []string {
-	n := 1 + rand.Intn(3)
-	tags := make([]string, n)
-	for i := range tags {
-		tags[i] = tagPool[rand.Intn(len(tagPool))]
+	n := 1 + randIntn(3)
+	chosen := make(map[string]bool, n)
+	tags := make([]string, 0, n)
+	for len(tags) < n {
+		tag := tagPool[randIntn(len(tagPool))]
+		if chosen[tag] {
+			continue
+		}
+		chosen[tag] = true
+		tags = append(tags, tag)
 	}
 	return tags
 }
 
 func randomBlogPost() (title string, content string, tags []string) {
 	title = randomTitle()
-	nParagraphs := 2 + rand.Intn(4)
+	nParagraphs := 2 + randIntn(4)
 	paragraphs := make([]string, nParagraphs)
 	for i := range paragraphs {
 		paragraphs[i] = randomParagraph()
@@ -119,7 +144,7 @@ func addDoc(client *http.Client, baseURL, collection string, docNum int) error {
 		Meta: map[string][]string{
 			"title":  {title},
 			"tags":   tags,
-			"author": {fmt.Sprintf("author-%d", rand.Intn(20))},
+			"author": {fmt.Sprintf("author-%d", randIntn(20))},
 		},
 		ContentMD: content,
 	})
@@ -128,7 +153,7 @@ func addDoc(client *http.Client, baseURL, collection string, docNum int) error {
 	if err != nil {
 		return fmt.Errorf("POST /v1/add: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("POST /v1/add: status %d", resp.StatusCode)
@@ -141,7 +166,7 @@ func checkConnectivity(client *http.Client, baseURL string) error {
 	if err != nil {
 		return fmt.Errorf("cannot connect to %s: %w", baseURL, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("GET /v1/stats returned %d", resp.StatusCode)
 	}
@@ -154,7 +179,7 @@ func deleteCollection(client *http.Client, baseURL, collection string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return nil
 }
 
@@ -168,6 +193,118 @@ type batchResult struct {
 	CumAvg     float64 // cumulative average docs/sec
 }
 
+// --- benchmark run ---
+
+// benchConfig is everything a run needs, so the run itself can be exercised
+// without a process to launch (TEST-001: this all lived inside main(), which
+// called os.Exit on the first failure and could not be called by a test).
+type benchConfig struct {
+	URL        string
+	Collection string
+	Total      int
+	Batch      int
+	Output     string
+	Cleanup    bool
+}
+
+// runBenchmark inserts Total documents in batches of Batch, timing each batch.
+//
+// It stops at the first failed write and returns what it had measured so far:
+// a partial run is worth reporting, and continuing past a server that started
+// refusing writes would report a throughput nothing achieved.
+func runBenchmark(client *http.Client, cfg benchConfig, progress io.Writer) ([]batchResult, error) {
+	nBatches := (cfg.Total + cfg.Batch - 1) / cfg.Batch
+	results := make([]batchResult, 0, nBatches)
+	totalDocs := 0
+	var totalElapsed time.Duration
+
+	for b := 0; b < nBatches; b++ {
+		batchSize := cfg.Batch
+		if totalDocs+batchSize > cfg.Total {
+			batchSize = cfg.Total - totalDocs
+		}
+
+		start := time.Now()
+		for i := 0; i < batchSize; i++ {
+			docNum := totalDocs + i + 1
+			if err := addDoc(client, cfg.URL, cfg.Collection, docNum); err != nil {
+				return results, fmt.Errorf("document %d: %w", docNum, err)
+			}
+		}
+		elapsed := time.Since(start)
+
+		totalDocs += batchSize
+		totalElapsed += elapsed
+		// GO-013: a sub-microsecond batch makes elapsed.Seconds() ~0 → +Inf.
+		throughput := perSecond(float64(batchSize), elapsed.Seconds())
+		cumAvg := perSecond(float64(totalDocs), totalElapsed.Seconds())
+
+		results = append(results, batchResult{
+			BatchNum:   b + 1,
+			DocsTotal:  totalDocs,
+			Duration:   elapsed,
+			Throughput: throughput,
+			CumAvg:     cumAvg,
+		})
+
+		if progress != nil {
+			_, _ = fmt.Fprintf(progress,
+				"  [batch %3d/%d] %4d docs in %8s (%6.0f docs/sec) | total: %5d  avg: %6.0f docs/sec\n",
+				b+1, nBatches, batchSize, elapsed.Round(time.Millisecond), throughput, totalDocs, cumAvg)
+		}
+	}
+
+	return results, nil
+}
+
+// summarise reports the totals a run produced.
+//
+// minThroughput is 0 for an empty run rather than the MaxFloat64 sentinel the
+// scan starts from — printing 1.7976931348623157e+308 as the slowest batch is
+// not a summary.
+func summarise(results []batchResult) (totalDocs int, totalElapsed time.Duration, minT, maxT float64) {
+	if len(results) == 0 {
+		return 0, 0, 0, 0
+	}
+	minT = math.MaxFloat64
+	for _, r := range results {
+		totalElapsed += r.Duration
+		if r.Throughput < minT {
+			minT = r.Throughput
+		}
+		if r.Throughput > maxT {
+			maxT = r.Throughput
+		}
+	}
+	return results[len(results)-1].DocsTotal, totalElapsed, minT, maxT
+}
+
+// printHeader describes the run about to start.
+func printHeader(w io.Writer, cfg benchConfig) {
+	_, _ = fmt.Fprintf(w, "MDDB Benchmark\n")
+	_, _ = fmt.Fprintf(w, "  URL:        %s\n", cfg.URL)
+	_, _ = fmt.Fprintf(w, "  Collection: %s\n", cfg.Collection)
+	_, _ = fmt.Fprintf(w, "  Total:      %d docs\n", cfg.Total)
+	_, _ = fmt.Fprintf(w, "  Batch:      %d docs\n", cfg.Batch)
+	_, _ = fmt.Fprintln(w)
+}
+
+// printSummary writes the totals people quote from a run.
+//
+// Separate from main so the numbers can be asserted: a summary line reading
+// "+Inf docs/sec" is a wrong measurement presented with authority.
+func printSummary(w io.Writer, results []batchResult) {
+	totalDocs, totalElapsed, minT, maxT := summarise(results)
+
+	_, _ = fmt.Fprintln(w)
+	_, _ = fmt.Fprintln(w, "--- Summary ---")
+	_, _ = fmt.Fprintf(w, "  Total documents: %d\n", totalDocs)
+	_, _ = fmt.Fprintf(w, "  Total time:      %s\n", totalElapsed.Round(time.Millisecond))
+	_, _ = fmt.Fprintf(w, "  Avg throughput:  %.0f docs/sec\n", perSecond(float64(totalDocs), totalElapsed.Seconds()))
+	_, _ = fmt.Fprintf(w, "  Min batch:       %.0f docs/sec\n", minT)
+	_, _ = fmt.Fprintf(w, "  Max batch:       %.0f docs/sec\n", maxT)
+}
+
 // --- main ---
 
 func main() {
@@ -179,95 +316,45 @@ func main() {
 	cleanup := flag.Bool("cleanup", false, "Delete collection after benchmark")
 	flag.Parse()
 
+	cfg := benchConfig{
+		URL: *url, Collection: *collection, Total: *total,
+		Batch: *batch, Output: *output, Cleanup: *cleanup,
+	}
 	client := &http.Client{Timeout: 30 * time.Second}
 
-	fmt.Printf("MDDB Benchmark\n")
-	fmt.Printf("  URL:        %s\n", *url)
-	fmt.Printf("  Collection: %s\n", *collection)
-	fmt.Printf("  Total:      %d docs\n", *total)
-	fmt.Printf("  Batch:      %d docs\n", *batch)
-	fmt.Println()
+	printHeader(os.Stdout, cfg)
 
-	// Check connectivity
-	if err := checkConnectivity(client, *url); err != nil {
+	if err := checkConnectivity(client, cfg.URL); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("Connected to MDDB.")
 	fmt.Println()
 
-	nBatches := (*total + *batch - 1) / *batch
-	results := make([]batchResult, 0, nBatches)
-	totalDocs := 0
-	var totalElapsed time.Duration
-
-	for b := 0; b < nBatches; b++ {
-		batchSize := *batch
-		if totalDocs+batchSize > *total {
-			batchSize = *total - totalDocs
-		}
-
-		start := time.Now()
-		for i := 0; i < batchSize; i++ {
-			docNum := totalDocs + i + 1
-			if err := addDoc(client, *url, *collection, docNum); err != nil {
-				fmt.Fprintf(os.Stderr, "\nError at doc %d: %v\n", docNum, err)
-				os.Exit(1)
-			}
-		}
-		elapsed := time.Since(start)
-
-		totalDocs += batchSize
-		totalElapsed += elapsed
-		// GO-013: a sub-microsecond batch makes elapsed.Seconds() ~0 → +Inf.
-		throughput := perSecond(float64(batchSize), elapsed.Seconds())
-		cumAvg := perSecond(float64(totalDocs), totalElapsed.Seconds())
-
-		r := batchResult{
-			BatchNum:   b + 1,
-			DocsTotal:  totalDocs,
-			Duration:   elapsed,
-			Throughput: throughput,
-			CumAvg:     cumAvg,
-		}
-		results = append(results, r)
-
-		fmt.Printf("  [batch %3d/%d] %4d docs in %8s (%6.0f docs/sec) | total: %5d  avg: %6.0f docs/sec\n",
-			b+1, nBatches, batchSize, elapsed.Round(time.Millisecond), throughput, totalDocs, cumAvg)
+	results, runErr := runBenchmark(client, cfg, os.Stdout)
+	if runErr != nil {
+		fmt.Fprintf(os.Stderr, "\nError: %v\n", runErr)
 	}
 
-	fmt.Println()
-	fmt.Println("--- Summary ---")
-	fmt.Printf("  Total documents: %d\n", totalDocs)
-	fmt.Printf("  Total time:      %s\n", totalElapsed.Round(time.Millisecond))
-	fmt.Printf("  Avg throughput:  %.0f docs/sec\n", perSecond(float64(totalDocs), totalElapsed.Seconds()))
+	printSummary(os.Stdout, results)
 
-	var minT, maxT float64
-	minT = math.MaxFloat64
-	for _, r := range results {
-		if r.Throughput < minT {
-			minT = r.Throughput
-		}
-		if r.Throughput > maxT {
-			maxT = r.Throughput
-		}
-	}
-	fmt.Printf("  Min batch:       %.0f docs/sec\n", minT)
-	fmt.Printf("  Max batch:       %.0f docs/sec\n", maxT)
-
-	// Generate HTML report
-	if err := generateReport(*output, results, *collection, *url, *total, *batch); err != nil {
+	if err := generateReport(cfg.Output, results, cfg.Collection, cfg.URL, cfg.Total, cfg.Batch); err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating report: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("\n  Report saved to: %s\n", *output)
+	fmt.Printf("\n  Report saved to: %s\n", cfg.Output)
 
-	// Cleanup
-	if *cleanup {
-		fmt.Printf("  Cleaning up collection '%s'...\n", *collection)
-		if err := deleteCollection(client, *url, *collection); err != nil {
+	if cfg.Cleanup {
+		fmt.Printf("  Cleaning up collection '%s'...\n", cfg.Collection)
+		if err := deleteCollection(client, cfg.URL, cfg.Collection); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: cleanup failed: %v\n", err)
 		}
+	}
+
+	// A failed run must not exit zero: a CI job reading the exit code would
+	// treat a benchmark that stopped a tenth of the way in as a pass.
+	if runErr != nil {
+		os.Exit(1)
 	}
 }
 
@@ -290,7 +377,11 @@ type reportData struct {
 func generateReport(path string, results []batchResult, collection, url string, total, batch int) error {
 	var totalElapsed time.Duration
 	var minT, maxT float64
-	minT = math.MaxFloat64
+	// A run with no batches has no minimum. Leaving the sentinel would print
+	// 1.7976931348623157e+308 as the slowest batch.
+	if len(results) > 0 {
+		minT = math.MaxFloat64
+	}
 	for _, r := range results {
 		totalElapsed += r.Duration
 		if r.Throughput < minT {
@@ -312,14 +403,18 @@ func generateReport(path string, results []batchResult, collection, url string, 
 		Total:      total,
 		Batch:      batch,
 		TotalTime:  totalElapsed.Round(time.Millisecond).String(),
-		AvgThrpt:   float64(total) / totalElapsed.Seconds(),
-		MinThrpt:   minT,
-		MaxThrpt:   maxT,
-		Results:    results,
-		MaxY:       maxY,
-		Timestamp:  time.Now().Format("2006-01-02 15:04:05"),
+		// perSecond, not a bare division: a run with no batches — or one whose
+		// batches were too fast to measure — has a zero elapsed time, and
+		// 0/0 is NaN. GO-013 guarded every other division and missed this one.
+		AvgThrpt:  perSecond(float64(total), totalElapsed.Seconds()),
+		MinThrpt:  minT,
+		MaxThrpt:  maxT,
+		Results:   results,
+		MaxY:      maxY,
+		Timestamp: time.Now().Format("2006-01-02 15:04:05"),
 	}
 
+	// #nosec G304 -- the report path is the operator's own --output flag
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -339,30 +434,51 @@ func perSecond(count, secs float64) float64 {
 	if secs <= 0 {
 		return 0
 	}
-	return count / secs
-}
-
-// GO-013: SVG-coordinate helpers guard maxY<=0 so empty benchmark data can't
-// put Inf/NaN into the report.
-func barHeight(val, maxY float64) float64 {
-	if maxY <= 0 {
+	rate := count / secs
+	// An interval too short to divide by is unmeasurable, not infinitely
+	// fast. Reporting +Inf docs/sec would put a non-number in the report.
+	if math.IsInf(rate, 0) || math.IsNaN(rate) {
 		return 0
 	}
-	return (val / maxY) * 300
+	return rate
+}
+
+// SVG-coordinate helpers.
+//
+// GO-013 guarded maxY<=0 so empty benchmark data could not put Inf or NaN into
+// the report. TEST-001 added the other half: a ratio large enough to overflow,
+// or a maxY small enough to, produced coordinates outside the viewBox, which an
+// SVG renderer draws as nothing at all. Every result is clamped to the chart
+// area, so an out-of-range bar is visibly full height rather than invisible.
+
+// chartHeight is the plot area; chartBaseline is where the x-axis sits.
+const (
+	chartHeight   = 300.0
+	chartBaseline = 320.0
+)
+
+// scaledHeight converts a value into a bar height clamped to the chart.
+func scaledHeight(val, maxY float64) float64 {
+	if maxY <= 0 || val <= 0 {
+		return 0
+	}
+	h := (val / maxY) * chartHeight
+	if math.IsInf(h, 0) || math.IsNaN(h) || h > chartHeight {
+		return chartHeight
+	}
+	return h
+}
+
+func barHeight(val, maxY float64) float64 {
+	return scaledHeight(val, maxY)
 }
 
 func barY(val, maxY float64) float64 {
-	if maxY <= 0 {
-		return 300
-	}
-	return 300 - (val/maxY)*300
+	return chartHeight - scaledHeight(val, maxY)
 }
 
 func lineY(val, maxY float64) float64 {
-	if maxY <= 0 {
-		return 320
-	}
-	return 320 - (val/maxY)*300
+	return chartBaseline - scaledHeight(val, maxY)
 }
 
 var reportTmpl = template.Must(template.New("report").Funcs(template.FuncMap{

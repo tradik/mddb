@@ -1,6 +1,6 @@
 # MDDB — AI-Native Document Database
 
-[![Go Version](https://img.shields.io/badge/Go-1.26-blue.svg)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.27-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
 [![Release](https://img.shields.io/github/v/release/tradik/mddb)](https://github.com/tradik/mddb/releases)
 [![Docker](https://img.shields.io/docker/v/tradik/mddb?label=docker)](https://hub.docker.com/r/tradik/mddb)
@@ -8,9 +8,9 @@
 [![Tests](https://github.com/tradik/mddb/workflows/Tests/badge.svg)](https://github.com/tradik/mddb/actions)
 [![codecov](https://codecov.io/gh/tradik/mddb/branch/main/graph/badge.svg)](https://codecov.io/gh/tradik/mddb)
 
-**AI-native document database with built-in MCP server, file upload (PDF/DOCX/HTML/ODT/RTF/TEX/YAML/Wikipedia XML→Markdown), vector search, RAG pipelines, and 79 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
+**AI-native document database with built-in MCP server, file upload (PDF/DOCX/HTML/ODT/RTF/TEX/YAML/Wikipedia XML→Markdown), vector search, RAG pipelines, and 81 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
 
-MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT) — they're auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 79 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~26MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
+MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT) — they're auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 81 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~26MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
 
 ## 🎯 What is MDDB?
 
@@ -18,7 +18,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 
 - **File Upload** - Upload PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT files — auto-converted to Markdown and indexed
 - **Wikipedia Import** - Stream and import MediaWiki XML dumps (`.xml.bz2`) — wikitext auto-converted to Markdown, namespace filtering, handles multi-GB files
-- **Built-in MCP Server** - 79 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
+- **Built-in MCP Server** - 81 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
 - **Vector Search** - Auto-embed documents, semantic similarity with 7 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, BQ) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode-v2114) + ARM NEON/SME hardware acceleration + goroutine parallel search
 - **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere — configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
 - **[Geo Search](docs/GEOSEARCH.md)** - R-tree and geohash indexes for radius/bounding-box queries, composable with FTS/vector via `hybrid-search`, optional postcode lookup
@@ -29,6 +29,15 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Integrations** - [Docling](docs/INTEGRATIONS.md), [Langflow](docs/INTEGRATIONS.md), [OpenSearch](docs/INTEGRATIONS.md), [SSG](docs/INTEGRATIONS.md), [wpexporter](docs/INTEGRATIONS.md), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), [Chrome extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines
 - **Zero-Shot Classification** — Classify documents against candidate labels using embeddings, no training data
 - **Custom AI Tools** - Define YAML-based MCP tools for domain-specific workflows
+- **Code Documents** - Store HTML/CSS/JS alongside prose; a `kind: ["code"]` convention on the existing flat meta switches to a source-aware tokeniser that keeps `.hero-banner` and `checkoutHandler` findable whole and in parts ([API.md](docs/API.md#code-documents))
+- **Code Symbols** - Each code document records what it `defines`, `uses` and `imports` in its meta, so `meta.defines=.hero-banner` returns the stylesheet that declares the selector instead of the twelve templates that apply it ([API.md](docs/API.md#symbols-which-file-declares-this))
+- **Code Connection Graph** - What breaks if this selector changes, which pages load this script, what does nothing reference any more. Edges are derived from the symbol meta, never stored, so a reindex reproduces the graph exactly ([API.md](docs/API.md#the-connection-graph))
+- **Per-Collection Retrieval Profiles** - Search type, topK, granularity, hybrid strategy and a context token budget stored with the collection instead of repeated by every client; an explicit request parameter always wins ([API.md](docs/API.md#retrieval-defaults-v2120))
+- **Embedding Cache** - Repeated queries never reach the provider twice, and a reindex reuses the vectors of chunks whose text is unchanged — editing one paragraph of a 50-chunk document embeds one chunk, not fifty ([config.md](docs/config.md))
+- **Answer Formatting per Collection** - A `responsePrompt` stored with the collection tells every consumer how its answers should be shaped; MCP agents receive it with their search results, in the same round trip ([API.md](docs/API.md#answer-formatting-v2120))
+- **`fast` Ingest Profile** - One named trade-off instead of a combination of flags to reverse-engineer: text-only parsing, no revisions, no webhooks — 43× faster on HTML. Embeddings and full-text stay on, because *fast* should not mean *unsearchable* ([API.md](docs/API.md#the-fast-ingest-profile-v2120))
+- **`oversample` Knob** - Recall/latency dial per query or per collection, where the `topK * 3` constant used to be. At 1× a chunked collection returns half the documents you asked for; at 10× it returns all of them, for about 1% more time on a flat index ([SEARCH.md](docs/SEARCH.md#oversampling-v2120))
+- **Agent Instructions** - Ready-made guidance for Claude Code, Cursor and Windsurf on which tool fits a question and how to ask for chunks instead of whole documents ([integrations/agent-instructions/](integrations/agent-instructions/)) — measured at 60x fewer tokens for the same search
 - **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse, 8 search modes (simple, boolean, phrase, wildcard, proximity, **expression**, range, fuzzy), typo tolerance, multi-language stemming (18 languages), synonyms, per-query metadata boost/demote, prefix autocomplete, **search-result highlighting with fragments**
 - **Geosearch** - R-tree + geohash radius/bbox queries, **GeoJSON polygon and multi-polygon containment**, postcode lookup, **distance-sorted hybrid search** combining proximity with keyword/vector relevance
 - **Async Bulk Ingest** - Queue long-running document imports with job tracking, progress polling, and optional webhook callback
@@ -52,7 +61,8 @@ Start all services with one command:
 git clone https://github.com/tradik/mddb.git
 cd mddb
 
-# Production mode (all services)
+# Production mode (all services) — set the secrets first, see below
+cp .env.example .env && $EDITOR .env
 docker compose up -d
 
 # Development mode (with hot reload)
@@ -61,6 +71,19 @@ make dev-start
 # Development + Ollama for embeddings
 make dev-start-with-ollama
 ```
+
+> **The production compose refuses to start without credentials.** The image
+> defaults to `MDDB_AUTH_ENABLED=false`, which suits a throwaway `docker run`
+> but not `docker-compose.yml`, which runs the server read-write and publishes
+> HTTP, gRPC and MCP. So the compose file turns authentication on and reads
+> `MDDB_AUTH_JWT_SECRET` and `MDDB_AUTH_ADMIN_PASSWORD` from `.env` with no
+> fallback: leave either unset and compose stops with an error naming the
+> variable, rather than quietly starting an open database.
+>
+> Every port is published on `127.0.0.1` by default. A reverse proxy or
+> cloudflared reaches the containers over `mddb-network` and needs no published
+> port at all; to expose the stack on the host's interfaces, set
+> `MDDB_BIND_ADDR=0.0.0.0` — deliberately, and only with authentication on.
 
 > **Importing existing content:** MDDB does not automatically index bind-mounted
 > directories. Use [`scripts/load-md-folder.sh`](docs/BULK-IMPORT.md) or the ingest
@@ -93,7 +116,7 @@ MDDB has a built-in MCP server — no extra service needed. Add to your MCP conf
 }
 ```
 
-That's it — your AI agent now has full access to your knowledge base with 79 built-in tools (add, search, vector search, classify, and more).
+That's it — your AI agent now has full access to your knowledge base with 81 built-in tools (add, search, vector search, classify, and more).
 
 **[→ Full MCP setup guide](docs/LLM_CONNECTIONS.md)** | **[→ MCP server config](docs/MCP.md)** | **[→ Custom MCP tools](docs/CUSTOM-TOOLS.md)**
 
@@ -276,7 +299,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 ## 💡 Key Features
 
 ### AI & Search
-- ✅ **MCP Server** - 79 built-in tools via Model Context Protocol 2025-11-25 (stdio + Streamable HTTP + SSE) with tool annotations, prompts, completion, and structured output
+- ✅ **MCP Server** - 81 built-in tools via Model Context Protocol 2025-11-25 (stdio + Streamable HTTP + SSE) with tool annotations, prompts, completion, and structured output
 - ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md) — tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools-v2110))
 - ✅ **File Upload** - Upload PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT — auto-converted to Markdown (single and batch, configurable size limit)
 - ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext→Markdown conversion, namespace filtering, batch processing
@@ -339,7 +362,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics
 
-**[→ See all features](docs/FEATURES.md)** | **[→ Compare with alternatives](docs/COMPARISON.md)** | **[→ Performance benchmarks](docs/PERFORMANCE.md)**
+**[→ See all features](docs/FEATURES.md)** | **[→ Compare with alternatives](docs/COMPARISON.md)** | **[→ Measured benchmarks](docs/BENCHMARK.md)**
 
 ## 🔄 Replication Architecture
 
@@ -363,7 +386,7 @@ graph LR
 
 Modern React-based UI for managing documents, users, and search with REST/GraphQL API toggle.
 
-![MDDB Web Panel](docs/panel.png)
+![MDDB Web Panel](services/ssg-template/images/panel.png)
 
 **Features:** Browse collections, view/edit documents, vector search, user management, API mode switching (REST ↔ GraphQL), live markdown preview.
 
@@ -533,7 +556,7 @@ mddb-cli fts blog --query="getting started"
 mddb-cli stats
 ```
 
-**[→ More examples](docs/API_QUICK_REFERENCE.md)** | **[→ Use case examples](docs/USE_CASES.md)** | **[→ Client libraries](docs/CLIENTS.md)**
+**[→ API reference](docs/API.md)** | **[→ Use case examples](docs/USE_CASES.md)** | **[→ Client libraries](docs/EXAMPLES.md)**
 
 ## 📚 Documentation
 
@@ -549,7 +572,7 @@ mddb-cli stats
 - **[gRPC API](docs/GRPC.md)** - High-performance protocol guide
 - **[GraphQL API](docs/GRAPHQL.md)** - Flexible query language
 - **[OpenAPI/Swagger](docs/openapi.yaml)** - Machine-readable spec
-- **[Swagger UI](docs/swagger.html)** - Interactive API docs
+- **[Swagger UI](https://mddb.tradik.com/docs/api/swagger/)** - Interactive API docs
 
 ### Features & Guides
 - **[Vector Search](docs/EMBEDDING_PROVIDERS.md)** - Semantic search setup (OpenAI, Cohere, Voyage, Ollama)
@@ -557,14 +580,14 @@ mddb-cli stats
 - **[Search Algorithms](docs/SEARCH.md)** - TF-IDF, BM25, BM25F, PMISparse, Flat, HNSW, IVF, PQ, SQ, BQ
 - **[Vector Quantization](docs/QUANTIZATION.md)** - Per-collection int8/int4 scalar quantization (4-8x compression)
 - **[Server-Sent Events](docs/SSE.md)** - Real-time document change notifications with auth and rate limiting
-- **[Full-Text Search](docs/FTS.md)** - Built-in inverted index with multi-language support
+- **[Search algorithms](docs/SEARCH.md)** - Inverted index, four ranking algorithms, multi-language
 - **[Zero-Shot Classification](docs/ZERO-SHOT-CLASSIFICATION.md)** - Classify documents against labels using embeddings
 - **[PMISparse](docs/PMISPARSE.md)** - Two-phase BM25 + PPMI query expansion (invented by Tradik Limited)
-- **[Webhooks](docs/WEBHOOKS.md)** - Event-driven integration
+- **[Webhooks](docs/API.md#getpost-v1webhooks)** - Event-driven integration (API reference)
 - **[Automations](docs/AUTOMATIONS.md)** - Triggers, crons, webhooks, sentiment, template variables
 - **[Temporal Tracking](docs/TEMPORAL-TRACK.md)** - Document event history, hot-docs leaderboard, activity histograms
 - **[Spell Correction](docs/SYMSPELL.md)** - SymSpell FTS spell suggestions, text cleanup, custom dictionaries
-- **[Authentication](docs/AUTH.md)** - JWT & API keys, RBAC
+- **[Authentication](docs/AUTHENTICATION.md)** - JWT & API keys, RBAC
 - **[Web Panel](docs/PANEL.md)** - Admin UI guide
 - **[LLM Connections](docs/LLM_CONNECTIONS.md)** - MCP for Claude, ChatGPT, Ollama, DeepSeek
 - **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension
@@ -576,14 +599,15 @@ mddb-cli stats
 - **[Deployment](docs/DEPLOYMENT.md)** - Production setup
 - **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes
-- **[Performance](docs/PERFORMANCE.md)** - Benchmarks & tuning
+- **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured
 - **[Architecture](docs/ARCHITECTURE.md)** - System design
 
 ### Development
-- **[Client Libraries](docs/CLIENTS.md)** - PHP, Python, Go, Node.js
+- **[Client Libraries](docs/EXAMPLES.md)** - PHP, Python, Go, Node.js
 - **[Custom MCP Tools](docs/CUSTOM-TOOLS.md)** - YAML-defined AI tools
 - **[Examples](docs/EXAMPLES.md)** - Code samples
 - **[Contributing](CONTRIBUTING.md)** - Development guide
+- **[Versioning](VERSIONING.md)** - What moves with a release, and what does not
 - **[Changelog](CHANGELOG.md)** - Version history
 
 ## 🏗️ Architecture

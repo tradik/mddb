@@ -139,10 +139,20 @@ func loadServerConfig() ServerConfig {
 		mcpStdio     = flag.String("mcp-stdio", "", "Run in MCP stdio mode (true/false)")
 		http3Enabled = flag.String("http3-enabled", "", "Enable HTTP/3 server (true/false)")
 		http3Addr    = flag.String("http3-addr", "", "HTTP/3 listen address (e.g. :11443)")
+		// OPS-019: reports and exits. The daemon never replaces itself — it is
+		// a data server, and an unexpected restart is an incident. Installing
+		// is `mddb-cli self-update`, run on purpose.
+		checkUpdate = flag.Bool("check-update", false, "Report whether a newer release exists, then exit")
 	)
 	flag.StringVar(&configFile, "config", "", "Path to YAML config file")
 	flag.StringVar(&configFile, "c", "", "Path to YAML config file (shorthand)")
 	flag.Parse()
+
+	// Before any config is interpreted: this asks GitHub a question and exits,
+	// so nothing about this installation needs to be loaded to answer it.
+	if *checkUpdate {
+		reportUpdateAndExit()
+	}
 
 	// 2. Load config file (lowest priority after defaults)
 	cfgPath := configFile

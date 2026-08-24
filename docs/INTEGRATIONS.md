@@ -855,6 +855,29 @@ volumes:
   mddb-data:
 ```
 
+### Structured frontmatter: what MDDB can and cannot hold
+
+SSG pages often carry structured frontmatter — an `faq:` list of objects, a
+`schema:` Recipe JSON-LD block. MDDB's metadata is flat
+(`map<string, repeated string>`) and cannot hold it directly. An importer that
+stringifies nested YAML with Go's `%v` produces values like
+`map[answer:Yes question:Is it free?]`; MDDB stores them faithfully, and the
+site build fails later on a template that cannot render them
+([issue #187](https://github.com/tradik/mddb/issues/187)).
+
+Before ingesting a site with structured frontmatter, pick one of the three
+patterns in [API.md](API.md#structured-frontmatter-and-flat-meta) — JSON in a
+single value, flattened leaf keys, or leaving the block in the markdown body.
+`POST /v1/validate` warns when a value looks stringified, so a pipeline can
+catch it at import time rather than at render time:
+
+```bash
+curl -s -X POST "$MDDB/v1/validate" \
+  -H 'Content-Type: application/json' \
+  -d '{"collection":"site","meta":{"faq":["[map[answer:Yes question:Is it free?]]"]}}' \
+  | jq .warnings
+```
+
 ### Workflow: Edit in Panel → Generate → Deploy
 
 ```mermaid
@@ -1479,3 +1502,48 @@ graph TB
 | Full production pipeline | All together |
 
 **[← Back to README](../README.md)** · **[LLM Connections →](LLM_CONNECTIONS.md)** · **[RAG Pipeline →](RAG-PIPELINE.md)**
+
+## 12. LangChain ⇄ MDDB (VectorStore + Retriever)
+
+A developer choosing a retrieval backend inside LangChain picks from the list
+that has an adapter. `langchain-mddb` puts MDDB on that list.
+
+```bash
+pip install "langchain-mddb[client]"
+```
+
+```python
+from langchain_mddb import MddbVectorStore
+
+store = MddbVectorStore(collection="docs", address="localhost:11024")
+store.add_texts(["Restart the service with systemctl."], [{"kind": "runbook"}])
+
+retriever = store.as_retriever(search_kwargs={"k": 5, "filter": {"kind": "runbook"}})
+```
+
+It is a thin layer over [`clients/python`](../clients/python/README.md) — the
+adapter's whole job is mapping LangChain's interface onto the client. Two places
+where the two disagree, and which way this resolves them:
+
+**MDDB embeds server-side.** LangChain's contract assumes the application owns
+an embedding function and passes vectors in; MDDB is configured with a provider
+and embeds on write. One model per collection rather than one per application,
+and no vectors on the wire. `similarity_search_by_vector` raises rather than
+quietly re-embedding with a different model, because a caller reaching for it
+is usually trying to keep two systems in one vector space.
+
+**Hybrid is the default.** LangChain's `similarity_search` means vector search;
+MDDB's better answer for most corpora is a keyword/vector blend. Following the
+framework here would mean the adapter returns worse results than the same
+server queried directly. `search_type="vector"` gets the literal reading.
+
+The store also exposes `recommended_settings()`, which asks the server how this
+collection should be searched ([SRCH-010](../docs/SEARCH.md)) — choosing
+`search_type` by hand is guessing, and the server has measured.
+
+Filters translate equality and membership. Operator forms (`{"$gt": ...}`)
+raise rather than being dropped: a dropped condition silently widens the search.
+
+**[→ Full README](../integrations/langchain-mddb/README.md)**
+
+---

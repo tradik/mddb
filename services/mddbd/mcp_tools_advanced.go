@@ -7,7 +7,7 @@ import (
 	"path"
 	"strings"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // --- Collection Config Tools ---
@@ -77,6 +77,7 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		Threshold:        mcpGetFloat(args, "threshold"),
 		Algorithm:        mcpGetString(args, "algorithm"),
 		DistanceMetric:   mcpGetString(args, "distance_metric"),
+		Oversample:       mcpGetFloat(args, "oversample"),
 		FilterMeta:       mcpGetMetaMap(args, "filter_meta"),
 	}
 	if ic, ok := args["include_content"].(bool); ok {

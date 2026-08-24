@@ -3,6 +3,7 @@ package fts
 import (
 	"bytes"
 	"encoding/binary"
+	"sort"
 	"strings"
 	"unicode"
 
@@ -128,32 +129,42 @@ func (f *FTSIndex) IndexPositionsWithLang(collection, docID, content, lang strin
 	}
 
 	return f.db.Update(func(tx *bolt.Tx) error {
-		bPos := tx.Bucket(bucketFTSPos)
-		if bPos == nil {
-			return nil
-		}
-
-		revKey := ftspRevKey(collection, docID)
-		if old := bPos.Get(revKey); old != nil {
-			oldTerms := strings.Split(string(old), ",")
-			for _, term := range oldTerms {
-				if term != "" {
-					_ = bPos.Delete(ftspKey(collection, term, docID))
-				}
-			}
-		}
-
-		termList := make([]string, 0, len(positions))
-		for term, posSlice := range positions {
-			k := ftspKey(collection, term, docID)
-			if err := bPos.Put(k, encodePositions(posSlice)); err != nil {
-				return err
-			}
-			termList = append(termList, term)
-		}
-
-		return bPos.Put(revKey, []byte(strings.Join(termList, ",")))
+		return f.indexPositionsInTx(tx, collection, docID, positions)
 	})
+}
+
+// indexPositionsInTx writes one document's term positions inside a caller's
+// transaction — the shared body behind IndexPositionsWithLang and the bulk
+// path (GO-027).
+func (f *FTSIndex) indexPositionsInTx(tx *bolt.Tx, collection, docID string, positions map[string][]uint32) error {
+	bPos := tx.Bucket(bucketFTSPos)
+	if bPos == nil {
+		return nil
+	}
+
+	revKey := ftspRevKey(collection, docID)
+	if old := bPos.Get(revKey); old != nil {
+		oldTerms := strings.Split(string(old), ",")
+		for _, term := range oldTerms {
+			if term != "" {
+				_ = bPos.Delete(ftspKey(collection, term, docID))
+			}
+		}
+	}
+
+	termList := make([]string, 0, len(positions))
+	for term, posSlice := range positions {
+		k := ftspKey(collection, term, docID)
+		if err := bPos.Put(k, encodePositions(posSlice)); err != nil {
+			return err
+		}
+		termList = append(termList, term)
+	}
+
+	// Sorted so identical content yields identical bytes — see the note in
+	// indexTermsInTx.
+	sort.Strings(termList)
+	return bPos.Put(revKey, []byte(strings.Join(termList, ",")))
 }
 
 // IndexPositions stores term positions for a document (used for phrase/proximity search).

@@ -99,7 +99,7 @@ sudo systemctl status mddb
 Create `Dockerfile`:
 
 ```dockerfile
-FROM golang:1.26-alpine AS builder
+FROM golang:1.27-alpine AS builder
 
 WORKDIR /build
 COPY services/mddbd/go.mod services/mddbd/go.sum ./
@@ -247,6 +247,65 @@ mddb.example.com {
     }
 }
 ```
+
+## Persistence Guarantees
+
+What MDDB promises about a write that returned success, and what it does not.
+
+| Surface | On acknowledgement the write is… | Survives `kill -9`? |
+|---|---|---|
+| `POST /v1/add` (REST) | committed to bbolt and fsynced | **Yes** |
+| gRPC `Add` | committed to bbolt and fsynced | **Yes** |
+| Batch (`POST /v1/batch`, gRPC batch) | committed in one transaction and fsynced | **Yes** |
+| MCP write tools | same path as REST | **Yes** |
+| FTS index for the above | written in the same batch transaction | **Yes** |
+| Async bulk job (`POST /v1/bulk`) | **queued, not written** — the payload lives in memory until the worker reaches it | **No** — an in-flight job is marked failed on restart |
+| Embeddings | queued to a background worker after the document commits | **No** — re-embed by reindexing; the document itself is safe |
+
+bbolt fsyncs on every commit, so durability does not depend on a graceful
+shutdown. Verified rather than assumed: a document written over REST, then
+`kill -9` with no shutdown hooks, is present — content and full-text index
+intact — after the process restarts.
+
+`NoFreelistSync` is enabled, which skips syncing the free-page list. That is a
+recovery-time trade, not a durability one: the freelist is rebuilt from the
+page tree when the file is opened.
+
+### What breaks the guarantee
+
+The engine fsyncs to whatever storage it was given. If that storage does not
+outlive the process, neither does the data — which is what happens when a
+container runs without a volume mounted at the data directory.
+
+MDDB checks this at startup and says so, rather than accepting writes quietly:
+
+```
+{"level":"WARN","msg":"persistence warning","code":"ephemeral_storage",
+ "detail":"the data directory is on tmpfs: an in-memory filesystem — its contents are lost on restart",
+ "path":"/data"}
+```
+
+`GET /health` reports the same, so a probe or dashboard can see it:
+
+```json
+{
+  "status": "healthy",
+  "durable": false,
+  "persistence": {
+    "path": "/data",
+    "filesystem": "overlay",
+    "ephemeral": true,
+    "writable": true,
+    "warnings": [{"code": "ephemeral_storage", "detail": "…mount a volume at this path"}]
+  }
+}
+```
+
+| Warning | Meaning |
+|---|---|
+| `ephemeral_storage` | The data directory is on tmpfs, ramfs or a container's own overlay layer. Mount a volume. |
+| `not_writable` | The directory cannot be written to — checked by creating a file, not by reading mode bits, since a read-only mount or a user mismatch looks writable otherwise. |
+| `low_disk_space` | Free space is below `MDDB_DISK_MIN_FREE` (default 100 MB). Set it to `0` to disable the check. |
 
 ## Backup Strategy
 

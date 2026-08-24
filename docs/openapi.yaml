@@ -68,7 +68,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.11.4"
+  version: "2.12.0"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -174,6 +174,31 @@ paths:
                     type: string
                     enum: [ read, write, wr ]
                     example: wr
+                  persistence:
+                    $ref: "#/components/schemas/PersistenceStatus"
+                  durable:
+                    type: boolean
+                    description: >-
+                      Whether an acknowledged write can be expected to survive a
+                      restart of the process and its container (GO-032). False
+                      means the data directory is read-only or ephemeral.
+                    example: true
+                  mcpSessions:
+                    type: object
+                    description: >-
+                      Open MCP sessions per transport (GO-021). Absent when the
+                      MCP server is disabled — an absent field says "not
+                      running" where a zero would say "idle". A count that only
+                      grows is how a session leak becomes visible.
+                    properties:
+                      sse:
+                        type: integer
+                        description: Sessions on the legacy MCP-over-SSE transport
+                        example: 0
+                      streamable:
+                        type: integer
+                        description: Sessions on the Streamable HTTP transport
+                        example: 2
         "503":
           description: Service is unhealthy
           content:
@@ -203,6 +228,31 @@ paths:
                     type: string
                     enum: [ read, write, wr ]
                     example: wr
+                  persistence:
+                    $ref: "#/components/schemas/PersistenceStatus"
+                  durable:
+                    type: boolean
+                    description: >-
+                      Whether an acknowledged write can be expected to survive a
+                      restart of the process and its container (GO-032). False
+                      means the data directory is read-only or ephemeral.
+                    example: true
+                  mcpSessions:
+                    type: object
+                    description: >-
+                      Open MCP sessions per transport (GO-021). Absent when the
+                      MCP server is disabled — an absent field says "not
+                      running" where a zero would say "idle". A count that only
+                      grows is how a session leak becomes visible.
+                    properties:
+                      sse:
+                        type: integer
+                        description: Sessions on the legacy MCP-over-SSE transport
+                        example: 0
+                      streamable:
+                        type: integer
+                        description: Sessions on the Streamable HTTP transport
+                        example: 2
         "503":
           description: Service is unhealthy
           content:
@@ -837,6 +887,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: >-
+            Restore failed (unusable backup, copy or reopen error). The
+            previous database is rolled back and keeps serving — the backup is
+            validated before the live file is touched, and a pre-restore
+            snapshot guards the swap.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/truncate:
     post:
@@ -891,7 +951,7 @@ paths:
 
         Results are ranked by cosine similarity score. Use `threshold` to filter out low-relevance results. Use `filterMeta` to narrow results by metadata before ranking.
 
-        Use `algorithm` to select the search strategy: `flat` (exact), `hnsw` (fast approximate), `ivf` (clustered), or `pq` (compressed). See [Search Algorithms](SEARCH.md) for details.
+        Use `algorithm` to select the search strategy: `flat` (exact), `hnsw` (fast approximate), `ivf` (clustered), or one of the quantized indexes `pq`/`opq`/`sq`/`sq4`/`bq` (compressed, smallest first). See [Search Algorithms](SEARCH.md) for details.
       operationId: vectorSearch
       requestBody:
         required: true
@@ -924,8 +984,33 @@ paths:
       tags:
         - MCP
       summary: Create MCP API key
-      description: Create a named API key for MCP clients (admin only). The plaintext key is returned once.
+      description: |
+        Creates a named API key for MCP clients. The full key is returned
+        **once, in this response only** — the listing exposes a fingerprint
+        rather than key material, so it cannot be recovered afterwards.
+
+        Requires admin authentication.
       operationId: createMCPKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: Label identifying what the key is for.
+                  example: claude-desktop
+                expiresAt:
+                  type: integer
+                  format: int64
+                  description: Unix timestamp; omit or 0 for a key that never expires.
+                  example: 0
       responses:
         "200":
           description: Key created (plaintext returned once)
@@ -933,12 +1018,40 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  key:
+                    type: string
+                    description: The full key — store it now, it is not retrievable later.
+                    example: mcp_4f3c2a1b8e7d6c5b4a39281706f5e4d3
+                  name:
+                    type: string
+                    example: claude-desktop
+                  createdAt:
+                    type: integer
+                    format: int64
+                  expiresAt:
+                    type: integer
+                    format: int64
+        "400":
+          description: Invalid request body or key name
+        "403":
+          description: Admin permission required
+        "503":
+          description: MCP API key store not initialized
     get:
       tags:
         - MCP
       summary: List MCP API keys
-      description: List MCP API keys without plaintext values (admin only).
+      description: |
+        Lists the registered MCP API keys. No key material is returned: each
+        entry carries a `fingerprint` (four bytes of SHA-256, hex) that also
+        identifies the key in the server log, while `keyPrefix` holds only the
+        `mcp_` scheme marker.
+
+        Requires admin authentication.
       operationId: listMCPKeys
+      security:
+        - BearerAuth: []
       responses:
         "200":
           description: Key list
@@ -946,12 +1059,36 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MCPAPIKeySummary"
+                  total:
+                    type: integer
+                    example: 2
+        "403":
+          description: Admin permission required
+        "503":
+          description: MCP API key store not initialized
     delete:
       tags:
         - MCP
       summary: Delete MCP API key
-      description: Delete an MCP API key by hash (admin only).
+      description: |
+        Permanently removes a key, identified by its full value. The MCP auth
+        cache is invalidated, so the key stops working immediately.
+
+        Requires admin authentication.
       operationId: deleteMCPKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MCPAPIKeyRef"
       responses:
         "200":
           description: Key deleted
@@ -959,14 +1096,38 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    example: deleted
+        "400":
+          description: Invalid request body
+        "403":
+          description: Admin permission required
+        "404":
+          description: No such key
+        "503":
+          description: MCP API key store not initialized
 
   /v1/mcp/keys/disable:
     post:
       tags:
         - MCP
       summary: Disable MCP API key
-      description: Disable an MCP API key without deleting it (admin only).
+      description: |
+        Marks a key disabled without deleting it, so it stops authenticating
+        but stays visible in the listing.
+
+        Requires admin authentication.
       operationId: disableMCPKey
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MCPAPIKeyRef"
       responses:
         "200":
           description: Key disabled
@@ -974,6 +1135,19 @@ paths:
             application/json:
               schema:
                 type: object
+                properties:
+                  status:
+                    type: string
+                    example: disabled
+        "400":
+          description: Invalid request body
+        "403":
+          description: Admin permission required
+        "404":
+          description: No such key
+        "503":
+          description: MCP API key store not initialized
+
 
   /v1/vector-projection:
     post:
@@ -1473,7 +1647,7 @@ paths:
 
         **FTS algorithms:** `bm25` (default), `bm25f` (field-weighted).
 
-        **Vector algorithms:** `flat` (default), `hnsw`, `ivf`, `pq`, `sq`.
+        **Vector algorithms:** `flat` (default), `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`.
 
         Use `filterMeta` to pre-filter by metadata before both FTS and vector scoring.
       operationId: hybridSearch
@@ -3411,6 +3585,130 @@ paths:
                   hasMore:
                     type: boolean
 
+  /v1/code-graph:
+    get:
+      tags:
+        - Search
+      summary: Code connection graph for one document
+      description: >
+        Answers the relational questions full-text search cannot: what breaks if
+        this selector changes, which pages load this script, what does nothing
+        reference any more. Edges are derived at query time from the
+        `defines`/`uses`/`imports` metadata of code documents through the
+        metadata index — nothing is stored, so a reindex reproduces the graph
+        exactly. Resolution stays inside one collection.
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Collection name
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Document key, e.g. `theme/style.css`
+        - name: direction
+          in: query
+          schema:
+            type: string
+            enum: [ in, out, both ]
+            default: both
+          description: >
+            `in` = what depends on this document, `out` = what it depends on.
+        - name: depth
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3
+            default: 1
+          description: Hops to follow. Values above the maximum are clamped, not rejected.
+        - name: maxDegree
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+          description: >
+            Maximum neighbours per node. A selector such as `.title` appears in
+            nearly every template, so an unbounded walk returns the whole theme.
+        - name: lines
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: >
+            Include the first line each edge's symbol appears on, both sides.
+            Off by default: it is the only part of a traversal that reads
+            document content.
+      responses:
+        "200":
+          description: The graph around the requested document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeGraphResponse"
+        "400":
+          description: Missing collection/key, or an unknown direction
+        "404":
+          description: No such document in the collection
+    post:
+      tags:
+        - Search
+      summary: Code connection graph for one document (JSON body)
+      description: >
+        Identical to the GET form. Accepts a JSON body for keys containing
+        characters awkward in a query string.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ collection, key ]
+              properties:
+                collection:
+                  type: string
+                key:
+                  type: string
+                direction:
+                  type: string
+                  enum: [ in, out, both ]
+                  default: both
+                depth:
+                  type: integer
+                  minimum: 1
+                  maximum: 3
+                  default: 1
+                maxDegree:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 100
+                lines:
+                  type: boolean
+                  default: false
+                  description: Include first-occurrence line numbers for each edge.
+              example:
+                collection: theme
+                key: theme/style.css
+                direction: in
+                depth: 2
+      responses:
+        "200":
+          description: The graph around the requested document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CodeGraphResponse"
+        "400":
+          description: Missing collection/key, or an unknown direction
+        "404":
+          description: No such document in the collection
   /v1/meta-keys:
     get:
       tags:
@@ -3908,14 +4206,32 @@ paths:
         - Real-Time
       summary: Server-Sent Events stream
       description: |
-        Subscribe to real-time document change events via SSE.
-        Events: doc.added, doc.updated, doc.deleted.
+        Subscribe to real-time events via SSE.
+
+        Document events: `doc.added`, `doc.updated`, `doc.deleted`.
+
+        Async job events: `job.started`, `job.progress`, `job.completed`,
+        `job.failed`, `job.cancelled` — so a client can watch a bulk import
+        finish instead of polling its status endpoint. Job events carry the
+        same record `GET /v1/bulk/jobs/{id}` returns, under a `job` key.
+        `job.progress` is throttled to one event per second per job; terminal
+        events are not throttled.
+
         Default enabled (MDDB_SSE_ENABLED=false to disable).
       operationId: sseEvents
       parameters:
         - name: collection
           in: query
           description: Filter events to a specific collection (optional)
+          schema:
+            type: string
+        - name: job
+          in: query
+          description: |
+            Filter to one async job's events. A connection with this parameter
+            receives that job's events only — no `doc.*` events — since a
+            client asking for one job's stream wants the job, not every
+            document change. Combines with `collection`.
           schema:
             type: string
       responses:
@@ -4362,6 +4678,76 @@ paths:
                   id:
                     type: string
 
+  /v1/search-advisor:
+    get:
+      tags:
+        - Search
+      summary: How should I search this collection?
+      description: |
+        Measures a collection and recommends the search type, ranking
+        algorithm, vector index, fusion weights and result shape — with a
+        plain-language reason for every choice (SRCH-010).
+
+        Read-only by default. `apply=true` additionally writes the
+        recommendation into the collection's retrieval profile, which needs
+        write permission.
+
+        Also available as the `search_advisor` MCP tool, annotated read-only,
+        so an agent can ask before it searches instead of guessing from
+        algorithm names.
+      operationId: getSearchAdvisor
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: apply
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Store the recommendation as the collection's retrieval profile.
+      responses:
+        "200":
+          description: The recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchRecommendation"
+        "403":
+          description: Forbidden, or read-only mode when apply=true
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Search
+      summary: How should I search this collection? (body form)
+      operationId: postSearchAdvisor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ collection ]
+              properties:
+                collection:
+                  type: string
+                apply:
+                  type: boolean
+                  default: false
+      responses:
+        "200":
+          description: The recommendation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchRecommendation"
+
   /v1/collection-config:
     get:
       tags:
@@ -4442,6 +4828,24 @@ paths:
                   description: Custom key-value metadata for the collection
                 wordpress:
                   $ref: "#/components/schemas/WordPressTargetConfig"
+                retrieval:
+                  $ref: "#/components/schemas/RetrievalProfile"
+                responsePrompt:
+                  type: string
+                  maxLength: 4096
+                  description: (v2.12.0+) How to format answers from this collection (RAG-002)
+                trackAccess:
+                  type: boolean
+                  description: Record per-read access events for temporal analytics
+                trackHot:
+                  type: boolean
+                  description: Maintain a hot-documents leaderboard for this collection
+                spellCorrect:
+                  type: boolean
+                  description: Auto-correct FTS queries using the spell checker
+                spellLang:
+                  type: string
+                  description: Override language for spell correction
                 storageBackend:
                   type: string
                   enum: [ boltdb, memory, s3 ]
@@ -5282,6 +5686,136 @@ paths:
 
 components:
   schemas:
+    CodeGraphResponse:
+      type: object
+      description: >
+        One traversal of the code connection graph. Nodes and edges are sorted,
+        so two responses can be diffed to see what a change did.
+      properties:
+        collection:
+          type: string
+        root:
+          type: string
+          description: The key the traversal started from
+        direction:
+          type: string
+          enum: [ in, out, both ]
+        depth:
+          type: integer
+        nodes:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              docId:
+                type: string
+              lang:
+                type: string
+              language:
+                type: string
+                description: Source language, e.g. `css`, `javascript`, `html`
+              depth:
+                type: integer
+                description: Hops from the root, by the shortest path
+        edges:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: string
+              to:
+                type: string
+              kind:
+                type: string
+                enum: [ uses-selector, imports ]
+              symbol:
+                type: string
+                description: >
+                  The selector or path that justifies this edge. Without it the
+                  answer is only "these files are related", which is not
+                  actionable.
+              direction:
+                type: string
+                enum: [ in, out ]
+              lines:
+                type: object
+                description: >
+                  Present only when `lines` was requested. A symbol usually
+                  occurs more than once, so these are the first occurrence — a
+                  place to jump to, not a complete answer. Zero means the symbol
+                  is not literal text in that file.
+                properties:
+                  fromLine:
+                    type: integer
+                  toLine:
+                    type: integer
+        truncated:
+          type: boolean
+          description: >
+            A depth or degree limit cut the walk short, so "nothing else depends
+            on this" cannot be read from a truncated result.
+      example:
+        collection: theme
+        root: theme/style.css
+        direction: in
+        depth: 1
+        nodes:
+          - key: theme/style.css
+            docId: rng|doc-0001|en
+            language: css
+            depth: 0
+          - key: theme/index.html
+            docId: rng|doc-0002|en
+            language: html
+            depth: 1
+        edges:
+          - from: theme/index.html
+            to: theme/style.css
+            kind: uses-selector
+            symbol: .hero-banner
+            direction: in
+        truncated: false
+    MCPAPIKeySummary:
+      type: object
+      description: |
+        Public view of an MCP API key. Carries no key material: `fingerprint`
+        is four bytes of SHA-256 over the key, and `keyPrefix` holds only the
+        scheme marker every key starts with.
+      properties:
+        keyPrefix:
+          type: string
+          description: Scheme marker only — never a slice of the key.
+          example: mcp_
+        fingerprint:
+          type: string
+          description: Stable, non-reversible identifier; matches what the server logs.
+          example: 9f2a41c7
+        name:
+          type: string
+          example: claude-desktop
+        createdAt:
+          type: integer
+          format: int64
+        expiresAt:
+          type: integer
+          format: int64
+          description: Unix timestamp; absent when the key never expires.
+        disabled:
+          type: boolean
+
+    MCPAPIKeyRef:
+      type: object
+      description: Identifies an existing key by its full value.
+      required:
+        - key
+      properties:
+        key:
+          type: string
+          example: mcp_4f3c2a1b8e7d6c5b4a39281706f5e4d3
+
     RotationJob:
       type: object
       description: Encryption re-keying job descriptor (2.9.16+).
@@ -5762,6 +6296,48 @@ components:
           type: boolean
           description: Save revision history for all documents in this batch
           default: false
+        profile:
+          type: string
+        sanitized:
+          type: integer
+          description: >-
+            How many documents had undecodable bytes dropped because their text
+            was not valid UTF-8 (GO-036). A bulk import sanitises rather than
+            failing, so one page in Windows-1250 cannot abort the other twenty
+            thousand — but the count says how many were changed. Single-document
+            writes refuse instead, with an error naming the encoding.
+          enum: [ default, fast ]
+          default: default
+          description: >
+            (v2.12.0+) Named preset of the flags above. `default` keeps every
+            step. `fast` trades parsing fidelity and per-document bookkeeping
+            for throughput: text-only parsing, no webhooks, no revisions,
+            duplicates skipped. Notably `fast` does NOT skip embeddings or FTS —
+            that is a separate decision with its own flag. Any flag set
+            explicitly overrides the preset, so `fast` plus `saveRevision: true`
+            keeps revisions. An unknown name is rejected with 400 rather than
+            falling back silently.
+        keyCollisions:
+          type: array
+          items:
+            type: string
+          description: |
+            (v2.12.0+) Input keys that differ only in letter case and therefore
+            name one document — `README.md` and `readme.md` are the same
+            document, and the last write wins.
+
+            The write still happens; refusing a large import over a spelling
+            would be worse. Absent when there are no collisions.
+          example:
+            - '"README.md" and "readme.md" name one document (keys are case-insensitive); the last write wins'
+        textOnly:
+          type: boolean
+          default: false
+          description: >
+            (v2.12.0+) Extract plain text from html/docx/odt instead of
+            rebuilding their structure as Markdown. Implied by `profile: fast`.
+            PDF has no text-only variant: its extractor already produces plain
+            text and builds no structure.
 
     IngestResponse:
       type: object
@@ -5796,6 +6372,12 @@ components:
           format: int64
           description: Total processing time in milliseconds
           example: 45
+        profile:
+          type: string
+          description: >
+            (v2.12.0+) Which ingest profile actually applied, so a corpus
+            loaded months ago can be explained without guessing which flags the
+            caller sent.
 
     GetRequest:
       type: object
@@ -6009,6 +6591,16 @@ components:
       required:
         - collection
       properties:
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (v2.12.0+) Recall/latency knob: candidates fetched per requested
+            result before deduplication, merging or rescoring trims them.
+            Omitted, uses the collection's retrieval profile then MDDB's default
+            of 3.0. Out of range returns 422 rather than clamping. See
+            SEARCH.md#oversampling-v2120 for measured effect.
         collection:
           type: string
           description: Collection name to search
@@ -6053,13 +6645,21 @@ components:
           example: false
         algorithm:
           type: string
-          enum: [ flat, hnsw, ivf, pq, opq, sq, bq, quantized ]
+          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq, quantized ]
           description: |
             Search algorithm to use (default "flat").
             - **flat**: Exact brute-force cosine similarity (most accurate, slower for large datasets)
             - **hnsw**: Hierarchical Navigable Small World graph (fast approximate, best general-purpose)
             - **ivf**: Inverted File Index with k-means clustering (good for large datasets)
             - **pq**: Product Quantization (compressed, lowest memory, slightly less accurate)
+            - **opq**: Optimised Product Quantization — PQ with a learned rotation
+            - **sq**: Scalar Quantization to 8 bits per dimension (4x smaller than float32)
+            - **sq4**: Scalar Quantization to 4 bits, two dimensions per byte (8x smaller).
+              Measured at 99.5% of `sq`'s recall@10 for half its storage — see
+              `TestQuantizerRecallCurve`. Reach for it when a collection no longer
+              fits in RAM at `sq`.
+            - **bq**: Binary Quantization to 1 bit per dimension (32x smaller, much coarser)
+            - **quantized**: Follows the collection's own `quantization` setting
           default: flat
           example: flat
         distanceMetric:
@@ -6070,7 +6670,7 @@ components:
           example: cosine
         retrievalMode:
           type: string
-          enum: [ parent, chunk, window ]
+          enum: [ parent, chunk, window, graph ]
           description: |
             Result granularity (default "parent").
             - **parent**: One result per document, scored by its best-matching chunk.
@@ -6404,6 +7004,22 @@ components:
           description: (v2.9.15+) Cap per-key bucket count; 0 = unlimited
           default: 0
 
+        cacheTtl:
+          type: integer
+          description: |
+            Serve this search from the result cache when a matching response is
+            no older than this many seconds, and store the response for that
+            long. Omitted or 0 means no caching at all — neither served nor
+            stored — so a request that says nothing keeps the default
+            behaviour and the default freshness.
+
+            Writes to the collection invalidate its cached results
+            immediately. The response carries `X-MDDB-Cache: hit|miss`.
+            Capped at 3600; `MDDB_SEARCH_CACHE_SIZE=0` disables the cache
+            server-wide.
+          minimum: 0
+          maximum: 3600
+          example: 60
     Highlight:
       type: object
       properties:
@@ -6421,6 +7037,15 @@ components:
         endOffset:
           type: integer
 
+        startLine:
+          type: integer
+          description: |
+            (v2.12.0+) 1-based, inclusive line where the fragment begins. This
+            is what makes a result a place to edit rather than a document to
+            read — see docs/API.md#finding-the-place-not-just-the-file.
+        endLine:
+          type: integer
+          description: (v2.12.0+) 1-based, inclusive line where the fragment ends
     RangeFilter:
       type: object
       properties:
@@ -6726,6 +7351,17 @@ components:
             type: string
           description: Validation error messages (empty if valid)
           example: []
+        warnings:
+          type: array
+          items:
+            type: string
+          description: >
+            Advisory findings that do not make the document invalid. Today:
+            metadata values that look like a structure lost on the way in —
+            Go's `%v` rendering of a map or a list of maps. A warning rather
+            than an error, because such a value is a valid string and rejecting
+            it would break callers legitimately storing text that looks like it.
+          example: []
 
     ReplicationStatusResponse:
       type: object
@@ -6817,6 +7453,16 @@ components:
         - collection
         - query
       properties:
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (v2.12.0+) Recall/latency knob: candidates fetched per requested
+            result before deduplication, merging or rescoring trims them.
+            Omitted, uses the collection's retrieval profile then MDDB's default
+            of 3.0. Out of range returns 422 rather than clamping. See
+            SEARCH.md#oversampling-v2120 for measured effect.
         collection:
           type: string
           description: Collection name to search
@@ -6838,24 +7484,35 @@ components:
           example: bm25
         vectorAlgorithm:
           type: string
-          enum: [ flat, hnsw, ivf, pq, opq, sq, bq ]
+          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq ]
           description: Vector search algorithm (default "flat")
           default: flat
           example: flat
+        signals:
+          $ref: "#/components/schemas/FusionSignals"
         strategy:
           type: string
-          enum: [ alpha, rrf ]
+          enum: [ alpha, rrf, weighted ]
           description: |
             Fusion strategy (default "alpha").
             - **alpha**: Weighted blending — `combined = (1-alpha) * normalizedFTS + alpha * vectorScore`
             - **rrf**: Reciprocal Rank Fusion — `score = 1/(k + rank_fts) + 1/(k + rank_vector)`
+            - **weighted** (SRCH-002): alpha's blend, then adjusted by the
+              signals in `signals`. Nothing changes unless a weight is set, and
+              `alpha`/`rrf` are unaffected.
           default: alpha
           example: alpha
         alpha:
           type: number
           format: float
-          description: Alpha blending weight (0=keyword only, 1=semantic only, default
-            0.5). Only used with "alpha" strategy.
+          description: >-
+            Alpha blending weight: 0 = keyword only, 1 = semantic only. Used by
+            the "alpha" and "weighted" strategies.
+
+            Omit the field to take the collection's retrieval profile, or 0.5.
+            An explicit 0 means pure keyword search and is honoured as such
+            (SRCH-007) — it used to be indistinguishable from an omitted field
+            and was silently replaced with 0.5, the opposite of the request.
           minimum: 0
           maximum: 1
           default: 0.5
@@ -7098,6 +7755,218 @@ components:
           format: int64
       required: [ collection, query ]
 
+    SearchRecommendation:
+      type: object
+      description: |
+        How to search a collection, measured rather than guessed (SRCH-010).
+
+        MDDB offers eight vector algorithms, four ranking algorithms, three
+        fusion strategies and four retrieval modes. An agent connecting over
+        MCP has no basis for choosing among them. This measures the collection
+        — length, vocabulary, whether it is embedded, whether it is code — and
+        recommends, with a reason for every choice.
+
+        It changes nothing. `retrievalProfile` is the advice encoded as a
+        RAG-001 profile, ready to `PUT` to `/v1/collection-config` if you agree.
+      properties:
+        profile:
+          $ref: "#/components/schemas/CollectionProfile"
+        searchType:
+          type: string
+          enum: [ fts, vector, hybrid ]
+        ftsAlgorithm:
+          type: string
+          enum: [ tfidf, bm25, bm25f, pmisparse ]
+        vectorAlgorithm:
+          type: string
+          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq ]
+        hybridStrategy:
+          type: string
+          enum: [ alpha, rrf, weighted ]
+        hybridAlpha:
+          type: number
+        retrievalMode:
+          type: string
+          enum: [ parent, chunk, window, graph ]
+        topK:
+          type: integer
+        signals:
+          $ref: "#/components/schemas/FusionSignals"
+        reasons:
+          type: array
+          description: >-
+            One line per decision, in plain language. The part worth reading:
+            a recommendation nobody can argue with is one nobody should follow.
+          items:
+            type: string
+        warnings:
+          type: array
+          description: What would stop the recommendation working — a
+            half-embedded collection, a missing provider.
+          items:
+            type: string
+        retrievalProfile:
+          $ref: "#/components/schemas/RetrievalProfile"
+
+    CollectionProfile:
+      type: object
+      description: What the advisor measured, from a sample of up to 2000 documents.
+      properties:
+        collection:
+          type: string
+        documents:
+          type: integer
+        sampled:
+          type: integer
+          description: How many were actually read. A recommendation from a
+            sample should say so.
+        embeddedDocuments:
+          type: integer
+        vectorDimensions:
+          type: integer
+        medianWords:
+          type: integer
+          description: Median, not mean — one long manual among ten thousand
+            notes moves a mean and describes nothing.
+        longDocumentRatio:
+          type: number
+          description: Share above 500 words, where returning whole documents
+            starts wasting a prompt.
+        distinctTerms:
+          type: integer
+        termsPerDocument:
+          type: number
+          description: >-
+            Vocabulary divided by documents sampled — how much new vocabulary
+            each document contributes. This decides whether keyword search can
+            discriminate. Type-token ratio would not: pooled over a corpus it
+            falls towards zero as the corpus grows, so every large collection
+            would look repetitive.
+        typeTokenRatio:
+          type: number
+          description: Reported because it is familiar; not used for any decision.
+        codeDocuments:
+          type: integer
+          description: How many carry extracted symbols, which is what makes
+            the connection graph useful.
+        estimatedVectorBytes:
+          type: integer
+          format: int64
+
+    FusionSignals:
+      type: object
+      description: |
+        Ranking signals for the `weighted` hybrid strategy (SRCH-002).
+
+        **A weight is a fraction of the result's own score**: `proximity: 0.1`
+        means "up to 10% better", `diversity: 0.8` means "up to 80% worse".
+        That keeps the signals scale-free, and makes large weights genuinely
+        powerful — at 1.0 a proximity bonus can carry a result past one scoring
+        half again as much. Weights are clamped to [0, 1].
+
+        Every weight defaults to 0, so a `weighted` request with no signals
+        behaves exactly like `alpha`.
+      properties:
+        diversity:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Penalise a result that is a near-copy of a higher-ranked one,
+            measured by text overlap. A vector score cannot do this: near-copies
+            have near-identical embeddings, so similarity rewards the
+            duplication. Suggested range 0.5-1.0.
+          example: 0.8
+        diversityThreshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.5
+          description: Overlap below which two documents count as unrelated.
+        proximity:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Reward a result whose key shares a directory with a higher-ranked
+            one. Suggested range 0.05-0.15.
+          example: 0.1
+        freshness:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >-
+            Reward recently updated documents on an exponential decay. Off by
+            default because it is wrong for reference material — an API
+            specification does not become less true with age. Suggested range
+            0.05-0.2.
+          example: 0.1
+        freshnessHalfLifeDays:
+          type: number
+          default: 180
+          description: How long the freshness bonus takes to halve.
+
+    SignalBreakdown:
+      type: object
+      description: >-
+        What each signal contributed to one result, in the same order as
+        `results`. Returned by the `weighted` strategy, because a reranking
+        nobody can explain is a reranking nobody trusts.
+      properties:
+        base:
+          type: number
+          description: The score before any signal applied
+        diversity:
+          type: number
+          description: Negative — the near-duplicate penalty
+        proximity:
+          type: number
+        freshness:
+          type: number
+        final:
+          type: number
+
+    PersistenceStatus:
+      type: object
+      description: >-
+        What the data directory can promise about durability (GO-032). Reported
+        by /health so an operator sees whether acknowledged writes will survive,
+        not only that the process is up.
+      properties:
+        path:
+          type: string
+          description: The data directory the server writes to
+          example: /var/lib/mddb
+        filesystem:
+          type: string
+          description: Detected filesystem type, when it could be determined
+          example: ext4
+        ephemeral:
+          type: boolean
+          description: >-
+            True when the directory lives on storage that does not survive a
+            container restart (tmpfs, overlayfs upper layer).
+          example: false
+        writable:
+          type: boolean
+          example: true
+        freeBytes:
+          type: integer
+          format: int64
+          description: Free space on the filesystem holding the data directory
+          example: 21474836480
+        warnings:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+                example: EPHEMERAL_FS
+              detail:
+                type: string
+                example: data directory is on tmpfs; writes will not survive a restart
+
     ErrorResponse:
       type: object
       properties:
@@ -7277,7 +8146,7 @@ components:
         goVersion:
           type: string
           description: Go runtime version
-          example: go1.26.5
+          example: go1.27.0
         version:
           type: string
           description: MDDB server version
@@ -8014,6 +8883,71 @@ components:
             category: [ blog ]
             author: [ John Doe ]
 
+    RetrievalProfile:
+      type: object
+      description: >
+        (v2.12.0+) Per-collection retrieval defaults. Every field is optional;
+        an unset field means "not configured". Precedence is fixed everywhere:
+        an explicit request parameter wins, then this profile, then MDDB's own
+        default for that endpoint — so a collection without a profile behaves
+        exactly as it did before this existed.
+      properties:
+        defaultSearchType:
+          type: string
+          enum: [ fts, vector, hybrid ]
+          description: >
+            Which search this collection expects. Consumed by clients reading
+            the config (mddb-chat, MCP agents); the server does not reroute a
+            request to a different endpoint because of it.
+        topK:
+          type: integer
+          minimum: 0
+          maximum: 1000
+          description: Results per search. 0 = unset.
+        retrievalMode:
+          type: string
+          enum: [ parent, chunk, window, graph ]
+          description: Granularity — whole document, matching passage, or passage with neighbours.
+        hybridStrategy:
+          type: string
+          enum: [ alpha, rrf, weighted ]
+          description: Hybrid fusion strategy.
+        hybridAlpha:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: >
+            Keyword-to-semantic weight: 0 = keyword only, 1 = semantic only.
+            Requires hybridAlphaSet, because 0.0 is a meaningful weight and
+            cannot double as "unset".
+        hybridAlphaSet:
+          type: boolean
+          description: Whether hybridAlpha was configured.
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (SRCH-005) Default recall/latency knob for this collection:
+            candidates fetched per requested result before deduplication,
+            merging or rescoring. A request parameter overrides it.
+        contextTokenBudget:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          description: >
+            Cap on the total context a search returns, so a RAG caller cannot be
+            handed more than its model holds. Results are dropped from the tail,
+            never truncated mid-document — half a document still costs tokens and
+            no longer says anything reliable. Approximated as bytes/4 rather than
+            tokenised: a real tokeniser would tie the budget to one model family.
+            Responses set `contextTruncated` when this applied. 0 = no cap.
+      example:
+        defaultSearchType: hybrid
+        topK: 40
+        retrievalMode: chunk
+        contextTokenBudget: 8000
+
     CollectionConfig:
       type: object
       properties:
@@ -8057,9 +8991,15 @@ components:
         storageBackend:
           type: string
           enum: [ boltdb, memory, s3 ]
-          description: "Storage backend for this collection (default: boltdb). Use
-            'memory' for ephemeral data or 's3' for S3-compatible object
-            storage."
+          description: >
+            (Honoured from v2.12.0; accepted and ignored before that.) Where
+            this collection's document *bodies* are stored. The metadata index,
+            revisions, search indexes and replication binlog stay in the
+            server's own database in every configuration — they are written in
+            one transaction that a remote object store cannot join. A backend
+            that cannot be reached is refused at configuration time, and writes
+            to a collection whose backend fails later error rather than falling
+            back to local disk.
           example: boltdb
         storageConfig:
           $ref: "#/components/schemas/StorageConfigDef"
@@ -8076,6 +9016,21 @@ components:
             When `> 0`, older revisions are trimmed synchronously on every write so
             history stays capped even under high write-churn.
           default: 0
+        retrieval:
+          $ref: "#/components/schemas/RetrievalProfile"
+        responsePrompt:
+          type: string
+          maxLength: 4096
+          description: >
+            (v2.12.0+) How answers drawn from this collection should be
+            formatted — numbered steps for runbooks, code blocks for API docs.
+            Applied automatically by mddb-chat and returned alongside MCP search
+            results, so the instruction travels with the data instead of living
+            in every client. Supports `{{collection}}` and `{{query}}`
+            placeholders. Plain text for a model; never rendered as markup.
+            Capped at 4 KiB because it is prepended to prompts automatically and
+            would otherwise eat the context the answer needs.
+          example: "Answer as numbered steps. Quote the exact command for each step."
           example: 20
         wordpress:
           $ref: "#/components/schemas/WordPressTargetConfig"
@@ -8095,7 +9050,19 @@ components:
           example: https://blog.example.com
         apiKey:
           type: string
-          description: mddb-sync publish key (Settings → MDDB Sync), sent as Authorization Bearer.
+          writeOnly: true
+          description: |
+            mddb-sync publish key (Settings → MDDB Sync), sent as Authorization Bearer.
+
+            (v2.12.0+) Write-only. Reads never return it — see `apiKeySet`. On
+            write, an empty value keeps the stored key; remove the whole
+            `wordpress` block to clear it.
+        apiKeySet:
+          type: boolean
+          readOnly: true
+          description: |
+            (v2.12.0+) Read-only. `true` when a publish key is stored.
+          example: true
 
     StorageConfigDef:
       type: object
@@ -8120,8 +9087,25 @@ components:
           example: AKIAIOSFODNN7EXAMPLE
         secretKey:
           type: string
-          description: Secret key for authentication
+          writeOnly: true
+          description: |
+            (v2.12.0+) Write-only. Reads never return it — see `secretKeySet`.
+
+            Reading a collection's configuration requires read permission on
+            that collection, which is permission to read its documents, not to
+            collect the credentials for the bucket underneath them.
+
+            On write, an empty value keeps the stored secret, so the usual
+            read-modify-write loop does not erase it. Send a new value to
+            replace it; remove the whole `storageConfig` block to clear it.
           example: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+        secretKeySet:
+          type: boolean
+          readOnly: true
+          description: |
+            (v2.12.0+) Read-only. `true` when a secret key is stored — so a
+            blank `secretKey` field can be told apart from no credential at all.
+          example: true
         prefix:
           type: string
           description: Key prefix within the bucket
@@ -8233,6 +9217,16 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        oversample:
+          type: number
+          minimum: 1.0
+          maximum: 10.0
+          description: >
+            (v2.12.0+) Recall/latency knob: candidates fetched per requested
+            result before deduplication, merging or rescoring trims them.
+            Omitted, uses the collection's retrieval profile then MDDB's default
+            of 3.0. Out of range returns 422 rather than clamping. See
+            SEARCH.md#oversampling-v2120 for measured effect.
         sourceCollection:
           type: string
           description: Collection containing the source document (for document-as-query)
@@ -8356,10 +9350,19 @@ components:
           description: Collection to scan
         mode:
           type: string
-          enum: [ exact, similar, both ]
+          enum: [ exact, similar, minhash, both ]
           default: both
-          description: "Detection mode: exact (content hash), similar (embedding
-            similarity), or both"
+          description: |
+            Detection mode.
+            - **exact**: identical content hashes
+            - **similar**: close embeddings — finds documents on the same
+              topic, and needs an embedding provider configured
+            - **minhash**: overlapping text (SRCH-002) — finds a page that was
+              forked and lightly edited, which `exact` misses and `similar`
+              cannot distinguish from two independent pages on one subject.
+              Needs no embeddings.
+            - **both**: exact and similar. Deliberately excludes `minhash`,
+              which reads every document body.
         threshold:
           type: number
           minimum: 0
@@ -8413,7 +9416,7 @@ components:
           type: integer
         type:
           type: string
-          enum: [ exact, similar ]
+          enum: [ exact, similar, minhash ]
         documents:
           type: array
           items:

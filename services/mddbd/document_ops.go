@@ -40,6 +40,17 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 			return storage.Doc{}, false, err
 		}
 	}
+	// GO-036: refuse text protobuf cannot store, here for the same reason as
+	// the schema check above — every transport goes through this function, and
+	// a check in a handler is a check the other five handlers do not have.
+	//
+	// Refusing rather than sanitising: a person picked this one file, and
+	// silently dropping the bytes that would not decode turns `café` into
+	// `caf` and tells nobody. Bulk paths sanitise and count instead; see
+	// text_encoding.go.
+	if err := ValidateDocumentText(contentMD, meta); err != nil {
+		return storage.Doc{}, false, err
+	}
 
 	now := time.Now().Unix()
 	docID := genID(collection, key, lang)
@@ -72,6 +83,10 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 			ID: docID, Key: key, Lang: lang, Meta: meta,
 			ContentMD: contentMD, AddedAt: added, UpdatedAt: now,
 		}
+		// CODE-004: source symbols go into meta before the document is
+		// marshalled, so the existing metadata filter can answer "which file
+		// declares this" without a new query surface.
+		EnrichCodeSymbols(&doc)
 		if ttl > 0 {
 			doc.ExpiresAt = now + ttl
 		}
@@ -82,6 +97,16 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 		}
 		cachedBuf = buf
 		docKey := storage.DocKey(collection, docID)
+
+		// GO-021: an external backend receives the payload before this
+		// transaction commits, so a crash in between leaves an unreferenced
+		// object rather than an index entry pointing at nothing. The bucket
+		// write below still happens for every collection — it is the storage
+		// for BoltDB-backed ones and the local index for the rest.
+		if err := s.putDocPayload(collection, docID, buf); err != nil {
+			return err
+		}
+
 		if err := bDocs.Put(docKey, buf); err != nil {
 			return err
 		}
@@ -174,12 +199,18 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 // must happen inside the write transaction (see addDocument / the batch
 // commits) so a crash can never leave a doc without its revision.
 func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew bool) {
+	// A write changes what a search returns, so cached result sets for this
+	// collection must stop being reachable (GO-031). This is the shared
+	// pipeline for every write transport, so one call covers them all.
+	s.invalidateSearchCache(collection)
+
 	// Trigger async embedding
 	if s.EmbeddingWorker != nil && saved.ContentMD != "" {
 		s.EmbeddingWorker.Enqueue(EmbeddingJob{
 			Collection: collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,
+			ChunkMode:  ChunkModeFor(&saved),
 		})
 	}
 
@@ -279,6 +310,12 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 		deletedDoc = doc
 
 		docKey := storage.DocKey(collection, docID)
+		// GO-021: the payload leaves the backend as well, or a delete
+		// removes the index and leaves the data the caller believes is gone.
+		if err := s.deleteDocPayload(collection, docID); err != nil {
+			return err
+		}
+
 		if err := bDocs.Delete(docKey); err != nil {
 			return err
 		}
@@ -346,13 +383,7 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 
 	// Invalidate the read cache so a gRPC Get can't serve the just-deleted doc
 	// for up to the 5-minute TTL (GO-002). Same cache.BuildCacheKey as the write path.
-	cacheKey := cache.BuildCacheKey(collection, key, lang)
-	if s.Cache != nil {
-		s.Cache.Delete(cacheKey)
-	}
-	if s.LockFreeCache != nil {
-		s.LockFreeCache.Delete(cacheKey)
-	}
+	s.invalidateDocReadCaches(collection, key, lang)
 
 	// Clean up FTS index
 	if s.FTSIndex != nil {
@@ -379,4 +410,89 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 	}
 
 	return nil
+}
+
+// invalidateDocReadCaches evicts every read cache that can serve a stale copy
+// of one document: the gRPC Get document caches (regular and lock-free) and
+// the collection's search-result cache. GO-002 wired this into delete; GO-038
+// makes it the single helper every mutating path calls.
+func (s *Server) invalidateDocReadCaches(collection, key, lang string) {
+	cacheKey := cache.BuildCacheKey(collection, key, lang)
+	if s.Cache != nil {
+		s.Cache.Delete(cacheKey)
+	}
+	if s.LockFreeCache != nil {
+		s.LockFreeCache.Delete(cacheKey)
+	}
+	s.invalidateSearchCache(collection)
+}
+
+// runPostUpdateHooks is the side-effect pipeline shared by both partial-update
+// transports (PATCH /v1/update and gRPC UpdateDocument) after their
+// transaction commits. GO-038: the gRPC path used to skip cache invalidation,
+// FTS/geo reindexing, webhooks and metrics entirely, so a gRPC Get served the
+// pre-update document for up to the cache TTL and FTS kept matching the old
+// content. One pipeline, like runPostWriteHooks for Add (GO-001), keeps the
+// transports from drifting again.
+func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.Doc, contentChanged, ttlChanged bool) {
+	s.invalidateDocReadCaches(collection, key, lang)
+
+	if contentChanged && s.EmbeddingWorker != nil && saved.ContentMD != "" {
+		s.EmbeddingWorker.Enqueue(EmbeddingJob{
+			Collection: collection,
+			DocID:      saved.ID,
+			ContentMD:  saved.ContentMD,
+			ChunkMode:  ChunkModeFor(&saved),
+		})
+	}
+
+	if s.TTLManager != nil {
+		if saved.ExpiresAt > 0 {
+			_ = s.TTLManager.Set(collection, saved.ID, saved.ExpiresAt)
+		} else if ttlChanged {
+			_ = s.TTLManager.Remove(collection, saved.ID)
+		}
+	}
+
+	if contentChanged && s.FTSIndex != nil && saved.ContentMD != "" {
+		_ = s.FTSIndex.IndexWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
+		_ = s.FTSIndex.IndexPositionsWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
+		fields := map[string]string{"content": saved.ContentMD}
+		for k, vals := range saved.Meta {
+			if len(vals) > 0 {
+				fields["meta."+k] = strings.Join(vals, " ")
+			}
+		}
+		_ = s.FTSIndex.IndexFieldsWithLang(collection, saved.ID, fields, saved.Lang)
+	}
+
+	// Geo re-index on partial update. Mirrors the Add/Upsert path: if meta now
+	// contains a usable point, upsert it into both indexes; otherwise drop any
+	// stale points.
+	if s.GeoIndex != nil && s.GeoStore != nil {
+		if lat, lng, geoOK := s.GeoIndex.AddFromMeta(collection, saved.ID, saved.Meta); geoOK {
+			_ = s.GeoStore.Put(collection, saved.ID, lat, lng)
+			if s.GeoHashIndex != nil {
+				s.GeoHashIndex.Add(collection, saved.ID, lat, lng)
+			}
+		} else {
+			s.GeoIndex.Remove(collection, saved.ID)
+			if s.GeoHashIndex != nil {
+				s.GeoHashIndex.Remove(collection, saved.ID)
+			}
+			_ = s.GeoStore.Delete(collection, saved.ID)
+		}
+	}
+
+	if s.WebhookManager != nil {
+		s.WebhookManager.Fire("doc.updated", collection, key, lang, &saved)
+	}
+
+	if s.AutomationManager != nil && env("MDDB_TRIGGERS", "false") == "true" {
+		go s.AutomationManager.EvaluateTriggers(collection, saved, "update")
+	}
+
+	if s.Metrics != nil {
+		s.Metrics.IncOp("doc_update")
+	}
 }

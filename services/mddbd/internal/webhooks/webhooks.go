@@ -6,17 +6,16 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/httpclient"
+	json "mddb/internal/jsonx"
 	"mddb/internal/metrics"
 	"mddb/internal/storage"
 	"net/http"
 	"sync"
 	"time"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 var bucketWebhooks = []byte("webhooks")
@@ -268,7 +267,7 @@ func fireWebhook(hook Webhook, payload WebhookPayload) {
 
 		req, err := http.NewRequest("POST", hook.URL, bytes.NewReader(data))
 		if err != nil {
-			log.Printf("webhook %s: request error: %v", hook.ID, err)
+			slog.Warn("webhook request error", "iD", hook.ID, "err", err)
 			return
 		}
 		req.Header.Set("Content-Type", "application/json")
@@ -277,7 +276,7 @@ func fireWebhook(hook Webhook, payload WebhookPayload) {
 
 		resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req)
 		if err != nil {
-			log.Printf("webhook %s: attempt %d failed: %v", hook.ID, attempt+1, err)
+			slog.Warn("webhook attempt failed", "iD", hook.ID, "attempt", attempt+1, "err", err)
 			continue
 		}
 		httpclient.DrainAndClose(resp.Body)
@@ -285,9 +284,9 @@ func fireWebhook(hook Webhook, payload WebhookPayload) {
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return // success
 		}
-		log.Printf("webhook %s: attempt %d got status %d", hook.ID, attempt+1, resp.StatusCode)
+		slog.Info("webhook attempt returned an error status", "iD", hook.ID, "attempt", attempt+1, "statusCode", resp.StatusCode)
 	}
-	log.Printf("webhook %s: all retries exhausted for event %s", hook.ID, payload.Event)
+	slog.Info("webhook retries exhausted", "iD", hook.ID, "event", payload.Event)
 }
 
 func generateWebhookID() string {

@@ -32,12 +32,16 @@ func NewBatchDeleter(server *Server, maxWorkers int) *BatchDeleter {
 
 // DeletedDoc represents a document to delete
 type DeletedDoc struct {
-	Key     string
-	Lang    string
-	DocID   string
-	Found   bool
-	OldMeta map[string][]string
-	Error   error
+	Key   string
+	Lang  string
+	DocID string
+	// StoredKey is the spelling the document itself carries, which can differ
+	// from the requested one only in letter case (DOC-016). Both index entries
+	// have to go or the survivor points at a document that is gone.
+	StoredKey string
+	Found     bool
+	OldMeta   map[string][]string
+	Error     error
 }
 
 // ProcessBatchDelete processes multiple document deletions in parallel
@@ -115,6 +119,7 @@ func (bd *BatchDeleter) lookupDocument(collection string, deleteDoc *proto.Delet
 			}
 			result.Found = true
 			result.OldMeta = existingDoc.Meta
+			result.StoredKey = existingDoc.Key
 		}
 		return nil
 	})
@@ -160,10 +165,13 @@ func (bd *BatchDeleter) commitDelete(collection string, deleted []*DeletedDoc) *
 			}
 			bo.Delete("docs", docKey)
 
-			// Delete bykey index
-			byKeyKey := storage.ByKeyKey(collection, d.Key, d.Lang)
-			_ = bByK.Delete(byKeyKey)
-			bo.Delete("bykey", byKeyKey)
+			// Delete bykey index. DOC-016: the requested spelling and the
+			// stored one, which differ when a document was written as
+			// "README.md" and deleted as "readme.md".
+			for _, byKeyKey := range byKeyVariants(collection, d.Key, d.StoredKey, d.Lang) {
+				_ = bByK.Delete(byKeyKey)
+				bo.Delete("bykey", byKeyKey)
+			}
 
 			// Delete metadata indices
 			if d.OldMeta != nil {
@@ -202,6 +210,9 @@ func (bd *BatchDeleter) commitDelete(collection string, deleted []*DeletedDoc) *
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
 	} else {
 		bo.FlushTo(bd.server.Binlog)
+		// Once per batch rather than per document: the generation counter
+		// makes one bump enough for the whole collection (GO-031).
+		bd.server.invalidateSearchCache(collection)
 	}
 
 	return resp

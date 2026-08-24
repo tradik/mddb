@@ -1,4 +1,4 @@
-.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat docs-prep docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -63,12 +63,28 @@ dev-shell-server: ## Open shell in MDDB server container
 dev-shell-panel: ## Open shell in MDDB panel container
 	docker compose -f docker-compose.dev.yml exec mddb-panel sh
 
-test: ## Run all tests
+test: ## Run all Go tests
 	@echo "🧪 Running backend tests..."
 	cd services/mddbd && go test -v -timeout 5m ./...
 	cd clients/go/mddb && go test -timeout 5m ./...
 	cd services/mddb-cli && go test -timeout 5m ./...
+	cd tools/bench && go test -timeout 5m ./...
 	@echo "✅ Tests passed!"
+
+test-langchain: ## Run the LangChain adapter tests (INT-017)
+	@cd integrations/langchain-mddb && python3 -m pytest -q
+
+test-clients: ## Run the Node.js and Python client tests (TEST-001)
+	@echo "🧪 Running Node.js client tests..."
+	cd clients/nodejs && npm test
+	@echo "🧪 Running Python client tests..."
+	cd clients/python && python3 -m pytest -q
+	@echo "✅ Client tests passed!"
+
+test-chat: ## Run the mddb-chat (Rust) tests
+	@echo "🧪 Running mddb-chat tests..."
+	cd services/mddb-chat && cargo test
+	@echo "✅ Chat tests passed!"
 
 test-coverage: ## Run tests with coverage
 	@echo "🧪 Running tests with coverage..."
@@ -120,10 +136,10 @@ test-graphql: ## Run GraphQL tests with coverage
 lint-all: fmt vet sec lint ## Run all linters
 	@echo "✅ All linting passed!"
 
-test-all: test test-graphql ## Run all tests
+test-all: test test-graphql test-clients test-langchain ## Run every test suite in the monorepo
 	@echo "✅ All tests passed!"
 
-ci: check-go-version fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
+ci: check-go-version check-version check-action-pins check-repo-links fmt-check lint-all test-all ## Run full CI pipeline (lint + test)
 	@echo "✅ CI pipeline complete!"
 
 dev-logs-chat: ## Show logs from chat server only
@@ -153,14 +169,67 @@ check-go-version: ## Verify Go toolchain pins are consistent (go.work/go.mod/CI/
 test-go-version: ## Run the Go-version-drift guard test suite
 	@bash scripts/tests/test-go-version.sh
 
+check-version: ## Verify the release version matches across every source
+	@bash scripts/check-version.sh --print
+
+test-version: ## Run the release-version drift guard test suite
+	@bash scripts/tests/test-version.sh
+
+agent-instructions: ## Regenerate the Claude Code / Cursor / Windsurf variants from AGENTS.md
+	@python3 scripts/gen-agent-instructions.py
+
+check-agent-instructions: ## Fail if the generated agent instructions are stale
+	@python3 scripts/gen-agent-instructions.py --check
+
+check-changelog: ## Verify the CHANGELOG has exactly one, leading [Unreleased]
+	@bash scripts/check-changelog.sh
+
+test-changelog: ## Run the CHANGELOG structure guard test suite
+	@bash scripts/tests/test-changelog.sh
+
+check-proto-plugins: ## Verify the protobuf plugin pin matches the runtime in go.mod
+	@bash scripts/check-proto-plugins.sh --print
+
+test-proto-plugins: ## Run the protobuf plugin/runtime guard test suite
+	@bash scripts/tests/test-proto-plugins.sh
+
+coverage-areas: ## Report per-file coverage for the tracked high-risk areas
+	@cd services/mddbd && go test -coverprofile=coverage.out ./... > /dev/null 2>&1
+	@bash scripts/check-coverage-areas.sh --print
+
+bench-comparison: ## Measure the numbers docs/COMPARISON.md publishes (DOC-013)
+	@echo "🧪 Profiling MDDB — start a server first (make dev-start or ./mddbd)"
+	@cd test && go run ./mddb-profile -markdown $(BENCH_ARGS)
+
+bench-comparison-all: ## Full cross-database comparison (needs Docker)
+	@cd test && bash compare-all-databases.sh
+
+check-repo-links: ## Verify every relative Markdown link resolves (DOC-013)
+	@bash scripts/check-repo-links.sh
+
+test-repo-links: ## Run the repo-link guard test suite
+	@bash scripts/tests/test-repo-links.sh
+
+check-action-pins: ## Verify every GitHub Action is pinned to a commit SHA (OPS-018)
+	@bash scripts/check-action-pins.sh
+
+test-action-pins: ## Run the action-pin guard test suite
+	@bash scripts/tests/test-action-pins.sh
+
+test-coverage-areas: ## Run the per-area coverage guard test suite
+	@bash scripts/tests/test-coverage-areas.sh
+
 mcp-tools-count: ## Verify docs' built-in MCP tool count matches the code (DOC-001)
 	@cd services/mddbd && go test -run TestMCPToolCountDocsInSync -count=1 . && \
 		echo "✅ docs MCP tool count matches len(mcpBuiltinTools())"
 
-docs-dev: ## Start SSG docs server in watch mode on :8888
+docs-metadata: ## Write the empty docs/metadata.json SSG expects (gitignored)
+	@test -f docs/metadata.json || echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
+
+docs-dev: docs-metadata ## Start SSG docs server in watch mode on :8888
 	@ssg --config .ssg.yaml --watch --http --port 8888
 
-docs-build: ## Build static documentation site into dist/
+docs-build: docs-metadata ## Build static documentation site into dist/
 	@ssg --config .ssg.yaml --clean
 
 docs-linkcheck: docs-build ## Fail if any internal link would hit a redirect

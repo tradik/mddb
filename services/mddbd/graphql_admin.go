@@ -94,7 +94,7 @@ func (a *GraphQLAdapter) ValidateDocument(ctx context.Context, collection string
 	if err != nil {
 		return nil, err
 	}
-	return &gql.ValidationResult{Valid: resp.Valid, Errors: resp.Errors}, nil
+	return &gql.ValidationResult{Valid: resp.Valid, Errors: resp.Errors, Warnings: resp.Warnings}, nil
 }
 
 // =============================================================================

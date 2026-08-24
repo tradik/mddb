@@ -1,12 +1,11 @@
 package main
 
 import (
-	"log"
+	"github.com/robfig/cron/v3"
+	"log/slog"
 	"mddb/internal/automationlog"
 	"sync"
 	"time"
-
-	"github.com/robfig/cron/v3"
 )
 
 // CronScheduler manages scheduled automation triggers.
@@ -61,7 +60,7 @@ func (cs *CronScheduler) Reload() {
 		cs.addEntry(cronRule)
 	}
 
-	log.Printf("Cron scheduler reloaded: %d active crons", len(cs.entryMap))
+	slog.Info("Cron scheduler reloaded active crons", "entryMapCount", len(cs.entryMap))
 }
 
 // addEntry adds a single cron entry to the scheduler.
@@ -71,7 +70,7 @@ func (cs *CronScheduler) addEntry(cronRule AutomationRule) {
 	// Resolve the webhook
 	webhook := am.GetWebhook(cronRule.WebhookID)
 	if webhook == nil {
-		log.Printf("cron %s: webhook %s not found, skipping", cronRule.ID, cronRule.WebhookID)
+		slog.Info("cron webhook not found, skipping", "iD", cronRule.ID, "webhookID", cronRule.WebhookID)
 		return
 	}
 
@@ -79,7 +78,7 @@ func (cs *CronScheduler) addEntry(cronRule AutomationRule) {
 	webhookID := cronRule.WebhookID
 
 	entryID, err := cs.cron.AddFunc(cronRule.Schedule, func() {
-		log.Printf("cron %s: firing webhook %s", ruleID, webhookID)
+		slog.Info("cron firing webhook", "ruleID", ruleID, "webhookID", webhookID)
 
 		// Track cron execution
 		if cs.server.Metrics != nil {
@@ -89,7 +88,7 @@ func (cs *CronScheduler) addEntry(cronRule AutomationRule) {
 		// Re-fetch webhook in case it was updated
 		currentWebhook := am.GetWebhook(webhookID)
 		if currentWebhook == nil || !currentWebhook.Enabled {
-			log.Printf("cron %s: webhook %s disabled or deleted, skipping", ruleID, webhookID)
+			slog.Info("cron webhook disabled or deleted, skipping", "ruleID", ruleID, "webhookID", webhookID)
 			if cs.server.AutomationLogStore != nil {
 				_ = cs.server.AutomationLogStore.Log(automationlog.Entry{
 					Timestamp: time.Now().Unix(),
@@ -109,7 +108,7 @@ func (cs *CronScheduler) addEntry(cronRule AutomationRule) {
 	})
 
 	if err != nil {
-		log.Printf("cron %s: invalid schedule '%s': %v", cronRule.ID, cronRule.Schedule, err)
+		slog.Warn("cron invalid schedule", "iD", cronRule.ID, "schedule", cronRule.Schedule, "err", err)
 		return
 	}
 

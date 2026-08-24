@@ -12,8 +12,8 @@ import (
 	"mddb/internal/storage"
 	proto "mddb/proto"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // ---- HTTP types for /v1/ingest ----
@@ -46,6 +46,15 @@ type IngestOptionsHTTP struct {
 	SkipWebhooks            bool `json:"skipWebhooks,omitempty"`
 	AutoConfigureCollection bool `json:"autoConfigureCollection,omitempty"`
 	SaveRevision            bool `json:"saveRevision,omitempty"`
+	// Profile names a preset of the flags above (RAG-004): "" or "default"
+	// keeps every step, "fast" trades parsing fidelity and bookkeeping for
+	// throughput. An explicitly-set flag always overrides the preset.
+	Profile string `json:"profile,omitempty"`
+	// TextOnly extracts plain text from heavy formats instead of rebuilding
+	// their structure as Markdown. It changes html, docx and odt; pdf and rtf
+	// build no structure to begin with, so they are unaffected. Implied by
+	// profile "fast".
+	TextOnly bool `json:"textOnly,omitempty"`
 }
 
 // IngestResponseHTTP is the HTTP response body for a bulk ingest operation.
@@ -57,6 +66,28 @@ type IngestResponseHTTP struct {
 	Errors     []string `json:"errors,omitempty"`
 	Collection string   `json:"collection"`
 	DurationMs int64    `json:"durationMs"`
+	// Profile records which ingest profile actually applied (RAG-004), so a
+	// corpus loaded months ago can be explained without guessing which flags
+	// the caller happened to send.
+	Profile string `json:"profile,omitempty"`
+	// Sanitized counts documents whose text was not valid UTF-8 and had the
+	// undecodable bytes dropped (GO-036).
+	//
+	// A bulk import must not fail because one page of a 20 GB dump is in
+	// Windows-1250, but silently altering documents and reporting nothing is
+	// how a corpus quietly loses characters. Single-document writes refuse
+	// instead; see text_encoding.go.
+	Sanitized int `json:"sanitized,omitempty"`
+	// KeyCollisions reports input keys that differ only in letter case and
+	// therefore name one document (DOC-016).
+	//
+	// Document identifiers are case-insensitive, the key index is not, and the
+	// gap is silent: the later write replaces the earlier one's content, both
+	// spellings still resolve, and the response otherwise reports two
+	// successful writes. Silence is the worst available behaviour here, so the
+	// collisions are named — importing a repository holding both `README.md`
+	// and `readme.md` should not be something you find out about later.
+	KeyCollisions []string `json:"keyCollisions,omitempty"`
 }
 
 // handleIngest handles POST /v1/ingest
@@ -94,6 +125,20 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) (*IngestResponseHTTP, error) {
 	start := time.Now()
 
+	// RAG-004: expand the named profile into the flags that already existed,
+	// so there is one place that decides what "fast" means and every explicit
+	// flag still overrides it.
+	profile, err := ResolveIngestProfile(&opts)
+	if err != nil {
+		return nil, err
+	}
+	opts.SkipDuplicates = profile.SkipDuplicates
+	opts.SkipEmbeddings = profile.SkipEmbeddings
+	opts.SkipFTS = profile.SkipFTS
+	opts.SkipWebhooks = profile.SkipWebhooks
+	opts.AutoConfigureCollection = profile.AutoConfigureCollection
+	opts.SaveRevision = profile.SaveRevision
+
 	// Auto-configure collection as "scraping" type
 	if opts.AutoConfigureCollection && s.CollectionManager != nil {
 		existing, _ := s.CollectionManager.Get(collection)
@@ -106,13 +151,20 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	}
 
 	// Phase 1: Pre-process documents (key derivation, frontmatter, meta injection)
-	protoDocs, skippedIdx, errs := s.preProcessIngest(collection, docs, opts)
+	protoDocs, skippedIdx, errs, sanitized := s.preProcessIngest(collection, docs, opts)
 
 	resp := &IngestResponseHTTP{
 		Collection: collection,
 		Skipped:    len(skippedIdx),
 		Failed:     len(errs),
 		Errors:     errs,
+		Profile:    profile.Name,
+		// Set here rather than on the way out, so it is reported on every
+		// path — the first version assigned it only in the early return
+		// below, and every successful import reported zero.
+		Sanitized: sanitized,
+		// DOC-016: reported on every path, including the empty one below.
+		KeyCollisions: describeKeyCollisions(docs),
 	}
 
 	if len(protoDocs) == 0 {
@@ -151,9 +203,10 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 // preProcessIngest transforms IngestDocumentHTTP into proto.BatchDocument,
 // applying URL key derivation, frontmatter extraction, metadata injection,
 // and optional deduplication.
-func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ([]*proto.BatchDocument, map[int]bool, []string) {
+func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ([]*proto.BatchDocument, map[int]bool, []string, int) {
 	var protoDocs []*proto.BatchDocument
 	var errs []string
+	var sanitized int
 	skippedIdx := make(map[int]bool)
 
 	// Build dedup map if needed
@@ -181,6 +234,16 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 		meta := d.Meta
 		if meta == nil {
 			meta = make(map[string][]string)
+		}
+
+		// GO-036: drop bytes protobuf cannot store, and count it. Sanitising
+		// here rather than refusing, because one badly encoded page must not
+		// abort an import of the other twenty thousand — but the response says
+		// how many were changed, which it previously did not.
+		if sanitizedContent, sanitizedMeta, changed := SanitizeDocumentText(content, meta); changed {
+			content = sanitizedContent
+			meta = sanitizedMeta
+			sanitized++
 		}
 
 		// Extract frontmatter
@@ -229,7 +292,7 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 		})
 	}
 
-	return protoDocs, skippedIdx, errs
+	return protoDocs, skippedIdx, errs, sanitized
 }
 
 // buildContentHashMap builds a map of docID → CRC32 content hash for existing docs.

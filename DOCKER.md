@@ -155,6 +155,23 @@ To completely reset:
 make dev-clean  # Removes volumes and all data
 ```
 
+### The volume is the guarantee
+
+MDDB fsyncs every commit, so an acknowledged write survives a crash — but only
+to the storage it was given. A container started **without** a volume at the
+data directory writes to its own overlay layer, which is deleted with the
+container: writes are accepted, fsynced, and gone.
+
+The server checks this at startup and refuses to be quiet about it. Watch for:
+
+```
+{"level":"WARN","msg":"persistence warning","code":"ephemeral_storage", ...}
+```
+
+and check `GET /health`, which reports `"durable": false` in that state. See
+[Persistence Guarantees](docs/DEPLOYMENT.md#persistence-guarantees) for what is
+and is not covered.
+
 ## 🐛 Troubleshooting
 
 ### Services won't start

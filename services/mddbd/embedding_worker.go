@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	"mddb/internal/metrics"
@@ -17,6 +17,11 @@ type EmbeddingJob struct {
 	Collection string
 	DocID      string
 	ContentMD  string
+	// ChunkMode must match what retrieval uses to re-derive the passage
+	// (CODE-003). Chunks are not stored, only their index — so if the two
+	// disagree, chunk 3 at read time is not chunk 3 at write time and every
+	// passage is wrong.
+	ChunkMode ChunkMode
 }
 
 // EmbeddingWorker processes embedding jobs asynchronously.
@@ -64,8 +69,8 @@ func (w *EmbeddingWorker) Start(workers int) {
 		w.wg.Add(1)
 		go w.worker(i)
 	}
-	log.Printf("Embedding worker started (%d workers, buffer=%d, chunking=%v, chunkSize=%d)",
-		workers, cap(w.jobs), w.chunkEnabled, w.chunkSize)
+	slog.Info("embedding worker started",
+		"workers", workers, "buffer", cap(w.jobs), "chunking", w.chunkEnabled, "chunkSize", w.chunkSize)
 }
 
 // Stop gracefully stops the worker.
@@ -81,7 +86,7 @@ func (w *EmbeddingWorker) Enqueue(job EmbeddingJob) bool {
 	case w.jobs <- job:
 		return true
 	default:
-		log.Printf("WARNING: embedding queue full, dropping job for %s/%s", job.Collection, job.DocID)
+		slog.Warn("embedding queue full, dropping job", "collection", job.Collection, "docID", job.DocID)
 		return false
 	}
 }
@@ -119,7 +124,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	// Split into chunks if enabled
 	var chunks []string
 	if w.chunkEnabled {
-		chunks = ChunkText(job.ContentMD, w.chunkSize)
+		chunks = chunkTextsMode(job.ContentMD, w.chunkSize, job.ChunkMode)
 	} else {
 		chunks = []string{job.ContentMD}
 	}
@@ -128,9 +133,30 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		return
 	}
 
+	// RAG-003: reuse the vectors of chunks whose text did not change.
+	//
+	// The document-level check above only helps when nothing changed at all.
+	// Editing one paragraph of a fifty-chunk document changed the document
+	// hash and re-embedded all fifty — at full provider cost — even though
+	// forty-nine were identical. Keyed by chunk hash, so a chunk that merely
+	// shifted position is still recognised.
+	reusable := w.vectorStore.ChunkVectorsByHash(job.Collection, job.DocID)
+
 	// Generate embedding for each chunk
 	var chunkEmbeddings []vec.ChunkEmbedding
+	var reusedCount int
 	for i, chunk := range chunks {
+		chunkHash := vec.ContentHash(chunk)
+		if cached, ok := reusable[chunkHash]; ok {
+			chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{
+				ChunkIndex: i,
+				Vector:     cached,
+				ChunkHash:  chunkHash,
+			})
+			reusedCount++
+			continue
+		}
+
 		var vector []float32
 		var embedErr error
 		for attempt := 0; attempt < 3; attempt++ {
@@ -140,12 +166,12 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 			if embedErr == nil {
 				break
 			}
-			log.Printf("Embedding attempt %d failed for %s/%s chunk %d: %v", attempt+1, job.Collection, job.DocID, i, embedErr)
+			slog.Warn("embedding attempt failed", "attempt", attempt+1, "collection", job.Collection, "docID", job.DocID, "i", i, "err", embedErr)
 			time.Sleep(time.Duration(attempt+1) * time.Second)
 		}
 
 		if embedErr != nil {
-			log.Printf("ERROR: failed to embed %s/%s chunk %d after 3 attempts: %v", job.Collection, job.DocID, i, embedErr)
+			slog.Error("embedding failed after all attempts", "collection", job.Collection, "docID", job.DocID, "i", i, "err", embedErr)
 			if w.metrics != nil {
 				w.metrics.IncOp("embedding", "error")
 			}
@@ -155,12 +181,19 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{
 			ChunkIndex: i,
 			Vector:     vector,
+			ChunkHash:  chunkHash,
 		})
+	}
+
+	if reusedCount > 0 {
+		slog.Debug("reused unchanged chunk embeddings",
+			"collection", job.Collection, "docID", job.DocID,
+			"reused", reusedCount, "embedded", len(chunks)-reusedCount)
 	}
 
 	// Store all chunks in BoltDB
 	if err := w.vectorStore.PutChunks(job.Collection, job.DocID, chunkEmbeddings, w.provider.Model(), contentHash); err != nil {
-		log.Printf("ERROR: failed to store embedding for %s/%s: %v", job.Collection, job.DocID, err)
+		slog.Error("failed to store embedding", "collection", job.Collection, "docID", job.DocID, "err", err)
 		return
 	}
 

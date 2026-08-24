@@ -68,13 +68,17 @@ mod tests {
             rate_limit_per_minute: 30,
             max_message_length: 2000,
             webhook_secret: String::new(),
+            trusted_proxies: Vec::new(),
+            max_tokens_per_session: 0,
         }
     }
 
     #[test]
     fn test_sanitize_message_strips_html() {
         let s = Sanitizer::new(test_config());
-        let result = s.sanitize_message("hello <script>alert('xss')</script> world").unwrap();
+        let result = s
+            .sanitize_message("hello <script>alert('xss')</script> world")
+            .unwrap();
         assert_eq!(result, "hello alert('xss') world");
     }
 

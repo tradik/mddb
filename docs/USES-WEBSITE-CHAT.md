@@ -106,7 +106,6 @@ api_key = "not-needed"
 model = "qwen3:8b"
 max_tokens = 1024
 temperature = 0.7
-stream = true
 
 [session]
 max_concurrent = 2
@@ -118,6 +117,8 @@ max_response_length = 4096
 [security]
 rate_limit_per_minute = 30
 max_message_length = 2000
+trusted_proxies = []   # see "Rate limiting behind a proxy" below
+max_tokens_per_session = 0   # 0 = unlimited; see "Capping what a session costs"
 
 [scenarios.assistant]
 name = "Website Assistant"
@@ -127,6 +128,72 @@ Be concise, accurate, and friendly. If you don't know the answer,
 say so honestly rather than making something up."""
 allowed_collections = ["docs"]
 ```
+
+### Capping what a session costs
+
+A scenario's `max_turns` caps how many turns a conversation takes. It says
+nothing about what they cost, and that is the dimension a budget runs out in:
+one turn carrying a large retrieval context through several tool-calling rounds
+can be worth ten short ones.
+
+```toml
+[security]
+max_tokens_per_session = 120000   # 0 = unlimited
+```
+
+Once a session has spent its budget, its next message is refused with a message
+rather than silence:
+
+> this conversation has used its token budget (121450 tokens)
+
+The count comes from the `usage` block every provider response carries —
+`input_tokens`/`output_tokens` from Anthropic, `prompt_tokens`/`completion_tokens`
+from OpenAI — and is summed across **every round of a turn**, not only the round
+that produced the answer. The agentic loop calls the model once per tool-calling
+round, so counting the last call alone would miss most of what was spent.
+
+Two limits worth knowing:
+
+- A provider that omits its usage block contributes **zero** for that call. A
+  budget must not depend on a field the provider is free to leave out, so a
+  missing block is logged rather than treated as an error.
+- A turn that exhausts the tool-calling rounds and falls through to the
+  streaming path **undercounts by its final response**: that call's usage
+  arrives in an SSE frame this server does not read.
+
+### Scenario names
+
+A scenario has two names. The TOML table key (`[scenarios.assistant]`) is the
+identifier a client sends when opening a session; `name` is the label people
+read. `GET /config` returns both — `scenarios` lists the identifiers,
+`scenario_labels` maps each to its label — so a picker can show
+"Documentation Assistant" and send `assistant`.
+
+Before v2.12.0 nothing read `name`, so an operator who set it saw no effect
+anywhere.
+
+### Rate limiting behind a proxy
+
+The rate limit is charged per client address, and that address is the TCP peer
+— it cannot be forged by sending a header.
+
+Behind a reverse proxy or cloudflared, the TCP peer is the *proxy*. Every
+visitor then shares one bucket, so the first noisy one locks out the rest, and
+`rate_limit_per_minute` stops meaning what it says.
+
+Set `trusted_proxies` to the proxy's address or network and `X-Forwarded-For`
+is honoured from it:
+
+```toml
+[security]
+trusted_proxies = ["172.16.0.0/12"]   # the Docker bridge network
+```
+
+Only list addresses you control. Anything listed here can name whatever client
+address it likes, which is the whole reason the list exists rather than the
+header being trusted outright. Addresses to the left of the last trusted hop
+are ignored, so a client prepending its own `X-Forwarded-For` cannot pick which
+bucket it lands in.
 
 Key settings:
 - `api_url` points to Ollama's OpenAI-compatible endpoint

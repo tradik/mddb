@@ -3,15 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"net/http"
-
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
-
+	"log/slog"
 	gql "mddb/graphql"
+	"net/http"
 )
 
 // newGraphQLHandler creates the GraphQL HTTP handler
@@ -43,7 +41,7 @@ func (s *Server) newGraphQLHandler() http.Handler {
 
 	// Recovery handler for panics
 	srv.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
-		log.Printf("GraphQL panic recovered: %v", err)
+		slog.Warn("GraphQL panic recovered", "err", err)
 		return fmt.Errorf("internal server error")
 	})
 

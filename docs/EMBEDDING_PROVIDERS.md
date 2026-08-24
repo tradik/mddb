@@ -9,6 +9,52 @@ status: publish
 
 MDDB supports multiple embedding providers for vector search functionality. You can configure embeddings either through environment variables or via the Admin Panel UI.
 
+## Zero configuration: a local model is found automatically (v2.12.0+)
+
+If no embedding provider is configured, MDDB asks `localhost:11434` once at
+startup whether Ollama is running with an embedding model pulled. If one is,
+it is used:
+
+```
+vector search enabled  source=autodetected provider=ollama
+                       model=nomic-embed-text:latest dimensions=768
+```
+
+This is discovery, not a model in the binary. It exists because the common
+shape of "this install has no semantic search" turned out not to be "there is
+no model on this machine" — it was that MDDB never looked.
+
+**What it will and will not pick.** Ollama's `/api/tags` reports model names
+but not embedding dimensions, and a wrong dimension writes vectors that no
+later query can match. So only models whose dimensionality is known are
+selected, in this order:
+
+| Model | Dimensions |
+|---|---|
+| `nomic-embed-text` | 768 |
+| `mxbai-embed-large` | 1024 |
+| `snowflake-arctic-embed` | 1024 |
+| `bge-m3` | 1024 |
+| `all-minilm` | 384 |
+
+Preference order beats installation order — a machine with both `all-minilm`
+and `nomic-embed-text` gets the better one. An Ollama holding only chat models
+is left alone: a chat model would produce vectors that are not embeddings.
+Anything not on this list is left for you to configure explicitly, because
+guessing its size is worse than not configuring it.
+
+**Precedence.** Stored configuration wins, then `MDDB_EMBEDDING_PROVIDER`, then
+autodetection. It never overrides a choice you made.
+
+**Turning it off.** `MDDB_EMBEDDING_AUTODETECT=0` skips the probe entirely.
+`OLLAMA_HOST` points it elsewhere (with or without a scheme). The probe has a
+two-second budget and a refused connection answers in microseconds, so a
+machine with nothing on the port pays nothing for being asked.
+
+`GET /config` reports `vectorConfig.source` as `autodetected`, so the panel
+shows a configuration nobody remembers writing for what it is.
+
+
 ## Supported Providers
 
 ### 1. OpenAI
@@ -340,6 +386,28 @@ If you're using environment variables and want to migrate to database config:
   "isDefault": true
 }
 ```
+
+### Where `apiUrl` may point (v2.12.0+)
+
+`apiUrl` is the one field that reaches the network without going through the
+server's SSRF guard — because `localhost` is precisely what that guard refuses,
+and a local Ollama is the reason the field exists.
+
+Loopback (`localhost`, `127.0.0.1`, `[::1]`) is accepted with no configuration.
+Any other private or reserved address is refused when the config is saved:
+
+```
+apiUrl "http://10.0.0.5:11434" resolves to a private or reserved address.
+Loopback needs no opt-in; for a service elsewhere on a trusted network set
+MDDB_OUTBOUND_ALLOW_PRIVATE=true or add the host to MDDB_OUTBOUND_ALLOWLIST
+```
+
+Running Ollama on another machine on your network is a legitimate setup — set
+one of those two variables and it works. The refusal exists because the same
+field also reaches cloud metadata endpoints and internal admin panels, and
+"only an administrator can set it" limits who aims it rather than what it hits.
+
+Public endpoints (`https://api.openai.com/v1` and the rest) are unaffected.
 
 ---
 

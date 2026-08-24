@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 func TestCohereEmbeddingProvider_New(t *testing.T) {

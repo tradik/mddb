@@ -3,12 +3,11 @@ package main
 import (
 	"io"
 	"mddb/internal/storage"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	json "github.com/goccy/go-json"
 )
 
 func env(k, def string) string {
@@ -75,6 +74,13 @@ func intersect(sets ...[]string) []string {
 	}
 	return out
 }
+
+// copyBufferSize is how much of a file is read at a time when copying it.
+// 256 KiB keeps the syscall count low on database-sized files without pinning
+// meaningful memory: one buffer per concurrent copy, and backups do not run
+// concurrently.
+const copyBufferSize = 256 << 10
+
 func copyFile(src, dst string) error {
 	// #nosec G304 -- Function intentionally copies provided path
 	in, err := os.Open(filepath.Clean(src))
@@ -88,7 +94,16 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	if _, err = io.Copy(out, in); err != nil {
+
+	// GO-020: this copies whole database files during backup and restore.
+	// io.Copy alone reads in 32 KiB steps with a buffer it allocates per call;
+	// the pooled reader raises that to copyBufferSize and reuses the buffer
+	// across every copy, so a multi-gigabyte database costs a fraction of the
+	// read syscalls and no repeated allocation.
+	buffered := NewZeroCopyReader(in, copyBufferSize)
+	defer func() { _ = buffered.Close() }()
+
+	if _, err = io.Copy(out, buffered); err != nil {
 		_ = out.Close()
 		return err
 	}
@@ -97,13 +112,24 @@ func copyFile(src, dst string) error {
 	}
 	return os.Rename(tmp, dst) // #nosec G703 -- paths are internally constructed
 }
-func mustJSON(v any) []byte {
-	b, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
+
+// httpFlusher resolves the http.Flusher behind w, walking Unwrap()-style
+// middleware wrappers the way http.ResponseController does. GO-040: a bare
+// `w.(http.Flusher)` assertion fails on any wrapper that hides Flush, which
+// turned every SSE endpoint into a 500 whenever the metrics middleware was on.
+func httpFlusher(w http.ResponseWriter) (http.Flusher, bool) {
+	for {
+		if f, ok := w.(http.Flusher); ok {
+			return f, true
+		}
+		u, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return nil, false
+		}
+		w = u.Unwrap()
 	}
-	return b
 }
+
 func sortDocs(docs []storage.Doc, field string, asc bool) {
 	sort.Slice(docs, func(i, j int) bool {
 		var less bool

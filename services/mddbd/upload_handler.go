@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 const (
@@ -111,6 +111,23 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// RAG-004: the ingest profile, as a multipart field. A typo must not fall
+	// back silently — a caller who asked for "fast" and got the default would
+	// see a slow upload and no reason why.
+	profile := r.FormValue("profile")
+	if err := ValidateIngestProfile(profile); err != nil {
+		bad(w, err)
+		return
+	}
+	resolved, err := ResolveIngestProfile(&IngestOptionsHTTP{
+		Profile:  profile,
+		TextOnly: r.FormValue("textOnly") == "true",
+	})
+	if err != nil {
+		bad(w, err)
+		return
+	}
+
 	// Collect files from both "file" and "files[]" field names
 	var files []*multipart.FileHeader
 	for _, name := range []string{"file", "files[]", "files"} {
@@ -126,7 +143,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// Single file → simple response; multiple → batch response
 	if len(files) == 1 {
-		res, err := s.processUploadedFile(files[0], collection, lang, keyOverride, meta, ttl, maxSize)
+		res, err := s.processUploadedFile(files[0], collection, lang, keyOverride, meta, ttl, maxSize, resolved.TextOnly)
 		if err != nil {
 			bad(w, err)
 			return
@@ -139,7 +156,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	// Multi-file upload
 	resp := UploadBatchResponse{}
 	for _, fh := range files {
-		res, err := s.processUploadedFile(fh, collection, lang, "", meta, ttl, maxSize)
+		res, err := s.processUploadedFile(fh, collection, lang, "", meta, ttl, maxSize, resolved.TextOnly)
 		if err != nil {
 			resp.Failed++
 			resp.Errors = append(resp.Errors, fmt.Sprintf("%s: %s", fh.Filename, err.Error()))
@@ -158,7 +175,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 // processUploadedFile reads a single multipart file, converts to markdown if needed,
 // and stores via addDocument.
-func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang, keyOverride string, baseMeta map[string][]string, ttl, maxSize int64) (*UploadResponse, error) {
+func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang, keyOverride string, baseMeta map[string][]string, ttl, maxSize int64, textOnly bool) (*UploadResponse, error) {
 	if fh.Size > maxSize {
 		return nil, fmt.Errorf("file %q exceeds max size (%d bytes)", fh.Filename, maxSize)
 	}
@@ -199,27 +216,48 @@ func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang,
 		contentMD = texToMarkdown(data)
 		converted = true
 	case "html":
-		contentMD = htmlToMarkdown(data)
+		// RAG-004: text-only keeps the words and drops the shape, which is
+		// both faster and far more tolerant of malformed markup.
+		if textOnly {
+			contentMD = htmlToText(data)
+		} else {
+			contentMD = htmlToMarkdown(data)
+		}
 		converted = true
 	case "pdf":
+		// No text-only variant: pdfToMarkdown already extracts raw text from
+		// content streams and builds no structure, so a second name for it
+		// would promise a speedup that does not exist.
 		contentMD, err = pdfToMarkdown(data)
 		if err != nil {
 			return nil, fmt.Errorf("pdf conversion: %w", err)
 		}
 		converted = true
 	case "docx":
-		contentMD, err = docxToMarkdown(data)
+		if textOnly {
+			contentMD, err = docxToText(data)
+		} else {
+			contentMD, err = docxToMarkdown(data)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("docx conversion: %w", err)
 		}
 		converted = true
 	case "odt":
-		contentMD, err = odtToMarkdown(data)
+		if textOnly {
+			contentMD, err = odtToText(data)
+		} else {
+			contentMD, err = odtToMarkdown(data)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("odt conversion: %w", err)
 		}
 		converted = true
 	case "rtf":
+		// No text-only variant, for the same reason as pdf: RTF control words
+		// carry no structure worth rebuilding, so rtfToMarkdown already
+		// returns plain text and a second name would promise a speedup that
+		// does not exist.
 		contentMD = rtfToMarkdown(data)
 		converted = true
 	default:
@@ -291,7 +329,12 @@ func deriveKeyFromFilename(filename string) string {
 		base = base[:len(base)-len(ext)]
 	}
 	base = strings.TrimSpace(base)
-	if base == "" || base == "." {
+	// "." and ".." are not names — they are path operators, and consumers
+	// that write a file per document key (ssg, wpexporter) would resolve them
+	// against their output directory. A filename that yields one of these has
+	// no usable key, and inventing one puts the document somewhere the caller
+	// cannot find it (TEST-002).
+	if base == "" || base == "." || base == ".." {
 		return ""
 	}
 	// Replace spaces with hyphens, lowercase

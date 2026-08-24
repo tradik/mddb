@@ -6,9 +6,26 @@ linters:
     - gosec
     - govet
     - staticcheck
+    # GO-034: resource-lifecycle linters. The leaks this repo has actually had
+    # — GO-006 (cache goroutine), GO-007 (worker with no Stop), GO-017
+    # (double close) and the seven subsystems whose Stop was never called —
+    # were all found by hand. These catch the same shapes at review time.
+    - bodyclose      # an HTTP response body that is never closed leaks a connection
+    - sqlclosecheck  # rows/statements left open leak a connection from the pool
   exclusions:
     rules:
       - path: graphql/generated.go
         linters:
           - gosec
           - errcheck
+      # bodyclose cannot see through httpclient.DrainAndClose, the helper these
+      # callers use: it drains the body before closing, so the connection goes
+      # back to the pool instead of being torn down (GO-014). The bodies are
+      # closed — the linter just cannot follow the indirection.
+      - path: (automation_trigger|bulk_ingest_job|exporter_webhook|webhooks)\.go
+        linters:
+          - bodyclose
+      # Tests own their servers and their lifetimes.
+      - path: _test\.go
+        linters:
+          - bodyclose

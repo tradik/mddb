@@ -50,13 +50,22 @@ if ! command -v protoc-gen-go-grpc &> /dev/null; then
     go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 fi
 
-# Generate Go code
+# Generate Go code.
+#
+# The output directory is services/mddbd/proto, matching buf.gen.yaml and
+# `option go_package = "mddb/proto"`. It said services/mddbd before — the
+# pre-buf-migration layout — which silently wrote mddb.pb.go one level too high,
+# next to the server sources, where it neither compiles as `package proto` nor
+# shows up in the CI drift check against services/mddbd/proto/.
 mkdir -p services/mddbd/proto
-protoc --go_out=services/mddbd --go_opt=paths=source_relative \
-    --go-grpc_out=services/mddbd --go-grpc_opt=paths=source_relative \
+protoc --go_out=services/mddbd/proto --go_opt=paths=source_relative \
+    --go-grpc_out=services/mddbd/proto --go-grpc_opt=paths=source_relative \
     -I ${PROTO_DIR} ${PROTO_DIR}/${PROTO_FILE}
 
 echo "  ✅ Go code generated in services/mddbd/proto/"
+echo "  ⚠️  Plugin versions here are whatever is installed locally, NOT the"
+echo "     versions pinned in buf.gen.yaml. CI regenerates with buf and fails"
+echo "     on any difference — install buf before committing generated code."
 
 # ============================================================================
 # Python (Client Library)
@@ -78,8 +87,15 @@ if command -v python3 &> /dev/null; then
         --grpc_python_out=clients/python/mddb_client \
         ${PROTO_DIR}/${PROTO_FILE} 2>/dev/null || echo "  ⚠️  Python generation skipped (install grpcio-tools)"
     
-    # Create __init__.py
-    touch clients/python/mddb_client/__init__.py
+    # TEST-001: the gRPC plugin emits `import mddb_pb2`, which only resolves
+    # when the generated files are on sys.path directly. Inside a package it
+    # raises ModuleNotFoundError, so `import mddb_client` had never worked.
+    sed -i 's/^import mddb_pb2 as mddb__pb2$/from . import mddb_pb2 as mddb__pb2/' \
+        clients/python/mddb_client/mddb_pb2_grpc.py 2>/dev/null || true
+
+    # __init__.py is hand-written (it exports MddbClient); only create it if
+    # the package is being generated from scratch.
+    [ -f clients/python/mddb_client/__init__.py ] || touch clients/python/mddb_client/__init__.py
     
     echo "  ✅ Python code generated in clients/python/mddb_client/"
 else

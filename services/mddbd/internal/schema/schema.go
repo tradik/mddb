@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 var bucketSchemas = []byte("schemas")
@@ -169,7 +169,16 @@ func (sm *SchemaManager) List() map[string]string {
 
 // Validate checks metadata against the collection's schema.
 // Returns nil if no schema is set (opt-in behavior).
+//
+// A nil receiver validates nothing rather than panicking. "No schema manager"
+// and "no schema for this collection" mean the same thing to a caller — neither
+// should reject the document — and half the call sites guarded the nil while
+// half did not (TEST-002). Handling it here makes the whole class impossible
+// instead of relying on every future caller remembering.
 func (sm *SchemaManager) Validate(collection string, meta map[string][]string) error {
+	if sm == nil {
+		return nil
+	}
 	sm.mu.RLock()
 	schema, ok := sm.schemas[collection]
 	sm.mu.RUnlock()

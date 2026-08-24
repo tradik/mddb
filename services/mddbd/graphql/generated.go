@@ -57,6 +57,34 @@ type ComplexityRoot struct {
 		Updated func(childComplexity int) int
 	}
 
+	CodeGraph struct {
+		Collection func(childComplexity int) int
+		Depth      func(childComplexity int) int
+		Direction  func(childComplexity int) int
+		Edges      func(childComplexity int) int
+		Nodes      func(childComplexity int) int
+		Root       func(childComplexity int) int
+		Truncated  func(childComplexity int) int
+	}
+
+	CodeGraphEdge struct {
+		Direction func(childComplexity int) int
+		From      func(childComplexity int) int
+		FromLine  func(childComplexity int) int
+		Kind      func(childComplexity int) int
+		Symbol    func(childComplexity int) int
+		To        func(childComplexity int) int
+		ToLine    func(childComplexity int) int
+	}
+
+	CodeGraphNode struct {
+		Depth    func(childComplexity int) int
+		DocID    func(childComplexity int) int
+		Key      func(childComplexity int) int
+		Lang     func(childComplexity int) int
+		Language func(childComplexity int) int
+	}
+
 	CollectionStats struct {
 		DocumentCount  func(childComplexity int) int
 		MetaIndexCount func(childComplexity int) int
@@ -155,6 +183,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
+		CodeGraph        func(childComplexity int, input CodeGraphInput) int
 		Document         func(childComplexity int, collection string, key string, lang string, env map[string]any) int
 		Fts              func(childComplexity int, input FTSInput) int
 		GroupPermissions func(childComplexity int, groupName string) int
@@ -202,8 +231,9 @@ type ComplexityRoot struct {
 	}
 
 	ValidationResult struct {
-		Errors func(childComplexity int) int
-		Valid  func(childComplexity int) int
+		Errors   func(childComplexity int) int
+		Valid    func(childComplexity int) int
+		Warnings func(childComplexity int) int
 	}
 
 	VectorCollectionStats struct {
@@ -277,6 +307,7 @@ type QueryResolver interface {
 	VectorSearch(ctx context.Context, input VectorSearchInput) (*VectorSearchResponse, error)
 	VectorStats(ctx context.Context) (*VectorStats, error)
 	Fts(ctx context.Context, input FTSInput) (*FTSResponse, error)
+	CodeGraph(ctx context.Context, input CodeGraphInput) (*CodeGraph, error)
 	Stats(ctx context.Context) (*Stats, error)
 	Webhooks(ctx context.Context, collection *string) ([]*Webhook, error)
 	Schema(ctx context.Context, collection string) (*Schema, error)
@@ -368,6 +399,123 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.BatchAddResult.Updated(childComplexity), true
+
+	case "CodeGraph.collection":
+		if e.ComplexityRoot.CodeGraph.Collection == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraph.Collection(childComplexity), true
+	case "CodeGraph.depth":
+		if e.ComplexityRoot.CodeGraph.Depth == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraph.Depth(childComplexity), true
+	case "CodeGraph.direction":
+		if e.ComplexityRoot.CodeGraph.Direction == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraph.Direction(childComplexity), true
+	case "CodeGraph.edges":
+		if e.ComplexityRoot.CodeGraph.Edges == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraph.Edges(childComplexity), true
+	case "CodeGraph.nodes":
+		if e.ComplexityRoot.CodeGraph.Nodes == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraph.Nodes(childComplexity), true
+	case "CodeGraph.root":
+		if e.ComplexityRoot.CodeGraph.Root == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraph.Root(childComplexity), true
+	case "CodeGraph.truncated":
+		if e.ComplexityRoot.CodeGraph.Truncated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraph.Truncated(childComplexity), true
+
+	case "CodeGraphEdge.direction":
+		if e.ComplexityRoot.CodeGraphEdge.Direction == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphEdge.Direction(childComplexity), true
+	case "CodeGraphEdge.from":
+		if e.ComplexityRoot.CodeGraphEdge.From == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphEdge.From(childComplexity), true
+	case "CodeGraphEdge.fromLine":
+		if e.ComplexityRoot.CodeGraphEdge.FromLine == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphEdge.FromLine(childComplexity), true
+	case "CodeGraphEdge.kind":
+		if e.ComplexityRoot.CodeGraphEdge.Kind == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphEdge.Kind(childComplexity), true
+	case "CodeGraphEdge.symbol":
+		if e.ComplexityRoot.CodeGraphEdge.Symbol == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphEdge.Symbol(childComplexity), true
+	case "CodeGraphEdge.to":
+		if e.ComplexityRoot.CodeGraphEdge.To == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphEdge.To(childComplexity), true
+	case "CodeGraphEdge.toLine":
+		if e.ComplexityRoot.CodeGraphEdge.ToLine == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphEdge.ToLine(childComplexity), true
+
+	case "CodeGraphNode.depth":
+		if e.ComplexityRoot.CodeGraphNode.Depth == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphNode.Depth(childComplexity), true
+	case "CodeGraphNode.docId":
+		if e.ComplexityRoot.CodeGraphNode.DocID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphNode.DocID(childComplexity), true
+	case "CodeGraphNode.key":
+		if e.ComplexityRoot.CodeGraphNode.Key == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphNode.Key(childComplexity), true
+	case "CodeGraphNode.lang":
+		if e.ComplexityRoot.CodeGraphNode.Lang == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphNode.Lang(childComplexity), true
+	case "CodeGraphNode.language":
+		if e.ComplexityRoot.CodeGraphNode.Language == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeGraphNode.Language(childComplexity), true
 
 	case "CollectionStats.documentCount":
 		if e.ComplexityRoot.CollectionStats.DocumentCount == nil {
@@ -874,6 +1022,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PageInfo.StartCursor(childComplexity), true
 
+	case "Query.codeGraph":
+		if e.ComplexityRoot.Query.CodeGraph == nil {
+			break
+		}
+
+		args, err := ec.field_Query_codeGraph_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.CodeGraph(childComplexity, args["input"].(CodeGraphInput)), true
 	case "Query.document":
 		if e.ComplexityRoot.Query.Document == nil {
 			break
@@ -1124,6 +1283,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.ValidationResult.Valid(childComplexity), true
+	case "ValidationResult.warnings":
+		if e.ComplexityRoot.ValidationResult.Warnings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ValidationResult.Warnings(childComplexity), true
 
 	case "VectorCollectionStats.collection":
 		if e.ComplexityRoot.VectorCollectionStats.Collection == nil {
@@ -1266,6 +1431,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
 		ec.unmarshalInputAddBatchDocumentInput,
 		ec.unmarshalInputAddDocumentInput,
+		ec.unmarshalInputCodeGraphInput,
 		ec.unmarshalInputCreateAPIKeyInput,
 		ec.unmarshalInputCreateGroupInput,
 		ec.unmarshalInputFTSInput,
@@ -1409,6 +1575,62 @@ func (ec *executionContext) childFields_BatchAddResult(ctx context.Context, fiel
 		return ec.fieldContext_BatchAddResult_errors(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type BatchAddResult", field.Name)
+}
+
+func (ec *executionContext) childFields_CodeGraph(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "collection":
+		return ec.fieldContext_CodeGraph_collection(ctx, field)
+	case "root":
+		return ec.fieldContext_CodeGraph_root(ctx, field)
+	case "direction":
+		return ec.fieldContext_CodeGraph_direction(ctx, field)
+	case "depth":
+		return ec.fieldContext_CodeGraph_depth(ctx, field)
+	case "nodes":
+		return ec.fieldContext_CodeGraph_nodes(ctx, field)
+	case "edges":
+		return ec.fieldContext_CodeGraph_edges(ctx, field)
+	case "truncated":
+		return ec.fieldContext_CodeGraph_truncated(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CodeGraph", field.Name)
+}
+
+func (ec *executionContext) childFields_CodeGraphEdge(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "from":
+		return ec.fieldContext_CodeGraphEdge_from(ctx, field)
+	case "to":
+		return ec.fieldContext_CodeGraphEdge_to(ctx, field)
+	case "kind":
+		return ec.fieldContext_CodeGraphEdge_kind(ctx, field)
+	case "symbol":
+		return ec.fieldContext_CodeGraphEdge_symbol(ctx, field)
+	case "direction":
+		return ec.fieldContext_CodeGraphEdge_direction(ctx, field)
+	case "fromLine":
+		return ec.fieldContext_CodeGraphEdge_fromLine(ctx, field)
+	case "toLine":
+		return ec.fieldContext_CodeGraphEdge_toLine(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CodeGraphEdge", field.Name)
+}
+
+func (ec *executionContext) childFields_CodeGraphNode(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "key":
+		return ec.fieldContext_CodeGraphNode_key(ctx, field)
+	case "docId":
+		return ec.fieldContext_CodeGraphNode_docId(ctx, field)
+	case "lang":
+		return ec.fieldContext_CodeGraphNode_lang(ctx, field)
+	case "language":
+		return ec.fieldContext_CodeGraphNode_language(ctx, field)
+	case "depth":
+		return ec.fieldContext_CodeGraphNode_depth(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CodeGraphNode", field.Name)
 }
 
 func (ec *executionContext) childFields_CollectionStats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -1621,6 +1843,8 @@ func (ec *executionContext) childFields_ValidationResult(ctx context.Context, fi
 		return ec.fieldContext_ValidationResult_valid(ctx, field)
 	case "errors":
 		return ec.fieldContext_ValidationResult_errors(ctx, field)
+	case "warnings":
+		return ec.fieldContext_ValidationResult_warnings(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type ValidationResult", field.Name)
 }
@@ -2301,6 +2525,20 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
+func (ec *executionContext) field_Query_codeGraph_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (CodeGraphInput, error) {
+			return ec.unmarshalNCodeGraphInput2mddbᚋgraphqlᚐCodeGraphInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Query_document_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -2725,6 +2963,461 @@ func (ec *executionContext) _BatchAddResult_errors(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_BatchAddResult_errors(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("BatchAddResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraph_collection(ctx context.Context, field graphql.CollectedField, obj *CodeGraph) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraph_collection(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Collection, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraph_collection(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraph", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraph_root(ctx context.Context, field graphql.CollectedField, obj *CodeGraph) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraph_root(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Root, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraph_root(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraph", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraph_direction(ctx context.Context, field graphql.CollectedField, obj *CodeGraph) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraph_direction(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Direction, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraph_direction(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraph", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraph_depth(ctx context.Context, field graphql.CollectedField, obj *CodeGraph) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraph_depth(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Depth, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraph_depth(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraph", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraph_nodes(ctx context.Context, field graphql.CollectedField, obj *CodeGraph) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraph_nodes(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Nodes, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*CodeGraphNode) graphql.Marshaler {
+			return ec.marshalNCodeGraphNode2ᚕᚖmddbᚋgraphqlᚐCodeGraphNodeᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraph_nodes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeGraph",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CodeGraphNode(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeGraph_edges(ctx context.Context, field graphql.CollectedField, obj *CodeGraph) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraph_edges(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Edges, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*CodeGraphEdge) graphql.Marshaler {
+			return ec.marshalNCodeGraphEdge2ᚕᚖmddbᚋgraphqlᚐCodeGraphEdgeᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraph_edges(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeGraph",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CodeGraphEdge(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeGraph_truncated(ctx context.Context, field graphql.CollectedField, obj *CodeGraph) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraph_truncated(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Truncated, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraph_truncated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraph", field, false, false, errors.New("field of type Boolean does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphEdge_from(ctx context.Context, field graphql.CollectedField, obj *CodeGraphEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphEdge_from(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.From, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphEdge_from(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphEdge_to(ctx context.Context, field graphql.CollectedField, obj *CodeGraphEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphEdge_to(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.To, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphEdge_to(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphEdge_kind(ctx context.Context, field graphql.CollectedField, obj *CodeGraphEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphEdge_kind(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Kind, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphEdge_kind(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphEdge_symbol(ctx context.Context, field graphql.CollectedField, obj *CodeGraphEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphEdge_symbol(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Symbol, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphEdge_symbol(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphEdge_direction(ctx context.Context, field graphql.CollectedField, obj *CodeGraphEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphEdge_direction(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Direction, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphEdge_direction(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphEdge", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphEdge_fromLine(ctx context.Context, field graphql.CollectedField, obj *CodeGraphEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphEdge_fromLine(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FromLine, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphEdge_fromLine(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphEdge", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphEdge_toLine(ctx context.Context, field graphql.CollectedField, obj *CodeGraphEdge) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphEdge_toLine(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ToLine, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphEdge_toLine(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphEdge", field, false, false, errors.New("field of type Int does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphNode_key(ctx context.Context, field graphql.CollectedField, obj *CodeGraphNode) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphNode_key(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphNode_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphNode", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphNode_docId(ctx context.Context, field graphql.CollectedField, obj *CodeGraphNode) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphNode_docId(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.DocID, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphNode_docId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphNode", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphNode_lang(ctx context.Context, field graphql.CollectedField, obj *CodeGraphNode) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphNode_lang(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Lang, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphNode_lang(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphNode", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphNode_language(ctx context.Context, field graphql.CollectedField, obj *CodeGraphNode) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphNode_language(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Language, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphNode_language(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphNode", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _CodeGraphNode_depth(ctx context.Context, field graphql.CollectedField, obj *CodeGraphNode) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeGraphNode_depth(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Depth, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeGraphNode_depth(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeGraphNode", field, false, false, errors.New("field of type Int does not have child fields"))
 }
 
 func (ec *executionContext) _CollectionStats_name(ctx context.Context, field graphql.CollectedField, obj *CollectionStats) (ret graphql.Marshaler) {
@@ -5372,6 +6065,63 @@ func (ec *executionContext) fieldContext_Query_fts(ctx context.Context, field gr
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_codeGraph(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_codeGraph(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().CodeGraph(ctx, fc.Args["input"].(CodeGraphInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *CodeGraph
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *CodeGraph) graphql.Marshaler {
+			return ec.marshalOCodeGraph2ᚖmddbᚋgraphqlᚐCodeGraph(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_codeGraph(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CodeGraph(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_codeGraph_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_stats(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6427,6 +7177,29 @@ func (ec *executionContext) _ValidationResult_errors(ctx context.Context, field 
 	)
 }
 func (ec *executionContext) fieldContext_ValidationResult_errors(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ValidationResult", field, false, false, errors.New("field of type String does not have child fields"))
+}
+
+func (ec *executionContext) _ValidationResult_warnings(ctx context.Context, field graphql.CollectedField, obj *ValidationResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ValidationResult_warnings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Warnings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalOString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ValidationResult_warnings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("ValidationResult", field, false, false, errors.New("field of type String does not have child fields"))
 }
 
@@ -8122,6 +8895,71 @@ func (ec *executionContext) unmarshalInputAddDocumentInput(ctx context.Context, 
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputCodeGraphInput(ctx context.Context, obj any) (CodeGraphInput, error) {
+	var it CodeGraphInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"collection", "key", "direction", "depth", "maxDegree", "lines"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "collection":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collection"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Collection = data
+		case "key":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("key"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Key = data
+		case "direction":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("direction"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Direction = data
+		case "depth":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("depth"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Depth = data
+		case "maxDegree":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("maxDegree"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.MaxDegree = data
+		case "lines":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("lines"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Lines = data
+		}
+	}
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputCreateAPIKeyInput(ctx context.Context, obj any) (CreateAPIKeyInput, error) {
 	var it CreateAPIKeyInput
 	if obj == nil {
@@ -8766,7 +9604,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "includeContent"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "includeContent", "oversample"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -8822,6 +9660,13 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.IncludeContent = data
+		case "oversample":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("oversample"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Oversample = data
 		}
 	}
 	return it, nil
@@ -8961,6 +9806,200 @@ func (ec *executionContext) _BatchAddResult(ctx context.Context, sel ast.Selecti
 		case "errors":
 			out.Values[i] = ec._BatchAddResult_errors(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var codeGraphImplementors = []string{"CodeGraph"}
+
+func (ec *executionContext) _CodeGraph(ctx context.Context, sel ast.SelectionSet, obj *CodeGraph) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, codeGraphImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CodeGraph")
+		case "collection":
+			out.Values[i] = ec._CodeGraph_collection(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "root":
+			out.Values[i] = ec._CodeGraph_root(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "direction":
+			out.Values[i] = ec._CodeGraph_direction(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "depth":
+			out.Values[i] = ec._CodeGraph_depth(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "nodes":
+			out.Values[i] = ec._CodeGraph_nodes(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "edges":
+			out.Values[i] = ec._CodeGraph_edges(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "truncated":
+			out.Values[i] = ec._CodeGraph_truncated(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var codeGraphEdgeImplementors = []string{"CodeGraphEdge"}
+
+func (ec *executionContext) _CodeGraphEdge(ctx context.Context, sel ast.SelectionSet, obj *CodeGraphEdge) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, codeGraphEdgeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CodeGraphEdge")
+		case "from":
+			out.Values[i] = ec._CodeGraphEdge_from(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "to":
+			out.Values[i] = ec._CodeGraphEdge_to(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "kind":
+			out.Values[i] = ec._CodeGraphEdge_kind(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "symbol":
+			out.Values[i] = ec._CodeGraphEdge_symbol(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "direction":
+			out.Values[i] = ec._CodeGraphEdge_direction(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "fromLine":
+			out.Values[i] = ec._CodeGraphEdge_fromLine(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "toLine":
+			out.Values[i] = ec._CodeGraphEdge_toLine(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(min(len(deferLabelToView), math.MaxInt32)))
+
+	ec.ProcessDeferredGroup(graphql.DeferredGroup{
+		Defers:   deferLabelToView,
+		Path:     graphql.GetPath(ctx),
+		FieldSet: deferredFieldSet,
+		Context:  ctx,
+	})
+
+	return out
+}
+
+var codeGraphNodeImplementors = []string{"CodeGraphNode"}
+
+func (ec *executionContext) _CodeGraphNode(ctx context.Context, sel ast.SelectionSet, obj *CodeGraphNode) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, codeGraphNodeImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferredFieldSet := graphql.NewFieldSet(nil)
+	deferLabelToView := make(map[string]*graphql.FieldSetView)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CodeGraphNode")
+		case "key":
+			out.Values[i] = ec._CodeGraphNode_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "docId":
+			out.Values[i] = ec._CodeGraphNode_docId(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lang":
+			out.Values[i] = ec._CodeGraphNode_lang(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "language":
+			out.Values[i] = ec._CodeGraphNode_language(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "depth":
+			out.Values[i] = ec._CodeGraphNode_depth(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
 		default:
@@ -9849,6 +10888,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "codeGraph":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_codeGraph(ctx, field)
+				if res == graphql.RequiredNull {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
 		case "stats":
 			field := field
 
@@ -10324,6 +11385,11 @@ func (ec *executionContext) _ValidationResult(ctx context.Context, sel ast.Selec
 		case "errors":
 			out.Values[i] = ec._ValidationResult_errors(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "warnings":
+			out.Values[i] = ec._ValidationResult_warnings(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:
@@ -11024,8 +12090,7 @@ func (ec *executionContext) marshalNAPIKey2ᚖmddbᚋgraphqlᚐAPIKey(ctx contex
 }
 
 func (ec *executionContext) unmarshalNAddBatchDocumentInput2ᚕᚖmddbᚋgraphqlᚐAddBatchDocumentInputᚄ(ctx context.Context, v any) ([]*AddBatchDocumentInput, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*AddBatchDocumentInput, len(vSlice))
 	for i := range vSlice {
@@ -11090,6 +12155,63 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNCodeGraphEdge2ᚕᚖmddbᚋgraphqlᚐCodeGraphEdgeᚄ(ctx context.Context, sel ast.SelectionSet, v []*CodeGraphEdge) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNCodeGraphEdge2ᚖmddbᚋgraphqlᚐCodeGraphEdge(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCodeGraphEdge2ᚖmddbᚋgraphqlᚐCodeGraphEdge(ctx context.Context, sel ast.SelectionSet, v *CodeGraphEdge) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CodeGraphEdge(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNCodeGraphInput2mddbᚋgraphqlᚐCodeGraphInput(ctx context.Context, v any) (CodeGraphInput, error) {
+	res, err := ec.unmarshalInputCodeGraphInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNCodeGraphNode2ᚕᚖmddbᚋgraphqlᚐCodeGraphNodeᚄ(ctx context.Context, sel ast.SelectionSet, v []*CodeGraphNode) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNCodeGraphNode2ᚖmddbᚋgraphqlᚐCodeGraphNode(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCodeGraphNode2ᚖmddbᚋgraphqlᚐCodeGraphNode(ctx context.Context, sel ast.SelectionSet, v *CodeGraphNode) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CodeGraphNode(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNCollectionStats2ᚕᚖmddbᚋgraphqlᚐCollectionStatsᚄ(ctx context.Context, sel ast.SelectionSet, v []*CollectionStats) graphql.Marshaler {
@@ -11288,8 +12410,7 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 }
 
 func (ec *executionContext) unmarshalNIngestDocumentInput2ᚕᚖmddbᚋgraphqlᚐIngestDocumentInputᚄ(ctx context.Context, v any) ([]*IngestDocumentInput, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*IngestDocumentInput, len(vSlice))
 	for i := range vSlice {
@@ -11360,8 +12481,7 @@ func (ec *executionContext) marshalNJSONObject2map(ctx context.Context, sel ast.
 }
 
 func (ec *executionContext) unmarshalNMetaInput2ᚕᚖmddbᚋgraphqlᚐMetaInputᚄ(ctx context.Context, v any) ([]*MetaInput, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*MetaInput, len(vSlice))
 	for i := range vSlice {
@@ -11467,8 +12587,7 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 }
 
 func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -11725,8 +12844,7 @@ func (ec *executionContext) marshalN__DirectiveLocation2string(ctx context.Conte
 }
 
 func (ec *executionContext) unmarshalN__DirectiveLocation2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) {
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {
@@ -11859,6 +12977,13 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
+func (ec *executionContext) marshalOCodeGraph2ᚖmddbᚋgraphqlᚐCodeGraph(ctx context.Context, sel ast.SelectionSet, v *CodeGraph) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CodeGraph(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalODocument2ᚖmddbᚋgraphqlᚐDocument(ctx context.Context, sel ast.SelectionSet, v *Document) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -11884,8 +13009,7 @@ func (ec *executionContext) unmarshalOFloat2ᚕfloat64ᚄ(ctx context.Context, v
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]float64, len(vSlice))
 	for i := range vSlice {
@@ -11981,8 +13105,7 @@ func (ec *executionContext) unmarshalOMetaInput2ᚕᚖmddbᚋgraphqlᚐMetaInput
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]*MetaInput, len(vSlice))
 	for i := range vSlice {
@@ -12013,8 +13136,7 @@ func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v
 	if v == nil {
 		return nil, nil
 	}
-	var vSlice []any
-	vSlice = graphql.CoerceList(v)
+	vSlice := graphql.CoerceList(v)
 	var err error
 	res := make([]string, len(vSlice))
 	for i := range vSlice {

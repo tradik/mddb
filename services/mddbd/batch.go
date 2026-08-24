@@ -168,6 +168,9 @@ func (bp *BatchProcessor) processDocument(collection string, batchDoc *proto.Bat
 		ID: docID, Key: batchDoc.Key, Lang: batchDoc.Lang, Meta: meta,
 		ContentMD: batchDoc.ContentMd, AddedAt: added, UpdatedAt: now,
 	}
+	// CODE-004: same enrichment as the single-document path — one behaviour
+	// across every write transport (the GO-001 lesson).
+	EnrichCodeSymbols(&doc)
 
 	// Marshal (+ optional at-rest encryption based on CollectionConfig.Encrypted)
 	buf, err := marshalAndEncrypt(&doc, collection)
@@ -189,6 +192,10 @@ func (bp *BatchProcessor) processDocument(collection string, batchDoc *proto.Bat
 func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedDoc, now int64) (*proto.AddBatchResponse, []*ProcessedDoc) {
 	resp := &proto.AddBatchResponse{}
 	committed := make([]*ProcessedDoc, 0, len(processed))
+
+	// GO-021: payloads reach an external backend before the transaction that
+	// indexes them opens.
+	pushBatchPayloads(bp.server, collection, processed)
 
 	var bo binlog.BinlogOps
 	// Single transaction for all documents

@@ -1,28 +1,13 @@
 package main
 
-import (
-	"encoding/json"
-	"os"
-)
-
 // MCPProgressSender sends progress notifications.
-// For stdio transport, writes directly to stdout.
-// For HTTP transports, callers provide a callback.
+//
+// The writer comes from the transport, which is the only part that knows where
+// a notification has to go: stdout for stdio, the session's SSE stream for the
+// HTTP transports.
 type MCPProgressSender struct {
 	progressToken interface{}
 	writer        func(notification map[string]interface{})
-}
-
-// NewStdioProgressSender creates a progress sender for stdio transport.
-func NewStdioProgressSender(progressToken interface{}) *MCPProgressSender {
-	return &MCPProgressSender{
-		progressToken: progressToken,
-		writer: func(notification map[string]interface{}) {
-			data, _ := json.Marshal(notification)
-			_, _ = os.Stdout.Write(data)
-			_, _ = os.Stdout.Write([]byte("\n"))
-		},
-	}
 }
 
 // NewCallbackProgressSender creates a progress sender with a custom callback.

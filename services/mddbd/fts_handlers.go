@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"mddb/internal/fts"
 	"mddb/internal/spell"
 	"mddb/internal/storage"
@@ -10,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // FTSSearchRequest is the HTTP request for full-text search.
@@ -39,6 +40,11 @@ type FTSSearchRequest struct {
 	// aggregated over the matched documents. Cardinality per key is capped by FacetMaxValues.
 	FacetBy        []string `json:"facetBy,omitempty"`
 	FacetMaxValues int      `json:"facetMaxValues,omitempty"` // 0 = unlimited
+	// CacheTTL opts this request into the search-result cache for the given
+	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
+	// caller that says nothing keeps today's behaviour and today's freshness.
+	// Capped at searchCacheMaxTTL.
+	CacheTTL int `json:"cacheTtl,omitempty"`
 }
 
 // FTSSearchResponse is the HTTP response for full-text search.
@@ -55,6 +61,10 @@ type FTSSearchResponse struct {
 	Stats          *SearchStats               `json:"searchStats,omitempty"`
 	SpellCorrected *spell.SpellCorrectionInfo `json:"spellCorrected,omitempty"`
 	Facets         FacetResult                `json:"facets,omitempty"` // populated when request.facetBy is set (v2.9.14+)
+	// ContextTruncated reports that the collection's contextTokenBudget
+	// dropped results from the tail (RAG-001). Without it, a caller cannot
+	// tell a short result list from a capped one.
+	ContextTruncated bool `json:"contextTruncated,omitempty"`
 }
 
 // FTSResultWithDoc includes the full document in the result.
@@ -79,13 +89,31 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		bad(w, fmt.Errorf("missing required fields: collection, query"))
 		return
 	}
-	if req.Limit <= 0 {
-		req.Limit = 50
-	}
+	// RAG-001: request > collection profile > this path's historical default.
+	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
 
 	if s.FTSIndex == nil {
 		bad(w, fmt.Errorf("full-text search not initialized"))
 		return
+	}
+
+	// GO-031: opt-in result cache. The key covers the whole request, so two
+	// callers only share an entry when they asked the same question of the
+	// same collection at the same index generation.
+	cacheKey, cacheTTL := s.searchCacheLookup(&req)
+	if cacheKey != "" {
+		if cached, hit := s.SearchCache.Get(cacheKey); hit {
+			w.Header().Set("X-MDDB-Cache", "hit")
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write(cached); err != nil {
+				slog.Debug("writing a cached search response failed", "err", err)
+			}
+			if s.Metrics != nil {
+				s.Metrics.IncOp("fts_search", "cache_hit")
+			}
+			return
+		}
+		w.Header().Set("X-MDDB-Cache", "miss")
 	}
 
 	// Spell-correct the query when enabled for this collection
@@ -209,6 +237,10 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		var expr fts.QueryExpr
 		expr, err = fts.ParseQueryExpression(req.Query)
 		if err != nil {
+			// Includes ErrEmptyQueryExpression: a whitespace-only expression
+			// query passes the earlier non-empty check but means nothing, and
+			// used to return an empty result set as though it had been asked
+			// a real question (TEST-003).
 			bad(w, err)
 			return
 		}
@@ -329,6 +361,15 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	if req.Limit > 0 && len(resp.Results) > req.Limit {
 		resp.Results = resp.Results[:req.Limit]
 	}
+
+	// RAG-001: cap the total context this collection hands back. Applied
+	// before Total and facets so both describe what the caller actually
+	// receives — a count that includes dropped results is worse than no count.
+	var contextTruncated bool
+	resp.Results, contextTruncated = applyContextBudget(s, req.Collection, resp.Results,
+		func(r FTSResultWithDoc) int { return approxTokens(r.Document.ContentMD) })
+	resp.ContextTruncated = contextTruncated
+
 	resp.Total = len(resp.Results)
 
 	if len(req.FacetBy) > 0 && len(resp.Results) > 0 {
@@ -353,6 +394,17 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp.SpellCorrected = spellCorrected
+
+	if cacheKey != "" {
+		if body, err := json.Marshal(resp); err == nil {
+			s.SearchCache.Set(cacheKey, body, int64(cacheTTL))
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write(body); err != nil {
+				slog.Debug("writing a search response failed", "err", err)
+			}
+			return
+		}
+	}
 	ok(w, resp)
 }
 
@@ -368,6 +420,9 @@ func (s *Server) handleFTSReindex(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
+	// Reindexing changes scores and can change the result set, so cached
+	// responses for this collection stop being valid (GO-031).
+	defer s.invalidateSearchCache(req.Collection)
 	if req.Collection == "" {
 		bad(w, fmt.Errorf("missing required field: collection"))
 		return

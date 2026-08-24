@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 func TestValidRetrievalMode(t *testing.T) {
@@ -56,34 +56,34 @@ func TestChunkPassage(t *testing.T) {
 	}
 
 	// Single chunk
-	got := chunkPassage(content, 1, 0)
+	got := chunkPassage(content, 1, 0, ChunkModeProse)
 	if got != chunks[1] {
-		t.Errorf("chunkPassage(idx=1, window=0) != chunks[1]")
+		t.Errorf("chunkPassage(idx=1, window=0, ChunkModeProse) != chunks[1]")
 	}
 
 	// Window of 1 around the middle chunk joins its neighbors
-	got = chunkPassage(content, 1, 1)
+	got = chunkPassage(content, 1, 1, ChunkModeProse)
 	want := strings.Join(chunks[0:3], "\n\n")
 	if got != want {
-		t.Errorf("chunkPassage(idx=1, window=1) mismatch")
+		t.Errorf("chunkPassage(idx=1, window=1, ChunkModeProse) mismatch")
 	}
 
 	// Window clamped at document start
-	got = chunkPassage(content, 0, 1)
+	got = chunkPassage(content, 0, 1, ChunkModeProse)
 	want = strings.Join(chunks[0:2], "\n\n")
 	if got != want {
-		t.Errorf("chunkPassage(idx=0, window=1) mismatch")
+		t.Errorf("chunkPassage(idx=0, window=1, ChunkModeProse) mismatch")
 	}
 
 	// Out-of-range chunk index clamps to the last chunk
-	got = chunkPassage(content, 99, 0)
+	got = chunkPassage(content, 99, 0, ChunkModeProse)
 	if got != chunks[len(chunks)-1] {
-		t.Errorf("chunkPassage(out-of-range) should clamp to last chunk")
+		t.Errorf("chunkPassage(out-of-range, ChunkModeProse) should clamp to last chunk")
 	}
 
 	// Empty content
-	if got := chunkPassage("", 0, 0); got != "" {
-		t.Errorf("chunkPassage(empty) = %q, want empty", got)
+	if got := chunkPassage("", 0, 0, ChunkModeProse); got != "" {
+		t.Errorf("chunkPassage(empty, ChunkModeProse) = %q, want empty", got)
 	}
 }
 

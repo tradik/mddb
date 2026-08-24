@@ -17,7 +17,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: '1.26.5'
+  GO_VERSION: '1.27.0'
   DOCKER_HUB_USERNAME: tradik
   IMAGE_NAME: mddb
   GHCR_REGISTRY: ghcr.io
@@ -26,8 +26,36 @@ env:
   GOWORK: "off"
 
 jobs:
+  # TEST-003: nothing ships until the new build proves it can still open a
+  # database written by an older release.
+  #
+  # This runs before every build job rather than alongside them: the worst
+  # failure a database can hand a user is a file the new version refuses to
+  # open, with the old binary already replaced. Every other test writes and
+  # reads with the same code, which proves the format is self-consistent —
+  # exactly the property that stays true while compatibility breaks.
+  upgrade-compat:
+    name: Upgrade Compatibility Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/mddbd/go.sum
+
+      - name: Open databases written by older releases
+        working-directory: services/mddbd
+        env:
+          GOWORK: "off"
+        run: go test -run 'TestOpensFixturesFromOlderReleases|TestFixtureContentIsUnchanged' -v ./
+
   build-server:
     name: Build MDDB Server
+    needs: upgrade-compat
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -60,12 +88,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddbd/go.sum
@@ -176,7 +204,7 @@ jobs:
            markdown documents with rich metadata, full revision history,
            and dual protocol support (HTTP/JSON + gRPC/Protobuf).
            .
-           Performance: 29,810 docs/sec with 29 advanced optimizations.
+           Full-text, vector and hybrid search, with an MCP server built in.
           Homepage: https://github.com/tradik/mddb
           EOF
           
@@ -238,7 +266,7 @@ jobs:
           markdown documents with rich metadata, full revision history,
           and dual protocol support (HTTP/JSON + gRPC/Protobuf).
           
-          Performance: 29,810 docs/sec with 29 advanced optimizations.
+          Full-text, vector and hybrid search, with an MCP server built in.
 
           %prep
           %setup -q
@@ -302,7 +330,7 @@ jobs:
           find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddbd-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mddbd-${{ matrix.platform }}
           path: |
@@ -312,13 +340,14 @@ jobs:
 
       - name: Upload binary for Docker
         if: matrix.goos == 'linux'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mddbd-binary-${{ matrix.platform }}
           path: services/mddbd/mddbd-${{ matrix.platform }}
 
   build-client:
     name: Build MDDB CLI Client
+    needs: upgrade-compat
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -351,12 +380,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddb-cli/go.sum
@@ -539,7 +568,7 @@ jobs:
           find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddb-cli-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: mddb-cli-${{ matrix.platform }}
           path: |
@@ -556,7 +585,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Get version
         id: version
@@ -568,82 +597,42 @@ jobs:
           fi
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           path: release-artifacts
           pattern: md*
 
+      # OPS-011: notes come from CHANGELOG.md, so they describe the release
+      # they are attached to. The previous step published the same hand-written
+      # text for every tag, carrying benchmark figures from one historical
+      # measurement.
       - name: Create release notes
         run: |
-          cat > release-notes.md << 'EOF'
-          # MDDB ${{ steps.version.outputs.VERSION }} - Ultra Performance Release
+          python3 scripts/release-notes.py "${{ steps.version.outputs.VERSION }}" > release-notes.md
+          echo "--- release notes ---"
+          head -40 release-notes.md
 
-          ## 🚀 Performance Highlights
-
-          **MDDB is now 37.4x faster than baseline!**
-
-          - **29,810 docs/sec** throughput
-          - **34µs** average latency
-          - **5.75x faster** than MongoDB
-          - **6.89x faster** than PostgreSQL
-          - **24.54x faster** than MySQL
-          - **95.43x faster** than CouchDB
-
-          ## 📦 Installation
-
-          ### Ubuntu/Debian
-          ```bash
-          # Server
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          sudo dpkg -i mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          
-          # Client
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          sudo dpkg -i mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.deb
-          ```
-
-          ### RHEL/CentOS/Fedora
-          ```bash
-          # Server
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          sudo rpm -i mddbd-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          
-          # Client
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          sudo rpm -i mddb-cli-${{ steps.version.outputs.VERSION }}-linux-amd64.rpm
-          ```
-
-          ### macOS (Homebrew)
-          ```bash
-          # Intel
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz
-          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64.tar.gz
-          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-darwin-amd64/mddbd /usr/local/bin/
-          
-          # Apple Silicon
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz
-          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64.tar.gz
-          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-darwin-arm64/mddbd /usr/local/bin/
-          ```
-
-          ### FreeBSD
-          ```bash
-          wget https://github.com/tradik/mddb/releases/download/${{ steps.version.outputs.VERSION }}/mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz
-          tar xzf mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64.tar.gz
-          sudo mv mddbd-${{ steps.version.outputs.VERSION }}-freebsd-amd64/mddbd /usr/local/bin/
-          ```
-
-          ## ✨ What's New
-
-          See [CHANGELOG.md](https://github.com/tradik/mddb/blob/main/CHANGELOG.md) for full details.
-
-          ## 📊 Benchmarks
-
-          All benchmarks available in the repository under `test/`.
-          EOF
+      # OPS-019: `mddb-cli self-update` downloads a tarball and refuses to
+      # install it unless its SHA-256 matches this file. Names are flattened to
+      # basenames because that is how the downloader asks for them — it knows
+      # the artifact name, not which build job produced it.
+      #
+      # A checksum served from the same release as the binary proves the
+      # download arrived intact. It does not prove the release is genuine:
+      # whoever can publish a release can publish a matching checksum. Signing
+      # would close that and is not configured here; docs/INSTALLATION.md says
+      # so in the same words.
+      - name: Generate checksums.txt
+        run: |
+          find release-artifacts -type f \( -name '*.tar.gz' -o -name '*.deb' -o -name '*.rpm' \) \
+            -exec sha256sum {} + \
+            | sed 's#release-artifacts/[^ ]*/#*#' \
+            | sed 's#  \*#  #' > checksums.txt
+          echo "--- checksums.txt ---"
+          cat checksums.txt
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ steps.version.outputs.VERSION }}
           name: MDDB ${{ steps.version.outputs.VERSION }}
@@ -654,6 +643,7 @@ jobs:
             release-artifacts/**/*.tar.gz
             release-artifacts/**/*.deb
             release-artifacts/**/*.rpm
+            checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -703,7 +693,7 @@ jobs:
           done
 
       - name: Checkout homebrew-tap
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: tradik/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
@@ -827,7 +817,7 @@ jobs:
           git push origin main
 
       - name: Upload Homebrew formulas as artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: homebrew-formulas
           path: homebrew-tap/Formula/*.rb
@@ -854,16 +844,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build snap
         id: build
-        uses: snapcore/action-build@v1
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
         with:
           path: services/mddbd
 
       - name: Publish snap
-        uses: snapcore/action-publish@v1
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
@@ -885,10 +875,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: services/mddb-cli/go.sum
@@ -909,12 +899,12 @@ jobs:
 
       - name: Build snap
         id: build
-        uses: snapcore/action-build@v1
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
         with:
           path: services/mddb-cli
 
       - name: Publish snap
-        uses: snapcore/action-publish@v1
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
@@ -936,7 +926,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # The panel's src/components/MCPConfigPanel.jsx does
       #   import mddbModelPyRaw from '@scripts/mddb_model.py?raw'
@@ -951,12 +941,12 @@ jobs:
 
       - name: Build snap
         id: build
-        uses: snapcore/action-build@v1
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
         with:
           path: services/mddb-panel
 
       - name: Publish snap
-        uses: snapcore/action-publish@v1
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
         with:
@@ -975,7 +965,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Get version
         id: meta
@@ -992,13 +982,13 @@ jobs:
           echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Download server binary (linux-amd64)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: mddbd-binary-linux-amd64
           path: docker-ctx
 
       - name: Download server binary (linux-arm64)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: mddbd-binary-linux-arm64
           path: docker-ctx
@@ -1009,19 +999,19 @@ jobs:
           ls -la docker-ctx/
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v4.5.2
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4.5.2
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
@@ -1029,7 +1019,7 @@ jobs:
 
       - name: Build and push server image
         id: build-server
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: docker-ctx
           file: docker-ctx/Dockerfile
@@ -1053,7 +1043,7 @@ jobs:
             org.opencontainers.image.vendor=MDDB Team
 
       - name: Generate artifact attestation for server
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-name: ${{ env.GHCR_REGISTRY }}/${{ github.repository }}
           subject-digest: ${{ steps.build-server.outputs.digest }}
@@ -1070,7 +1060,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Get version
         id: meta
@@ -1087,19 +1077,19 @@ jobs:
           echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v4.5.2
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4.5.2
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
@@ -1107,7 +1097,7 @@ jobs:
 
       - name: Build and push panel image
         id: build-panel
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
         with:
           context: .
           file: ./services/mddb-panel/Dockerfile
@@ -1136,7 +1126,7 @@ jobs:
           cache-to: type=gha,mode=max,scope=panel
 
       - name: Generate artifact attestation for panel
-        uses: actions/attest-build-provenance@v4
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
           subject-name: ${{ env.GHCR_REGISTRY }}/${{ github.repository }}
           subject-digest: ${{ steps.build-panel.outputs.digest }}

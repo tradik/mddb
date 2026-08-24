@@ -3,15 +3,14 @@ package main
 import (
 	"crypto/subtle"
 	"fmt"
-	"log"
+	"log/slog"
+	json "mddb/internal/jsonx"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	json "github.com/goccy/go-json"
 )
 
 // ---- MCP API Key Authentication (#29, #33) ----
@@ -84,7 +83,7 @@ func (m *MCPAPIKeyMiddleware) SetKeyStore(store *mcpAPIKeyStore) {
 	if store != nil {
 		storeCount = store.Count()
 	}
-	log.Printf("MCP API key auth enabled (%d static, %d stored, cache TTL=%s)", len(m.keys), storeCount, m.cacheTTL)
+	slog.Info("MCP API key auth enabled (static, stored, cache TTL)", "keysCount", len(m.keys), "storeCount", storeCount, "cacheTTL", m.cacheTTL)
 }
 
 // Wrap wraps an HTTP handler with API key validation.
@@ -198,7 +197,7 @@ func NewMCPRateLimiter() *MCPRateLimiter {
 		rl.by = "ip"
 	}
 
-	log.Printf("MCP rate limiting enabled (%d req/%ds, burst=%d, by=%s)", rl.limit, windowSec, rl.burst, rl.by) // #nosec G706 -- config values only, not user input
+	slog.Info("MCP rate limiting enabled (req/s,,)", "limit", rl.limit, "windowSec", windowSec, "burst", rl.burst, "by", rl.by) // #nosec G706 -- config values only, not user input
 	return rl
 }
 
@@ -301,7 +300,7 @@ func NewMCPRequestLogger() *MCPRequestLogger {
 		rl.level = "info"
 	}
 	if rl.enabled {
-		log.Println("MCP request logging enabled (level=" + rl.level + ")") // #nosec G706 -- config value only, not user input
+		slog.Info("MCP request logging enabled (level=" + rl.level + ")") // #nosec G706 -- config value only, not user input
 	}
 	return rl
 }
@@ -346,7 +345,7 @@ func (rl *MCPRequestLogger) logRequest(r *http.Request, status int, duration tim
 	}
 
 	data, _ := json.Marshal(entry)
-	log.Printf("MCP-AUDIT %s", string(data)) // #nosec G706 -- structured JSON, no injection
+	slog.Info("MCP-AUDIT", "string", string(data)) // #nosec G706 -- structured JSON, no injection
 }
 
 // MCPLogEntry represents a single MCP request audit log entry.

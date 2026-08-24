@@ -153,6 +153,34 @@ Control progress update frequency:
 
 Default is 10 files per progress update.
 
+## Watching a job finish
+
+An async import returns a job ID immediately. Rather than polling
+`GET /v1/bulk/jobs/{id}` in a loop, subscribe to the job's event stream:
+
+```bash
+curl -N "http://localhost:11023/v1/events?job=bj_1a2b3c"
+```
+
+```
+event: job.started
+data: {"event":"job.started","timestamp":1711324801,"job":{"id":"bj_1a2b3c","status":"processing","total":5000,"processed":0,...}}
+
+event: job.progress
+data: {"event":"job.progress","timestamp":1711324805,"job":{"id":"bj_1a2b3c","status":"processing","total":5000,"processed":2500,...}}
+
+event: job.completed
+data: {"event":"job.completed","timestamp":1711324812,"job":{"id":"bj_1a2b3c","status":"completed","total":5000,"processed":5000,"added":5000,...}}
+```
+
+The `job` payload is the same record the status endpoint returns, so code that
+already reads counters from `GET` needs no second shape. `job.progress` arrives
+at most once per second per job; the start and terminal events always arrive.
+
+A connection filtered to a job receives that job's events only — no `doc.*`
+traffic from the import itself. See [SSE.md](SSE.md) for authentication, per-IP
+limits and reconnection.
+
 ## Frontmatter Support
 
 The script automatically extracts metadata from YAML-style frontmatter:

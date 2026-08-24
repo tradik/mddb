@@ -5,8 +5,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // newAutocompleteServer creates a server with FTS buckets ready for

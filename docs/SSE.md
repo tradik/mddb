@@ -39,11 +39,32 @@ SSE broadcasts three event types when documents change:
 | `doc.updated` | Existing document updated |
 | `doc.deleted` | Document deleted |
 
+…and five for async jobs, so a client can watch a bulk import finish instead
+of polling its status endpoint:
+
+| Event | Trigger |
+|-------|---------|
+| `job.started` | The worker picked the job up |
+| `job.progress` | A chunk finished — at most one per second per job |
+| `job.completed` | The job finished |
+| `job.failed` | Every document failed |
+| `job.cancelled` | The job was cancelled before or during processing |
+
+Job events carry the same record `GET /v1/bulk/jobs/{id}` returns, under a
+`job` key, so a client reads counters from one shape either way.
+
+`job.progress` is throttled to one event per second per job: a large import
+updates its counters every chunk, and the intermediate values say nothing the
+next one will not. Terminal events are never throttled.
+
 ### Event Format
 
 ```
 event: doc.added
 data: {"event":"doc.added","collection":"blog","key":"post1","lang":"en","timestamp":1711324800,"readOnly":true}
+
+event: job.progress
+data: {"event":"job.progress","timestamp":1711324805,"job":{"id":"bj_1a2b3c","collection":"blog","status":"processing","total":5000,"processed":2500,"added":2500,"updated":0,"failed":0,"submittedAt":1711324800,"startedAt":1711324801}}
 
 event: doc.updated
 data: {"event":"doc.updated","collection":"blog","key":"post1","lang":"en","timestamp":1711324860,"readOnly":false}
@@ -127,7 +148,16 @@ MDDB_SSE_ENABLED=false ./mddbd
 | HTTP (11023) | `GET /v1/events` | Main SSE endpoint |
 | MCP (9000) | `GET /events` | SSE on MCP port |
 
-Both endpoints support the `?collection=NAME` query parameter for filtering.
+Both endpoints support these query parameters for filtering:
+
+| Parameter | Effect |
+|-----------|--------|
+| `?collection=NAME` | Only events for that collection |
+| `?job=ID` | Only that job's events — and no `doc.*` events, since a client asking for one job's stream wants the job, not every document change |
+
+They combine: `?collection=blog&job=bj_1a2b3c` is the job's events, scoped to
+`blog`. Job events follow the same read-permission rule as document events,
+checked against the job's collection.
 
 ## Client Examples
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // handleAutomationLogs handles GET /v1/automation-logs

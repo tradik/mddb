@@ -7,13 +7,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"log"
+	"github.com/quic-go/quic-go/http3"
+	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
 	"time"
-
-	"github.com/quic-go/quic-go/http3"
 )
 
 // HTTP3Server wraps HTTP/3 server with QUIC
@@ -47,10 +46,10 @@ func NewHTTP3Server(addr string, handler http.Handler) (*HTTP3Server, error) {
 
 // Start starts the HTTP/3 server
 func (h3 *HTTP3Server) Start() error {
-	log.Printf("🚀 HTTP/3 (QUIC) server starting on %s", h3.addr)
-	log.Printf("   ⚡ 0-RTT reconnection enabled")
-	log.Printf("   ⚡ Multiplexing enabled")
-	log.Printf("   ⚡ Better congestion control")
+	slog.Info("HTTP/3 (QUIC) server starting", "addr", h3.addr)
+	slog.Info("0-RTT reconnection enabled")
+	slog.Info("Multiplexing enabled")
+	slog.Info("Better congestion control")
 
 	return h3.server.ListenAndServe()
 }

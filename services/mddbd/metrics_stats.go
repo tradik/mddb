@@ -8,6 +8,7 @@ import (
 
 	bolt "go.etcd.io/bbolt"
 
+	"mddb/internal/embedding"
 	"mddb/internal/metrics"
 )
 
@@ -35,6 +36,19 @@ func (a *serverMetricsStats) EmbeddingQueueSize() (int, bool) {
 		return 0, false
 	}
 	return len(a.s.EmbeddingWorker.jobs), true
+}
+
+// EmbeddingCacheStats reports the embedding cache when one is in use (RAG-003).
+//
+// The provider is wrapped only when caching is enabled, so the type assertion
+// is also the "is it on" test — no second flag to keep in step with the wiring.
+func (a *serverMetricsStats) EmbeddingCacheStats() (uint64, uint64, int, bool) {
+	cache, ok := a.s.Embedding.(*embedding.CachingProvider)
+	if !ok {
+		return 0, 0, 0, false
+	}
+	hits, misses, size := cache.Stats()
+	return hits, misses, size, true
 }
 
 func (a *serverMetricsStats) ReplicationRole() string { return a.s.ReplicationRole }

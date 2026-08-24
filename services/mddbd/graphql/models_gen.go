@@ -45,6 +45,53 @@ type BatchAddResult struct {
 	Errors  []string `json:"errors,omitempty"`
 }
 
+type CodeGraph struct {
+	Collection string           `json:"collection"`
+	Root       string           `json:"root"`
+	Direction  string           `json:"direction"`
+	Depth      int              `json:"depth"`
+	Nodes      []*CodeGraphNode `json:"nodes"`
+	Edges      []*CodeGraphEdge `json:"edges"`
+	// True when a depth or degree limit cut the walk short.
+	Truncated bool `json:"truncated"`
+}
+
+type CodeGraphEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	// uses-selector or imports
+	Kind string `json:"kind"`
+	// The symbol or path that justifies this edge.
+	Symbol    string `json:"symbol"`
+	Direction string `json:"direction"`
+	// First occurrence of the symbol in the source document, 0 if not literal.
+	FromLine *int `json:"fromLine,omitempty"`
+	// First occurrence of the symbol in the target document, 0 if not literal.
+	ToLine *int `json:"toLine,omitempty"`
+}
+
+type CodeGraphInput struct {
+	Collection string `json:"collection"`
+	Key        string `json:"key"`
+	// in = what depends on this document, out = what it depends on, both (default)
+	Direction *string `json:"direction,omitempty"`
+	// Hops to follow, 1-3 (default: 1)
+	Depth *int `json:"depth,omitempty"`
+	// Maximum neighbours per node, 1-100 (default: 100)
+	MaxDegree *int `json:"maxDegree,omitempty"`
+	// Include the first line each edge's symbol appears on, both sides. Reads
+	// document content, which a traversal otherwise never does.
+	Lines *bool `json:"lines,omitempty"`
+}
+
+type CodeGraphNode struct {
+	Key      string  `json:"key"`
+	DocID    string  `json:"docId"`
+	Lang     *string `json:"lang,omitempty"`
+	Language *string `json:"language,omitempty"`
+	Depth    int     `json:"depth"`
+}
+
 type CollectionStats struct {
 	Name           string `json:"name"`
 	DocumentCount  int    `json:"documentCount"`
@@ -243,6 +290,9 @@ type UserPermission struct {
 type ValidationResult struct {
 	Valid  bool     `json:"valid"`
 	Errors []string `json:"errors"`
+	// Advisory findings that do not make the document invalid (DOC-012) — today,
+	// metadata values that look like a structure lost on the way in.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 type VectorCollectionStats struct {
@@ -259,6 +309,10 @@ type VectorSearchInput struct {
 	Threshold      *float64     `json:"threshold,omitempty"`
 	FilterMeta     []*MetaInput `json:"filterMeta,omitempty"`
 	IncludeContent *bool        `json:"includeContent,omitempty"`
+	// Recall/latency knob (SRCH-005): candidates fetched per requested result
+	// before deduplication trims them. 1.0-10.0; omit to use the collection's
+	// retrieval profile, then MDDB's default of 3.0.
+	Oversample *float64 `json:"oversample,omitempty"`
 }
 
 type VectorSearchResponse struct {

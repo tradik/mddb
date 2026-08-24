@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // handleCuration multiplexes GET/POST/PUT/DELETE on /v1/curation.

@@ -6,7 +6,7 @@ import (
 
 	proto "mddb/proto"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // resolveBulkManager extracts the *BulkIngestManager from the underlying

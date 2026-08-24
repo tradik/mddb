@@ -39,7 +39,12 @@ export class WsClient {
           const msg: WsIncoming = JSON.parse(event.data);
           this.onMessage(msg);
         } catch {
-          console.error('[mddb-chat] invalid message:', event.data);
+          // Bounded and single-line. The payload is whatever arrived on the
+          // socket, so dumping it raw meant an unbounded write into the
+          // console and, with newlines in it, a frame that could forge
+          // entries around itself (CodeQL js/log-injection). A prefix is
+          // enough to recognise what failed to parse.
+          console.error('[mddb-chat] invalid message:', summariseForLog(event.data));
         }
       };
 
@@ -103,4 +108,17 @@ export class WsClient {
       this.pingTimer = null;
     }
   }
+}
+
+/**
+ * Renders an untrusted value for a single console line.
+ *
+ * Newlines and carriage returns become spaces so one frame cannot look like
+ * several log entries, and the result is capped — a malformed 100 KB frame is
+ * not more diagnostic than its first 200 characters.
+ */
+function summariseForLog(value: unknown): string {
+  const text = typeof value === 'string' ? value : String(value);
+  const oneLine = text.replace(/[\r\n]+/g, ' ');
+  return oneLine.length > 200 ? `${oneLine.slice(0, 200)}… (${text.length} chars)` : oneLine;
 }

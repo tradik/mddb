@@ -82,7 +82,7 @@ docker build -t mddb:latest -f services/mddbd/Dockerfile services/mddbd
 
 ### Development Image
 
-**Base**: golang:1.26-alpine  
+**Base**: golang:1.27-alpine  
 **Size**: ~500 MB  
 **Features**: Hot reload with Air
 

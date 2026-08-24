@@ -222,33 +222,16 @@ func mcpMetaToInterface(meta map[string][]string) map[string]interface{} {
 
 // validateMCPCustomTools validates custom tool definitions.
 func validateMCPCustomTools(tools []MCPCustomToolConfig) error {
-	builtinNames := map[string]bool{
-		"add_document": true, "search_documents": true, "delete_document": true,
-		"get_stats": true, "add_documents_batch": true, "delete_documents_batch": true,
-		"export_documents": true, "create_backup": true, "restore_backup": true,
-		"semantic_search": true, "vector_reindex": true, "vector_stats": true,
-		"import_url": true, "set_ttl": true, "full_text_search": true, "fts_reindex": true, "fts_languages": true,
-		"hybrid_search":    true,
-		"register_webhook": true, "list_webhooks": true, "delete_webhook": true,
-		"set_schema": true, "get_schema": true, "delete_schema": true,
-		"list_schemas": true, "validate_document": true,
-		"update_document": true, "get_document_meta": true,
-		"classify_document": true,
-		"delete_collection": true, "truncate_revisions": true,
-		"list_revisions": true, "restore_revision": true,
-		"list_synonyms": true, "add_synonym": true, "delete_synonym": true,
-		"list_stopwords": true, "add_stopwords": true, "delete_stopwords": true,
-		"get_meta_keys": true, "get_checksum": true,
-		"list_automation": true, "create_automation": true, "get_automation": true,
-		"update_automation": true, "delete_automation": true, "test_automation": true,
-		"get_automation_logs":   true,
-		"get_collection_config": true, "set_collection_config": true, "list_collection_configs": true,
-		"list_curation_rules": true, "create_curation_rule": true, "update_curation_rule": true, "delete_curation_rule": true,
-		"cross_search":      true,
-		"find_duplicates":   true,
-		"ingest_documents":  true,
-		"upload_file":       true,
-		"wordpress_publish": true, "wordpress_set_status": true,
+	// Derived from mcpBuiltinTools rather than restated.
+	//
+	// This was a hand-maintained copy of all 80 names — a second source of
+	// truth that happened to be in step, and would have drifted the first
+	// time someone added a tool and forgot this file. A custom tool shadowing
+	// a built-in is a silent capability swap, so the list has to be the real
+	// one (TEST-002).
+	builtinNames := make(map[string]bool, len(mcpBuiltinTools()))
+	for _, tool := range mcpBuiltinTools() {
+		builtinNames[tool.Name] = true
 	}
 	validActions := map[string]bool{
 		"semantic_search": true, "search_documents": true, "full_text_search": true, "fts_languages": true,

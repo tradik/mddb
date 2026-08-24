@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mddb/internal/fts"
 	"strconv"
 	"strings"
 
@@ -18,6 +19,11 @@ import (
 //     matched (chunkIndex + chunkText) — precise context for LLM prompts.
 //   - "window": like "chunk", but the passage is widened with N neighboring
 //     chunks on each side, trading precision for surrounding context.
+//   - "graph": whole documents, plus their neighbours in the code connection
+//     graph (SRCH-006). The first three decide what a result looks like; this
+//     one decides which documents are reached at all — a query matching
+//     checkout.js also returns the stylesheet whose selector it manipulates,
+//     which matches the query on no term.
 //
 // Chunking is deterministic (ChunkText on the parent's content with the
 // configured chunk size), so passages are re-derived from the parent document
@@ -26,13 +32,17 @@ const (
 	RetrievalModeParent = "parent"
 	RetrievalModeChunk  = "chunk"
 	RetrievalModeWindow = "window"
+	// RetrievalModeGraph returns whole documents and adds their neighbours
+	// from the code connection graph (SRCH-006). The other three change what a
+	// result *looks like*; this one changes which documents are *reached*.
+	RetrievalModeGraph = "graph"
 )
 
 // validRetrievalMode reports whether mode is a supported retrieval mode.
 // The empty string is valid and means RetrievalModeParent.
 func validRetrievalMode(mode string) bool {
 	switch mode {
-	case "", RetrievalModeParent, RetrievalModeChunk, RetrievalModeWindow:
+	case "", RetrievalModeParent, RetrievalModeChunk, RetrievalModeWindow, RetrievalModeGraph:
 		return true
 	}
 	return false
@@ -67,25 +77,53 @@ func splitChunkKey(key string) (docID string, chunkIndex int) {
 // chunkPassage re-derives the chunk (or window of chunks) text from the
 // parent document's content. windowSize is the number of neighboring chunks
 // included on each side; 0 returns just the matching chunk.
-func chunkPassage(contentMD string, chunkIndex, windowSize int) string {
+//
+// Superseded in production by chunkPassageWithLines (CODE-002), which every
+// caller uses because a hit without its line range is a worse answer. Kept as
+// the text-only form the segmentation tests assert against, where the line
+// numbers would be noise.
+func chunkPassage(contentMD string, chunkIndex, windowSize int, mode ChunkMode) string {
+	text, _, _ := chunkPassageWithLines(contentMD, chunkIndex, windowSize, mode)
+	return text
+}
+
+// chunkPassageWithLines is chunkPassage plus the 1-based, inclusive line range
+// the passage occupies in the parent document (CODE-002).
+//
+// The lines are what turn a hit into a place to edit: "css/style.css lines
+// 41-58" is a neighbourhood, where a document name and a chunk index mean
+// reading the file to find out where the chunk was. Both come from the same
+// segmentation, so the text and its range can never disagree.
+func chunkPassageWithLines(contentMD string, chunkIndex, windowSize int, mode ChunkMode) (text string, startLine, endLine int) {
 	chunkSize := envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500)
-	chunks := ChunkText(contentMD, chunkSize)
-	if len(chunks) == 0 {
-		return ""
+	spans := ChunkSpansMode(contentMD, chunkSize, mode)
+	if len(spans) == 0 {
+		return "", 0, 0
 	}
-	if chunkIndex >= len(chunks) {
-		chunkIndex = len(chunks) - 1
+	if chunkIndex >= len(spans) {
+		chunkIndex = len(spans) - 1
 	}
-	if windowSize <= 0 {
-		return chunks[chunkIndex]
+	if chunkIndex < 0 {
+		chunkIndex = 0
 	}
-	lo := chunkIndex - windowSize
-	if lo < 0 {
-		lo = 0
+
+	lo, hi := chunkIndex, chunkIndex+1
+	if windowSize > 0 {
+		lo = chunkIndex - windowSize
+		if lo < 0 {
+			lo = 0
+		}
+		hi = chunkIndex + windowSize + 1
+		if hi > len(spans) {
+			hi = len(spans)
+		}
 	}
-	hi := chunkIndex + windowSize + 1
-	if hi > len(chunks) {
-		hi = len(chunks)
+
+	parts := make([]string, 0, hi-lo)
+	for _, s := range spans[lo:hi] {
+		parts = append(parts, s.Text)
 	}
-	return strings.Join(chunks[lo:hi], "\n\n")
+	li := fts.NewLineIndex(contentMD)
+	startLine, endLine = li.Range(spans[lo].Start, spans[hi-1].End)
+	return strings.Join(parts, "\n\n"), startLine, endLine
 }

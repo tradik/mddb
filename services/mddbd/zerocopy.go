@@ -80,12 +80,20 @@ type BufferPool struct {
 }
 
 // NewBufferPool creates a new buffer pool
+// The pool stores *[]byte rather than []byte throughout (GO-021).
+//
+// It used to hand out []byte from New and store *[]byte in Put, so the first
+// Get after any Put panicked on the type assertion —
+// "interface {} is *[]uint8, not []uint8". Nothing had ever reused a buffer,
+// which is the only reason the panic was not in production. The pointer form is
+// also what sync.Pool wants: storing a slice header allocates on every Put.
 func NewBufferPool(size int) *BufferPool {
 	return &BufferPool{
 		size: size,
 		pool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, size)
+				buf := make([]byte, size)
+				return &buf
 			},
 		},
 	}
@@ -93,14 +101,35 @@ func NewBufferPool(size int) *BufferPool {
 
 // Get gets a buffer from pool
 func (bp *BufferPool) Get() []byte {
-	return bp.pool.Get().([]byte)
+	return *bp.pool.Get().(*[]byte)
 }
 
-// Put returns a buffer to pool
+// Put returns a buffer to pool.
+//
+// A buffer of the wrong size is dropped rather than pooled: handing back a
+// short buffer would make a later Get return less than the caller asked for.
 func (bp *BufferPool) Put(buf []byte) {
 	if len(buf) == bp.size {
 		bp.pool.Put(&buf)
 	}
+}
+
+// sharedBufferPools hands out one pool per buffer size.
+//
+// GO-020: NewZeroCopyReader and NewZeroCopyWriter each built a private
+// BufferPool, so every buffer was returned to a pool that became garbage with
+// the reader or writer that owned it. Every call allocated a fresh buffer and
+// the pooling was decorative. Sizes are compile-time constants, so the map has
+// as many entries as there are call sites.
+var sharedBufferPools sync.Map // int -> *BufferPool
+
+// bufferPoolFor returns the pool for a given buffer size, creating it once.
+func bufferPoolFor(size int) *BufferPool {
+	if p, ok := sharedBufferPools.Load(size); ok {
+		return p.(*BufferPool)
+	}
+	p, _ := sharedBufferPools.LoadOrStore(size, NewBufferPool(size))
+	return p.(*BufferPool)
 }
 
 // ZeroCopyReader wraps a reader for zero-copy operations
@@ -110,13 +139,16 @@ type ZeroCopyReader struct {
 	buffer     []byte
 	offset     int
 	limit      int
+	// pending holds an error the underlying reader returned alongside data,
+	// to be reported once that data has been handed to the caller.
+	pending error
 }
 
 // NewZeroCopyReader creates a zero-copy reader
 func NewZeroCopyReader(r io.Reader, bufferSize int) *ZeroCopyReader {
 	return &ZeroCopyReader{
 		reader:     r,
-		bufferPool: NewBufferPool(bufferSize),
+		bufferPool: bufferPoolFor(bufferSize),
 		buffer:     nil,
 	}
 }
@@ -129,20 +161,33 @@ func (zcr *ZeroCopyReader) Read(p []byte) (int, error) {
 		zcr.limit = 0
 	}
 
-	// If buffer is empty, refill
+	// Refill when the buffer is spent.
+	//
+	// A reader is allowed to return data together with io.EOF, and returning
+	// (0, err) there would drop those bytes — the last ones of the stream,
+	// which is where a truncation is hardest to notice. The error is kept and
+	// reported once the buffered data has been handed over.
 	if zcr.offset >= zcr.limit {
 		n, err := zcr.reader.Read(zcr.buffer)
-		if err != nil {
+		if n == 0 {
 			return 0, err
 		}
 		zcr.offset = 0
 		zcr.limit = n
+		if err != nil {
+			zcr.pending = err
+		}
 	}
 
 	// Copy from buffer
 	n := copy(p, zcr.buffer[zcr.offset:zcr.limit])
 	zcr.offset += n
 
+	if zcr.offset >= zcr.limit && zcr.pending != nil {
+		err := zcr.pending
+		zcr.pending = nil
+		return n, err
+	}
 	return n, nil
 }
 
@@ -167,7 +212,7 @@ type ZeroCopyWriter struct {
 func NewZeroCopyWriter(w io.Writer, bufferSize int) *ZeroCopyWriter {
 	return &ZeroCopyWriter{
 		writer:     w,
-		bufferPool: NewBufferPool(bufferSize),
+		bufferPool: bufferPoolFor(bufferSize),
 		buffer:     nil,
 	}
 }

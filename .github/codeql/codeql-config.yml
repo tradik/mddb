@@ -1,0 +1,60 @@
+# CodeQL analysis configuration.
+#
+# Written when the Go analysis started working for the first time (the
+# autobuilder had always failed on go.work in the repository root) and produced
+# 47 findings at once. Sixteen were acted on — three critical and thirteen high,
+# of which two were real bugs and are fixed. The rest are recorded here, with
+# the reason, rather than dismissed one alert at a time in a web UI where the
+# reasoning does not survive review.
+#
+# This file is the CodeQL equivalent of sonar-project.properties. Unlike that
+# one, it is actually honoured: `sonar.issue.ignore.*` does nothing under
+# SonarCloud Auto Analysis (see OPS-021), which is worth knowing before trusting
+# either file.
+
+name: "MDDB"
+
+paths-ignore:
+  # Test code legitimately contains the patterns it asserts against. The
+  # sanitiser tests hold the *old*, deliberately broken tag stripper so the
+  # tests can show what changed rather than assert the new behaviour in a
+  # vacuum — and CodeQL, correctly, recognises that stripper as broken.
+  #
+  # The same exclusion exists for SonarCloud and for the same reason; see the
+  # "Tests are lower-stakes" block in sonar-project.properties.
+  - "**/*_test.go"
+  - "**/*.test.ts"
+  - "**/*.test.js"
+  - "**/*.test.mjs"
+  - "**/*.spec.ts"
+  - "**/*.spec.js"
+  - "**/__tests__/**"
+  - "**/tests/**"
+
+query-filters:
+  # go/log-injection — 29 findings, every one a structured slog attribute.
+  #
+  # Measured rather than assumed: both slog handlers escape control characters
+  # in attribute *values*. A username of "alice\nINFO fake entry status=200"
+  # renders as
+  #
+  #   user="alice\nINFO fake entry status=200"      (text handler)
+  #   {"user":"alice\nINFO fake entry status=200"}  (JSON handler)
+  #
+  # — quoted, with the newline as its two-character escape. It cannot begin a
+  # new record. Every flagged call passes the value as an attribute; none
+  # concatenates it into the message, which is the shape that would be real,
+  # and all 29 were checked individually rather than sampled.
+  #
+  # Passing user input as a structured attribute IS the recommended mitigation
+  # for log injection. The rule cannot see that slog applies it.
+  - exclude:
+      id: go/log-injection
+
+  # js/log-injection — the only JavaScript logging in this repository goes to
+  # the browser console, which is not a parsed log: there are no records for a
+  # newline to forge. The one flagged call is bounded to a single line and 200
+  # characters anyway (services/mddb-chat-widget/src/ws/client.ts), because an
+  # unbounded dump of a failed frame is bad diagnostics regardless of security.
+  - exclude:
+      id: js/log-injection

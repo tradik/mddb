@@ -18,6 +18,7 @@ import UsersPanel from './components/UsersPanel';
 import GroupsPanel from './components/GroupsPanel';
 import VectorPanel from './components/VectorPanel';
 import VectorSpacePanel from './components/VectorSpacePanel';
+import SearchAdvisorPanel from './components/SearchAdvisorPanel';
 import EmbeddingModelsPanel from './components/EmbeddingModelsPanel';
 import SettingsPanel from './components/SettingsPanel';
 import ClusterPanel from './components/ClusterPanel';
@@ -235,6 +236,11 @@ function App() {
           {viewMode === 'vectorSpace' && (
             <div className="flex-1 border-l border-gray-200">
               <VectorSpacePanel />
+            </div>
+          )}
+          {viewMode === 'searchAdvisor' && (
+            <div className="flex-1 border-l border-gray-200">
+              <SearchAdvisorPanel />
             </div>
           )}
           {viewMode === 'embeddings' && (

@@ -8,6 +8,17 @@ import (
 // If a single paragraph exceeds maxChars, it splits on sentence boundaries (". ").
 // As a last resort, it hard-splits at maxChars.
 // Returns the original text as a single-element slice if it fits within maxChars.
+// Kept as the reference implementation, not as production code (GO-021).
+//
+// The span-based chunker replaced it in CODE-003, and nothing in the server
+// calls this any more. It stays because
+// TestChunkSpansSegmentsExactlyLikeChunkText holds the new chunker against it:
+// segmentation had to stay byte-identical or every embedding made under the old
+// one would point at the wrong passage. Deleting this would leave that
+// guarantee asserted against nothing.
+//
+// Do not call it from the server. If the compatibility test is ever retired,
+// this goes with it.
 func ChunkText(text string, maxChars int) []string {
 	if maxChars <= 0 {
 		maxChars = 1500
@@ -64,7 +75,8 @@ func ChunkText(text string, maxChars int) []string {
 	return chunks
 }
 
-// splitLargeParagraph splits a paragraph that exceeds maxChars on sentence boundaries.
+// splitLargeParagraph splits a paragraph that exceeds maxChars on sentence
+// boundaries. Reached only through ChunkText, and kept for the same reason.
 func splitLargeParagraph(para string, maxChars int) []string {
 	sentences := splitSentences(para)
 
@@ -106,6 +118,7 @@ func splitLargeParagraph(para string, maxChars int) []string {
 }
 
 // splitSentences splits text on sentence boundaries (". ", "! ", "? ").
+// Reached only through splitLargeParagraph, and kept for the same reason.
 func splitSentences(text string) []string {
 	var sentences []string
 	start := 0

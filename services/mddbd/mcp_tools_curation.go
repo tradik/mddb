@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // --- Curation MCP tools (v2.9.14+) ---

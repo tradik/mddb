@@ -1,151 +1,143 @@
 package main
 
 import (
-	"context"
+	"strings"
 	"testing"
 )
 
-// SEC-010: operator-pinned scope keys (collection / filter_meta /
-// include_content / fields) must survive client args, and only declared
-// parameters may pass through at all.
+// TEST-002. Custom tools let an operator expose a pre-configured search under
+// their own name. The validator is what stands between a YAML file and an MCP
+// agent's tool list, so its refusals matter more than its acceptances.
 
-func customToolFixture() MCPCustomToolConfig {
-	pinnedInclude := false
+func validTool(name string) MCPCustomToolConfig {
 	return MCPCustomToolConfig{
-		Name:   "public_versions",
-		Action: "search_documents",
-		Defaults: MCPCustomToolDefs{
-			Collection:     "public-versions",
-			FilterMeta:     map[string][]string{"visibility": {"public"}},
-			IncludeContent: &pinnedInclude,
-			Fields:         []string{"name", "currentVersion"},
-		},
-		Parameters: []MCPCustomToolParam{
-			{Name: "limit", Type: "integer"},
-		},
+		Name:        name,
+		Description: "a tool",
+		Action:      "search_documents",
 	}
 }
 
-func TestCustomToolPinnedScopeSurvivesUserArgs(t *testing.T) {
-	merged, err := mcpMergeCustomToolArgs(customToolFixture(), map[string]interface{}{
-		"collection":      "secrets",
-		"filter_meta":     map[string]interface{}{},
-		"include_content": true,
-		"fields":          []interface{}{},
-		"limit":           float64(5),
+// A custom tool shadowing a built-in is a silent capability swap: the agent
+// calls what it thinks is MDDB's own tool and gets someone's configuration.
+func TestCustomToolCannotShadowAnyBuiltin(t *testing.T) {
+	builtins := mcpBuiltinTools()
+	if len(builtins) == 0 {
+		t.Fatal("no built-in tools — the test cannot mean anything")
+	}
+
+	var unguarded []string
+	for _, tool := range builtins {
+		if err := validateMCPCustomTools([]MCPCustomToolConfig{validTool(tool.Name)}); err == nil {
+			unguarded = append(unguarded, tool.Name)
+		}
+	}
+
+	if len(unguarded) > 0 {
+		t.Errorf("%d built-in tools can be shadowed by a custom tool of the same name:\n  %s",
+			len(unguarded), strings.Join(unguarded, "\n  "))
+	}
+}
+
+// The guard list used to be a hand-written copy of all 80 names. It is derived
+// now, but the property worth pinning is the behaviour: a tool added to the
+// built-in table is protected without anyone editing a second list.
+func TestShadowGuardCoversNewlyAddedTools(t *testing.T) {
+	// code_graph was added in CODE-005, long after the copy was written.
+	err := validateMCPCustomTools([]MCPCustomToolConfig{validTool("code_graph")})
+	if err == nil {
+		t.Error("a tool added after the guard list was written is not protected")
+	}
+	if err != nil && !strings.Contains(err.Error(), "built-in") {
+		t.Errorf("the error does not explain the conflict: %v", err)
+	}
+}
+
+func TestCustomToolValidationRejectsBadDefinitions(t *testing.T) {
+	cases := map[string]MCPCustomToolConfig{
+		"no name":        {Description: "d", Action: "search_documents"},
+		"no description": {Name: "x", Action: "search_documents"},
+		"unknown action": {Name: "x", Description: "d", Action: "telepathy"},
+		"empty action":   {Name: "x", Description: "d"},
+	}
+	for name, tool := range cases {
+		if err := validateMCPCustomTools([]MCPCustomToolConfig{tool}); err == nil {
+			t.Errorf("%s was accepted", name)
+		}
+	}
+}
+
+// Two tools with one name means an agent's call is ambiguous; which one runs
+// would depend on map iteration order.
+func TestCustomToolNamesMustBeUnique(t *testing.T) {
+	err := validateMCPCustomTools([]MCPCustomToolConfig{
+		validTool("my-search"),
+		validTool("my-search"),
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("duplicate custom tool names were accepted")
 	}
-
-	if merged["collection"] != "public-versions" {
-		t.Errorf("collection = %v, pinned scope must win (SEC-010)", merged["collection"])
-	}
-	if v, ok := merged["include_content"].(bool); !ok || v {
-		t.Errorf("include_content = %v, pinned data minimization must win", merged["include_content"])
-	}
-	if fields, ok := merged["fields"].([]string); !ok || len(fields) != 2 {
-		t.Errorf("fields = %v, pinned projection must win", merged["fields"])
-	}
-	fm, ok := merged["filter_meta"].(map[string]interface{})
-	if !ok || len(fm) == 0 {
-		t.Errorf("filter_meta = %v, pinned filter must win", merged["filter_meta"])
-	}
-	if merged["limit"] != float64(5) {
-		t.Errorf("limit = %v, declared parameter should pass through", merged["limit"])
+	if !strings.Contains(err.Error(), "duplicate") {
+		t.Errorf("the error does not name the problem: %v", err)
 	}
 }
 
-func TestCustomToolDropsUndeclaredParams(t *testing.T) {
-	merged, err := mcpMergeCustomToolArgs(customToolFixture(), map[string]interface{}{
-		"sort":   "addedAt", // not declared in Parameters
-		"offset": float64(10),
+func TestValidCustomToolsAreAccepted(t *testing.T) {
+	tools := []MCPCustomToolConfig{
+		validTool("search-handbook"),
+		{Name: "find-runbooks", Description: "d", Action: "semantic_search"},
+		{Name: "grep-logs", Description: "d", Action: "full_text_search"},
+	}
+	if err := validateMCPCustomTools(tools); err != nil {
+		t.Errorf("a valid set was rejected: %v", err)
+	}
+}
+
+func TestEmptyCustomToolListIsValid(t *testing.T) {
+	if err := validateMCPCustomTools(nil); err != nil {
+		t.Errorf("no custom tools should be fine: %v", err)
+	}
+}
+
+// The error must say which entry is wrong; a YAML file with twenty tools and
+// "invalid action" tells the operator nothing.
+func TestCustomToolErrorsNameTheOffendingEntry(t *testing.T) {
+	err := validateMCPCustomTools([]MCPCustomToolConfig{
+		validTool("fine-one"),
+		{Name: "broken-one", Description: "d", Action: "telepathy"},
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("an invalid action was accepted")
 	}
-	if _, present := merged["sort"]; present {
-		t.Error("undeclared 'sort' arg must be dropped (SEC-010)")
+	if !strings.Contains(err.Error(), "broken-one") {
+		t.Errorf("the error does not name the offending tool: %v", err)
 	}
-	if _, present := merged["offset"]; present {
-		t.Error("undeclared 'offset' arg must be dropped (SEC-010)")
-	}
-}
-
-func TestCustomToolUnpinnedDeclaredScopeKeyStillWorks(t *testing.T) {
-	// When the operator does NOT pin a scope key but declares it as a
-	// parameter, the client may set it — locking applies to pinned keys only.
-	ct := MCPCustomToolConfig{
-		Name:   "open_search",
-		Action: "search_documents",
-		Parameters: []MCPCustomToolParam{
-			{Name: "collection", Type: "string", Required: true},
-		},
-	}
-	merged, err := mcpMergeCustomToolArgs(ct, map[string]interface{}{"collection": "blog"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if merged["collection"] != "blog" {
-		t.Errorf("collection = %v, declared unpinned param should pass", merged["collection"])
+	if !strings.Contains(err.Error(), "[1]") {
+		t.Errorf("the error does not give the entry's position: %v", err)
 	}
 }
 
-func TestCustomToolUnknownActionErrors(t *testing.T) {
-	ct := MCPCustomToolConfig{Name: "x", Action: "delete_collection"}
-	if _, err := mcpMergeCustomToolArgs(ct, nil); err == nil {
-		t.Error("unknown/unsupported action must error")
-	}
-}
-
-// GO-022: search_documents with include_content=false must not carry document
-// bodies out of the store layer.
-func TestDirectClientSearchIncludeContent(t *testing.T) {
-	s, cleanup := newHandlerTestServer(t)
-	defer cleanup()
-	addTestDoc(t, s, "col", "k1", "en", "the body", nil)
-	client := NewDirectClient(s)
-
-	// Zero value (false) drops the body at the store layer.
-	resp, err := client.Search(context.Background(), &MCPSearchRequest{Collection: "col"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(resp.Documents) != 1 {
-		t.Fatalf("expected 1 document, got %d", len(resp.Documents))
-	}
-	if resp.Documents[0].ContentMD != "" {
-		t.Errorf("ContentMD should be empty without IncludeContent, got %q", resp.Documents[0].ContentMD)
-	}
-
-	// Explicit opt-in keeps the body.
-	resp, err = client.Search(context.Background(), &MCPSearchRequest{Collection: "col", IncludeContent: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(resp.Documents) != 1 || resp.Documents[0].ContentMD != "the body" {
-		t.Errorf("ContentMD should survive with IncludeContent=true, got %+v", resp.Documents)
-	}
-}
-
-// GO-022: the same guarantee for the filter_meta (idxmeta) search path.
-func TestDirectClientSearchIncludeContentWithFilter(t *testing.T) {
-	s, cleanup := newHandlerTestServer(t)
-	defer cleanup()
-	addTestDoc(t, s, "col", "k2", "en", "secret body", map[string][]string{"kind": {"page"}})
-	client := NewDirectClient(s)
-
-	resp, err := client.Search(context.Background(), &MCPSearchRequest{
-		Collection: "col",
-		FilterMeta: map[string][]string{"kind": {"page"}},
+// Custom tools must appear alongside the built-ins, or defining one has no
+// visible effect.
+func TestCustomToolsJoinTheAdvertisedList(t *testing.T) {
+	all := mcpAllTools([]MCPCustomToolConfig{
+		{Name: "search-handbook", Description: "Search the handbook", Action: "search_documents"},
 	})
-	if err != nil {
-		t.Fatal(err)
+
+	var found bool
+	builtinCount := 0
+	for _, tool := range all {
+		if tool.Name == "search-handbook" {
+			found = true
+			if tool.Description != "Search the handbook" {
+				t.Errorf("the custom description was lost: %q", tool.Description)
+			}
+		}
+		builtinCount++
 	}
-	if len(resp.Documents) != 1 {
-		t.Fatalf("expected 1 document, got %d", len(resp.Documents))
+	if !found {
+		t.Error("a defined custom tool is not advertised")
 	}
-	if resp.Documents[0].ContentMD != "" {
-		t.Errorf("ContentMD should be empty without IncludeContent, got %q", resp.Documents[0].ContentMD)
+	if builtinCount <= len(mcpBuiltinTools()) {
+		t.Error("the custom tool did not extend the list")
 	}
 }

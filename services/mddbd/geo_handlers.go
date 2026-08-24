@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // GeoSearchRequest is the JSON payload for POST /v1/geo-search.
@@ -393,6 +393,17 @@ func (s *Server) handleGeoReindex(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
+	// The gRPC twin of this call checks a permission and this one checked
+	// none, so the same operation was gated two different ways depending on
+	// which port it arrived at. Admin rather than write: loading a CSV reads
+	// the filesystem, which is not the authority "may write to a collection"
+	// grants.
+	if s.AuthManager != nil && len(req.LoadPostcodes) > 0 {
+		if err := s.AuthManager.CheckPermission(r.Context(), "*", PermAdmin); err != nil {
+			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+			return
+		}
+	}
 	if s.GeoStore == nil || s.GeoIndex == nil {
 		bad(w, errors.New("geo subsystem not initialized"))
 		return
@@ -407,7 +418,17 @@ func (s *Server) handleGeoReindex(w http.ResponseWriter, r *http.Request) {
 			s.GeoIndex.SetPostcodes(pc)
 		}
 		for _, p := range req.LoadPostcodes {
-			n, err := pc.LoadCountry(p.Country, p.CSVPath)
+			// CodeQL go/path-injection. csvPath came from the request body and
+			// went straight to os.Open, so this endpoint would read any file
+			// the process could — and unlike its gRPC twin it checked no
+			// permission at all. Confined to the geo data directory now, and
+			// gated below.
+			csvPath, err := safeGeoCSVPath(p.CSVPath)
+			if err != nil {
+				bad(w, err)
+				return
+			}
+			n, err := pc.LoadCountry(p.Country, csvPath)
 			if err != nil {
 				bad(w, err)
 				return

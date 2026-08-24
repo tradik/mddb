@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // WebhookExporter delivers each audit event as a JSON POST to a fixed
@@ -70,7 +70,11 @@ func (w *WebhookExporter) deliver(ev AuditEvent) error {
 		if backoff > 0 {
 			time.Sleep(backoff)
 		}
-		req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewReader(payload))
+		// noctx would have this carry a context, which would let shutdown
+		// interrupt the backoff sleeps. Doing that means threading one through
+		// exporterCore.run, whose signature the syslog exporter shares — a
+		// wider change than this ticket, tracked as a follow-up.
+		req, err := http.NewRequest(http.MethodPost, w.url, bytes.NewReader(payload)) //nolint:noctx // see above
 		if err != nil {
 			return fmt.Errorf("build request: %w", err)
 		}

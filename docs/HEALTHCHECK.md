@@ -18,9 +18,33 @@ Simple health check endpoint that verifies database connectivity.
 ```json
 {
   "status": "healthy",
-  "mode": "wr"
+  "mode": "wr",
+  "persistence": {
+    "path": "/var/lib/mddb",
+    "filesystem": "ext4",
+    "ephemeral": false,
+    "writable": true,
+    "freeBytes": 21474836480
+  },
+  "durable": true,
+  "mcpSessions": {
+    "sse": 0,
+    "streamable": 2
+  }
 }
 ```
+
+**Fields beyond `status` and `mode`:**
+
+| Field | Meaning |
+|---|---|
+| `persistence` | What the data directory can promise (GO-032): where it is, what filesystem holds it, whether it is writable and whether it survives a container restart. `warnings[]` carries anything that made the answer worse. |
+| `durable` | `writable && !ephemeral`. **`false` means acknowledged writes may not survive a restart** — the process is up and the data is not safe. Worth alerting on separately from `status`. |
+| `mcpSessions` | Open MCP sessions per transport. **Absent when the MCP server is disabled** — an absent field says "not running" where a zero would say "idle". A count that only grows is how a session leak becomes visible: a client that disconnects without closing leaves its session until it times out. |
+
+A load balancer should read `status` alone. A monitoring system should also
+watch `durable`, because a healthy server on ephemeral storage answers `200`
+right up to the restart that loses the data.
 
 **Response (Unhealthy):**
 ```json

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"unicode"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 var (
@@ -80,6 +80,17 @@ func NewFTSIndex(db *bolt.DB) *FTSIndex {
 	return &FTSIndex{
 		db:        db,
 		stopWords: defaultStopWords,
+	}
+}
+
+// Reload points the index at a freshly swapped database handle after a
+// restore, and drops the in-memory PMI data built from the old one. The caller
+// must hold the server's restore write lock, so no search is mid-flight on the
+// old handle (SEC-015/SEC-016).
+func (f *FTSIndex) Reload(db *bolt.DB) {
+	f.db = db
+	if f.pmiData != nil {
+		f.pmiData = NewPMIData()
 	}
 }
 
@@ -245,54 +256,69 @@ func (f *FTSIndex) IndexWithLang(collection, docID, content, lang string) error 
 
 	var bo binlog.BinlogOps
 	err := f.db.Update(func(tx *bolt.Tx) error {
-		bFTS := tx.Bucket(bucketFTS)
-		bRev := tx.Bucket(bucketFTSRev)
-
-		// Remove old entries via reverse index
-		revKey := ftsRevKey(collection, docID)
-		if old := bRev.Get(revKey); old != nil {
-			oldTerms := strings.Split(string(old), ",")
-			for _, term := range oldTerms {
-				if term != "" {
-					k := ftsKey(collection, term, docID)
-					_ = bFTS.Delete(k)
-					bo.Delete("fts", k)
-				}
-			}
-		}
-
-		// Store new entries
-		termList := make([]string, 0, len(terms))
-		for term, count := range terms {
-			var buf [4]byte
-			binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
-			k := ftsKey(collection, term, docID)
-			if err := bFTS.Put(k, buf[:]); err != nil {
-				return err
-			}
-			bo.Put("fts", k, buf[:])
-			termList = append(termList, term)
-		}
-
-		// Store reverse index
-		revVal := []byte(strings.Join(termList, ","))
-		bo.Put("ftsrev", revKey, revVal)
-		if err := bRev.Put(revKey, revVal); err != nil {
-			return err
-		}
-
-		// Store BM25 metadata
-		var docLength uint32
-		for _, count := range terms {
-			docLength += uint32(count) // #nosec G115 -- value always positive and bounded
-		}
-		return f.IndexBM25Meta(tx, collection, docID, docLength)
+		return f.indexTermsInTx(tx, &bo, collection, docID, terms)
 	})
 	if err == nil {
 		bo.FlushTo(f.binlog)
 		f.InvalidatePMI(collection)
 	}
 	return err
+}
+
+// indexTermsInTx writes one document's inverted-index entries inside a caller's
+// transaction. Split out of IndexWithLang so a bulk import can index many
+// documents in a single transaction (GO-027) while running exactly the same
+// logic — the batch path cannot drift from the single-document one because
+// there is only one implementation.
+func (f *FTSIndex) indexTermsInTx(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string, terms map[string]int) error {
+	bFTS := tx.Bucket(bucketFTS)
+	bRev := tx.Bucket(bucketFTSRev)
+
+	// Remove old entries via reverse index
+	revKey := ftsRevKey(collection, docID)
+	if old := bRev.Get(revKey); old != nil {
+		oldTerms := strings.Split(string(old), ",")
+		for _, term := range oldTerms {
+			if term != "" {
+				k := ftsKey(collection, term, docID)
+				_ = bFTS.Delete(k)
+				bo.Delete("fts", k)
+			}
+		}
+	}
+
+	// Store new entries
+	termList := make([]string, 0, len(terms))
+	for term, count := range terms {
+		var buf [4]byte
+		binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
+		k := ftsKey(collection, term, docID)
+		if err := bFTS.Put(k, buf[:]); err != nil {
+			return err
+		}
+		bo.Put("fts", k, buf[:])
+		termList = append(termList, term)
+	}
+
+	// Store reverse index. Sorted because the list comes from a Go map, whose
+	// iteration order is randomised: without this, indexing the same document
+	// twice writes different bytes for the same content, which defeats content
+	// hashing and makes two replicas' indexes impossible to compare. Order
+	// carries no meaning here — the list is only ever split to delete a
+	// document's previous terms.
+	sort.Strings(termList)
+	revVal := []byte(strings.Join(termList, ","))
+	bo.Put("ftsrev", revKey, revVal)
+	if err := bRev.Put(revKey, revVal); err != nil {
+		return err
+	}
+
+	// Store BM25 metadata
+	var docLength uint32
+	for _, count := range terms {
+		docLength += uint32(count) // #nosec G115 -- value always positive and bounded
+	}
+	return f.IndexBM25Meta(tx, collection, docID, docLength)
 }
 
 // IndexFieldsWithLang indexes a document's fields using language-specific tokenization.
@@ -309,6 +335,15 @@ func (f *FTSIndex) IndexFieldsWithLang(collection, docID string, fields map[stri
 	}
 
 	return f.db.Update(func(tx *bolt.Tx) error {
+		return f.indexFieldTokensInTx(tx, collection, docID, fieldTokens)
+	})
+}
+
+// indexFieldTokensInTx writes one document's per-field index entries inside a
+// caller's transaction — the shared body behind IndexFieldsWithLang and the
+// bulk path (GO-027).
+func (f *FTSIndex) indexFieldTokensInTx(tx *bolt.Tx, collection, docID string, fieldTokens map[string]map[string]int) error {
+	{
 		if err := f.removeFieldData(tx, collection, docID); err != nil {
 			return err
 		}
@@ -352,12 +387,20 @@ func (f *FTSIndex) IndexFieldsWithLang(collection, docID string, fields map[stri
 			}
 		}
 
+		// Sorted for the same reason as the term lists: identical input must
+		// produce identical bytes.
+		sort.Slice(allEntries, func(i, j int) bool {
+			if allEntries[i].Field != allEntries[j].Field {
+				return allEntries[i].Field < allEntries[j].Field
+			}
+			return allEntries[i].Term < allEntries[j].Term
+		})
 		revData, err := json.Marshal(allEntries)
 		if err != nil {
 			return err
 		}
 		return bRev.Put(ftsfRevKey(collection, docID), revData)
-	})
+	}
 }
 
 // Index adds or updates the FTS index for a document.
@@ -398,7 +441,9 @@ func (f *FTSIndex) Index(collection, docID, content string) error {
 			termList = append(termList, term)
 		}
 
-		// Store reverse index
+		// Store reverse index, sorted for a stable byte representation —
+		// see the note in indexTermsInTx.
+		sort.Strings(termList)
 		revVal := []byte(strings.Join(termList, ","))
 		bo.Put("ftsrev", revKey, revVal)
 		if err := bRev.Put(revKey, revVal); err != nil {
@@ -683,6 +728,14 @@ func (f *FTSIndex) IndexFields(collection, docID string, fields map[string]strin
 		}
 
 		// Store reverse index for cleanup
+		// Sorted for the same reason as the term lists: identical input must
+		// produce identical bytes.
+		sort.Slice(allEntries, func(i, j int) bool {
+			if allEntries[i].Field != allEntries[j].Field {
+				return allEntries[i].Field < allEntries[j].Field
+			}
+			return allEntries[i].Term < allEntries[j].Term
+		})
 		revData, err := json.Marshal(allEntries)
 		if err != nil {
 			return err

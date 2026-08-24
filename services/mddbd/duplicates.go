@@ -9,8 +9,8 @@ import (
 	"sort"
 	"time"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 // ---- Request/Response types ----
@@ -18,7 +18,7 @@ import (
 // FindDuplicatesRequest represents a duplicate detection request.
 type FindDuplicatesRequest struct {
 	Collection     string  `json:"collection"`
-	Mode           string  `json:"mode"`           // "exact", "similar", "both" (default)
+	Mode           string  `json:"mode"`           // "exact", "similar", "minhash", "both" (default)
 	Threshold      float64 `json:"threshold"`      // similarity threshold 0-1 (default 0.9)
 	MaxDocs        int     `json:"maxDocs"`        // max docs to process (default 5000)
 	DistanceMetric string  `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
@@ -44,14 +44,18 @@ type DuplicateDocInfo struct {
 
 // FindDuplicatesResponse represents the result of duplicate detection.
 type FindDuplicatesResponse struct {
-	Collection      string           `json:"collection"`
-	Mode            string           `json:"mode"`
-	Threshold       float64          `json:"threshold"`
-	DistanceMetric  string           `json:"distanceMetric"`
-	TotalDocuments  int              `json:"totalDocuments"`
-	TotalEmbedded   int              `json:"totalEmbedded"`
-	ExactGroups     []DuplicateGroup `json:"exactGroups,omitempty"`
-	SimilarGroups   []DuplicateGroup `json:"similarGroups,omitempty"`
+	Collection     string           `json:"collection"`
+	Mode           string           `json:"mode"`
+	Threshold      float64          `json:"threshold"`
+	DistanceMetric string           `json:"distanceMetric"`
+	TotalDocuments int              `json:"totalDocuments"`
+	TotalEmbedded  int              `json:"totalEmbedded"`
+	ExactGroups    []DuplicateGroup `json:"exactGroups,omitempty"`
+	SimilarGroups  []DuplicateGroup `json:"similarGroups,omitempty"`
+	// MinHashGroups holds near-duplicates found by text overlap (SRCH-002) —
+	// documents that share their words, as opposed to their topic.
+	MinHashGroups   []DuplicateGroup `json:"minhashGroups,omitempty"`
+	MinHashPairs    int              `json:"minhashPairs,omitempty"`
 	ExactDuplicates int              `json:"exactDuplicates"`
 	SimilarPairs    int              `json:"similarPairs"`
 	Stats           *SearchStats     `json:"searchStats,omitempty"`
@@ -120,7 +124,7 @@ func (s *Server) handleFindDuplicates(w http.ResponseWriter, r *http.Request) {
 	if req.Mode == "" {
 		req.Mode = "both"
 	}
-	if req.Mode != "exact" && req.Mode != "similar" && req.Mode != "both" {
+	if req.Mode != "exact" && req.Mode != "similar" && req.Mode != "minhash" && req.Mode != "both" {
 		bad(w, errors.New("mode must be 'exact', 'similar', or 'both'"))
 		return
 	}
@@ -233,6 +237,25 @@ func (s *Server) findDuplicates(req FindDuplicatesRequest) (*FindDuplicatesRespo
 		for _, g := range resp.ExactGroups {
 			resp.ExactDuplicates += len(g.Documents)
 		}
+	}
+
+	// ---- Near-duplicates by text overlap (SRCH-002) ----
+	//
+	// Not part of "both": it reads every document body, which the other two
+	// modes do not, so it is opt-in rather than something "both" quietly
+	// starts doing to a large collection.
+	if req.Mode == "minhash" {
+		groups, scanned, err := s.findMinHashDuplicates(req.Collection, req.Threshold, req.IncludeContent)
+		if err != nil {
+			return nil, err
+		}
+		resp.MinHashGroups = groups
+		resp.TotalDocuments = scanned
+		for _, g := range groups {
+			n := len(g.Documents)
+			resp.MinHashPairs += n * (n - 1) / 2
+		}
+		return resp, nil
 	}
 
 	// ---- Similar duplicates ----

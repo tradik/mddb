@@ -5,19 +5,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	bolt "go.etcd.io/bbolt"
 	"hash/crc32"
 	"io"
-	"log"
+	"log/slog"
 	"mddb/internal/binlog"
+	json "mddb/internal/jsonx"
 	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	"mddb/internal/temporal"
 	"net/http"
 	"sort"
 	"time"
-
-	json "github.com/goccy/go-json"
-	bolt "go.etcd.io/bbolt"
 )
 
 // --- handlers
@@ -127,9 +126,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
-	if req.Limit <= 0 {
-		req.Limit = 50
-	}
+	// RAG-001: request > collection profile > this path's historical default.
+	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
 
 	// Check read permission
 	if s.AuthManager != nil {
@@ -265,41 +263,63 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Reużyj /search
-	sr := SearchRequest{Collection: req.Collection, FilterMeta: req.FilterMeta, Limit: 1 << 30}
-	buf := new(bytes.Buffer)
+	// GO-021: this used to HTTP-POST to its own /v1/search on
+	// localhost:MDDB_ADDR — a loopback round-trip through the whole stack to
+	// reach data the handler already has open. It broke whenever the server
+	// was not reachable at that guessed address (TLS, a unix socket, a
+	// different interface), and it did not check whether the request
+	// succeeded: `res, _ :=` followed by `res.Body.Close()` panicked on a nil
+	// response and took the server down with it. The direct client runs the
+	// same query in-process.
+	client := NewDirectClient(s)
+	exportReq := &MCPExportRequest{
+		Collection: req.Collection,
+		FilterMeta: req.FilterMeta,
+		Format:     req.Format,
+	}
 
 	switch req.Format {
 	case "ndjson":
-		// stream NDJSON
-		res, _ := http.Post("http://localhost"+env("MDDB_ADDR", ":11023")+"/v1/search", "application/json", bytes.NewReader(mustJSON(sr)))
-		defer func() { _ = res.Body.Close() }()
-		var docs []storage.Doc
-		_ = json.NewDecoder(res.Body).Decode(&docs)
-		for _, d := range docs {
-			b, _ := json.Marshal(d)
-			buf.Write(b)
-			buf.WriteByte('\n')
+		stream, err := client.Export(r.Context(), exportReq)
+		if err != nil {
+			bad(w, err)
+			return
 		}
+		defer func() { _ = stream.Close() }()
+
 		w.Header().Set("Content-Type", "application/x-ndjson")
-		_, _ = w.Write(buf.Bytes())
+		// Streamed straight to the client: a large collection no longer has
+		// to exist in memory twice before the first byte leaves.
+		if _, err := io.Copy(w, stream); err != nil {
+			// The status line is long gone by now, so the only honest signal
+			// left is to log it and let the truncated body speak.
+			slog.Warn("streaming an export failed", "collection", req.Collection, "err", err)
+		}
 
 	case "zip":
-		// pack contentMd as files {key}.{lang}.md
-		res, _ := http.Post("http://localhost"+env("MDDB_ADDR", ":11023")+"/v1/search", "application/json", bytes.NewReader(mustJSON(sr)))
-		defer func() { _ = res.Body.Close() }()
-		var docs []storage.Doc
-		_ = json.NewDecoder(res.Body).Decode(&docs)
-		var z bytes.Buffer
-		zw := zip.NewWriter(&z)
+		docs, err := client.collectExportDocs(exportReq)
+		if err != nil {
+			bad(w, err)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/zip")
+		zw := zip.NewWriter(w)
 		for _, d := range docs {
 			name := fmt.Sprintf("%s.%s.md", safe(d.Key), safe(d.Lang))
-			f, _ := zw.Create(name)
-			_, _ = io.WriteString(f, d.ContentMD)
+			f, err := zw.Create(name)
+			if err != nil {
+				slog.Warn("creating a zip entry failed", "name", name, "err", err)
+				break
+			}
+			if _, err := io.WriteString(f, d.ContentMD); err != nil {
+				slog.Warn("writing a zip entry failed", "name", name, "err", err)
+				break
+			}
 		}
-		_ = zw.Close()
-		w.Header().Set("Content-Type", "application/zip")
-		_, _ = w.Write(z.Bytes())
+		if err := zw.Close(); err != nil {
+			slog.Warn("closing the export archive failed", "collection", req.Collection, "err", err)
+		}
 
 	default:
 		http.Error(w, `{"error":"unsupported format"}`, 400)
@@ -359,25 +379,11 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// zamknij db, podmień plik, otwórz ponownie
-	_ = s.DB.Close()
-	if err := copyFile(safeFrom, s.Path); err != nil {
-		bad(w, err)
+	// SEC-015: validated snapshot -> close -> copy -> reopen with rollback,
+	// under the restore lock — shared with the gRPC Restore RPC.
+	if err := s.restoreFromBackup(safeFrom); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
 		return
-	}
-
-	db, err := bolt.Open(s.Path, 0600, getOptimizedBoltOptions())
-	if err != nil {
-		bad(w, err)
-		return
-	}
-	s.DB = db
-
-	// Reset binlog after restore — forces followers to re-snapshot
-	if s.Binlog != nil {
-		if err := s.Binlog.Rotate(0); err != nil {
-			log.Printf("Warning: failed to reset binlog after restore: %v", err)
-		}
 	}
 
 	ok(w, map[string]string{"restored": body.From})
@@ -461,6 +467,15 @@ func bad(w http.ResponseWriter, err error) {
 	_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error()) // #nosec G705 -- response write to http.ResponseWriter
 }
 
+// unprocessable reports a request that parsed correctly but asks for something
+// outside what the server will do — an out-of-range tuning parameter, not a
+// malformed body. The distinction matters to a caller deciding whether to fix
+// its serialisation or its numbers (SRCH-005).
+func unprocessable(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusUnprocessableEntity)
+	_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error()) // #nosec G705 -- response write to http.ResponseWriter
+}
+
 // handleHealth returns a simple health check response
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	// Check if server has finished initialization
@@ -481,8 +496,48 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// GO-032: an operator checking health should see whether acknowledged
+	// writes will actually survive, not only that the process is up.
+	body := map[string]any{
+		"status":      "healthy",
+		"mode":        string(s.Mode),
+		"persistence": s.Persistence,
+		"durable":     s.Persistence.Durable(),
+	}
+	// GO-021: an MCP session a client abandoned without closing lives until it
+	// times out, so a count that only ever grows is the first sign of a leak.
+	if sessions := s.mcpSessionCounts(); sessions != nil {
+		body["mcpSessions"] = sessions
+	}
+	// OPS-019: the check runs once at startup, so this is a cached answer and
+	// costs the health endpoint nothing. Absent when the check is disabled or
+	// has not completed, which is how a monitoring system tells "no update" —
+	// available:false — from "we do not know".
+	if update := s.UpdateStatus; update != nil {
+		body["update"] = update
+	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	_, _ = w.Write([]byte(`{"status":"healthy","mode":"` + string(s.Mode) + `"}`))
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		slog.Debug("writing the health response failed", "err", err)
+	}
+}
+
+// mcpSessionCounts reports open sessions per MCP transport, or nil when MCP is
+// disabled — an absent field says "not running" where a zero would say "idle".
+func (s *Server) mcpSessionCounts() map[string]int {
+	if s == nil || (s.mcpSSE == nil && s.mcpStreamable == nil) {
+		return nil
+	}
+	counts := map[string]int{}
+	if s.mcpSSE != nil {
+		counts["sse"] = s.mcpSSE.SessionCount()
+	}
+	if s.mcpStreamable != nil {
+		counts["streamable"] = s.mcpStreamable.SessionCount()
+	}
+	return counts
 }
 
 // handleComplianceStatus returns the ISO 27001 / SOC 2 production-guard

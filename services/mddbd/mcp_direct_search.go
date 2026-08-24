@@ -62,16 +62,11 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		return nil, errors.New("no embedding provider configured and no queryVector provided")
 	}
 
-	topK := req.TopK
-	if topK <= 0 {
-		topK = 5
-	}
+	// RAG-001: request > collection profile > historical default.
+	topK := c.server.ResolveTopK(req.Collection, req.TopK, 5)
 
-	// Oversample for chunk deduplication
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample for chunk deduplication (SRCH-005).
+	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
@@ -87,6 +82,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 				Results:        []MCPVectorSearchResult{},
 				Algorithm:      algo,
 				DistanceMetric: metricName,
+				// Included even with no results: a field that appears only
+				// sometimes is a field agents handle inconsistently.
+				ResponsePrompt: s.ResponsePrompt(req.Collection, req.Query),
 			}
 			if s.Embedding != nil {
 				resp.Model = s.Embedding.Model()
@@ -157,7 +155,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 			if chunkMode {
 				idx := chunkIndex
 				item.ChunkIndex = &idx
-				item.ChunkText = chunkPassage(doc.ContentMD, chunkIndex, windowSize)
+				item.ChunkText, item.StartLine, item.EndLine =
+					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize, ChunkModeFor(&doc))
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""
@@ -172,11 +171,23 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		Results:   items,
 		Total:     len(items),
 		Algorithm: algo,
+		// RAG-002: the collection's formatting instruction travels with the
+		// results, so an agent does not need a second call to learn how this
+		// collection wants its answers shaped.
+		ResponsePrompt: s.ResponsePrompt(req.Collection, req.Query),
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()
 		resp.Dimensions = s.Embedding.Dimensions()
 	}
+
+	// RAG-001: cap what this collection hands back. The MCP paths resolved
+	// topK from the profile and returned its responsePrompt, and then skipped
+	// the budget — so the caller the cap exists for, an agent assembling a
+	// prompt, was the one path that never had it applied.
+	resp.Results, resp.ContextTruncated = applyContextBudget(s, req.Collection, resp.Results,
+		func(r MCPVectorSearchResult) int { return approxTokens(r.Document.ContentMD) })
+	resp.Total = len(resp.Results)
 
 	return resp, nil
 }
@@ -195,6 +206,10 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 	type docEntry struct {
 		ID        string
 		ContentMD string
+		// Mode has to travel with the document: reindexing must segment it
+		// exactly as the embedding worker did, or the stored chunk indices
+		// stop pointing at the passages they named (CODE-003).
+		Mode ChunkMode
 	}
 	var docs []docEntry
 
@@ -210,7 +225,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 			if err != nil {
 				continue
 			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: ChunkModeFor(d)})
 		}
 		return nil
 	})
@@ -221,7 +236,20 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 	embedded, skipped, failed := 0, 0, 0
 	var errs []string
 
-	for _, d := range docs {
+	// GO-021: reindexing a large collection embeds every document, one
+	// network call at a time. Without progress it is indistinguishable from a
+	// hung call, which is when someone kills it half-finished. Reported every
+	// few documents rather than every one — a notification per document would
+	// be more traffic than the work.
+	const progressEvery = 25
+	ReportProgress(ctx, 0, len(docs), "starting reindex")
+
+	for i, d := range docs {
+		if (i+1)%progressEvery == 0 {
+			ReportProgress(ctx, i+1, len(docs),
+				fmt.Sprintf("embedded %d, skipped %d", embedded, skipped))
+		}
+
 		if d.ContentMD == "" {
 			skipped++
 			continue
@@ -243,7 +271,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 		chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
 		var chunks []string
 		if chunkEnabled {
-			chunks = ChunkText(d.ContentMD, chunkSize)
+			chunks = chunkTextsMode(d.ContentMD, chunkSize, d.Mode)
 		} else {
 			chunks = []string{d.ContentMD}
 		}
@@ -300,6 +328,8 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 			}
 		}
 	}
+
+	ReportProgress(ctx, len(docs), len(docs), "reindex complete")
 
 	return &MCPVectorReindexResponse{
 		Embedded: embedded,
@@ -373,7 +403,7 @@ func (c *DirectClient) ImportURL(ctx context.Context, req *MCPImportURLRequest) 
 		}
 	}
 
-	content, err := fetchURL(req.URL)
+	content, err := fetchURL(ctx, req.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -455,10 +485,8 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		return nil, errors.New("full-text search not initialized")
 	}
 
-	limit := req.Limit
-	if limit <= 0 {
-		limit = 50
-	}
+	// RAG-001: request > collection profile > historical default.
+	limit := c.server.ResolveTopK(req.Collection, req.Limit, 50)
 	algo := req.Algorithm
 	if algo == "" {
 		algo = "tfidf"
@@ -503,10 +531,11 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 	results = c.server.applyBoostFTS(req.Collection, results, req.Boost)
 
 	resp := &MCPFTSSearchResponse{
-		Algorithm: algo,
-		Fuzzy:     fuzzy,
-		Lang:      req.Lang,
-		Results:   make([]MCPFTSResult, 0, len(results)),
+		Algorithm:      algo,
+		Fuzzy:          fuzzy,
+		Lang:           req.Lang,
+		Results:        make([]MCPFTSResult, 0, len(results)),
+		ResponsePrompt: c.server.ResponsePrompt(req.Collection, req.Query),
 	}
 
 	_ = c.server.DBView(func(tx *bolt.Tx) error {
@@ -523,6 +552,17 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < time.Now().Unix() {
 				continue
 			}
+			// CODE-002: fragments and their line ranges are extracted before
+			// the body is dropped — the whole point is to answer without
+			// carrying the document, so the body must go and the lines stay.
+			var highlights []fts.Highlight
+			if req.Highlight && docPtr.ContentMD != "" {
+				highlights = fts.ExtractHighlights(docPtr.ContentMD, res.MatchedTerms, fts.HighlightOptions{
+					OpenTag:      req.HighlightTag,
+					MaxFragments: req.MaxHighlights,
+					FragmentSize: req.FragmentSize,
+				})
+			}
 			if !req.IncludeContent {
 				docPtr.ContentMD = "" // GO-022: don't carry a body the caller discards
 			}
@@ -530,10 +570,18 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 				Document:     docToMCPDocument(*docPtr),
 				Score:        res.Score,
 				MatchedTerms: res.MatchedTerms,
+				Highlights:   highlights,
 			})
 		}
 		return nil
 	})
+	// RAG-001: cap what this collection hands back. The MCP paths resolved
+	// topK from the profile and returned its responsePrompt, and then skipped
+	// the budget — so the caller the cap exists for, an agent assembling a
+	// prompt, was the one path that never had it applied.
+	resp.Results, resp.ContextTruncated = applyContextBudget(c.server, req.Collection, resp.Results,
+		func(r MCPFTSResult) int { return approxTokens(r.Document.ContentMD) })
+
 	resp.Total = len(resp.Results)
 
 	return resp, nil
@@ -632,7 +680,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		TopK:            req.TopK,
 		Algorithm:       req.Algorithm,
 		VectorAlgorithm: req.VectorAlgorithm,
-		Alpha:           req.Alpha,
+		Alpha:           floatPtr(req.Alpha),
 		Strategy:        req.Strategy,
 		RRFK:            req.RRFK,
 		Fuzzy:           req.Fuzzy,
@@ -641,6 +689,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		FilterMeta:      req.FilterMeta,
 		Boost:           req.Boost,
 		Sort:            req.Sort,
+		Oversample:      req.Oversample,
 		IncludeContent:  true,
 	}
 
@@ -656,18 +705,20 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		return nil, err
 	}
 
-	// Defaults
-	if httpReq.TopK <= 0 {
-		httpReq.TopK = 10
-	}
+	// Defaults. RAG-001: request > collection profile > historical default.
+	httpReq.TopK = c.server.ResolveTopK(httpReq.Collection, httpReq.TopK, 10)
 	if httpReq.Strategy == "" {
 		httpReq.Strategy = "alpha"
 	}
 	if httpReq.RRFK <= 0 {
 		httpReq.RRFK = 60
 	}
-	if httpReq.Strategy == "alpha" && httpReq.Alpha == 0 {
-		httpReq.Alpha = 0.5
+	// SRCH-007: the MCP request carries a plain float, so this path cannot
+	// distinguish an omitted alpha from an explicit zero either. Left as it
+	// was rather than half-fixed — the HTTP surface now honours a zero, and
+	// bringing MCP with it means a shape change in the tool schema.
+	if httpReq.Strategy == "alpha" && httpReq.Alpha != nil && *httpReq.Alpha == 0 {
+		httpReq.Alpha = floatPtr(0.5)
 	}
 
 	var merged []HybridSearchResultItem
@@ -675,7 +726,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, httpReq.RRFK, httpReq.TopK)
 	default:
-		merged = mergeAlpha(ftsResults, vectorResults, httpReq.Alpha, httpReq.TopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(httpReq.Alpha), httpReq.TopK)
 	}
 
 	// Apply per-query boosts/demotions (metadata-based score multipliers).
@@ -696,6 +747,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		VectorAlgorithm: httpReq.VectorAlgorithm,
 		DistanceMetric:  distMetric,
 		Results:         make([]MCPHybridSearchResult, 0, len(items)),
+		ResponsePrompt:  c.server.ResponsePrompt(httpReq.Collection, httpReq.Query),
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{
@@ -707,7 +759,23 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 			Rank:          item.Rank,
 		})
 	}
+	// RAG-001: cap what this collection hands back. The MCP paths resolved
+	// topK from the profile and returned its responsePrompt, and then skipped
+	// the budget — so the caller the cap exists for, an agent assembling a
+	// prompt, was the one path that never had it applied.
+	resp.Results, resp.ContextTruncated = applyContextBudget(c.server, req.Collection, resp.Results,
+		func(r MCPHybridSearchResult) int { return approxTokens(r.Document.ContentMD) })
+
 	resp.Total = len(resp.Results)
 
 	return resp, nil
+}
+
+// SearchAdvisor measures a collection and recommends how to search it
+// (SRCH-010).
+func (c *DirectClient) SearchAdvisor(ctx context.Context, collection string) (*SearchRecommendation, error) {
+	if collection == "" {
+		return nil, errors.New("missing required field: collection")
+	}
+	return c.server.RecommendSearch(collection)
 }

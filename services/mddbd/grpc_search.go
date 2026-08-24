@@ -4,17 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"log/slog"
+	"math"
 	"mddb/internal/fts"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	proto "mddb/proto"
 	"strings"
 	"time"
-
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 // VectorSearch implements the VectorSearch RPC
@@ -24,6 +24,12 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermRead); err != nil {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
+	}
+
+	// SRCH-005: InvalidArgument is the gRPC equivalent of the REST 422 —
+	// the message parsed, the number is out of range.
+	if err := ValidateOversample(req.Oversample); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	if req.Collection == "" {
@@ -64,10 +70,8 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		return nil, status.Error(codes.FailedPrecondition, "no embedding provider configured")
 	}
 
-	topK := int(req.TopK)
-	if topK <= 0 {
-		topK = 5
-	}
+	// RAG-001: request > collection profile > historical default.
+	topK := g.server.ResolveTopK(req.Collection, int(req.TopK), 5)
 
 	// Convert proto filter
 	filterMeta := make(map[string][]string)
@@ -75,11 +79,8 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		filterMeta[k] = v.Values
 	}
 
-	// Oversample for chunk deduplication
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
+	// Oversample for chunk deduplication (SRCH-005).
+	searchTopK := OversampledTopK(topK, g.server.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	var results []vec.VectorResult
 	if len(filterMeta) > 0 {
@@ -367,7 +368,7 @@ func (g *GRPCServer) ImportURL(ctx context.Context, req *proto.ImportURLRequest)
 		}
 	}
 
-	content, err := fetchURL(req.Url)
+	content, err := fetchURL(ctx, req.Url)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "fetch failed: "+err.Error())
 	}
@@ -466,10 +467,8 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 		return nil, status.Error(codes.FailedPrecondition, "full-text search not initialized")
 	}
 
-	limit := int(req.Limit)
-	if limit <= 0 {
-		limit = 50
-	}
+	// RAG-001: request > collection profile > historical default.
+	limit := g.server.ResolveTopK(req.Collection, int(req.Limit), 50)
 
 	algo := req.Algorithm
 	if algo == "" {
@@ -674,7 +673,7 @@ func (g *GRPCServer) FTSReindex(ctx context.Context, req *proto.FTSReindexReques
 	for _, d := range docs {
 		if err := g.server.FTSIndex.IndexWithLang(req.Collection, d.ID, d.ContentMD, d.Lang); err != nil {
 			failed++
-			log.Printf("fts reindex %s/%s: %v", req.Collection, d.ID, err)
+			slog.Warn("FTS reindex failed", "collection", req.Collection, "iD", d.ID, "err", err)
 			continue
 		}
 		_ = g.server.FTSIndex.IndexPositionsWithLang(req.Collection, d.ID, d.ContentMD, d.Lang)
@@ -734,11 +733,8 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, query")
 	}
 
-	// Defaults
-	topK := int(req.TopK)
-	if topK <= 0 {
-		topK = 10
-	}
+	// Defaults. RAG-001: request > collection profile > historical default.
+	topK := g.server.ResolveTopK(req.Collection, int(req.TopK), 10)
 	algo := req.Algorithm
 	if algo == "" {
 		algo = "bm25"
@@ -803,7 +799,7 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		TopK:            topK,
 		Algorithm:       algo,
 		VectorAlgorithm: vectorAlgo,
-		Alpha:           alpha,
+		Alpha:           floatPtr(alpha),
 		Strategy:        strategy,
 		RRFK:            rrfK,
 		Fuzzy:           fuzzy,
@@ -882,4 +878,72 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		resp.Facets = facetsToProto(computeFacets(docs, req.FacetBy, int(req.FacetMaxValues)))
 	}
 	return resp, nil
+}
+
+// SearchAdvisor measures a collection and recommends how to search it
+// (SRCH-010).
+//
+// Added for gRPC parity after the HTTP endpoint and the MCP tool: the Python
+// client speaks gRPC, so an adapter built on it could not reach the advice at
+// all. Read-only — it measures and returns, and storing the recommendation
+// stays an explicit write through the collection-config surface.
+func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisorRequest) (*proto.SearchAdvisorResponse, error) {
+	if req.GetCollection() == "" {
+		return nil, status.Error(codes.InvalidArgument, "collection is required")
+	}
+	if g.server.AuthManager != nil {
+		if err := g.server.AuthManager.CheckPermission(ctx, req.GetCollection(), PermRead); err != nil {
+			return nil, status.Error(codes.PermissionDenied, "forbidden")
+		}
+	}
+
+	rec, err := g.server.RecommendSearch(req.GetCollection())
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	p := rec.Profile
+	return &proto.SearchAdvisorResponse{
+		Profile: &proto.CollectionProfile{
+			Collection: p.Collection,
+			// Counts are clamped rather than converted: a collection of more
+			// than two billion documents would otherwise arrive negative, and
+			// a negative document count is a worse answer than a saturated one.
+			Documents:            clampInt32(p.Documents),
+			Sampled:              clampInt32(p.Sampled),
+			EmbeddedDocuments:    clampInt32(p.EmbeddedDocuments),
+			VectorDimensions:     clampInt32(p.VectorDimensions),
+			MedianWords:          clampInt32(p.MedianWords),
+			LongDocumentRatio:    p.LongDocumentRatio,
+			DistinctTerms:        clampInt32(p.DistinctTerms),
+			TermsPerDocument:     p.TermsPerDocument,
+			TypeTokenRatio:       p.TypeTokenRatio,
+			CodeDocuments:        clampInt32(p.CodeDocuments),
+			EstimatedVectorBytes: p.EstimatedVectorBytes,
+		},
+		SearchType:      rec.SearchType,
+		FtsAlgorithm:    rec.FTSAlgorithm,
+		VectorAlgorithm: rec.VectorAlgorithm,
+		HybridStrategy:  rec.HybridStrategy,
+		HybridAlpha:     rec.HybridAlpha,
+		RetrievalMode:   rec.RetrievalMode,
+		TopK:            clampInt32(rec.TopK),
+		Reasons:         rec.Reasons,
+		Warnings:        rec.Warnings,
+	}, nil
+}
+
+// clampInt32 narrows a count to the protobuf field that carries it.
+//
+// Saturating rather than wrapping: a collection larger than MaxInt32 would
+// otherwise be reported as a negative number of documents, and a caller
+// reading that has no way to tell it from a bug.
+func clampInt32(n int) int32 {
+	if n > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	if n < math.MinInt32 {
+		return math.MinInt32
+	}
+	return int32(n)
 }

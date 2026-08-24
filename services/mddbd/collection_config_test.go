@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	json "github.com/goccy/go-json"
 	bolt "go.etcd.io/bbolt"
+	json "mddb/internal/jsonx"
 )
 
 func newTestServerForCollectionConfig(t *testing.T) (*Server, func()) {

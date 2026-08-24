@@ -344,7 +344,7 @@ func TestReplicationClientRebuildInMemoryState(t *testing.T) {
 	})
 
 	// Should not panic
-	rc.rebuildInMemoryState()
+	rc.server.rebuildInMemoryState()
 
 	// Verify subsystems were rebuilt (non-nil)
 	if s.VectorStore == nil {
@@ -378,7 +378,7 @@ func TestReplicationClientRebuildInMemoryStateNilSubsystems(t *testing.T) {
 	})
 
 	// Should not panic with nil subsystems
-	rc.rebuildInMemoryState()
+	rc.server.rebuildInMemoryState()
 }
 
 func TestReplicationClientConnect(t *testing.T) {

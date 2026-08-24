@@ -6,8 +6,12 @@ cors_origins = ["*"]
 [mddb]
 grpc_addr = "http://localhost:11024"
 default_collection = "docs"
-search_top_k = 5
-search_type = "hybrid"  # "hybrid", "vector", "fts"
+# Retrieval settings. Leave these commented out to use whatever the collection
+# says (its retrieval profile, set in the panel or over the API) — that is the
+# point of RAG-001: search settings live next to the data, not in every client.
+# Uncomment only to override a specific collection's profile from here.
+# search_top_k = 5
+# search_type = "hybrid"  # "hybrid", "vector", "fts"
 # Credentials used to authenticate to mddbd. Leave EMPTY here and supply them
 # via env (SEC-007): MDDB_CHAT_AUTH_USERNAME / MDDB_CHAT_AUTH_PASSWORD override
 # these when blank. Never commit real passwords — config.toml is gitignored.
@@ -34,7 +38,6 @@ api_key = ""  # or set MDDB_CHAT_LLM_API_KEY env var
 model = "gpt-4o-mini"
 max_tokens = 1024
 temperature = 0.7
-stream = true
 
 [session]
 max_concurrent = 2
@@ -48,6 +51,35 @@ name_max_chars = 50
 rate_limit_per_minute = 30
 max_message_length = 2000
 webhook_secret = ""  # or set MDDB_CHAT_WEBHOOK_SECRET env var
+
+# Tokens one session may spend before it is refused. 0 = unlimited.
+#
+# The second limit, and the one a budget actually runs out in. A scenario's
+# max_turns caps how many turns a conversation takes and says nothing about
+# what they cost — one turn carrying a large retrieval context through several
+# tool-calling rounds can be worth ten short ones.
+#
+# Charged from the usage block every provider response carries, summed across
+# every round of a turn rather than only the round that produced the answer.
+# A turn that exhausts the tool-calling rounds and falls through to the
+# streaming path undercounts by its final response: that call's usage arrives
+# in an SSE frame this server does not read.
+max_tokens_per_session = 0
+
+# Networks whose X-Forwarded-For header is believed, as addresses or CIDRs.
+#
+# Leave this empty and the rate limit is charged to the TCP peer, which cannot
+# be spoofed — right for a directly exposed server. Behind a reverse proxy or
+# cloudflared, though, every visitor arrives from the proxy's address and they
+# all share one bucket, so the first noisy visitor locks everyone out.
+#
+# Set it to the proxy's address or network to get per-visitor limits back.
+# Only list addresses you control: anything listed here can name whatever
+# client address it likes.
+#
+#   trusted_proxies = ["172.16.0.0/12"]   # the Docker bridge network
+#   trusted_proxies = ["10.0.0.7"]        # one nginx host
+trusted_proxies = []
 
 [scenarios.assistant]
 name = "Documentation Assistant"

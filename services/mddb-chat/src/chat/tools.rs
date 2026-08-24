@@ -11,7 +11,9 @@ fn strip_markdown(input: &str) -> String {
     let mut s = input.to_string();
     // Remove code fences (```lang ... ```)
     let code_fence = Regex::new(r"(?s)```[a-zA-Z]*\n?.*?```").unwrap();
-    s = code_fence.replace_all(&s, "[code block removed]").to_string();
+    s = code_fence
+        .replace_all(&s, "[code block removed]")
+        .to_string();
     // Remove inline code
     let inline_code = Regex::new(r"`([^`]+)`").unwrap();
     s = inline_code.replace_all(&s, "$1").to_string();
@@ -113,7 +115,11 @@ pub async fn execute_tool(
     tool_call: &ToolCall,
     default_collection: &str,
 ) -> Result<String, AppError> {
-    debug!(tool = tool_call.function.name, args = tool_call.function.arguments, "executing tool");
+    debug!(
+        tool = tool_call.function.name,
+        args = tool_call.function.arguments,
+        "executing tool"
+    );
 
     match tool_call.function.name.as_str() {
         "search_docs" => {
@@ -175,7 +181,10 @@ pub async fn execute_tool(
                     args.key, doc.key, content
                 ))
             } else {
-                Ok(format!("Document '{}' not found in collection '{}'.", args.key, collection))
+                Ok(format!(
+                    "Document '{}' not found in collection '{}'.",
+                    args.key, collection
+                ))
             }
         }
         other => Ok(format!("Unknown tool: {other}")),

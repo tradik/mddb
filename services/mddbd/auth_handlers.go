@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	json "github.com/goccy/go-json"
+	json "mddb/internal/jsonx"
 )
 
 // ---- Request/Response types ----

@@ -1,6 +1,6 @@
 # Multi-stage build for minimal image size
 # Stage 1: Build
-FROM golang:1.26.5-alpine AS builder
+FROM golang:1.27.0-alpine AS builder
 
 # Install build dependencies (git for VCS stamping, make for Makefile targets)
 RUN apk add --no-cache git make
@@ -58,6 +58,8 @@ EXPOSE 11023 11024 9000 11443
 # Environment variables with defaults
 ENV MDDB_ADDR=":11023" \
     MDDB_GRPC_ADDR=":11024" \
+    MDDB_LOG_FORMAT="json" \
+    MDDB_LOG_LEVEL="info" \
     MDDB_MODE="wr" \
     MDDB_PATH="/app/data/mddb.db" \
     MDDB_HTTP_ENABLED="true" \

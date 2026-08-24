@@ -376,7 +376,7 @@ func TestFetchURL_Success(t *testing.T) {
 	}))
 	defer server.Close()
 
-	content, err := fetchURL(server.URL)
+	content, err := fetchURL(t.Context(), server.URL)
 	if err != nil {
 		t.Fatalf("fetchURL failed: %v", err)
 	}
@@ -391,7 +391,7 @@ func TestFetchURL_NotFound(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := fetchURL(server.URL)
+	_, err := fetchURL(t.Context(), server.URL)
 	if err == nil {
 		t.Error("expected error for 404 response")
 	}
@@ -406,14 +406,14 @@ func TestFetchURL_ServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	_, err := fetchURL(server.URL)
+	_, err := fetchURL(t.Context(), server.URL)
 	if err == nil {
 		t.Error("expected error for 500 response")
 	}
 }
 
 func TestFetchURL_InvalidURL(t *testing.T) {
-	_, err := fetchURL("http://[::1]:namedport")
+	_, err := fetchURL(t.Context(), "http://[::1]:namedport")
 	if err == nil {
 		t.Error("expected error for invalid URL")
 	}
@@ -425,7 +425,7 @@ func TestFetchURL_EmptyResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	content, err := fetchURL(server.URL)
+	content, err := fetchURL(t.Context(), server.URL)
 	if err != nil {
 		t.Fatalf("fetchURL failed: %v", err)
 	}
@@ -442,7 +442,7 @@ func TestFetchURL_LargeResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	content, err := fetchURL(server.URL)
+	content, err := fetchURL(t.Context(), server.URL)
 	if err != nil {
 		t.Fatalf("fetchURL failed: %v", err)
 	}
@@ -465,7 +465,7 @@ Body content.`
 	}))
 	defer server.Close()
 
-	content, err := fetchURL(server.URL)
+	content, err := fetchURL(t.Context(), server.URL)
 	if err != nil {
 		t.Fatalf("fetchURL failed: %v", err)
 	}

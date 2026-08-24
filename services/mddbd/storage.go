@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 
 	"mddb/internal/compression"
@@ -8,7 +9,6 @@ import (
 	"mddb/internal/storage"
 	pb "mddb/proto"
 
-	json "github.com/goccy/go-json"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,7 +64,22 @@ func loadDoc(data []byte) (*storage.Doc, error) {
 		}
 		data = pt
 	}
-	// JSON always starts with '{' (0x7B = 123)
+	// JSON always starts with '{' (0x7B = 123).
+	//
+	// Decoded with the standard library rather than goccy (TEST-003).
+	// goccy v0.10.6 panics with an index-out-of-range inside
+	// decodeKeyByBitmapUint8 on malformed JSON decoded into storage.Doc —
+	// around 5% of calls in a mixed sequence, because the fault depends on
+	// the decoder state left by a previous decode rather than on the input
+	// alone. That is why a single offending document could never be
+	// isolated.
+	//
+	// This branch reads documents written before the protobuf format, and
+	// the bytes may come from a corrupt file, a restored backup, or another
+	// node. It is not the throughput path — that is unmarshalDoc below — so
+	// the speed goccy was chosen for (GO-026) is not what is at stake here,
+	// and a decoder that returns an error beats one that takes the process
+	// down. See GO-037.
 	if data[0] == '{' {
 		var doc storage.Doc
 		if err := json.Unmarshal(data, &doc); err != nil {
