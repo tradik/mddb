@@ -367,11 +367,14 @@ func TestWebhookFire(t *testing.T) {
 	var mu sync.Mutex
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&received, 1)
 		body, _ := io.ReadAll(r.Body)
 		mu.Lock()
 		_ = json.Unmarshal(body, &receivedPayload)
 		mu.Unlock()
+		// Incremented last, after the payload is stored: the counter is what
+		// the test waits on, so it must not become non-zero before the thing
+		// the test then reads is there.
+		atomic.AddInt32(&received, 1)
 		w.WriteHeader(200)
 	}))
 	defer ts.Close()

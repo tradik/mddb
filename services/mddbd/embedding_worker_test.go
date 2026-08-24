@@ -232,8 +232,18 @@ func TestEmbeddingWorker_ReembedOnContentChange(t *testing.T) {
 		ContentMD:  "New content",
 	})
 
-	testsync.WaitForCount(t, "the provider to be called for the changed content", 1,
-		provider.getCallCount)
+	// Wait for the store to be rewritten, not for the provider to be called.
+	// Those are two events — the provider returning a vector, and the worker
+	// persisting it — and waiting on the first races the second. This test
+	// failed in CI exactly that way, reading the pre-stored 0.1 after the call
+	// count had already reached 1.
+	//
+	// The condition is the content hash rather than the vector, so the value
+	// assertion below still asserts something.
+	testsync.Wait(t, "the stored embedding to be rewritten for the new content", func() bool {
+		rec, err := vs.Get("col", "doc-1")
+		return err == nil && rec != nil && rec.ContentHash != "old-hash"
+	})
 
 	// Provider should have been called since content changed
 	if provider.getCallCount() == 0 {
@@ -241,10 +251,12 @@ func TestEmbeddingWorker_ReembedOnContentChange(t *testing.T) {
 	}
 
 	// Verify new embedding was stored
-	rec, _ := vs.Get("col", "doc-1")
+	rec, err := vs.Get("col", "doc-1")
+	if err != nil {
+		t.Fatalf("VectorStore.Get: %v", err)
+	}
 	if rec == nil {
 		t.Fatal("expected updated embedding")
-		return
 	}
 	if rec.Vector[0] != 0.4 {
 		t.Errorf("Vector[0] = %f, want 0.4", rec.Vector[0])

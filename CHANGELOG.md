@@ -131,11 +131,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Three tests waited on a signal that arrives before the state they assert
+  (TEST-004 follow-up)** — CI caught one: `Vector[0] = 0.100000, want 0.4`,
+  reading the pre-stored vector after the embedding provider's call count had
+  reached 1. The provider returning and the worker persisting the result are two
+  events, and waiting on the first races the second.
+
+  Auditing every `testsync` call site for the same shape found two more. A
+  webhook test incremented its received-counter before unmarshalling the payload
+  it then asserted on. And in production code, the audit exporter incremented
+  `Failed` before setting `LastError` — so anything polling `Stats()`, a monitor
+  as much as a test, could see a failure recorded with no error attached. The
+  counter is now the last thing to become visible in all three.
+
+  The other twenty-two call sites are sound: `indexqueue` increments `processed`
+  after `processJob` returns, and the rest wait on the end state itself.
+
+- **Two concurrent copies to the same destination could publish a blend of
+  both** — `copyFile` wrote to a fixed `dst.tmp`, so two backups requested with
+  the same `to` interleaved their bytes into one file before either renamed it
+  into place. It now uses `os.CreateTemp` in the destination's directory, which
+  gives each copy its own name. They still race on the final rename — one wins,
+  and that is the caller's business — but the winner is now one of the sources
+  rather than a mixture. Mutation-checked: restoring the shared name fails the
+  new test four times in five.
+
 - **A failed copy left an orphan the size of what it had written** —
-  `copyFile` wrote to `dst.tmp` and renamed it into place, but removed it on
-  none of its three failure paths. After a failed restore that orphan is a
-  partial copy of the database, sitting on the filesystem whose running out of
-  room is the most likely reason the copy failed in the first place.
+  `copyFile` removed its temp file on none of its three failure paths. After a
+  failed restore that orphan is a partial copy of the database, sitting on the
+  filesystem whose running out of room is the most likely reason the copy
+  failed in the first place.
 
 - **Nothing verified that a restore resets the binlog** — the branch that does
   it had never executed: every server in the restore suite runs without a

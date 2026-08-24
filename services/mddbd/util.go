@@ -88,22 +88,28 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	defer func() { _ = in.Close() }()
-	tmp := dst + ".tmp"
-	// #nosec G304 -- Subpath created securely
-	out, err := os.Create(filepath.Clean(tmp))
+	// The temp file is created by os.CreateTemp in the destination's own
+	// directory rather than at a fixed dst+".tmp". Two properties come from
+	// that: the name is unique, so two copies to the same destination no longer
+	// write through each other's temp file; and the path this function later
+	// deletes is one os.CreateTemp produced, not one assembled from the
+	// caller's string.
+	out, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp-*")
 	if err != nil {
 		return err
 	}
-	// Clean up the temp file on every failure path. Both calls are no-ops once
-	// the copy has succeeded — Close on a closed file, Remove on a path the
-	// rename has emptied. Without this a copy that fails midway leaves an
-	// orphan the size of whatever it managed to write, which on a restore is a
-	// partial copy of the database, sitting on the filesystem that most likely
-	// just ran out of room.
+	tmp := out.Name()
+	// Clean up on every failure path. Both calls are no-ops once the copy has
+	// succeeded — Close on a closed file, Remove on a path the rename has
+	// emptied. Without this a copy that fails midway leaves an orphan the size
+	// of whatever it managed to write, which on a restore is a partial copy of
+	// the database, sitting on the filesystem that most likely just ran out of
+	// room.
 	defer func() {
 		_ = out.Close()
-		// #nosec G703 -- tmp is dst+".tmp"; every caller passes either a path
-		// from safeBackupPath or the server's own database path
+		// #nosec G703 -- tmp is the name os.CreateTemp just produced, so this
+		// can only unlink the file this function itself created two statements
+		// ago. Its reachable set is a subset of that create's.
 		_ = os.Remove(tmp)
 	}()
 
