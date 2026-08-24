@@ -179,9 +179,30 @@ mddb-cli fts blog --query="getting started" --algorithm=bm25
 
 **Other platforms:** See [Installation Guide](docs/INSTALLATION.md)
 
-**Windows:** WSL2 runs the tested Linux binary and is the supported route. A
-native `windows/amd64` build compiles from source as of 2.13 but ships no
-release artifacts and has no CI coverage yet — see
+### Platform support
+
+| Platform | Release binary | Test suite runs in CI |
+|---|---|---|
+| linux/amd64, linux/arm64 | ✅ | ✅ every push |
+| darwin/amd64, darwin/arm64 | ✅ | compiled and vetted, not run |
+| freebsd/amd64, freebsd/arm64 | ✅ | compiled and vetted, not run |
+| **windows/amd64** | ❌ build from source | ✅ every push, since 2.13 |
+| windows/arm64 | ❌ | ❌ not a target |
+
+Two things this table is precise about on purpose.
+
+**macOS and FreeBSD ship binaries that no CI job executes.** They are built and
+type-checked on every push, including test files, which catches a platform-split
+that fails to compile — the FreeBSD build broke once on a `Statfs_t` field width
+and that is exactly what it catches. It does not catch a syscall that compiles
+and returns the wrong thing.
+
+**Windows runs the suite but ships nothing.** As of 2.13 the full test suite runs
+on `windows-latest` on every push, and native `windows/amd64` binaries build from
+source with `make build-windows`. There are no Windows release artifacts, and
+Unix domain sockets are refused there by design — the listener's security model
+is owner-only mode bits, which Windows cannot express. WSL2 remains the route
+that runs the same binary every release is built and tested against. See the
 [Installation Guide](docs/INSTALLATION.md#windows).
 
 ### Build from Source
