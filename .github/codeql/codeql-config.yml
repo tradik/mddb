@@ -58,3 +58,15 @@ query-filters:
   # unbounded dump of a failed frame is bad diagnostics regardless of security.
   - exclude:
       id: js/log-injection
+
+# Not expressible here, and recorded so the reason is not lost:
+#
+# go/path-injection on services/mddbd/util.go (copyFile) has now been raised
+# five times — alerts #19, #20, #56, #57, #60 — each at a different line as the
+# function was edited, each dismissed as a false positive. query-filters can
+# exclude a rule but not a rule-in-a-file, and excluding go/path-injection
+# outright is not on: it is the rule that found the missing permission check on
+# /v1/geo-reindex in 2.12, which was real.
+#
+# So that one lives as a dismissal, and the reasoning also lives in a comment
+# at the call site, where the next person to move the line will see it.

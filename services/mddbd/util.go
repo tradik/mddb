@@ -94,6 +94,16 @@ func copyFile(src, dst string) error {
 	// write through each other's temp file; and the path this function later
 	// deletes is one os.CreateTemp produced, not one assembled from the
 	// caller's string.
+	//
+	// CodeQL raises go/path-injection here and has done so at four earlier line
+	// numbers in this function (alerts #19, #20, #56, #57, #60), each dismissed
+	// as a false positive. It traces dst back to a request parameter and does
+	// not model safeBackupPath as a barrier: it sees the filepath.Clean calls,
+	// which correctly are not barriers, and not the filepath.Rel check against
+	// ".." that follows them on symlink-resolved paths. Every caller passes
+	// either safeBackupPath's output or the server's own database path —
+	// restore_backup.go, http_handlers.go and mcp_direct_client.go twice.
+	// Moving this line raises the alert again; the answer is the same.
 	out, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp-*")
 	if err != nil {
 		return err
