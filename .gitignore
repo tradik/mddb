@@ -170,4 +170,5 @@ AUDIT_REPORT.md
 # A report belongs in the ticket that asked for it, not in the tree.
 tools/bench/soak/soak
 tools/bench/soak/mddb-soak
+/mddb-soak
 soak-report/
