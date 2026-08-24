@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **The Python packages no longer resolve a 2017 `requests` (14 Dependabot
+  alerts)** — `integrations/langchain-mddb/uv.lock` and
+  `clients/python/uv.lock` were locked against `requires-python = ">=3.9"`,
+  and uv resolves such a range as **branches**: one for Python ≥3.10 and one
+  for below it. The modern branch took `requests 2.34.2`; the 3.9 branch could
+  only satisfy its whole graph with **`requests 2.15.1`, published in 2017**,
+  carrying four CVEs including one from 2018. The same split pulled in old
+  `langchain-core`, `langsmith`, `orjson` and `pytest`.
+
+  These vulnerabilities were not introduced by the lock files — they were
+  introduced by *committing* them, which is the first time anything could see
+  the transitive tree at all. That is the lock files working as intended.
+
+  Both floors move to `>=3.10` and the split disappears: single-branch
+  resolution, `requests 2.34.2`, `langchain-core 1.6.0`, `langsmith 0.11.1`,
+  `orjson 3.12.0`, `pytest 9.1.1`.
+
+  **This drops Python 3.9 support for these two packages.** 3.9 reached end of
+  life in October 2025, and supporting it was costing a decade-old HTTP client
+  in the dependency tree. `services/python-extension` still declares `>=3.9`
+  and is unaffected — it has no lock file and was not part of this.
+
+  Verified rather than assumed: the LangChain adapter's 20 tests pass against
+  `langchain-core` **1.x**, a major-version jump from the 0.3 it had been
+  resolving, and the Python client imports and passes its 18.
+
 ## [2.12.0] - 2026-08-24
 
 ### Added
