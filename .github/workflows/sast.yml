@@ -73,9 +73,22 @@ jobs:
       # Reporting pass. -no-fail so the SARIF always reaches the Security tab,
       # including on the run that finds something: a finding that only exists
       # in a failed job's log is a finding nobody triages.
+      # -tags noasm is not about security, it is about gosec being able to load
+      # the package at all. internal/vector declares three functions that are
+      # implemented in assembly (SRCH-011), and a declaration without a body is
+      # a type error to gosec's loader, which reads .go files and knows nothing
+      # about .s ones:
+      #
+      #   internal/vector/vector_math_amd64.go:46:6: missing function body
+      #
+      # The whole package then fails to type-check and is skipped, silently for
+      # the SARIF pass and loudly for the gate. Under noasm the scalar
+      # implementation compiles in its place, so the package stays under
+      # analysis; the assembly itself contains no syscalls, no paths and no
+      # allocation, which is to say nothing any gosec rule looks for.
       - name: Scan (SARIF for the Security tab)
         working-directory: ${{ matrix.module.path }}
-        run: gosec -no-fail -exclude-dir=proto -fmt sarif -out gosec.sarif ./...
+        run: gosec -no-fail -tags noasm -exclude-dir=proto -fmt sarif -out gosec.sarif ./...
 
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4
@@ -93,7 +106,7 @@ jobs:
       # by the next `buf generate`.
       - name: Gate on medium and above
         working-directory: ${{ matrix.module.path }}
-        run: gosec -exclude-dir=proto -severity=medium ./...
+        run: gosec -tags noasm -exclude-dir=proto -severity=medium ./...
 
   codeql:
     name: CodeQL (${{ matrix.language }})
