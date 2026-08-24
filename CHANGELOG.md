@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The server and CLI cross-compile for Windows (WIN-001)** — `GOOS=windows`
+  failed on three files using Unix-only syscalls: `syscall.Getrusage` for the
+  CPU sampler and `syscall.Statfs` for disk space, in two places.
+
+  Each is now one signature with two implementations behind a build tag —
+  `diskSpace` over `statfs` / `GetDiskFreeSpaceEx`, and `processCPUTime` over
+  `getrusage` / `GetProcessTimes`. No call site changed platform behaviour, and
+  the two disk callers that had been running near-identical block arithmetic now
+  share one primitive.
+
+  `make build-windows` produces `mddbd.exe` and `mddb-cli.exe` for
+  `windows/amd64`. `windows/arm64` is not built.
+
+  One thing the Windows implementation gets deliberately wrong-looking:
+  `windows.Filetime` has a `Nanoseconds` method, and calling it here would be a
+  bug. It subtracts the 1601-to-1970 epoch offset because it converts
+  *timestamps*, while `GetProcessTimes` returns *durations* — so a second of CPU
+  would read as roughly minus 369 years. There is a test asserting that method
+  is wrong for this input, so a future edit reaching for the obvious call gets
+  stopped.
+
+  **This is not Windows support.** The binaries build and link; no CI job has
+  run the test suite on Windows, and no release ships a Windows artifact. Two
+  known gaps remain: replacing a file another process holds open behaves
+  differently there, and Unix domain sockets compile without being exercised.
+  WSL2 remains the supported route, and the installation guide now says so
+  explicitly rather than implying parity.
+
+  Verified on the full release matrix — `go vet` including test files passes for
+  `windows/amd64`, `linux/amd64`, `linux/arm64`, `freebsd/amd64`, `darwin/amd64`
+  and `darwin/arm64`. The new platform layer is at 100% statement coverage and
+  is now a tracked coverage area; the failure branches are reached by replacing
+  the syscall, since a working kernel does not fail `getrusage` on itself.
+
 - **The vector index no longer blocks a Windows build (WIN-003)** — MDDB's
   HNSW index comes from `github.com/coder/hnsw`, and that package does not
   compile for Windows. Its `SavedGraph.Save` uses `github.com/google/renameio`,
@@ -72,6 +106,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   had *recorded* the delivery — two different events, with the counter
   incremented after the response returns. It only failed once the poll interval
   got short enough to catch the gap.
+
+### Fixed
+
+- **`make build` existed only in the README (WIN-001)** — the documented way to
+  build MDDB from source was `make build`, and the Makefile had no such target.
+  Added it, alongside `build-windows`.
+
+- **The Makefile reported version 2.11.4 through two releases** — `make version`
+  printed a hardcoded string that `scripts/check-version.sh` does not know about.
+  Thirteen other sources are guarded and stayed in step; this fourteenth one drifted
+  quietly. It now reads the version from `services/mddbd/main.go` instead of
+  keeping a copy, so the class of bug is gone rather than the instance.
 
 ### Removed
 

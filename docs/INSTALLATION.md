@@ -262,9 +262,37 @@ mddbd
 
 ---
 
-## Windows (WSL2)
+## Windows
 
-MDDB works best on Windows with WSL2 (Windows Subsystem for Linux).
+Two options, and they are not equivalent yet.
+
+**WSL2 is the supported route.** It runs the same Linux binary that every
+release is built and tested against, so it inherits the full test suite.
+
+**A native Windows build exists but is experimental.** As of 2.13 the server
+and CLI compile and link for `windows/amd64` from source. There are no Windows
+release artifacts, and no CI job runs the test suite on Windows yet, so nothing
+has proven the binaries behave correctly once they start — only that they
+build. Treat it as something to try, not something to run a database on.
+
+Two areas are known to differ and are not yet addressed: replacing a file that
+another process holds open behaves differently on Windows than on Unix, and
+Unix domain sockets compile but are not exercised. Configure a TCP listener.
+
+```powershell
+git clone https://github.com/tradik/mddb.git
+cd mddb
+go build -o mddbd.exe ./services/mddbd
+go build -o mddb-cli.exe ./services/mddb-cli
+```
+
+Cross-compiling from Linux or macOS produces the same pair:
+
+```bash
+make build-windows      # → dist/windows-amd64/{mddbd.exe,mddb-cli.exe}
+```
+
+`windows/arm64` is not built.
 
 ### Install WSL2
 

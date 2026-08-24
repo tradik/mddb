@@ -33,6 +33,14 @@ AREAS=(
   "graphql_adapter.go:92"
   "routes.go:95"
   "main.go:0"
+  # WIN-001. The platform layer: two syscalls behind one signature each. Small,
+  # and the branches that matter are the ones a healthy machine never takes, so
+  # they are reached by replacing the syscall. The Windows pair reads as "not in
+  # profile" on a Linux run and is checked by the windows-latest job.
+  "platform_disk_unix.go:90"
+  "platform_cpu_unix.go:90"
+  "platform_disk_windows.go:90"
+  "platform_cpu_windows.go:90"
 )
 
 if [[ ! -f "$PROFILE" ]]; then

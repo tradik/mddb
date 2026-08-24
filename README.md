@@ -179,12 +179,18 @@ mddb-cli fts blog --query="getting started" --algorithm=bm25
 
 **Other platforms:** See [Installation Guide](docs/INSTALLATION.md)
 
+**Windows:** WSL2 runs the tested Linux binary and is the supported route. A
+native `windows/amd64` build compiles from source as of 2.13 but ships no
+release artifacts and has no CI coverage yet — see
+[Installation Guide](docs/INSTALLATION.md#windows).
+
 ### Build from Source
 
 ```bash
 git clone https://github.com/tradik/mddb.git
 cd mddb
-make build
+make build                 # host platform
+make build-windows         # cross-compile windows/amd64 into dist/
 ./services/mddbd/mddbd
 ```
 

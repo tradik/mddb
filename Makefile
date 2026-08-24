@@ -1,4 +1,10 @@
-.PHONY: docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+# The release version, read from the one file that owns it. Never hardcode it
+# here: scripts/check-version.sh guards thirteen other sources and does not know
+# about this file, so a copy kept here drifts silently — as it had, at 2.11.4
+# through two releases.
+MDDB_VERSION := $(shell sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' services/mddbd/main.go | head -1)
+
+.PHONY: build build-windows docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -161,7 +167,28 @@ widget-dev: ## Run widget dev server
 	cd services/mddb-chat-widget && npm run dev
 
 version: ## Show current version
-	@echo "MDDB Version: 2.11.4"
+	@echo "MDDB Version: $(MDDB_VERSION)"
+
+build: ## Build the server and CLI for the host platform
+	@echo "Building $(MDDB_VERSION) for $$(go env GOOS)/$$(go env GOARCH)"
+	@set -e; \
+	cd services/mddbd && go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" -o mddbd . ; \
+	cd ../mddb-cli && go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" -o mddb-cli .
+	@echo "  services/mddbd/mddbd"
+	@echo "  services/mddb-cli/mddb-cli"
+
+build-windows: ## Cross-compile the Windows binaries into dist/windows-amd64 (WIN-001)
+	@# amd64 only. windows/arm64 is deliberately not built — see audit WIN-001.
+	@echo "Building $(MDDB_VERSION) for windows/amd64"
+	@mkdir -p dist/windows-amd64
+	@set -e; \
+	cd services/mddbd && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+		go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" \
+		-o ../../dist/windows-amd64/mddbd.exe . ; \
+	cd ../mddb-cli && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
+		go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" \
+		-o ../../dist/windows-amd64/mddb-cli.exe .
+	@ls -l dist/windows-amd64
 
 check-go-version: ## Verify Go toolchain pins are consistent (go.work/go.mod/CI/Docker)
 	@bash scripts/check-go-version.sh --print
