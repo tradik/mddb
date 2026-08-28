@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"mddb/internal/automationlog"
+	"mddb/internal/embedding"
 	"mddb/internal/httpclient"
 	json "mddb/internal/jsonx"
 	"mddb/internal/sentiment"
@@ -188,7 +189,7 @@ func (am *AutomationManager) evalVector(trigger *AutomationRule, doc *storage.Do
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	queryVector, err := s.Embedding.Embed(ctx, trigger.Query)
+	queryVector, err := s.Embedding.Embed(ctx, trigger.Query, embedding.RoleQuery)
 	if err != nil {
 		slog.Warn("trigger embedding error", "iD", trigger.ID, "err", err) // #nosec G706 -- internal log
 		return 0, false
@@ -342,7 +343,7 @@ func (am *AutomationManager) runTriggerVector(trigger *AutomationRule) ([]Trigge
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	queryVector, err := s.Embedding.Embed(ctx, trigger.Query)
+	queryVector, err := s.Embedding.Embed(ctx, trigger.Query, embedding.RoleQuery)
 	if err != nil {
 		return nil, err
 	}

@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 func newCurationTestServer(t *testing.T) (*Server, func()) {

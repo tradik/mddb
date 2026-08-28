@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mddb/internal/embedding"
 	"mddb/internal/fts"
 	"mddb/internal/geo"
 	"mddb/internal/storage"
@@ -12,8 +13,9 @@ import (
 	"sort"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // HybridSearchRequest represents an HTTP hybrid search request.
@@ -473,7 +475,7 @@ func (s *Server) runVectorSearch(ctx context.Context, req HybridSearchRequest) (
 
 	embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	queryVector, err := s.Embedding.Embed(embedCtx, req.Query)
+	queryVector, err := s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
 	if err != nil {
 		return nil, fmt.Errorf("embedding failed: %w", err)
 	}

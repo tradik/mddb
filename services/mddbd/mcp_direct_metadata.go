@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	"mddb/internal/schema"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // RegisterWebhook registers a new webhook via the direct client.

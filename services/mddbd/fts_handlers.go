@@ -11,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // FTSSearchRequest is the HTTP request for full-text search.

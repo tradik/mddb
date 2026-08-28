@@ -12,8 +12,9 @@ import (
 	"mddb/internal/storage"
 	proto "mddb/proto"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // ---- HTTP types for /v1/ingest ----

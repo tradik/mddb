@@ -1,13 +1,14 @@
 package main
 
 import (
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
 	"mddb/internal/vector"
 	"strings"
 	"sync/atomic"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // ReplicationApplier applies binlog entries from the leader to the local BoltDB and in-memory state.

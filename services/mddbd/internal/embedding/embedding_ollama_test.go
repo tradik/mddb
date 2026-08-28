@@ -54,7 +54,7 @@ func TestOllamaEmbeddingProvider_Embed(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nomic-embed-text", 4)
 
-	vec, err := p.Embed(context.Background(), "hello world")
+	vec, err := p.Embed(context.Background(), "hello world", RoleDocument)
 	if err != nil {
 		t.Fatalf("Embed: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestOllamaEmbeddingProvider_EmbedBatch(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nomic", 2)
 
-	vecs, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"})
+	vecs, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"}, RoleDocument)
 	if err != nil {
 		t.Fatalf("EmbedBatch: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestOllamaEmbeddingProvider_EmbedBatchError(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nomic", 2)
 
-	_, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"})
+	_, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"}, RoleDocument)
 	if err == nil {
 		t.Fatal("expected error when one embed fails in batch")
 	}
@@ -131,7 +131,7 @@ func TestOllamaEmbeddingProvider_EmbedAPIError(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nonexistent-model", 768)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for API error")
 	}
@@ -150,7 +150,7 @@ func TestOllamaEmbeddingProvider_EmbedEmptyEmbeddings(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nomic", 768)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for empty embeddings")
 	}
@@ -165,7 +165,7 @@ func TestOllamaEmbeddingProvider_EmbedInvalidJSON(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nomic", 768)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -182,7 +182,7 @@ func TestOllamaEmbeddingProvider_EmbedContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	_, err := p.Embed(ctx, "hello")
+	_, err := p.Embed(ctx, "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -194,7 +194,7 @@ func TestOllamaEmbeddingProvider_EmbedConnectionError(t *testing.T) {
 
 	p := NewOllamaProvider(server.URL, "nomic", 768)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for connection failure")
 	}

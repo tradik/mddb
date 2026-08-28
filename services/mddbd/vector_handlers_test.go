@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"mddb/internal/embedding"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,7 +18,7 @@ type mockEmbedding struct {
 	model string
 }
 
-func (m *mockEmbedding) Embed(_ context.Context, _ string) ([]float32, error) {
+func (m *mockEmbedding) Embed(_ context.Context, _ string, _ embedding.Role) ([]float32, error) {
 	vec := make([]float32, m.dims)
 	for i := range vec {
 		vec[i] = 0.1
@@ -25,10 +26,10 @@ func (m *mockEmbedding) Embed(_ context.Context, _ string) ([]float32, error) {
 	return vec, nil
 }
 
-func (m *mockEmbedding) EmbedBatch(_ context.Context, texts []string) ([][]float32, error) {
+func (m *mockEmbedding) EmbedBatch(_ context.Context, texts []string, _ embedding.Role) ([][]float32, error) {
 	result := make([][]float32, len(texts))
 	for i := range texts {
-		v, _ := m.Embed(context.Background(), texts[i])
+		v, _ := m.Embed(context.Background(), texts[i], embedding.RoleDocument)
 		result[i] = v
 	}
 	return result, nil

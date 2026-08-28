@@ -4,12 +4,6 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/grpc/peer"
-	"google.golang.org/grpc/status"
 	"io"
 	"log/slog"
 	"mddb/internal/binlog"
@@ -17,6 +11,13 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 // authorizeReplication gates the snapshot / binlog streams (SEC-001). Without

@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"mddb/internal/embedding"
 	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	"mddb/internal/vector"
@@ -15,8 +16,9 @@ import (
 	"strings"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // Memory RAG collection naming convention.
@@ -425,7 +427,7 @@ func (s *Server) memoryRecallSemantic(ctx context.Context, query string, topK in
 
 	embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
-	queryVec, err := s.Embedding.Embed(embedCtx, query)
+	queryVec, err := s.Embedding.Embed(embedCtx, query, embedding.RoleQuery)
 	if err != nil {
 		return nil
 	}

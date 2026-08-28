@@ -4,17 +4,19 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"log/slog"
 	"math"
+	"mddb/internal/embedding"
 	"mddb/internal/fts"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	proto "mddb/proto"
 	"strings"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // VectorSearch implements the VectorSearch RPC
@@ -62,7 +64,7 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		queryVector = req.QueryVector
 	} else if g.server.Embedding != nil {
 		var err error
-		queryVector, err = g.server.Embedding.Embed(ctx, req.Query)
+		queryVector, err = g.server.Embedding.Embed(ctx, req.Query, embedding.RoleQuery)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to embed query: "+err.Error())
 		}
@@ -194,7 +196,7 @@ func (g *GRPCServer) VectorReindex(ctx context.Context, req *proto.VectorReindex
 			}
 		}
 
-		vector, err := g.server.Embedding.Embed(ctx, d.ContentMD)
+		vector, err := g.server.Embedding.Embed(ctx, d.ContentMD, embedding.RoleDocument)
 		if err != nil {
 			failed++
 			errs = append(errs, d.ID+": "+err.Error())

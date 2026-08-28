@@ -9,13 +9,44 @@ import (
 	"mddb/internal/envconf"
 )
 
+// Role says whether a text is being stored or being searched with.
+//
+// Retrieval embedding models are trained asymmetrically: the same sentence
+// produces a different vector depending on whether it is a document in the
+// corpus or the question being asked of it. Handing both to the model as the
+// same kind of input flattens the space and costs ranking accuracy, which is
+// what this type exists to prevent (RAG-006).
+//
+// It is a required argument rather than an option with a default, because a
+// default is exactly how a call site stays silently wrong.
+type Role int
+
+const (
+	// RoleDocument is text entering the corpus.
+	RoleDocument Role = iota
+
+	// RoleQuery is text being searched with.
+	RoleQuery
+)
+
+func (r Role) String() string {
+	if r == RoleQuery {
+		return "query"
+	}
+	return "document"
+}
+
 // Provider generates embedding vectors from text.
 type Provider interface {
 	// Embed generates an embedding vector for a single text.
-	Embed(ctx context.Context, text string) ([]float32, error)
+	//
+	// role tells the provider whether this text is a document or a query;
+	// providers whose models distinguish the two use it, and the rest ignore it.
+	Embed(ctx context.Context, text string, role Role) ([]float32, error)
 
-	// EmbedBatch generates embedding vectors for multiple texts.
-	EmbedBatch(ctx context.Context, texts []string) ([][]float32, error)
+	// EmbedBatch generates embedding vectors for multiple texts, all in the
+	// same role.
+	EmbedBatch(ctx context.Context, texts []string, role Role) ([][]float32, error)
 
 	// Model returns the model name used for embeddings.
 	Model() string

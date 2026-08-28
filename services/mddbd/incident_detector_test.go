@@ -11,8 +11,9 @@ import (
 	"testing"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 func newIncidentWebhookManager(t *testing.T) *webhooks.WebhookManager {

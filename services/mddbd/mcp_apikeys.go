@@ -6,10 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
 	"net/http"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // MCP API Key management — stores keys in internal BoltDB bucket "_mcp_api_keys".

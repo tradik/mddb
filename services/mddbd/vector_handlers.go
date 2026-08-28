@@ -5,8 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
+	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	json "mddb/internal/jsonx"
 	"mddb/internal/sliceutil"
@@ -15,6 +15,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // VectorSearchRequest represents an HTTP vector search request.
@@ -210,7 +212,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
 		var err error
-		queryVector, err = s.Embedding.Embed(ctx, req.Query)
+		queryVector, err = s.Embedding.Embed(ctx, req.Query, embedding.RoleQuery)
 		if err != nil {
 			bad(w, errors.New("failed to embed query: "+err.Error()))
 			return
@@ -485,7 +487,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 		chunkFailed := false
 		for i, chunk := range chunks {
 			ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-			vector, err := s.Embedding.Embed(ctx, chunk)
+			vector, err := s.Embedding.Embed(ctx, chunk, embedding.RoleDocument)
 			cancel()
 			if err != nil {
 				failed++

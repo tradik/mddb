@@ -8,10 +8,12 @@ import (
 	"sort"
 	"time"
 
+	"mddb/internal/embedding"
 	"mddb/internal/storage"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // Vector-space projection: server-side PCA reduction of a collection's
@@ -154,7 +156,7 @@ func (s *Server) handleVectorProjection(w http.ResponseWriter, r *http.Request) 
 	if len(queryVector) == 0 && req.Query != "" && s.Embedding != nil {
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
-		if qv, embErr := s.Embedding.Embed(ctx, req.Query); embErr == nil {
+		if qv, embErr := s.Embedding.Embed(ctx, req.Query, embedding.RoleQuery); embErr == nil {
 			queryVector = qv
 		}
 	}

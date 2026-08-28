@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	"mddb/internal/fts"
 	"mddb/internal/storage"
@@ -54,7 +55,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
 		var err error
-		queryVector, err = s.Embedding.Embed(embedCtx, req.Query)
+		queryVector, err = s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
 		if err != nil {
 			return nil, fmt.Errorf("failed to embed query: %w", err)
 		}
@@ -285,7 +286,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 		chunkFailed := false
 		for i, chunk := range chunks {
 			embedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			vector, err := s.Embedding.Embed(embedCtx, chunk)
+			vector, err := s.Embedding.Embed(embedCtx, chunk, embedding.RoleDocument)
 			cancel()
 			if err != nil {
 				failed++

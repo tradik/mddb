@@ -42,8 +42,8 @@ func (p *CohereProvider) Model() string { return p.model }
 func (p *CohereProvider) Dimensions() int { return p.dimensions }
 
 // Embed generates an embedding for a single text
-func (p *CohereProvider) Embed(ctx context.Context, text string) ([]float32, error) {
-	vectors, err := p.EmbedBatch(ctx, []string{text})
+func (p *CohereProvider) Embed(ctx context.Context, text string, role Role) ([]float32, error) {
+	vectors, err := p.EmbedBatch(ctx, []string{text}, role)
 	if err != nil {
 		return nil, err
 	}
@@ -54,11 +54,14 @@ func (p *CohereProvider) Embed(ctx context.Context, text string) ([]float32, err
 }
 
 // EmbedBatch generates embeddings for multiple texts in one API call
-func (p *CohereProvider) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (p *CohereProvider) EmbedBatch(ctx context.Context, texts []string, role Role) ([][]float32, error) {
 	reqBody := cohereEmbedRequest{
-		Texts:     texts,
-		Model:     p.model,
-		InputType: "search_document",
+		Texts: texts,
+		Model: p.model,
+		// search_query for a question, search_document for the corpus. This was
+		// search_document unconditionally, so every query was embedded with the
+		// input type meant for the thing being searched (RAG-006).
+		InputType: cohereInputType(role),
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -113,4 +116,12 @@ type cohereEmbedRequest struct {
 
 type cohereEmbedResponse struct {
 	Embeddings [][]float32 `json:"embeddings"`
+}
+
+// cohereInputType maps a role onto Cohere's input_type parameter.
+func cohereInputType(role Role) string {
+	if role == RoleQuery {
+		return "search_query"
+	}
+	return "search_document"
 }

@@ -67,7 +67,7 @@ func TestCohereEmbeddingProvider_Embed(t *testing.T) {
 
 	p := NewCohereProvider("test-key", server.URL, "embed-english-v3.0", 3)
 
-	vec, err := p.Embed(context.Background(), "hello world")
+	vec, err := p.Embed(context.Background(), "hello world", RoleDocument)
 	if err != nil {
 		t.Fatalf("Embed: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestCohereEmbeddingProvider_EmbedBatch(t *testing.T) {
 
 	p := NewCohereProvider("test-key", server.URL, "model", 2)
 
-	vecs, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"})
+	vecs, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"}, RoleDocument)
 	if err != nil {
 		t.Fatalf("EmbedBatch: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestCohereEmbeddingProvider_EmbedAPIError(t *testing.T) {
 
 	p := NewCohereProvider("test-key", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for API error")
 	}
@@ -137,7 +137,7 @@ func TestCohereEmbeddingProvider_EmbedMismatchedCount(t *testing.T) {
 
 	p := NewCohereProvider("test-key", server.URL, "model", 2)
 
-	_, err := p.EmbedBatch(context.Background(), []string{"a", "b"})
+	_, err := p.EmbedBatch(context.Background(), []string{"a", "b"}, RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for mismatched embedding count")
 	}
@@ -155,7 +155,7 @@ func TestCohereEmbeddingProvider_EmbedEmptyResponse(t *testing.T) {
 
 	p := NewCohereProvider("test-key", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for empty response")
 	}
@@ -170,7 +170,7 @@ func TestCohereEmbeddingProvider_EmbedInvalidJSON(t *testing.T) {
 
 	p := NewCohereProvider("test-key", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON response")
 	}
@@ -187,7 +187,7 @@ func TestCohereEmbeddingProvider_EmbedContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	_, err := p.Embed(ctx, "hello")
+	_, err := p.Embed(ctx, "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -200,7 +200,7 @@ func TestCohereEmbeddingProvider_EmbedConnectionError(t *testing.T) {
 
 	p := NewCohereProvider("test-key", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for connection failure")
 	}

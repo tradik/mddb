@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mddb/internal/embedding"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	proto "mddb/proto"
@@ -12,8 +13,9 @@ import (
 	"strconv"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // --- Automation ---
@@ -380,7 +382,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 		defer cancel()
 		var err error
-		queryVector, err = s.Embedding.Embed(embedCtx, req.Query)
+		queryVector, err = s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
 		if err != nil {
 			return nil, fmt.Errorf("embedding failed: %w", err)
 		}

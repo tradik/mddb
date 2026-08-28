@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"mddb/internal/embedding"
 	"mddb/internal/storage"
 	"mddb/internal/vector"
 	"net/http"
@@ -10,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // CrossSearchRequest represents a cross-collection vector search request.
@@ -133,7 +135,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
 		defer cancel()
 		var err error
-		queryVector, err = s.Embedding.Embed(ctx, req.Query)
+		queryVector, err = s.Embedding.Embed(ctx, req.Query, embedding.RoleQuery)
 		if err != nil {
 			bad(w, errors.New("failed to embed query: "+err.Error()))
 			return

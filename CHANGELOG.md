@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Queries and documents were embedded identically (#214)** — retrieval models
+  are trained asymmetrically: the same sentence should produce a different
+  vector depending on whether it is a document in the corpus or the question
+  being asked of it. MDDB had one code path for both, with no way for a provider
+  to tell them apart.
+
+  Three of the four providers were affected. Ollama sent raw text, while
+  autodetection **prefers** exactly the models that need a prefix —
+  `nomic-embed-text` is first on its list. Cohere hardcoded
+  `input_type: "search_document"`, so queries were embedded with the input type
+  meant for the corpus. Voyage never sent `input_type` at all. OpenAI is
+  unaffected: its models are symmetric.
+
+  Measured on a six-document corpus with the query "my API key stopped working",
+  where the correct answer is the document about rotating credentials:
+
+  | | Position of the correct answer |
+  |---|---|
+  | Before | **3rd** (0.5296) |
+  | After | **1st** (0.5649) |
+
+  At `topK: 1`, which is how an agent asks when it wants one answer, that is the
+  difference between a hit and a miss.
+
+  The role is a required argument rather than an option with a default, because
+  a default is how a call site stays silently wrong — which is the bug being
+  fixed. All eighteen call sites now declare what their text is.
+
+  **Existing collections keep working and do not benefit until reindexed.** This
+  was measured rather than assumed: with documents embedded by the old code and
+  queries by the new, the ranking is unchanged. Absolute scores rise (0.5296 to
+  0.5722), so a configured similarity threshold will need revisiting. Run a
+  vector reindex to get the improvement.
+
+  Only `nomic-embed-text` carries prefixes so far, because it is the only model
+  the change was measured against. The others on the preference list document
+  prefixes too and will be added once someone runs the same measurement rather
+  than trusting the model card.
+
 - **Snap packages have failed to build for two releases** — the snap compiled
   from source inside its own sandbox against `build-snaps: [go/…/stable]`, and
   the store has no track for the Go version this project pins. Its newest is a

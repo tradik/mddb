@@ -4,11 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 	"log/slog"
 	"mddb/internal/cache"
 	"mddb/internal/sliceutil"
@@ -17,6 +12,12 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 // GRPCServer implements the MDDB gRPC service

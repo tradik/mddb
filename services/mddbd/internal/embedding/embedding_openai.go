@@ -39,8 +39,14 @@ func (p *OpenAIProvider) Model() string { return p.model }
 func (p *OpenAIProvider) Dimensions() int { return p.dimensions }
 
 // Embed generates an embedding for a single text.
-func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, error) {
-	vectors, err := p.EmbedBatch(ctx, []string{text})
+// Embed generates an embedding for one text.
+//
+// The role is ignored: OpenAI's text-embedding-3 models are symmetric, so a
+// query and a document holding the same words produce the same vector. The
+// parameter is present because the interface carries it, not because this
+// provider has anything to do with it.
+func (p *OpenAIProvider) Embed(ctx context.Context, text string, role Role) ([]float32, error) {
+	vectors, err := p.EmbedBatch(ctx, []string{text}, role)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +57,7 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string) ([]float32, err
 }
 
 // EmbedBatch generates embeddings for multiple texts in one API call.
-func (p *OpenAIProvider) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (p *OpenAIProvider) EmbedBatch(ctx context.Context, texts []string, _ Role) ([][]float32, error) {
 	reqBody := openAIEmbeddingRequest{
 		Input:      texts,
 		Model:      p.model,

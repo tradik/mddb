@@ -7,12 +7,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"github.com/quic-go/quic-go/http3"
 	"log/slog"
 	"math/big"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/quic-go/quic-go/http3"
 )
 
 // HTTP3Server wraps HTTP/3 server with QUIC

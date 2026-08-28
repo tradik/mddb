@@ -30,7 +30,7 @@ func newCounting() *countingProvider {
 	return &countingProvider{model: "test-model", dims: 4}
 }
 
-func (p *countingProvider) Embed(_ context.Context, text string) ([]float32, error) {
+func (p *countingProvider) Embed(_ context.Context, text string, _ Role) ([]float32, error) {
 	p.calls.Add(1)
 	p.texts.Add(1)
 	if p.failWith != nil {
@@ -42,7 +42,7 @@ func (p *countingProvider) Embed(_ context.Context, text string) ([]float32, err
 	return vectorFor(text), nil
 }
 
-func (p *countingProvider) EmbedBatch(_ context.Context, texts []string) ([][]float32, error) {
+func (p *countingProvider) EmbedBatch(_ context.Context, texts []string, _ Role) ([][]float32, error) {
 	p.calls.Add(1)
 	p.texts.Add(int64(len(texts)))
 	if p.failWith != nil {
@@ -80,12 +80,12 @@ func TestCacheServesRepeatedQueries(t *testing.T) {
 	inner := newCounting()
 	c := NewCachingProvider(inner, 10, time.Minute)
 
-	first, err := c.Embed(context.Background(), "where is the footer styled?")
+	first, err := c.Embed(context.Background(), "where is the footer styled?", RoleDocument)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for range 5 {
-		again, err := c.Embed(context.Background(), "where is the footer styled?")
+		again, err := c.Embed(context.Background(), "where is the footer styled?", RoleDocument)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,11 +105,11 @@ func TestCacheHandsOutCopies(t *testing.T) {
 	inner := newCounting()
 	c := NewCachingProvider(inner, 10, time.Minute)
 
-	first, _ := c.Embed(context.Background(), "text")
+	first, _ := c.Embed(context.Background(), "text", RoleDocument)
 	original := first[0]
 	first[0] = -999
 
-	second, _ := c.Embed(context.Background(), "text")
+	second, _ := c.Embed(context.Background(), "text", RoleDocument)
 	if second[0] != original {
 		t.Errorf("mutating one caller's vector changed the cache: got %v, want %v", second[0], original)
 	}
@@ -119,13 +119,13 @@ func TestCacheKeyIncludesTheModel(t *testing.T) {
 	inner := newCounting()
 	c := NewCachingProvider(inner, 10, time.Minute)
 
-	if _, err := c.Embed(context.Background(), "same text"); err != nil {
+	if _, err := c.Embed(context.Background(), "same text", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	// The same sentence embeds differently under a different model, and
 	// MDDB_EMBEDDING_MODEL can change while the cache is warm.
 	inner.model = "another-model"
-	if _, err := c.Embed(context.Background(), "same text"); err != nil {
+	if _, err := c.Embed(context.Background(), "same text", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 
@@ -138,11 +138,11 @@ func TestCacheExpiresEntries(t *testing.T) {
 	inner := newCounting()
 	c := NewCachingProvider(inner, 10, 20*time.Millisecond)
 
-	if _, err := c.Embed(context.Background(), "text"); err != nil {
+	if _, err := c.Embed(context.Background(), "text", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(40 * time.Millisecond)
-	if _, err := c.Embed(context.Background(), "text"); err != nil {
+	if _, err := c.Embed(context.Background(), "text", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 
@@ -158,28 +158,28 @@ func TestCacheEvictsLeastRecentlyUsed(t *testing.T) {
 	c := NewCachingProvider(inner, 2, time.Minute).(*CachingProvider)
 
 	ctx := context.Background()
-	if _, err := c.Embed(ctx, "a"); err != nil {
+	if _, err := c.Embed(ctx, "a", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Embed(ctx, "b"); err != nil {
+	if _, err := c.Embed(ctx, "b", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	// Touch "a" so "b" becomes the least recently used.
-	if _, err := c.Embed(ctx, "a"); err != nil {
+	if _, err := c.Embed(ctx, "a", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Embed(ctx, "c"); err != nil {
+	if _, err := c.Embed(ctx, "c", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 
 	before := inner.calls.Load()
-	if _, err := c.Embed(ctx, "a"); err != nil { // should still be cached
+	if _, err := c.Embed(ctx, "a", RoleDocument); err != nil { // should still be cached
 		t.Fatal(err)
 	}
 	if inner.calls.Load() != before {
 		t.Error("the recently used entry was evicted")
 	}
-	if _, err := c.Embed(ctx, "b"); err != nil { // should have been evicted
+	if _, err := c.Embed(ctx, "b", RoleDocument); err != nil { // should have been evicted
 		t.Fatal(err)
 	}
 	if inner.calls.Load() != before+1 {
@@ -198,12 +198,12 @@ func TestBatchAsksOnlyForMisses(t *testing.T) {
 	c := NewCachingProvider(inner, 10, time.Minute)
 	ctx := context.Background()
 
-	if _, err := c.Embed(ctx, "b"); err != nil {
+	if _, err := c.Embed(ctx, "b", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	inner.texts.Store(0)
 
-	out, err := c.EmbedBatch(ctx, []string{"a", "b", "c"})
+	out, err := c.EmbedBatch(ctx, []string{"a", "b", "c"}, RoleDocument)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,12 +228,12 @@ func TestBatchFullyCachedSkipsTheProvider(t *testing.T) {
 	c := NewCachingProvider(inner, 10, time.Minute)
 	ctx := context.Background()
 
-	if _, err := c.EmbedBatch(ctx, []string{"a", "b"}); err != nil {
+	if _, err := c.EmbedBatch(ctx, []string{"a", "b"}, RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	before := inner.calls.Load()
 
-	if _, err := c.EmbedBatch(ctx, []string{"a", "b"}); err != nil {
+	if _, err := c.EmbedBatch(ctx, []string{"a", "b"}, RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	if inner.calls.Load() != before {
@@ -249,7 +249,7 @@ func TestBatchRefusesAMisalignedResponse(t *testing.T) {
 	inner.shortBy = 1
 	c := NewCachingProvider(inner, 10, time.Minute)
 
-	out, err := c.EmbedBatch(context.Background(), []string{"a", "b", "c"})
+	out, err := c.EmbedBatch(context.Background(), []string{"a", "b", "c"}, RoleDocument)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,22 +266,22 @@ func TestErrorsAreNotCached(t *testing.T) {
 	c := NewCachingProvider(inner, 10, time.Minute)
 	ctx := context.Background()
 
-	if _, err := c.Embed(ctx, "text"); err == nil {
+	if _, err := c.Embed(ctx, "text", RoleDocument); err == nil {
 		t.Fatal("expected an error")
 	}
 	inner.failWith = nil
-	if _, err := c.Embed(ctx, "text"); err != nil {
+	if _, err := c.Embed(ctx, "text", RoleDocument); err != nil {
 		t.Fatalf("the retry failed: %v", err)
 	}
 	if got := inner.calls.Load(); got != 2 {
 		t.Errorf("provider calls = %d, want 2: a failure must not be cached", got)
 	}
 
-	if _, err := c.EmbedBatch(ctx, []string{"x"}); err != nil {
+	if _, err := c.EmbedBatch(ctx, []string{"x"}, RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	inner.failWith = errors.New("down again")
-	if _, err := c.EmbedBatch(ctx, []string{"y"}); err == nil {
+	if _, err := c.EmbedBatch(ctx, []string{"y"}, RoleDocument); err == nil {
 		t.Error("a batch failure was swallowed")
 	}
 }
@@ -321,10 +321,10 @@ func TestCacheStats(t *testing.T) {
 	c := NewCachingProvider(inner, 10, time.Minute).(*CachingProvider)
 	ctx := context.Background()
 
-	if _, err := c.Embed(ctx, "a"); err != nil {
+	if _, err := c.Embed(ctx, "a", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := c.Embed(ctx, "a"); err != nil {
+	if _, err := c.Embed(ctx, "a", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 
@@ -337,7 +337,7 @@ func TestCacheStats(t *testing.T) {
 func TestEmptyBatchGoesStraightToTheProvider(t *testing.T) {
 	inner := newCounting()
 	c := NewCachingProvider(inner, 10, time.Minute)
-	out, err := c.EmbedBatch(context.Background(), nil)
+	out, err := c.EmbedBatch(context.Background(), nil, RoleDocument)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +359,7 @@ func TestCacheUnderConcurrentAccess(t *testing.T) {
 			ctx := context.Background()
 			for i := range 50 {
 				text := fmt.Sprintf("query-%d", (w+i)%20)
-				vec, err := c.Embed(ctx, text)
+				vec, err := c.Embed(ctx, text, RoleDocument)
 				if err != nil {
 					t.Errorf("embed failed: %v", err)
 					return
@@ -393,7 +393,7 @@ func TestBatchUnderConcurrentAccess(t *testing.T) {
 		go func(w int) {
 			defer wg.Done()
 			texts := []string{"chunk-a", "chunk-b", "chunk-c"}
-			out, err := c.EmbedBatch(context.Background(), texts)
+			out, err := c.EmbedBatch(context.Background(), texts, RoleDocument)
 			if err != nil {
 				t.Errorf("batch failed: %v", err)
 				return
@@ -416,11 +416,11 @@ func TestCacheOverwritesAnExistingEntry(t *testing.T) {
 	c := NewCachingProvider(inner, 10, 30*time.Millisecond).(*CachingProvider)
 	ctx := context.Background()
 
-	if _, err := c.Embed(ctx, "text"); err != nil {
+	if _, err := c.Embed(ctx, "text", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(40 * time.Millisecond) // expire it
-	if _, err := c.Embed(ctx, "text"); err != nil {
+	if _, err := c.Embed(ctx, "text", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 
@@ -430,7 +430,7 @@ func TestCacheOverwritesAnExistingEntry(t *testing.T) {
 
 	// The refreshed entry is live again.
 	before := inner.calls.Load()
-	if _, err := c.Embed(ctx, "text"); err != nil {
+	if _, err := c.Embed(ctx, "text", RoleDocument); err != nil {
 		t.Fatal(err)
 	}
 	if inner.calls.Load() != before {

@@ -39,8 +39,8 @@ func (p *VoyageProvider) Model() string { return p.model }
 func (p *VoyageProvider) Dimensions() int { return p.dimensions }
 
 // Embed generates an embedding for a single text.
-func (p *VoyageProvider) Embed(ctx context.Context, text string) ([]float32, error) {
-	vectors, err := p.EmbedBatch(ctx, []string{text})
+func (p *VoyageProvider) Embed(ctx context.Context, text string, role Role) ([]float32, error) {
+	vectors, err := p.EmbedBatch(ctx, []string{text}, role)
 	if err != nil {
 		return nil, err
 	}
@@ -51,10 +51,11 @@ func (p *VoyageProvider) Embed(ctx context.Context, text string) ([]float32, err
 }
 
 // EmbedBatch generates embeddings for multiple texts in one API call.
-func (p *VoyageProvider) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (p *VoyageProvider) EmbedBatch(ctx context.Context, texts []string, role Role) ([][]float32, error) {
 	reqBody := voyageEmbeddingRequest{
-		Input: texts,
-		Model: p.model,
+		Input:     texts,
+		InputType: voyageInputType(role),
+		Model:     p.model,
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -101,6 +102,19 @@ func (p *VoyageProvider) EmbedBatch(ctx context.Context, texts []string) ([][]fl
 type voyageEmbeddingRequest struct {
 	Input []string `json:"input"`
 	Model string   `json:"model"`
+
+	// Voyage's models are trained asymmetrically and the API takes the role as
+	// a parameter. It was never sent, so queries and documents were embedded
+	// identically (RAG-006).
+	InputType string `json:"input_type,omitempty"`
+}
+
+// voyageInputType maps a role onto Voyage's input_type parameter.
+func voyageInputType(role Role) string {
+	if role == RoleQuery {
+		return "query"
+	}
+	return "document"
 }
 
 type voyageEmbeddingResponse struct {

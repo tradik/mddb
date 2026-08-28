@@ -3,14 +3,16 @@ package main
 import (
 	"context"
 	"errors"
+	"mddb/internal/embedding"
 	"mddb/internal/storage"
 	"mddb/internal/vector"
 	"net/http"
 	"sort"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // ClassifyHTTPRequest is the HTTP JSON request for zero-shot classification.
@@ -57,7 +59,7 @@ func (s *Server) classifyDocument(ctx context.Context, collection, key, lang, te
 	var docVector []float32
 
 	if text != "" {
-		vec, err := s.Embedding.Embed(ctx, text)
+		vec, err := s.Embedding.Embed(ctx, text, embedding.RoleDocument)
 		if err != nil {
 			return nil, errors.New("failed to embed text: " + err.Error())
 		}
@@ -85,7 +87,11 @@ func (s *Server) classifyDocument(ctx context.Context, collection, key, lang, te
 			if doc.ContentMD == "" {
 				return nil, errors.New("document has no content to classify")
 			}
-			vec, err := s.Embedding.Embed(ctx, doc.ContentMD)
+			// RoleDocument, matching how the stored vector above was
+			// embedded. The two paths of this function have to produce
+			// comparable vectors, or a classification would depend on whether
+			// the document happened to be indexed yet.
+			vec, err := s.Embedding.Embed(ctx, doc.ContentMD, embedding.RoleDocument)
 			if err != nil {
 				return nil, errors.New("failed to embed document: " + err.Error())
 			}
@@ -94,7 +100,10 @@ func (s *Server) classifyDocument(ctx context.Context, collection, key, lang, te
 	}
 
 	// Embed all labels in a single batch
-	labelVectors, err := s.Embedding.EmbedBatch(ctx, labels)
+	// The labels are the asking side: short phrases held up against a longer
+	// text, which is what the query role is for. Pairing a document vector with
+	// query vectors is exactly the asymmetry these models are trained on.
+	labelVectors, err := s.Embedding.EmbedBatch(ctx, labels, embedding.RoleQuery)
 	if err != nil {
 		return nil, errors.New("failed to embed labels: " + err.Error())
 	}

@@ -3,9 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"log/slog"
 	"mddb/internal/audit"
 	"mddb/internal/automationlog"
@@ -34,6 +31,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 )
 
 // VERSION is the current release version of the MDDB server.

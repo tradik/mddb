@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mddb/internal/embedding"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	proto "mddb/proto"
@@ -12,10 +13,11 @@ import (
 	"strconv"
 	"strings"
 
+	json "mddb/internal/jsonx"
+
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	json "mddb/internal/jsonx"
 )
 
 // automationRuleToProto converts internal AutomationRule to proto.
@@ -492,7 +494,7 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 		queryVector = rec.Vector
 	} else if g.server.Embedding != nil {
 		var err error
-		queryVector, err = g.server.Embedding.Embed(ctx, req.Query)
+		queryVector, err = g.server.Embedding.Embed(ctx, req.Query, embedding.RoleQuery)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to embed query: "+err.Error())
 		}

@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	gql "mddb/graphql"
+	"net/http"
+
 	"github.com/99designs/gqlgen/graphql/handler"
 	"github.com/99designs/gqlgen/graphql/handler/extension"
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
-	"log/slog"
-	gql "mddb/graphql"
-	"net/http"
 )
 
 // newGraphQLHandler creates the GraphQL HTTP handler

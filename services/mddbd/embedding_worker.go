@@ -161,7 +161,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		var embedErr error
 		for attempt := 0; attempt < 3; attempt++ {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			vector, embedErr = w.provider.Embed(ctx, chunk)
+			vector, embedErr = w.provider.Embed(ctx, chunk, embedding.RoleDocument)
 			cancel()
 			if embedErr == nil {
 				break

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
 	"mddb/internal/httpclient"
 	json "mddb/internal/jsonx"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var bucketBulkJobs = []byte("bulk_jobs")

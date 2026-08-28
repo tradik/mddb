@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/robfig/cron/v3"
 	"log/slog"
 	"mddb/internal/automationlog"
 	"sync"
 	"time"
+
+	"github.com/robfig/cron/v3"
 )
 
 // CronScheduler manages scheduled automation triggers.

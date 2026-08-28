@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"mddb/internal/embedding"
 	"mddb/internal/testsync"
 	"mddb/internal/vector"
 	"path/filepath"
@@ -23,7 +24,7 @@ type embWorkerMockProvider struct {
 	vector    []float32
 }
 
-func (m *embWorkerMockProvider) Embed(_ context.Context, _ string) ([]float32, error) {
+func (m *embWorkerMockProvider) Embed(_ context.Context, _ string, _ embedding.Role) ([]float32, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.callCount++
@@ -35,10 +36,10 @@ func (m *embWorkerMockProvider) Embed(_ context.Context, _ string) ([]float32, e
 	return vec, nil
 }
 
-func (m *embWorkerMockProvider) EmbedBatch(_ context.Context, texts []string) ([][]float32, error) {
+func (m *embWorkerMockProvider) EmbedBatch(_ context.Context, texts []string, _ embedding.Role) ([][]float32, error) {
 	results := make([][]float32, len(texts))
 	for i := range texts {
-		v, err := m.Embed(context.Background(), texts[i])
+		v, err := m.Embed(context.Background(), texts[i], embedding.RoleDocument)
 		if err != nil {
 			return nil, err
 		}

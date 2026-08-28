@@ -102,21 +102,26 @@ func (c *CachingProvider) Stats() (hits, misses uint64, size int) {
 // under a different model, and MDDB_EMBEDDING_MODEL can change between restarts
 // while the cache is warm. Hashed so an enormous document does not become an
 // enormous map key.
-func cacheKey(model, text string) string {
-	sum := sha256.Sum256([]byte(model + "\x00" + text))
+// The role is part of the key, not decoration. Providers embed a query and a
+// document differently (RAG-006), so the same text in the two roles yields two
+// different vectors — keying on text alone would hand a query the document's
+// vector, or the reverse, and the result would look like a ranking problem
+// rather than a cache problem.
+func cacheKey(model, text string, role Role) string {
+	sum := sha256.Sum256([]byte(model + "\x00" + role.String() + "\x00" + text))
 	return hex.EncodeToString(sum[:])
 }
 
 // Embed returns a cached vector when one is live, otherwise asks the provider.
-func (c *CachingProvider) Embed(ctx context.Context, text string) ([]float32, error) {
-	key := cacheKey(c.Model(), text)
+func (c *CachingProvider) Embed(ctx context.Context, text string, role Role) ([]float32, error) {
+	key := cacheKey(c.Model(), text, role)
 	if vec, ok := c.get(key); ok {
 		c.hits.Add(1)
 		return vec, nil
 	}
 	c.misses.Add(1)
 
-	vec, err := c.inner.Embed(ctx, text)
+	vec, err := c.inner.Embed(ctx, text, role)
 	if err != nil {
 		return nil, err
 	}
@@ -129,9 +134,9 @@ func (c *CachingProvider) Embed(ctx context.Context, text string) ([]float32, er
 // A batch is usually a document's chunks on reindex, where most chunks are
 // unchanged — asking for the whole batch because one chunk moved is what makes
 // reindexing expensive.
-func (c *CachingProvider) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (c *CachingProvider) EmbedBatch(ctx context.Context, texts []string, role Role) ([][]float32, error) {
 	if len(texts) == 0 {
-		return c.inner.EmbedBatch(ctx, texts)
+		return c.inner.EmbedBatch(ctx, texts, role)
 	}
 
 	model := c.Model()
@@ -142,7 +147,7 @@ func (c *CachingProvider) EmbedBatch(ctx context.Context, texts []string) ([][]f
 	var missingAt []int
 
 	for i, text := range texts {
-		keys[i] = cacheKey(model, text)
+		keys[i] = cacheKey(model, text, role)
 		if vec, ok := c.get(keys[i]); ok {
 			c.hits.Add(1)
 			out[i] = vec
@@ -157,7 +162,7 @@ func (c *CachingProvider) EmbedBatch(ctx context.Context, texts []string) ([][]f
 		return out, nil
 	}
 
-	fetched, err := c.inner.EmbedBatch(ctx, missing)
+	fetched, err := c.inner.EmbedBatch(ctx, missing, role)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +170,7 @@ func (c *CachingProvider) EmbedBatch(ctx context.Context, texts []string) ([][]f
 	// silently misalign vectors with their texts — the kind of corruption
 	// that only shows up as bad search results much later.
 	if len(fetched) != len(missing) {
-		return c.inner.EmbedBatch(ctx, texts)
+		return c.inner.EmbedBatch(ctx, texts, role)
 	}
 
 	for n, vec := range fetched {

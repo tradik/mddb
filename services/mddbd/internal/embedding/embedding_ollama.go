@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	json "mddb/internal/jsonx"
@@ -37,10 +38,45 @@ func (p *OllamaProvider) Model() string { return p.model }
 func (p *OllamaProvider) Dimensions() int { return p.dimensions }
 
 // Embed generates an embedding for a single text.
-func (p *OllamaProvider) Embed(ctx context.Context, text string) ([]float32, error) {
+// taskPrefixes maps an Ollama model to the prefixes it was trained to expect
+// for each role (RAG-006).
+//
+// Only models whose prefixes have been measured are listed. A model that is not
+// here is embedded as plain text, exactly as before: an invented prefix is
+// worse than none, because it moves every vector without improving the ranking.
+//
+// Measured for nomic-embed-text on a six-document corpus, query "my API key
+// stopped working", where the correct answer sat third without prefixes and
+// first with them. The others in autodetect.go's preference list document
+// prefixes too, and belong here once someone has run the same measurement
+// rather than trusted the model card.
+var taskPrefixes = map[string]struct{ document, query string }{
+	"nomic-embed-text": {document: "search_document: ", query: "search_query: "},
+}
+
+// applyTaskPrefix returns text with the prefix this model expects for role.
+//
+// Matching is on the name before any tag, so nomic-embed-text:latest and
+// nomic-embed-text:v1.5 both resolve.
+func applyTaskPrefix(model, text string, role Role) string {
+	name := model
+	if i := strings.IndexByte(name, ':'); i >= 0 {
+		name = name[:i]
+	}
+	p, ok := taskPrefixes[name]
+	if !ok {
+		return text
+	}
+	if role == RoleQuery {
+		return p.query + text
+	}
+	return p.document + text
+}
+
+func (p *OllamaProvider) Embed(ctx context.Context, text string, role Role) ([]float32, error) {
 	reqBody := ollamaEmbedRequest{
 		Model: p.model,
-		Input: text,
+		Input: applyTaskPrefix(p.model, text, role),
 	}
 
 	body, err := json.Marshal(reqBody)
@@ -83,10 +119,10 @@ func (p *OllamaProvider) Embed(ctx context.Context, text string) ([]float32, err
 }
 
 // EmbedBatch generates embeddings for multiple texts.
-func (p *OllamaProvider) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (p *OllamaProvider) EmbedBatch(ctx context.Context, texts []string, role Role) ([][]float32, error) {
 	vectors := make([][]float32, len(texts))
 	for i, text := range texts {
-		v, err := p.Embed(ctx, text)
+		v, err := p.Embed(ctx, text, role)
 		if err != nil {
 			return nil, fmt.Errorf("embed text %d: %w", i, err)
 		}

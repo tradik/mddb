@@ -59,7 +59,7 @@ func TestVoyageEmbeddingProvider_Embed(t *testing.T) {
 
 	p := NewVoyageProvider("vo-test", server.URL, "voyage-3", 3)
 
-	vec, err := p.Embed(context.Background(), "hello world")
+	vec, err := p.Embed(context.Background(), "hello world", RoleDocument)
 	if err != nil {
 		t.Fatalf("Embed: %v", err)
 	}
@@ -96,7 +96,7 @@ func TestVoyageEmbeddingProvider_EmbedBatch(t *testing.T) {
 
 	p := NewVoyageProvider("vo-test", server.URL, "model", 2)
 
-	vecs, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"})
+	vecs, err := p.EmbedBatch(context.Background(), []string{"a", "b", "c"}, RoleDocument)
 	if err != nil {
 		t.Fatalf("EmbedBatch: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestVoyageEmbeddingProvider_EmbedAPIError(t *testing.T) {
 
 	p := NewVoyageProvider("bad-key", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for API error")
 	}
@@ -129,7 +129,7 @@ func TestVoyageEmbeddingProvider_EmbedEmptyResponse(t *testing.T) {
 
 	p := NewVoyageProvider("vo-test", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for empty response")
 	}
@@ -144,7 +144,7 @@ func TestVoyageEmbeddingProvider_EmbedInvalidJSON(t *testing.T) {
 
 	p := NewVoyageProvider("vo-test", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
@@ -161,7 +161,7 @@ func TestVoyageEmbeddingProvider_EmbedContextCancelled(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	_, err := p.Embed(ctx, "hello")
+	_, err := p.Embed(ctx, "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for cancelled context")
 	}
@@ -173,7 +173,7 @@ func TestVoyageEmbeddingProvider_EmbedConnectionError(t *testing.T) {
 
 	p := NewVoyageProvider("vo-test", server.URL, "model", 2)
 
-	_, err := p.Embed(context.Background(), "hello")
+	_, err := p.Embed(context.Background(), "hello", RoleDocument)
 	if err == nil {
 		t.Fatal("expected error for connection failure")
 	}
@@ -194,7 +194,7 @@ func TestVoyageEmbeddingProvider_EmbedBatchOrdering(t *testing.T) {
 
 	p := NewVoyageProvider("vo-test", server.URL, "model", 1)
 
-	vecs, err := p.EmbedBatch(context.Background(), []string{"first", "second"})
+	vecs, err := p.EmbedBatch(context.Background(), []string{"first", "second"}, RoleDocument)
 	if err != nil {
 		t.Fatalf("EmbedBatch: %v", err)
 	}

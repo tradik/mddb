@@ -2,10 +2,11 @@ package main
 
 import (
 	"errors"
-	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 )
 
 // MCPFileConfig is the YAML file structure for custom tools.

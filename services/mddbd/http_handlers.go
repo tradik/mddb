@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"hash/crc32"
 	"io"
 	"log/slog"
@@ -17,6 +16,8 @@ import (
 	"net/http"
 	"sort"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // --- handlers

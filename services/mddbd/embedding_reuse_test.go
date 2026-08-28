@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"mddb/internal/embedding"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -21,7 +22,7 @@ type callCountingProvider struct {
 	texts atomic.Int64
 }
 
-func (p *callCountingProvider) Embed(_ context.Context, text string) ([]float32, error) {
+func (p *callCountingProvider) Embed(_ context.Context, text string, _ embedding.Role) ([]float32, error) {
 	p.calls.Add(1)
 	p.texts.Add(1)
 	var sum float32
@@ -31,10 +32,10 @@ func (p *callCountingProvider) Embed(_ context.Context, text string) ([]float32,
 	return []float32{sum, sum + 1, sum + 2}, nil
 }
 
-func (p *callCountingProvider) EmbedBatch(ctx context.Context, texts []string) ([][]float32, error) {
+func (p *callCountingProvider) EmbedBatch(ctx context.Context, texts []string, _ embedding.Role) ([][]float32, error) {
 	out := make([][]float32, 0, len(texts))
 	for _, t := range texts {
-		v, err := p.Embed(ctx, t)
+		v, err := p.Embed(ctx, t, embedding.RoleDocument)
 		if err != nil {
 			return nil, err
 		}
@@ -185,7 +186,7 @@ func TestReusedVectorsMatchTheirChunks(t *testing.T) {
 			t.Errorf("chunk %q has no stored vector", chunk)
 			continue
 		}
-		want, err := provider.Embed(context.Background(), chunk)
+		want, err := provider.Embed(context.Background(), chunk, embedding.RoleDocument)
 		if err != nil {
 			t.Fatal(err)
 		}

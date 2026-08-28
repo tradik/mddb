@@ -11,10 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"mddb/internal/schema"
+
 	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"mddb/internal/schema"
 )
 
 // RegisterWebhook implements the RegisterWebhook RPC
