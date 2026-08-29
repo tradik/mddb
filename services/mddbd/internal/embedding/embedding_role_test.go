@@ -60,7 +60,9 @@ func TestCacheKeyDependsOnRole(t *testing.T) {
 	if cacheKey(model, text, RoleDocument) == cacheKey(model, text, RoleQuery) {
 		t.Fatal("a query and a document with the same text share a cache entry")
 	}
-	if cacheKey(model, text, RoleQuery) != cacheKey(model, text, RoleQuery) {
+	first := cacheKey(model, text, RoleQuery)
+	second := cacheKey(model, text, RoleQuery)
+	if first != second {
 		t.Error("the key is not stable for one role")
 	}
 }
@@ -68,5 +70,43 @@ func TestCacheKeyDependsOnRole(t *testing.T) {
 func TestRoleString(t *testing.T) {
 	if RoleDocument.String() != "document" || RoleQuery.String() != "query" {
 		t.Errorf("roles render as %q and %q", RoleDocument, RoleQuery)
+	}
+}
+
+// RAG-007. The variant says how documents are embedded now, and an empty one
+// means "as MDDB always did" — which is what records written before roles
+// existed hold. That equivalence is what lets a mismatch be a plain string
+// comparison instead of a special case.
+func TestDocumentVariantDistinguishesProvidersThatChanged(t *testing.T) {
+	prefixed := &OllamaProvider{model: "nomic-embed-text:latest"}
+	if got := prefixed.DocumentVariant(); got != "search_document: " {
+		t.Errorf("a prefixed model reports %q", got)
+	}
+
+	// A model with no measured prefix is embedded as it always was.
+	plain := &OllamaProvider{model: "all-minilm"}
+	if got := plain.DocumentVariant(); got != "" {
+		t.Errorf("an unprefixed model reports %q, want empty", got)
+	}
+
+	// Cohere always sent search_document, so its document side is unchanged.
+	if got := (&CohereProvider{}).DocumentVariant(); got != "" {
+		t.Errorf("Cohere reports %q, want empty — its documents never changed", got)
+	}
+
+	// Voyage never sent input_type at all, so its documents did change.
+	if got := (&VoyageProvider{}).DocumentVariant(); got == "" {
+		t.Error("Voyage reports an empty variant, but its documents now carry " +
+			"an input_type they were written without")
+	}
+}
+
+// A provider that reports nothing must not be mistaken for one that reports
+// something; the wrapper has to pass the answer through.
+func TestCachingProviderPassesTheVariantThrough(t *testing.T) {
+	inner := &OllamaProvider{model: "nomic-embed-text"}
+	c := NewCachingProvider(inner, 10, 0)
+	if got, want := DocumentVariantOf(c), inner.DocumentVariant(); got != want {
+		t.Errorf("cache reports %q, wrapped provider reports %q", got, want)
 	}
 }

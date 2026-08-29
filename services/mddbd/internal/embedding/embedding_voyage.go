@@ -126,3 +126,13 @@ type voyageEmbeddingData struct {
 	Embedding []float64 `json:"embedding"`
 	Index     int       `json:"index"`
 }
+
+// DocumentVariant reports that documents now carry an input_type.
+//
+// Voyage's models are asymmetric and the parameter was never sent, so every
+// vector written before this existed was produced without it. That is a real
+// difference in how the document side is embedded, and it is why this is not
+// empty (RAG-006, RAG-007).
+func (p *VoyageProvider) DocumentVariant() string {
+	return "input_type=" + voyageInputType(RoleDocument)
+}

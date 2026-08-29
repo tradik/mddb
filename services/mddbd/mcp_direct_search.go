@@ -301,6 +301,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 		}
 
 		contentHash := vec.ContentHash(d.ContentMD)
+		noteEmbeddingProvenance(s.VectorStore, req.Collection, s.Embedding)
 		if err := s.VectorStore.PutChunks(req.Collection, d.ID, chunkEmbeddings, s.Embedding.Model(), contentHash); err != nil {
 			failed++
 			errs = append(errs, d.ID+": store: "+err.Error())

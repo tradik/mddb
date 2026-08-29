@@ -192,6 +192,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	}
 
 	// Store all chunks in BoltDB
+	noteEmbeddingProvenance(w.vectorStore, job.Collection, w.provider)
 	if err := w.vectorStore.PutChunks(job.Collection, job.DocID, chunkEmbeddings, w.provider.Model(), contentHash); err != nil {
 		slog.Error("failed to store embedding", "collection", job.Collection, "docID", job.DocID, "err", err)
 		return

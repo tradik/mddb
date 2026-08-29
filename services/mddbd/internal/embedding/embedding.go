@@ -121,3 +121,27 @@ func newBareProvider() Provider {
 		return nil
 	}
 }
+
+// DocumentVariant reports how a provider embeds documents, as a short string
+// that changes when that treatment changes (RAG-007).
+//
+// An empty string means "the same way MDDB has always embedded documents with
+// this provider" — which is what every record written before roles existed
+// holds. That equivalence is the point: a collection embedded with a provider
+// whose document handling never changed needs no reindex, and comparing
+// variants says so without special cases.
+//
+// A provider that does not implement this is treated as unchanged.
+type DocumentVariant interface {
+	// DocumentVariant identifies the current document embedding treatment.
+	DocumentVariant() string
+}
+
+// DocumentVariantOf returns p's document variant, or "" for a provider that
+// does not report one.
+func DocumentVariantOf(p Provider) string {
+	if v, ok := p.(DocumentVariant); ok {
+		return v.DocumentVariant()
+	}
+	return ""
+}

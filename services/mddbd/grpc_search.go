@@ -203,6 +203,7 @@ func (g *GRPCServer) VectorReindex(ctx context.Context, req *proto.VectorReindex
 			continue
 		}
 
+		noteEmbeddingProvenance(g.server.VectorStore, req.Collection, g.server.Embedding)
 		if err := g.server.VectorStore.Put(req.Collection, d.ID, vector, g.server.Embedding.Model(), vec.ContentHash(d.ContentMD)); err != nil {
 			failed++
 			errs = append(errs, d.ID+": store: "+err.Error())

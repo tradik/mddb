@@ -431,6 +431,13 @@ func main() {
 		}
 	}
 
+	// RAG-007: say so when the stored vectors were produced differently from
+	// how the configured provider produces them now. Reindexing is the
+	// operator's call, so this names the collections and stops there.
+	if msg := reportStaleEmbeddings(s.VectorStore, s.Embedding); msg != "" {
+		slog.Warn("embedding provenance changed", "detail", msg)
+	}
+
 	// Load vectors into memory asynchronously
 	go s.loadVectorIndex()
 

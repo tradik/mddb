@@ -125,3 +125,13 @@ func cohereInputType(role Role) string {
 	}
 	return "search_document"
 }
+
+// DocumentVariant is empty on purpose.
+//
+// Cohere always sent input_type: "search_document", so the document side is
+// embedded exactly as it always was; what RAG-006 changed was the query side.
+// A collection embedded with Cohere therefore needs no reindex, and reporting
+// an empty variant is how that is said.
+func (p *CohereProvider) DocumentVariant() string {
+	return ""
+}

@@ -506,6 +506,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 
 		// Store all chunks (with quantization if configured)
 		contentHash := vec.ContentHash(d.ContentMD)
+		noteEmbeddingProvenance(s.VectorStore, req.Collection, s.Embedding)
 		if err := s.VectorStore.PutChunksQuantized(req.Collection, d.ID, chunkEmbeddings, s.Embedding.Model(), contentHash, qt); err != nil {
 			failed++
 			errs = append(errs, d.ID+": store: "+err.Error())

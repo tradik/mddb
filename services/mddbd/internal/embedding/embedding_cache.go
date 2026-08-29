@@ -246,3 +246,12 @@ func copyVector(v []float32) []float32 {
 	copy(out, v)
 	return out
 }
+
+// DocumentVariant passes the wrapped provider's variant through.
+//
+// Without this the cache would answer "" for every provider and erase the
+// distinction it exists to carry — a wrapper that silently flattens what it
+// wraps is worse than no wrapper.
+func (c *CachingProvider) DocumentVariant() string {
+	return DocumentVariantOf(c.inner)
+}

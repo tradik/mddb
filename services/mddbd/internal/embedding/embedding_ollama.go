@@ -140,3 +140,12 @@ type ollamaEmbedResponse struct {
 	Model      string      `json:"model"`
 	Embeddings [][]float64 `json:"embeddings"`
 }
+
+// DocumentVariant returns the prefix this model's documents are embedded with.
+//
+// Empty for a model that is not in the prefix table, which is also what records
+// written before prefixes existed hold — and correctly so: for those models
+// nothing changed and nothing needs reindexing.
+func (p *OllamaProvider) DocumentVariant() string {
+	return applyTaskPrefix(p.model, "", RoleDocument)
+}

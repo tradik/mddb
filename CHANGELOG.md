@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MDDB now says which collections need reindexing after an embedding change**
+  — the previous entry ends with "run a vector reindex to get the improvement",
+  which is only actionable if you know which collections it applies to. Nothing
+  recorded that. A model name does not answer it either: a provider can start
+  sending a task prefix or an `input_type` while reporting the same model, so
+  vectors written a week apart under one name are no longer in the same space.
+
+  Every collection now carries the model **and the variant** its vectors were
+  produced with, written next to the vectors themselves so a backup or a
+  replica carries it too. At startup MDDB compares that against what the
+  configured provider produces now and logs the collections that differ, by
+  name.
+
+  A collection written before this record existed has no entry, and is treated
+  as carrying the empty variant rather than being skipped — otherwise the check
+  would stay silent about precisely the collections it exists to find. The
+  consequence worth stating: an unchanged provider reports nothing, so upgrading
+  does not produce a spurious "reindex everything" warning. Only providers whose
+  document side actually changed, Ollama with a prefixed model and Voyage, name
+  their collections.
+
+  Recording it costs a map lookup per write, not a transaction; the database is
+  touched only when a collection is new to the process or its embedding genuinely
+  changed.
+
+  Reindexing remains the operator's decision. MDDB names the collections and
+  stops there rather than rewriting stored data at startup.
+
 ### Fixed
 
 - **Queries and documents were embedded identically (#214)** — retrieval models

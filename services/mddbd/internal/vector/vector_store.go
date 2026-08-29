@@ -9,6 +9,7 @@ import (
 	"mddb/internal/binlog"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -44,6 +45,11 @@ type VectorStore struct {
 	db         *bolt.DB
 	bucketName []byte
 	binlog     *binlog.Binlog
+
+	// prov caches the per-collection embedding provenance so that recording it
+	// on every write costs a map lookup rather than a BoltDB transaction.
+	provMu sync.RWMutex
+	prov   map[string]Provenance
 }
 
 // NewVectorStore creates a new vector store backed by BoltDB.
@@ -51,6 +57,7 @@ func NewVectorStore(db *bolt.DB) *VectorStore {
 	return &VectorStore{
 		db:         db,
 		bucketName: []byte("vectors"),
+		prov:       make(map[string]Provenance),
 	}
 }
 

@@ -790,6 +790,22 @@ curl -X POST http://localhost:11023/v1/vector-search \
 
 Re-embed all documents in a collection. Useful after changing the embedding provider/model, or for initial indexing of existing documents.
 
+**Knowing when it is needed.** MDDB records the model *and the embedding
+variant* each collection's vectors were produced with. The variant covers what
+can change while the model name stays the same, such as a provider beginning to
+send a task prefix or an `input_type`. At startup MDDB compares the record
+against what the configured provider produces now and logs any collection that
+differs:
+
+```
+embedding provenance changed  detail="1 collection(s) were embedded differently
+than nomic-embed-text produces now and should be reindexed for search quality: docs"
+```
+
+Nothing is rewritten automatically. The vectors still work; they are simply no
+longer in the same space as a query embedded today, which shows up as quietly
+worse ranking rather than as an error. Reindexing is your call.
+
 **Request Body**:
 ```json
 {
