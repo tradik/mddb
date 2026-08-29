@@ -215,3 +215,76 @@ func TestHandleVectorSearchMMR(t *testing.T) {
 		t.Errorf("MMR second pick = %q, want diverse", resp.Results[1].Document.Key)
 	}
 }
+
+// RAG-008: a collection can ask for chunk retrieval once, in its profile,
+// instead of every caller repeating the parameter. The profile was accepted,
+// validated and stored, and then never read by either search path.
+func TestRetrievalModeComesFromTheCollectionProfile(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	s.VectorIndex.SetReady()
+
+	content := strings.Repeat("alpha ", 250) + "\n\n" + strings.Repeat("bravo ", 250)
+	doc := addTestDoc(t, s, "kb", "guide", "en", content, nil)
+	s.VectorIndex.Add("kb", doc.ID+"#0", []float32{1, 0, 0})
+	s.VectorIndex.Add("kb", doc.ID+"#1", []float32{0.9, 0.1, 0})
+
+	search := func(mode string) VectorSearchResponseHTTP {
+		t.Helper()
+		rec := doRequest(t, s.handleVectorSearch, VectorSearchRequest{
+			Collection:    "kb",
+			QueryVector:   []float32{1, 0, 0},
+			TopK:          5,
+			RetrievalMode: mode,
+		})
+		if rec.Code != 200 {
+			t.Fatalf("mode %q: status %d, body %s", mode, rec.Code, rec.Body.String())
+		}
+		var resp VectorSearchResponseHTTP
+		if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return resp
+	}
+
+	// No profile yet: the default is still whole documents.
+	if resp := search(""); resp.Total != 1 || resp.Results[0].ChunkIndex != nil {
+		t.Fatalf("without a profile: total = %d, chunkIndex = %v, want 1 and nil",
+			resp.Total, resp.Results[0].ChunkIndex)
+	}
+
+	setProfile(t, s, "kb", &RetrievalProfileDef{RetrievalMode: RetrievalModeChunk})
+
+	resp := search("")
+	if resp.Total != 2 {
+		t.Fatalf("with the profile: total = %d, want 2 chunk hits", resp.Total)
+	}
+	if resp.Results[0].ChunkIndex == nil {
+		t.Fatal("the collection asked for chunk retrieval and got whole documents")
+	}
+	if !strings.Contains(resp.Results[0].ChunkText, "alpha") {
+		t.Errorf("passage %q does not carry the matching chunk", resp.Results[0].ChunkText)
+	}
+
+	// An explicit parameter still outranks the profile, in both directions.
+	if resp := search(RetrievalModeParent); resp.Total != 1 {
+		t.Errorf("explicit parent: total = %d, want the profile overridden", resp.Total)
+	}
+}
+
+// A mode the request never asked for must still be rejected rather than
+// silently treated as parent, now that it can arrive from the profile.
+func TestAnUnknownModeIsRejectedWhereverItCameFrom(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	s.VectorIndex.SetReady()
+
+	rec := doRequest(t, s.handleVectorSearch, VectorSearchRequest{
+		Collection:    "kb",
+		QueryVector:   []float32{1, 0, 0},
+		RetrievalMode: "bogus",
+	})
+	if rec.Code != 400 {
+		t.Errorf("explicit bogus mode: status = %d, want 400", rec.Code)
+	}
+}

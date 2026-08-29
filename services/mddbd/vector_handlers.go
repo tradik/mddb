@@ -172,8 +172,14 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
-	if !validRetrievalMode(req.RetrievalMode) {
-		bad(w, errors.New("unknown retrievalMode: "+req.RetrievalMode+", available: parent, chunk, window"))
+	// RAG-008: request, then collection profile, then default — the same
+	// precedence ResolveTopK applies. The resolved value is what gets
+	// validated: an invalid explicit mode passes through Resolve unchanged and
+	// is still caught, and so is a profile written by a version that knew a
+	// mode this one does not.
+	mode := s.ResolveRetrievalMode(req.Collection, req.RetrievalMode, RetrievalModeParent)
+	if !validRetrievalMode(mode) {
+		bad(w, errors.New("unknown retrievalMode: "+mode+", available: parent, chunk, window"))
 		return
 	}
 
@@ -265,7 +271,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
 	}
 
-	chunkMode := req.RetrievalMode == RetrievalModeChunk || req.RetrievalMode == RetrievalModeWindow
+	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
 	if !chunkMode {
 		results = vec.DeduplicateChunkResults(results)
 	}
@@ -283,7 +289,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	windowSize := 0
-	if req.RetrievalMode == RetrievalModeWindow {
+	if mode == RetrievalModeWindow {
 		windowSize = req.WindowSize
 		if windowSize <= 0 {
 			windowSize = 1
@@ -349,7 +355,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// expansion cannot be trimmed away by a cap it was not counted against,
 	// and before the response so its documents arrive with the rest.
 	var expansions []GraphExpansion
-	if req.RetrievalMode == RetrievalModeGraph {
+	if mode == RetrievalModeGraph {
 		expansions, items = s.appendGraphNeighbours(req.Collection, items, req.GraphExpand, req.IncludeContent)
 	}
 

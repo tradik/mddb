@@ -39,6 +39,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A collection's `retrievalMode` was accepted, validated and then ignored
+  (#216)** — the documented precedence is "an explicit request parameter wins,
+  then the collection profile, then the default". For `topK` that held. For
+  `retrievalMode` it did not: both search paths read the request field directly,
+  and `ResolveRetrievalMode`, written for exactly this, had no callers.
+
+  Setting `{"retrieval":{"retrievalMode":"chunk"}}` on a collection returned
+  `{"status":"ok"}`, persisted, and read back correctly, while every search kept
+  returning whole documents. Measured on the same query and corpus: with the
+  parameter in the request, results carried `chunkIndex` 0, 1, 1 and their
+  `chunkText`; with the profile alone, `chunkIndex` was `null` in every result
+  and the scores were identical to four decimals — the only difference was that
+  the profile was not applied.
+
+  That is the main reason to configure a profile for a RAG collection: the agent
+  should get the passage that matched, not the whole document. The setting was
+  inert and nothing said so.
+
+  The defect existed in two independent copies, `handleVectorSearch` for HTTP and
+  `DirectClient.VectorSearch` for MCP. Both now resolve the mode once, before
+  validating it, so a profile written by a newer version is rejected rather than
+  silently treated as `parent`. An explicit parameter still wins in both
+  directions.
+
 - **Queries and documents were embedded identically (#214)** — retrieval models
   are trained asymmetrically: the same sentence should produce a different
   vector depending on whether it is a document in the corpus or the question

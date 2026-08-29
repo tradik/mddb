@@ -100,8 +100,18 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 
 	// Parent mode (default): dedupe chunks to their parent document.
 	// Chunk/window modes keep chunk hits and return the matching passage.
-	if !validRetrievalMode(req.RetrievalMode) {
-		return nil, errors.New("unknown retrievalMode: " + req.RetrievalMode + ", available: parent, chunk, window")
+	// RAG-008: the documented precedence is "request, then collection profile,
+	// then default" — the same rule ResolveTopK applies above. Reading
+	// req.RetrievalMode directly skipped the middle term, so a collection that
+	// asked for chunk retrieval silently got whole documents.
+	//
+	// The resolved value is what gets validated, not the requested one: an
+	// invalid explicit mode still passes through Resolve unchanged and is
+	// caught here, and a profile written by a version that knew a mode this
+	// one does not is caught too.
+	mode := s.ResolveRetrievalMode(req.Collection, req.RetrievalMode, RetrievalModeParent)
+	if !validRetrievalMode(mode) {
+		return nil, errors.New("unknown retrievalMode: " + mode + ", available: parent, chunk, window")
 	}
 	// Disk-only collections: rescore quantized candidates from disk first.
 	var diskVecs map[string][]float32
@@ -109,7 +119,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
 	}
 
-	chunkMode := req.RetrievalMode == RetrievalModeChunk || req.RetrievalMode == RetrievalModeWindow
+	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
 	if !chunkMode {
 		results = vec.DeduplicateChunkResults(results)
 	}
@@ -125,7 +135,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		results = results[:topK]
 	}
 	windowSize := 0
-	if req.RetrievalMode == RetrievalModeWindow {
+	if mode == RetrievalModeWindow {
 		windowSize = req.WindowSize
 		if windowSize <= 0 {
 			windowSize = 1
