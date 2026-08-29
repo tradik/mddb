@@ -1,4 +1,4 @@
-# MDDB — AI-Native Document Database
+# MDDB: AI-Native Document Database
 
 [![Go Version](https://img.shields.io/badge/Go-1.27-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
@@ -8,36 +8,36 @@
 [![Tests](https://github.com/tradik/mddb/workflows/Tests/badge.svg)](https://github.com/tradik/mddb/actions)
 [![codecov](https://codecov.io/gh/tradik/mddb/branch/main/graph/badge.svg)](https://codecov.io/gh/tradik/mddb)
 
-**AI-native document database with built-in MCP server, file upload (PDF/DOCX/HTML/ODT/RTF/TEX/YAML/Wikipedia XML→Markdown), vector search, RAG pipelines, and 81 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
+**AI-native document database with built-in MCP server, file upload (PDF/DOCX/HTML/ODT/RTF/TEX/YAML/Wikipedia XML to Markdown), vector search, RAG pipelines, and 81 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
 
-MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT) — they're auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 81 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~26MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
+MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 81 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~26MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
 
 ## 🎯 What is MDDB?
 
 MDDB gives your AI agents a persistent, searchable knowledge base:
 
-- **File Upload** - Upload PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT files — auto-converted to Markdown and indexed
-- **Wikipedia Import** - Stream and import MediaWiki XML dumps (`.xml.bz2`) — wikitext auto-converted to Markdown, namespace filtering, handles multi-GB files
+- **File Upload** - Upload PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT files, auto-converted to Markdown and indexed
+- **Wikipedia Import** - Stream and import MediaWiki XML dumps (`.xml.bz2`). Wikitext is auto-converted to Markdown, with namespace filtering, and multi-GB files are handled
 - **Built-in MCP Server** - 81 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
 - **Vector Search** - Auto-embed documents, semantic similarity with 7 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, BQ) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode-v2114) + ARM NEON/SME hardware acceleration + goroutine parallel search
-- **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere — configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
+- **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere, configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
 - **[Geo Search](docs/GEOSEARCH.md)** - R-tree and geohash indexes for radius/bounding-box queries, composable with FTS/vector via `hybrid-search`, optional postcode lookup
 - **RAG-Ready** - Hybrid search (BM25 keyword + vector, fused with RRF or alpha blending), [parent/chunk/window retrieval modes](docs/SEARCH.md#retrieval-modes--parent-chunk-window-v2114) for precise LLM context, [MMR result diversification](docs/SEARCH.md#mmr-result-diversification-v2114), and per-query metadata boosting (freshness/recency ranking)
-- **Native Multi-Tenancy** - [Namespace isolation per tenant](docs/MULTI_TENANCY.md) across HTTP/gRPC/GraphQL/MCP — ready for SaaS backends
-- **Zero-Maintenance Storage** - Single-file embedded database with automatic space management — no vacuum, compaction jobs, or index maintenance windows
+- **Native Multi-Tenancy** - [Namespace isolation per tenant](docs/MULTI_TENANCY.md) across HTTP/gRPC/GraphQL/MCP, ready for SaaS backends
+- **Zero-Maintenance Storage** - Single-file embedded database with automatic space management: no vacuum, compaction jobs, or index maintenance windows
 - **Memory RAG** - Conversational memory system: store, recall, and summarize chat sessions with semantic search
 - **Integrations** - [Docling](docs/INTEGRATIONS.md), [Langflow](docs/INTEGRATIONS.md), [OpenSearch](docs/INTEGRATIONS.md), [SSG](docs/INTEGRATIONS.md), [wpexporter](docs/INTEGRATIONS.md), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), [Chrome extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines
-- **Zero-Shot Classification** — Classify documents against candidate labels using embeddings, no training data
+- **Zero-Shot Classification** - Classify documents against candidate labels using embeddings, no training data
 - **Custom AI Tools** - Define YAML-based MCP tools for domain-specific workflows
 - **Code Documents** - Store HTML/CSS/JS alongside prose; a `kind: ["code"]` convention on the existing flat meta switches to a source-aware tokeniser that keeps `.hero-banner` and `checkoutHandler` findable whole and in parts ([API.md](docs/API.md#code-documents))
 - **Code Symbols** - Each code document records what it `defines`, `uses` and `imports` in its meta, so `meta.defines=.hero-banner` returns the stylesheet that declares the selector instead of the twelve templates that apply it ([API.md](docs/API.md#symbols-which-file-declares-this))
 - **Code Connection Graph** - What breaks if this selector changes, which pages load this script, what does nothing reference any more. Edges are derived from the symbol meta, never stored, so a reindex reproduces the graph exactly ([API.md](docs/API.md#the-connection-graph))
 - **Per-Collection Retrieval Profiles** - Search type, topK, granularity, hybrid strategy and a context token budget stored with the collection instead of repeated by every client; an explicit request parameter always wins ([API.md](docs/API.md#retrieval-defaults-v2120))
-- **Embedding Cache** - Repeated queries never reach the provider twice, and a reindex reuses the vectors of chunks whose text is unchanged — editing one paragraph of a 50-chunk document embeds one chunk, not fifty ([config.md](docs/config.md))
+- **Embedding Cache** - Repeated queries never reach the provider twice, and a reindex reuses the vectors of chunks whose text is unchanged. Editing one paragraph of a 50-chunk document embeds one chunk, not fifty ([config.md](docs/config.md))
 - **Answer Formatting per Collection** - A `responsePrompt` stored with the collection tells every consumer how its answers should be shaped; MCP agents receive it with their search results, in the same round trip ([API.md](docs/API.md#answer-formatting-v2120))
-- **`fast` Ingest Profile** - One named trade-off instead of a combination of flags to reverse-engineer: text-only parsing, no revisions, no webhooks — 43× faster on HTML. Embeddings and full-text stay on, because *fast* should not mean *unsearchable* ([API.md](docs/API.md#the-fast-ingest-profile-v2120))
-- **`oversample` Knob** - Recall/latency dial per query or per collection, where the `topK * 3` constant used to be. At 1× a chunked collection returns half the documents you asked for; at 10× it returns all of them, for about 1% more time on a flat index ([SEARCH.md](docs/SEARCH.md#oversampling-v2120))
-- **Agent Instructions** - Ready-made guidance for Claude Code, Cursor and Windsurf on which tool fits a question and how to ask for chunks instead of whole documents ([integrations/agent-instructions/](integrations/agent-instructions/)) — measured at 60x fewer tokens for the same search
+- **`fast` Ingest Profile** - One named trade-off instead of a combination of flags to reverse-engineer: text-only parsing, no revisions, no webhooks, and 43x faster on HTML. Embeddings and full-text stay on, because *fast* should not mean *unsearchable* ([API.md](docs/API.md#the-fast-ingest-profile-v2120))
+- **`oversample` Knob** - Recall/latency dial per query or per collection, where the `topK * 3` constant used to be. At 1x a chunked collection returns half the documents you asked for; at 10x it returns all of them, for about 1% more time on a flat index ([SEARCH.md](docs/SEARCH.md#oversampling-v2120))
+- **Agent Instructions** - Ready-made guidance for Claude Code, Cursor and Windsurf on which tool fits a question and how to ask for chunks instead of whole documents ([integrations/agent-instructions/](integrations/agent-instructions/)), measured at 60x fewer tokens for the same search
 - **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse, 8 search modes (simple, boolean, phrase, wildcard, proximity, **expression**, range, fuzzy), typo tolerance, multi-language stemming (18 languages), synonyms, per-query metadata boost/demote, prefix autocomplete, **search-result highlighting with fragments**
 - **Geosearch** - R-tree + geohash radius/bbox queries, **GeoJSON polygon and multi-polygon containment**, postcode lookup, **distance-sorted hybrid search** combining proximity with keyword/vector relevance
 - **Async Bulk Ingest** - Queue long-running document imports with job tracking, progress polling, and optional webhook callback
@@ -49,7 +49,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Built-in TLS** - Native HTTPS support, connection pooling, pprof profiling
 - **Zero Configuration** - Single ~26MB binary, embedded database, no dependencies
 
-**Perfect for:** AI agent memory, RAG pipelines, knowledge bases for LLMs, documentation chatbots, semantic search APIs, document processing (PDF/DOCX→Markdown), static site generation, WordPress migration
+**Perfect for:** AI agent memory, RAG pipelines, knowledge bases for LLMs, documentation chatbots, semantic search APIs, document processing (PDF/DOCX to Markdown), static site generation, WordPress migration
 
 ## 🚀 Quick Start
 
@@ -61,7 +61,7 @@ Start all services with one command:
 git clone https://github.com/tradik/mddb.git
 cd mddb
 
-# Production mode (all services) — set the secrets first, see below
+# Production mode (all services). Set the secrets first, see below
 cp .env.example .env && $EDITOR .env
 docker compose up -d
 
@@ -83,7 +83,7 @@ make dev-start-with-ollama
 > Every port is published on `127.0.0.1` by default. A reverse proxy or
 > cloudflared reaches the containers over `mddb-network` and needs no published
 > port at all; to expose the stack on the host's interfaces, set
-> `MDDB_BIND_ADDR=0.0.0.0` — deliberately, and only with authentication on.
+> `MDDB_BIND_ADDR=0.0.0.0`, deliberately, and only with authentication on.
 
 > **Importing existing content:** MDDB does not automatically index bind-mounted
 > directories. Use [`scripts/load-md-folder.sh`](docs/BULK-IMPORT.md) or the ingest
@@ -98,7 +98,7 @@ make dev-start-with-ollama
 
 ### Connect to Claude / Cursor / Windsurf (MCP)
 
-MDDB has a built-in MCP server — no extra service needed. Add to your MCP config:
+MDDB has a built-in MCP server, so no extra service is needed. Add to your MCP config:
 
 ```json
 {
@@ -116,9 +116,9 @@ MDDB has a built-in MCP server — no extra service needed. Add to your MCP conf
 }
 ```
 
-That's it — your AI agent now has full access to your knowledge base with 81 built-in tools (add, search, vector search, classify, and more).
+That is it. Your AI agent now has full access to your knowledge base with 81 built-in tools (add, search, vector search, classify, and more).
 
-**[→ Full MCP setup guide](docs/LLM_CONNECTIONS.md)** | **[→ MCP server config](docs/MCP.md)** | **[→ Custom MCP tools](docs/CUSTOM-TOOLS.md)**
+**[Full MCP setup guide](docs/LLM_CONNECTIONS.md)** | **[MCP server config](docs/MCP.md)** | **[Custom MCP tools](docs/CUSTOM-TOOLS.md)**
 
 ### Docker - Individual Services
 
@@ -193,14 +193,14 @@ Two things this table is precise about on purpose.
 
 **macOS and FreeBSD ship binaries that no CI job executes.** They are built and
 type-checked on every push, including test files, which catches a platform-split
-that fails to compile — the FreeBSD build broke once on a `Statfs_t` field width
+that fails to compile. The FreeBSD build broke once on a `Statfs_t` field width
 and that is exactly what it catches. It does not catch a syscall that compiles
 and returns the wrong thing.
 
 **Windows runs the suite but ships nothing.** As of 2.13 the full test suite runs
 on `windows-latest` on every push, and native `windows/amd64` binaries build from
 source with `make build-windows`. There are no Windows release artifacts, and
-Unix domain sockets are refused there by design — the listener's security model
+Unix domain sockets are refused there by design, because the listener's security model
 is owner-only mode bits, which Windows cannot express. WSL2 remains the route
 that runs the same binary every release is built and tested against. See the
 [Installation Guide](docs/INSTALLATION.md#windows).
@@ -219,8 +219,8 @@ make build-windows         # cross-compile windows/amd64 into dist/
 
 MDDB is a Go monorepo with multiple modules (`services/mddbd`, `services/mddb-cli`, `clients/go/mddb`, `tools/bench`). A [`go.work`](go.work) file at the repo root enables Go workspace mode for local development:
 
-- **Cross-module refactoring** — renaming a symbol in `services/mddbd` immediately updates references in `services/mddb-cli` via `gopls`.
-- **Unified build** — `go build ./services/mddbd/... ./services/mddb-cli/... ./tools/bench/...` from the repo root.
+- **Cross-module refactoring**: renaming a symbol in `services/mddbd` immediately updates references in `services/mddb-cli` via `gopls`.
+- **Unified build**: `go build ./services/mddbd/... ./services/mddb-cli/... ./tools/bench/...` from the repo root.
 - **IDE "goto definition"** works across module boundaries without opening each module separately.
 
 #### `services/mddbd` internal package structure (GO-015)
@@ -244,7 +244,7 @@ To use the same mode locally for debugging:
 GOWORK=off go build ./...   # from inside services/mddbd
 ```
 
-Regenerating protos (`buf generate`) and Docker builds are unaffected by `go.work` — they operate on individual modules.
+Regenerating protos (`buf generate`) and Docker builds are unaffected by `go.work`. They operate on individual modules.
 
 ## 📦 Packages & Client Libraries
 
@@ -291,7 +291,7 @@ High-performance clients generated from Protocol Buffers:
 
 | Library | Language | Location | Description |
 |---------|----------|----------|-------------|
-| **Go HTTP client** | Go | [`clients/go/mddb/`](clients/go/mddb/) | Official HTTP/JSON SDK — shared by `mddb-cli` and external Go integrations |
+| **Go HTTP client** | Go | [`clients/go/mddb/`](clients/go/mddb/) | Official HTTP/JSON SDK, shared by `mddb-cli` and external Go integrations |
 | **Go gRPC stubs** | Go | `services/mddbd/proto/` | Native Go gRPC stubs |
 | **Python gRPC** | Python | `clients/python/` | Generated Python gRPC client |
 | **Node.js gRPC** | Node.js | `clients/nodejs/` | Uses `@grpc/grpc-js` |
@@ -327,14 +327,14 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 
 ### AI & Search
 - ✅ **MCP Server** - 81 built-in tools via Model Context Protocol 2025-11-25 (stdio + Streamable HTTP + SSE) with tool annotations, prompts, completion, and structured output
-- ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md) — tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools-v2110))
-- ✅ **File Upload** - Upload PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT — auto-converted to Markdown (single and batch, configurable size limit)
-- ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext→Markdown conversion, namespace filtering, batch processing
+- ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md), including tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools-v2110))
+- ✅ **File Upload** - Upload PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT, auto-converted to Markdown (single and batch, configurable size limit)
+- ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext to Markdown conversion, namespace filtering, batch processing
 - ✅ **Vector Search** - Semantic similarity with auto-embeddings (OpenAI, Ollama, Cohere, Voyage), ARM NEON/SME SIMD acceleration
 - ✅ **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse scoring, 7 search modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy), typo tolerance, metadata pre-filtering, multi-language stemming and stop words (18 languages)
 - ✅ **Hybrid Search** - Sparse (BM25) + dense (vector) fusion with alpha blending or RRF
 - ✅ **Aggregations** - Metadata facets (value counts) and date histograms with optional pre-filtering
-- ✅ **Inline Facets on Search** (v2.9.14+) - Pass `facetBy` to `/v1/fts` or `/v1/hybrid-search` and get per-key value counts alongside results — no separate aggregate call
+- ✅ **Inline Facets on Search** (v2.9.14+) - Pass `facetBy` to `/v1/fts` or `/v1/hybrid-search` and get per-key value counts alongside results, with no separate aggregate call
 - ✅ **Curation Rules** (v2.9.14+) - Pin or hide documents for specific queries via `/v1/curation` (CRUD); applied in FTS + Hybrid pipelines
 - ✅ **Zero-Shot Classification** - Classify documents against candidate labels using embedding similarity
 - ✅ **Custom MCP Tools** - Define YAML-based AI tools for domain-specific workflows
@@ -370,18 +370,18 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **User Management** - Multi-user with admin roles
 - ✅ **[Native Multi-Tenancy](docs/MULTI_TENANCY.md)** - Namespace isolation per tenant, enforced centrally across HTTP/gRPC/GraphQL/MCP; zero config for single-tenant deployments
 - ✅ **Group Permissions** - Organize users into groups
-- ✅ **[TLS / HTTPS](docs/TLS.md)** - `MDDB_TLS_ENABLED=true`, `MDDB_TLS_CERT`, `MDDB_TLS_KEY` — user-supplied PEM cert + key, TLS 1.2 minimum
+- ✅ **[TLS / HTTPS](docs/TLS.md)** - `MDDB_TLS_ENABLED=true`, `MDDB_TLS_CERT`, `MDDB_TLS_KEY`, taking a user-supplied PEM cert and key, TLS 1.2 minimum
 - ✅ **[Mutual TLS (mTLS)](docs/TLS.md#quick-start-mtls--clients-must-present-certificates)** - `MDDB_TLS_CLIENT_CA` points to a PEM bundle of trusted client CAs; `MDDB_TLS_CLIENT_AUTH=require` (default) or `request`. Rejects unauthenticated clients when `require`
-- ✅ **Unix Domain Socket transport** - `MDDB_HTTP_ADDR=unix:/tmp/mddb-http.sock` and `MDDB_GRPC_ADDR=unix:/tmp/mddb-grpc.sock` — zero-network local transport with `0600` filesystem perms. Clients in Python (`MDDB.connect('unix:/tmp/mddb-http.sock')`), PHP (`mddb::connect('unix:/tmp/mddb-http.sock')`), Node/Python gRPC (`unix:/tmp/mddb-grpc.sock` channel target)
-- ✅ **Audit log (ISO 27001 / SOC 2)** — `MDDB_AUDIT_ENABLED=true` persists structured JSON events (auth attempts, writes, deletes) to a dedicated BoltDB bucket. Admin-only `GET /v1/audit` query with actor / action / result / time-window filters. Retention configurable via `MDDB_AUDIT_RETENTION_DAYS` (default 90)
-- ✅ **Incident webhook events** — subscribe on `/v1/webhooks` to `security.auth_failure_burst`, `security.rate_limit_exceeded`, `ops.replication_lag_high`, `ops.panic_recovered`, `ops.disk_usage_high`. Panic-recovery middleware turns handler crashes into structured 500 + event instead of process kill
-- ✅ **At-rest encryption (opt-in per collection)** — AES-256-GCM on document values. Enable globally with `MDDB_ENCRYPTION_KEY` (32 B base64) and flip `CollectionConfig.encrypted=true` per collection. Legacy plaintext stays readable after flip. FTS / vector indexes remain plaintext (queryable). Losing the key is terminal — store in HSM + escrow
-- ✅ **Encryption key rotation (2.9.16)** — V2 ciphertext format prefixes the keyID byte so the encryptor can hold a primary plus any number of read-only previous keys. Rotate by setting a fresh `MDDB_ENCRYPTION_KEY` + `MDDB_ENCRYPTION_KEY_ID` and listing every superseded key in `MDDB_ENCRYPTION_KEYS_PREVIOUS` (JSON `[{"id":1,"key":"..."}]`). Old documents stay readable; the admin endpoint `POST /v1/encryption/rotate` (or panel "Encryption" → "Start rotation") rewrites every encrypted entry under the new primary in the background. V1 (2.9.15) ciphertexts continue to decrypt — non-breaking
-- ✅ **Audit log export to SIEM / syslog (2.9.16)** — `MDDB_AUDIT_EXPORT_WEBHOOK_URL` mirrors every audit event as JSON to a SIEM (Splunk HEC, Datadog Logs, ELK) with custom auth headers from `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER`. `MDDB_AUDIT_EXPORT_SYSLOG_ADDR=host:port` (or `tcp://host:port`) sends RFC 5424 framed messages to a syslog collector. Both can run together. Per-sink delivered/failed/dropped counters at `GET /v1/audit/exporters` and in the Security panel
-- ✅ **HTTP + gRPC rate limiting** — `MDDB_RATE_LIMIT_ENABLED=true` enforces a single sliding-window budget across both transports (per-IP by default, `MDDB_RATE_LIMIT_BY=user` keys on authenticated username). Emits `X-RateLimit-*` headers + `429 Retry-After` on HTTP; `ResourceExhausted` on gRPC. Health / metrics endpoints are always exempt
-- ✅ **Production hardening switch** — `MDDB_PRODUCTION=true` fails startup unless every compliance guardrail is satisfied (auth on, JWT secret ≥32 bytes, TLS on, CORS explicit, audit + rate limit enabled). Unset = silent warning; no breaking change for existing deployments. **[→ Details](docs/config.md#production-hardening-iso-27001--soc-2)**
+- ✅ **Unix Domain Socket transport** - `MDDB_HTTP_ADDR=unix:/tmp/mddb-http.sock` and `MDDB_GRPC_ADDR=unix:/tmp/mddb-grpc.sock`, a zero-network local transport with `0600` filesystem perms. Clients in Python (`MDDB.connect('unix:/tmp/mddb-http.sock')`), PHP (`mddb::connect('unix:/tmp/mddb-http.sock')`), Node/Python gRPC (`unix:/tmp/mddb-grpc.sock` channel target)
+- ✅ **Audit log (ISO 27001 / SOC 2)** - `MDDB_AUDIT_ENABLED=true` persists structured JSON events (auth attempts, writes, deletes) to a dedicated BoltDB bucket. Admin-only `GET /v1/audit` query with actor / action / result / time-window filters. Retention configurable via `MDDB_AUDIT_RETENTION_DAYS` (default 90)
+- ✅ **Incident webhook events** - subscribe on `/v1/webhooks` to `security.auth_failure_burst`, `security.rate_limit_exceeded`, `ops.replication_lag_high`, `ops.panic_recovered`, `ops.disk_usage_high`. Panic-recovery middleware turns handler crashes into structured 500 + event instead of process kill
+- ✅ **At-rest encryption (opt-in per collection)** - AES-256-GCM on document values. Enable globally with `MDDB_ENCRYPTION_KEY` (32 B base64) and flip `CollectionConfig.encrypted=true` per collection. Legacy plaintext stays readable after flip. FTS / vector indexes remain plaintext (queryable). Losing the key is terminal, so store it in an HSM with escrow
+- ✅ **Encryption key rotation (2.9.16)** - V2 ciphertext format prefixes the keyID byte so the encryptor can hold a primary plus any number of read-only previous keys. Rotate by setting a fresh `MDDB_ENCRYPTION_KEY` + `MDDB_ENCRYPTION_KEY_ID` and listing every superseded key in `MDDB_ENCRYPTION_KEYS_PREVIOUS` (JSON `[{"id":1,"key":"..."}]`). Old documents stay readable; the admin endpoint `POST /v1/encryption/rotate` (or panel "Encryption", then "Start rotation") rewrites every encrypted entry under the new primary in the background. V1 (2.9.15) ciphertexts continue to decrypt, so the change is non-breaking
+- ✅ **Audit log export to SIEM / syslog (2.9.16)** - `MDDB_AUDIT_EXPORT_WEBHOOK_URL` mirrors every audit event as JSON to a SIEM (Splunk HEC, Datadog Logs, ELK) with custom auth headers from `MDDB_AUDIT_EXPORT_WEBHOOK_HEADER`. `MDDB_AUDIT_EXPORT_SYSLOG_ADDR=host:port` (or `tcp://host:port`) sends RFC 5424 framed messages to a syslog collector. Both can run together. Per-sink delivered/failed/dropped counters at `GET /v1/audit/exporters` and in the Security panel
+- ✅ **HTTP + gRPC rate limiting** - `MDDB_RATE_LIMIT_ENABLED=true` enforces a single sliding-window budget across both transports (per-IP by default, `MDDB_RATE_LIMIT_BY=user` keys on authenticated username). Emits `X-RateLimit-*` headers + `429 Retry-After` on HTTP; `ResourceExhausted` on gRPC. Health / metrics endpoints are always exempt
+- ✅ **Production hardening switch** - `MDDB_PRODUCTION=true` fails startup unless every compliance guardrail is satisfied (auth on, JWT secret of 32 bytes or more, TLS on, CORS explicit, audit + rate limit enabled). Unset = silent warning; no breaking change for existing deployments. **[Details](docs/config.md#production-hardening-iso-27001--soc-2)**
 
-**[→ Full compliance map, threat model, operational checklist](docs/SECURITY.md)**
+**[Full compliance map, threat model, operational checklist](docs/SECURITY.md)**
 
 ### Replication & High Availability
 - ✅ **Leader-Follower Replication** - Binlog streaming for read scaling
@@ -389,7 +389,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Zero-Downtime Snapshots** - Full sync for new followers
 - ✅ **Cluster Monitoring** - Web panel with health and lag metrics
 
-**[→ See all features](docs/FEATURES.md)** | **[→ Compare with alternatives](docs/COMPARISON.md)** | **[→ Measured benchmarks](docs/BENCHMARK.md)**
+**[See all features](docs/FEATURES.md)** | **[Compare with alternatives](docs/COMPARISON.md)** | **[Measured benchmarks](docs/BENCHMARK.md)**
 
 ## 🔄 Replication Architecture
 
@@ -407,7 +407,7 @@ graph LR
 - **Leader**: Handles writes, maintains changes in a binary log, and streams them via gRPC.
 - **Followers**: Read-only, pulls transactions, reconnects automatically.
 
-**[→ Read Full Replication Guide](docs/REPLICATION.md)**
+**[Read Full Replication Guide](docs/REPLICATION.md)**
 
 ## 🎨 Web Admin Panel
 
@@ -415,16 +415,16 @@ Modern React-based UI for managing documents, users, and search with REST/GraphQ
 
 ![MDDB Web Panel](services/ssg-template/images/panel.png)
 
-**Features:** Browse collections, view/edit documents, vector search, user management, API mode switching (REST ↔ GraphQL), live markdown preview.
+**Features:** Browse collections, view/edit documents, vector search, user management, API mode switching (REST and GraphQL), live markdown preview.
 
-**[→ Panel documentation](docs/PANEL.md)**
+**[Panel documentation](docs/PANEL.md)**
 
 ## 📖 Quick Examples
 
 ### Upload Files (PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT)
 
 ```bash
-# Upload a PDF — auto-converted to Markdown
+# Upload a PDF, auto-converted to Markdown
 curl -X POST http://localhost:11023/v1/upload \
   -F "file=@report.pdf" \
   -F "collection=docs" \
@@ -583,7 +583,7 @@ mddb-cli fts blog --query="getting started"
 mddb-cli stats
 ```
 
-**[→ API reference](docs/API.md)** | **[→ Use case examples](docs/USE_CASES.md)** | **[→ Client libraries](docs/EXAMPLES.md)**
+**[API reference](docs/API.md)** | **[Use case examples](docs/USE_CASES.md)** | **[Client libraries](docs/EXAMPLES.md)**
 
 ## 📚 Documentation
 
@@ -642,7 +642,7 @@ mddb-cli stats
 ```
 ┌─────────────────────────────────────────────────────┐
 │     AI Agents (Claude, ChatGPT, Cursor, Windsurf)   │
-│     ↕ MCP (stdio / HTTP :9000)                      │
+│     |  MCP (stdio / HTTP :9000)                     │
 ├─────────────────────────────────────────────────────┤
 │         Other Clients                               │
 ├──────────┬──────────┬──────────┬────────────────────┤
@@ -650,26 +650,26 @@ mddb-cli stats
 │  :11023  │  :11024  │ /graphql │ :11443             │
 ├──────────┴──────────┴──────────┴────────────────────┤
 │           MDDB Server (Go)                          │
-│  • File Upload (PDF/DOCX/HTML/TXT → Markdown)       │
-│  • Auto-Embeddings (OpenAI, Ollama, Cohere, Voyage) │
-│  • Vector + Full-Text + Hybrid Search               │
-│  • Zero-Shot Classification                         │
-│  • Automation (triggers, crons, webhooks)            │
-│  • JWT Auth + RBAC                                  │
+│  - File Upload (PDF/DOCX/HTML/TXT to Markdown)      │
+│  - Auto-Embeddings (OpenAI, Ollama, Cohere, Voyage) │
+│  - Vector + Full-Text + Hybrid Search               │
+│  - Zero-Shot Classification                         │
+│  - Automation (triggers, crons, webhooks)           │
+│  - JWT Auth + RBAC                                  │
 ├─────────────────────────────────────────────────────┤
 │      BoltDB (Embedded ACID Storage)                 │
-│  • B+Tree index • Single-file • MVCC transactions   │
+│  - B+Tree index, single-file, MVCC transactions     │
 └─────────────────────────────────────────────────────┘
 ```
 
-**[→ Detailed architecture](docs/ARCHITECTURE.md)**
+**[Detailed architecture](docs/ARCHITECTURE.md)**
 
 ## 🗺️ What's next
 
 Shipped work is in **[CHANGELOG.md](CHANGELOG.md)**. What people are asking for
 is in **[Issues](https://github.com/tradik/mddb/issues)** and
-**[Discussions](https://github.com/tradik/mddb/discussions/categories/ideas)** —
-both current by construction, which a hand-written roadmap was not.
+**[Discussions](https://github.com/tradik/mddb/discussions/categories/ideas)**.
+Both are current by construction, which a hand-written roadmap was not.
 
 ## 🤝 Contributing
 
