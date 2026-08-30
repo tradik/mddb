@@ -1,5 +1,5 @@
 # Development stage
-FROM node:26.7-alpine3.24 AS development
+FROM node:26.8-alpine3.24 AS development
 
 WORKDIR /app
 
@@ -22,7 +22,7 @@ EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Builder stage
-FROM node:26.7-alpine3.24 AS builder
+FROM node:26.8-alpine3.24 AS builder
 
 WORKDIR /app
 
@@ -42,7 +42,7 @@ COPY scripts/mddb_model.py ./scripts/mddb_model.py
 RUN npm run build
 
 # Production image
-FROM node:26.7-alpine3.24 AS production
+FROM node:26.8-alpine3.24 AS production
 
 WORKDIR /app
 
