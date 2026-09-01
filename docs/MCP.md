@@ -21,6 +21,66 @@ MDDB has a built-in MCP (Model Context Protocol) server implementing the **2025-
 
 All transports run on the MCP port (default: 9000, configurable via `MDDB_MCP_ADDR`).
 
+## Protocol Revisions
+
+A client and a server do not upgrade on the same day, so MDDB negotiates the
+revision rather than asserting one. It advertises the revisions it can speak,
+newest first, and answers each handshake with the one both sides agree on.
+
+| Client sends in `initialize` | MDDB answers with |
+|---|---|
+| a revision MDDB speaks | that revision |
+| a revision MDDB does not speak | its own newest revision, and the client decides whether to continue |
+| nothing | its own newest revision |
+
+`GET /v1/config` reports the current state without a handshake — a handshake
+answers for one client, and cannot show that a pin is in force or what else
+would have been accepted:
+
+```json
+{
+  "protocols": {
+    "mcp": {
+      "enabled": true,
+      "addr": ":9000",
+      "stdio": false,
+      "revision": "2025-11-25",
+      "supportedRevisions": ["2025-11-25"],
+      "revisionPinned": false
+    }
+  }
+}
+```
+
+### Pinning a revision
+
+`MDDB_MCP_PROTOCOL_VERSION` forces one revision and disables negotiation
+entirely. Set it when a client's own version handling is the thing that is
+broken; leave it unset otherwise, because a pin also stops MDDB from serving
+clients that ask for anything else.
+
+```bash
+MDDB_MCP_PROTOCOL_VERSION=2025-11-25
+```
+
+A pin naming a revision this build does not implement stops the server at
+startup, listing what it can speak. Accepting it would produce a handshake that
+succeeds and a session that then misbehaves, far from the cause.
+
+### The MCP-Protocol-Version header
+
+The Streamable HTTP transport reads this header. Sending a revision MDDB cannot
+speak — or one that disagrees with a pin — is refused with `400` and a body
+naming what would work. Omitting the header is fine and means "whatever the
+server prefers".
+
+```bash
+curl -X POST http://localhost:9000/mcp \
+  -H "MCP-Protocol-Version: 2024-01-01" -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+# {"error":"unsupported MCP revision 2024-01-01; this server speaks: 2025-11-25"}
+```
+
 ### Streamable HTTP (Recommended)
 
 ```bash

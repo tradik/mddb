@@ -41,6 +41,15 @@ func NewMCPStreamableTransport(handler *MCPHandler) *MCPStreamableTransport {
 
 // Handle is the single MCP endpoint handler supporting POST and GET.
 func (t *MCPStreamableTransport) Handle(w http.ResponseWriter, r *http.Request) {
+	// The MCP-Protocol-Version header was documented by this transport and
+	// never read, so a client asking for a revision MDDB cannot speak was
+	// answered as though it could. Refusing here fails at the handshake, where
+	// the client can still choose to fall back, rather than several calls
+	// later where the cause is no longer visible.
+	if err := checkMCPVersionHeader(r.Header.Get("MCP-Protocol-Version")); err != nil {
+		http.Error(w, mcpVersionErrorBody(err), http.StatusBadRequest)
+		return
+	}
 	switch r.Method {
 	case http.MethodPost:
 		t.handlePost(w, r)

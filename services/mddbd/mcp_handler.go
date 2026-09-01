@@ -10,9 +10,6 @@ import (
 	"sync"
 )
 
-// MCPProtocolVersion is the MCP spec version this server implements.
-const MCPProtocolVersion = "2025-11-25"
-
 // MCPHandler handles MCP JSON-RPC requests via stdio.
 type MCPHandler struct {
 	client       MCPClient
@@ -126,8 +123,11 @@ func (h *MCPHandler) Handle(req map[string]interface{}) map[string]interface{} {
 func (h *MCPHandler) handleInitialize(req map[string]interface{}) map[string]interface{} {
 	id := req["id"]
 
+	// Answer with the revision the client and this build agree on, not with a
+	// constant. A client pinned to an older revision than the newest MDDB
+	// implements is a supported case, not a misconfiguration.
 	result := map[string]interface{}{
-		"protocolVersion": MCPProtocolVersion,
+		"protocolVersion": NegotiateMCPVersion(requestedMCPVersion(req["params"])),
 		"capabilities": map[string]interface{}{
 			"resources": map[string]interface{}{
 				"subscribe":   false,

@@ -1028,6 +1028,18 @@ func main() {
 
 	// Start MCP HTTP server on its own port
 	if srvCfg.MCP.Enabled {
+		// A pin naming a revision this build cannot speak is refused here
+		// rather than at the first handshake: the operator set it deliberately,
+		// so silently ignoring it would leave them believing a compatibility
+		// problem was solved.
+		if err := ValidateMCPProtocolVersion(); err != nil {
+			logging.Fatal("startup step failed", "step", "MCP protocol version", "err", err)
+		}
+		if pinned := PinnedMCPVersion(); pinned != "" {
+			slog.Warn("MCP protocol revision is pinned; version negotiation is disabled",
+				"revision", pinned, "supported", SupportedMCPVersions())
+		}
+
 		// Built before the goroutine so /health can read their session counts
 		// without racing the listener's startup.
 		mcpSSE := NewMCPSSETransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),

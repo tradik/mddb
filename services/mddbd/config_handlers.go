@@ -58,6 +58,15 @@ type MCPProtocolStatus struct {
 	Enabled bool   `json:"enabled"`
 	Addr    string `json:"addr"`
 	Stdio   bool   `json:"stdio"`
+	// Revision is the MCP spec revision this server answers a handshake with,
+	// SupportedRevisions everything it could answer with, newest first, and
+	// RevisionPinned whether an operator fixed it. Reported here because
+	// finding out otherwise means performing a handshake, which answers for
+	// one client rather than for the server: it cannot show that a pin is in
+	// force, nor what else would have been accepted.
+	Revision           string   `json:"revision"`
+	SupportedRevisions []string `json:"supportedRevisions"`
+	RevisionPinned     bool     `json:"revisionPinned"`
 }
 
 // HTTP3ProtocolStatus indicates whether the HTTP/3 protocol is enabled and its address.
@@ -105,9 +114,12 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 				Addr:    s.Config.GRPC.Addr,
 			},
 			MCP: MCPProtocolStatus{
-				Enabled: s.Config.MCP.Enabled,
-				Addr:    s.Config.MCP.Addr,
-				Stdio:   s.Config.MCP.Stdio,
+				Enabled:            s.Config.MCP.Enabled,
+				Addr:               s.Config.MCP.Addr,
+				Stdio:              s.Config.MCP.Stdio,
+				Revision:           NegotiateMCPVersion(""),
+				SupportedRevisions: SupportedMCPVersions(),
+				RevisionPinned:     PinnedMCPVersion() != "",
 			},
 			HTTP3: HTTP3ProtocolStatus{
 				Enabled: s.Config.HTTP3.Enabled,

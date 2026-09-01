@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCP clients can stay on an older spec revision, and operators can pin one**
+  — MDDB answered every handshake with a hardcoded revision and never read the
+  one the client asked for. The `MCP-Protocol-Version` header was described in
+  the transport's own documentation and never read either, so a client asking
+  for a revision MDDB cannot speak was answered as though it could.
+
+  A client and a server do not upgrade on the same day. MDDB now keeps a list of
+  the revisions it can speak, newest first, and negotiates per the spec: ask for
+  one it speaks and it agrees; ask for one it does not and it names its own,
+  leaving the choice to you; ask for nothing and you get the newest. The header
+  is honoured, and a revision MDDB cannot speak is refused at the handshake with
+  `400` and a body naming what would work — at the handshake, where a client can
+  still fall back, rather than several calls later.
+
+  `MDDB_MCP_PROTOCOL_VERSION` pins a revision and disables negotiation, for the
+  case where a client's own version handling is the broken part. A pin naming a
+  revision this build does not implement stops the server at startup and lists
+  what it can speak, rather than being ignored.
+
+  `GET /v1/config` reports the revision in force, everything supported, and
+  whether a pin is active. A handshake cannot tell you that: it answers for one
+  client, not for the server.
+
+  The list holds one revision today, so nothing changes for existing clients.
+  It exists because catching up with spec 2026-07-28 (#215) has to leave clients
+  on the current revision working, and that is only possible if the server knows
+  which revisions it still answers for.
+
 - **MDDB now says which collections need reindexing after an embedding change**
   — the previous entry ends with "run a vector reindex to get the improvement",
   which is only actionable if you know which collections it applies to. Nothing
