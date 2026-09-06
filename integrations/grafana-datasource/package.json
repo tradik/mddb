@@ -36,26 +36,26 @@
     "react": "^18.3.1"
   },
   "devDependencies": {
-    "@grafana/data": "^13.1.1",
-    "@grafana/runtime": "^13.1.1",
+    "@grafana/data": "^13.2.1",
+    "@grafana/runtime": "^13.2.1",
     "@grafana/ui": "^13.1.0",
     "@types/jest": "^30.0.0",
-    "@types/node": "^26.1.2",
-    "@types/react": "^19.2.17",
-    "@typescript-eslint/eslint-plugin": "^8.65.0",
-    "@typescript-eslint/parser": "^8.65.0",
+    "@types/node": "^26.4.1",
+    "@types/react": "^19.2.18",
+    "@typescript-eslint/eslint-plugin": "^8.69.0",
+    "@typescript-eslint/parser": "^8.69.0",
     "copy-webpack-plugin": "^14.0.0",
-    "eslint": "^10.8.0",
+    "eslint": "^10.9.1",
     "eslint-plugin-react": "^7.37.5",
-    "jest": "^30.0.0",
-    "jest-environment-jsdom": "^30.0.0",
+    "jest": "^30.5.1",
+    "jest-environment-jsdom": "^30.5.1",
     "prettier": "^3.9.6",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "ts-jest": "^29.4.12",
     "ts-loader": "^9.6.2",
     "typescript": "^6.0.3",
-    "webpack": "^5.109.2",
-    "webpack-cli": "^7.2.2"
+    "webpack": "^5.110.3",
+    "webpack-cli": "^7.2.3"
   }
 }
