@@ -26,36 +26,12 @@ func (s *Server) newMCPHTTPServer() *MCPHTTPServer {
 }
 
 func (m *MCPHTTPServer) handleResources(w http.ResponseWriter, r *http.Request) {
-	resources := []MCPResource{
-		{
-			URI:         "mddb://health",
-			Name:        "MDDB Health",
-			Description: "Health status of MDDB server",
-			MimeType:    "application/json",
-		},
-		{
-			URI:         "mddb://stats",
-			Name:        "MDDB Statistics",
-			Description: "Server and database statistics",
-			MimeType:    "application/json",
-		},
-		{
-			URI:         "mddb://{collection}/{key}?lang={lang}",
-			Name:        "MDDB Document",
-			Description: "Get a document by collection, key, and language",
-			MimeType:    "text/markdown",
-		},
-		{
-			URI:         "mddb-search://{collection}",
-			Name:        "MDDB Search",
-			Description: "Search documents in a collection",
-			MimeType:    "application/json",
-		},
-	}
-
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"resources": resources,
+		"resources": mcpResourceCatalogue(),
+		// Listed separately from the resources, as they are over MCP: a
+		// template is a pattern to fill in, not an address to fetch.
+		"resourceTemplates": mcpResourceTemplates(),
 	}); err != nil {
 		slog.Error("encoding resources response", "err", err)
 	}

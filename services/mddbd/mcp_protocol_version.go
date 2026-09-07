@@ -8,8 +8,18 @@ import (
 	"mddb/internal/envconf"
 )
 
-// MCPProtocolVersion is the MCP spec revision MDDB offers by default: the
-// newest one it implements.
+// MCPModernProtocolVersion is the newest revision MDDB implements: stateless,
+// no handshake, every request carrying its own version and capabilities.
+const MCPModernProtocolVersion = "2026-07-28"
+
+// MCPProtocolVersion is the newest revision MDDB answers an `initialize`
+// handshake with.
+//
+// It is deliberately NOT the newest revision overall. 2026-07-28 removed
+// `initialize`, so a handshake cannot negotiate its way there: a client that
+// asks for it over `initialize` is telling us it has not made the move, and
+// naming a revision without a handshake in the handshake's own reply would
+// leave it speaking a protocol it did not implement.
 const MCPProtocolVersion = "2025-11-25"
 
 // supportedMCPVersions lists every MCP spec revision this server can speak,
@@ -21,7 +31,62 @@ const MCPProtocolVersion = "2025-11-25"
 // knows which revisions it can still answer for. The first entry is what MDDB
 // offers a client that asks for something it does not recognise.
 var supportedMCPVersions = []string{
+	MCPModernProtocolVersion,
 	MCPProtocolVersion,
+}
+
+// modernMCPVersions are the revisions with no handshake: version, identity and
+// capabilities arrive with each request instead of being established once.
+//
+// Membership of this set, rather than the ordering of the registry, is what
+// decides how a revision is served. Every revision not named here is
+// handshake-based, which keeps the rule stable when the registry is narrowed
+// by a pin or replaced in a test.
+var modernMCPVersions = map[string]bool{
+	MCPModernProtocolVersion: true,
+}
+
+// mcpVersionIsLegacy reports whether a revision is handshake-based.
+func mcpVersionIsLegacy(version string) bool {
+	return !modernMCPVersions[version]
+}
+
+// legacyMCPVersionsServed returns the handshake revisions this server will
+// answer for right now, newest first.
+func legacyMCPVersionsServed() []string {
+	var out []string
+	for _, v := range activeMCPVersions() {
+		if mcpVersionIsLegacy(v) {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// activeMCPVersions returns the revisions this server will answer for right
+// now: every revision the build implements, or only the pinned one.
+//
+// The pin is what makes this a function rather than the slice above. An
+// operator who pins a revision is saying the others must not be reachable, and
+// that has to hold everywhere a version is named — `server/discover`, the
+// version check on each request, and the handshake — not only in the one place
+// negotiation used to happen.
+func activeMCPVersions() []string {
+	if pinned := PinnedMCPVersion(); pinned != "" {
+		return []string{pinned}
+	}
+	return SupportedMCPVersions()
+}
+
+// mcpVersionServed reports whether this server will answer a request declaring
+// a revision, with the operator's pin applied.
+func mcpVersionServed(version string) bool {
+	for _, v := range activeMCPVersions() {
+		if v == version {
+			return true
+		}
+	}
+	return false
 }
 
 // mcpProtocolVersionEnv pins the revision, overriding negotiation entirely.
@@ -81,10 +146,26 @@ func NegotiateMCPVersion(requested string) string {
 	if pinned := PinnedMCPVersion(); pinned != "" {
 		return pinned
 	}
-	if mcpVersionSupported(requested) {
-		return requested
+	// Only handshake revisions are on the table here. `initialize` is how a
+	// legacy client opens, and 2026-07-28 has no `initialize` to answer — so
+	// naming it in a handshake reply would agree to a protocol neither side
+	// would then be speaking.
+	legacy := legacyMCPVersionsServed()
+	if len(legacy) == 0 {
+		return ""
 	}
-	return supportedMCPVersions[0]
+	for _, v := range legacy {
+		if v == requested {
+			return requested
+		}
+	}
+	return legacy[0]
+}
+
+// LegacyHandshakeAvailable reports whether `initialize` can still be served —
+// false when the operator pinned a revision that has no handshake.
+func LegacyHandshakeAvailable() bool {
+	return len(legacyMCPVersionsServed()) > 0
 }
 
 // requestedMCPVersion reads the client's asked-for revision out of an
@@ -118,7 +199,7 @@ func checkMCPVersionHeader(header string) error {
 	}
 	if !mcpVersionSupported(requested) {
 		return fmt.Errorf("unsupported MCP revision %s; this server speaks: %s",
-			requested, strings.Join(supportedMCPVersions, ", "))
+			requested, strings.Join(SupportedMCPVersions(), ", "))
 	}
 	return nil
 }

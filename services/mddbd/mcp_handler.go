@@ -62,6 +62,16 @@ func (h *MCPHandler) Handle(req map[string]interface{}) map[string]interface{} {
 		}
 	}
 
+	// One handler, two eras (MCP-001). Which one this request belongs to is a
+	// property of the request — the method it names or the protocol version it
+	// carries — and never of the connection: a stateless client and a
+	// handshake client may share a transport, and on stdio they may even share
+	// a process. A request with neither signal is legacy and is served exactly
+	// as it was before 2026-07-28 existed.
+	if mcpIsModernRequest(method, req) {
+		return h.handleModern(ctx, req)
+	}
+
 	var result map[string]interface{}
 	var errObj map[string]interface{}
 
@@ -72,6 +82,8 @@ func (h *MCPHandler) Handle(req map[string]interface{}) map[string]interface{} {
 	// Resources
 	case "resources/list":
 		result = h.handleResourcesList(req)
+	case "resources/templates/list":
+		result = h.handleResourceTemplatesList(req)
 	case "resources/read":
 		result = h.handleResourcesRead(ctx, req)
 
@@ -100,10 +112,13 @@ func (h *MCPHandler) Handle(req map[string]interface{}) map[string]interface{} {
 		result = map[string]interface{}{}
 
 	default:
-		errObj = map[string]interface{}{
-			"code":    -32601,
-			"message": "Method not found",
-		}
+		errObj = mcpError(mcpErrMethodNotFound, "Method not found")
+	}
+
+	// A handler that failed by returning an error object inside its result was
+	// telling the client the call succeeded. Lift it out (both eras).
+	if errObj == nil && result != nil {
+		errObj = mcpPromoteNestedError(result, false)
 	}
 
 	response := map[string]interface{}{
@@ -122,6 +137,12 @@ func (h *MCPHandler) Handle(req map[string]interface{}) map[string]interface{} {
 
 func (h *MCPHandler) handleInitialize(req map[string]interface{}) map[string]interface{} {
 	id := req["id"]
+
+	// A legacy client has no way to fall forward, so the refusal has to say
+	// what would work — this error may be the only diagnostic its user sees.
+	if !LegacyHandshakeAvailable() {
+		return mcpErrorResponse(id, mcpUnsupportedVersionError(requestedMCPVersion(req["params"])))
+	}
 
 	// Answer with the revision the client and this build agree on, not with a
 	// constant. A client pinned to an older revision than the newest MDDB
@@ -176,36 +197,21 @@ func (h *MCPHandler) buildServerInfo() map[string]interface{} {
 // ---- Resources with cursor pagination ----
 
 func (h *MCPHandler) handleResourcesList(req map[string]interface{}) map[string]interface{} {
-	resources := []MCPResource{
-		{
-			URI:         "mddb://health",
-			Name:        "MDDB Health",
-			Description: "Health status of MDDB server",
-			MimeType:    "application/json",
-		},
-		{
-			URI:         "mddb://stats",
-			Name:        "MDDB Statistics",
-			Description: "Server and database statistics",
-			MimeType:    "application/json",
-		},
-		{
-			URI:         "mddb://{collection}/{key}?lang={lang}",
-			Name:        "MDDB Document",
-			Description: "Get a document by collection, key, and language",
-			MimeType:    "text/markdown",
-		},
-		{
-			URI:         "mddb-search://{collection}",
-			Name:        "MDDB Search",
-			Description: "Search documents in a collection",
-			MimeType:    "application/json",
-		},
-	}
-
-	// Cursor pagination — since we have few resources, return all in one page
+	// Cursor pagination — the catalogue is small enough to fit one page.
 	return map[string]interface{}{
-		"resources": resources,
+		"resources": mcpResourceCatalogue(),
+	}
+}
+
+// handleResourceTemplatesList answers resources/templates/list.
+//
+// The templates used to be listed as resources, which told a client it could
+// read `mddb://{collection}/{key}` — a string that is not a URI. Both
+// revisions define this method for patterns; only this server had nothing
+// behind it.
+func (h *MCPHandler) handleResourceTemplatesList(req map[string]interface{}) map[string]interface{} {
+	return map[string]interface{}{
+		"resourceTemplates": mcpResourceTemplates(),
 	}
 }
 
@@ -217,10 +223,7 @@ func (h *MCPHandler) handleResourcesRead(ctx context.Context, req map[string]int
 	content, err := ts.readResource(ctx, uri)
 	if err != nil {
 		return map[string]interface{}{
-			"error": map[string]interface{}{
-				"code":    -32002,
-				"message": err.Error(),
-			},
+			"error": mcpError(mcpErrLegacyResourceNotFound, err.Error()),
 		}
 	}
 
@@ -277,7 +280,7 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 		// The client sees the failure in the result either way; this is the
 		// copy that reaches its log, where a run of failing calls is visible
 		// as a pattern rather than one error at a time.
-		h.logToClient(MCPLogError, "tools/call", name+": "+err.Error())
+		h.logToClient(ctx, MCPLogError, "tools/call", name+": "+err.Error())
 
 		return map[string]interface{}{
 			"content": []map[string]interface{}{
@@ -316,10 +319,7 @@ func (h *MCPHandler) handlePromptsGet(ctx context.Context, req map[string]interf
 	messages, description, err := mcpGetPrompt(ctx, h.client, name, args)
 	if err != nil {
 		return map[string]interface{}{
-			"error": map[string]interface{}{
-				"code":    -32602,
-				"message": err.Error(),
-			},
+			"error": mcpError(mcpErrInvalidParams, err.Error()),
 		}
 	}
 
@@ -355,10 +355,7 @@ func (h *MCPHandler) handleSetLogLevel(req map[string]interface{}) map[string]in
 
 	if _, ok := mcpLogLevelOrder[MCPLogLevel(level)]; !ok {
 		return map[string]interface{}{
-			"error": map[string]interface{}{
-				"code":    -32602,
-				"message": "invalid log level: " + level,
-			},
+			"error": mcpError(mcpErrInvalidParams, "invalid log level: "+level),
 		}
 	}
 

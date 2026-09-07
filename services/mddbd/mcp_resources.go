@@ -8,6 +8,44 @@ import (
 	"strings"
 )
 
+// mcpResourceCatalogue is every resource a client can read by name, and the
+// single source of truth for both surfaces that list them: the MCP handler and
+// the /resources endpoint, which each carried their own copy of this list.
+func mcpResourceCatalogue() []MCPResource {
+	return []MCPResource{
+		{
+			URI:         "mddb://health",
+			Name:        "MDDB Health",
+			Description: "Health status of MDDB server",
+			MimeType:    "application/json",
+		},
+		{
+			URI:         "mddb://stats",
+			Name:        "MDDB Statistics",
+			Description: "Server and database statistics",
+			MimeType:    "application/json",
+		},
+	}
+}
+
+// mcpResourceTemplates is every resource addressed by a pattern.
+func mcpResourceTemplates() []MCPResourceTemplate {
+	return []MCPResourceTemplate{
+		{
+			URITemplate: "mddb://{collection}/{key}?lang={lang}",
+			Name:        "MDDB Document",
+			Description: "Get a document by collection, key, and language",
+			MimeType:    "text/markdown",
+		},
+		{
+			URITemplate: "mddb-search://{collection}?q={query}",
+			Name:        "MDDB Search",
+			Description: "Search documents in a collection",
+			MimeType:    "application/json",
+		},
+	}
+}
+
 // readResource reads resource based on URI.
 func (s *MCPToolServer) readResource(ctx context.Context, uri string) (string, error) {
 	parsed, err := url.Parse(uri)
@@ -25,8 +63,22 @@ func (s *MCPToolServer) readResource(ctx context.Context, uri string) (string, e
 	}
 }
 
+// mcpResourcePath is everything after the scheme of a resource URI.
+//
+// url.Parse puts the first segment after "//" in Host rather than in Path, so
+// reading Path alone saw an empty string for `mddb://health` and just `key`
+// for `mddb://docs/key`. Every resource this server advertises is written in
+// that form, which made all of them unreadable at the URI they were advertised
+// under: `resources/list` named four resources and `resources/read` refused
+// each one. Joining the two parts back together reads the URI as it was
+// written, and the three-slash spelling that used to be the only one that
+// worked (`mddb:///health`) still does.
+func mcpResourcePath(uri *url.URL) string {
+	return strings.Trim(strings.Trim(uri.Host, "/")+"/"+strings.Trim(uri.Path, "/"), "/")
+}
+
 func (s *MCPToolServer) readMDDBResource(ctx context.Context, uri *url.URL) (string, error) {
-	path := strings.Trim(uri.Path, "/")
+	path := mcpResourcePath(uri)
 
 	if path == "health" {
 		health, err := s.client.Health(ctx)
@@ -82,7 +134,7 @@ func (s *MCPToolServer) readMDDBResource(ctx context.Context, uri *url.URL) (str
 }
 
 func (s *MCPToolServer) readSearchResource(ctx context.Context, uri *url.URL) (string, error) {
-	collection := strings.Trim(uri.Path, "/")
+	collection := mcpResourcePath(uri)
 	if collection == "" {
 		return "", fmt.Errorf("collection required in search uri")
 	}

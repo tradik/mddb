@@ -99,10 +99,24 @@ func (h *MCPHandler) progressSender() *MCPProgressSender {
 // Silent when the level is below the client's threshold or the transport cannot
 // deliver notifications. The server's own slog output is unaffected: this is
 // the copy the client sees, not a replacement for the operator's log.
-func (h *MCPHandler) logToClient(level MCPLogLevel, logger, message string) {
+//
+// Where the threshold comes from is what differs between the two eras
+// (MCP-001). A legacy client sets it once with logging/setLevel and it lives on
+// the handler until it is set again. A stateless client sets it per request in
+// _meta, so the threshold arrives in the context and applies to that request
+// only — and a request that named no level is entitled to no log notifications
+// at all, which is why an absent level silences rather than defaults.
+func (h *MCPHandler) logToClient(ctx context.Context, level MCPLogLevel, logger, message string) {
 	h.mu.Lock()
 	notify, min := h.notify, h.logLevel
 	h.mu.Unlock()
+
+	if policy, modern := mcpLogPolicyFrom(ctx); modern {
+		if !policy.Emit {
+			return
+		}
+		min = policy.Level
+	}
 
 	if notify == nil || !mcpShouldLog(level, min) {
 		return

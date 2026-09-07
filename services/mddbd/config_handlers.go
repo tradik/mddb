@@ -58,15 +58,21 @@ type MCPProtocolStatus struct {
 	Enabled bool   `json:"enabled"`
 	Addr    string `json:"addr"`
 	Stdio   bool   `json:"stdio"`
-	// Revision is the MCP spec revision this server answers a handshake with,
-	// SupportedRevisions everything it could answer with, newest first, and
-	// RevisionPinned whether an operator fixed it. Reported here because
-	// finding out otherwise means performing a handshake, which answers for
+	// Revision is the newest MCP spec revision this server serves,
+	// SupportedRevisions everything it serves, newest first, and
+	// RevisionPinned whether an operator fixed the set to one. Reported here
+	// because finding out otherwise means making a request, which answers for
 	// one client rather than for the server: it cannot show that a pin is in
 	// force, nor what else would have been accepted.
 	Revision           string   `json:"revision"`
 	SupportedRevisions []string `json:"supportedRevisions"`
 	RevisionPinned     bool     `json:"revisionPinned"`
+	// HandshakeRevision is what an `initialize` is answered with, or empty
+	// when this server serves no handshake revision at all. Since 2026-07-28
+	// there is no single revision "in force": a stateless client and a
+	// handshake client can be served side by side, and an operator debugging
+	// one of them needs to know which of the two they are looking at.
+	HandshakeRevision string `json:"handshakeRevision,omitempty"`
 }
 
 // HTTP3ProtocolStatus indicates whether the HTTP/3 protocol is enabled and its address.
@@ -117,9 +123,10 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 				Enabled:            s.Config.MCP.Enabled,
 				Addr:               s.Config.MCP.Addr,
 				Stdio:              s.Config.MCP.Stdio,
-				Revision:           NegotiateMCPVersion(""),
-				SupportedRevisions: SupportedMCPVersions(),
+				Revision:           activeMCPVersions()[0],
+				SupportedRevisions: activeMCPVersions(),
 				RevisionPinned:     PinnedMCPVersion() != "",
+				HandshakeRevision:  NegotiateMCPVersion(""),
 			},
 			HTTP3: HTTP3ProtocolStatus{
 				Enabled: s.Config.HTTP3.Enabled,

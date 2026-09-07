@@ -22,8 +22,16 @@ var docToolCountRe = regexp.MustCompile(`(\d+)\s+(?:built-in MCP tools|built-in 
 func TestMCPToolCountDocsInSync(t *testing.T) {
 	want := strconv.Itoa(len(mcpBuiltinTools()))
 
-	// Paths are relative to this package directory (services/mddbd).
-	for _, path := range []string{"../../README.md", "../../docs/MCP.md"} {
+	// Paths are relative to this package directory (services/mddbd). The docs
+	// index and the architecture overview joined the guard after both were
+	// found still claiming 67 — the number the guard was written to stop
+	// drifting, in the two files it did not yet cover.
+	for _, path := range []string{
+		"../../README.md",
+		"../../docs/MCP.md",
+		"../../docs/README.md",
+		"../../docs/ARCHITECTURE.md",
+	} {
 		data, err := os.ReadFile(path) // #nosec G304 -- path is one of two hardcoded repo doc files, not user input
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)

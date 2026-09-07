@@ -18,7 +18,7 @@ MDDB provides multiple integration paths:
 | Method | Best For | Protocol |
 |--------|----------|----------|
 | **MCP Server (stdio)** | Claude Desktop, Windsurf, IDE agents | MCP stdio |
-| **MCP Streamable HTTP** | Remote MCP clients, web agents (2025-11-25) | `POST/GET /mcp` |
+| **MCP Streamable HTTP** | Remote MCP clients, web agents (2026-07-28 or 2025-11-25) | `POST /mcp` |
 | **MCP-over-SSE (legacy)** | Older MCP clients (2024-11-05) | `GET /sse` + `POST /message` |
 | **REST API** | ChatGPT, custom agents, any HTTP client | HTTP/JSON |
 | **gRPC API** | High-performance integrations | gRPC/Protobuf |
@@ -45,7 +45,7 @@ You can also change the domain directly in the Panel — the input field is abov
 
 ## MCP Streamable HTTP Transport (Recommended)
 
-MDDB implements the [Streamable HTTP transport](https://spec.modelcontextprotocol.io/specification/2025-11-25/transport/streamable-http/) from MCP spec 2025-11-25. A single `/mcp` endpoint handles all communication — simpler than the legacy SSE transport.
+MDDB implements the Streamable HTTP transport for both revisions it speaks: the stateless [2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http) and the handshake-based [2025-11-25](https://spec.modelcontextprotocol.io/specification/2025-11-25/transport/streamable-http/). A single `/mcp` endpoint handles all communication — simpler than the legacy SSE transport. Which revision a request gets is decided per request; see [Protocol revisions](MCP-REVISIONS.md).
 
 ### How It Works
 
@@ -134,7 +134,7 @@ The legacy [MCP-over-SSE transport](https://modelcontextprotocol.io/docs/concept
 
 | Port | Path | Method | Description |
 |------|------|--------|-------------|
-| MCP (9000) | `/mcp` | POST/GET/DELETE | **Streamable HTTP** (2025-11-25) — recommended |
+| MCP (9000) | `/mcp` | POST (GET/DELETE for handshake clients) | **Streamable HTTP** (2026-07-28 + 2025-11-25) — recommended |
 | MCP (9000) | `/sse` | GET | **Legacy SSE** — SSE connection, returns `endpoint` event |
 | MCP (9000) | `/message?sessionId=X` | POST | **Legacy SSE** — send JSON-RPC request to a session |
 ```
@@ -246,9 +246,9 @@ Log output (to stderr):
 {"timestamp":"2026-03-26T10:30:00Z","method":"POST","path":"/mcp","status":200,"duration_ms":45,"client_ip":"1.2.3.4","key_name":"claude-prod","session_id":"abc123","user_agent":"claude-code/1.0"}
 ```
 
-## MCP Protocol Features (2025-11-25)
+## MCP Protocol Features
 
-MDDB implements the full MCP 2025-11-25 specification:
+MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVISIONS.md) for what each requires:
 
 | Feature | Description |
 |---------|-------------|

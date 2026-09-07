@@ -11,14 +11,25 @@ import (
 	"sync"
 )
 
-// MCPStreamableTransport implements the Streamable HTTP transport (MCP 2025-11-25).
+// MCPStreamableTransport implements the Streamable HTTP transport for both
+// revisions MDDB speaks (MCP-001).
 //
-// Protocol:
-//   - Single endpoint (e.g. /mcp) accepts POST and GET
-//   - POST: client sends JSON-RPC, server responds with application/json or text/event-stream
-//   - GET:  client opens SSE stream for server-initiated messages
-//   - Session management via MCP-Session-Id header
-//   - Protocol version via MCP-Protocol-Version header
+// 2025-11-25 (legacy, handshake-based):
+//   - POST: client sends JSON-RPC, server answers with application/json
+//   - GET:  client opens an SSE stream for server-initiated messages
+//   - Session management via MCP-Session-Id header, terminated with DELETE
+//
+// 2026-07-28 (stateless):
+//   - POST only; no session is minted and an Mcp-Session-Id is ignored
+//   - Mcp-Method / Mcp-Name / MCP-Protocol-Version are required and are
+//     checked against the body (mcp_headers.go)
+//   - subscriptions/listen answers with an SSE stream instead of JSON
+//   - an unknown method is 404 with a JSON-RPC body, which is what tells a
+//     client this endpoint exists and the method does not
+//
+// Both eras share the endpoint. A request is served according to what it
+// carries, never according to what an earlier request on the same connection
+// carried — see mcpIsModernRequest.
 type MCPStreamableTransport struct {
 	handler *MCPHandler
 	mu      sync.RWMutex
@@ -41,21 +52,22 @@ func NewMCPStreamableTransport(handler *MCPHandler) *MCPStreamableTransport {
 
 // Handle is the single MCP endpoint handler supporting POST and GET.
 func (t *MCPStreamableTransport) Handle(w http.ResponseWriter, r *http.Request) {
-	// The MCP-Protocol-Version header was documented by this transport and
-	// never read, so a client asking for a revision MDDB cannot speak was
-	// answered as though it could. Refusing here fails at the handshake, where
-	// the client can still choose to fall back, rather than several calls
-	// later where the cause is no longer visible.
-	if err := checkMCPVersionHeader(r.Header.Get("MCP-Protocol-Version")); err != nil {
-		http.Error(w, mcpVersionErrorBody(err), http.StatusBadRequest)
-		return
-	}
 	switch r.Method {
 	case http.MethodPost:
 		t.handlePost(w, r)
-	case http.MethodGet:
-		t.handleGet(w, r)
-	case http.MethodDelete:
+	case http.MethodGet, http.MethodDelete:
+		// GET (the standalone SSE stream) and DELETE (session termination)
+		// exist only in the handshake era; 2026-07-28 removed both. Their
+		// version check stays where it always was, before anything else,
+		// because neither carries a body to read an era from.
+		if err := checkMCPVersionHeader(r.Header.Get(mcpHeaderProtocolVersion)); err != nil {
+			http.Error(w, mcpVersionErrorBody(err), http.StatusBadRequest)
+			return
+		}
+		if r.Method == http.MethodGet {
+			t.handleGet(w, r)
+			return
+		}
 		t.handleDelete(w, r)
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
@@ -85,12 +97,40 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 	}
 
 	method, _ := req["method"].(string)
+	modern := mcpIsModernRequest(method, req)
+
+	// A legacy request is version-checked from its header exactly as it was
+	// before the stateless era existed. A modern one is checked against its
+	// own body below, where a disagreement between the two is itself an error
+	// the client has to be told about.
+	if !modern {
+		if err := checkMCPVersionHeader(r.Header.Get(mcpHeaderProtocolVersion)); err != nil {
+			http.Error(w, mcpVersionErrorBody(err), http.StatusBadRequest)
+			return
+		}
+	}
 
 	// Handle notifications (no id) — return 202 Accepted
 	if _, hasID := req["id"]; !hasID {
-		// notifications/initialized, notifications/cancelled, etc.
+		// notifications/initialized, notifications/cancelled, etc. The
+		// revision leaves header requirements for notification POSTs
+		// undefined, so they are not applied here.
 		w.WriteHeader(http.StatusAccepted)
 		return
+	}
+
+	if modern {
+		if errObj := mcpValidateModernHeaders(r.Header, req); errObj != nil {
+			writeMCPErrorResponse(w, req["id"], errObj)
+			return
+		}
+		// A subscription's answer is a stream, not an object: the
+		// acknowledgement has to reach the client before the response that
+		// closes it.
+		if method == "subscriptions/listen" {
+			t.handleListen(w, req)
+			return
+		}
 	}
 
 	// Process request through handler.
@@ -106,20 +146,89 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 		}
 	})
 
-	// On initialize, assign session ID
-	if method == "initialize" {
-		sessionID := generateStreamableSessionID()
-		w.Header().Set("MCP-Session-Id", sessionID)
-	} else {
-		// Echo back session ID if provided
-		if sid := r.Header.Get("MCP-Session-Id"); sid != "" {
+	// Sessions belong to the handshake era. 2026-07-28 removed them outright,
+	// and the rule for a server that still serves both is to neither mint nor
+	// echo one for a stateless request: a client that received an
+	// Mcp-Session-Id would have every reason to send it back, and the whole
+	// point of the revision is that nothing is remembered between requests.
+	if !modern {
+		if method == "initialize" {
+			sessionID := generateStreamableSessionID()
+			w.Header().Set("MCP-Session-Id", sessionID)
+		} else if sid := r.Header.Get("MCP-Session-Id"); sid != "" {
 			w.Header().Set("MCP-Session-Id", sid)
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	if modern {
+		// The revision maps its errors onto HTTP: an unimplemented method is
+		// 404 (with a JSON-RPC body, which distinguishes it from a 404 at a
+		// URL that hosts no MCP endpoint), and everything malformed or
+		// unservable is 400. A client reads the body before concluding that a
+		// 400 means "this server is legacy".
+		if errObj, failed := resp["error"].(map[string]interface{}); failed {
+			code, _ := errObj["code"].(int)
+			w.WriteHeader(mcpErrorHTTPStatus(code))
+		}
+	}
 	respJSON, _ := json.Marshal(resp)
 	_, _ = w.Write(respJSON)
+}
+
+// writeMCPErrorResponse answers a request that never reached the handler.
+func writeMCPErrorResponse(w http.ResponseWriter, id interface{}, errObj map[string]interface{}) {
+	code, _ := errObj["code"].(int)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(mcpErrorHTTPStatus(code))
+	body, err := json.Marshal(mcpErrorResponse(id, errObj))
+	if err != nil {
+		return
+	}
+	_, _ = w.Write(body)
+}
+
+// handleListen answers subscriptions/listen with an SSE stream.
+//
+// The stream carries the acknowledgement first — the spec requires it to
+// precede every other message on the subscription — and then the result that
+// ends it. MDDB honors no notification type (mcp_subscriptions.go), so there
+// is nothing to wait for in between, and a stream held open for a
+// notification that cannot arrive would cost a connection per client for as
+// long as the client cared to keep it. The client is told the subscription
+// closed cleanly rather than being left to infer it from a dropped socket.
+func (t *MCPStreamableTransport) handleListen(w http.ResponseWriter, req map[string]interface{}) {
+	flusher, ok := httpFlusher(w)
+	if !ok {
+		http.Error(w, `{"error":"streaming not supported"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	id := req["id"]
+	honored := mcpHonoredNotifications(mcpParseNotificationFilter(req))
+	writeSSEMessage(w, flusher, mcpSubscriptionAck(id, honored))
+
+	result := t.handler.mcpCompleteResult("subscriptions/listen", t.handler.handleSubscriptionsListen(req))
+	writeSSEMessage(w, flusher, map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      id,
+		"result":  result,
+	})
+}
+
+// writeSSEMessage writes one JSON-RPC message as an SSE event.
+func writeSSEMessage(w http.ResponseWriter, flusher http.Flusher, msg map[string]interface{}) {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	_, _ = fmt.Fprintf(w, "event: message\ndata: %s\n\n", data)
+	flusher.Flush()
 }
 
 func (t *MCPStreamableTransport) handleGet(w http.ResponseWriter, r *http.Request) {

@@ -37,6 +37,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the current revision working, and that is only possible if the server knows
   which revisions it still answers for.
 
+- **MCP 2026-07-28: the stateless revision, served beside the one MDDB already
+  spoke (#215)** — the revision does not add fields, it removes the handshake.
+  There is no `initialize`, no session, no `Mcp-Session-Id`, no standalone SSE
+  stream, no `ping` and no `logging/setLevel`. Every request instead carries its
+  own protocol version, client identity, capabilities and log level in `_meta`,
+  and every result carries its type, the server's identity and — where the
+  revision requires it — how long the client may cache it.
+
+  MDDB now serves both revisions, and **which one serves a request is decided by
+  the request**: one carrying `io.modelcontextprotocol/protocolVersion` is
+  served statelessly, one without it exactly as before. Not by the connection,
+  which is the whole point — a stateless client and a handshake client can share
+  a port, a connection, or a stdio process, and a client pinned to 2025-11-25
+  keeps working unchanged. There is a test that proves that rather than assuming
+  it.
+
+  What this adds for a stateless client: `server/discover` (the one RPC the
+  revision requires of every server) reporting supported revisions, capabilities
+  and identity in one call; `resultType` and `io.modelcontextprotocol/serverInfo`
+  on every result; `ttlMs` and `cacheScope` on the six list-and-read operations;
+  `subscriptions/listen` in place of the GET stream; per-request log levels; and
+  the `Mcp-Method` / `Mcp-Name` / `MCP-Protocol-Version` headers, checked against
+  the body, because a proxy routing on a header while the server acts on the body
+  must not be able to authorize one call and perform another.
+
+  Error codes follow the new allocation policy: `-32020` HeaderMismatch,
+  `-32022` UnsupportedProtocolVersion (whose `data.supported` names what would
+  work, so a client can retry instead of giving up), and `-32602` where
+  2025-11-25 used `-32002`. Handshake clients keep the old code. `initialize`
+  only ever answers with a revision that has a handshake, and says so plainly
+  when an operator has pinned one that does not.
+
+  `MDDB_MCP_PROTOCOL_VERSION` still pins, and now narrows what
+  `server/discover` advertises as well as what the server accepts — advertising
+  a revision it would refuse would send clients straight into the refusal.
+  `GET /v1/config` gained `handshakeRevision`: since this revision there is no
+  single revision "in force", and an operator debugging one client needs to know
+  which era it is in. Full details in `docs/MCP-REVISIONS.md`.
+
 - **MDDB now says which collections need reindexing after an embedding change**
   — the previous entry ends with "run a vector reindex to get the improvement",
   which is only actionable if you know which collections it applies to. Nothing
@@ -66,6 +105,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stops there rather than rewriting stored data at startup.
 
 ### Fixed
+
+- **Every MCP resource was advertised at a URI that could not be read** —
+  `resources/list` named four resources and `resources/read` refused all four.
+  `url.Parse` puts the first segment after `//` in the URI's *host*, not its
+  path, and the reader only ever looked at the path: `mddb://health` arrived as
+  an empty path, and `mddb://docs/quickstart` as a single-segment one that
+  failed the collection/key split. Only the three-slash spelling
+  (`mddb:///health`), which nothing advertised, ever worked — and it still does.
+
+  Two of those four were never resources at all. `mddb://{collection}/{key}`
+  and `mddb-search://{collection}` are patterns, and the braces are not even
+  valid in a host, so they failed to parse before they could fail to resolve.
+  They have moved to `resources/templates/list`, which both revisions define
+  for exactly this and which MDDB had left unimplemented.
 
 - **Every tag archive on the documentation site canonicalised to a 404** — the
   theme had no `tag.html`, so all 23 `/tag/<slug>/` pages fell back to

@@ -11,7 +11,7 @@ status: publish
 
 ## Overview
 
-MDDB is an AI-native embedded document database built on top of BoltDB. It serves a triple-protocol surface — **HTTP/JSON REST**, **gRPC/Protobuf**, and **GraphQL** — over either TCP or Unix Domain Sockets, with optional TLS / mTLS. A built-in **MCP server** (67 tools, MCP 2025-11-25) exposes the same operations to LLM agents over stdio, Streamable HTTP, and SSE transports.
+MDDB is an AI-native embedded document database built on top of BoltDB. It serves a triple-protocol surface — **HTTP/JSON REST**, **gRPC/Protobuf**, and **GraphQL** — over either TCP or Unix Domain Sockets, with optional TLS / mTLS. A built-in **MCP server** (81 MCP tools, MCP 2026-07-28 and 2025-11-25 side by side) exposes the same operations to LLM agents over stdio, Streamable HTTP, and SSE transports.
 
 Search is a layered stack: metadata indexes for filter pre-pruning, **full-text search** (TF-IDF / BM25 / BM25F / PMISparse, 7 modes, 18-language stemming, fuzzy / proximity), **vector / semantic search** (Flat / HNSW / IVF / PQ / OPQ / SQ / BQ + per-collection int8/int4 quantization, plug-in OpenAI / Ollama / Cohere / Voyage embeddings), **geospatial search** (R-tree + geohash), and **hybrid search** that combines BM25 and dense vectors via alpha blending or Reciprocal Rank Fusion.
 

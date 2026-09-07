@@ -140,12 +140,12 @@ func TestLogMessagesRespectTheClientsLevel(t *testing.T) {
 	h.notify = notify
 
 	// The default threshold is warning.
-	h.logToClient(MCPLogDebug, "test", "too quiet to send")
+	h.logToClient(context.Background(), MCPLogDebug, "test", "too quiet to send")
 	if len(got) != 0 {
 		t.Fatalf("a debug message was sent to a client asking for warnings: %v", got)
 	}
 
-	h.logToClient(MCPLogError, "test", "loud enough")
+	h.logToClient(context.Background(), MCPLogError, "test", "loud enough")
 	if len(got) != 1 {
 		t.Fatalf("got %d notifications, want 1", len(got))
 	}
@@ -161,7 +161,7 @@ func TestLogMessagesRespectTheClientsLevel(t *testing.T) {
 	h.handleSetLogLevel(map[string]interface{}{
 		"params": map[string]interface{}{"level": string(MCPLogDebug)},
 	})
-	h.logToClient(MCPLogDebug, "test", "now audible")
+	h.logToClient(context.Background(), MCPLogDebug, "test", "now audible")
 	if len(got) != 2 {
 		t.Errorf("lowering the level to debug delivered %d messages, want 2", len(got))
 	}
@@ -169,7 +169,7 @@ func TestLogMessagesRespectTheClientsLevel(t *testing.T) {
 
 func TestLogMessagesAreSilentWithoutATransport(t *testing.T) {
 	h := NewMCPHandlerWithConfig(nil, nil, MCPServerInfo{}, "", ModeRW, "")
-	h.logToClient(MCPLogEmergency, "test", "nobody to tell")
+	h.logToClient(context.Background(), MCPLogEmergency, "test", "nobody to tell")
 }
 
 // Logging and progress are separate subscriptions: a client that raised its log

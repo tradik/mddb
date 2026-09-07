@@ -83,6 +83,10 @@ func TestMCPHandlerPromptsGet(t *testing.T) {
 	}
 }
 
+// A failed call answers with a JSON-RPC error, not with a successful result
+// whose payload happens to contain the word "error" (MCP-001). The nesting was
+// never valid JSON-RPC in any revision: a client reading `result` saw a prompt
+// it could not use, and one reading `error` saw nothing at all.
 func TestMCPHandlerPromptsGetMissingArg(t *testing.T) {
 	h := &MCPHandler{logLevel: MCPLogWarning}
 	resp := h.Handle(map[string]interface{}{
@@ -95,9 +99,15 @@ func TestMCPHandlerPromptsGetMissingArg(t *testing.T) {
 		},
 	})
 
-	result := resp["result"].(map[string]interface{})
-	if _, ok := result["error"]; !ok {
-		t.Error("expected error for missing argument")
+	if _, ok := resp["result"]; ok {
+		t.Errorf("a failed prompts/get returned a result: %v", resp)
+	}
+	errObj, ok := resp["error"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected a JSON-RPC error for a missing argument, got %v", resp)
+	}
+	if code, _ := errObj["code"].(int); code != mcpErrInvalidParams {
+		t.Errorf("code = %v, want %d (invalid params)", errObj["code"], mcpErrInvalidParams)
 	}
 }
 
@@ -128,9 +138,12 @@ func TestMCPHandlerSetLogLevelInvalid(t *testing.T) {
 		"params":  map[string]interface{}{"level": "superduper"},
 	})
 
-	result := resp["result"].(map[string]interface{})
-	if result["error"] == nil {
-		t.Error("expected error for invalid log level")
+	errObj, ok := resp["error"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected a JSON-RPC error for an invalid log level, got %v", resp)
+	}
+	if code, _ := errObj["code"].(int); code != mcpErrInvalidParams {
+		t.Errorf("code = %v, want %d (invalid params)", errObj["code"], mcpErrInvalidParams)
 	}
 }
 

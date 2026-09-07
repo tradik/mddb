@@ -723,6 +723,22 @@ type MCPResource struct {
 	MimeType    string `json:"mimeType"`
 }
 
+// MCPResourceTemplate is a resource addressed by a pattern rather than by a
+// URI: the client fills in the placeholders and reads the result.
+//
+// It is a separate type because a template is not a resource. The two were
+// listed together under `resources/list`, where a client is entitled to read
+// every entry — and `mddb://{collection}/{key}` is not a URI at all: url.Parse
+// rejects the braces, so both templates failed to parse before they could
+// fail to resolve. They belong to `resources/templates/list`, which both
+// revisions define for exactly this.
+type MCPResourceTemplate struct {
+	URITemplate string `json:"uriTemplate"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	MimeType    string `json:"mimeType"`
+}
+
 // MCPResourceReadRequest represents resource read request.
 type MCPResourceReadRequest struct {
 	URI string `json:"uri"`

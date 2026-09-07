@@ -127,8 +127,9 @@ tags:
   - name: System
     description: System information and endpoint discovery
   - name: MCP
-    description: Model Context Protocol 2025-11-25 — Streamable HTTP transport,
-      tools, resources, prompts, completion, logging
+    description: Model Context Protocol 2026-07-28 and 2025-11-25 served side by
+      side — Streamable HTTP transport, tools, resources, prompts, completion,
+      logging, discovery
   - name: Memory RAG
     description: Conversational memory system for RAG — session management, message
       storage, semantic/hybrid recall, summarization
@@ -4129,21 +4130,62 @@ paths:
     post:
       tags:
         - MCP
-      summary: MCP Streamable HTTP endpoint (2025-11-25)
+      summary: MCP Streamable HTTP endpoint (2026-07-28 + 2025-11-25)
       description: |
-        Streamable HTTP transport for MCP protocol 2025-11-25. Accepts JSON-RPC requests.
-        Supported methods: initialize, tools/list, tools/call, resources/list, resources/read,
-        prompts/list, prompts/get, completion/complete, logging/setLevel, ping.
-        Notifications (no id) return 202 Accepted.
-        Session management via MCP-Session-Id header.
-        Available on MCP port (default 9000).
+        Streamable HTTP transport for both MCP revisions. Which one serves a request is
+        decided per request: one carrying `io.modelcontextprotocol/protocolVersion` in
+        `params._meta` is served statelessly under 2026-07-28, one without it under
+        2025-11-25.
+
+        Stateless (2026-07-28): server/discover, tools/list, tools/call, resources/list,
+        resources/templates/list, resources/read, prompts/list, prompts/get,
+        completion/complete, subscriptions/listen. Requires the MCP-Protocol-Version,
+        Mcp-Method and (where a name or URI is addressed) Mcp-Name headers, which must
+        match the body — a disagreement is 400 with JSON-RPC error -32020. No session is
+        minted. An unimplemented method is 404 with a JSON-RPC -32601 body.
+
+        Handshake (2025-11-25): initialize, tools/list, tools/call, resources/list,
+        resources/templates/list, resources/read, prompts/list, prompts/get,
+        completion/complete, logging/setLevel, ping, with session management via the
+        MCP-Session-Id header.
+
+        Notifications (no id) return 202 Accepted. Available on MCP port (default 9000).
+        See docs/MCP-REVISIONS.md.
       operationId: mcpStreamableHTTP
       parameters:
         - name: MCP-Session-Id
           in: header
-          description: Session identifier (assigned by server at initialize)
+          description: >-
+            Session identifier (assigned by the server at initialize). Handshake
+            clients only; ignored, and never echoed, for a stateless request.
           schema:
             type: string
+        - name: MCP-Protocol-Version
+          in: header
+          description: >-
+            The revision this request is written in. Required for 2026-07-28, where
+            it must equal params._meta['io.modelcontextprotocol/protocolVersion'];
+            optional for 2025-11-25.
+          schema:
+            type: string
+            example: "2026-07-28"
+        - name: Mcp-Method
+          in: header
+          description: >-
+            Mirrors the body's `method`. Required on every 2026-07-28 request so an
+            intermediary can route without parsing the body.
+          schema:
+            type: string
+            example: "tools/call"
+        - name: Mcp-Name
+          in: header
+          description: >-
+            Mirrors params.name (tools/call, prompts/get) or params.uri
+            (resources/read). Required on those methods for 2026-07-28. A value
+            outside plain ASCII is carried as =?base64?<base64>?=.
+          schema:
+            type: string
+            example: "full_text_search"
       requestBody:
         required: true
         content:
@@ -4176,13 +4218,33 @@ paths:
                 type: object
         "202":
           description: Notification accepted (no response body)
+        "400":
+          description: >-
+            Malformed or unservable request. The JSON-RPC body names which:
+            -32020 (headers disagree with the body), -32022 (revision not served,
+            with data.supported listing what is), or -32602 (a required _meta field
+            is missing).
+          content:
+            application/json:
+              schema:
+                type: object
+        "404":
+          description: >-
+            Method not implemented, with a JSON-RPC -32601 body. The body is what
+            distinguishes this from a 404 at a URL hosting no MCP endpoint.
+          content:
+            application/json:
+              schema:
+                type: object
     get:
       tags:
         - MCP
-      summary: MCP SSE stream for server-initiated messages
+      summary: MCP SSE stream for server-initiated messages (handshake clients)
       description: |
         Open an SSE stream for receiving server-initiated messages (notifications, progress).
         Requires MCP-Session-Id header from a previous initialize call.
+        Belongs to 2025-11-25 only: 2026-07-28 removed the standalone stream in favour of
+        subscriptions/listen, which answers on the POST that opened it.
       operationId: mcpStreamableSSE
       parameters:
         - name: MCP-Session-Id
@@ -8275,20 +8337,26 @@ components:
                   example: false
                 revision:
                   type: string
-                  description: MCP spec revision this server answers a handshake with.
-                  example: "2025-11-25"
+                  description: Newest MCP spec revision this server serves.
+                  example: "2026-07-28"
                 supportedRevisions:
                   type: array
-                  description: Every MCP spec revision this build can speak, newest first.
+                  description: Every MCP spec revision this server serves, newest first.
                   items:
                     type: string
-                  example: ["2025-11-25"]
+                  example: ["2026-07-28", "2025-11-25"]
                 revisionPinned:
                   type: boolean
                   description: >-
                     True when MDDB_MCP_PROTOCOL_VERSION fixes the revision and
                     version negotiation is disabled.
                   example: false
+                handshakeRevision:
+                  type: string
+                  description: >-
+                    Revision an `initialize` is answered with, absent when this
+                    server serves no handshake revision at all.
+                  example: "2025-11-25"
             http3:
               type: object
               properties:

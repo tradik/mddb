@@ -1,41 +1,55 @@
 ---
 title: "MCP Server Configuration"
 slug: "docs/mcp"
-description: "MDDB's built-in MCP server implementing the 2025-11-25 spec: the full built-in tool catalogue, stdio and HTTP transports, API keys and access modes."
+description: "MDDB's built-in MCP server across both spec revisions: the full built-in tool catalogue, stdio and HTTP transports, API keys and access modes."
 status: publish
 ---
 
 # MCP Server Configuration
 
-MDDB has a built-in MCP (Model Context Protocol) server implementing the **2025-11-25** specification. This document covers all MCP configuration options.
+MDDB has a built-in MCP (Model Context Protocol) server implementing both the
+stateless **2026-07-28** specification and the handshake-based **2025-11-25**,
+side by side. This document covers all MCP configuration options.
 
-**[→ LLM client setup (Claude, Cursor, ChatGPT, Ollama)](LLM_CONNECTIONS.md)** | **[→ Custom YAML tools](CUSTOM-TOOLS.md)**
+**[→ Protocol revisions: what each one requires](MCP-REVISIONS.md)** | **[→ LLM client setup (Claude, Cursor, ChatGPT, Ollama)](LLM_CONNECTIONS.md)** | **[→ Custom YAML tools](CUSTOM-TOOLS.md)**
 
 ## Transports
 
 | Transport | Endpoint | Spec Version | Status |
 |-----------|----------|-------------|--------|
-| **Stdio** | stdin/stdout | 2025-11-25 | Default for Claude Desktop |
-| **Streamable HTTP** | `POST/GET/DELETE /mcp` | 2025-11-25 | Recommended for remote |
+| **Stdio** | stdin/stdout | 2026-07-28 + 2025-11-25 | Default for Claude Desktop |
+| **Streamable HTTP** | `POST /mcp` (plus `GET`/`DELETE` for handshake clients) | 2026-07-28 + 2025-11-25 | Recommended for remote |
 | **SSE (legacy)** | `GET /sse` + `POST /message` | 2024-11-05 | Backward compatible |
+
+`GET /mcp` and `DELETE /mcp` belong to the handshake era only; 2026-07-28
+removed sessions and the standalone stream. Both stay available for the clients
+that still use them.
 
 All transports run on the MCP port (default: 9000, configurable via `MDDB_MCP_ADDR`).
 
 ## Protocol Revisions
 
-A client and a server do not upgrade on the same day, so MDDB negotiates the
-revision rather than asserting one. It advertises the revisions it can speak,
-newest first, and answers each handshake with the one both sides agree on.
+MDDB serves two revisions at once, and **each request declares its own**: one
+carrying `io.modelcontextprotocol/protocolVersion` in `params._meta` is served
+statelessly under 2026-07-28, and one without it is served under 2025-11-25 as
+before. A handshake client and a stateless client can share a port, a
+connection, or a stdio process.
+
+**[→ Full details of both revisions](MCP-REVISIONS.md)** — required `_meta`
+fields, `server/discover`, the mirrored HTTP headers, caching hints, error
+codes, and what 2026-07-28 removed.
+
+`initialize` still negotiates for handshake clients, and only ever offers a
+revision that has a handshake:
 
 | Client sends in `initialize` | MDDB answers with |
 |---|---|
-| a revision MDDB speaks | that revision |
-| a revision MDDB does not speak | its own newest revision, and the client decides whether to continue |
-| nothing | its own newest revision |
+| a handshake revision MDDB speaks | that revision |
+| anything else (including 2026-07-28) | its own newest handshake revision, and the client decides whether to continue |
 
-`GET /v1/config` reports the current state without a handshake — a handshake
-answers for one client, and cannot show that a pin is in force or what else
-would have been accepted:
+`GET /v1/config` reports the current state without a request, which cannot be
+learned from a handshake — that answers for one client, and cannot show that a
+pin is in force or what else would have been accepted:
 
 ```json
 {
@@ -44,9 +58,10 @@ would have been accepted:
       "enabled": true,
       "addr": ":9000",
       "stdio": false,
-      "revision": "2025-11-25",
-      "supportedRevisions": ["2025-11-25"],
-      "revisionPinned": false
+      "revision": "2026-07-28",
+      "supportedRevisions": ["2026-07-28", "2025-11-25"],
+      "revisionPinned": false,
+      "handshakeRevision": "2025-11-25"
     }
   }
 }
@@ -60,8 +75,11 @@ broken; leave it unset otherwise, because a pin also stops MDDB from serving
 clients that ask for anything else.
 
 ```bash
-MDDB_MCP_PROTOCOL_VERSION=2025-11-25
+MDDB_MCP_PROTOCOL_VERSION=2026-07-28
 ```
+
+Pinning the stateless revision takes the handshake off the table: `initialize`
+is then refused with `-32022` naming what the server does serve.
 
 A pin naming a revision this build does not implement stops the server at
 startup, listing what it can speak. Accepting it would produce a handshake that
@@ -69,19 +87,33 @@ succeeds and a session that then misbehaves, far from the cause.
 
 ### The MCP-Protocol-Version header
 
-The Streamable HTTP transport reads this header. Sending a revision MDDB cannot
-speak — or one that disagrees with a pin — is refused with `400` and a body
-naming what would work. Omitting the header is fine and means "whatever the
-server prefers".
+Required on every stateless POST, where it must also match the revision in the
+body's `_meta` — a disagreement is `-32020`. For a handshake client the header
+stays optional, and naming a revision MDDB cannot speak (or one that disagrees
+with a pin) is refused with `400` and a body naming what would work.
 
 ```bash
 curl -X POST http://localhost:9000/mcp \
   -H "MCP-Protocol-Version: 2024-01-01" -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
-# {"error":"unsupported MCP revision 2024-01-01; this server speaks: 2025-11-25"}
+# {"error":"unsupported MCP revision 2024-01-01; this server speaks: 2026-07-28, 2025-11-25"}
 ```
 
 ### Streamable HTTP (Recommended)
+
+A stateless client (2026-07-28) sends the call it wants, with no handshake
+before it:
+
+```bash
+curl -X POST http://localhost:9000/mcp \
+  -H "Content-Type: application/json" \
+  -H "MCP-Protocol-Version: 2026-07-28" -H "Mcp-Method: tools/list" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{
+        "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities":{}}}}'
+```
+
+A handshake client (2025-11-25) opens as it always did:
 
 ```bash
 # Initialize
@@ -469,7 +501,7 @@ docker run -d \
   tradik/mddb:latest
 ```
 
-## Protocol Features (2025-11-25)
+## Protocol Features
 
 | Feature | Description |
 |---------|-------------|
@@ -477,9 +509,12 @@ docker run -d \
 | **Structured Output** | `outputSchema` on 9 key tools for client-side validation |
 | **5 Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
-| **Logging** | `logging/setLevel` with RFC 5424 levels (debug → emergency) |
+| **Logging** | RFC 5424 levels (debug → emergency): `logging/setLevel` for handshake clients, `io.modelcontextprotocol/logLevel` per request for stateless ones |
 | **Progress Tokens** | `notifications/progress` for long-running operations |
 | **Cursor Pagination** | `tools/list` and `resources/list` |
+| **Resource Templates** | `resources/templates/list` — the patterns (`mddb://{collection}/{key}`) live here rather than among the readable resources |
+| **Discovery** (2026-07-28) | `server/discover` — supported revisions, capabilities and identity in one call |
+| **Caching Hints** (2026-07-28) | `ttlMs` + `cacheScope` on every list and read |
 | **Notifications** | `notifications/initialized`, `notifications/cancelled` |
 | **Memory RAG Tools** | 6 tools for conversational memory: start session, add message, recall, summarize, list sessions, history |
 | **Async Bulk Ingest Tools** (v2.9.12+) | 4 tools for long-running ingest jobs: submit, status, list, cancel |

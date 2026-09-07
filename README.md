@@ -45,7 +45,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Multi-Protocol APIs** - HTTP/JSON (easy), gRPC (fast), GraphQL (flexible), and WebSocket streaming via [mddb-chat](services/mddb-chat/) for LLM chat pipelines
 - **Automation** - Triggers, crons, webhooks with template variables and sentiment analysis
 - **Real-Time Events** - Server-Sent Events (SSE) for live document change notifications
-- **MCP Transports** - Streamable HTTP (`/mcp`, 2025-11-25), legacy SSE (`/sse`), and stdio
+- **MCP Transports** - Streamable HTTP (`/mcp`, 2026-07-28 + 2025-11-25), legacy SSE (`/sse`), and stdio
 - **Built-in TLS** - Native HTTPS support, connection pooling, pprof profiling
 - **Zero Configuration** - Single ~26MB binary, embedded database, no dependencies
 
@@ -326,7 +326,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 ## 💡 Key Features
 
 ### AI & Search
-- ✅ **MCP Server** - 81 built-in tools via Model Context Protocol 2025-11-25 (stdio + Streamable HTTP + SSE) with tool annotations, prompts, completion, and structured output
+- ✅ **MCP Server** - 81 built-in tools via Model Context Protocol 2026-07-28 and 2025-11-25, served side by side (stdio + Streamable HTTP + SSE) with `server/discover`, tool annotations, prompts, completion, and structured output
 - ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md), including tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools-v2110))
 - ✅ **File Upload** - Upload PDF, DOCX, HTML, ODT, RTF, TEX, YAML, TXT, auto-converted to Markdown (single and batch, configurable size limit)
 - ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext to Markdown conversion, namespace filtering, batch processing

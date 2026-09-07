@@ -22,11 +22,15 @@ func withSupportedVersions(t *testing.T, versions ...string) {
 	t.Cleanup(func() { supportedMCPVersions = original })
 }
 
-func TestTheNewestRevisionIsTheDefault(t *testing.T) {
+// NegotiateMCPVersion answers `initialize`, so the revisions it may choose
+// from are the ones that have an `initialize` to answer. 2026-07-28 removed
+// the handshake: naming it here would agree, in a handshake, to a protocol
+// with no handshake in it.
+func TestTheHandshakeOffersTheNewestRevisionThatHasOne(t *testing.T) {
 	withSupportedVersions(t, "2026-07-28", "2025-11-25")
 
-	if got := NegotiateMCPVersion(""); got != "2026-07-28" {
-		t.Errorf("a client that asks for nothing got %q, want the newest", got)
+	if got := NegotiateMCPVersion(""); got != "2025-11-25" {
+		t.Errorf("a client that asks for nothing got %q, want the newest handshake revision", got)
 	}
 }
 
@@ -43,8 +47,49 @@ func TestAClientOnAnOlderRevisionIsAgreedWith(t *testing.T) {
 func TestAnUnknownRevisionFallsBackToTheNewest(t *testing.T) {
 	withSupportedVersions(t, "2026-07-28", "2025-11-25")
 
-	if got := NegotiateMCPVersion("2024-01-01"); got != "2026-07-28" {
-		t.Errorf("got %q, want the server's own preference", got)
+	if got := NegotiateMCPVersion("2024-01-01"); got != "2025-11-25" {
+		t.Errorf("got %q, want the server's own preference among handshake revisions", got)
+	}
+}
+
+// A client that sends `initialize` asking for a stateless revision has its era
+// handling wrong. It is answered with a revision it can actually complete a
+// handshake in, rather than with the one it named.
+func TestTheHandshakeWillNotAgreeToAStatelessRevision(t *testing.T) {
+	withSupportedVersions(t, "2026-07-28", "2025-11-25")
+
+	if got := NegotiateMCPVersion("2026-07-28"); got != "2025-11-25" {
+		t.Errorf("got %q, want a revision that has a handshake", got)
+	}
+}
+
+// Pinning the stateless revision takes the handshake off the table entirely,
+// and `initialize` has to say so — a legacy client has no way to fall forward,
+// so this error is the only diagnostic its user will see.
+func TestPinningTheStatelessRevisionRefusesTheHandshake(t *testing.T) {
+	withSupportedVersions(t, "2026-07-28", "2025-11-25")
+	t.Setenv(mcpProtocolVersionEnv, "2026-07-28")
+
+	if LegacyHandshakeAvailable() {
+		t.Fatal("a server pinned to a handshake-less revision still offers a handshake")
+	}
+
+	h := &MCPHandler{logLevel: MCPLogWarning}
+	resp := h.Handle(map[string]interface{}{
+		"jsonrpc": "2.0", "id": 1, "method": "initialize",
+		"params": map[string]interface{}{"protocolVersion": "2025-11-25"},
+	})
+	errObj, ok := resp["error"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("initialize was served by a server that cannot serve it: %v", resp)
+	}
+	if code, _ := errObj["code"].(int); code != mcpErrUnsupportedProtocolVersion {
+		t.Errorf("code = %v, want %d", errObj["code"], mcpErrUnsupportedProtocolVersion)
+	}
+	data, _ := errObj["data"].(map[string]interface{})
+	supported, _ := data["supported"].([]string)
+	if len(supported) != 1 || supported[0] != "2026-07-28" {
+		t.Errorf("supported = %v, want the pinned revision named so the operator can see it", data["supported"])
 	}
 }
 
@@ -218,14 +263,14 @@ func TestTheHandshakeAnswersWithTheNegotiatedRevision(t *testing.T) {
 	if got := initialize(map[string]interface{}{"protocolVersion": "2025-11-25"}); got != "2025-11-25" {
 		t.Errorf("client asked for 2025-11-25 and was answered %q", got)
 	}
-	if got := initialize(map[string]interface{}{"protocolVersion": "2024-01-01"}); got != "2026-07-28" {
-		t.Errorf("client asked for an unknown revision and was answered %q, want the newest", got)
+	if got := initialize(map[string]interface{}{"protocolVersion": "2024-01-01"}); got != "2025-11-25" {
+		t.Errorf("client asked for an unknown revision and was answered %q, want the newest handshake revision", got)
 	}
-	if got := initialize(map[string]interface{}{}); got != "2026-07-28" {
-		t.Errorf("client asked for nothing and was answered %q, want the newest", got)
+	if got := initialize(map[string]interface{}{}); got != "2025-11-25" {
+		t.Errorf("client asked for nothing and was answered %q, want the newest handshake revision", got)
 	}
-	if got := initialize(nil); got != "2026-07-28" {
-		t.Errorf("client sent no params and was answered %q, want the newest", got)
+	if got := initialize(nil); got != "2025-11-25" {
+		t.Errorf("client sent no params and was answered %q, want the newest handshake revision", got)
 	}
 }
 
@@ -305,5 +350,18 @@ func TestTheConfigReportCarriesTheRevision(t *testing.T) {
 	if got.Revision != "2025-11-25" || !got.RevisionPinned {
 		t.Errorf("with a pin: revision = %q, pinned = %v; want the pin reported as such",
 			got.Revision, got.RevisionPinned)
+	}
+}
+
+// A build with no handshake revision left has nothing to answer `initialize`
+// with, and says so by naming nothing rather than by inventing a revision.
+func TestNegotiationHasNothingToOfferWithoutAHandshakeRevision(t *testing.T) {
+	withSupportedVersions(t, MCPModernProtocolVersion)
+
+	if got := NegotiateMCPVersion("2025-11-25"); got != "" {
+		t.Errorf("got %q, want no revision at all", got)
+	}
+	if LegacyHandshakeAvailable() {
+		t.Error("a handshake was offered by a build that implements none")
 	}
 }
