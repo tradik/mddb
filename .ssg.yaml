@@ -50,10 +50,11 @@ fingerprint: true
 # Updated by the release version sweep alongside Makefile/main.go.
 variables:
   mddbVersion: "2.13.0"
-  # Set to the 2.12.0 tag date when the release is cut. It read "31 July 2026"
-  # — 2.11.4's date — while the version above already said 2.12.0, so every
-  # page dated this release to the previous one's release day.
-  mddbReleaseDate: "31 July 2026"
+  # The tag date of the version above, not of the one before it: the download
+  # section prints it verbatim. It has now been wrong twice in a row (2.11.4's
+  # date shown for 2.12.0, then for 2.13.0) — `git log -1 --format=%ad v<tag>`
+  # settles it, and the release version sweep has to touch this line too.
+  mddbReleaseDate: "24 August 2026"
   # Counted from tools/list against a running server, not from memory.
   mcpTools: "81"
   # A release binary: CGO_ENABLED=0, -ldflags="-s -w". A plain `go build` is
@@ -71,6 +72,16 @@ mermaid: true
 mermaid_theme: neutral
 mermaid_background: "#ffffff"
 
+
+# The only category is "Blog", and its archive at /category/blog/ listed the
+# same posts as /blog/ under a different URL: noindex, linked from nowhere,
+# and named in sitemap.xml anyway (the sitemap reads what was rendered, not
+# what the template's robots meta says). Not rendering it removes the
+# duplicate, the stray sitemap entry and the 404 canonical trail behind it.
+# Tags stay on: they are a real navigation layer with an archive per term.
+taxonomies:
+  category:
+    archive: false
 
 # Enable sitemap and robots.txt generation
 sitemap_off: false
@@ -147,6 +158,52 @@ redirects:
   - from: /index/
     to: /
     status: 301
+  # Retired tags (2026-09): the vocabulary carried 23 terms across 11 posts, so
+  # 13 archives listed a single article each — thin pages a crawler reports and
+  # a reader gains nothing from. The terms were merged into the ones below;
+  # the URLs keep resolving to the archive that absorbed them.
+  - from: /tag/vector-search/
+    to: /tag/search/
+    status: 301
+  - from: /tag/hybrid-search/
+    to: /tag/search/
+    status: 301
+  - from: /tag/code-intelligence/
+    to: /tag/agents/
+    status: 301
+  - from: /tag/refactoring/
+    to: /tag/agents/
+    status: 301
+  - from: /tag/css/
+    to: /tag/agents/
+    status: 301
+  - from: /tag/simd/
+    to: /tag/performance/
+    status: 301
+  - from: /tag/profiling/
+    to: /tag/performance/
+    status: 301
+  - from: /tag/synonyms/
+    to: /tag/retrieval/
+    status: 301
+  - from: /tag/ranking/
+    to: /tag/retrieval/
+    status: 301
+  - from: /tag/deduplication/
+    to: /tag/retrieval/
+    status: 301
+  - from: /tag/memory/
+    to: /tag/operations/
+    status: 301
+  - from: /tag/monitoring/
+    to: /tag/operations/
+    status: 301
+  - from: /tag/configuration/
+    to: /tag/rag/
+    status: 301
+  - from: /tag/windows/
+    to: /tag/release/
+    status: 301
 
 # Fail the build on anything a crawl would report: dead links, images with no
 # alt attribute, indexable pages missing a title or description, and pages
@@ -157,7 +214,16 @@ check_images: strict
 check_meta: strict
 check_orphans: strict
 meta_limits:
-  title_min: 0
+  # 0 let /blog/ ship an 11-character title ("Blog — MDDB") — the page every
+  # post links back to. Crawlers report a title under ~15 characters as too
+  # short; 20 leaves a margin without warning about every page on the site.
+  title_min: 20
   title_max: 60
   description_min: 70
   description_max: 160
+
+# Validate JSON-LD against the properties each type actually requires. The home
+# page shipped `codeRepository` on a SoftwareApplication (it belongs to
+# SoftwareSourceCode) and a softwareVersion two releases behind, and nothing in
+# the build had an opinion about either.
+check_schema: strict

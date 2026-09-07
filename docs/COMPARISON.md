@@ -1,7 +1,7 @@
 ---
 title: "MDDB vs Alternatives"
 slug: "docs/comparison"
-description: "Measured numbers and honest trade-offs: how MDDB compares with relational and document databases, search engines, vector stores and RAG wrappers — with the command that reproduces every figure."
+description: "How MDDB compares with relational and document databases, search engines, vector stores and RAG wrappers - with the command that reproduces every figure."
 status: publish
 ---
 

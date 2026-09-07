@@ -1,7 +1,7 @@
 ---
 title: "FTS Spell Correction"
 slug: "docs/symspell"
-description: "SymSpell-based spell correction for full-text search with per-collection custom dictionaries"
+description: "SymSpell spell correction for MDDB full-text search: symmetric delete lookup, per-collection dictionaries, and when a query is corrected at all."
 status: publish
 ---
 

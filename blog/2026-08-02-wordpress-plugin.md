@@ -4,6 +4,7 @@ slug: "blog/wordpress-plugin"
 description: "MDDB Sync mirrors your WordPress posts into MDDB for semantic search and RAG — and lets your AI agent publish drafts back. Setup takes ten minutes."
 status: publish
 date: 2026-08-02
+tags: [mcp, search, rag]
 ---
 
 # Your WordPress just became AI-searchable: meet the MDDB Sync plugin

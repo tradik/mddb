@@ -1,9 +1,13 @@
 {{define "page_slug"}}category/{{.Category.Slug}}{{end -}}
 {{/* A category page lists the same posts as the section index it mirrors
-     (/category/blog/ vs /blog/), is absent from the sitemap and is linked from
-     nowhere on the site. It exists so the taxonomy URL resolves, not to rank —
-     so keep it out of the index while still letting crawlers follow through to
-     the posts. */ -}}
+     (/category/blog/ vs /blog/) and is linked from nowhere on the site. It
+     exists so the taxonomy URL resolves, not to rank — so keep it out of the
+     index while still letting crawlers follow through to the posts.
+
+     .CanonicalURL (SSG 1.8.56) is the path the archive was actually written
+     to. This template is also the fallback for every other archive kind, so
+     re-deriving the URL from .Category.Slug published /category/<slug>/ on 23
+     tag pages, each canonicalising to a 404. Never hardcode the base here. */ -}}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,10 +15,10 @@
     <meta name="robots" content="noindex, follow">
     <meta name="description" content="{{if .Category.Description}}{{.Category.Description}}{{else}}Every MDDB article filed under {{.Category.Name}} - release notes, engineering write-ups and guides from the team.{{end}}">
     <meta property="og:title" content="{{.Category.Name}} — MDDB">
-    <meta property="og:url" content="https://{{.Domain}}/category/{{.Category.Slug}}/" />
+    <meta property="og:url" content="{{.CanonicalURL}}" />
     <meta property="twitter:title" content="{{.Category.Name}} — MDDB">
-    <meta property="twitter:url" content="https://{{.Domain}}/category/{{.Category.Slug}}/" />
-    <link rel="canonical" href="https://{{.Domain}}/category/{{.Category.Slug}}/" />
+    <meta property="twitter:url" content="{{.CanonicalURL}}" />
+    <link rel="canonical" href="{{.CanonicalURL}}" />
     <title>{{.Category.Name}} — MDDB</title>
 </head>
 <body>

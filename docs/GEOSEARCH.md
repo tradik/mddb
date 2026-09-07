@@ -1,5 +1,5 @@
 ---
-title: "Geosearch"
+title: "Geospatial Search: Radius and Bounding-Box Queries"
 slug: "docs/geosearch"
 description: "Geospatial search in MDDB — R-tree and geohash indexes, radius and bounding-box queries, composition with full-text and vector search."
 status: publish

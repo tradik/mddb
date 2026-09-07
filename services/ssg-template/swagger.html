@@ -1,28 +1,96 @@
 <!DOCTYPE html>
+<!-- Copied verbatim by static_sources (.ssg.yaml) to /docs/api/swagger/index.html,
+     so it is plain HTML and carries no template actions. Anything shared
+     with the theme —
+     the GTM container id, the nav links — is duplicated on purpose and has to
+     be changed in both places. -->
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description"
         content="Interactive Swagger UI for the MDDB REST API - browse every endpoint, request and response schema, and try calls against a running server.">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="MDDB API Documentation">
+    <meta property="og:description"
+        content="Interactive Swagger UI for the MDDB REST API - browse every endpoint, request and response schema, and try calls against a running server.">
+    <meta property="og:url" content="https://mddb.tradik.com/docs/api/swagger/" />
+    <meta property="og:image" content="https://mddb.tradik.com/og-image.png">
+    <meta property="twitter:card" content="summary_large_image">
+    <link rel="canonical" href="https://mddb.tradik.com/docs/api/swagger/" />
+    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
     <title>MDDB API Documentation</title>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui.css">
+    <!-- Same container as base.html's gtm_id; this page is outside the theme. -->
+    <script>(function (w, d, s, l, i) { w[l] = w[l] || []; w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' }); var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f); })(window, document, 'script', 'dataLayer', 'GTM-K296KCVM');</script>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15/swagger-ui.css"
+        integrity="sha384-fgyWYkUAamzuI8mJFu/xpRP0JWCJRwkwUwsYDoOYVHUJ8NQE5cENn8ib3ppwFFSX" crossorigin="anonymous">
     <style>
         body {
             margin: 0;
             padding: 0;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
         }
+
         .topbar {
             display: none;
         }
+
+        /* The reference renderer owns the rest of the page, so the way back to
+           the site is this bar. Without it the page had no outgoing link at
+           all: a crawler (and a reader) reached the API reference and stopped.
+           #0050A6 on #F2F3F6 is 7.0:1 — WCAG 2.2 AAA. */
+        .api-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.25rem;
+            align-items: center;
+            padding: 0.75rem 1.25rem;
+            background: #F2F3F6;
+            border-bottom: 1px solid #E2E8F0;
+            font-size: 0.9375rem;
+        }
+
+        .api-bar a {
+            color: #0050A6;
+            text-decoration: none;
+        }
+
+        .api-bar a:hover {
+            text-decoration: underline;
+        }
+
+        .api-bar a:focus-visible {
+            outline: 3px solid #0050A6;
+            outline-offset: 2px;
+        }
+
+        .api-bar strong {
+            color: #0F172A;
+        }
     </style>
 </head>
+
 <body>
+    <noscript><iframe src='https://www.googletagmanager.com/ns.html?id=GTM-K296KCVM' height="0" width="0"
+            style="display:none;visibility:hidden"></iframe></noscript>
+    <nav class="api-bar" aria-label="Documentation">
+        <strong>MDDB API reference</strong>
+        <a href="/">Home</a>
+        <a href="/docs/api/">API guide</a>
+        <a href="/docs/authentication/">Authentication</a>
+        <a href="/docs/quickstart/">Quick start</a>
+        <a href="/docs/api/openapi.yaml">openapi.yaml</a>
+    </nav>
     <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-bundle.js"></script>
-    <script src="https://unpkg.com/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15/swagger-ui-bundle.js"
+        integrity="sha384-m7zaGj7MPzU+G4lz2eyy73GxK9bbRDr9bB2CSdj8wodg2wu/Wnt6wsoLP3JD+RS9"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.32.15/swagger-ui-standalone-preset.js"
+        integrity="sha384-9rDX8vR4ir9/JIiV/XvxMpb5T9tVyFbssk49PV935hrdwmkVNJ7VZMM0RXAm184h"
+        crossorigin="anonymous"></script>
     <script>
-        window.onload = function() {
+        window.onload = function () {
             window.ui = SwaggerUIBundle({
                 url: "openapi.yaml",
                 dom_id: '#swagger-ui',
@@ -46,4 +114,5 @@
         };
     </script>
 </body>
+
 </html>

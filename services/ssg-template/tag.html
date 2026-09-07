@@ -1,0 +1,54 @@
+{{define "page_slug"}}tag/{{.Category.Slug}}{{end -}}
+{{/* A tag archive at /tag/<slug>/. Without this file every tag fell back to
+     category.html, which took its title, description and canonical from the
+     category shape: 23 pages titled "<tag> — MDDB" (too short to be a title),
+     described as "filed under <tag>" (too short to be a description) and
+     canonicalised to /category/<tag>/, which does not exist.
+
+     Tags are a real navigation layer here — every post lists its own at the
+     foot of the article — so these are indexable. The vocabulary is kept small
+     enough on purpose (blog/README.md) that no tag archive lists a single post.
+
+     .CanonicalURL comes from SSG 1.8.56 and names the path the archive was
+     written to; it must not be re-derived from the slug. */ -}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {{template "head_meta" .}}
+    <meta name="robots" content="index, follow">
+    <meta name="description" content="Every MDDB article tagged {{.Category.Name}}: release notes, engineering write-ups and hands-on guides from the team building the AI-native knowledge base.">
+    <meta property="og:title" content="{{.Category.Name}} in MDDB: guides and release notes">
+    <meta property="og:url" content="{{.CanonicalURL}}" />
+    <meta property="twitter:title" content="{{.Category.Name}} in MDDB: guides and release notes">
+    <meta property="twitter:url" content="{{.CanonicalURL}}" />
+    <link rel="canonical" href="{{.CanonicalURL}}" />
+    <title>{{.Category.Name}} in MDDB: guides and release notes</title>
+</head>
+<body>
+{{template "gtm_noscript" .}}
+{{template "navbar" .}}
+
+<div class="site-layout">
+    {{template "sidebar" .}}
+    <main id="main-content" class="main-content">
+        <div class="doc-category">
+            <header class="doc-header">
+                <h1 class="doc-title">Posts tagged {{.Category.Name}}</h1>
+                <p class="doc-index-lead">{{len .Posts}} article{{if ne (len .Posts) 1}}s{{end}} on {{.Category.Name}}, newest first. The full archive is on the <a href="/blog/">blog</a>.</p>
+            </header>
+            <ul class="doc-page-list">
+                {{range .Posts}}
+                <li>
+                    <a href="/{{.Slug}}/">{{.Title}}</a>
+                    {{if .Description}}<span class="doc-page-excerpt">{{.Description}}</span>
+                    {{else if .Excerpt}}<span class="doc-page-excerpt">{{.Excerpt}}</span>{{end}}
+                </li>
+                {{end}}
+            </ul>
+        </div>
+    </main>
+</div>
+
+{{template "footer" .}}
+</body>
+</html>

@@ -25,7 +25,7 @@ slug: "blog/short-title"
 status: publish                  # draft keeps it out of publication
 type: post                       # explicit; drives URL and template behaviour
 date: 2026-08-23                 # ordering, and the date-based URL
-tags: [rag, retrieval, mcp]      # generates listings at /tag/<slug>/
+tags: [rag, retrieval, mcp]      # from the fixed vocabulary below
 excerpt: "What a reader sees in the listing and the feed."
 description: "SEO description; distinct from excerpt, 70–160 characters."
 mermaid: true                    # only on posts that contain a diagram
@@ -39,6 +39,15 @@ mermaid_background: "#ffffff"
   only one leaves the other empty, and every documentation page shipped an
   empty `<meta name="description">` for exactly that reason until 2.12.
 
+- **Tags come from a fixed vocabulary**, written as lowercase slugs:
+  `agents`, `benchmarking`, `embeddings`, `mcp`, `operations`, `performance`,
+  `rag`, `release`, `retrieval`, `search`, `security`. Each one renders an
+  indexable archive at `/tag/<slug>/`, linked from the foot of every post that
+  carries it. Adding a term is a deliberate act: a tag with one post is a thin
+  page that a crawler reports and a reader learns nothing from, which is what
+  23 terms across 11 posts produced. Introduce a new tag with the second post
+  that needs it, not the first, and add a redirect in `.ssg.yaml` when one is
+  retired — the URLs are public.
 - **Slug prefix** `blog/` puts the post under `/blog/<name>/` on the site;
   the `/blog/` index page (`docs/BLOG.md`, `layout: blog`) lists posts
   newest-first automatically. Add a `date: YYYY-MM-DD` field for ordering.

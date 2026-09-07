@@ -1,5 +1,5 @@
 ---
-title: "Security"
+title: "Security: ISO 27001 and SOC 2 Control Map"
 slug: "docs/security"
 description: "MDDB's ISO 27001 and SOC 2 control map, threat model and operator checklist, tracing every requirement from the control down to the source file."
 status: publish

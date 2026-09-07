@@ -4,7 +4,7 @@ slug: "blog/the-loop-that-was-not-waiting-for-memory"
 status: publish
 type: post
 date: 2026-08-24
-tags: [performance, vector-search, simd, benchmarking]
+tags: [performance, search, benchmarking]
 excerpt: "Two optimisations to MDDB's vector loop predicted 33% and delivered 1.5%. The benchmark had been saying why for months, in a column nobody read as a diagnosis."
 description: "How a constant 6.8 GB/s across every working-set size revealed that MDDB's vector comparison was instruction-bound, not memory-bound — and what fixed it."
 ---

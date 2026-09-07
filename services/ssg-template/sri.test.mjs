@@ -21,9 +21,11 @@ const templates = readdirSync(here)
   .filter((name) => name.endsWith('.html'))
   .map((name) => ({ name, html: readFileSync(join(here, name), 'utf8') }));
 
-// Match every <script>/<link> pointing at a public CDN.
+// Match every <script>/<link> pointing at a public CDN. unpkg is listed
+// because it was not: swagger.html loaded three swagger-ui files from it with
+// no integrity attribute, and this test reported a clean run for months.
 const cdnTagRe =
-  /<(?:script|link)\b[^>]*\b(?:src|href)=["']https:\/\/(?:cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com)\/[^"']+["'][^>]*>/gi;
+  /<(?:script|link)\b[^>]*\b(?:src|href)=["']https:\/\/(?:cdn\.jsdelivr\.net|cdnjs\.cloudflare\.com|unpkg\.com)\/[^"']+["'][^>]*>/gi;
 
 test('FE-007: every CDN resource in a template uses SRI + crossorigin', () => {
   for (const { name, html } of templates) {

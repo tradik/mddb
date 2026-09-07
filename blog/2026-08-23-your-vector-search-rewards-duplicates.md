@@ -4,7 +4,7 @@ slug: "blog/your-vector-search-rewards-duplicates"
 status: publish
 type: post
 date: 2026-08-23
-tags: [search, rag, ranking, embeddings, deduplication]
+tags: [search, rag, retrieval, embeddings]
 excerpt: "A runbook copied for four environments can occupy four result slots. MDDB uses MinHash overlap to reduce that repetition after ranking."
 description: "How MinHash-based diversity demotes near-duplicate search results in MDDB and changes a measured top-four result from one distinct answer to four."
 mermaid: true

@@ -4,7 +4,7 @@ slug: "blog/the-collection-knows-how-to-be-searched"
 status: publish
 type: post
 date: 2026-08-23
-tags: [rag, retrieval, mcp, configuration, agents]
+tags: [rag, retrieval, mcp, agents]
 excerpt: "Retrieval settings and answer formatting used to live in every client. In MDDB 2.12 they live with the data, so a new consumer gets them right without being told."
 description: "Per-collection retrieval profiles and response prompts in MDDB 2.12 — the collection carries how it should be searched and how its answers should be shaped."
 mermaid: true

@@ -1,5 +1,5 @@
 ---
-title: "Website Chat"
+title: "Website Chat: a Local RAG Widget"
 slug: "docs/uses-website-chat"
 description: "Add a RAG-powered AI chat widget to any website with MDDB, mddb-chat and Ollama - the whole stack runs locally, with no cloud API fees."
 status: publish

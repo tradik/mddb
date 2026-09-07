@@ -67,6 +67,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Every tag archive on the documentation site canonicalised to a 404** — the
+  theme had no `tag.html`, so all 23 `/tag/<slug>/` pages fell back to
+  `category.html` and inherited a canonical hardcoded to
+  `/category/<slug>/`: a URL the build never wrote. A crawl found 23 pages
+  pointing search engines at 23 missing documents, each of them also `noindex`,
+  listed in `sitemap.xml`, and linked from nowhere on the site.
+
+  Tags are now a navigation layer rather than a by-product. `tag.html` renders
+  the archive with its own title and description, and takes its canonical from
+  `.CanonicalURL` (SSG 1.8.56), which names the path the archive was written to
+  instead of one the template re-derives — `category.html` does the same now,
+  so the next archive kind added cannot repeat this. Every post lists its tags
+  at the foot of the article, which is what stops the archives being orphans.
+
+  The vocabulary went from 23 terms to 11 (`blog/README.md` documents it): 13
+  of them carried a single post each, and a tag archive listing one article is
+  a thin page for a reader and for a crawler. Retired terms 301 to the archive
+  that absorbed them, so the published URLs keep resolving.
+
+  Also on the site: `/category/blog/` is no longer rendered (it mirrored
+  `/blog/` post for post, `noindex`, and was named in the sitemap anyway); the
+  API reference at `/docs/api/swagger/` carries a canonical, GTM and links back
+  into the docs, where it previously had no outgoing link at all; the home
+  page's JSON-LD drops `codeRepository`, which belongs to `SoftwareSourceCode`
+  and not to `SoftwareApplication`, and reads its `softwareVersion` from the
+  build's own variable instead of the string `2.11.4`; the download section is
+  dated from the 2.13.0 tag rather than 2.11.4's release day; and `/blog/`,
+  three docs pages and two descriptions are no longer outside the length bounds
+  the site sets for itself. `check_schema: strict` and `title_min` now hold
+  those last two classes at build time.
+
+- **The Swagger UI on the docs site loaded three unpinned CDN scripts without
+  SRI** — `swagger-ui-dist@5.10.5` from unpkg, whose integrity nothing checked.
+  The SRI test that exists for this reason matched only jsdelivr and cdnjs, so
+  it reported a clean run. The bundle now comes from jsdelivr at 5.32.15 with
+  `integrity` and `crossorigin` on every tag, and the test matches unpkg too.
+
 - **A collection's `retrievalMode` was accepted, validated and then ignored
   (#216)** — the documented precedence is "an explicit request parameter wins,
   then the collection profile, then the default". For `topK` that held. For

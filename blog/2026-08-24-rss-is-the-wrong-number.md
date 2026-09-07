@@ -4,7 +4,7 @@ slug: "blog/rss-is-the-wrong-number"
 status: publish
 type: post
 date: 2026-08-24
-tags: [operations, memory, profiling, monitoring]
+tags: [operations, performance]
 excerpt: "A report said MDDB grew from 42 MB to 153 MB under load. The observation was probably right and the conclusion wrong — and the difference is one field you already have."
 description: "Why resident memory grows under sustained load in MDDB, which figure separates a cache from a leak, and a 45-minute measurement that settles it."
 ---

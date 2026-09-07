@@ -268,3 +268,32 @@
     font-weight: var(--font-weight-medium);
     color: var(--color-fg-link);
 }
+
+/* Post tag list (foot of an article) and the /tag/<slug>/ archives it links.
+   Pill contrast: --color-fg-link (#0050A6) on --color-bg-sunken (#F2F3F6) is
+   7.0:1, WCAG 2.2 AAA for body text. */
+.doc-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+    margin-top: var(--space-6);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border-default);
+}
+.doc-tags-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-fg-muted);
+}
+.doc-tag {
+    display: inline-block;
+    padding: 0.15rem var(--space-3);
+    border: 1px solid var(--color-border-default);
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-sunken);
+    color: var(--color-fg-link);
+    font-size: var(--font-size-sm);
+    text-decoration: none;
+}
+.doc-tag:hover { border-color: var(--color-border-strong); color: var(--color-fg-accent); }
+.doc-tag:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--color-border-focus); }

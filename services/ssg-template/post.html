@@ -30,6 +30,16 @@
             <div class="doc-body">
                 {{.Post.Content | safeHTML}}
             </div>
+            {{if .Post.Tags}}
+            {{/* Tags are written as slugs in frontmatter (blog/README.md), so
+                 /tag/<tag>/ is the address SSG wrote the archive to. These
+                 links are also what keeps those archives out of the orphan
+                 report: nothing else on the site links them. */}}
+            <nav class="doc-tags" aria-label="Post tags">
+                <span class="doc-tags-label">Tagged</span>
+                {{range .Post.Tags}}<a class="doc-tag" href="/tag/{{.}}/">{{.}}</a>{{end}}
+            </nav>
+            {{end}}
         </article>
     </main>
 </div>

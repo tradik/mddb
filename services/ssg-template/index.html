@@ -51,7 +51,9 @@
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       "name": "MDDB",
-      "applicationCategory": "AIApplication",
+      "applicationCategory": "DeveloperApplication",
+      "url": "https://mddb.tradik.com/",
+      "downloadUrl": "https://github.com/tradik/mddb/releases",
       "operatingSystem": "Linux, macOS, Windows, FreeBSD",
       "offers": {
         "@type": "Offer",
@@ -59,7 +61,7 @@
         "priceCurrency": "USD"
       },
       "description": "AI-native knowledge base with built-in MCP server, vector search, RAG support, and semantic retrieval for AI agents and LLM workflows",
-      "softwareVersion": "2.11.4",
+      "softwareVersion": "{{$.Vars.mddbVersion}}",
       "featureList": [
         "Built-in MCP server (2025-11-25) with 81 tools, tool annotations, prompts, completion, structured output — stdio, Streamable HTTP, SSE transports for Claude, Cursor, Windsurf, ChatGPT, Ollama, DeepSeek",
         "Vector/semantic search with 7 index algorithms: Flat, HNSW, IVF, PQ, OPQ, SQ, BQ + per-collection int8/int4 quantization (OpenAI, Ollama, Cohere, Voyage AI)",
@@ -98,7 +100,10 @@
         "name": "MDDB Team"
       },
       "license": "https://opensource.org/licenses/BSD-3-Clause",
-      "codeRepository": "https://github.com/tradik/mddb"
+      "sameAs": [
+        "https://github.com/tradik/mddb",
+        "https://hub.docker.com/r/tradik/mddb"
+      ]
     }
     </script>
 </head>

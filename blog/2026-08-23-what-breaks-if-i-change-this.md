@@ -4,7 +4,7 @@ slug: "blog/what-breaks-if-i-change-this"
 status: publish
 type: post
 date: 2026-08-23
-tags: [code-intelligence, search, refactoring, css, mcp]
+tags: [search, mcp, agents]
 excerpt: "MDDB 2.12 indexes what a code file declares, uses and imports, then answers the relational questions grep cannot: what depends on this selector, which pages load this script, what is nobody using any more."
 description: "Code symbol extraction and a connection graph in MDDB 2.12 — ask what depends on a CSS selector or a JS module, instead of grepping and hoping."
 mermaid: true
