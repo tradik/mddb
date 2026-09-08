@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cloudflare was rewriting the email addresses inside our own documentation**
+  — every address it finds becomes a `/cdn-cgi/l/email-protection` link reading
+  `[email protected]`, and it does not distinguish an address from an example.
+  `docs/TLS.md` published the certificate command as
+  `-subj "/CN=[email protected]/O=Acme Inc/C=US"`: a command a reader copies, and
+  a certificate subject that comes out wrong. Eight pages also linked to
+  `/cdn-cgi/l/email-protection`, which 404s on this site, and a crawl reported
+  each of them.
+
+  `<!--email_off-->` turns the rewriting off for a region, but `html/template`
+  strips HTML comments while parsing — silently, and long before this site
+  existed — so a theme cannot write one directly. SSG 1.8.57 documents the way
+  through (`{{ "<!--email_off-->" | safeHTML }}`), which is now a pair of
+  partials wrapping the body of every page, with the two verbatim documents
+  carrying the literal comment.
+
+- **The API reference was in the footer of every page and in no sitemap** —
+  `/docs/api/swagger/` is copied verbatim rather than rendered, so it never
+  became a page and no branch of the sitemap could reach it. SSG 1.8.57 lets a
+  `static_sources` entry say it is a document (`sitemap: true`); it is now
+  listed at priority 0.8, like any other page.
+
+### Changed
+
+- **SSG 1.8.56 → 1.8.57** for the documentation site.
+
 ## [2.14.0] - 2026-09-08
 
 ### Added

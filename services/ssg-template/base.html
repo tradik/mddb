@@ -17,6 +17,21 @@
 <script>(function (w, d, s, l, i) { w[l] = w[l] || []; w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' }); var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f); })(window, document, 'script', 'dataLayer', '{{template "gtm_id" .}}');</script>
 {{end}}
 
+{{/* Cloudflare rewrites every email address it finds in a page into a
+     /cdn-cgi/l/email-protection link with the text "[email protected]", and it
+     does that to the addresses in our documentation: an openssl command in
+     docs/TLS.md was published as -subj "/CN=[email protected]/O=Acme Inc/C=US",
+     which is a command a reader copies and a certificate that comes out wrong.
+     Eight pages also linked to /cdn-cgi/l/email-protection, which 404s here.
+
+     <!--email_off--> turns the rewriting off for a region, but html/template
+     strips HTML comments while parsing (SSG 1.8.57 documents this), so a theme
+     cannot simply write one — it has to hand the engine a string it is told not
+     to escape. That is all these two partials are. They wrap the whole body of
+     every page, because an address can appear in any document. */ -}}
+{{define "email_off"}}{{ "<!--email_off-->" | safeHTML }}{{end}}
+{{define "email_on"}}{{ "<!--/email_off-->" | safeHTML }}{{end}}
+
 {{define "gtm_noscript"}}
 <noscript><iframe src='https://www.googletagmanager.com/ns.html?id={{template "gtm_id" .}}' height="0" width="0"
         style="display:none;visibility:hidden"></iframe></noscript>

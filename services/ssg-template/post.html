@@ -14,6 +14,7 @@
     <title>{{.Post.Title}} — MDDB</title>
 </head>
 <body>
+{{template "email_off" .}}
 {{template "gtm_noscript" .}}
 {{template "navbar" .}}
 
@@ -45,5 +46,6 @@
 </div>
 
 {{template "footer" .}}
+{{template "email_on" .}}
 </body>
 </html>

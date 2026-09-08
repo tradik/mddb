@@ -109,6 +109,7 @@
 </head>
 
 <body>
+    {{template "email_off" .}}
     {{template "gtm_noscript" .}}
     {{template "navbar" .}}
 
@@ -633,6 +634,7 @@
             }
         })();
     </script>
+{{template "email_on" .}}
 </body>
 
 </html>

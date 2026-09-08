@@ -106,6 +106,10 @@ static_sources:
   # and 308s, so a .html URL and the file on disk can never both be right.
   - path: services/ssg-template/swagger.html
     dest: docs/api/swagger/index.html
+    # A copied file never becomes a page, so nothing in the sitemap could reach
+    # it: the API reference was linked from the footer of every page and absent
+    # from the file the site uses to state its own structure (SSG 1.8.57).
+    sitemap: true
   - path: docs/openapi.yaml
     dest: docs/api/openapi.yaml
   - path: services/ssg-template/404.html

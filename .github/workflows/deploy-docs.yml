@@ -52,20 +52,23 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@5bc07a7e218514f1d093cd6197877eebf22a9225 # v1.8.56
+        uses: spagu/ssg@ae19b443973a889feaaf57f735bb7b2abb63f52d # v1.8.57
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
           # declared feeds (feeds:, RSS) from 1.8.20 and the archive canonical
           # (.CanonicalURL) from 1.8.56 — before it, every archive template had
           # to re-derive its own URL, which is how 23 tag pages shipped a
-          # canonical pointing at /category/<slug>/ and a 404. The pin is also
-          # what made the last mismatch obvious rather than intermittent.
+          # canonical pointing at /category/<slug>/ and a 404 — and, from
+          # 1.8.57, `sitemap:` on a static_sources entry, which is the only way
+          # the API reference at /docs/api/swagger/ can enter sitemap.xml. The
+          # pin is also what made the last mismatch obvious rather than
+          # intermittent.
           #
           # Both pins move together. Dependabot only sees the `uses:` ref, so a
           # bare dependabot bump leaves `version:` behind and the action then
           # fetches a binary older than itself — check both when bumping.
-          version: 'v1.8.56'
+          version: 'v1.8.57'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'
