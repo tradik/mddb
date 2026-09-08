@@ -82,7 +82,10 @@ bump() {
 	after="$(printf '%s\n' "${before}" | sed -E "s|${anchor}|${repl}|")"
 
 	if [[ "${before}" == "${after}" ]]; then
-		echo "  same ${file} (already ${NEW})"
+		# Not "already ${NEW}": one of the anchors below writes a release date
+		# rather than a version, and naming the version there was a small lie
+		# in the one line an operator reads to check the sweep.
+		echo "  same ${file} (already up to date)"
 		return 0
 	fi
 	if [[ "${DRY_RUN}" == true ]]; then

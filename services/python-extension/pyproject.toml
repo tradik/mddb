@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mddb"
-version = "2.14.0"
+version = "2.14.1"
 description = "Python client/extension for MDDB (Markdown Database) over HTTP / Unix socket."
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "tradik" }]

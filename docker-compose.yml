@@ -35,7 +35,7 @@ x-deploy-small: &deploy-small
 
 services:
   mddb:
-    image: tradik/mddb:${MDDB_VERSION:-2.14.0}
+    image: tradik/mddb:${MDDB_VERSION:-2.14.1}
     container_name: mddb-server
     restart: unless-stopped
     ports:
