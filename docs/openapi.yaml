@@ -6105,6 +6105,15 @@ components:
           items:
             type: string
           description: Error messages for failed documents
+        embeddingDropped:
+          type: integer
+          description: >-
+            (v2.15.0+) Documents stored without a vector because the embedding
+            queue was full and the write gave up waiting. Present only when
+            non-zero. `failed` stays 0: the documents ARE stored, they are just
+            unreachable by vector and hybrid search until POST /v1/vector-reindex
+            fills them in. See MDDB_EMBEDDING_QUEUE_SIZE / MDDB_EMBEDDING_QUEUE_WAIT.
+          example: 0
 
     BulkIngestSubmitRequest:
       type: object
@@ -6920,6 +6929,33 @@ components:
               total_documents: 100
               embedded_documents: 95
               total_chunks: 280
+        queue:
+          type: object
+          description: >-
+            (v2.15.0+) Embedding queue state. It answers the question the two
+            document counts cannot: whether embedding is still running or gave
+            up. Absent when no embedding worker is configured.
+          properties:
+            size:
+              type: integer
+              description: Queue capacity (MDDB_EMBEDDING_QUEUE_SIZE)
+              example: 1000
+            depth:
+              type: integer
+              description: Jobs waiting now; above zero means embedding is still running
+              example: 0
+            dropped:
+              type: integer
+              format: int64
+              description: >-
+                Documents stored without a vector since startup, because the
+                queue was full and the write gave up waiting. Repair with
+                POST /v1/vector-reindex.
+              example: 0
+            wait:
+              type: string
+              description: How long a write waits for queue room (MDDB_EMBEDDING_QUEUE_WAIT)
+              example: "5s"
         chunking:
           type: object
           properties:

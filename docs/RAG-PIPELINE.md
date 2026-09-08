@@ -228,12 +228,35 @@ curl -s http://localhost:11023/v1/vector-stats | python3 -m json.tool
 # Example response:
 # {
 #   "collections": {
-#     "blog": { "total": 142, "embedded": 142, "pending": 0 }
+#     "blog": { "total_documents": 142, "embedded_documents": 142, "total_chunks": 142 }
 #   },
+#   "queue": { "size": 1000, "depth": 0, "dropped": 0, "wait": "5s" },
 #   "model": "text-embedding-3-small",
 #   "dimensions": 1536
 # }
 ```
+
+`queue` is what tells you which kind of "not finished yet" you are looking at
+when `embedded_documents` is below `total_documents`:
+
+- **`depth` above zero** — still working. Wait and look again.
+- **`dropped` above zero** — that many documents were stored without a vector
+  because the queue was full and the writer gave up waiting. They are
+  invisible to vector and hybrid search until reindexed:
+
+  ```bash
+  curl -X POST http://localhost:11023/v1/vector-reindex \
+    -H 'Content-Type: application/json' -d '{"collection":"blog"}'
+  ```
+
+  Reindexing embeds exactly the documents that are missing one; `force: true`
+  is for re-embedding a collection whose model changed, not for this.
+
+An import large enough to outrun the embedding provider slows down rather than
+losing work — a write waits up to `MDDB_EMBEDDING_QUEUE_WAIT` (default 5s) for
+room. A batch that reports `embeddingDropped` in its response is telling you
+that limit was reached; raise `MDDB_EMBEDDING_QUEUE_SIZE`, raise the wait, or
+reindex afterwards.
 
 ### 4. Test Semantic Search
 

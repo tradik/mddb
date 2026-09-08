@@ -408,7 +408,7 @@ func main() {
 		// Fall back to environment variables
 		s.Embedding = embedding.NewProvider()
 		if s.Embedding != nil {
-			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, 1000)
+			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, EmbeddingQueueSize())
 			s.EmbeddingWorker.SetDiskOnly(s.QuantizedVecIndex, s.collectionDiskOnly)
 			s.EmbeddingWorker.Start(2)
 			slog.Info("vector search enabled", "source", "environment",
@@ -419,7 +419,7 @@ func main() {
 			// sitting there — MDDB simply never looked.
 			s.Embedding = detected.Provider
 			s.DetectedEmbedding = detected
-			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, 1000)
+			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, EmbeddingQueueSize())
 			s.EmbeddingWorker.SetDiskOnly(s.QuantizedVecIndex, s.collectionDiskOnly)
 			s.EmbeddingWorker.Start(2)
 			slog.Info("vector search enabled", "source", "autodetected",

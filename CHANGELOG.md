@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A bulk import could leave most of a collection without vectors, and the
+  API called it a success (#232)** — the embedding queue held 1000 jobs,
+  hardcoded, and a write that found it full threw the job away. `Enqueue` has
+  always returned `false` to say so and no caller has ever read it, so a
+  4,000-document import answered `{"added":4000,"failed":0}` with 1,002
+  documents embedded. The rest were stored and unreachable by vector or hybrid
+  search, and the only trace was one log line per lost document.
+
+  Measured on the same 1,500-document batch, before and after:
+
+  | | Embedded | Reported | Ingest |
+  |---|---|---|---|
+  | Before | 1,002 of 1,500 | `failed: 0` | 0.04 s |
+  | After | **1,500 of 1,500** | `failed: 0` | 4.3 s |
+
+  A write now waits up to `MDDB_EMBEDDING_QUEUE_WAIT` (default 5s) for room
+  before giving up, which turns a large import into backpressure rather than
+  loss: the queue drains continuously, so waiting costs seconds and saves the
+  vectors. **This makes a bulk ingest slower than in 2.14.** Set the wait to
+  `0` for the previous behaviour, and `MDDB_EMBEDDING_QUEUE_SIZE` now sets the
+  queue depth that could not be changed before.
+
+  When a document *is* dropped, three places say so instead of none: the batch
+  response carries `embeddingDropped` (omitted when zero, so a healthy import
+  is unchanged), `GET /v1/vector-stats` gained a `queue` block reporting size,
+  depth, the running dropped count and the configured wait, and the batch logs
+  one summary line naming the remedy. `embedded_documents` below
+  `total_documents` used to have two indistinguishable causes — still working,
+  or gave up — and `queue.depth` is the difference.
+
+  Repair is unchanged and needs no flag: `POST /v1/vector-reindex` embeds
+  exactly the documents that have no vector. (An earlier note on #232 claimed
+  otherwise; that was a misreading of a second run, corrected on the issue.)
+
 - **A near-duplicate group named its pages only if you also downloaded their
   bodies** — `find_duplicates` in `minhash` mode filled each result's `key`
   inside the `includeContent` branch, so the cheap question ("which pages are
@@ -16,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   4,000-page site, megabytes of Markdown to learn a handful of names. The
   `exact` and `similar` modes have always enriched their groups
   unconditionally; this one now does too, and the body still costs extra.
+
+### Added
+
+- **`MDDB_EMBEDDING_QUEUE_SIZE` and `MDDB_EMBEDDING_QUEUE_WAIT`** — the depth of
+  the embedding queue, and how long a write waits for room in it. Both were
+  fixed constants; see the ingest fix above for why the second one has a
+  non-zero default.
 
 ### Changed
 

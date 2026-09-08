@@ -39,6 +39,12 @@ type AddBatchHTTPResponse struct {
 	Updated int      `json:"updated"`
 	Failed  int      `json:"failed"`
 	Errors  []string `json:"errors,omitempty"`
+	// EmbeddingDropped counts documents written without their vector because
+	// the embedding queue could not take them (#232). Omitted when zero, so a
+	// healthy import is unchanged and a lossy one cannot be mistaken for one:
+	// `failed` stays 0 because the documents ARE stored — they are simply
+	// invisible to vector and hybrid search until reindexed.
+	EmbeddingDropped int `json:"embeddingDropped,omitempty"`
 }
 
 // handleAddBatch handles POST /v1/add-batch
@@ -82,15 +88,16 @@ func (s *Server) handleAddBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fire post-batch hooks
-	s.firePostBatchHooks(req.Collection, processed, postBatchOptions{})
+	dropped := s.firePostBatchHooks(req.Collection, processed, postBatchOptions{})
 
 	s.Metrics.IncOp("add_batch")
 
 	ok(w, AddBatchHTTPResponse{
-		Added:   int(resp.Added),
-		Updated: int(resp.Updated),
-		Failed:  int(resp.Failed),
-		Errors:  resp.Errors,
+		Added:            int(resp.Added),
+		Updated:          int(resp.Updated),
+		Failed:           int(resp.Failed),
+		Errors:           resp.Errors,
+		EmbeddingDropped: dropped,
 	})
 }
 
@@ -131,13 +138,16 @@ func (s *Server) processBatchWithDocs(ctx context.Context, collection string, pr
 
 // firePostBatchHooks fires embedding, FTS, webhook, TTL, and automation hooks
 // for all successfully processed documents after batch commit.
-func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc, opts postBatchOptions) {
+// It returns the number of documents whose embedding job the queue refused,
+// which the caller is expected to pass on rather than discard (#232).
+func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc, opts postBatchOptions) int {
 	// Every document's FTS work is gathered and written in one transaction
 	// after the loop. Indexing a document touches three indexes, and each
 	// entry point opens its own BoltDB commit, so doing it per document cost
 	// 3N commits per batch — measured at 238 docs/s against 46k docs/s for the
 	// same writes without indexing.
 	var ftsBatch []fts.BulkDoc
+	embeddingDropped := 0
 
 	for _, p := range processed {
 		if p.Error != nil {
@@ -146,12 +156,14 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 
 		// Embedding
 		if !opts.SkipEmbeddings && s.EmbeddingWorker != nil && p.Doc.ContentMD != "" {
-			s.EmbeddingWorker.Enqueue(EmbeddingJob{
+			if !s.EmbeddingWorker.Enqueue(EmbeddingJob{
 				Collection: collection,
 				DocID:      p.DocID,
 				ContentMD:  p.Doc.ContentMD,
 				ChunkMode:  ChunkModeFor(&p.Doc),
-			})
+			}) {
+				embeddingDropped++
+			}
 		}
 
 		// TTL
@@ -233,6 +245,13 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 	s.indexBatchFTS(collection, ftsBatch)
 	// The batch changed the collection's contents (GO-031).
 	s.invalidateSearchCache(collection)
+
+	if embeddingDropped > 0 {
+		slog.Warn("documents were written without vectors: the embedding queue could not take them",
+			"collection", collection, "dropped", embeddingDropped, "batch", len(processed),
+			"remedy", "POST /v1/vector-reindex, or raise MDDB_EMBEDDING_QUEUE_SIZE / MDDB_EMBEDDING_QUEUE_WAIT")
+	}
+	return embeddingDropped
 }
 
 // indexBatchFTS writes a batch's full-text entries in one transaction, falling

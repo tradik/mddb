@@ -638,6 +638,20 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 		"chunkSize": envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500),
 	}
 
+	// Queue state (#232). `dropped` is the number that turns "embedded is
+	// lower than total" from a question into an answer: either the queue is
+	// still draining (depth > 0) or it gave up on that many documents, and
+	// before this the two looked identical from outside.
+	if s.EmbeddingWorker != nil {
+		size, depth, dropped, wait := s.EmbeddingWorker.QueueStats()
+		resp["queue"] = map[string]interface{}{
+			"size":    size,
+			"depth":   depth,
+			"dropped": dropped,
+			"wait":    wait.String(),
+		}
+	}
+
 	ok(w, resp)
 }
 

@@ -161,6 +161,10 @@ func TestEmbeddingWorker_EnqueueFull(t *testing.T) {
 		vector: []float32{0.1, 0.2, 0.3},
 	}
 
+	// Drop immediately rather than waiting: this test is about what happens
+	// when the queue gives up, and the default now waits first (#232).
+	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "0")
+
 	// Buffer size of 1 and no workers started to fill the queue
 	w := NewEmbeddingWorker(provider, vs, vi, 1)
 	// Don't start workers, so the queue stays full
@@ -326,5 +330,94 @@ func TestEmbeddingWorker_StopDrainsQueue(t *testing.T) {
 	size := vi.CollectionSize("drain")
 	if size != 5 {
 		t.Errorf("VectorIndex size = %d, want 5 (drain on stop)", size)
+	}
+}
+
+// A document written without its vector is invisible to every kind of search
+// MDDB offers, and the write said nothing about it: Enqueue returned false, no
+// caller read it, and the only trace was a log line (#232). These four cover
+// the two halves of the fix — do not lose the job, and when you must, say so.
+
+func TestAFullQueueWaitsForRoomInsteadOfDroppingTheJob(t *testing.T) {
+	_, vs, vi := embWorkerSetup(t)
+	provider := &embWorkerMockProvider{model: "test-model", dims: 3, vector: []float32{0.1, 0.2, 0.3}}
+
+	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "5s")
+	w := NewEmbeddingWorker(provider, vs, vi, 1)
+
+	if !w.Enqueue(EmbeddingJob{Collection: "c", DocID: "d1", ContentMD: "one"}) {
+		t.Fatal("the first job did not fit an empty queue")
+	}
+
+	// Nothing is draining yet, so this second job can only succeed if Enqueue
+	// waits — which is the whole point. The worker starts a moment later, as a
+	// slow provider would.
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		w.Start(1)
+	}()
+
+	if !w.Enqueue(EmbeddingJob{Collection: "c", DocID: "d2", ContentMD: "two"}) {
+		t.Error("a job was abandoned while the queue was about to have room")
+	}
+	w.Stop()
+
+	if _, _, dropped, _ := w.QueueStats(); dropped != 0 {
+		t.Errorf("dropped = %d, want 0 — nothing was lost here", dropped)
+	}
+}
+
+func TestAbandonedJobsAreCounted(t *testing.T) {
+	_, vs, vi := embWorkerSetup(t)
+	provider := &embWorkerMockProvider{model: "test-model", dims: 3, vector: []float32{0.1, 0.2, 0.3}}
+
+	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "0")
+	w := NewEmbeddingWorker(provider, vs, vi, 1)
+
+	_ = w.Enqueue(EmbeddingJob{Collection: "c", DocID: "fits", ContentMD: "one"})
+	for i := 0; i < 3; i++ {
+		if w.Enqueue(EmbeddingJob{Collection: "c", DocID: "lost", ContentMD: "x"}) {
+			t.Fatal("a job fit a queue that should be full")
+		}
+	}
+
+	size, depth, dropped, wait := w.QueueStats()
+	if dropped != 3 {
+		t.Errorf("dropped = %d, want 3 — the count is what makes the loss visible", dropped)
+	}
+	if size != 1 || depth != 1 {
+		t.Errorf("size/depth = %d/%d, want 1/1", size, depth)
+	}
+	if wait != 0 {
+		t.Errorf("wait = %v, want the configured 0", wait)
+	}
+}
+
+func TestTheQueueSizeIsConfigurable(t *testing.T) {
+	if got := EmbeddingQueueSize(); got != 1000 {
+		t.Errorf("default = %d, want the 1000 that was hardcoded before", got)
+	}
+
+	t.Setenv("MDDB_EMBEDDING_QUEUE_SIZE", "8192")
+	if got := EmbeddingQueueSize(); got != 8192 {
+		t.Errorf("configured = %d, want 8192", got)
+	}
+
+	// A queue of zero would drop every job on a server that looks configured.
+	t.Setenv("MDDB_EMBEDDING_QUEUE_SIZE", "0")
+	if got := EmbeddingQueueSize(); got < 1 {
+		t.Errorf("size = %d, want at least one slot", got)
+	}
+}
+
+func TestAnUnparseableWaitFallsBackToTheDefault(t *testing.T) {
+	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "soon")
+	if got := embeddingEnqueueWait(); got != 5*time.Second {
+		t.Errorf("wait = %v, want the 5s default rather than zero — a typo must not silently switch dropping back on", got)
+	}
+
+	t.Setenv("MDDB_EMBEDDING_QUEUE_WAIT", "250ms")
+	if got := embeddingEnqueueWait(); got != 250*time.Millisecond {
+		t.Errorf("wait = %v, want 250ms", got)
 	}
 }
