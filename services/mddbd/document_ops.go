@@ -206,7 +206,11 @@ func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew b
 
 	// Trigger async embedding
 	if s.EmbeddingWorker != nil && saved.ContentMD != "" {
-		s.EmbeddingWorker.Enqueue(EmbeddingJob{
+		// The drop is not discarded, it is counted: the worker logs the
+		// document and /v1/vector-stats reports the running total (#232).
+		// A single write has nothing useful to do with the boolean that a
+		// batch does — there is no per-request tally to add it to.
+		_ = s.EmbeddingWorker.Enqueue(EmbeddingJob{
 			Collection: collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,
@@ -438,7 +442,11 @@ func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.
 	s.invalidateDocReadCaches(collection, key, lang)
 
 	if contentChanged && s.EmbeddingWorker != nil && saved.ContentMD != "" {
-		s.EmbeddingWorker.Enqueue(EmbeddingJob{
+		// The drop is not discarded, it is counted: the worker logs the
+		// document and /v1/vector-stats reports the running total (#232).
+		// A single write has nothing useful to do with the boolean that a
+		// batch does — there is no per-request tally to add it to.
+		_ = s.EmbeddingWorker.Enqueue(EmbeddingJob{
 			Collection: collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,

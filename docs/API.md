@@ -240,6 +240,22 @@ Add multiple documents to a collection in a single request. Uses the optimized b
 }
 ```
 
+`embeddingDropped` (v2.15.0+) appears **only when non-zero**: that many
+documents were stored without a vector because the embedding queue was full
+and the write gave up waiting. `failed` stays `0` — the documents are in the
+database; they are simply unreachable by vector and hybrid search until
+`POST /v1/vector-reindex` fills them in. See `MDDB_EMBEDDING_QUEUE_SIZE` and
+`MDDB_EMBEDDING_QUEUE_WAIT`.
+
+```json
+{
+  "added": 4000,
+  "updated": 0,
+  "failed": 0,
+  "embeddingDropped": 1298
+}
+```
+
 **cURL Example**:
 ```bash
 curl -X POST http://localhost:11023/v1/add-batch \
@@ -858,9 +874,25 @@ Get embedding/vector search statistics.
       "total_documents": 120,
       "embedded_documents": 120
     }
+  },
+  "queue": {
+    "size": 1000,
+    "depth": 2,
+    "dropped": 0,
+    "wait": "5s"
   }
 }
 ```
+
+`queue` (v2.15.0+) says why `embedded_documents` might be below
+`total_documents`, which the two counts alone cannot:
+
+| Field | Meaning |
+|---|---|
+| `size` | Queue capacity (`MDDB_EMBEDDING_QUEUE_SIZE`) |
+| `depth` | Jobs waiting right now — above zero means embedding is still running |
+| `dropped` | Documents stored **without** a vector since startup, because the queue was full and the write gave up waiting. Repair with `POST /v1/vector-reindex` |
+| `wait` | How long a write waits for room before dropping (`MDDB_EMBEDDING_QUEUE_WAIT`) |
 
 **cURL Example**:
 ```bash
