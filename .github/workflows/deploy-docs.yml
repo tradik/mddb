@@ -68,6 +68,13 @@ jobs:
           # Both pins move together. Dependabot only sees the `uses:` ref, so a
           # bare dependabot bump leaves `version:` behind and the action then
           # fetches a binary older than itself — check both when bumping.
+          #
+          # And wait for the upstream release, not the tag: `version:` names a
+          # release asset, which is published by a CI run that starts when the
+          # tag is pushed and takes minutes. Bumping to a tag whose release has
+          # not landed fails this job with a 404 on ssg-linux-amd64.tar.gz. The
+          # check is one command:
+          #   gh release view v1.8.58 --repo spagu/ssg --json assets
           version: 'v1.8.58'
           source: '.'
           template: 'ssg-template'
