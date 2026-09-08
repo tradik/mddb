@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.1] - 2026-09-08
+
+Documentation site only. The server, CLI and clients are unchanged from
+2.14.0 — this release carries no code, and the binaries it publishes differ
+from 2.14.0's by their version string alone.
+
 ### Fixed
 
 - **Cloudflare was rewriting the email addresses inside our own documentation**
