@@ -52,7 +52,7 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@ae19b443973a889feaaf57f735bb7b2abb63f52d # v1.8.57
+        uses: spagu/ssg@b5607b96dfa98a97cf593b556641d8163b850bff # v1.8.58
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
@@ -68,7 +68,7 @@ jobs:
           # Both pins move together. Dependabot only sees the `uses:` ref, so a
           # bare dependabot bump leaves `version:` behind and the action then
           # fetches a binary older than itself — check both when bumping.
-          version: 'v1.8.57'
+          version: 'v1.8.58'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'

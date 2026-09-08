@@ -33,7 +33,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **SSG 1.8.56 → 1.8.57** for the documentation site.
+- **SSG 1.8.56 → 1.8.58** for the documentation site. 1.8.57 is what made the
+  two fixes above possible; 1.8.58 gives the API reference's sitemap entry a
+  `<lastmod>` (it was the one entry of 80 without one, a regression in the
+  day-old feature the entry depends on) and fixes the setting this repository
+  reported as inert: `taxonomies: { tag: { sitemap: false } }` parsed,
+  validated and did nothing (spagu/ssg#259).
+
+  The tag archives stay indexable. `sitemap: false` was what we reached for
+  when they were `noindex` orphans, but consolidating 23 thin terms into 11
+  real ones and linking them from every post left pages worth indexing —
+  keeping them out of the sitemap now would throw that away to use a setting
+  that has since been fixed.
 
 ## [2.14.0] - 2026-09-08
 
