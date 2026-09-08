@@ -106,8 +106,25 @@ echo "✓ release version consistent across ${#sources[@]} sources: ${only}"
 # The CHANGELOG is checked separately: an unreleased version legitimately sits
 # under [Unreleased] until the release is cut, so a mismatch there is only an
 # error once a dated section for this version exists.
-if grep -qE "^## \[${only}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md 2>/dev/null; then
+changelog_date="$(grep -m1 -oE "^## \[${only}\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' || true)"
+if [[ -n "${changelog_date}" ]]; then
 	echo "  CHANGELOG has a dated [${only}] section — ready to tag"
 else
 	echo "  CHANGELOG still has this version under [Unreleased] — move it before tagging"
+fi
+
+# The site prints a release date next to the version, and it is the one number
+# here that cannot be compared against another copy of itself: it appears once.
+# It was wrong for two releases running — 2.11.4's date shown for 2.12.0 and
+# again for 2.13.0 — because the version beside it moved and it did not. Once
+# the CHANGELOG names a date for this version, that is what it must say.
+site_date="$(grep -m1 -E '^  mddbReleaseDate: ' .ssg.yaml 2>/dev/null | sed -E 's/^  mddbReleaseDate: "(.*)"/\1/' || true)"
+if [[ -n "${changelog_date}" && -n "${site_date}" ]]; then
+	want_date="$(LC_ALL=C date -d "${changelog_date}" '+%-d %B %Y' 2>/dev/null || true)"
+	if [[ -n "${want_date}" && "${site_date}" != "${want_date}" ]]; then
+		echo "✗ .ssg.yaml mddbReleaseDate says \"${site_date}\", but CHANGELOG dates ${only} to ${changelog_date} (\"${want_date}\")" >&2
+		echo "  The download section prints this verbatim. Run: scripts/bump-version.sh ${only} ${changelog_date}" >&2
+		exit 1
+	fi
+	echo "  release date agrees with the CHANGELOG: ${site_date}"
 fi

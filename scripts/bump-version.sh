@@ -14,8 +14,12 @@
 # right way round.
 #
 # Usage:
-#   scripts/bump-version.sh 2.13.0          # rewrite
+#   scripts/bump-version.sh 2.13.0             # rewrite
+#   scripts/bump-version.sh 2.13.0 2026-08-24  # ... with an explicit release date
 #   scripts/bump-version.sh --dry-run 2.13.0
+#
+# The release date defaults to today, which is when a release is normally cut.
+# Pass one when preparing a bump ahead of the tag.
 #
 set -euo pipefail
 
@@ -30,9 +34,19 @@ fi
 
 NEW="${1:-}"
 if [[ ! "${NEW}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-	echo "usage: $0 [--dry-run] <x.y.z>" >&2
+	echo "usage: $0 [--dry-run] <x.y.z> [yyyy-mm-dd]" >&2
 	exit 2
 fi
+
+RELEASE_DATE="${2:-$(date +%F)}"
+if [[ ! "${RELEASE_DATE}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+	echo "usage: $0 [--dry-run] <x.y.z> [yyyy-mm-dd]" >&2
+	exit 2
+fi
+# The site prints the date verbatim ("24 August 2026"), so it is formatted here
+# rather than stored twice. LC_ALL is forced: a French locale would write août
+# into an English page.
+RELEASE_DATE_LONG="$(LC_ALL=C date -d "${RELEASE_DATE}" '+%-d %B %Y')"
 
 cd "${ROOT}"
 
@@ -127,6 +141,12 @@ bump "integrations/langchain-mddb/pyproject.toml" \
 bump "docker-compose.yml" \
 	"(image: tradik/mddb:.*MDDB_VERSION:-)${V}" \
 	"\\1${NEW}" || FAILED=1
+# The download section prints this verbatim, and it had been wrong twice in a
+# row — 2.11.4's date shown first for 2.12.0 and then for 2.13.0 — because the
+# version beside it moved and this did not. It moves with the version now.
+bump ".ssg.yaml" \
+	"^  mddbReleaseDate: \".*\"" \
+	"  mddbReleaseDate: \"${RELEASE_DATE_LONG}\"" || FAILED=1
 
 if [[ "${FAILED}" -eq 1 ]]; then
 	echo

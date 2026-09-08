@@ -9,6 +9,7 @@
 #   4. a stale package manifest (the 2.12.0 case)    -> 1
 #   5. nothing to check                              -> 2
 #   6. CHANGELOG state is reported, not enforced
+#   7. the site's release date must match the CHANGELOG's date for the version
 #
 set -euo pipefail
 
@@ -111,6 +112,24 @@ if grep -q "ready to tag" <<<"${out}"; then
 else
 	echo -e "${RED}✗${NC} expected the ready-to-tag hint, got: ${out}"; FAIL=$((FAIL + 1))
 fi
+
+# Case 7: the site prints a release date beside the version, and it is the one
+# number with no second copy to compare against. It was wrong for two releases
+# running, so the CHANGELOG's own date is what it is now checked against.
+printf 'vars:\n  mddbVersion: "3.1.4"\n  mddbReleaseDate: "22 August 2026"\n' \
+	> "${TMP}/nochangelog/.ssg.yaml"
+out="$(bash "${TMP}/nochangelog/scripts/check-version.sh" 2>&1)"
+if grep -q "release date agrees with the CHANGELOG" <<<"${out}"; then
+	echo -e "${GREEN}✓${NC} a release date matching the CHANGELOG passes"; PASS=$((PASS + 1))
+else
+	echo -e "${RED}✗${NC} expected the date to be accepted, got: ${out}"; FAIL=$((FAIL + 1))
+fi
+
+printf 'vars:\n  mddbVersion: "3.1.4"\n  mddbReleaseDate: "31 July 2026"\n' \
+	> "${TMP}/nochangelog/.ssg.yaml"
+expect_exit "the previous release's date is rejected" 1 \
+	bash "${TMP}/nochangelog/scripts/check-version.sh"
+
 
 echo "---"
 echo "Passed: ${PASS}, Failed: ${FAIL}"
