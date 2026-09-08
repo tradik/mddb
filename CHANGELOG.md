@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-09-08
+
+A bulk import no longer loses vectors in silence. Everything else here is the
+duplicate detector and the documentation site.
+
 ### Fixed
 
 - **A bulk import could leave most of a collection without vectors, and the
