@@ -241,3 +241,37 @@ func TestMinHashCanReturnContent(t *testing.T) {
 		}
 	}
 }
+
+// A near-duplicate group has to name the pages it found. The key was filled
+// only when includeContent was set, so the cheap question — which pages are
+// near-duplicates? — could not be answered without also downloading every
+// body: on a four-thousand-page site, megabytes to learn a handful of names.
+// The other two detectors have always enriched unconditionally.
+func TestMinHashGroupsNameTheirDocumentsWithoutTheirBodies(t *testing.T) {
+	_, srv, cleanup := directClientServer(t)
+	defer cleanup()
+
+	body := "Our store stocks road and trail shoes from every major brand, " +
+		"with free gait analysis on a treadmill and a thirty day trial."
+	seedForDuplicates(t, srv, "stores", map[string]string{
+		"store-krakow": body + " Call the Krakow shop to book a fitting.",
+		"store-warsaw": body + " Call the Warsaw shop to book a fitting.",
+	})
+
+	groups, _, err := srv.findMinHashDuplicates("stores", 0.6, false)
+	if err != nil {
+		t.Fatalf("findMinHashDuplicates: %v", err)
+	}
+	if len(groups) != 1 {
+		t.Fatalf("got %d groups, want the two templated pages in one", len(groups))
+	}
+
+	for _, doc := range groups[0].Documents {
+		if doc.Key == "" {
+			t.Errorf("%s came back with no key — the caller cannot act on a docID alone", doc.DocID)
+		}
+		if doc.ContentMD != "" {
+			t.Errorf("%s carries its body without includeContent", doc.Key)
+		}
+	}
+}
