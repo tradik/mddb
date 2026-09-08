@@ -1050,12 +1050,12 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 		// --- Duplicate Detection ---
 		{
 			Name:        "find_duplicates",
-			Description: "Find duplicate and similar documents within a collection. Detects exact duplicates (same content hash) and semantically similar documents (above similarity threshold). Requires documents to have embeddings for similar mode.",
+			Description: "Find duplicate and similar documents within a collection. Three detectors: exact (identical content hash), similar (embeddings above a similarity threshold — the same topic in different words), and minhash (text overlap — the same words, whether or not the topic matches). Requires embeddings for similar mode only.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"collection":      map[string]interface{}{"type": "string", "description": "Collection to scan for duplicates"},
-					"mode":            map[string]interface{}{"type": "string", "description": "Detection mode: exact, similar, or both (default: both)"},
+					"mode":            map[string]interface{}{"type": "string", "description": "Detection mode: exact, similar, minhash, or both (default: both). minhash is opt-in rather than part of both: it reads every document body, which the other two do not."},
 					"threshold":       map[string]interface{}{"type": "number", "description": "Similarity threshold 0-1 for similar mode (default: 0.9)"},
 					"max_docs":        map[string]interface{}{"type": "integer", "description": "Max documents to process (default: 5000)"},
 					"distance_metric": map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},

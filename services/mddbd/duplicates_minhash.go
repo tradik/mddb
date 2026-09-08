@@ -110,17 +110,21 @@ func (s *Server) findMinHashDuplicates(collection string, threshold float64, inc
 
 		g := DuplicateGroup{GroupID: n + 1, Type: "minhash"}
 		for _, i := range idx {
-			info := DuplicateDocInfo{DocID: docs[i].docID, Score: float32(best[i])}
-			if includeContent {
-				if doc, err := s.LoadDocByID(collection, docs[i].docID); err == nil && doc != nil {
-					info.ContentMD = doc.ContentMD
-					info.Key = doc.Key
-				}
-			}
-			g.Documents = append(g.Documents, info)
+			g.Documents = append(g.Documents, DuplicateDocInfo{
+				DocID: docs[i].docID,
+				Score: float32(best[i]),
+			})
 		}
 		groups = append(groups, g)
 	}
+
+	// The key is what a caller acts on — it names the page. Filling it only
+	// under includeContent, as this path used to, meant the cheap question
+	// ("which pages are near-duplicates?") could not be answered without also
+	// downloading every body: on a 4,000-page site, megabytes to learn a
+	// handful of names. The other two modes have always enriched
+	// unconditionally; this one now does too, and the body still costs extra.
+	s.enrichDuplicateGroups(collection, groups, includeContent)
 	return groups, len(docs), nil
 }
 

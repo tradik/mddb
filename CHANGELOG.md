@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A near-duplicate group named its pages only if you also downloaded their
+  bodies** — `find_duplicates` in `minhash` mode filled each result's `key`
+  inside the `includeContent` branch, so the cheap question ("which pages are
+  near-duplicates?") could not be answered without the expensive one: on a
+  4,000-page site, megabytes of Markdown to learn a handful of names. The
+  `exact` and `similar` modes have always enriched their groups
+  unconditionally; this one now does too, and the body still costs extra.
+
+### Changed
+
+- **The `find_duplicates` MCP tool now describes its third detector.** The
+  schema offered `exact`, `similar` and `both`, so an agent reading the tool
+  list had no way to know `minhash` existed — the HTTP API has accepted it
+  since SRCH-002. The description now says what each of the three compares:
+  a content hash, the words, or the meaning.
+
 ## [2.14.1] - 2026-09-08
 
 Documentation site only. The server, CLI and clients are unchanged from
