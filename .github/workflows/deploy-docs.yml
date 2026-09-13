@@ -52,7 +52,7 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@b5607b96dfa98a97cf593b556641d8163b850bff # v1.8.58
+        uses: spagu/ssg@272ef01b9ef961f616bf30463056bc9741648b1a # v1.8.59
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
