@@ -18,6 +18,7 @@ Published as the Docker image `tradik/airbyte-destination-mddb`. Airbyte registe
 - [Local development](#local-development)
 - [Registering in the Airbyte UI](#registering-in-the-airbyte-ui)
 - [Tests](#tests)
+- [Known audit findings](#known-audit-findings)
 - [Release](#release)
 - [Architecture](#architecture)
 - [Changelog](CHANGELOG.md)
@@ -110,6 +111,20 @@ make airbyte-test
 
 - `unit_tests/test_client.py` — record→document mapping, key hashing, MDDB HTTP retries, mocked `ping`/`addDocument`/`addBatch`.
 - `unit_tests/test_destination.py` — `spec`, `check` (success / auth failure / connection failure), `write` (flush on STATE, flush on batch size, skipping unconfigured streams, overwrite warning, propagation of `keyField`/`language`).
+
+## Known audit findings
+
+`pip-audit -r requirements.txt` reports 55 findings in two packages: `nltk`
+3.9.4 (53) and `setuptools` 80.10.2 (2). Both are pinned by `airbyte-cdk`
+itself — `nltk==3.9.4` and `setuptools<81` in every release up to 7.30.0 — so
+neither can be raised here without breaking the CDK's declared constraints.
+
+This connector does not reach them. Its only import from the CDK is
+`airbyte_cdk.destinations.Destination`; nothing here imports `nltk`,
+`setuptools` or `pkg_resources`, or the CDK's file-based and document-parsing
+modules that use them. Upstream tracks the pin as
+[airbytehq/airbyte-python-cdk#1146](https://github.com/airbytehq/airbyte-python-cdk/issues/1146);
+the findings clear with the CDK release that lifts it.
 
 ## CI/CD
 
