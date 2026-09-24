@@ -70,9 +70,31 @@ func confineToDir(dir, name string, requireExisting bool, label string) (string,
 	}
 	candidate = filepath.Clean(candidate)
 
+	// Refuse a path outside the jail before touching the filesystem. The stat
+	// below used to come first, and it answered a question nobody should be
+	// able to ask: for any path on the host — ../../etc/shadow — it returned
+	// "not found", "not a regular file" or, only after that, "escapes its
+	// directory", so the three errors told a caller whether a file existed and
+	// what kind it was before the containment check ever ran. The lexical check
+	// costs nothing and settles every such path with one answer; the check at
+	// the end still catches a symlink inside the jail that points out of it.
+	//
+	// The directory has two spellings — as configured, and with its symlinks
+	// resolved — and a caller may use either: on Windows a temp directory
+	// resolves from its 8.3 short name (RUNNER~1) to the long one, on macOS
+	// /var resolves to /private/var. The pre-check accepts a path inside
+	// either spelling; both name the jail, so nothing outside it is stat'ed.
+	if !withinDir(rootResolved, candidate) && !withinDir(root, candidate) {
+		return "", fmt.Errorf("%s path escapes its directory", label)
+	}
+
 	// Resolve symlinks for the existing portion of the path; for non-existent
 	// targets fall back to the parent directory's resolved form.
 	resolved := candidate
+	// #nosec G703 -- candidate passed withinDir above: this stat cannot reach
+	// outside the jail, which TestAnEscapingPathRevealsNothingAboutWhatItNames
+	// proves rather than asserts. gosec does not trace a sanitizer through a
+	// helper function.
 	if info, statErr := os.Lstat(candidate); statErr == nil {
 		if requireExisting && !info.Mode().IsRegular() {
 			return "", fmt.Errorf("%s path is not a regular file", label)
@@ -91,11 +113,17 @@ func confineToDir(dir, name string, requireExisting bool, label string) (string,
 		resolved = filepath.Join(pr, filepath.Base(candidate))
 	}
 
-	rel, err := filepath.Rel(rootResolved, resolved)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	if !withinDir(rootResolved, resolved) {
 		return "", fmt.Errorf("%s path escapes its directory", label)
 	}
 	return resolved, nil
+}
+
+// withinDir reports whether p lies inside root, lexically. Both must already be
+// cleaned; symlinks are the caller's business.
+func withinDir(root, p string) bool {
+	rel, err := filepath.Rel(root, p)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 // geoDataDir returns the directory postcode CSVs must live in.

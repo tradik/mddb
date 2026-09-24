@@ -40,7 +40,13 @@ func (vi *VectorIndex) SetReady() {
 }
 
 // Add inserts or updates a vector in the index.
-func (vi *VectorIndex) Add(collection, docID string, vector []float32) {
+func (vi *VectorIndex) Add(collection, docID string, vector []float32) error {
+	// An empty vector is refused before it is stored anywhere (#252): it
+	// cannot be compared with anything, and in the HNSW graph it poisoned
+	// every add that followed it.
+	if err := CheckVector(vector, 0); err != nil {
+		return err
+	}
 	vi.mu.Lock()
 	defer vi.mu.Unlock()
 
@@ -48,6 +54,7 @@ func (vi *VectorIndex) Add(collection, docID string, vector []float32) {
 		vi.collections[collection] = make(map[string][]float32)
 	}
 	vi.collections[collection][docID] = vector
+	return nil
 }
 
 // GetVector returns the stored vector for a doc/chunk ID, or nil if absent.

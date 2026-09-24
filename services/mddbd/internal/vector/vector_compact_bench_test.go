@@ -31,7 +31,9 @@ func buildIndex(total int, deleteRatio float64) (*VectorIndex, []string) {
 	ids := make([]string, total)
 	for i := range total {
 		ids[i] = fmt.Sprintf("doc-%06d", i)
-		idx.Add("bench", ids[i], benchVector(r))
+		if err := idx.Add("bench", ids[i], benchVector(r)); err != nil {
+			panic(err) // helper without a testing handle; a valid vector cannot fail
+		}
 	}
 	cut := int(float64(total) * deleteRatio)
 	for i := range cut {
@@ -96,7 +98,9 @@ func buildHNSW(total int, deleteRatio float64) *HNSWIndex {
 	ids := make([]string, total)
 	for i := range total {
 		ids[i] = fmt.Sprintf("doc-%06d", i)
-		idx.Add("bench", ids[i], benchVector(r))
+		if err := idx.Add("bench", ids[i], benchVector(r)); err != nil {
+			panic(err) // helper without a testing handle; a valid vector cannot fail
+		}
 	}
 	for i := range int(float64(total) * deleteRatio) {
 		idx.Remove("bench", ids[i])

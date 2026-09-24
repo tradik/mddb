@@ -23,6 +23,7 @@ This is a *frontend* plugin (no backend Go binary), so installation is a single 
 - [Configuration](#configuration)
 - [Local development](#local-development)
 - [Tests](#tests)
+- [Known audit findings](#known-audit-findings)
 - [Packaging & release](#packaging--release)
 - [Architecture](#architecture)
 - [Changelog](CHANGELOG.md)
@@ -158,6 +159,24 @@ Pure-logic Jest suites focus on the four modules that drive correctness:
 - `__tests__/datasource.test.ts` — `DataSourceApi` lifecycle, template-variable interpolation, per-target dispatch, error propagation.
 
 React components are intentionally excluded from the coverage gate — they're thin shells over `@grafana/ui` inputs and verified manually in Grafana.
+
+## Known audit findings
+
+`npm audit` reports four moderate findings here, all one issue: `react-router`
+6.x, reached through `@grafana/ui` → `react-router-dom-v5-compat`
+([GHSA-wrjc-x8rr-h8h6](https://github.com/advisories/GHSA-wrjc-x8rr-h8h6),
+[GHSA-337j-9hxr-rhxg](https://github.com/advisories/GHSA-337j-9hxr-rhxg)).
+
+None of it ships. `webpack.config.js` marks every `@grafana/*` package
+external, and the built `dist/module.js` contains no react-router code at all:
+at runtime the plugin uses the `@grafana/ui` of the Grafana it is loaded into,
+so exposure depends on the operator's Grafana version, not on this plugin. The
+SSR finding needs server-side rendering, which a datasource plugin never does.
+
+**Do not run `npm audit fix --force`.** Its "fix" is to downgrade `@grafana/ui`
+from 13.x to 11.2.10. Even the newest `@grafana/ui` (13.2.2 at the time of
+writing) still depends on `react-router-dom-v5-compat ^6.26.1`, so there is no
+forward fix to take yet; the finding clears when Grafana moves off it.
 
 ## Packaging & release
 

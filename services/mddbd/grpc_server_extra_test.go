@@ -32,8 +32,12 @@ func TestGRPCVectorSearch_WithFilter(t *testing.T) {
 	// Manually add vectors
 	docID1 := genID("blog", "vf1", "en")
 	docID2 := genID("blog", "vf2", "en")
-	s.VectorIndex.Add("blog", docID1, []float32{1.0, 0.0, 0.0})
-	s.VectorIndex.Add("blog", docID2, []float32{0.0, 1.0, 0.0})
+	if err := s.VectorIndex.Add("blog", docID1, []float32{1.0, 0.0, 0.0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.VectorIndex.Add("blog", docID2, []float32{0.0, 1.0, 0.0}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Manually add meta index entries so filter works
 	_ = s.DB.Update(func(tx *bolt.Tx) error {
@@ -106,7 +110,9 @@ func TestGRPCVectorSearch_ExcludeContent(t *testing.T) {
 
 	addDocViaGRPC(t, gs, "blog", "excl1", "en", "some content to exclude", nil)
 	docID := genID("blog", "excl1", "en")
-	s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0})
+	if err := s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0}); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := gs.VectorSearch(context.Background(), &pb.VectorSearchRequest{
 		Collection:     "blog",
@@ -133,7 +139,9 @@ func TestGRPCVectorSearch_IncludeContent(t *testing.T) {
 
 	addDocViaGRPC(t, gs, "blog", "incl1", "en", "included content", nil)
 	docID := genID("blog", "incl1", "en")
-	s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0})
+	if err := s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0}); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := gs.VectorSearch(context.Background(), &pb.VectorSearchRequest{
 		Collection:     "blog",

@@ -57,7 +57,13 @@ func (b *BQIndex) getOrCreate(collection string) *bqCollection {
 }
 
 // Add implements the VectorSearcher interface.
-func (b *BQIndex) Add(collection, docID string, vector []float32) {
+func (b *BQIndex) Add(collection, docID string, vector []float32) error {
+	// An empty vector is refused before it is stored anywhere (#252): it
+	// cannot be compared with anything, and in the HNSW graph it poisoned
+	// every add that followed it.
+	if err := CheckVector(vector, 0); err != nil {
+		return err
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -69,6 +75,7 @@ func (b *BQIndex) Add(collection, docID string, vector []float32) {
 		c.nWords = (c.dim + 63) / 64
 	}
 	c.codes[docID] = encodeBQ(vector)
+	return nil
 }
 
 // Remove implements the VectorSearcher interface.

@@ -695,7 +695,9 @@ func TestGRPCCrossSearch_WithQueryVector(t *testing.T) {
 	// Add doc and vector
 	addDocViaGRPC(t, gs, "blog", "cs1", "en", "cross search test", nil)
 	docID := genID("blog", "cs1", "en")
-	s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0})
+	if err := s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0}); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := gs.CrossSearch(context.Background(), &pb.CrossSearchRequest{
 		TargetCollections: []string{"blog"},

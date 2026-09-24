@@ -50,9 +50,8 @@ func (p *OpenAIProvider) Embed(ctx context.Context, text string, role Role) ([]f
 	if err != nil {
 		return nil, err
 	}
-	if len(vectors) == 0 {
-		return nil, fmt.Errorf("empty response from OpenAI")
-	}
+	// EmbedBatch answers with exactly one usable vector per text or an
+	// error (#252), so there is no empty result left to guard against here.
 	return vectors[0], nil
 }
 
@@ -92,12 +91,11 @@ func (p *OpenAIProvider) EmbedBatch(ctx context.Context, texts []string, _ Role)
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	vectors := make([][]float32, len(result.Data))
+	entries := make([]indexedEmbedding, 0, len(result.Data))
 	for _, d := range result.Data {
-		vectors[d.Index] = float64sToFloat32s(d.Embedding)
+		entries = append(entries, indexedEmbedding{index: d.Index, vector: float64sToFloat32s(d.Embedding)})
 	}
-
-	return vectors, nil
+	return placeByIndex("openai", len(texts), entries)
 }
 
 type openAIEmbeddingRequest struct {

@@ -252,7 +252,12 @@ type fileHTTP3 struct {
 }
 
 func loadConfigFile(path string) (*fileConfig, error) {
-	// #nosec G304 -- Expected configuration file path
+	// The path is the operator's: it comes from the command line or an
+	// environment variable read at startup, never from a request, and reading a
+	// file the operator named is what this function is for. G304 and gosec's
+	// newer taint rule G703 both flag it for the same reason and are both
+	// wrong about it for the same reason.
+	// #nosec G304 G703 -- operator-supplied configuration path, not request input
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {

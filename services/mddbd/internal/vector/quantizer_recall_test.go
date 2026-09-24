@@ -153,7 +153,9 @@ func TestQuantizerRecallCurve(t *testing.T) {
 			trainable.Train("bench", vectors)
 		} else {
 			for i, v := range corpus {
-				idx.Add("bench", ids[i], v)
+				if err := idx.Add("bench", ids[i], v); err != nil {
+					t.Fatal(err)
+				}
 			}
 		}
 		idx.SetReady()

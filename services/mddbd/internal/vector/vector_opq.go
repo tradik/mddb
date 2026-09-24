@@ -78,7 +78,13 @@ func (o *OPQIndex) getOrCreate(collection string) *opqCollection {
 }
 
 // Add implements the VectorSearcher interface.
-func (o *OPQIndex) Add(collection, docID string, vector []float32) {
+func (o *OPQIndex) Add(collection, docID string, vector []float32) error {
+	// An empty vector is refused before it is stored anywhere (#252): it
+	// cannot be compared with anything, and in the HNSW graph it poisoned
+	// every add that followed it.
+	if err := CheckVector(vector, 0); err != nil {
+		return err
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
@@ -89,6 +95,7 @@ func (o *OPQIndex) Add(collection, docID string, vector []float32) {
 		rotated := matVecMul(c.rotation, vector, c.dim)
 		c.codes[docID] = encodeOPQ(c, rotated, o.nSubspaces)
 	}
+	return nil
 }
 
 // Remove implements the VectorSearcher interface.

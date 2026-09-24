@@ -44,9 +44,8 @@ func (p *VoyageProvider) Embed(ctx context.Context, text string, role Role) ([]f
 	if err != nil {
 		return nil, err
 	}
-	if len(vectors) == 0 {
-		return nil, fmt.Errorf("empty response from Voyage AI")
-	}
+	// EmbedBatch answers with exactly one usable vector per text or an
+	// error (#252), so there is no empty result left to guard against here.
 	return vectors[0], nil
 }
 
@@ -86,15 +85,17 @@ func (p *VoyageProvider) EmbedBatch(ctx context.Context, texts []string, role Ro
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	vectors := make([][]float32, len(result.Data))
+	entries := make([]indexedEmbedding, 0, len(result.Data))
 	for _, d := range result.Data {
-		vectors[d.Index] = float64sToFloat32s(d.Embedding)
+		entries = append(entries, indexedEmbedding{index: d.Index, vector: float64sToFloat32s(d.Embedding)})
+	}
+	vectors, err := placeByIndex("voyage", len(texts), entries)
+	if err != nil {
+		return nil, err
 	}
 
 	// Update dimensions from actual response.
-	if len(vectors) > 0 && len(vectors[0]) > 0 {
-		p.dimensions = len(vectors[0])
-	}
+	p.dimensions = len(vectors[0])
 
 	return vectors, nil
 }

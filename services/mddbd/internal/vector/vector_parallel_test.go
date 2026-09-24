@@ -278,7 +278,9 @@ func TestFlatSearchParallelIntegration(t *testing.T) {
 
 	for i := 0; i < count; i++ {
 		vec := randVecP(dims, rng)
-		idx.Add("test", fmt.Sprintf("doc-%d", i), vec)
+		if err := idx.Add("test", fmt.Sprintf("doc-%d", i), vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	query := randVecP(dims, rng)
@@ -322,7 +324,9 @@ func TestFlatSearchWithFilterParallel(t *testing.T) {
 
 	for i := 0; i < count; i++ {
 		id := fmt.Sprintf("doc-%d", i)
-		idx.Add("test", id, randVecP(dims, rng))
+		if err := idx.Add("test", id, randVecP(dims, rng)); err != nil {
+			t.Fatal(err)
+		}
 		if i%5 == 0 {
 			allowed[id] = true
 		}
@@ -350,7 +354,9 @@ func TestParallelConcurrentSearchAndMutate(t *testing.T) {
 
 	// Pre-populate
 	for i := 0; i < 3000; i++ {
-		idx.Add("test", fmt.Sprintf("doc-%d", i), randVecP(dims, rng))
+		if err := idx.Add("test", fmt.Sprintf("doc-%d", i), randVecP(dims, rng)); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	defer swapParallelMinSize(1)()
@@ -376,7 +382,9 @@ func TestParallelConcurrentSearchAndMutate(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 			localRng := rand.New(rand.NewSource(int64(id + 1000))) //nolint:gosec // G404
-			idx.Add("test", fmt.Sprintf("new-%d", id), randVecP(dims, localRng))
+			if err := idx.Add("test", fmt.Sprintf("new-%d", id), randVecP(dims, localRng)); err != nil {
+				t.Error(err) // Fatal must not be called from a non-test goroutine
+			}
 			idx.Remove("test", fmt.Sprintf("doc-%d", id))
 		}(m)
 	}
@@ -472,7 +480,9 @@ func benchmarkFlatSearchP(b *testing.B, count, dims int) {
 	idx.SetReady()
 
 	for i := 0; i < count; i++ {
-		idx.Add("bench", fmt.Sprintf("doc-%d", i), randVecP(dims, rng))
+		if err := idx.Add("bench", fmt.Sprintf("doc-%d", i), randVecP(dims, rng)); err != nil {
+			b.Fatal(err)
+		}
 	}
 
 	query := randVecP(dims, rng)
@@ -503,7 +513,9 @@ func BenchmarkParallelWorkerScaling(b *testing.B) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 	for i := 0; i < count; i++ {
-		idx.Add("bench", fmt.Sprintf("doc-%d", i), randVecP(dims, rng))
+		if err := idx.Add("bench", fmt.Sprintf("doc-%d", i), randVecP(dims, rng)); err != nil {
+			b.Fatal(err)
+		}
 	}
 	query := randVecP(dims, rng)
 

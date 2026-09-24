@@ -35,7 +35,9 @@ func TestVectorSearcherInterface(t *testing.T) {
 			}
 
 			// Test Add
-			s.Add("test", "doc1", []float32{1, 0, 0})
+			if err := s.Add("test", "doc1", []float32{1, 0, 0}); err != nil {
+				t.Fatal(err)
+			}
 			if s.CollectionSize("test") != 1 {
 				t.Errorf("expected collection size 1, got %d", s.CollectionSize("test"))
 			}
@@ -47,8 +49,12 @@ func TestVectorSearcherInterface(t *testing.T) {
 			}
 
 			// Test Collections
-			s.Add("col1", "doc1", []float32{1, 0})
-			s.Add("col2", "doc2", []float32{0, 1})
+			if err := s.Add("col1", "doc1", []float32{1, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.Add("col2", "doc2", []float32{0, 1}); err != nil {
+				t.Fatal(err)
+			}
 			cols := s.Collections()
 			if len(cols) < 2 {
 				t.Errorf("expected at least 2 collections, got %d", len(cols))
@@ -67,10 +73,18 @@ func TestFlatIndexBasicOps(t *testing.T) {
 	}
 
 	// Add vectors
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0, 0})
-	idx.Add("docs", "doc3", []float32{0, 0, 1, 0})
-	idx.Add("docs", "doc4", []float32{1, 1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0, 0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc4", []float32{1, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	if idx.CollectionSize("docs") != 4 {
 		t.Fatalf("expected 4 vectors, got %d", idx.CollectionSize("docs"))
@@ -103,10 +117,18 @@ func TestFlatIndexSearchWithFilter(t *testing.T) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0})
-	idx.Add("docs", "doc2", []float32{0.9, 0.1, 0})
-	idx.Add("docs", "doc3", []float32{0.8, 0.2, 0})
-	idx.Add("docs", "doc4", []float32{0, 1, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0.9, 0.1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0.8, 0.2, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc4", []float32{0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Filter to only doc2 and doc3
 	allowed := map[string]bool{"doc2": true, "doc3": true}
@@ -140,10 +162,18 @@ func TestHNSWIndexBasicOps(t *testing.T) {
 	}
 
 	// Add vectors
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0, 0})
-	idx.Add("docs", "doc3", []float32{0, 0, 1, 0})
-	idx.Add("docs", "doc4", []float32{0.9, 0.1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0, 0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc4", []float32{0.9, 0.1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	if idx.CollectionSize("docs") != 4 {
 		t.Fatalf("expected 4 vectors, got %d", idx.CollectionSize("docs"))
@@ -177,10 +207,18 @@ func TestHNSWIndexSearchWithFilter(t *testing.T) {
 	idx.SetReady()
 
 	// Add multiple vectors
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0.9, 0.1, 0, 0})
-	idx.Add("docs", "doc3", []float32{0, 1, 0, 0})
-	idx.Add("docs", "doc4", []float32{0, 0, 1, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0.9, 0.1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc4", []float32{0, 0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Search with filter allowing only doc2 and doc3
 	allowed := map[string]bool{"doc2": true, "doc3": true}
@@ -224,7 +262,9 @@ func TestIVFIndexBasicOps(t *testing.T) {
 	}
 
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Train the index
@@ -260,8 +300,12 @@ func TestIVFIndexUntrained(t *testing.T) {
 	idx := NewIVFIndex(2, 10)
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Search without training should return nil
 	query := []float32{1, 0, 0}
@@ -294,7 +338,9 @@ func TestPQIndexBasicOps(t *testing.T) {
 	}
 
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Train the index
@@ -330,8 +376,12 @@ func TestPQIndexUntrained(t *testing.T) {
 	idx := NewPQIndex(4, 16, 10)
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Search without training should return nil
 	query := []float32{1, 0, 0, 0}
@@ -358,9 +408,15 @@ func TestVectorSearchersWithThreshold(t *testing.T) {
 			idx := impl.searcher
 			idx.SetReady()
 
-			idx.Add("docs", "doc1", []float32{1, 0, 0})
-			idx.Add("docs", "doc2", []float32{0.7, 0.7, 0})
-			idx.Add("docs", "doc3", []float32{0, 1, 0})
+			if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := idx.Add("docs", "doc2", []float32{0.7, 0.7, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := idx.Add("docs", "doc3", []float32{0, 1, 0}); err != nil {
+				t.Fatal(err)
+			}
 
 			query := []float32{1, 0, 0}
 
@@ -417,7 +473,9 @@ func TestVectorSearchersTopK(t *testing.T) {
 	// Add 10 vectors
 	for i := 0; i < 10; i++ {
 		vec := []float32{float32(i) / 10.0, 0, 0}
-		idx.Add("docs", string(rune('a'+i)), vec)
+		if err := idx.Add("docs", string(rune('a'+i)), vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	query := []float32{1, 0, 0}
@@ -455,8 +513,12 @@ func TestVectorSearchersRemove(t *testing.T) {
 			idx := impl.searcher
 			idx.SetReady()
 
-			idx.Add("docs", "doc1", []float32{1, 0, 0})
-			idx.Add("docs", "doc2", []float32{0, 1, 0})
+			if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+				t.Fatal(err)
+			}
+			if err := idx.Add("docs", "doc2", []float32{0, 1, 0}); err != nil {
+				t.Fatal(err)
+			}
 
 			if idx.CollectionSize("docs") != 2 {
 				t.Fatalf("expected 2 vectors, got %d", idx.CollectionSize("docs"))
@@ -479,9 +541,15 @@ func TestVectorSearchersCollections(t *testing.T) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 
-	idx.Add("blog", "doc1", []float32{1, 0})
-	idx.Add("docs", "doc2", []float32{0, 1})
-	idx.Add("news", "doc3", []float32{1, 1})
+	if err := idx.Add("blog", "doc1", []float32{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("news", "doc3", []float32{1, 1}); err != nil {
+		t.Fatal(err)
+	}
 
 	cols := idx.Collections()
 
@@ -549,9 +617,15 @@ func TestVectorResultScoreRange(t *testing.T) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0})
-	idx.Add("docs", "doc3", []float32{-1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{-1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	query := []float32{1, 0, 0}
 	results := idx.Search("docs", query, 10, -2.0, nil)
@@ -571,7 +645,9 @@ func TestVectorSearchersConcurrentOps(t *testing.T) {
 
 	// Pre-populate
 	for i := 0; i < 10; i++ {
-		idx.Add("docs", string(rune('a'+i)), []float32{float32(i), 0, 0})
+		if err := idx.Add("docs", string(rune('a'+i)), []float32{float32(i), 0, 0}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Concurrent searches (should not panic)
@@ -594,8 +670,12 @@ func TestVectorSearchersZeroTopK(t *testing.T) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0})
-	idx.Add("docs", "doc2", []float32{0, 1})
+	if err := idx.Add("docs", "doc1", []float32{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1}); err != nil {
+		t.Fatal(err)
+	}
 
 	query := []float32{1, 0}
 	results := idx.Search("docs", query, 0, 0.0, nil)

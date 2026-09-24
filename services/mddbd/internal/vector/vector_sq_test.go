@@ -36,7 +36,9 @@ func TestSQIndexBasicOps(t *testing.T) {
 	}
 
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 	idx.Train("docs", vectors)
 
@@ -64,7 +66,9 @@ func TestSQIndexUntrained(t *testing.T) {
 	idx := NewSQIndex()
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	query := []float32{1, 0, 0, 0}
 	results := idx.Search("docs", query, 5, 0.0, nil)
@@ -83,7 +87,9 @@ func TestSQIndexSearchWithFilter(t *testing.T) {
 		"doc3": {0, 1, 0, 0},
 	}
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 	idx.Train("docs", vectors)
 
@@ -106,7 +112,9 @@ func TestSQIndexQuantizationRange(t *testing.T) {
 		"doc2": {10, -5, 0, -100},
 	}
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 	idx.Train("docs", vectors)
 
@@ -127,7 +135,9 @@ func TestSQIndexRemove(t *testing.T) {
 		"doc2": {0, 1, 0, 0},
 	}
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 	idx.Train("docs", vectors)
 
@@ -153,8 +163,12 @@ func TestSQIndexEmptyCollection(t *testing.T) {
 
 func TestSQIndexCollections(t *testing.T) {
 	idx := NewSQIndex()
-	idx.Add("a", "doc1", []float32{1, 0})
-	idx.Add("b", "doc1", []float32{0, 1})
+	if err := idx.Add("a", "doc1", []float32{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("b", "doc1", []float32{0, 1}); err != nil {
+		t.Fatal(err)
+	}
 
 	colls := idx.Collections()
 	if len(colls) != 2 {
@@ -171,7 +185,9 @@ func TestSQIndexConcurrent(t *testing.T) {
 		"doc2": {0, 1, 0, 0},
 	}
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 	idx.Train("docs", vectors)
 
@@ -199,7 +215,9 @@ func TestSQIndexScoreRange(t *testing.T) {
 		"doc2": {0.5, 0.5, 0, 0},
 	}
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 	idx.Train("docs", vectors)
 

@@ -37,15 +37,21 @@ func (qi *QuantizedVectorIndex) SetReady()     { qi.ready.Store(true) }
 func (qi *QuantizedVectorIndex) Name() string  { return "quantized" }
 
 // Add quantizes and stores a float32 vector.
-func (qi *QuantizedVectorIndex) Add(collection, docID string, vector []float32) {
+func (qi *QuantizedVectorIndex) Add(collection, docID string, vector []float32) error {
+	// An empty vector is refused before it is stored anywhere (#252): it
+	// cannot be compared with anything, and in the HNSW graph it poisoned
+	// every add that followed it.
+	if err := CheckVector(vector, 0); err != nil {
+		return err
+	}
 	qt := qi.resolveQuantType(collection)
 	if qt == QuantNone {
-		return // not quantized, skip
+		return nil // not quantized, skip
 	}
 
 	qv := QuantizeFloat32(vector, qt)
 	if qv == nil {
-		return
+		return nil
 	}
 
 	qi.mu.Lock()
@@ -60,6 +66,7 @@ func (qi *QuantizedVectorIndex) Add(collection, docID string, vector []float32) 
 		qi.collections[collection] = coll
 	}
 	coll.vectors[docID] = qv
+	return nil
 }
 
 // Remove deletes a vector from the quantized index.

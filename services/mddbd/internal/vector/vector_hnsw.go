@@ -1,6 +1,8 @@
 package vector
 
 import (
+	"fmt"
+
 	"github.com/coder/hnsw"
 	"log/slog"
 	"sort"
@@ -17,7 +19,12 @@ type HNSWIndex struct {
 	// deleted counts removals per collection since the graph was last rebuilt.
 	// The graph cannot be asked how much tombstoned structure it carries, so
 	// this is the only signal available for deciding when to compact (GO-029).
-	deleted  map[string]int
+	deleted map[string]int
+	// dims is the vector length a collection has settled on, taken from the
+	// first vector it accepted. The library needs every node in a graph to
+	// have the same length and panics when they differ (#252), so the index
+	// has to know what that length is rather than find out by crashing.
+	dims     map[string]int
 	ready    atomic.Bool
 	m        int // max connections per node
 	efSearch int // search beam width
@@ -44,6 +51,7 @@ func NewHNSWIndex(m, _ int, efSearch int) *HNSWIndex {
 		graphs:   make(map[string]*hnsw.Graph[string]),
 		vectors:  make(map[string]map[string][]float32),
 		deleted:  make(map[string]int),
+		dims:     make(map[string]int),
 		m:        m,
 		efSearch: efSearch,
 	}
@@ -70,9 +78,20 @@ func (h *HNSWIndex) getOrCreateGraph(collection string) *hnsw.Graph[string] {
 }
 
 // Add inserts or updates a vector in the HNSW index.
-func (h *HNSWIndex) Add(collection, docID string, vector []float32) {
+//
+// A vector the graph cannot hold is refused before anything is written, and the
+// reason is returned rather than logged and forgotten (#252). Refusing early is
+// what keeps one unusable vector from becoming the entry point every later add
+// is compared against.
+func (h *HNSWIndex) Add(collection, docID string, vector []float32) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	if err := CheckVector(vector, h.dims[collection]); err != nil {
+		slog.Warn("vector refused by the HNSW index; this chunk will not be searchable",
+			"collection", collection, "docID", docID, "err", err)
+		return err
+	}
 
 	g := h.getOrCreateGraph(collection)
 
@@ -82,20 +101,34 @@ func (h *HNSWIndex) Add(collection, docID string, vector []float32) {
 	}
 	_, exists := h.vectors[collection][docID]
 	h.vectors[collection][docID] = vector
+	h.dims[collection] = len(vector)
 
 	if exists {
 		g.Delete(docID)
 	}
 
-	// Recover from panics in the hnsw library (known issue with empty/small graphs)
-	defer func() {
-		if r := recover(); r != nil {
-			// Log but don't crash — flat index still works as fallback
-			slog.Info("HNSW Add recovered from panic", "collection", collection, "docID", docID, "r", r)
-		}
-	}()
-	node := hnsw.MakeNode(docID, vector)
-	g.Add(node)
+	if panicked := addToGraph(g, docID, vector); panicked != nil {
+		slog.Warn("HNSW Add panicked; this chunk is not in the graph and will not be searchable",
+			"collection", collection, "docID", docID, "panic", panicked)
+		// The flat fallback holds the vector, so it is not lost to filtered
+		// search — but the caller is told, because a graph that does not hold
+		// it is the thing it asked for.
+		return fmt.Errorf("hnsw add panicked: %v", panicked)
+	}
+	return nil
+}
+
+// addToGraph adds one node and returns what the library panicked with, or nil.
+//
+// CheckVector already keeps out the vectors that were known to panic it
+// (#252), but the library can still panic on its own account — a
+// half-tombstoned graph did, before compaction (GO-029). A separate function
+// so the recovery can be exercised directly: the vectors that used to reach it
+// through Add are now refused before they get here.
+func addToGraph(g *hnsw.Graph[string], docID string, vector []float32) (panicked any) {
+	defer func() { panicked = recover() }()
+	g.Add(hnsw.MakeNode(docID, vector))
+	return nil
 }
 
 // Remove deletes a vector from the index.
@@ -148,6 +181,7 @@ func (h *HNSWIndex) compactLocked(collection string) {
 	g := hnsw.NewGraph[string]()
 	g.M = h.m
 	g.EfSearch = h.efSearch
+	skipped := 0
 
 	func() {
 		// The library panics on some small-graph shapes (see Add); a failed
@@ -162,9 +196,20 @@ func (h *HNSWIndex) compactLocked(collection string) {
 			}
 		}()
 		for docID, vec := range live {
+			// A rebuild must not be aborted by one unusable vector. Add
+			// refuses these now, but a process that has been running since
+			// before it did may still hold one (#252).
+			if err := CheckVector(vec, h.dims[collection]); err != nil {
+				skipped++
+				continue
+			}
 			g.Add(hnsw.MakeNode(docID, vec))
 		}
 	}()
+	if skipped > 0 {
+		slog.Warn("HNSW compaction skipped vectors the graph cannot hold",
+			"collection", collection, "skipped", skipped, "vectors", len(live))
+	}
 
 	if g == nil {
 		return

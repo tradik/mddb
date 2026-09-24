@@ -95,8 +95,12 @@ func TestHandleVectorSearchRetrievalModes(t *testing.T) {
 	// Two chunks worth of content: chunk 0 is "alpha...", chunk 1 is "bravo..."
 	content := strings.Repeat("alpha ", 250) + "\n\n" + strings.Repeat("bravo ", 250)
 	doc := addTestDoc(t, s, "kb", "guide", "en", content, nil)
-	s.VectorIndex.Add("kb", doc.ID+"#0", []float32{1, 0, 0})
-	s.VectorIndex.Add("kb", doc.ID+"#1", []float32{0.9, 0.1, 0})
+	if err := s.VectorIndex.Add("kb", doc.ID+"#0", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.VectorIndex.Add("kb", doc.ID+"#1", []float32{0.9, 0.1, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	search := func(mode string, windowSize int) VectorSearchResponseHTTP {
 		t.Helper()
@@ -175,7 +179,9 @@ func TestHandleVectorSearchMMR(t *testing.T) {
 		{"diverse", []float32{0.5, 0.87, 0}},
 	} {
 		doc := addTestDoc(t, s, "mmr", d.key, "en", "content "+d.key, nil)
-		s.VectorIndex.Add("mmr", doc.ID, d.vec)
+		if err := s.VectorIndex.Add("mmr", doc.ID, d.vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	query := VectorSearchRequest{
@@ -226,8 +232,12 @@ func TestRetrievalModeComesFromTheCollectionProfile(t *testing.T) {
 
 	content := strings.Repeat("alpha ", 250) + "\n\n" + strings.Repeat("bravo ", 250)
 	doc := addTestDoc(t, s, "kb", "guide", "en", content, nil)
-	s.VectorIndex.Add("kb", doc.ID+"#0", []float32{1, 0, 0})
-	s.VectorIndex.Add("kb", doc.ID+"#1", []float32{0.9, 0.1, 0})
+	if err := s.VectorIndex.Add("kb", doc.ID+"#0", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.VectorIndex.Add("kb", doc.ID+"#1", []float32{0.9, 0.1, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	search := func(mode string) VectorSearchResponseHTTP {
 		t.Helper()

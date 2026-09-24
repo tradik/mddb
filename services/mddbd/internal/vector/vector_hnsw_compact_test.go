@@ -23,7 +23,9 @@ func compactTestIndex(t testing.TB, total int, deleteRatio float64) (*HNSWIndex,
 		for j := range v {
 			v[j] = r.Float32()
 		}
-		idx.Add("c", ids[i], v)
+		if err := idx.Add("c", ids[i], v); err != nil {
+			t.Fatal(err)
+		}
 	}
 	cut := int(float64(total) * deleteRatio)
 	for i := range cut {

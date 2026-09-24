@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.1] - 2026-09-24
+
+A bug fix reported from production, a security fix, and every open
+dependency and security update in one place.
+
+### Fixed
+
+- **One unusable vector could cost a collection its whole HNSW index, and a
+  reindex reported `"failed": 0` (#252)** — reported from a 2.15.0 deployment
+  as HNSW panics during a bulk reindex. Reproduced, and the report
+  understated it: four vectors into an empty collection, the first of them
+  empty, left three panics and **no usable graph node** — while
+  `CollectionSize` counted all four and every later search fell back to brute
+  force.
+
+  An unusable vector became the graph's entry point, and the graph library
+  compares every new node against it, so every later add in that collection
+  failed. The panic was caught and logged at INFO, the vector was already in
+  the flat fallback, and the reindex counted the document as embedded.
+
+  The unusable vectors came from the providers. OpenAI and Voyage sized their
+  answer by what came back rather than by what was sent and placed each
+  embedding by its `index`: a short answer or a skipped index — which a
+  rate-limited upstream produces — left **nil vectors returned with a nil
+  error**. Ollama returned an empty inner vector unchecked, and Cohere checked
+  the count but not each vector. They were persisted before indexing, so a
+  restart loaded them back in random map order, which is why the reporter saw
+  the loss as "probabilistic, not deterministic per-document".
+
+  Fixed at every layer, because each covers a path the others do not:
+  providers refuse to answer with an unusable vector; every index refuses an
+  empty one before storing it, and HNSW refuses one whose length differs from
+  its collection's; and the reindex (HTTP, gRPC and MCP) now reports each
+  such document as **failed**, naming the chunk and the cause. Vectors already
+  persisted by 2.15.0 are skipped and named at startup; a plain
+  `POST /v1/vector-reindex` replaces them.
+
+### Security
+
+- **A path outside the backup directory revealed what it named** — the path
+  confinement for restore and the geo CSV loader called `lstat` on the
+  candidate before checking it lay inside the directory. For any path on the
+  host the three outcomes came back as three different errors — "not found"
+  (echoing the absolute path), "not a regular file", "escapes its directory" —
+  an oracle for the existence and type of arbitrary files. The containment
+  check now runs first, so every such path gets one answer.
+- **rustls 0.23.45 in mddb-chat** (RUSTSEC-2026-0285: TLS 1.3 handshake
+  messages accepted across encryption level boundaries). Dependabot had not
+  raised it; it surfaced when `cargo audit` was run directly. `chacha20`
+  0.10.1, yanked by its author, moves to 0.10.2.
+- **All five open Dependabot alerts closed:** `js-yaml` 4.3.2 in the panel,
+  `browserslist` 4.29.1 and `baseline-browser-mapping` 2.11.26 in the Chrome
+  extension and the GitHub Action.
+- Two findings that cannot be fixed from this repository are now documented
+  where the next audit will look: `react-router` in the Grafana datasource
+  (not shipped — `@grafana/*` is external — and `npm audit fix --force` would
+  downgrade `@grafana/ui` to 11.x), and `nltk`/`setuptools` in the Airbyte
+  destination (pinned exactly by `airbyte-cdk`, unreachable from this
+  connector, tracked upstream as airbytehq/airbyte-python-cdk#1146).
+
+### Changed
+
+- **Dependencies:** the npm minor/patch group (#250, 19 updates across five
+  directories) and the security bumps that superseded #241 and #253–#258,
+  consolidated because they touch the same three lockfiles.
+
 ## [2.15.0] - 2026-09-08
 
 A bulk import no longer loses vectors in silence. Everything else here is the

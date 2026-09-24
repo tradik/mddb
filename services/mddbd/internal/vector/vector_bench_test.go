@@ -32,7 +32,9 @@ func generateRandomVector(dims int, rng *rand.Rand) []float32 {
 func populateIndex(idx *VectorIndex, collection string, n, dims int) {
 	rng := rand.New(rand.NewSource(42)) //nolint:gosec // G404: math/rand fine for test data generation
 	for i := 0; i < n; i++ {
-		idx.Add(collection, fmt.Sprintf("doc-%d", i), generateRandomVector(dims, rng))
+		if err := idx.Add(collection, fmt.Sprintf("doc-%d", i), generateRandomVector(dims, rng)); err != nil {
+			panic(err) // helper without a testing handle; a valid vector cannot fail
+		}
 	}
 }
 
@@ -166,7 +168,9 @@ func benchmarkAdd(b *testing.B, dims int) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		idx.Add("bench", fmt.Sprintf("doc-%d", i), vecs[i])
+		if err := idx.Add("bench", fmt.Sprintf("doc-%d", i), vecs[i]); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 
