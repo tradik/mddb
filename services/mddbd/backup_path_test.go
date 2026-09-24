@@ -125,3 +125,30 @@ func TestAnEscapingPathRevealsNothingAboutWhatItNames(t *testing.T) {
 		}
 	}
 }
+
+// The jail has two spellings — as configured, and resolved — and an absolute
+// path in the configured spelling is inside it. The pre-check added in 2.15.1
+// compared against the resolved spelling only, and Windows CI caught it: a
+// temp directory resolves from RUNNER~1 to the long name, so a CSV inside the
+// configured directory was reported as escaping. macOS would do the same with
+// /var and /private/var, where CI does not run the tests. A symlinked
+// directory reproduces both on any platform.
+func TestAPathInTheConfiguredSpellingOfTheJailIsInside(t *testing.T) {
+	real := t.TempDir()
+	link := filepath.Join(t.TempDir(), "jail")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+	t.Setenv("MDDB_BACKUP_DIR", link)
+
+	target := filepath.Join(link, "snapshot.db")
+	if err := os.WriteFile(target, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, requireExisting := range []bool{true, false} {
+		if _, err := safeBackupPath(target, requireExisting); err != nil {
+			t.Errorf("requireExisting=%v: a file inside the configured directory was refused: %v", requireExisting, err)
+		}
+	}
+}

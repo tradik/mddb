@@ -78,7 +78,13 @@ func confineToDir(dir, name string, requireExisting bool, label string) (string,
 	// what kind it was before the containment check ever ran. The lexical check
 	// costs nothing and settles every such path with one answer; the check at
 	// the end still catches a symlink inside the jail that points out of it.
-	if !withinDir(rootResolved, candidate) {
+	//
+	// The directory has two spellings — as configured, and with its symlinks
+	// resolved — and a caller may use either: on Windows a temp directory
+	// resolves from its 8.3 short name (RUNNER~1) to the long one, on macOS
+	// /var resolves to /private/var. The pre-check accepts a path inside
+	// either spelling; both name the jail, so nothing outside it is stat'ed.
+	if !withinDir(rootResolved, candidate) && !withinDir(root, candidate) {
 		return "", fmt.Errorf("%s path escapes its directory", label)
 	}
 
