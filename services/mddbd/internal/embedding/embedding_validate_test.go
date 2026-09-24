@@ -116,3 +116,15 @@ func TestCohereRefusesAnEmptyVector(t *testing.T) {
 		t.Errorf("error = %q — it failed, but not on the empty vector", err)
 	}
 }
+
+// An answer that simply has the wrong number of embeddings, as a provider that
+// does not label its entries by index can produce.
+func TestCheckVectorsRefusesTheWrongCount(t *testing.T) {
+	err := checkVectors("test", [][]float32{{0.1, 0.2}}, 2)
+	if err == nil || !strings.Contains(err.Error(), "returned 1 embeddings for 2 texts") {
+		t.Errorf("err = %v, want it to name both counts", err)
+	}
+	if err := checkVectors("test", [][]float32{{0.1, 0.2}, {0.3, 0.4}}, 2); err != nil {
+		t.Errorf("a whole answer was refused: %v", err)
+	}
+}

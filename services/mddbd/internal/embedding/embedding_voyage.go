@@ -44,9 +44,8 @@ func (p *VoyageProvider) Embed(ctx context.Context, text string, role Role) ([]f
 	if err != nil {
 		return nil, err
 	}
-	if len(vectors) == 0 {
-		return nil, fmt.Errorf("empty response from Voyage AI")
-	}
+	// EmbedBatch answers with exactly one usable vector per text or an
+	// error (#252), so there is no empty result left to guard against here.
 	return vectors[0], nil
 }
 

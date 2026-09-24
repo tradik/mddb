@@ -109,3 +109,59 @@ func TestEachCollectionHasItsOwnDimension(t *testing.T) {
 		t.Errorf("a second collection was held to the first one's dimension: %v", err)
 	}
 }
+
+// The library can still panic on its own account, and the recovery has to hold
+// when it does. Reached directly, because the vectors that used to reach it
+// through Add are now refused before they get there.
+func TestAGraphPanicIsRecoveredAndReported(t *testing.T) {
+	idx := NewHNSWIndex(16, 0, 100)
+	if err := idx.Add("c", "a", []float32{1, 2, 3}); err != nil {
+		t.Fatal(err)
+	}
+	g := idx.graphs["c"]
+
+	// A node the graph cannot compare with its entry point — the panic that
+	// used to fire inside Add.
+	if panicked := addToGraph(g, "short", []float32{1, 2}); panicked == nil {
+		t.Fatal("the library did not panic on a mismatched node; the recovery is untested")
+	}
+	if panicked := addToGraph(g, "b", []float32{4, 5, 6}); panicked != nil {
+		t.Errorf("a good node panicked after the recovered one: %v", panicked)
+	}
+}
+
+// Re-adding a document replaces it in the graph rather than duplicating it.
+func TestReAddingAVectorReplacesIt(t *testing.T) {
+	idx := NewHNSWIndex(16, 0, 100)
+	for _, v := range [][]float32{{1, 0, 0}, {0, 1, 0}} {
+		if err := idx.Add("c", "doc", v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := idx.CollectionSize("c"); got != 1 {
+		t.Errorf("CollectionSize = %d after re-adding one document, want 1", got)
+	}
+}
+
+// A process running since before Add refused unusable vectors can still hold
+// one in its fallback map. A rebuild must skip it rather than abort, or one bad
+// vector would stop the whole collection from being compacted.
+func TestCompactionSkipsAVectorTheGraphCannotHold(t *testing.T) {
+	idx := NewHNSWIndex(16, 0, 100)
+	for i, v := range [][]float32{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}} {
+		if err := idx.Add("c", string(rune('a'+i)), v); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// What a pre-2.15.1 process could have stored: a vector of the wrong
+	// length, placed where only the fallback map holds it.
+	idx.mu.Lock()
+	idx.vectors["c"]["legacy"] = []float32{1, 2}
+	idx.mu.Unlock()
+
+	idx.Compact("c")
+
+	if hits := idx.Search("c", []float32{1, 0, 0}, 10, 0, nil); len(hits) != 3 {
+		t.Errorf("search after compaction found %d of 3 good vectors", len(hits))
+	}
+}

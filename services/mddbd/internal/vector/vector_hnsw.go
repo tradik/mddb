@@ -101,24 +101,13 @@ func (h *HNSWIndex) Add(collection, docID string, vector []float32) error {
 	}
 	_, exists := h.vectors[collection][docID]
 	h.vectors[collection][docID] = vector
-	if h.dims == nil {
-		h.dims = make(map[string]int)
-	}
 	h.dims[collection] = len(vector)
 
 	if exists {
 		g.Delete(docID)
 	}
 
-	// The library can still panic on its own account — a half-tombstoned graph
-	// did, before compaction (GO-029). Keep catching it, but at a level that
-	// matches what it means: this chunk is not in the index.
-	var panicked any
-	func() {
-		defer func() { panicked = recover() }()
-		g.Add(hnsw.MakeNode(docID, vector))
-	}()
-	if panicked != nil {
+	if panicked := addToGraph(g, docID, vector); panicked != nil {
 		slog.Warn("HNSW Add panicked; this chunk is not in the graph and will not be searchable",
 			"collection", collection, "docID", docID, "panic", panicked)
 		// The flat fallback holds the vector, so it is not lost to filtered
@@ -126,6 +115,19 @@ func (h *HNSWIndex) Add(collection, docID string, vector []float32) error {
 		// it is the thing it asked for.
 		return fmt.Errorf("hnsw add panicked: %v", panicked)
 	}
+	return nil
+}
+
+// addToGraph adds one node and returns what the library panicked with, or nil.
+//
+// CheckVector already keeps out the vectors that were known to panic it
+// (#252), but the library can still panic on its own account — a
+// half-tombstoned graph did, before compaction (GO-029). A separate function
+// so the recovery can be exercised directly: the vectors that used to reach it
+// through Add are now refused before they get here.
+func addToGraph(g *hnsw.Graph[string], docID string, vector []float32) (panicked any) {
+	defer func() { panicked = recover() }()
+	g.Add(hnsw.MakeNode(docID, vector))
 	return nil
 }
 

@@ -456,3 +456,28 @@ func TestCopyVectorOnNil(t *testing.T) {
 		t.Error("copying nil produced a slice")
 	}
 }
+
+// Storing a key that is already cached replaces its vector and renews it,
+// rather than adding a second entry.
+//
+// Reached in production only when two callers miss on the same text at once,
+// both ask the provider, and both store the answer — so until this test the
+// branch was covered only when a concurrent test happened to race that way,
+// and the package's coverage moved between runs of the same code.
+func TestStoringAnExistingKeyReplacesIt(t *testing.T) {
+	c := NewCachingProvider(&countingProvider{}, 4, time.Hour).(*CachingProvider)
+
+	c.put("k", []float32{1, 2})
+	c.put("k", []float32{3, 4})
+
+	got, ok := c.get("k")
+	if !ok {
+		t.Fatal("the key vanished when it was stored a second time")
+	}
+	if got[0] != 3 {
+		t.Errorf("get = %v, want the second vector", got)
+	}
+	if n := len(c.entries); n != 1 {
+		t.Errorf("entries = %d, want 1 — a repeated key must not take a second slot", n)
+	}
+}
