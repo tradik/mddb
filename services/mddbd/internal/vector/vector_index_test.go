@@ -71,10 +71,18 @@ func TestVectorIndex_AddAndSearch(t *testing.T) {
 	idx.SetReady()
 
 	// Add some vectors
-	idx.Add("docs", "doc1", []float32{1, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0})
-	idx.Add("docs", "doc3", []float32{0.9, 0.1, 0})
-	idx.Add("docs", "doc4", []float32{0, 0, 1})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0.9, 0.1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc4", []float32{0, 0, 1}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Search for something close to doc1
 	results := idx.Search("docs", []float32{1, 0, 0}, 3, 0.0, nil)
@@ -101,9 +109,15 @@ func TestVectorIndex_SearchWithThreshold(t *testing.T) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0})
-	idx.Add("docs", "doc3", []float32{0.9, 0.1, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0.9, 0.1, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	// With high threshold, should only get very similar results
 	results := idx.Search("docs", []float32{1, 0, 0}, 10, 0.9, nil)
@@ -117,9 +131,15 @@ func TestVectorIndex_SearchWithFilter(t *testing.T) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0})
-	idx.Add("docs", "doc2", []float32{0.9, 0.1, 0})
-	idx.Add("docs", "doc3", []float32{0.8, 0.2, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0.9, 0.1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0.8, 0.2, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Only allow doc2 and doc3
 	allowed := map[string]bool{"doc2": true, "doc3": true}
@@ -139,8 +159,12 @@ func TestVectorIndex_Remove(t *testing.T) {
 	idx := NewVectorIndex()
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	if idx.CollectionSize("docs") != 2 {
 		t.Fatalf("expected 2 vectors, got %d", idx.CollectionSize("docs"))

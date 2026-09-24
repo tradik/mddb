@@ -146,7 +146,9 @@ func TestSQ4AddAfterTrainingIsSearchable(t *testing.T) {
 	// A document written after the index was trained must be findable without
 	// waiting for a reindex.
 	idx := trainedSQ4(t, map[string][]float32{"a": {1, 0}, "b": {0, 1}})
-	idx.Add("c", "late", []float32{0.6, 0.8})
+	if err := idx.Add("c", "late", []float32{0.6, 0.8}); err != nil {
+		t.Fatal(err)
+	}
 
 	// Query pointing between the two trained vectors but closest to the new
 	// one. "a" and "b" are further away, so if the late document were missing

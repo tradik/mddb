@@ -61,7 +61,13 @@ func (idx *IVFIndex) getOrCreate(collection string) *ivfCollection {
 }
 
 // Add implements the VectorSearcher interface.
-func (idx *IVFIndex) Add(collection, docID string, vector []float32) {
+func (idx *IVFIndex) Add(collection, docID string, vector []float32) error {
+	// An empty vector is refused before it is stored anywhere (#252): it
+	// cannot be compared with anything, and in the HNSW graph it poisoned
+	// every add that followed it.
+	if err := CheckVector(vector, 0); err != nil {
+		return err
+	}
 	idx.mu.Lock()
 	defer idx.mu.Unlock()
 
@@ -76,6 +82,7 @@ func (idx *IVFIndex) Add(collection, docID string, vector []float32) {
 		}
 		c.clusters[ci][docID] = vector
 	}
+	return nil
 }
 
 // Remove implements the VectorSearcher interface.

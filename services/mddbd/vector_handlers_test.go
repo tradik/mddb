@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"mddb/internal/embedding"
+	"mddb/internal/vector"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -164,7 +165,9 @@ func TestHandleVectorSearch_WithMockEmbedding(t *testing.T) {
 
 	// Add a document and its vector to the index
 	doc := addTestDoc(t, s, "blog", "post1", "en", "# Hello World", nil)
-	s.VectorIndex.Add("blog", doc.ID, []float32{0.1, 0.1, 0.1})
+	if err := s.VectorIndex.Add("blog", doc.ID, []float32{0.1, 0.1, 0.1}); err != nil {
+		t.Fatal(err)
+	}
 
 	payload := VectorSearchRequest{
 		Collection: "blog",
@@ -472,5 +475,49 @@ func TestHandleVectorStats_CollectionCounts(t *testing.T) {
 	}
 	if embeddedDocs != 1 {
 		t.Errorf("expected 1 embedded_documents, got %v", embeddedDocs)
+	}
+}
+
+// #252: a reindex whose chunks the index refused reported "failed": 0.
+//
+// The reporter's reindex lost chunks to HNSW panics while the response counted
+// every document as embedded. Here a collection's graph is established at three
+// dimensions and the provider then answers in two — the shape of an embedding
+// model changed under a collection that was not reindexed. Every document must
+// come back failed, with a reason, and none may be called embedded.
+func TestHandleVectorReindex_ReportsChunksTheIndexRefused(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+
+	hnsw := vector.NewHNSWIndex(16, 0, 100)
+	if err := hnsw.Add("blog", "established#0", []float32{1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	s.VectorSearchers = map[string]vector.VectorSearcher{"flat": s.VectorIndex, "hnsw": hnsw}
+	s.Embedding = &mockEmbedding{dims: 2, model: "a-different-model"}
+
+	addTestDoc(t, s, "blog", "p1", "en", "# Post 1 content", nil)
+	addTestDoc(t, s, "blog", "p2", "en", "# Post 2 content", nil)
+
+	rec := doRequest(t, s.handleVectorReindex, VectorReindexRequestHTTP{Collection: "blog", Force: true})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp struct {
+		Embedded int      `json:"embedded"`
+		Failed   int      `json:"failed"`
+		Errors   []string `json:"errors"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.Failed != 2 || resp.Embedded != 0 {
+		t.Errorf("embedded/failed = %d/%d, want 0/2 — the graph holds none of these chunks",
+			resp.Embedded, resp.Failed)
+	}
+	if len(resp.Errors) != 2 || !strings.Contains(resp.Errors[0], "index") {
+		t.Errorf("errors = %v, want one per document naming the index as the cause", resp.Errors)
 	}
 }

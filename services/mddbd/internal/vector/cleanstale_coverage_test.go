@@ -39,7 +39,9 @@ func TestVectorStoreCleanStaleChunks(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, ch := range chunks {
-		idx.Add("c", "doc1#"+strconv.Itoa(ch.ChunkIndex), ch.Vector)
+		if err := idx.Add("c", "doc1#"+strconv.Itoa(ch.ChunkIndex), ch.Vector); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// The doc now has only 1 chunk -> chunks #1 and #2 are stale and removed.

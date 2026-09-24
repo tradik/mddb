@@ -59,7 +59,9 @@ func TestVectorSearchWithFilterCoverage(t *testing.T) {
 	vecs := [][]float32{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}
 	for _, s := range []VectorSearcher{NewVectorIndex(), NewHNSWIndex(16, 0, 100), NewSQIndex(), NewBQIndex(0)} {
 		for i, v := range vecs {
-			s.Add("c", docName(i), v)
+			if err := s.Add("c", docName(i), v); err != nil {
+				t.Fatal(err)
+			}
 		}
 		s.SetReady()
 		allowed := map[string]bool{"doc0": true, "doc1": true}

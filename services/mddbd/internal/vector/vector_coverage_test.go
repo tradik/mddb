@@ -30,9 +30,13 @@ func TestSearcherInterfaceCoverage(t *testing.T) {
 	trained := []VectorSearcher{pq, opq, sq, ivf}
 	for id, v := range corpus {
 		for _, idx := range trained {
-			idx.Add("c", id, v)
+			if err := idx.Add("c", id, v); err != nil {
+				t.Fatal(err)
+			}
 		}
-		bq.Add("c", id, v)
+		if err := bq.Add("c", id, v); err != nil {
+			t.Fatal(err)
+		}
 	}
 	pq.Train("c", corpus)
 	opq.Train("c", corpus)
@@ -40,7 +44,9 @@ func TestSearcherInterfaceCoverage(t *testing.T) {
 	ivf.Train("c", corpus)
 	// Adding after training exercises the per-index encode paths.
 	for _, idx := range trained {
-		idx.Add("c", "d9", []float32{0, 0, 0, 0, 0, 0, 0, 1})
+		if err := idx.Add("c", "d9", []float32{0, 0, 0, 0, 0, 0, 0, 1}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	q := []float32{1, 0, 0, 0, 0, 0, 0, 0}
@@ -64,7 +70,9 @@ func TestSearcherInterfaceCoverage(t *testing.T) {
 func TestQuantizedVectorIndexCoverage(t *testing.T) {
 	qi := NewQuantizedVectorIndex(func(string) QuantizationType { return QuantInt8 })
 	for id, v := range trainCorpus() {
-		qi.Add("c", id, v)
+		if err := qi.Add("c", id, v); err != nil {
+			t.Fatal(err)
+		}
 	}
 	qi.SetReady()
 	if qi.Name() == "" {
@@ -146,7 +154,9 @@ func TestIVFSearchCoverage(t *testing.T) {
 	corpus := trainCorpus()
 	ivf := NewIVFIndex(4, 15)
 	for id, v := range corpus {
-		ivf.Add("c", id, v)
+		if err := ivf.Add("c", id, v); err != nil {
+			t.Fatal(err)
+		}
 	}
 	ivf.Train("c", corpus)
 	ivf.SetReady()

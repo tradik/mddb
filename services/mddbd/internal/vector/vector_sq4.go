@@ -82,7 +82,13 @@ func (s *SQ4Index) getOrCreate(collection string) *sq4Collection {
 }
 
 // Add implements the VectorSearcher interface.
-func (s *SQ4Index) Add(collection, docID string, vector []float32) {
+func (s *SQ4Index) Add(collection, docID string, vector []float32) error {
+	// An empty vector is refused before it is stored anywhere (#252): it
+	// cannot be compared with anything, and in the HNSW graph it poisoned
+	// every add that followed it.
+	if err := CheckVector(vector, 0); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -92,6 +98,7 @@ func (s *SQ4Index) Add(collection, docID string, vector []float32) {
 	if c.trained && len(c.scales) > 0 {
 		c.codes[docID] = c.encode(vector)
 	}
+	return nil
 }
 
 // Remove implements the VectorSearcher interface.

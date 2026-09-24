@@ -99,11 +99,12 @@ func (p *CohereProvider) EmbedBatch(ctx context.Context, texts []string, role Ro
 	// Copy embeddings to result
 	vectors := make([][]float32, len(result.Embeddings))
 	copy(vectors, result.Embeddings)
+	if err := checkVectors("cohere", vectors, len(texts)); err != nil {
+		return nil, err
+	}
 
 	// Update dimensions from actual response
-	if len(vectors) > 0 && len(vectors[0]) > 0 {
-		p.dimensions = len(vectors[0])
-	}
+	p.dimensions = len(vectors[0])
 
 	return vectors, nil
 }

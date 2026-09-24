@@ -361,7 +361,9 @@ func TestUpdateInMemoryState_VectorsDelete(t *testing.T) {
 	defer cleanup()
 
 	// Pre-add a vector
-	s.VectorIndex.Add("blog", "testdoc", []float32{1.0, 2.0, 3.0})
+	if err := s.VectorIndex.Add("blog", "testdoc", []float32{1.0, 2.0, 3.0}); err != nil {
+		t.Fatal(err)
+	}
 
 	applier := NewReplicationApplier(s)
 

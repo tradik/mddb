@@ -111,21 +111,24 @@ func (s *Server) loadVectorIndex() {
 		// vectors are never loaded into the float32 searchers.
 		diskOnly := s.collectionDiskOnly(collection)
 
+		refused := 0
 		for docID, rec := range records {
-			// Add to all searchers (docID may be "id" or "id#0", "id#1", etc.)
-			if !diskOnly {
-				for name, searcher := range s.VectorSearchers {
-					if name == "quantized" {
-						continue // quantized index is populated separately below
-					}
-					searcher.Add(collection, docID, rec.Vector)
-				}
-			}
-			// Also add to quantized index (it will self-check if collection has quantization)
-			if s.QuantizedVecIndex != nil {
-				s.QuantizedVecIndex.Add(collection, docID, rec.Vector)
+			// docID may be "id" or "id#0", "id#1", etc.
+			if err := s.indexChunk(collection, docID, rec.Vector, diskOnly); err != nil {
+				// A store written by 2.15.0 or earlier can hold vectors a
+				// provider returned empty (#252). Loading one used to poison
+				// the whole graph — and map order is random, so whether it did
+				// changed from one restart to the next. Refused now, and
+				// counted so the operator is told to reindex.
+				refused++
+				continue
 			}
 			collVecs[docID] = rec.Vector
+		}
+		if refused > 0 {
+			slog.Warn("stored vectors the index cannot hold were skipped; reindex the collection to replace them",
+				"collection", collection, "skipped", refused, "loaded", len(records)-refused,
+				"remedy", "POST /v1/vector-reindex")
 		}
 		if diskOnly {
 			collVecs = nil // nothing to train float32 indexes with
@@ -519,25 +522,27 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Update in-memory indexes (disk-only: quantized index exclusively)
+		// Update in-memory indexes (disk-only: quantized index exclusively).
+		// A chunk an index refuses is a failed chunk (#252): it is stored, and
+		// no search that uses that index will find it. It used to be counted
+		// as embedded, which is how a reindex could report "failed": 0 while
+		// a collection lost its graph.
+		indexErr := error(nil)
 		for _, ce := range chunkEmbeddings {
 			chunkKey := fmt.Sprintf("%s#%d", d.ID, ce.ChunkIndex)
-			if !diskOnly {
-				for name, searcher := range s.VectorSearchers {
-					if name == "quantized" {
-						continue
-					}
-					searcher.Add(req.Collection, chunkKey, ce.Vector)
-				}
-			}
-			if s.QuantizedVecIndex != nil {
-				s.QuantizedVecIndex.Add(req.Collection, chunkKey, ce.Vector)
+			if err := s.indexChunk(req.Collection, chunkKey, ce.Vector, diskOnly); err != nil && indexErr == nil {
+				indexErr = fmt.Errorf("chunk %d: %w", ce.ChunkIndex, err)
 			}
 		}
 
 		// Clean stale chunks
 		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), s.VectorIndex)
 
+		if indexErr != nil {
+			failed++
+			errs = append(errs, d.ID+": index: "+indexErr.Error())
+			continue
+		}
 		embedded++
 		totalChunks += len(chunkEmbeddings)
 	}

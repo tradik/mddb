@@ -92,12 +92,11 @@ func (p *OpenAIProvider) EmbedBatch(ctx context.Context, texts []string, _ Role)
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	vectors := make([][]float32, len(result.Data))
+	entries := make([]indexedEmbedding, 0, len(result.Data))
 	for _, d := range result.Data {
-		vectors[d.Index] = float64sToFloat32s(d.Embedding)
+		entries = append(entries, indexedEmbedding{index: d.Index, vector: float64sToFloat32s(d.Embedding)})
 	}
-
-	return vectors, nil
+	return placeByIndex("openai", len(texts), entries)
 }
 
 type openAIEmbeddingRequest struct {

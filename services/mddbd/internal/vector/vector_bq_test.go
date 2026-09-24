@@ -36,7 +36,9 @@ func TestBQIndexBasicOps(t *testing.T) {
 	}
 
 	for id, vec := range vectors {
-		idx.Add("docs", id, vec)
+		if err := idx.Add("docs", id, vec); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	if idx.CollectionSize("docs") != 4 {
@@ -88,8 +90,12 @@ func TestBQIndexNoTrainingRequired(t *testing.T) {
 	idx.SetReady()
 
 	// BQ works immediately without Train()
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	query := []float32{1, 0, 0, 0}
 	results := idx.Search("docs", query, 5, 0.0, nil)
@@ -122,9 +128,15 @@ func TestBQIndexSearchWithFilter(t *testing.T) {
 	idx := NewBQIndex(10)
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0.9, 0.1, 0, 0})
-	idx.Add("docs", "doc3", []float32{0, 1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0.9, 0.1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc3", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	allowed := map[string]bool{"doc2": true, "doc3": true}
 	results := idx.SearchWithFilter("docs", []float32{1, 0, 0, 0}, 5, 0.0, allowed, nil)
@@ -140,8 +152,12 @@ func TestBQIndexRemove(t *testing.T) {
 	idx := NewBQIndex(10)
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	idx.Remove("docs", "doc1")
 	if idx.CollectionSize("docs") != 1 {
@@ -161,8 +177,12 @@ func TestBQIndexEmptyCollection(t *testing.T) {
 
 func TestBQIndexCollections(t *testing.T) {
 	idx := NewBQIndex(10)
-	idx.Add("a", "doc1", []float32{1, 0})
-	idx.Add("b", "doc1", []float32{0, 1})
+	if err := idx.Add("a", "doc1", []float32{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("b", "doc1", []float32{0, 1}); err != nil {
+		t.Fatal(err)
+	}
 
 	colls := idx.Collections()
 	if len(colls) != 2 {
@@ -174,8 +194,12 @@ func TestBQIndexConcurrent(t *testing.T) {
 	idx := NewBQIndex(10)
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0, 1, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0, 1, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -195,8 +219,12 @@ func TestBQIndexScoreRange(t *testing.T) {
 	idx := NewBQIndex(10)
 	idx.SetReady()
 
-	idx.Add("docs", "doc1", []float32{1, 0, 0, 0})
-	idx.Add("docs", "doc2", []float32{0.5, 0.5, 0, 0})
+	if err := idx.Add("docs", "doc1", []float32{1, 0, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "doc2", []float32{0.5, 0.5, 0, 0}); err != nil {
+		t.Fatal(err)
+	}
 
 	results := idx.Search("docs", []float32{1, 0, 0, 0}, 5, 0.0, nil)
 	for _, r := range results {
@@ -229,8 +257,12 @@ func TestBQIndexLargeVector(t *testing.T) {
 		v2[i] = -1.0
 	}
 
-	idx.Add("docs", "pos", v1)
-	idx.Add("docs", "neg", v2)
+	if err := idx.Add("docs", "pos", v1); err != nil {
+		t.Fatal(err)
+	}
+	if err := idx.Add("docs", "neg", v2); err != nil {
+		t.Fatal(err)
+	}
 
 	results := idx.Search("docs", v1, 2, 0.0, nil)
 	if len(results) == 0 {

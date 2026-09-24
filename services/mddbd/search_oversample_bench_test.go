@@ -42,7 +42,9 @@ func buildChunkedIndex(b *testing.B) (*vec.VectorIndex, []float32) {
 			for i := range v {
 				v[i] = base[i] + float32(rng.NormFloat64())*0.05
 			}
-			idx.Add("bench", fmt.Sprintf("doc-%04d#%d", d, c), v)
+			if err := idx.Add("bench", fmt.Sprintf("doc-%04d#%d", d, c), v); err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
 	idx.SetReady()
@@ -89,7 +91,9 @@ func TestOversampleRaisesDistinctDocumentRecall(t *testing.T) {
 			for i := range v {
 				v[i] = base[i] + float32(rng.NormFloat64())*0.05
 			}
-			idx.Add("bench", fmt.Sprintf("doc-%04d#%d", d, c), v)
+			if err := idx.Add("bench", fmt.Sprintf("doc-%04d#%d", d, c), v); err != nil {
+				t.Fatal(err)
+			}
 		}
 	}
 	idx.SetReady()

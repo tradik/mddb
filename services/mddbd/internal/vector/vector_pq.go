@@ -74,7 +74,13 @@ func (p *PQIndex) getOrCreate(collection string) *pqCollection {
 }
 
 // Add implements the VectorSearcher interface.
-func (p *PQIndex) Add(collection, docID string, vector []float32) {
+func (p *PQIndex) Add(collection, docID string, vector []float32) error {
+	// An empty vector is refused before it is stored anywhere (#252): it
+	// cannot be compared with anything, and in the HNSW graph it poisoned
+	// every add that followed it.
+	if err := CheckVector(vector, 0); err != nil {
+		return err
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -85,6 +91,7 @@ func (p *PQIndex) Add(collection, docID string, vector []float32) {
 	if c.trained && len(c.codebooks) > 0 {
 		c.codes[docID] = p.encode(c, vector)
 	}
+	return nil
 }
 
 // Remove implements the VectorSearcher interface.

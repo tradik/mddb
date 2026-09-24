@@ -288,13 +288,25 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	diskOnly := w.isDiskOnly != nil && w.isDiskOnly(job.Collection)
 	for _, ce := range chunkEmbeddings {
 		chunkKey := fmt.Sprintf("%s#%d", job.DocID, ce.ChunkIndex)
+		var err error
 		if diskOnly {
 			if w.quantIndex != nil {
-				w.quantIndex.Add(job.Collection, chunkKey, ce.Vector)
+				err = w.quantIndex.Add(job.Collection, chunkKey, ce.Vector)
 			}
-			continue
+		} else {
+			err = w.vectorIndex.Add(job.Collection, chunkKey, ce.Vector)
 		}
-		w.vectorIndex.Add(job.Collection, chunkKey, ce.Vector)
+		if err != nil {
+			// The provider now refuses to hand back an unusable vector, so
+			// this is a vector that no longer matches its collection — most
+			// often an embedding model changed under a collection that was
+			// not reindexed (#252). The chunk is stored and unsearchable.
+			slog.Warn("embedded chunk refused by the vector index; it will not be searchable until reindexed",
+				"collection", job.Collection, "chunk", chunkKey, "err", err)
+			if w.metrics != nil {
+				w.metrics.IncOp("embedding", "index_refused")
+			}
+		}
 	}
 
 	// Clean stale chunks from index (if document shrank)

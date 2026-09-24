@@ -109,13 +109,17 @@ func (p *OllamaProvider) Embed(ctx context.Context, text string, role Role) ([]f
 	if len(result.Embeddings) == 0 {
 		return nil, fmt.Errorf("empty embedding response from Ollama")
 	}
-
-	// Update dimensions from actual response
-	if len(result.Embeddings[0]) > 0 {
-		p.dimensions = len(result.Embeddings[0])
+	// The outer array was checked; the vector inside it was not, and an
+	// empty one was returned as a success (#252).
+	vector := float64sToFloat32s(result.Embeddings[0])
+	if err := checkVectors("ollama", [][]float32{vector}, 1); err != nil {
+		return nil, err
 	}
 
-	return float64sToFloat32s(result.Embeddings[0]), nil
+	// Update dimensions from actual response
+	p.dimensions = len(vector)
+
+	return vector, nil
 }
 
 // EmbedBatch generates embeddings for multiple texts.

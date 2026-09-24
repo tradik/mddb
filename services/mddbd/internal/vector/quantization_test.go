@@ -288,14 +288,18 @@ func TestQuantizedSearchRanking(t *testing.T) {
 	// Float32 baseline
 	floatIndex := NewVectorIndex()
 	for id, v := range vecs {
-		floatIndex.Add("test", id, v)
+		if err := floatIndex.Add("test", id, v); err != nil {
+			t.Fatal(err)
+		}
 	}
 	floatResults := floatIndex.Search("test", query, 10, 0, nil)
 
 	// Quantized int8
 	qi8 := NewQuantizedVectorIndex(func(string) QuantizationType { return QuantInt8 })
 	for id, v := range vecs {
-		qi8.Add("test", id, v)
+		if err := qi8.Add("test", id, v); err != nil {
+			t.Fatal(err)
+		}
 	}
 	qi8Results := qi8.Search("test", query, 10, 0, nil)
 

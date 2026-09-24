@@ -1793,7 +1793,9 @@ func TestGRPCVectorSearch_WithQueryVector(t *testing.T) {
 
 	// Manually add a vector to the index
 	docID := genID("blog", "vec1", "en")
-	s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0})
+	if err := s.VectorIndex.Add("blog", docID, []float32{1.0, 0.0, 0.0}); err != nil {
+		t.Fatal(err)
+	}
 
 	resp, err := gs.VectorSearch(context.Background(), &pb.VectorSearchRequest{
 		Collection:  "blog",

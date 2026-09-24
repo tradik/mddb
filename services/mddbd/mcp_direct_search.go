@@ -317,13 +317,23 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 			errs = append(errs, d.ID+": store: "+err.Error())
 			continue
 		}
+		// Same indexing as the HTTP reindex, through the same helper: this
+		// copy also added full-precision vectors to disk-only collections,
+		// which the other two paths never did.
+		diskOnly := s.collectionDiskOnly(req.Collection)
+		var indexErr error
 		for _, ce := range chunkEmbeddings {
 			chunkKey := fmt.Sprintf("%s#%d", d.ID, ce.ChunkIndex)
-			for _, searcher := range s.VectorSearchers {
-				searcher.Add(req.Collection, chunkKey, ce.Vector)
+			if err := s.indexChunk(req.Collection, chunkKey, ce.Vector, diskOnly); err != nil && indexErr == nil {
+				indexErr = fmt.Errorf("chunk %d: %w", ce.ChunkIndex, err)
 			}
 		}
 		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), s.VectorIndex)
+		if indexErr != nil {
+			failed++
+			errs = append(errs, d.ID+": index: "+indexErr.Error())
+			continue
+		}
 		embedded++
 	}
 

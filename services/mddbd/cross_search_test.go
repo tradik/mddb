@@ -74,7 +74,9 @@ func TestHandleCrossSearch_WithQueryVector(t *testing.T) {
 	doc := addTestDoc(t, s, "blog", "post1", "en", "hello world", nil)
 	vec := []float32{1.0, 0.0, 0.0}
 	_ = s.VectorStore.Put("blog", doc.ID, vec, "test-model", "abc123")
-	s.VectorIndex.Add("blog", doc.ID, vec)
+	if err := s.VectorIndex.Add("blog", doc.ID, vec); err != nil {
+		t.Fatal(err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/cross-search",
 		strings.NewReader(`{"targetCollections":["blog"],"queryVector":[1.0,0.0,0.0],"topK":5}`))
