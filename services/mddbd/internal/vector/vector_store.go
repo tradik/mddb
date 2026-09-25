@@ -203,7 +203,18 @@ func (vs *VectorStore) PutChunks(collection, docID string, chunks []ChunkEmbeddi
 }
 
 // CleanStaleChunks removes chunk keys beyond the current chunk count from BoltDB and the in-memory index.
-func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCount int, index *VectorIndex) {
+// ChunkRemover is anything that can drop a chunk from an in-memory index.
+//
+// It used to be *VectorIndex, which is the flat index alone: a document that
+// shrank lost its surplus chunks from the flat index and kept them in HNSW,
+// IVF, PQ, OPQ, SQ, SQ4 and BQ, which went on returning passages of text the
+// document no longer contained. Taking an interface lets the caller pass every
+// index it keeps.
+type ChunkRemover interface {
+	Remove(collection, docID string)
+}
+
+func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCount int, index ChunkRemover) {
 	prefix := []byte("vec|" + collection + "|" + docID + "#")
 
 	var bo binlog.BinlogOps

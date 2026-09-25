@@ -536,7 +536,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Clean stale chunks
-		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), s.VectorIndex)
+		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), serverIndexes{s})
 
 		if indexErr != nil {
 			failed++

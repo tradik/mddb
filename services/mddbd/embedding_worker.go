@@ -54,18 +54,33 @@ type EmbeddingWorker struct {
 	// rather than a mystery.
 	dropped atomic.Uint64
 
-	// Disk-only support: when isDiskOnly reports true for a collection, the
-	// full-precision vector is NOT added to the float32 index — only the
-	// quantized index keeps an in-memory representation.
-	quantIndex *vec.QuantizedVectorIndex
-	isDiskOnly func(collection string) bool
+	// indexer receives every chunk the worker embeds, and drops the chunks a
+	// shrunken document no longer has. The server sets it to all of its
+	// indexes; left alone it is the flat index, which is what tests of the
+	// worker in isolation want.
+	indexer chunkIndexer
 }
 
-// SetDiskOnly wires the quantized index and the disk-only predicate so the
-// worker can route freshly embedded vectors to the right in-memory index.
-func (w *EmbeddingWorker) SetDiskOnly(quantIndex *vec.QuantizedVectorIndex, isDiskOnly func(string) bool) {
-	w.quantIndex = quantIndex
-	w.isDiskOnly = isDiskOnly
+// chunkIndexer is where freshly embedded chunks go.
+type chunkIndexer interface {
+	IndexChunk(collection, chunkKey string, vector []float32) error
+	Remove(collection, chunkKey string)
+}
+
+// flatIndexer is the worker's view of a lone flat index.
+type flatIndexer struct{ index *vec.VectorIndex }
+
+func (f flatIndexer) IndexChunk(collection, chunkKey string, vector []float32) error {
+	return f.index.Add(collection, chunkKey, vector)
+}
+
+func (f flatIndexer) Remove(collection, chunkKey string) { f.index.Remove(collection, chunkKey) }
+
+// SetIndexer replaces where embedded chunks go. The server passes every index
+// it keeps, so a document embedded after startup reaches HNSW, IVF and the
+// rest instead of the flat index alone.
+func (w *EmbeddingWorker) SetIndexer(ix chunkIndexer) {
+	w.indexer = ix
 }
 
 // NewEmbeddingWorker creates a new background embedding worker.
@@ -79,6 +94,7 @@ func NewEmbeddingWorker(provider embedding.Provider, store *vec.VectorStore, ind
 		chunkSize:    envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500),
 		chunkEnabled: envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true",
 		enqueueWait:  embeddingEnqueueWait(),
+		indexer:      flatIndexer{index},
 	}
 }
 
@@ -283,20 +299,12 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		return
 	}
 
-	// Update in-memory index. Disk-only collections keep RAM quantized-only:
-	// the full vector stays on disk and only the quantized index is updated.
-	diskOnly := w.isDiskOnly != nil && w.isDiskOnly(job.Collection)
+	// Update the in-memory indexes — all of them, through the indexer. Which
+	// ones a collection gets (disk-only collections keep only the quantized
+	// index in RAM) is the indexer's decision, made once for every writer.
 	for _, ce := range chunkEmbeddings {
 		chunkKey := fmt.Sprintf("%s#%d", job.DocID, ce.ChunkIndex)
-		var err error
-		if diskOnly {
-			if w.quantIndex != nil {
-				err = w.quantIndex.Add(job.Collection, chunkKey, ce.Vector)
-			}
-		} else {
-			err = w.vectorIndex.Add(job.Collection, chunkKey, ce.Vector)
-		}
-		if err != nil {
+		if err := w.indexer.IndexChunk(job.Collection, chunkKey, ce.Vector); err != nil {
 			// The provider now refuses to hand back an unusable vector, so
 			// this is a vector that no longer matches its collection — most
 			// often an embedding model changed under a collection that was
@@ -309,8 +317,9 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		}
 	}
 
-	// Clean stale chunks from index (if document shrank)
-	w.vectorStore.CleanStaleChunks(job.Collection, job.DocID, len(chunkEmbeddings), w.vectorIndex)
+	// Clean stale chunks (if the document shrank) from every index, not only
+	// flat: the others went on returning passages the document no longer had.
+	w.vectorStore.CleanStaleChunks(job.Collection, job.DocID, len(chunkEmbeddings), w.indexer)
 
 	if w.metrics != nil {
 		w.metrics.IncOp("embedding", "completed")

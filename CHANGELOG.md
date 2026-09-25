@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.2] - 2026-09-25
+
+A search-correctness fix: every index now sees what the worker embeds.
+
+### Fixed
+
+- **HNSW, IVF, PQ, OPQ, SQ, SQ4 and BQ did not see documents embedded after
+  startup** — found while verifying 2.15.1. Three documents ingested with no
+  reindex, then searched with each algorithm on the released 2.15.1 image:
+  `flat` found all three, `hnsw`, `ivf`, `sq` and `bq` found **none** —
+  each answering from the index that was asked for, with no error and no
+  fallback. After a restart all of them found all three, because startup
+  reloads every index from the store; a document added after that restart was
+  again visible to `flat` alone. A restart or `vector-reindex` hid the bug,
+  which is why it looked fine to anyone who checked after one.
+
+  The embedding worker held a reference to the flat index and nothing else.
+  It now writes through the same path as reindex, so each chunk reaches every
+  index, and disk-only collections still go to the quantized index alone.
+  The same blind spot, fixed the same way:
+  - chunks a shrinking document no longer has were removed from `flat` only,
+    so the other algorithms kept returning passages that no longer existed;
+  - the gRPC reindex and the replication applier (followers) wrote to `flat`
+    only.
+
+- **Changing the embedding provider at runtime reset the queue to 1000** —
+  the restart path hard-coded the size instead of reading
+  `MDDB_EMBEDDING_QUEUE_SIZE`. The worker is now built in one place.
+
+### Tests
+
+- The test server built only the `flat` and `quantized` indexes, so no
+  server test had ever run against the other seven — how this went unnoticed.
+  It now uses the production constructor. New tests fail on 2.15.1 and pass
+  here: a document embedded after startup reaches every index, and stale
+  chunks leave every index.
+- `internal/vector` coverage 94.2% → 96.3%: every vector write reaches the
+  binlog when one is attached (the replication contract), a store without
+  its bucket refuses writes with an error, `GetVectors` (disk-only search)
+  returns what was stored and only that, and every searcher handles filtered
+  search edges alike.
+
 ## [2.15.1] - 2026-09-24
 
 A bug fix reported from production, a security fix, and every open
