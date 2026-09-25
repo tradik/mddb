@@ -62,7 +62,9 @@ func TestSQIndexBasicOps(t *testing.T) {
 	}
 }
 
-func TestSQIndexUntrained(t *testing.T) {
+func TestSQIndexTrainsOnFirstSearch(t *testing.T) {
+	// A collection nobody trained used to answer every search with nothing
+	// until a restart or reindex; the first search now trains it.
 	idx := NewSQIndex()
 	idx.SetReady()
 
@@ -71,9 +73,9 @@ func TestSQIndexUntrained(t *testing.T) {
 	}
 
 	query := []float32{1, 0, 0, 0}
-	results := idx.Search("docs", query, 5, 0.0, nil)
-	if len(results) != 0 {
-		t.Errorf("expected no results from untrained index, got %d", len(results))
+	results := idx.Search("docs", query, 10, 0.0, nil)
+	if len(results) == 0 || results[0].DocID != "doc1" {
+		t.Fatalf("first search on an untrained collection = %+v, want doc1 first", results)
 	}
 }
 

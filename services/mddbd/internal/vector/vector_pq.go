@@ -24,8 +24,8 @@ type pqCollection struct {
 	codebooks [][]float32Slice     // [subspace][codeword] -> sub-vector
 	codes     map[string][]uint8   // docID -> quantized code (one byte per subspace)
 	origVecs  map[string][]float32 // original vectors for re-ranking
-	trained   bool
-	dim       int // vector dimensionality
+	trainState
+	dim int // vector dimensionality
 }
 
 type float32Slice = []float32
@@ -192,12 +192,19 @@ func (p *PQIndex) Train(collection string, vectors map[string][]float32) {
 	c := p.getOrCreate(collection)
 	c.codebooks = codebooks
 	c.codes = codes
-	c.trained = true
 	c.dim = dim
 	// Ensure origVecs has all vectors
 	for i, id := range allIDs {
 		c.origVecs[id] = allVecs[i]
 	}
+	// Vectors added while training ran are in the collection but not in the
+	// snapshot it trained on; encode them into the new structure too.
+	for id, v := range c.origVecs {
+		if _, inSnapshot := vectors[id]; !inSnapshot && len(v) == dim {
+			c.codes[id] = p.encode(c, v)
+		}
+	}
+	c.markTrained(len(c.origVecs))
 	p.mu.Unlock()
 }
 
@@ -220,6 +227,7 @@ func (p *PQIndex) encode(c *pqCollection, vector []float32) []uint8 {
 // Pre-computes distance tables between query sub-vectors and codebook entries,
 // then sums distances for each document using quantized codes.
 func (p *PQIndex) Search(collection string, query []float32, topK int, threshold float64, metric SimilarityFunc) []VectorResult {
+	p.autoTrain(collection)
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
@@ -236,6 +244,7 @@ func (p *PQIndex) Search(collection string, query []float32, topK int, threshold
 
 // SearchWithFilter implements the VectorSearcher interface.
 func (p *PQIndex) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc) []VectorResult {
+	p.autoTrain(collection)
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 

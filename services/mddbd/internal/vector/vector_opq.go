@@ -26,8 +26,8 @@ type opqCollection struct {
 	codebooks [][]float32Slice     // [subspace][codeword] -> rotated sub-vector
 	codes     map[string][]uint8   // docID -> quantized code
 	origVecs  map[string][]float32 // original (unrotated) vectors for re-ranking
-	trained   bool
-	dim       int
+	trainState
+	dim int
 }
 
 // NewOPQIndex creates a new Optimized Product Quantization index.
@@ -194,16 +194,24 @@ func (o *OPQIndex) Train(collection string, vectors map[string][]float32) {
 	c.rotation = rotation
 	c.codebooks = codebooks
 	c.codes = codes
-	c.trained = true
 	c.dim = dim
 	for i, id := range allIDs {
 		c.origVecs[id] = allVecs[i]
 	}
+	// Vectors added while training ran are in the collection but not in the
+	// snapshot it trained on; encode them into the new structure too.
+	for id, v := range c.origVecs {
+		if _, inSnapshot := vectors[id]; !inSnapshot && len(v) == dim {
+			c.codes[id] = encodePQVec(matVecMul(rotation, v, dim), codebooks, nSub, dim)
+		}
+	}
+	c.markTrained(len(c.origVecs))
 	o.mu.Unlock()
 }
 
 // Search uses ADC on rotated query vector.
 func (o *OPQIndex) Search(collection string, query []float32, topK int, threshold float64, metric SimilarityFunc) []VectorResult {
+	o.autoTrain(collection)
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 
@@ -220,6 +228,7 @@ func (o *OPQIndex) Search(collection string, query []float32, topK int, threshol
 
 // SearchWithFilter implements the VectorSearcher interface.
 func (o *OPQIndex) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc) []VectorResult {
+	o.autoTrain(collection)
 	o.mu.RLock()
 	defer o.mu.RUnlock()
 

@@ -296,7 +296,9 @@ func TestIVFIndexBasicOps(t *testing.T) {
 }
 
 // TestIVFIndexUntrained tests that untrained IVF returns empty results
-func TestIVFIndexUntrained(t *testing.T) {
+func TestIVFIndexTrainsOnFirstSearch(t *testing.T) {
+	// A collection nobody trained used to answer every search with nothing
+	// until a restart or reindex; the first search now trains it.
 	idx := NewIVFIndex(2, 10)
 	idx.SetReady()
 
@@ -307,12 +309,10 @@ func TestIVFIndexUntrained(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Search without training should return nil
 	query := []float32{1, 0, 0}
 	results := idx.Search("docs", query, 10, 0.0, nil)
-
-	if results != nil {
-		t.Error("expected nil results from untrained IVF index")
+	if len(results) == 0 || results[0].DocID != "doc1" {
+		t.Fatalf("first search on an untrained collection = %+v, want doc1 first", results)
 	}
 }
 
@@ -372,7 +372,9 @@ func TestPQIndexBasicOps(t *testing.T) {
 }
 
 // TestPQIndexUntrained tests that untrained PQ returns empty results
-func TestPQIndexUntrained(t *testing.T) {
+func TestPQIndexTrainsOnFirstSearch(t *testing.T) {
+	// A collection nobody trained used to answer every search with nothing
+	// until a restart or reindex; the first search now trains it.
 	idx := NewPQIndex(4, 16, 10)
 	idx.SetReady()
 
@@ -383,12 +385,10 @@ func TestPQIndexUntrained(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Search without training should return nil
 	query := []float32{1, 0, 0, 0}
 	results := idx.Search("docs", query, 10, 0.0, nil)
-
-	if results != nil {
-		t.Error("expected nil results from untrained PQ index")
+	if len(results) == 0 || results[0].DocID != "doc1" {
+		t.Fatalf("first search on an untrained collection = %+v, want doc1 first", results)
 	}
 }
 
