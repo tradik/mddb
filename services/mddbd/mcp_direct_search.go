@@ -328,7 +328,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 				indexErr = fmt.Errorf("chunk %d: %w", ce.ChunkIndex, err)
 			}
 		}
-		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), s.VectorIndex)
+		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), serverIndexes{s})
 		if indexErr != nil {
 			failed++
 			errs = append(errs, d.ID+": index: "+indexErr.Error())

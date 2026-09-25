@@ -382,20 +382,7 @@ func main() {
 		}
 		return vector.ParseQuantization(cfg.Quantization)
 	})
-	s.VectorSearchers = map[string]vector.VectorSearcher{
-		"flat": s.VectorIndex,
-		"hnsw": vector.NewHNSWIndex(16, 200, 100),
-		"ivf":  vector.NewIVFIndex(10, 20),
-		"pq":   vector.NewPQIndex(8, 256, 20),
-		"opq":  vector.NewOPQIndex(8, 256, 20, 5),
-		"sq":   vector.NewSQIndex(),
-		// SRCH-003: 4 bits per dimension, two dimensions per byte. Keeps
-		// 99.5% of int8's recall at half its storage — measured, not assumed;
-		// see TestQuantizerRecallCurve.
-		"sq4":       vector.NewSQ4Index(),
-		"bq":        vector.NewBQIndex(bqRerank),
-		"quantized": s.QuantizedVecIndex,
-	}
+	s.VectorSearchers = newVectorSearchers(s.VectorIndex, s.QuantizedVecIndex, bqRerank)
 
 	// Try to load embedding config from database first
 	defaultConfig, err := s.GetDefaultEmbeddingConfig()
@@ -408,9 +395,7 @@ func main() {
 		// Fall back to environment variables
 		s.Embedding = embedding.NewProvider()
 		if s.Embedding != nil {
-			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, EmbeddingQueueSize())
-			s.EmbeddingWorker.SetDiskOnly(s.QuantizedVecIndex, s.collectionDiskOnly)
-			s.EmbeddingWorker.Start(2)
+			s.startEmbeddingWorker(s.Embedding)
 			slog.Info("vector search enabled", "source", "environment",
 				"provider", s.Embedding.Model(), "model", s.Embedding.Model(), "dimensions", s.Embedding.Dimensions())
 		} else if detected := embedding.DetectLocalProvider(context.Background()); detected != nil {
@@ -419,9 +404,7 @@ func main() {
 			// sitting there — MDDB simply never looked.
 			s.Embedding = detected.Provider
 			s.DetectedEmbedding = detected
-			s.EmbeddingWorker = NewEmbeddingWorker(s.Embedding, s.VectorStore, s.VectorIndex, EmbeddingQueueSize())
-			s.EmbeddingWorker.SetDiskOnly(s.QuantizedVecIndex, s.collectionDiskOnly)
-			s.EmbeddingWorker.Start(2)
+			s.startEmbeddingWorker(s.Embedding)
 			slog.Info("vector search enabled", "source", "autodetected",
 				"provider", detected.Name, "model", detected.Model,
 				"dimensions", detected.Dimensions, "url", detected.APIURL,

@@ -209,7 +209,8 @@ func (g *GRPCServer) VectorReindex(ctx context.Context, req *proto.VectorReindex
 			errs = append(errs, d.ID+": store: "+err.Error())
 			continue
 		}
-		if err := g.server.VectorIndex.Add(req.Collection, d.ID, vector); err != nil {
+		// Every index, not flat alone — the same view the HTTP reindex has.
+		if err := (serverIndexes{g.server}).IndexChunk(req.Collection, d.ID, vector); err != nil {
 			// The gRPC reindex reports failures the same way the HTTP one
 			// does (#252) — a vector the index refused is not embedded.
 			failed++

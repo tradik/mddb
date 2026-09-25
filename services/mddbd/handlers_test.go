@@ -92,10 +92,9 @@ func newHandlerTestServer(t *testing.T) (*Server, func()) {
 	})
 	s.QuantizedVecIndex.SetReady()
 
-	s.VectorSearchers = map[string]vector.VectorSearcher{
-		"flat":      s.VectorIndex,
-		"quantized": s.QuantizedVecIndex,
-	}
+	// The same set production builds — not a subset. With flat and quantized
+	// alone, no handler test could see an index the others had missed.
+	s.VectorSearchers = newVectorSearchers(s.VectorIndex, s.QuantizedVecIndex, 10)
 
 	// TTL
 	s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})

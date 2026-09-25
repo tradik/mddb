@@ -169,7 +169,10 @@ func (ra *ReplicationApplier) applyVector(entry *binlog.BinlogEntry) {
 			slog.Warn("Replication applier failed to unmarshal embedding", "err", err)
 			return
 		}
-		if err := ra.server.VectorIndex.Add(collection, docID, rec.Vector); err != nil {
+		// A follower serves queries too, and used to hold replicated vectors in
+		// its flat index alone — every other algorithm on a replica answered
+		// from whatever it loaded at startup.
+		if err := (serverIndexes{ra.server}).IndexChunk(collection, docID, rec.Vector); err != nil {
 			// A leader running an older build can replicate a vector its
 			// provider returned empty (#252). The follower refuses it the way
 			// the leader now would, and says which document needs reindexing.
@@ -177,7 +180,7 @@ func (ra *ReplicationApplier) applyVector(entry *binlog.BinlogEntry) {
 				"collection", collection, "docID", docID, "err", err)
 		}
 	case binlog.BinlogDelete:
-		ra.server.VectorIndex.Remove(collection, docID)
+		(serverIndexes{ra.server}).Remove(collection, docID)
 	}
 }
 
