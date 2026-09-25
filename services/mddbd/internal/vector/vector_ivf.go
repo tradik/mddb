@@ -22,7 +22,7 @@ type ivfCollection struct {
 	centroids [][]float32            // nClusters centroids
 	clusters  []map[string][]float32 // cluster_id -> docID -> vector
 	allVecs   map[string][]float32   // all vectors for retraining
-	trained   bool
+	trainState
 }
 
 // NewIVFIndex creates a new IVF index.
@@ -151,13 +151,24 @@ func (idx *IVFIndex) Train(collection string, vectors map[string][]float32) {
 	c := idx.getOrCreate(collection)
 	c.centroids = centroids
 	c.clusters = clusters
-	c.trained = true
+	for id, v := range vectors {
+		c.allVecs[id] = v
+	}
+	// Vectors added while training ran are in the collection but not in the
+	// snapshot it trained on; encode them into the new structure too.
+	for id, v := range c.allVecs {
+		if _, inSnapshot := vectors[id]; !inSnapshot && len(v) == len(centroids[0]) {
+			c.clusters[nearestCentroid(v, centroids)][id] = v
+		}
+	}
+	c.markTrained(len(c.allVecs))
 	idx.mu.Unlock()
 }
 
 // Search implements the VectorSearcher interface.
 // Uses goroutine parallelism when probed clusters contain enough vectors.
 func (idx *IVFIndex) Search(collection string, query []float32, topK int, threshold float64, metric SimilarityFunc) []VectorResult {
+	idx.autoTrain(collection)
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 
@@ -180,6 +191,7 @@ func (idx *IVFIndex) Search(collection string, query []float32, topK int, thresh
 // SearchWithFilter implements the VectorSearcher interface.
 // Uses goroutine parallelism when probed clusters contain enough vectors.
 func (idx *IVFIndex) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc) []VectorResult {
+	idx.autoTrain(collection)
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
 

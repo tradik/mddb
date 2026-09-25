@@ -45,21 +45,19 @@ func TestADocumentEmbeddedAfterStartupReachesEveryIndex(t *testing.T) {
 	doc := addTestDoc(t, s, "blog", "fresh", "en", "# Written after startup", nil)
 	waitForEmbedding(t, s, "blog", doc.ID)
 
+	// Searched, not counted: in 2.15.2 every index held the vector, and IVF,
+	// PQ, OPQ, SQ and SQ4 still found nothing, because a collection created
+	// after startup had never been trained and an untrained index answers
+	// every query with nothing. Counting the vectors would have passed.
 	for name, searcher := range s.VectorSearchers {
 		if name == "quantized" {
 			continue // holds only collections configured for quantization
 		}
 		t.Run(name, func(t *testing.T) {
-			if got := searcher.CollectionSize("blog"); got == 0 {
-				t.Errorf("%s holds nothing for a document the worker embedded", name)
+			if hits := searcher.Search("blog", []float32{0.1, 0.1, 0.1}, 5, -1, nil); len(hits) == 0 {
+				t.Errorf("a %s search found nothing for a document embedded after startup", name)
 			}
 		})
-	}
-
-	// And the graph search itself, which is what a user asking for hnsw gets.
-	hnsw := s.VectorSearchers["hnsw"]
-	if hits := hnsw.Search("blog", []float32{0.1, 0.1, 0.1}, 5, 0, nil); len(hits) == 0 {
-		t.Error("an hnsw search found nothing for a document embedded after startup")
 	}
 }
 

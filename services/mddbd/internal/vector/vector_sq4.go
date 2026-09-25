@@ -39,8 +39,8 @@ type sq4Collection struct {
 	// codes are packed two dimensions per byte.
 	codes    map[string][]uint8
 	origVecs map[string][]float32
-	trained  bool
-	dim      int
+	trainState
+	dim int
 }
 
 // sq4Levels is how many distinct values 4 bits can carry.
@@ -176,11 +176,18 @@ func (s *SQ4Index) Train(collection string, vectors map[string][]float32) {
 		}
 	}
 
-	c.trained = true
 	for docID, v := range vectors {
 		c.origVecs[docID] = v
 		c.codes[docID] = c.encode(v)
 	}
+	// Vectors added while training ran are in the collection but not in the
+	// snapshot it trained on; encode them into the new structure too.
+	for docID, v := range c.origVecs {
+		if _, inSnapshot := vectors[docID]; !inSnapshot {
+			c.codes[docID] = c.encode(v)
+		}
+	}
+	c.markTrained(len(c.origVecs))
 	s.ready.Store(true)
 }
 
@@ -252,6 +259,7 @@ func (s *SQ4Index) Search(collection string, query []float32, topK int, threshol
 
 // SearchWithFilter implements the VectorSearcher interface.
 func (s *SQ4Index) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc) []VectorResult {
+	s.autoTrain(collection)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

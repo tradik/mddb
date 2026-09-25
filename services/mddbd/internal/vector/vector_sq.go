@@ -22,8 +22,8 @@ type sqCollection struct {
 	scales   []float32            // per-dimension scale factor: 255 / (max - min)
 	codes    map[string][]uint8   // docID -> quantized code
 	origVecs map[string][]float32 // original vectors for re-ranking
-	trained  bool
-	dim      int
+	trainState
+	dim int
 }
 
 // NewSQIndex creates a new Scalar Quantization index.
@@ -163,11 +163,18 @@ func (s *SQIndex) Train(collection string, vectors map[string][]float32) {
 	c.maxs = maxs
 	c.scales = scales
 	c.codes = codes
-	c.trained = true
 	c.dim = dim
 	for i, id := range allIDs {
 		c.origVecs[id] = allVecs[i]
 	}
+	// Vectors added while training ran are in the collection but not in the
+	// snapshot it trained on; encode them into the new structure too.
+	for id, v := range c.origVecs {
+		if _, inSnapshot := vectors[id]; !inSnapshot {
+			c.codes[id] = s.encode(c, v)
+		}
+	}
+	c.markTrained(len(c.origVecs))
 	s.mu.Unlock()
 }
 
@@ -188,6 +195,7 @@ func (s *SQIndex) encode(c *sqCollection, vector []float32) []uint8 {
 
 // Search finds the top-K most similar vectors using ADC with scalar quantization.
 func (s *SQIndex) Search(collection string, query []float32, topK int, threshold float64, metric SimilarityFunc) []VectorResult {
+	s.autoTrain(collection)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -204,6 +212,7 @@ func (s *SQIndex) Search(collection string, query []float32, topK int, threshold
 
 // SearchWithFilter implements the VectorSearcher interface.
 func (s *SQIndex) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc) []VectorResult {
+	s.autoTrain(collection)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
