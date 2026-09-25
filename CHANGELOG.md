@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.3] - 2026-09-25
+
+Completes the 2.15.2 fix, which was only half a fix for five of the
+algorithms.
+
+### Fixed
+
+- **IVF, PQ, OPQ, SQ and SQ4 still found nothing in a collection created
+  after startup** — the 2.15.2 notes said these algorithms now see documents
+  embedded after startup. For HNSW and BQ that was true. For these five it
+  was true only in collections that already existed at startup. We checked on
+  the released 2.15.2 image: three documents ingested into a new collection
+  with no reindex. `flat`, `hnsw` and `bq` found all three, and `ivf`, `pq`,
+  `opq`, `sq` and `sq4` found none.
+
+  These five search a trained structure: clusters, codebooks or scales.
+  2.15.2 gave them the vectors, but a collection is trained only at startup
+  and on a reindex, and an untrained index answered every search with
+  nothing. The index now trains the collection itself. The first search on a
+  collection that was never trained trains it and waits for the result. A
+  collection that has doubled since its last training is retrained in the
+  background while searches carry on, so a collection that grows to N vectors
+  is trained about log2(N) times. After this change, all eight algorithms
+  found all three documents without a reindex.
+
+- **A vector added while training ran could be left out of the trained
+  structure** — training works on a snapshot. A vector added after the
+  snapshot was taken stayed in the collection but got no code or cluster, so
+  it could not be found until the next retrain. This already affected the
+  background training after `vector-reindex`. The new structure now includes
+  such vectors.
+
+### Tests
+
+- The server test searches with every algorithm. It used to count the
+  vectors each index held, and that check passed on 2.15.2. Three unit tests
+  asserted that "an untrained index returns nothing", which is how this bug
+  got into the tests. They now assert that the first search trains.
+  New tests cover when a collection is due for training, retraining after
+  it doubles, a vector added during training, and concurrent add, search
+  and retrain under `-race`. `internal/vector` coverage is 96.4%.
+
 ## [2.15.2] - 2026-09-25
 
 A search-correctness fix: every index now sees what the worker embeds.

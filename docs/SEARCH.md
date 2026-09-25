@@ -588,7 +588,16 @@ Approximate nearest neighbor search using a multi-layer graph structure. Each la
 
 ### IVF (Inverted File Index)
 
-Clusters vectors using k-means, then searches only the nearest clusters. Requires training after loading vectors.
+Clusters vectors using k-means, then searches only the nearest clusters.
+
+> **Training (IVF, PQ, OPQ, SQ, SQ4).** These five search a structure trained
+> from the collection's vectors. It is trained at startup, after a
+> `vector-reindex`, and — since 2.15.3 — by the index itself: the first search
+> on a collection that was never trained trains it and waits for it, and a
+> collection that has doubled since its last training is retrained in the
+> background while searches carry on against the current structure. Before
+> 2.15.3 a collection created while the server was running returned no results
+> from these five until a restart or reindex.
 
 | Property | Value |
 |----------|-------|
