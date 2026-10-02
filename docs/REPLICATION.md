@@ -79,8 +79,33 @@ MDDB_GRPC_PORT=11034 \
 The follower:
 - Automatically switches to **read-only mode**
 - Connects to the leader's gRPC port
-- Downloads a full snapshot (if starting fresh)
+- Downloads a full snapshot (if starting fresh). The snapshot must pass
+  bbolt's full integrity check before it replaces the follower's database
+  ([BACKUP.md](BACKUP.md))
 - Tails the binlog for real-time updates
+
+#### How the stream guarantees every entry (v2.15.4)
+
+The leader sends every LSN after the follower's position, once and in order:
+
+- **History is streamed as it is read.** Before 2.15.4 the leader read its
+  whole binlog into memory before sending the first entry. A follower starting
+  at LSN 0 against a 20 GB binlog got about 1 KB and then nothing for hours.
+- **No entry falls between history and live tail.** The stream subscribes
+  before it reads the file. An entry written between the two used to reach
+  neither.
+- **A follower that falls behind catches up from the file.** The live
+  subscription is a bounded buffer (4096 entries) and drops what does not fit,
+  for example during a bulk import. The stream detects the gap in LSNs, even
+  one at the very end of a burst, and reads the missing entries back from the
+  binlog. Before 2.15.4 they were silently lost.
+- **Reconnecting under the same ID is safe.** The old stream's cleanup used
+  to close the new stream's subscription and remove its record, so
+  `mddb_replication_followers_connected` showed 0 while data was flowing.
+- **A crash during an append does not stop replication.** On startup the
+  binlog drops an incomplete last entry. That entry used to stop the server
+  from starting, or to stay in the file so that every later entry was
+  unreadable.
 
 ### 3. Verify Replication
 

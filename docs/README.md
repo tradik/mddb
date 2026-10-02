@@ -95,6 +95,7 @@ MDDB (Markdown Database) is an **AI-native embedded document database** for mark
 - **[Authentication](AUTHENTICATION.md)** — JWT, API keys, per-collection RBAC, per-protocol access modes
 - **[TLS / mTLS](TLS.md)** — built-in HTTPS with optional client certificate authentication
 - **[Replication](REPLICATION.md)** — leader-follower binlog streaming for read scaling
+- **[Backup, restore & repair](BACKUP.md)** — consistent, integrity-checked backups; `mddbd -verify-db` and `-repair-db` for a damaged database file
 - **[Automation](AUTOMATIONS.md)** — triggers, crons, webhooks, sentiment analysis, template variables
 - **Document TTL** with auto-expiry, full **revision history**, **schema validation**, **aggregations** (facets + histograms)
 - **[Web Admin Panel](PANEL.md)** — React UI for documents, users, search, geo, settings

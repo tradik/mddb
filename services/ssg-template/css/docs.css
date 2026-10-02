@@ -65,6 +65,21 @@
     letter-spacing: var(--letter-spacing-tight);
 }
 .doc-date { font-size: .85rem; color: var(--text-muted); }
+.doc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+
+/* "Listen" — the post read aloud by the visitor's browser voice (ssg listen:).
+   Accent on canvas is the link colour pair, which meets WCAG 2.2 AA for text;
+   1.75rem (28px) clears the 24px minimum target size. */
+.ssg-listen {
+    display: inline-flex; align-items: center; gap: .35em;
+    min-height: 1.75rem; padding: 0 .65em;
+    border: 1px solid var(--primary); border-radius: 999px;
+    background: transparent; color: var(--primary);
+    font: inherit; font-size: .85rem; line-height: 1; cursor: pointer;
+}
+.ssg-listen-icon { flex: none; width: 1em; height: 1em; }
+.ssg-listen:hover, .ssg-listen[aria-pressed="true"] { background: var(--primary); color: var(--bg); }
+.ssg-listen:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
 
 /* Rendered markdown content */
 .doc-body h1 { font-size: 1.875rem; margin: 2.5rem 0 1rem; padding-top: .5rem; }

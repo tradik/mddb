@@ -81,69 +81,59 @@ func (qi *QuantizedVectorIndex) Remove(collection, docID string) {
 // Search performs brute-force search on quantized vectors.
 // The query vector (float32) is quantized using per-collection calibration (global min/max of stored vectors).
 func (qi *QuantizedVectorIndex) Search(collection string, query []float32, topK int, threshold float64, _ SimilarityFunc) []VectorResult {
-	qi.mu.RLock()
-	defer qi.mu.RUnlock()
-
-	coll, ok := qi.collections[collection]
-	if !ok || len(coll.vectors) == 0 {
-		return nil
-	}
-	if topK <= 0 {
-		topK = 5
-	}
-
-	// Compute global min/max for query quantization calibration
-	qQuery := qi.quantizeQuery(query, coll)
-	if qQuery == nil {
-		return nil
-	}
-
-	simFunc := qi.selectSimFunc(coll.quantType)
-
-	results := make([]VectorResult, 0, len(coll.vectors))
-	for docID, qv := range coll.vectors {
-		score := simFunc(qQuery, qv)
-		if float64(score) >= threshold {
-			results = append(results, VectorResult{DocID: docID, Score: score})
-		}
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Score > results[j].Score
-	})
-	if len(results) > topK {
-		results = results[:topK]
-	}
-	return results
+	return qi.search(collection, query, topK, threshold, nil)
 }
 
 // SearchWithFilter searches only among allowed doc IDs.
 func (qi *QuantizedVectorIndex) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, _ SimilarityFunc) []VectorResult {
+	if allowed == nil {
+		allowed = map[string]bool{}
+	}
+	return qi.search(collection, query, topK, threshold, allowed)
+}
+
+// search scores every stored vector the query can be compared with. A nil
+// allowed set means no filter.
+//
+// Each vector is scored as the type it was stored as (#269). A collection's
+// quantization can be changed while it holds vectors, and from then on it
+// holds both int8 and int4 ones; scoring them all as the type the collection
+// started with read an int4 payload — half the bytes — as int8, and panicked
+// on every search. Vectors whose dimension differs from the query's, left by
+// an earlier embedding model, are skipped: they cannot be compared, and a
+// score of 0 would pass a threshold of 0 as a match.
+func (qi *QuantizedVectorIndex) search(collection string, query []float32, topK int, threshold float64, allowed map[string]bool) []VectorResult {
 	qi.mu.RLock()
 	defer qi.mu.RUnlock()
 
 	coll, ok := qi.collections[collection]
-	if !ok || len(coll.vectors) == 0 {
+	if !ok || len(coll.vectors) == 0 || len(query) == 0 {
 		return nil
 	}
 	if topK <= 0 {
 		topK = 5
 	}
 
-	qQuery := qi.quantizeQuery(query, coll)
-	if qQuery == nil {
-		return nil
-	}
+	globalMin, globalMax := coll.calibration()
+	queries := map[QuantizationType]*QuantizedVector{}
 
-	simFunc := qi.selectSimFunc(coll.quantType)
-
-	results := make([]VectorResult, 0, min(len(allowed), len(coll.vectors)))
+	results := make([]VectorResult, 0, len(coll.vectors))
 	for docID, qv := range coll.vectors {
-		baseID := baseDocIDQ(docID)
-		if !allowed[baseID] {
+		if allowed != nil && !allowed[baseDocIDQ(docID)] {
 			continue
 		}
-		score := simFunc(qQuery, qv)
+		if qv.Dims != len(query) {
+			continue
+		}
+		q, ok := queries[qv.Type]
+		if !ok {
+			q = quantizeQueryAs(qv.Type, query, globalMin, globalMax)
+			queries[qv.Type] = q
+		}
+		if q == nil {
+			continue
+		}
+		score := similarityFor(qv.Type)(q, qv)
 		if float64(score) >= threshold {
 			results = append(results, VectorResult{DocID: docID, Score: score})
 		}
@@ -187,15 +177,13 @@ func (qi *QuantizedVectorIndex) HasCollection(collection string) bool {
 	return ok && len(coll.vectors) > 0
 }
 
-// quantizeQuery quantizes the float32 query using the collection's global min/max.
-func (qi *QuantizedVectorIndex) quantizeQuery(query []float32, coll *quantizedCollection) *QuantizedVector {
-	// Find global min/max across all stored vectors for calibration
-	var globalMin, globalMax float32
+// calibration is the min/max across every stored vector, which queries are
+// quantized against.
+func (coll *quantizedCollection) calibration() (globalMin, globalMax float32) {
 	first := true
 	for _, qv := range coll.vectors {
 		if first {
-			globalMin = qv.Min
-			globalMax = qv.Max
+			globalMin, globalMax = qv.Min, qv.Max
 			first = false
 		}
 		if qv.Min < globalMin {
@@ -205,8 +193,13 @@ func (qi *QuantizedVectorIndex) quantizeQuery(query []float32, coll *quantizedCo
 			globalMax = qv.Max
 		}
 	}
+	return globalMin, globalMax
+}
 
-	switch coll.quantType {
+// quantizeQueryAs quantizes a query for comparison with vectors of type qt,
+// or returns nil for a type that is not quantized.
+func quantizeQueryAs(qt QuantizationType, query []float32, globalMin, globalMax float32) *QuantizedVector {
+	switch qt {
 	case QuantInt8:
 		return QuantizeQueryForInt8(query, globalMin, globalMax)
 	case QuantInt4:
@@ -216,15 +209,12 @@ func (qi *QuantizedVectorIndex) quantizeQuery(query []float32, coll *quantizedCo
 	}
 }
 
-func (qi *QuantizedVectorIndex) selectSimFunc(qt QuantizationType) func(*QuantizedVector, *QuantizedVector) float32 {
-	switch qt {
-	case QuantInt8:
-		return CosineSimInt8
-	case QuantInt4:
+// similarityFor is the cosine similarity for two vectors of type qt.
+func similarityFor(qt QuantizationType) func(*QuantizedVector, *QuantizedVector) float32 {
+	if qt == QuantInt4 {
 		return CosineSimInt4
-	default:
-		return CosineSimInt8
 	}
+	return CosineSimInt8
 }
 
 func (qi *QuantizedVectorIndex) resolveQuantType(collection string) QuantizationType {

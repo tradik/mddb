@@ -1,6 +1,6 @@
 {
   "name": "mddb-panel",
-  "version": "2.15.3",
+  "version": "2.15.4",
   "description": "Web admin panel for MDDB - Markdown Database",
   "license": "BSD-3-Clause",
   "type": "module",
@@ -17,7 +17,7 @@
     "express": "^5.2.1",
     "http-proxy-middleware": "^4.2.0",
     "leaflet": "^1.9.4",
-    "lucide-react": "^1.47.0",
+    "lucide-react": "^1.48.0",
     "prismjs": "^1.30.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -43,7 +43,7 @@
     "globals": "^17.12.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.1.13",
-    "vite": "^8.3.0"
+    "vite": "^8.3.1"
   },
   "engines": {
     "node": ">=24.3.0",

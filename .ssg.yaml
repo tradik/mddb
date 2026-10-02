@@ -49,12 +49,12 @@ fingerprint: true
 # version strings baked into the HTML at build time (no client-side JS).
 # Updated by the release version sweep alongside Makefile/main.go.
 variables:
-  mddbVersion: "2.15.3"
+  mddbVersion: "2.15.4"
   # The tag date of the version above, not of the one before it: the download
   # section prints it verbatim. It has now been wrong twice in a row (2.11.4's
   # date shown for 2.12.0, then for 2.13.0) — `git log -1 --format=%ad v<tag>`
   # settles it, and the release version sweep has to touch this line too.
-  mddbReleaseDate: "25 September 2026"
+  mddbReleaseDate: "2 October 2026"
   # Counted from tools/list against a running server, not from memory.
   mcpTools: "81"
   # A release binary: CGO_ENABLED=0, -ldflags="-s -w". A plain `go build` is
@@ -71,6 +71,15 @@ variables:
 mermaid: true
 mermaid_theme: neutral
 mermaid_background: "#ffffff"
+
+# A "Listen" button on blog posts (ssg 1.8.66+): the visitor's own browser
+# voice reads the post, nothing leaves the device and nothing is generated at
+# build time. ssg places it in post.html's data-ssg-listen-slot, next to the
+# date; browsers without speech synthesis never see it.
+listen:
+  enabled: true
+  label: "Listen"
+  sections: [posts]
 
 
 # The only category is "Blog", and its archive at /category/blog/ listed the

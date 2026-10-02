@@ -1,0 +1,12 @@
+# Advisories govulncheck reports that do not apply, one per line:
+#   ID  module  version  # why
+# An entry covers that exact version only — upgrading or downgrading the module
+# brings the advisory back for review. Remove an entry once the vulnerability
+# database is corrected or the module has moved on.
+
+# xDS server panic on requests without :authority/Host. The fix (#9365) was
+# cherry-picked to v1.84.x as #9370 before v1.84.0 was tagged and is in the
+# released code (internal/transport/http2_server.go rejects such requests), but
+# the advisory lists only 1.85.0-dev as fixed for the 1.84 line. mddb does not
+# use xDS either.
+GO-2026-6443 google.golang.org/grpc v1.84.0  # fix #9365 shipped in v1.84.0 via #9370; vulndb range omits it; no xDS in mddb

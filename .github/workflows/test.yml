@@ -68,7 +68,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: "1.27.0"
+  GO_VERSION: "1.27.1"
   # Disable Go workspace mode in CI so each module builds/tests in isolation.
   # This catches missing `require` entries that go.work would hide by
   # transparently resolving sibling modules. Developers get the workspace
@@ -180,6 +180,9 @@ jobs:
 
       - name: Run repo-link guard test suite
         run: bash scripts/tests/test-repo-links.sh
+
+      - name: Run govulncheck gate test suite
+        run: bash scripts/tests/test-govulncheck-gate.sh
 
       # WIN-004: PowerShell's `>` and Out-File write UTF-16 LE with a BOM by
       # default, and Go answers a file like that with "illegal UTF-8 encoding".

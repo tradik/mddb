@@ -336,7 +336,11 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// snapshot = copy pliku DB (najprościej)
+	// A large database takes longer to copy and check than the server's write
+	// timeout allows; without this the client got no response at all while
+	// the backup went on being written (#266).
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
+
 	dst := r.URL.Query().Get("to")
 	if dst == "" {
 		dst = fmt.Sprintf("backup-%d.db", time.Now().Unix())
@@ -346,8 +350,8 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
-	if err := copyFile(s.Path, safeDst); err != nil {
-		bad(w, err)
+	if err := s.backupTo(safeDst); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusInternalServerError)
 		return
 	}
 	ok(w, map[string]string{"backup": safeDst})

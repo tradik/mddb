@@ -137,7 +137,7 @@ func (s *Server) loadVectorIndex() {
 		// Trigger training for trainable indexes (IVF, PQ)
 		for _, searcher := range s.VectorSearchers {
 			if trainer, ok := searcher.(vec.Trainable); ok {
-				trainer.Train(collection, collVecs)
+				vec.TrainSafely(trainer, collection, collVecs)
 			}
 		}
 
@@ -557,7 +557,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 			}
 			for _, searcher := range s.VectorSearchers {
 				if trainer, isTrainable := searcher.(vec.Trainable); isTrainable {
-					go trainer.Train(req.Collection, collVecs)
+					go vec.TrainSafely(trainer, req.Collection, collVecs)
 				}
 			}
 		}

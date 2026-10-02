@@ -184,6 +184,9 @@ func scoreRange(
 		if filter != nil && !filter(e.docID) {
 			continue
 		}
+		if len(e.vector) != len(query) {
+			continue // another embedding model's vector; see sameDimension
+		}
 		score := metric(query, e.vector)
 		if float64(score) >= threshold {
 			results = append(results, VectorResult{DocID: e.docID, Score: score})

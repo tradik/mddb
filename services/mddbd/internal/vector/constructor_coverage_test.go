@@ -34,12 +34,15 @@ func TestVectorConstructorDefaults(t *testing.T) {
 }
 
 // TestQuantizedIndexHelpers covers the quantized-index helper branches:
-// selectSimFunc's int4/default arms, resolveQuantType's configured-callback
+// similarityFor and quantizeQueryAs for every type, resolveQuantType's configured-callback
 // path, and baseDocIDQ's chunk-suffix split.
 func TestQuantizedIndexHelpers(t *testing.T) {
 	qi := &QuantizedVectorIndex{}
-	if qi.selectSimFunc(QuantInt4) == nil || qi.selectSimFunc(QuantInt8) == nil || qi.selectSimFunc(QuantNone) == nil {
-		t.Error("selectSimFunc must return a function for every quant type")
+	if similarityFor(QuantInt4) == nil || similarityFor(QuantInt8) == nil || similarityFor(QuantNone) == nil {
+		t.Error("similarityFor must return a function for every quant type")
+	}
+	if quantizeQueryAs(QuantNone, []float32{1}, 0, 1) != nil {
+		t.Error("an unquantized type has no quantized query")
 	}
 	if qi.resolveQuantType("c") != QuantNone {
 		t.Error("resolveQuantType with no callback should be QuantNone")

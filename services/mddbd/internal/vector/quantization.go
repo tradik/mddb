@@ -203,7 +203,9 @@ func dequantizeInt4(qv *QuantizedVector) []float32 {
 // For cross-calibration (different min/max), we use the raw byte values which
 // preserves relative ordering within each vector.
 func CosineSimInt8(a, b *QuantizedVector) float32 {
-	if a.Dims != b.Dims || a.Dims == 0 {
+	// A payload shorter than its dimensions — an int4 vector handed to the
+	// int8 function, or a damaged record — is not read past its end (#269).
+	if a.Dims != b.Dims || a.Dims == 0 || len(a.Data) < a.Dims || len(b.Data) < b.Dims {
 		return 0
 	}
 
@@ -225,7 +227,7 @@ func CosineSimInt8(a, b *QuantizedVector) float32 {
 
 // CosineSimInt4 computes approximate cosine similarity between two int4 quantized vectors.
 func CosineSimInt4(a, b *QuantizedVector) float32 {
-	if a.Dims != b.Dims || a.Dims == 0 {
+	if a.Dims != b.Dims || a.Dims == 0 || len(a.Data) < (a.Dims+1)/2 || len(b.Data) < (b.Dims+1)/2 {
 		return 0
 	}
 

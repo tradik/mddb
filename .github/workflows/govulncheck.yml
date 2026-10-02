@@ -8,6 +8,8 @@ on:
       - 'services/mddb-cli/**'
       - 'tools/bench/**'
       - '.github/workflows/govulncheck.yml'
+      - '.github/govulncheck-ignore.txt'
+      - 'scripts/govulncheck-gate.py'
   pull_request:
     branches: [main, develop]
     paths:
@@ -15,6 +17,8 @@ on:
       - 'services/mddb-cli/**'
       - 'tools/bench/**'
       - '.github/workflows/govulncheck.yml'
+      - '.github/govulncheck-ignore.txt'
+      - 'scripts/govulncheck-gate.py'
   # Daily scan catches newly-disclosed CVEs in already-pinned dependencies.
   schedule:
     - cron: '0 6 * * *'
@@ -22,7 +26,7 @@ on:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: "1.27.0"
+  GO_VERSION: "1.27.1"
   # Scan each module in isolation — mirrors the Tests workflow so we catch
   # vulnerabilities reachable from each module's declared deps, not the
   # workspace-merged graph.
@@ -59,9 +63,17 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0 # NOSONAR -- immutable, explicitly pinned tool version
 
+      # Through a gate rather than bare: govulncheck cannot be told an
+      # advisory is wrong, and GO-2026-6443 lists grpc v1.84.0 as affected
+      # although the fix shipped in it. .github/govulncheck-ignore.txt excuses
+      # one advisory at one module version, with the reason; everything else
+      # still fails the job. pipefail keeps a govulncheck error from passing.
       - name: Run govulncheck
         working-directory: ${{ matrix.module.path }}
-        run: govulncheck ./...
+        shell: bash
+        run: |
+          set -o pipefail
+          govulncheck -format json ./... | python3 "$GITHUB_WORKSPACE/scripts/govulncheck-gate.py" "$GITHUB_WORKSPACE/.github/govulncheck-ignore.txt"
 
   # OPS-008: mddb-chat is a shipped service whose dependency graph had never
   # been scanned — govulncheck only knows Go, and nothing else looked at Rust.

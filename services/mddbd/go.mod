@@ -2,7 +2,7 @@ module mddb
 
 go 1.27
 
-toolchain go1.27.0
+toolchain go1.27.1
 
 require (
 	github.com/99designs/gqlgen v0.17.95
@@ -15,14 +15,14 @@ require (
 	github.com/golang/snappy v1.0.0
 	github.com/klauspost/compress v1.20.0
 	github.com/minio/minio-go/v7 v7.3.0
-	github.com/quic-go/quic-go v0.62.0
+	github.com/quic-go/quic-go v0.63.0
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/tidwall/rtree v1.11.1
-	github.com/vektah/gqlparser/v2 v2.5.37
+	github.com/vektah/gqlparser/v2 v2.5.58
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/sys v0.48.0
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )

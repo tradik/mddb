@@ -38,7 +38,7 @@ import (
 )
 
 // VERSION is the current release version of the MDDB server.
-const VERSION = "2.15.3"
+const VERSION = "2.15.4"
 
 // AccessMode defines the database access mode (read, write, or both).
 type AccessMode string
@@ -224,18 +224,31 @@ type DeleteCollectionRequest struct {
 	Collection string `json:"collection"`
 }
 
+// freelistSyncNote: by default the freelist is not written on commit, which
+// makes writes faster and makes every open rebuild it by walking every page —
+// seconds on a warm SSD, reported at over 40 minutes cold on a busy spinning
+// disk (#270), and the point where a damaged page tree panics.
+// MDDB_FREELIST_SYNC=true writes it on every commit instead, so an open reads
+// one page. The first open with it set still walks once, to write it.
+
 // getOptimizedBoltOptions returns optimized BoltDB options for performance
 func getOptimizedBoltOptions() *bolt.Options {
 	return &bolt.Options{
 		Timeout:         2 * time.Second,
-		NoFreelistSync:  true,                 // Don't sync freelist to disk on every commit (faster writes)
-		FreelistType:    bolt.FreelistMapType, // Use hashmap for freelist (faster than array)
-		NoGrowSync:      false,                // Sync after growing mmap (safer)
-		InitialMmapSize: 100 * 1024 * 1024,    // 100MB initial mmap (reduce remapping)
+		NoFreelistSync:  os.Getenv("MDDB_FREELIST_SYNC") != "true", // see freelistSyncNote
+		FreelistType:    bolt.FreelistMapType,                      // Use hashmap for freelist (faster than array)
+		NoGrowSync:      false,                                     // Sync after growing mmap (safer)
+		InitialMmapSize: 100 * 1024 * 1024,                         // 100MB initial mmap (reduce remapping)
 	}
 }
 
 func main() {
+	// A child started by verifyDatabase: check one file and exit, before
+	// anything else about this process is set up.
+	if p := os.Getenv(verifyChildEnv); p != "" {
+		os.Exit(runVerifyChild(p))
+	}
+
 	// Install the structured logger before anything can log (GO-028).
 	// MDDB_LOG_FORMAT picks text or json, MDDB_LOG_LEVEL the threshold; both
 	// have defaults, so an unconfigured process still logs.
@@ -254,9 +267,10 @@ func main() {
 	persistence := CheckPersistence(dbPath)
 	logPersistenceStatus(persistence, slog.Warn)
 
-	db, err := bolt.Open(dbPath, 0600, getOptimizedBoltOptions())
+	db, err := openBolt(dbPath, getOptimizedBoltOptions())
 	if err != nil {
-		logging.Fatal("startup step failed", "step", "bolt.Open", "err", err)
+		logging.Fatal("startup step failed", "step", "bolt.Open", "err", err,
+			"remedy", "if the file is damaged: mddbd -verify-db FILE, then mddbd -repair-db FILE -repair-to NEWFILE (docs/BACKUP.md)")
 	}
 	defer func() {
 		if err := db.Close(); err != nil {

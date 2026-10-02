@@ -201,8 +201,25 @@ func TestBinlogRecoverCorruptTail(t *testing.T) {
 		t.Fatalf("write garbage: %v", err)
 	}
 	_ = f.Close()
-	if _, err := NewBinlog("", BinlogConfig{Path: path}); err == nil {
-		t.Fatal("expected recovery error on corrupt tail")
+	// A torn tail is a crash mid-append: dropped, not fatal.
+	assertRecoveredTo(t, path, 2)
+}
+
+// assertRecoveredTo reopens a binlog with a torn tail and checks it kept the
+// whole entries and nothing else.
+func assertRecoveredTo(t *testing.T, path string, wantLSN uint64) {
+	t.Helper()
+	bl, err := NewBinlog("", BinlogConfig{Path: path})
+	if err != nil {
+		t.Fatalf("a torn tail stopped the binlog opening: %v", err)
+	}
+	defer func() { _ = bl.Close() }()
+	if got := bl.CurrentLSN(); got != wantLSN {
+		t.Errorf("CurrentLSN = %d, want %d", got, wantLSN)
+	}
+	entries, err := bl.ReadFrom(0)
+	if err != nil || uint64(len(entries)) != wantLSN {
+		t.Errorf("ReadFrom = %d entries, %v; want %d", len(entries), err, wantLSN)
 	}
 }
 
@@ -314,7 +331,7 @@ func TestBinlogRecoverTruncatedEntry(t *testing.T) {
 		t.Fatalf("Close: %v", err)
 	}
 	// Append a second entry header that claims a 255-byte bucket name but
-	// supplies no body, so recovery fails while skipping the bucket name.
+	// supplies no body: a write cut short mid-entry.
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600) // #nosec G304 -- path is under t.TempDir()
 	if err != nil {
 		t.Fatalf("open for corruption: %v", err)
@@ -325,9 +342,7 @@ func TestBinlogRecoverTruncatedEntry(t *testing.T) {
 		t.Fatalf("write header: %v", err)
 	}
 	_ = f.Close()
-	if _, err := NewBinlog("", BinlogConfig{Path: path}); err == nil {
-		t.Fatal("expected recovery error on mid-entry truncation")
-	}
+	assertRecoveredTo(t, path, 1)
 }
 
 func TestUnmarshalBinlogEntryTruncationOffsets(t *testing.T) {

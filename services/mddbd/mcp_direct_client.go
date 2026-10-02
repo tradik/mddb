@@ -547,7 +547,7 @@ func (c *DirectClient) Backup(ctx context.Context, req *MCPBackupRequest) (*MCPB
 	if err != nil {
 		return nil, err
 	}
-	if err := copyFile(c.server.Path, safeDst); err != nil {
+	if err := c.server.backupTo(safeDst); err != nil {
 		return nil, err
 	}
 	return &MCPBackupResponse{Backup: safeDst}, nil

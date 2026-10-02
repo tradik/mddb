@@ -194,8 +194,9 @@ func TestSQ4EmptyAndDegenerateInputs(t *testing.T) {
 	if got := trained.Search("c", []float32{1, 0}, 0, 0, nil); got != nil {
 		t.Errorf("topK of zero returned %v", got)
 	}
-	// A query shorter than the indexed vectors is a caller error, not a crash.
-	if got := trained.Search("c", []float32{1}, 1, 0, nil); len(got) != 1 {
+	// A query shorter than the indexed vectors cannot be compared with them:
+	// no crash and no results, the same answer every index gives.
+	if got := trained.Search("c", []float32{1}, 1, 0, nil); len(got) != 0 {
 		t.Errorf("a short query returned %d results", len(got))
 	}
 }

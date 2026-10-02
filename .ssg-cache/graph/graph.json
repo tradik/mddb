@@ -1,0 +1,1020 @@
+{
+  "schema": 2,
+  "nodes": {
+    ".ssg.yaml": {
+      "id": ".ssg.yaml",
+      "kind": "config",
+      "hash": "a1b1f944a0a0bbfabe441cb8a5c15b19634ef976995491b2595186f32ea7d750"
+    },
+    "/snap/static-site-generator/161/bin/ssg": {
+      "id": "/snap/static-site-generator/161/bin/ssg",
+      "kind": "config",
+      "hash": "b3cc5b0e2971ea64646dafc1ee03ec2805d40adb2fab0ec7402ea7c3713d922b"
+    },
+    "blog/2026-07-31-mddb-2-11-4.md": {
+      "id": "blog/2026-07-31-mddb-2-11-4.md",
+      "kind": "content",
+      "hash": "1892b54600b0d07fd67a2f621ab8f6f2b1ae7f50ad7f6ca15d6ddfc9a1f95dc0"
+    },
+    "blog/2026-08-02-wordpress-plugin.md": {
+      "id": "blog/2026-08-02-wordpress-plugin.md",
+      "kind": "content",
+      "hash": "03c487222d11b6a1de427531c9cce9e01019395156c49ee219cebce8d27169d3"
+    },
+    "blog/2026-08-23-the-collection-knows-how-to-be-searched.md": {
+      "id": "blog/2026-08-23-the-collection-knows-how-to-be-searched.md",
+      "kind": "content",
+      "hash": "1f9c7f0f9dd61e5a7e77679d1422af4efe1e5465bb8de2fcc1b81ed04da04a8e"
+    },
+    "blog/2026-08-23-what-breaks-if-i-change-this.md": {
+      "id": "blog/2026-08-23-what-breaks-if-i-change-this.md",
+      "kind": "content",
+      "hash": "a778455a33560ad9d701062e38e7990646ee854c2a06f2684b723b66fbc16d1c"
+    },
+    "blog/2026-08-23-which-algorithm-should-i-use.md": {
+      "id": "blog/2026-08-23-which-algorithm-should-i-use.md",
+      "kind": "content",
+      "hash": "54d05a093f801e04456727e4cf48394600c1c0c04116976c88e9cc37751a6c5c"
+    },
+    "blog/2026-08-23-your-vector-search-rewards-duplicates.md": {
+      "id": "blog/2026-08-23-your-vector-search-rewards-duplicates.md",
+      "kind": "content",
+      "hash": "75cb229a6cf8134a0f0df89a1f6439b894226ab423e0ad3736b7593adec86b52"
+    },
+    "blog/2026-08-24-rss-is-the-wrong-number.md": {
+      "id": "blog/2026-08-24-rss-is-the-wrong-number.md",
+      "kind": "content",
+      "hash": "5adf158f95da15295144ab7c882ca24ec0932a45c5384e7d36cfb4dca49597dc"
+    },
+    "blog/2026-08-24-the-loop-that-was-not-waiting-for-memory.md": {
+      "id": "blog/2026-08-24-the-loop-that-was-not-waiting-for-memory.md",
+      "kind": "content",
+      "hash": "97b760c39879545dc24ceadf5af65a90bda63c1bab4ed820f547c74afc47c877"
+    },
+    "blog/2026-08-24-whats-new-in-mddb-2-12.md": {
+      "id": "blog/2026-08-24-whats-new-in-mddb-2-12.md",
+      "kind": "content",
+      "hash": "2c106010d01bf92ce7ea70eec35960bfdd11af6cf2cb8eef6999e53788cf3e5d"
+    },
+    "blog/2026-08-24-whats-new-in-mddb-2-13.md": {
+      "id": "blog/2026-08-24-whats-new-in-mddb-2-13.md",
+      "kind": "content",
+      "hash": "a57003705c6e7508c8d5d6ba833bdacc28fa1f830cfe1dfa1003104fe3a50cbe"
+    },
+    "blog/2026-08-29-why-your-rag-returns-the-wrong-document.md": {
+      "id": "blog/2026-08-29-why-your-rag-returns-the-wrong-document.md",
+      "kind": "content",
+      "hash": "68fc9dd8a86411ab0072f333bfe76daf39464f5c381e2eb0f9472f66919b3e58"
+    },
+    "blog/2026-09-08-duplicate-pages-your-crawler-cannot-see.md": {
+      "id": "blog/2026-09-08-duplicate-pages-your-crawler-cannot-see.md",
+      "kind": "content",
+      "hash": "cb95d7362212d4a47be9a06e50cc174594e98fcb46551401786ba867ca0817c5"
+    },
+    "blog/2026-09-08-whats-new-in-mddb-2-14.md": {
+      "id": "blog/2026-09-08-whats-new-in-mddb-2-14.md",
+      "kind": "content",
+      "hash": "f724675320e2f5a8863114688c4f4c0d7dfbd04b898f9566dc92c24166c2a799"
+    },
+    "dist/blog/duplicate-pages-your-crawler-cannot-see/index.html": {
+      "id": "dist/blog/duplicate-pages-your-crawler-cannot-see/index.html",
+      "kind": "output"
+    },
+    "dist/blog/index.html": {
+      "id": "dist/blog/index.html",
+      "kind": "output"
+    },
+    "dist/blog/mddb-2-11-4/index.html": {
+      "id": "dist/blog/mddb-2-11-4/index.html",
+      "kind": "output"
+    },
+    "dist/blog/rss-is-the-wrong-number/index.html": {
+      "id": "dist/blog/rss-is-the-wrong-number/index.html",
+      "kind": "output"
+    },
+    "dist/blog/the-collection-knows-how-to-be-searched/index.html": {
+      "id": "dist/blog/the-collection-knows-how-to-be-searched/index.html",
+      "kind": "output"
+    },
+    "dist/blog/the-loop-that-was-not-waiting-for-memory/index.html": {
+      "id": "dist/blog/the-loop-that-was-not-waiting-for-memory/index.html",
+      "kind": "output"
+    },
+    "dist/blog/what-breaks-if-i-change-this/index.html": {
+      "id": "dist/blog/what-breaks-if-i-change-this/index.html",
+      "kind": "output"
+    },
+    "dist/blog/whats-new-in-mddb-2-12/index.html": {
+      "id": "dist/blog/whats-new-in-mddb-2-12/index.html",
+      "kind": "output"
+    },
+    "dist/blog/whats-new-in-mddb-2-13/index.html": {
+      "id": "dist/blog/whats-new-in-mddb-2-13/index.html",
+      "kind": "output"
+    },
+    "dist/blog/whats-new-in-mddb-2-14/index.html": {
+      "id": "dist/blog/whats-new-in-mddb-2-14/index.html",
+      "kind": "output"
+    },
+    "dist/blog/which-algorithm-should-i-use/index.html": {
+      "id": "dist/blog/which-algorithm-should-i-use/index.html",
+      "kind": "output"
+    },
+    "dist/blog/why-your-rag-returns-the-wrong-document/index.html": {
+      "id": "dist/blog/why-your-rag-returns-the-wrong-document/index.html",
+      "kind": "output"
+    },
+    "dist/blog/wordpress-plugin/index.html": {
+      "id": "dist/blog/wordpress-plugin/index.html",
+      "kind": "output"
+    },
+    "dist/blog/your-vector-search-rewards-duplicates/index.html": {
+      "id": "dist/blog/your-vector-search-rewards-duplicates/index.html",
+      "kind": "output"
+    },
+    "dist/docs/api/index.html": {
+      "id": "dist/docs/api/index.html",
+      "kind": "output"
+    },
+    "dist/docs/architecture/index.html": {
+      "id": "dist/docs/architecture/index.html",
+      "kind": "output"
+    },
+    "dist/docs/auth-implementation-summary/index.html": {
+      "id": "dist/docs/auth-implementation-summary/index.html",
+      "kind": "output"
+    },
+    "dist/docs/auth-quickstart/index.html": {
+      "id": "dist/docs/auth-quickstart/index.html",
+      "kind": "output"
+    },
+    "dist/docs/authentication/index.html": {
+      "id": "dist/docs/authentication/index.html",
+      "kind": "output"
+    },
+    "dist/docs/automations/index.html": {
+      "id": "dist/docs/automations/index.html",
+      "kind": "output"
+    },
+    "dist/docs/backup/index.html": {
+      "id": "dist/docs/backup/index.html",
+      "kind": "output"
+    },
+    "dist/docs/benchmark/index.html": {
+      "id": "dist/docs/benchmark/index.html",
+      "kind": "output"
+    },
+    "dist/docs/bulk-import/index.html": {
+      "id": "dist/docs/bulk-import/index.html",
+      "kind": "output"
+    },
+    "dist/docs/chat/index.html": {
+      "id": "dist/docs/chat/index.html",
+      "kind": "output"
+    },
+    "dist/docs/comparison/index.html": {
+      "id": "dist/docs/comparison/index.html",
+      "kind": "output"
+    },
+    "dist/docs/config/index.html": {
+      "id": "dist/docs/config/index.html",
+      "kind": "output"
+    },
+    "dist/docs/custom-tools/index.html": {
+      "id": "dist/docs/custom-tools/index.html",
+      "kind": "output"
+    },
+    "dist/docs/deployment/index.html": {
+      "id": "dist/docs/deployment/index.html",
+      "kind": "output"
+    },
+    "dist/docs/docker-hub-update/index.html": {
+      "id": "dist/docs/docker-hub-update/index.html",
+      "kind": "output"
+    },
+    "dist/docs/docker-hub/index.html": {
+      "id": "dist/docs/docker-hub/index.html",
+      "kind": "output"
+    },
+    "dist/docs/docker-setup/index.html": {
+      "id": "dist/docs/docker-setup/index.html",
+      "kind": "output"
+    },
+    "dist/docs/docker/index.html": {
+      "id": "dist/docs/docker/index.html",
+      "kind": "output"
+    },
+    "dist/docs/embedding-providers/index.html": {
+      "id": "dist/docs/embedding-providers/index.html",
+      "kind": "output"
+    },
+    "dist/docs/examples/index.html": {
+      "id": "dist/docs/examples/index.html",
+      "kind": "output"
+    },
+    "dist/docs/features/index.html": {
+      "id": "dist/docs/features/index.html",
+      "kind": "output"
+    },
+    "dist/docs/geosearch/index.html": {
+      "id": "dist/docs/geosearch/index.html",
+      "kind": "output"
+    },
+    "dist/docs/graphql/index.html": {
+      "id": "dist/docs/graphql/index.html",
+      "kind": "output"
+    },
+    "dist/docs/grpc/index.html": {
+      "id": "dist/docs/grpc/index.html",
+      "kind": "output"
+    },
+    "dist/docs/healthcheck/index.html": {
+      "id": "dist/docs/healthcheck/index.html",
+      "kind": "output"
+    },
+    "dist/docs/index-audit/index.html": {
+      "id": "dist/docs/index-audit/index.html",
+      "kind": "output"
+    },
+    "dist/docs/installation/index.html": {
+      "id": "dist/docs/installation/index.html",
+      "kind": "output"
+    },
+    "dist/docs/integrations/index.html": {
+      "id": "dist/docs/integrations/index.html",
+      "kind": "output"
+    },
+    "dist/docs/license-audit/index.html": {
+      "id": "dist/docs/license-audit/index.html",
+      "kind": "output"
+    },
+    "dist/docs/llm-connections/index.html": {
+      "id": "dist/docs/llm-connections/index.html",
+      "kind": "output"
+    },
+    "dist/docs/mcp-revisions/index.html": {
+      "id": "dist/docs/mcp-revisions/index.html",
+      "kind": "output"
+    },
+    "dist/docs/mcp/index.html": {
+      "id": "dist/docs/mcp/index.html",
+      "kind": "output"
+    },
+    "dist/docs/multi-tenancy/index.html": {
+      "id": "dist/docs/multi-tenancy/index.html",
+      "kind": "output"
+    },
+    "dist/docs/panel/index.html": {
+      "id": "dist/docs/panel/index.html",
+      "kind": "output"
+    },
+    "dist/docs/pmisparse/index.html": {
+      "id": "dist/docs/pmisparse/index.html",
+      "kind": "output"
+    },
+    "dist/docs/quantization/index.html": {
+      "id": "dist/docs/quantization/index.html",
+      "kind": "output"
+    },
+    "dist/docs/quickstart/index.html": {
+      "id": "dist/docs/quickstart/index.html",
+      "kind": "output"
+    },
+    "dist/docs/rag-pipeline/index.html": {
+      "id": "dist/docs/rag-pipeline/index.html",
+      "kind": "output"
+    },
+    "dist/docs/readme/index.html": {
+      "id": "dist/docs/readme/index.html",
+      "kind": "output"
+    },
+    "dist/docs/replication/index.html": {
+      "id": "dist/docs/replication/index.html",
+      "kind": "output"
+    },
+    "dist/docs/schema-validation/index.html": {
+      "id": "dist/docs/schema-validation/index.html",
+      "kind": "output"
+    },
+    "dist/docs/search/index.html": {
+      "id": "dist/docs/search/index.html",
+      "kind": "output"
+    },
+    "dist/docs/security/index.html": {
+      "id": "dist/docs/security/index.html",
+      "kind": "output"
+    },
+    "dist/docs/sse/index.html": {
+      "id": "dist/docs/sse/index.html",
+      "kind": "output"
+    },
+    "dist/docs/symspell/index.html": {
+      "id": "dist/docs/symspell/index.html",
+      "kind": "output"
+    },
+    "dist/docs/telemetry/index.html": {
+      "id": "dist/docs/telemetry/index.html",
+      "kind": "output"
+    },
+    "dist/docs/temporal-track/index.html": {
+      "id": "dist/docs/temporal-track/index.html",
+      "kind": "output"
+    },
+    "dist/docs/tls/index.html": {
+      "id": "dist/docs/tls/index.html",
+      "kind": "output"
+    },
+    "dist/docs/use-cases/index.html": {
+      "id": "dist/docs/use-cases/index.html",
+      "kind": "output"
+    },
+    "dist/docs/uses-website-chat/index.html": {
+      "id": "dist/docs/uses-website-chat/index.html",
+      "kind": "output"
+    },
+    "dist/docs/uses-wordpress-analyzer/index.html": {
+      "id": "dist/docs/uses-wordpress-analyzer/index.html",
+      "kind": "output"
+    },
+    "dist/docs/uses-youtube-transcribe/index.html": {
+      "id": "dist/docs/uses-youtube-transcribe/index.html",
+      "kind": "output"
+    },
+    "dist/docs/wordpress-agent/index.html": {
+      "id": "dist/docs/wordpress-agent/index.html",
+      "kind": "output"
+    },
+    "dist/docs/zero-shot-classification/index.html": {
+      "id": "dist/docs/zero-shot-classification/index.html",
+      "kind": "output"
+    },
+    "dist/guides/index.html": {
+      "id": "dist/guides/index.html",
+      "kind": "output"
+    },
+    "docs/API.md": {
+      "id": "docs/API.md",
+      "kind": "content",
+      "hash": "5cf83eb4bbd1412caa0e035565b6fec9a82d69065ca743e0fe3cc21e3be05619"
+    },
+    "docs/ARCHITECTURE.md": {
+      "id": "docs/ARCHITECTURE.md",
+      "kind": "content",
+      "hash": "8893d98cc4bb497b6105df77b6024b33ef2f13510bc4f66ec1b1a1ca2e1f3bbe"
+    },
+    "docs/AUTHENTICATION.md": {
+      "id": "docs/AUTHENTICATION.md",
+      "kind": "content",
+      "hash": "ac78e0473f0fedb41fe060854884d2aebddfd62d666ac372d36cc272957b1e5f"
+    },
+    "docs/AUTH_IMPLEMENTATION_SUMMARY.md": {
+      "id": "docs/AUTH_IMPLEMENTATION_SUMMARY.md",
+      "kind": "content",
+      "hash": "ff3efe5c15a3d0f1fa113526716aea747f5149b9e58901667ad3e6175c1fe07b"
+    },
+    "docs/AUTH_QUICKSTART.md": {
+      "id": "docs/AUTH_QUICKSTART.md",
+      "kind": "content",
+      "hash": "f60640e500019f9a12a35bfd07f82f0a527e71a6d467e5d3c8583b281f63bd42"
+    },
+    "docs/AUTOMATIONS.md": {
+      "id": "docs/AUTOMATIONS.md",
+      "kind": "content",
+      "hash": "8d5fa67a536b28a9cfe4e42e823bde32263794ed5ad41d85358052473f1cb883"
+    },
+    "docs/BACKUP.md": {
+      "id": "docs/BACKUP.md",
+      "kind": "content",
+      "hash": "57be344e31499f584a88ce02d1f1ad95bb62cd6f4000a7c0a615d1a81ffdb4b0"
+    },
+    "docs/BENCHMARK.md": {
+      "id": "docs/BENCHMARK.md",
+      "kind": "content",
+      "hash": "9099b979a3fe401816bd61baf2259fcdfcddd8d361b6f18baa9e6d45ef77f9aa"
+    },
+    "docs/BLOG.md": {
+      "id": "docs/BLOG.md",
+      "kind": "content",
+      "hash": "4c0ca296e687d2417633141d601902657e18d04752eaca3171f2a723d52427c0"
+    },
+    "docs/BULK-IMPORT.md": {
+      "id": "docs/BULK-IMPORT.md",
+      "kind": "content",
+      "hash": "ddd5bbefe763ce187dcd6894dca251024305604f337e42d1dac5b4b86fa34f19"
+    },
+    "docs/COMPARISON.md": {
+      "id": "docs/COMPARISON.md",
+      "kind": "content",
+      "hash": "7a67accd4142b37b097d470de056318bf594012ecdeed602f98627c1c1a2fbea"
+    },
+    "docs/CUSTOM-TOOLS.md": {
+      "id": "docs/CUSTOM-TOOLS.md",
+      "kind": "content",
+      "hash": "d3f12083cf659677a6e4b3a37ac77c12671168a4ec39a980b559544248985f1f"
+    },
+    "docs/DEPLOYMENT.md": {
+      "id": "docs/DEPLOYMENT.md",
+      "kind": "content",
+      "hash": "a951c917773049aa0cf54eea3a79004c65345bff6cd549c2322fca678cf0c556"
+    },
+    "docs/DOCKER.md": {
+      "id": "docs/DOCKER.md",
+      "kind": "content",
+      "hash": "0139f7317bfe7627613d6365b50950a401e822064d88f8246ec46746ab3635e0"
+    },
+    "docs/DOCKER_HUB.md": {
+      "id": "docs/DOCKER_HUB.md",
+      "kind": "content",
+      "hash": "65841f8afa7315b773ba9304b39c03c136acc64f2935e1d4da8dde2e19416da5"
+    },
+    "docs/DOCKER_HUB_UPDATE.md": {
+      "id": "docs/DOCKER_HUB_UPDATE.md",
+      "kind": "content",
+      "hash": "e5d7ac79ef976dfbcfb0750640d7a4ea7b0806f65725b1e91a3eb9c280545607"
+    },
+    "docs/DOCKER_SETUP.md": {
+      "id": "docs/DOCKER_SETUP.md",
+      "kind": "content",
+      "hash": "8198366bef48838b90dc22ea07ba89a13f0bbcf882c63ec7e561e1f58ddfb39c"
+    },
+    "docs/EMBEDDING_PROVIDERS.md": {
+      "id": "docs/EMBEDDING_PROVIDERS.md",
+      "kind": "content",
+      "hash": "47e690c9f7af3f98d27a19724d89d640c1836aa9d66557fb01e9b8ed62b52d29"
+    },
+    "docs/EXAMPLES.md": {
+      "id": "docs/EXAMPLES.md",
+      "kind": "content",
+      "hash": "ce6bab3927650f4666bac519e11988e00a93be098a97df0b0f8732ab1b73df16"
+    },
+    "docs/FEATURES.md": {
+      "id": "docs/FEATURES.md",
+      "kind": "content",
+      "hash": "853f4e2093775dc552c16347b9679ae3a2d7f4dd1357691ef9fc63cd0dbdead6"
+    },
+    "docs/GEOSEARCH.md": {
+      "id": "docs/GEOSEARCH.md",
+      "kind": "content",
+      "hash": "1083635317f301a00d9732f6bd58549be4084a7dd2baf09f84806ce5600a631d"
+    },
+    "docs/GRAPHQL.md": {
+      "id": "docs/GRAPHQL.md",
+      "kind": "content",
+      "hash": "f9d328a09aef72c61f4665626cb9c35bc0c02841c1f53f43d019d0bba0c6086e"
+    },
+    "docs/GRPC.md": {
+      "id": "docs/GRPC.md",
+      "kind": "content",
+      "hash": "f5f27e7690d255054ff8c4ce051ecaf143b05f7d76301b7fa50a4c341773bf86"
+    },
+    "docs/GUIDES.md": {
+      "id": "docs/GUIDES.md",
+      "kind": "content",
+      "hash": "71cdf943da22594e963c05eea9feb1e8f289d8332e307d8010083fe9c277bd8c"
+    },
+    "docs/HEALTHCHECK.md": {
+      "id": "docs/HEALTHCHECK.md",
+      "kind": "content",
+      "hash": "55f413f4221326ae0e90fa9811c18f53f7176a5b5421e2f8e760e8afae3c7e9f"
+    },
+    "docs/INDEX_AUDIT.md": {
+      "id": "docs/INDEX_AUDIT.md",
+      "kind": "content",
+      "hash": "ba8903a6ca159e9736dc042a425500cdd8346efad3973146beba285b64736780"
+    },
+    "docs/INSTALLATION.md": {
+      "id": "docs/INSTALLATION.md",
+      "kind": "content",
+      "hash": "45f22f0ff3d3423afd7765f6fc8ca4b16bdbaa08ba00e31c5320e6b29fb5f671"
+    },
+    "docs/INTEGRATIONS.md": {
+      "id": "docs/INTEGRATIONS.md",
+      "kind": "content",
+      "hash": "a38f2df78c5af8075e725995bbb09d6f53ff3b65ff0eecf2b9b2ef911b1aae7d"
+    },
+    "docs/LICENSE_AUDIT.md": {
+      "id": "docs/LICENSE_AUDIT.md",
+      "kind": "content",
+      "hash": "0b5a879aab7f2de892716618118a0c403c1edc4c3a94fbe08610c1d863383bde"
+    },
+    "docs/LLM_CONNECTIONS.md": {
+      "id": "docs/LLM_CONNECTIONS.md",
+      "kind": "content",
+      "hash": "bbf316138426ae8927cf50d6fd0bcfd726ffe886ab261f21f27e9cb6db087b4f"
+    },
+    "docs/MCP-REVISIONS.md": {
+      "id": "docs/MCP-REVISIONS.md",
+      "kind": "content",
+      "hash": "b4f90ecb063a2aec1e106adaa40cf6eff2011a4251b68c72431e7b52bcd9ec85"
+    },
+    "docs/MCP.md": {
+      "id": "docs/MCP.md",
+      "kind": "content",
+      "hash": "a913d873c09896d98492468b8746f510cf6562a8d0eaa5fe861396eb25ed8830"
+    },
+    "docs/MULTI_TENANCY.md": {
+      "id": "docs/MULTI_TENANCY.md",
+      "kind": "content",
+      "hash": "7c877476df7e91f81e448d5e11e4eac2f66c4dc7d06b5c3f08b0027d06fd5bd1"
+    },
+    "docs/PANEL.md": {
+      "id": "docs/PANEL.md",
+      "kind": "content",
+      "hash": "90c5182710c5dbe61b5b1bc0a2ad3d2dbe6a413d851d3d9483dc1fab055d42ae"
+    },
+    "docs/PMISPARSE.md": {
+      "id": "docs/PMISPARSE.md",
+      "kind": "content",
+      "hash": "65e7a300026b978f8b1ca44e17d64a7dfe84fa0bc839d49284052a6363c09c07"
+    },
+    "docs/QUANTIZATION.md": {
+      "id": "docs/QUANTIZATION.md",
+      "kind": "content",
+      "hash": "bca03eb81263000c75014f8b97491cf9c393452c62c855dc48aaa7e3e281a193"
+    },
+    "docs/QUICKSTART.md": {
+      "id": "docs/QUICKSTART.md",
+      "kind": "content",
+      "hash": "1f556ecc41abf34d83ad0506bb15ac961f5247130542abf3a1330b92e54f23b3"
+    },
+    "docs/RAG-PIPELINE.md": {
+      "id": "docs/RAG-PIPELINE.md",
+      "kind": "content",
+      "hash": "f3ab061fbba997b66aaa2540a8a192b71fbd918cb5fbef493e3b534bd79d1725"
+    },
+    "docs/README.md": {
+      "id": "docs/README.md",
+      "kind": "content",
+      "hash": "e54156a43ffa5abb3c70a39df030da274e7c0c8bcf76c88abe8642ef557e01ed"
+    },
+    "docs/REPLICATION.md": {
+      "id": "docs/REPLICATION.md",
+      "kind": "content",
+      "hash": "ec64d5640059e58fe1c78a561a051c0a96dc95b30bc511fe0f30fd74c1793033"
+    },
+    "docs/SCHEMA-VALIDATION.md": {
+      "id": "docs/SCHEMA-VALIDATION.md",
+      "kind": "content",
+      "hash": "7f7fb18d45e6d28216d337d4f6af347b3d521ee23881b9ece8cbc4058cb6689c"
+    },
+    "docs/SEARCH.md": {
+      "id": "docs/SEARCH.md",
+      "kind": "content",
+      "hash": "ed10425d18467b8248d549fffb04609ff7dddd7f7969b56424439fbc1c3b34b9"
+    },
+    "docs/SECURITY.md": {
+      "id": "docs/SECURITY.md",
+      "kind": "content",
+      "hash": "b87464d6b87c1717ba1257fce17f8adc0441c24b665d9a493fdf5724f9697559"
+    },
+    "docs/SSE.md": {
+      "id": "docs/SSE.md",
+      "kind": "content",
+      "hash": "6786689466c0bd7d8caad46f13e9fc627d36de1f13273b30b016cc2364167911"
+    },
+    "docs/SYMSPELL.md": {
+      "id": "docs/SYMSPELL.md",
+      "kind": "content",
+      "hash": "1d51cc9c7d43ecc331c4061a26701ca6841c6750eeb64aa3981daa8f7cf2a67b"
+    },
+    "docs/TELEMETRY.md": {
+      "id": "docs/TELEMETRY.md",
+      "kind": "content",
+      "hash": "07f08952e7cc46c2656f079929581fd1dfe753d7316f1bc8d2df514d3c94cdc0"
+    },
+    "docs/TEMPORAL-TRACK.md": {
+      "id": "docs/TEMPORAL-TRACK.md",
+      "kind": "content",
+      "hash": "b50a606e4030ecfbfaf6444b9c31b244816029c279aa75e8b96243321685b4e9"
+    },
+    "docs/TLS.md": {
+      "id": "docs/TLS.md",
+      "kind": "content",
+      "hash": "9a7026092ac32fc5785392aaa40b6d1d5be4fcbddfe4dafe66cf12916f22b08f"
+    },
+    "docs/USES-WEBSITE-CHAT.md": {
+      "id": "docs/USES-WEBSITE-CHAT.md",
+      "kind": "content",
+      "hash": "6058c5f8203c292bef10cbd169c71c2c07fd8a24dd849b09d7e310cfc552a6de"
+    },
+    "docs/USES-WORDPRESS-ANALYZER.md": {
+      "id": "docs/USES-WORDPRESS-ANALYZER.md",
+      "kind": "content",
+      "hash": "d307d7a7c96052c4c34ffbf3457e8d60e0ed75e868f3a5a0873155ea2f378128"
+    },
+    "docs/USES-YOUTUBE-TRANSCRIBE.md": {
+      "id": "docs/USES-YOUTUBE-TRANSCRIBE.md",
+      "kind": "content",
+      "hash": "e6444e6af447fc8f004030ce000b5f2c11149bb99b2d04c7e373b7653eaf89f8"
+    },
+    "docs/USE_CASES.md": {
+      "id": "docs/USE_CASES.md",
+      "kind": "content",
+      "hash": "748af4ba3d1cbebe7bfaea6f7fa420bfe62f0d457a1db081306305fd2e9f8fc5"
+    },
+    "docs/WORDPRESS-AGENT.md": {
+      "id": "docs/WORDPRESS-AGENT.md",
+      "kind": "content",
+      "hash": "3b45b2a639ef81412bee8d57bb2760859a3e8dbe5a6a7d006f6a06f6f893293d"
+    },
+    "docs/ZERO-SHOT-CLASSIFICATION.md": {
+      "id": "docs/ZERO-SHOT-CLASSIFICATION.md",
+      "kind": "content",
+      "hash": "fc1e72c49330eb6d78e708d4670b52abb5de1f4ed75f385cce9f2b19f42cfaaa"
+    },
+    "docs/chat.md": {
+      "id": "docs/chat.md",
+      "kind": "content",
+      "hash": "985c0356873e10d62e870e0110788f68ed5d1d5bb46cecd7a2b57bb4374daba2"
+    },
+    "docs/config.md": {
+      "id": "docs/config.md",
+      "kind": "content",
+      "hash": "e4ef64b1d7750810b067c64d0234c8b35d7a45f5eb041a70687bc82a78f21b49"
+    },
+    "services/ssg-template/404.html": {
+      "id": "services/ssg-template/404.html",
+      "kind": "template",
+      "hash": "7c07a29fce35557c7a66293f63016610c807a3a3898358f8f6e1358024896a36"
+    },
+    "services/ssg-template/base.html": {
+      "id": "services/ssg-template/base.html",
+      "kind": "template",
+      "hash": "c59950517f8cb32ecc1e24b29029a692638624e2efadeac34bdeaaee069dc1e4"
+    },
+    "services/ssg-template/category.html": {
+      "id": "services/ssg-template/category.html",
+      "kind": "template",
+      "hash": "13e9152da211d3457d01e0b07a463a41e6161b19c1168be37640040219af7f5c"
+    },
+    "services/ssg-template/css.test.mjs": {
+      "id": "services/ssg-template/css.test.mjs",
+      "kind": "template",
+      "hash": "7dc8bce314051236e04f65399938333bec45133ea676899de161dbab395197ad"
+    },
+    "services/ssg-template/css/base.css": {
+      "id": "services/ssg-template/css/base.css",
+      "kind": "template",
+      "hash": "de01e22617be41a9988c0958960477579f04a38f5443d42a6f7e96fcb459c58b"
+    },
+    "services/ssg-template/css/docs.css": {
+      "id": "services/ssg-template/css/docs.css",
+      "kind": "template",
+      "hash": "f750fbcc40f970c395788b022fa6f9af02a2065d49d3f635b2f1f02d5dc5993d"
+    },
+    "services/ssg-template/css/landing.css": {
+      "id": "services/ssg-template/css/landing.css",
+      "kind": "template",
+      "hash": "c9a176bf5a39f1942384b7a5fbd4625f4fa9431d288a2acedd6456475cb9604d"
+    },
+    "services/ssg-template/css/tradik-tokens.css": {
+      "id": "services/ssg-template/css/tradik-tokens.css",
+      "kind": "template",
+      "hash": "4f8d77760cef29c2739776adf1152f988271242ae28e63035b56e79f78818bc2"
+    },
+    "services/ssg-template/extract-fn.mjs": {
+      "id": "services/ssg-template/extract-fn.mjs",
+      "kind": "template",
+      "hash": "6aaf3144282db6cf0b74191709b4a79030c0d31f67ff2f45af772acfb49c533a"
+    },
+    "services/ssg-template/images/chat.webp": {
+      "id": "services/ssg-template/images/chat.webp",
+      "kind": "template",
+      "hash": "ac0ab55cb3c7d9eaedac53be155aff5f5f36d489635bf9a476a320f1c982f472"
+    },
+    "services/ssg-template/images/gits.png": {
+      "id": "services/ssg-template/images/gits.png",
+      "kind": "template",
+      "hash": "59b0ff9f189b68c706ddd6e60559f23930df93110f21eb2c328f50ef6d249e14"
+    },
+    "services/ssg-template/images/hero.webp": {
+      "id": "services/ssg-template/images/hero.webp",
+      "kind": "template",
+      "hash": "181b213865cb272791e81acaebcf79f12418ab9817ca209c794f4c9d0b5142fd"
+    },
+    "services/ssg-template/images/logo.svg": {
+      "id": "services/ssg-template/images/logo.svg",
+      "kind": "template",
+      "hash": "c14266ad8eacb457ef74b44ee0f2b2ec6579f564ab16983abb2d06e8159cb5ef"
+    },
+    "services/ssg-template/images/panel.png": {
+      "id": "services/ssg-template/images/panel.png",
+      "kind": "template",
+      "hash": "c3ff4d1907cb57aa453f8d1cd124b58bd8ec4647bae6b6ceb29c5aab84d53185"
+    },
+    "services/ssg-template/index-md.test.mjs": {
+      "id": "services/ssg-template/index-md.test.mjs",
+      "kind": "template",
+      "hash": "90ade408461ead238d8d05292ccc16f1a3ddf280a5e383a0881eb3c808619c0f"
+    },
+    "services/ssg-template/index-section-ai-strip.html": {
+      "id": "services/ssg-template/index-section-ai-strip.html",
+      "kind": "template",
+      "hash": "7b3004e1eef3706f776715ea01ea5d385db81e4d54795f66d08c19ec43969750"
+    },
+    "services/ssg-template/index-section-community.html": {
+      "id": "services/ssg-template/index-section-community.html",
+      "kind": "template",
+      "hash": "98499eda4e29beabfc2ef9a17f7eb129c692169de6ff250aabcd522708e27975"
+    },
+    "services/ssg-template/index-section-documentation.html": {
+      "id": "services/ssg-template/index-section-documentation.html",
+      "kind": "template",
+      "hash": "c553edb37474b8b2f7906e6906f2849ee1d0b463e3e6cbae0228c4f1a99b376e"
+    },
+    "services/ssg-template/index-section-download.html": {
+      "id": "services/ssg-template/index-section-download.html",
+      "kind": "template",
+      "hash": "34d1bfb12df44c5463af6595fc2d7df59de404d6bd92ef14b3930645d5913c8f"
+    },
+    "services/ssg-template/index-section-examples.html": {
+      "id": "services/ssg-template/index-section-examples.html",
+      "kind": "template",
+      "hash": "c451afb4216a84f61c593977c8db84dbd3b3df36dffc531c78e6e1f810df7d4f"
+    },
+    "services/ssg-template/index-section-features.html": {
+      "id": "services/ssg-template/index-section-features.html",
+      "kind": "template",
+      "hash": "766a1156e52543040a25a66caaea0a1c74cb5ae15496f65b0268e7e90c02cb10"
+    },
+    "services/ssg-template/index-section-hero.html": {
+      "id": "services/ssg-template/index-section-hero.html",
+      "kind": "template",
+      "hash": "c9f0f9e235d385d67c14d89dcd2947a95a318d79264788ae7984108410bcd6a3"
+    },
+    "services/ssg-template/index-section-quick-start.html": {
+      "id": "services/ssg-template/index-section-quick-start.html",
+      "kind": "template",
+      "hash": "ca3c64b27f446f1a5ce45d9f34e61a538ff9e68f4eb1a39f4f43cd68fd673b3c"
+    },
+    "services/ssg-template/index-section-replication.html": {
+      "id": "services/ssg-template/index-section-replication.html",
+      "kind": "template",
+      "hash": "26602c458e9ed4671022ac4d1e685b505adb241fbe6933a2b799e63b7bdd4b06"
+    },
+    "services/ssg-template/index-section-web-panel.html": {
+      "id": "services/ssg-template/index-section-web-panel.html",
+      "kind": "template",
+      "hash": "46f5dbd5657d0767cf3d2189b82a62cbc5e9f0a1aa6c793ef2b62efc615929f2"
+    },
+    "services/ssg-template/index.html": {
+      "id": "services/ssg-template/index.html",
+      "kind": "template",
+      "hash": "9ff46b4a0cc610d01e0c979b2011af0f57dc0a6d3b4f37ee0ed9a87d7f13af07"
+    },
+    "services/ssg-template/js/main.js": {
+      "id": "services/ssg-template/js/main.js",
+      "kind": "template",
+      "hash": "049f6a9a88d234448eef3e48fa018597db3a22c7d51ce22ccd63c6c8b449f869"
+    },
+    "services/ssg-template/layouts/blog.html": {
+      "id": "services/ssg-template/layouts/blog.html",
+      "kind": "template",
+      "hash": "4769c25fc3ccf4d7f16e47dbb7ace1f865fceb211984a2ddabc299dba7c2d27a"
+    },
+    "services/ssg-template/og-image.png": {
+      "id": "services/ssg-template/og-image.png",
+      "kind": "template",
+      "hash": "df42c16be6d3efdbc259f5ac8acad76d4bfbbb229e34ab3500795dba0cec917d"
+    },
+    "services/ssg-template/page.html": {
+      "id": "services/ssg-template/page.html",
+      "kind": "template",
+      "hash": "9c059de4ebd0176a161e78f3d41dbb58e41cf230138975fc32647a61ceb9ed91"
+    },
+    "services/ssg-template/post.html": {
+      "id": "services/ssg-template/post.html",
+      "kind": "template",
+      "hash": "7eccdf870b47191f8d6e10f298daf0dee662a769d795a428e7d1a03c557bd165"
+    },
+    "services/ssg-template/sri.test.mjs": {
+      "id": "services/ssg-template/sri.test.mjs",
+      "kind": "template",
+      "hash": "57ebe28dd984969371a3e749e99b969e1f5686fd747603762b05fee5c853bda7"
+    },
+    "services/ssg-template/static/.well-known/security.txt": {
+      "id": "services/ssg-template/static/.well-known/security.txt",
+      "kind": "template",
+      "hash": "86877a5ca0838be0acf1d1c02a6ec12df8a91f0fe39f3557b8ab06db7d228b09"
+    },
+    "services/ssg-template/swagger.html": {
+      "id": "services/ssg-template/swagger.html",
+      "kind": "template",
+      "hash": "0a4b45c13e83a269e7bb6ab8761e3ab0fe0503bb54209bcfc1e72ff619ba8be0"
+    },
+    "services/ssg-template/tag.html": {
+      "id": "services/ssg-template/tag.html",
+      "kind": "template",
+      "hash": "1c1a804c7eb94f5a3edd8c145d60d523277efcf169fe53f838085c73d2a8eec4"
+    }
+  },
+  "edges": {
+    "blog/2026-07-31-mddb-2-11-4.md": [
+      "dist/blog/mddb-2-11-4/index.html"
+    ],
+    "blog/2026-08-02-wordpress-plugin.md": [
+      "dist/blog/wordpress-plugin/index.html"
+    ],
+    "blog/2026-08-23-the-collection-knows-how-to-be-searched.md": [
+      "dist/blog/the-collection-knows-how-to-be-searched/index.html"
+    ],
+    "blog/2026-08-23-what-breaks-if-i-change-this.md": [
+      "dist/blog/what-breaks-if-i-change-this/index.html"
+    ],
+    "blog/2026-08-23-which-algorithm-should-i-use.md": [
+      "dist/blog/which-algorithm-should-i-use/index.html"
+    ],
+    "blog/2026-08-23-your-vector-search-rewards-duplicates.md": [
+      "dist/blog/your-vector-search-rewards-duplicates/index.html"
+    ],
+    "blog/2026-08-24-rss-is-the-wrong-number.md": [
+      "dist/blog/rss-is-the-wrong-number/index.html"
+    ],
+    "blog/2026-08-24-the-loop-that-was-not-waiting-for-memory.md": [
+      "dist/blog/the-loop-that-was-not-waiting-for-memory/index.html"
+    ],
+    "blog/2026-08-24-whats-new-in-mddb-2-12.md": [
+      "dist/blog/whats-new-in-mddb-2-12/index.html"
+    ],
+    "blog/2026-08-24-whats-new-in-mddb-2-13.md": [
+      "dist/blog/whats-new-in-mddb-2-13/index.html"
+    ],
+    "blog/2026-08-29-why-your-rag-returns-the-wrong-document.md": [
+      "dist/blog/why-your-rag-returns-the-wrong-document/index.html"
+    ],
+    "blog/2026-09-08-duplicate-pages-your-crawler-cannot-see.md": [
+      "dist/blog/duplicate-pages-your-crawler-cannot-see/index.html"
+    ],
+    "blog/2026-09-08-whats-new-in-mddb-2-14.md": [
+      "dist/blog/whats-new-in-mddb-2-14/index.html"
+    ],
+    "docs/API.md": [
+      "dist/docs/api/index.html"
+    ],
+    "docs/ARCHITECTURE.md": [
+      "dist/docs/architecture/index.html"
+    ],
+    "docs/AUTHENTICATION.md": [
+      "dist/docs/authentication/index.html"
+    ],
+    "docs/AUTH_IMPLEMENTATION_SUMMARY.md": [
+      "dist/docs/auth-implementation-summary/index.html"
+    ],
+    "docs/AUTH_QUICKSTART.md": [
+      "dist/docs/auth-quickstart/index.html"
+    ],
+    "docs/AUTOMATIONS.md": [
+      "dist/docs/automations/index.html"
+    ],
+    "docs/BACKUP.md": [
+      "dist/docs/backup/index.html"
+    ],
+    "docs/BENCHMARK.md": [
+      "dist/docs/benchmark/index.html"
+    ],
+    "docs/BLOG.md": [
+      "dist/blog/index.html"
+    ],
+    "docs/BULK-IMPORT.md": [
+      "dist/docs/bulk-import/index.html"
+    ],
+    "docs/COMPARISON.md": [
+      "dist/docs/comparison/index.html"
+    ],
+    "docs/CUSTOM-TOOLS.md": [
+      "dist/docs/custom-tools/index.html"
+    ],
+    "docs/DEPLOYMENT.md": [
+      "dist/docs/deployment/index.html"
+    ],
+    "docs/DOCKER.md": [
+      "dist/docs/docker/index.html"
+    ],
+    "docs/DOCKER_HUB.md": [
+      "dist/docs/docker-hub/index.html"
+    ],
+    "docs/DOCKER_HUB_UPDATE.md": [
+      "dist/docs/docker-hub-update/index.html"
+    ],
+    "docs/DOCKER_SETUP.md": [
+      "dist/docs/docker-setup/index.html"
+    ],
+    "docs/EMBEDDING_PROVIDERS.md": [
+      "dist/docs/embedding-providers/index.html"
+    ],
+    "docs/EXAMPLES.md": [
+      "dist/docs/examples/index.html"
+    ],
+    "docs/FEATURES.md": [
+      "dist/docs/features/index.html"
+    ],
+    "docs/GEOSEARCH.md": [
+      "dist/docs/geosearch/index.html"
+    ],
+    "docs/GRAPHQL.md": [
+      "dist/docs/graphql/index.html"
+    ],
+    "docs/GRPC.md": [
+      "dist/docs/grpc/index.html"
+    ],
+    "docs/GUIDES.md": [
+      "dist/guides/index.html"
+    ],
+    "docs/HEALTHCHECK.md": [
+      "dist/docs/healthcheck/index.html"
+    ],
+    "docs/INDEX_AUDIT.md": [
+      "dist/docs/index-audit/index.html"
+    ],
+    "docs/INSTALLATION.md": [
+      "dist/docs/installation/index.html"
+    ],
+    "docs/INTEGRATIONS.md": [
+      "dist/docs/integrations/index.html"
+    ],
+    "docs/LICENSE_AUDIT.md": [
+      "dist/docs/license-audit/index.html"
+    ],
+    "docs/LLM_CONNECTIONS.md": [
+      "dist/docs/llm-connections/index.html"
+    ],
+    "docs/MCP-REVISIONS.md": [
+      "dist/docs/mcp-revisions/index.html"
+    ],
+    "docs/MCP.md": [
+      "dist/docs/mcp/index.html"
+    ],
+    "docs/MULTI_TENANCY.md": [
+      "dist/docs/multi-tenancy/index.html"
+    ],
+    "docs/PANEL.md": [
+      "dist/docs/panel/index.html"
+    ],
+    "docs/PMISPARSE.md": [
+      "dist/docs/pmisparse/index.html"
+    ],
+    "docs/QUANTIZATION.md": [
+      "dist/docs/quantization/index.html"
+    ],
+    "docs/QUICKSTART.md": [
+      "dist/docs/quickstart/index.html"
+    ],
+    "docs/RAG-PIPELINE.md": [
+      "dist/docs/rag-pipeline/index.html"
+    ],
+    "docs/README.md": [
+      "dist/docs/readme/index.html"
+    ],
+    "docs/REPLICATION.md": [
+      "dist/docs/replication/index.html"
+    ],
+    "docs/SCHEMA-VALIDATION.md": [
+      "dist/docs/schema-validation/index.html"
+    ],
+    "docs/SEARCH.md": [
+      "dist/docs/search/index.html"
+    ],
+    "docs/SECURITY.md": [
+      "dist/docs/security/index.html"
+    ],
+    "docs/SSE.md": [
+      "dist/docs/sse/index.html"
+    ],
+    "docs/SYMSPELL.md": [
+      "dist/docs/symspell/index.html"
+    ],
+    "docs/TELEMETRY.md": [
+      "dist/docs/telemetry/index.html"
+    ],
+    "docs/TEMPORAL-TRACK.md": [
+      "dist/docs/temporal-track/index.html"
+    ],
+    "docs/TLS.md": [
+      "dist/docs/tls/index.html"
+    ],
+    "docs/USES-WEBSITE-CHAT.md": [
+      "dist/docs/uses-website-chat/index.html"
+    ],
+    "docs/USES-WORDPRESS-ANALYZER.md": [
+      "dist/docs/uses-wordpress-analyzer/index.html"
+    ],
+    "docs/USES-YOUTUBE-TRANSCRIBE.md": [
+      "dist/docs/uses-youtube-transcribe/index.html"
+    ],
+    "docs/USE_CASES.md": [
+      "dist/docs/use-cases/index.html"
+    ],
+    "docs/WORDPRESS-AGENT.md": [
+      "dist/docs/wordpress-agent/index.html"
+    ],
+    "docs/ZERO-SHOT-CLASSIFICATION.md": [
+      "dist/docs/zero-shot-classification/index.html"
+    ],
+    "docs/chat.md": [
+      "dist/docs/chat/index.html"
+    ],
+    "docs/config.md": [
+      "dist/docs/config/index.html"
+    ]
+  }
+}
