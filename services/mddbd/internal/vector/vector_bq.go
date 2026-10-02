@@ -203,6 +203,9 @@ func (b *BQIndex) hammingSearch(c *bqCollection, query []float32, topK int, thre
 		if allowed != nil && !allowed[BaseDocID(docID)] {
 			continue
 		}
+		if len(c.origVecs[docID]) != len(query) {
+			continue // another embedding model's vector; it would take a rerank slot
+		}
 		dist := hammingDistance(queryCode, code)
 		candidates = append(candidates, candidate{docID: docID, hamDist: dist})
 	}
@@ -227,6 +230,9 @@ func (b *BQIndex) hammingSearch(c *bqCollection, query []float32, topK int, thre
 		vec, ok := c.origVecs[cand.docID]
 		if !ok {
 			continue
+		}
+		if len(vec) != len(query) {
+			continue // another embedding model's vector; see sameDimension
 		}
 		score := metric(query, vec)
 		if float64(score) >= threshold {

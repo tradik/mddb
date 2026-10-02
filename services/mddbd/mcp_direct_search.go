@@ -345,7 +345,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 			}
 			for _, searcher := range s.VectorSearchers {
 				if trainer, ok := searcher.(vec.Trainable); ok {
-					go trainer.Train(req.Collection, collVecs)
+					go vec.TrainSafely(trainer, req.Collection, collVecs)
 				}
 			}
 		}

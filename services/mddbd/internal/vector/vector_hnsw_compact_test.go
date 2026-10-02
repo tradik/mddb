@@ -88,17 +88,33 @@ func TestCompactionTriggersAtThreshold(t *testing.T) {
 		t.Errorf("DeletedSince = %d, want 10", got)
 	}
 
-	// ...and crossing it rebuilds. With a 20% threshold the rebuild happens on
-	// the 20th deletion (80 live, 20 gone), which resets the debt; the five
+	// ...and crossing it rebuilds. With a 50% threshold the rebuild happens on
+	// the 50th deletion (50 live, 50 gone), which resets the debt; the five
 	// deletions after that start accumulating the next round.
-	for i := 10; i < 25; i++ {
+	for i := 10; i < 55; i++ {
 		idx.Remove("c", fmt.Sprintf("doc-%05d", i))
 	}
 	if got := idx.DeletedSince("c"); got != 5 {
-		t.Errorf("DeletedSince after 25 deletions with a rebuild at 20 = %d, want 5", got)
+		t.Errorf("DeletedSince after 55 deletions with a rebuild at 50 = %d, want 5", got)
 	}
-	if got := idx.CollectionSize("c"); got != 75 {
-		t.Errorf("the rebuilt graph should hold the 75 live vectors, got %d", got)
+	if got := idx.CollectionSize("c"); got != 45 {
+		t.Errorf("the rebuilt graph should hold the 45 live vectors, got %d", got)
+	}
+}
+
+// An overwrite leaves a tombstone, so it is debt like a deletion (#267).
+func TestAnOverwriteIsDeletionDebt(t *testing.T) {
+	idx, _ := compactTestIndex(t, 100, 0)
+	for i := range 10 {
+		if err := idx.Add("c", fmt.Sprintf("doc-%05d", i), query32(uint64(i))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := idx.DeletedSince("c"); got != 10 {
+		t.Errorf("DeletedSince after 10 overwrites = %d, want 10", got)
+	}
+	if got := idx.CollectionSize("c"); got != 100 {
+		t.Errorf("CollectionSize = %d, want 100", got)
 	}
 }
 

@@ -1,6 +1,7 @@
 package vector
 
 import (
+	"log/slog"
 	"maps"
 	"sync"
 )
@@ -88,11 +89,81 @@ func autoTrain(mu *sync.RWMutex, state func() (*trainState, map[string][]float32
 	}
 	mu.Unlock()
 
+	runTrain := func() {
+		// Whatever happens in train, the collection must not be left marked
+		// as retraining, or it is never trained again.
+		defer func() {
+			mu.Lock()
+			if t, _ := state(); t != nil {
+				t.retraining = false
+			}
+			mu.Unlock()
+		}()
+		TrainSafely(trainFunc(train), "", snapshot)
+	}
 	if wait {
-		train(snapshot)
+		runTrain()
 		return
 	}
-	go train(snapshot)
+	go runTrain()
+}
+
+// trainFunc adapts a closure to Trainable.
+type trainFunc func(map[string][]float32)
+
+func (f trainFunc) Train(_ string, v map[string][]float32) { f(v) }
+
+// TrainSafely trains an index and turns a panic into a log line.
+//
+// Training runs in a goroutine after a reindex and after a collection
+// doubles, and a panic in a goroutine has no handler above it: it ends the
+// process. A collection holding embeddings from two models used to do
+// exactly that — PQ sliced every vector by the first one's dimension (#269
+// class). Every training call goes through here so the next such bug costs
+// one collection its trained structure, not the server.
+func TrainSafely(t Trainable, collection string, vectors map[string][]float32) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("index training panicked; the collection keeps its previous structure",
+				"collection", collection, "panic", r)
+		}
+	}()
+	t.Train(collection, vectors)
+}
+
+// sameDimension returns the vectors of the dimension most of them have, and
+// that dimension (the larger one on a tie, so the answer does not depend on
+// map order).
+//
+// A collection can hold embeddings from two models — the old one's until a
+// reindex replaces them, the new one's from the first document re-embedded.
+// Trained indexes build one structure of one dimension, and used to take it
+// from whichever vector map iteration produced first: PQ then sliced every
+// other vector by it and panicked, and the rest trained on garbage. Vectors
+// of the other dimension stay in the index, uncoded; a query of their
+// dimension finds nothing in the trained structure, as it could not be
+// compared with it anyway.
+func sameDimension(vectors map[string][]float32) (map[string][]float32, int) {
+	counts := map[int]int{}
+	for _, v := range vectors {
+		counts[len(v)]++
+	}
+	dim, best := 0, 0
+	for d, n := range counts {
+		if d > 0 && (n > best || (n == best && d > dim)) {
+			dim, best = d, n
+		}
+	}
+	if len(counts) == 1 {
+		return vectors, dim
+	}
+	same := make(map[string][]float32, best)
+	for id, v := range vectors {
+		if len(v) == dim {
+			same[id] = v
+		}
+	}
+	return same, dim
 }
 
 // The five indexes' hooks: which vectors each keeps, and its Train.

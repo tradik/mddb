@@ -88,7 +88,8 @@ func (p *PQIndex) Add(collection, docID string, vector []float32) error {
 	c.origVecs[docID] = vector
 
 	// If trained, encode the vector
-	if c.trained && len(c.codebooks) > 0 {
+	delete(c.codes, docID) // the replaced vector's code, if any
+	if c.trained && len(c.codebooks) > 0 && len(vector) == c.dim {
 		c.codes[docID] = p.encode(c, vector)
 	}
 	return nil
@@ -113,12 +114,7 @@ func (p *PQIndex) Train(collection string, vectors map[string][]float32) {
 		return
 	}
 
-	// Get dimensionality
-	var dim int
-	for _, v := range vectors {
-		dim = len(v)
-		break
-	}
+	vectors, dim := sameDimension(vectors)
 	if dim == 0 {
 		return
 	}
@@ -232,7 +228,7 @@ func (p *PQIndex) Search(collection string, query []float32, topK int, threshold
 	defer p.mu.RUnlock()
 
 	c, ok := p.data[collection]
-	if !ok || !c.trained || len(c.codebooks) == 0 {
+	if !ok || !c.trained || len(c.codebooks) == 0 || len(query) != c.dim {
 		return nil
 	}
 	if topK <= 0 {
@@ -249,7 +245,7 @@ func (p *PQIndex) SearchWithFilter(collection string, query []float32, topK int,
 	defer p.mu.RUnlock()
 
 	c, ok := p.data[collection]
-	if !ok || !c.trained || len(c.codebooks) == 0 {
+	if !ok || !c.trained || len(c.codebooks) == 0 || len(query) != c.dim {
 		return nil
 	}
 	if topK <= 0 {
@@ -324,6 +320,9 @@ func (p *PQIndex) adcSearch(c *pqCollection, query []float32, topK int, threshol
 		vec, ok := c.origVecs[cand.docID]
 		if !ok {
 			continue
+		}
+		if len(vec) != len(query) {
+			continue // another embedding model's vector; see sameDimension
 		}
 		score := metric(query, vec)
 		if float64(score) >= threshold {

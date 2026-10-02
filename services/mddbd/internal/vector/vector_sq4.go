@@ -95,7 +95,8 @@ func (s *SQ4Index) Add(collection, docID string, vector []float32) error {
 	c := s.getOrCreate(collection)
 	c.origVecs[docID] = vector
 
-	if c.trained && len(c.scales) > 0 {
+	delete(c.codes, docID) // the replaced vector's code, if any
+	if c.trained && len(c.scales) > 0 && len(vector) == c.dim {
 		c.codes[docID] = c.encode(vector)
 	}
 	return nil
@@ -123,11 +124,7 @@ func (s *SQ4Index) Train(collection string, vectors map[string][]float32) {
 		return
 	}
 
-	dim := 0
-	for _, v := range vectors {
-		dim = len(v)
-		break
-	}
+	vectors, dim := sameDimension(vectors)
 	if dim == 0 {
 		return
 	}
@@ -176,6 +173,9 @@ func (s *SQ4Index) Train(collection string, vectors map[string][]float32) {
 		}
 	}
 
+	// A fresh map: codes from an earlier training of another dimension are
+	// not comparable with this one's, and reading one panicked.
+	c.codes = make(map[string][]uint8, len(vectors))
 	for docID, v := range vectors {
 		c.origVecs[docID] = v
 		c.codes[docID] = c.encode(v)
@@ -183,7 +183,7 @@ func (s *SQ4Index) Train(collection string, vectors map[string][]float32) {
 	// Vectors added while training ran are in the collection but not in the
 	// snapshot it trained on; encode them into the new structure too.
 	for docID, v := range c.origVecs {
-		if _, inSnapshot := vectors[docID]; !inSnapshot {
+		if _, inSnapshot := vectors[docID]; !inSnapshot && len(v) == dim {
 			c.codes[docID] = c.encode(v)
 		}
 	}
@@ -264,7 +264,7 @@ func (s *SQ4Index) SearchWithFilter(collection string, query []float32, topK int
 	defer s.mu.RUnlock()
 
 	c, ok := s.data[collection]
-	if !ok || !c.trained || len(c.codes) == 0 {
+	if !ok || !c.trained || len(c.codes) == 0 || len(query) != c.dim {
 		return nil
 	}
 	if topK <= 0 {
@@ -321,6 +321,9 @@ func (s *SQ4Index) SearchWithFilter(collection string, query []float32, topK int
 		vec, ok := c.origVecs[candidates[i].docID]
 		if !ok {
 			continue
+		}
+		if len(vec) != len(query) {
+			continue // another embedding model's vector; see sameDimension
 		}
 		score := metric(query, vec)
 		if float64(score) >= threshold {

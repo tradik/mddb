@@ -74,8 +74,14 @@ func (idx *IVFIndex) Add(collection, docID string, vector []float32) error {
 	c := idx.getOrCreate(collection)
 	c.allVecs[docID] = vector
 
+	// A re-added document may land in a different cluster; without this its
+	// old entry stayed behind and answered with the vector it replaced.
+	for i := range c.clusters {
+		delete(c.clusters[i], docID)
+	}
+
 	// If trained, assign to nearest cluster
-	if c.trained && len(c.centroids) > 0 {
+	if c.trained && len(c.centroids) > 0 && len(vector) == len(c.centroids[0]) {
 		ci := nearestCentroid(vector, c.centroids)
 		if c.clusters[ci] == nil {
 			c.clusters[ci] = make(map[string][]float32)
@@ -105,6 +111,8 @@ func (idx *IVFIndex) Train(collection string, vectors map[string][]float32) {
 	if len(vectors) == 0 {
 		return
 	}
+
+	vectors, _ = sameDimension(vectors)
 
 	// Determine number of clusters: sqrt(N), min 1, max 256
 	nClusters := int(math.Sqrt(float64(len(vectors))))
@@ -173,7 +181,7 @@ func (idx *IVFIndex) Search(collection string, query []float32, topK int, thresh
 	defer idx.mu.RUnlock()
 
 	c, ok := idx.data[collection]
-	if !ok || !c.trained || len(c.centroids) == 0 {
+	if !ok || !c.trained || len(c.centroids) == 0 || len(query) != len(c.centroids[0]) {
 		return nil
 	}
 	if topK <= 0 {
@@ -196,7 +204,7 @@ func (idx *IVFIndex) SearchWithFilter(collection string, query []float32, topK i
 	defer idx.mu.RUnlock()
 
 	c, ok := idx.data[collection]
-	if !ok || !c.trained || len(c.centroids) == 0 {
+	if !ok || !c.trained || len(c.centroids) == 0 || len(query) != len(c.centroids[0]) {
 		return nil
 	}
 	if topK <= 0 {
@@ -243,6 +251,12 @@ func (idx *IVFIndex) searchClusters(c *ivfCollection, query []float32, topK int,
 					if filter != nil && !filter(docID) {
 						continue
 					}
+					if len(vec) != len(query) {
+						continue
+					}
+					if len(vec) != len(query) {
+						continue
+					}
 					score := metric(query, vec)
 					if float64(score) >= threshold {
 						local = append(local, VectorResult{DocID: docID, Score: score})
@@ -283,6 +297,9 @@ func (idx *IVFIndex) searchClusters(c *ivfCollection, query []float32, topK int,
 		}
 		for docID, vec := range c.clusters[ci] {
 			if filter != nil && !filter(docID) {
+				continue
+			}
+			if len(vec) != len(query) {
 				continue
 			}
 			score := metric(query, vec)

@@ -120,6 +120,9 @@ func (vi *VectorIndex) Search(collection string, query []float32, topK int, thre
 	defer vi.mu.RUnlock()
 	results := make([]VectorResult, 0, len(coll))
 	for docID, vec := range coll {
+		if len(vec) != len(query) {
+			continue // another embedding model's vector; see sameDimension
+		}
 		score := metric(query, vec)
 		if float64(score) >= threshold {
 			results = append(results, VectorResult{DocID: docID, Score: score})
@@ -173,6 +176,9 @@ func (vi *VectorIndex) SearchWithFilter(collection string, query []float32, topK
 	for docID, vec := range coll {
 		if !filter(docID) {
 			continue
+		}
+		if len(vec) != len(query) {
+			continue // another embedding model's vector; see sameDimension
 		}
 		score := metric(query, vec)
 		if float64(score) >= threshold {

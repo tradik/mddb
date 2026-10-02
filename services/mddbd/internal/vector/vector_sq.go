@@ -68,7 +68,8 @@ func (s *SQIndex) Add(collection, docID string, vector []float32) error {
 	c := s.getOrCreate(collection)
 	c.origVecs[docID] = vector
 
-	if c.trained && len(c.scales) > 0 {
+	delete(c.codes, docID) // the replaced vector's code, if any
+	if c.trained && len(c.scales) > 0 && len(vector) == c.dim {
 		c.codes[docID] = s.encode(c, vector)
 	}
 	return nil
@@ -94,11 +95,7 @@ func (s *SQIndex) Train(collection string, vectors map[string][]float32) {
 		return
 	}
 
-	var dim int
-	for _, v := range vectors {
-		dim = len(v)
-		break
-	}
+	vectors, dim := sameDimension(vectors)
 	if dim == 0 {
 		return
 	}
@@ -170,7 +167,7 @@ func (s *SQIndex) Train(collection string, vectors map[string][]float32) {
 	// Vectors added while training ran are in the collection but not in the
 	// snapshot it trained on; encode them into the new structure too.
 	for id, v := range c.origVecs {
-		if _, inSnapshot := vectors[id]; !inSnapshot {
+		if _, inSnapshot := vectors[id]; !inSnapshot && len(v) == dim {
 			c.codes[id] = s.encode(c, v)
 		}
 	}
@@ -200,7 +197,7 @@ func (s *SQIndex) Search(collection string, query []float32, topK int, threshold
 	defer s.mu.RUnlock()
 
 	c, ok := s.data[collection]
-	if !ok || !c.trained || len(c.codes) == 0 {
+	if !ok || !c.trained || len(c.codes) == 0 || len(query) != c.dim {
 		return nil
 	}
 	if topK <= 0 {
@@ -217,7 +214,7 @@ func (s *SQIndex) SearchWithFilter(collection string, query []float32, topK int,
 	defer s.mu.RUnlock()
 
 	c, ok := s.data[collection]
-	if !ok || !c.trained || len(c.codes) == 0 {
+	if !ok || !c.trained || len(c.codes) == 0 || len(query) != c.dim {
 		return nil
 	}
 	if topK <= 0 {
@@ -290,6 +287,9 @@ func (s *SQIndex) adcSearch(c *sqCollection, query []float32, topK int, threshol
 		vec, ok := c.origVecs[cand.docID]
 		if !ok {
 			continue
+		}
+		if len(vec) != len(query) {
+			continue // another embedding model's vector; see sameDimension
 		}
 		score := metric(query, vec)
 		if float64(score) >= threshold {

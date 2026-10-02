@@ -91,7 +91,8 @@ func (o *OPQIndex) Add(collection, docID string, vector []float32) error {
 	c := o.getOrCreate(collection)
 	c.origVecs[docID] = vector
 
-	if c.trained && len(c.codebooks) > 0 {
+	delete(c.codes, docID) // the replaced vector's code, if any
+	if c.trained && len(c.codebooks) > 0 && len(vector) == c.dim {
 		rotated := matVecMul(c.rotation, vector, c.dim)
 		c.codes[docID] = encodeOPQ(c, rotated, o.nSubspaces)
 	}
@@ -118,11 +119,7 @@ func (o *OPQIndex) Train(collection string, vectors map[string][]float32) {
 		return
 	}
 
-	var dim int
-	for _, v := range vectors {
-		dim = len(v)
-		break
-	}
+	vectors, dim := sameDimension(vectors)
 	if dim == 0 {
 		return
 	}
@@ -216,7 +213,7 @@ func (o *OPQIndex) Search(collection string, query []float32, topK int, threshol
 	defer o.mu.RUnlock()
 
 	c, ok := o.data[collection]
-	if !ok || !c.trained || len(c.codebooks) == 0 {
+	if !ok || !c.trained || len(c.codebooks) == 0 || len(query) != c.dim {
 		return nil
 	}
 	if topK <= 0 {
@@ -233,7 +230,7 @@ func (o *OPQIndex) SearchWithFilter(collection string, query []float32, topK int
 	defer o.mu.RUnlock()
 
 	c, ok := o.data[collection]
-	if !ok || !c.trained || len(c.codebooks) == 0 {
+	if !ok || !c.trained || len(c.codebooks) == 0 || len(query) != c.dim {
 		return nil
 	}
 	if topK <= 0 {
@@ -310,6 +307,9 @@ func (o *OPQIndex) adcSearchOPQ(c *opqCollection, query []float32, topK int, thr
 		vec, ok := c.origVecs[candidates[i].docID]
 		if !ok {
 			continue
+		}
+		if len(vec) != len(query) {
+			continue // another embedding model's vector; see sameDimension
 		}
 		score := metric(query, vec)
 		if float64(score) >= threshold {
