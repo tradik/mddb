@@ -151,6 +151,14 @@ that could not be restored.
   `urllib3` 2.8.0.
 - Go 1.27.1 everywhere: the Docker images moved to it with the
   docker-minor-patch update, so the toolchains and CI pins follow (15 pins).
+- `govulncheck` now runs through a gate, `scripts/govulncheck-gate.py`. The
+  gate fails on every vulnerability our code reaches, except those listed in
+  `.github/govulncheck-ignore.txt`. Each entry names one advisory at one
+  module version and gives the reason. The first entry is GO-2026-6443:
+  the Go vulnerability database lists `google.golang.org/grpc` v1.84.0 as
+  affected, but the fix (grpc-go #9365) was cherry-picked into v1.84.0 as
+  #9370 before the release, and mddb does not use xDS. Without the gate,
+  that one wrong entry failed every PR and every daily scan.
 - Not changed: `npm audit` in `integrations/grafana-datasource` still reports
   `react-router` inside `@grafana/ui`. The only fix it offers is a downgrade
   of `@grafana/ui` from 13 to 11, and Grafana provides these packages at

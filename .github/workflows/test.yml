@@ -181,6 +181,9 @@ jobs:
       - name: Run repo-link guard test suite
         run: bash scripts/tests/test-repo-links.sh
 
+      - name: Run govulncheck gate test suite
+        run: bash scripts/tests/test-govulncheck-gate.sh
+
       # WIN-004: PowerShell's `>` and Out-File write UTF-16 LE with a BOM by
       # default, and Go answers a file like that with "illegal UTF-8 encoding".
       # .gitattributes normalises line endings and says nothing about encoding,

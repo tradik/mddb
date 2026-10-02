@@ -27,6 +27,12 @@ import (
 // itself is damaged (#270) — which is worth knowing while it is still
 // serving, before a restart finds out. MDDB_BACKUP_VERIFY=false skips the
 // check for databases too large to walk on every backup.
+//
+// dst must be safeBackupPath's output; every caller passes it. CodeQL raises
+// go/path-injection on the CreateTemp and Rename below (alerts #62, #63) for
+// the reason given at copyFile in util.go: it does not model safeBackupPath's
+// symlink-resolved filepath.Rel check as a barrier. Dismissed as false
+// positives, as the copyFile alerts were.
 func (s *Server) backupTo(dst string) error {
 	// #nosec G703 -- every caller passes safeBackupPath's output; see copyFile
 	tmp, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp-*")
