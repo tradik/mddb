@@ -11,7 +11,20 @@ downgrade or any other advisory is judged afresh.
 Usage: govulncheck -format json ./... | scripts/govulncheck-gate.py IGNOREFILE
 """
 import json
+import os
 import sys
+
+REPO_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+
+
+def inside_repo(path):
+    """The ignore file must be a file in this repository: the path comes from
+    the command line, and a gate that reads any file it is pointed at could be
+    pointed at one that excuses everything."""
+    real = os.path.realpath(path)
+    if not real.startswith(REPO_ROOT + os.sep) or not os.path.isfile(real):
+        sys.exit(f"ignore file must be a file inside {REPO_ROOT}: {path}")
+    return real
 
 
 def read_stream(text):
@@ -29,7 +42,7 @@ def read_stream(text):
 def read_ignores(path):
     """Lines of `ID module version  # why`; blank lines and comments skipped."""
     ignores = {}
-    with open(path, encoding="utf-8") as f:
+    with open(inside_repo(path), encoding="utf-8") as f:
         for line in f:
             body, _, why = line.partition("#")
             fields = body.split()

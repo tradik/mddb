@@ -142,7 +142,10 @@ func (b *Binlog) recoverLSN() error {
 	if good < b.fileSize {
 		slog.Warn("binlog ends in an incomplete entry, most likely a write cut short by a crash; dropping it",
 			"path", b.path, "keptBytes", good, "droppedBytes", b.fileSize-good, "lastLSN", lastLSN)
-		if err := b.file.Truncate(good); err != nil {
+		// Through the path, not b.file: on Windows a file opened with
+		// O_APPEND has append access only, and truncating through it is
+		// refused. The second handle shares the file, as Go opens it.
+		if err := os.Truncate(b.path, good); err != nil {
 			return fmt.Errorf("truncating the incomplete tail: %w", err)
 		}
 		b.fileSize = good

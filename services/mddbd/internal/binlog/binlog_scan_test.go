@@ -76,9 +76,9 @@ func TestScanFromReportsATrimmedLogUpFront(t *testing.T) {
 
 func TestScanFromAMissingFileIsAnError(t *testing.T) {
 	bl := newScanLog(t, 1)
-	if err := os.Remove(bl.path); err != nil {
-		t.Fatal(err)
-	}
+	// Pointed elsewhere rather than removed: Windows does not let an open
+	// file be deleted.
+	bl.path = filepath.Join(t.TempDir(), "gone.binlog")
 	if err := bl.ScanFrom(0, func(*BinlogEntry) error { return nil }); err == nil {
 		t.Error("scanning a binlog whose file is gone succeeded")
 	}

@@ -102,7 +102,11 @@ func TestADamagedDatabaseFailsTheCheckWithBboltsReason(t *testing.T) {
 	if err == nil {
 		t.Fatal("a database whose tree references one page twice passed the check")
 	}
-	if !strings.Contains(err.Error(), "multiple references") {
+	// Which of bbolt's two failures wins is a race — its walker goroutine
+	// can fault on the rolled-back transaction before the reported panic
+	// (seen on Windows CI) — and the reason the check is a child process.
+	// Either is reported, not a stack trace.
+	if msg := err.Error(); !strings.Contains(msg, "multiple references") && !strings.Contains(msg, "nil pointer") {
 		t.Errorf("the error should carry bbolt's description, got: %v", err)
 	}
 }
