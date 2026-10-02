@@ -10,6 +10,7 @@ import (
 	proto "mddb/proto"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -70,6 +71,8 @@ type ReplicationServer struct {
 	server    *Server
 	followers map[string]*FollowerState
 	mu        sync.RWMutex
+	// streamSeq numbers binlog streams so each has its own subscription.
+	streamSeq atomic.Uint64
 }
 
 // FollowerState tracks a connected follower
@@ -156,6 +159,10 @@ func (rs *ReplicationServer) RequestSnapshot(req *proto.SnapshotRequest, stream 
 	return nil
 }
 
+// replicationGapCheck is how often an idle binlog stream checks that it has
+// sent everything the log holds.
+const replicationGapCheck = 500 * time.Millisecond
+
 // StreamBinlog streams binlog entries from a given LSN. The stream stays open for continuous tailing.
 func (rs *ReplicationServer) StreamBinlog(req *proto.StreamBinlogRequest, stream proto.MDDBReplication_StreamBinlogServer) error {
 	if err := rs.authorizeReplication(stream.Context()); err != nil {
@@ -177,50 +184,100 @@ func (rs *ReplicationServer) StreamBinlog(req *proto.StreamBinlogRequest, stream
 	if p, ok := peer.FromContext(stream.Context()); ok {
 		addr = p.Addr.String()
 	}
-	rs.mu.Lock()
-	rs.followers[followerID] = &FollowerState{
+	state := &FollowerState{
 		ID:           followerID,
 		ConfirmedLSN: fromLSN,
 		LastSeenAt:   time.Now().Unix(),
 		Address:      addr,
 	}
+	rs.mu.Lock()
+	rs.followers[followerID] = state
 	rs.mu.Unlock()
 
+	// A follower that reconnects under the same ID opens its new stream
+	// before the old one has noticed it is dead. Both the follower record and
+	// the subscription are therefore this stream's own: removing them by
+	// follower ID let the old stream's cleanup delete the new stream's record
+	// and close its channel, so status and the followers_connected metric
+	// showed nothing while data flowed (#267).
+	subID := fmt.Sprintf("%s#%d", followerID, rs.streamSeq.Add(1))
 	defer func() {
 		rs.mu.Lock()
-		delete(rs.followers, followerID)
+		if rs.followers[followerID] == state {
+			delete(rs.followers, followerID)
+		}
 		rs.mu.Unlock()
 		slog.Info("Replication follower disconnected from binlog stream", "followerID", followerID)
 	}()
 
 	slog.Info("replication follower streaming binlog", "followerID", followerID, "fromLSN", fromLSN)
 
-	// 1. Send historical entries from binlog file
-	entries, err := rs.server.Binlog.ReadFrom(fromLSN)
-	if err != nil {
-		if err == binlog.ErrBinlogLSNTooOld {
-			return status.Error(codes.FailedPrecondition, "LSN too old, snapshot required")
-		}
-		return status.Error(codes.Internal, err.Error())
-	}
+	// Subscribe before reading the file: an entry appended between the end of
+	// the file read and a later subscription reached neither, and the
+	// follower silently diverged.
+	ch := rs.server.Binlog.Subscribe(subID)
+	defer rs.server.Binlog.Unsubscribe(subID)
 
-	for _, entry := range entries {
+	sent := fromLSN
+	send := func(entry *binlog.BinlogEntry) error {
 		if err := stream.Send(entryToProto(entry)); err != nil {
 			return err
 		}
+		sent = entry.LSN
+		return nil
+	}
+	catchUp := func() error {
+		err := rs.server.Binlog.ScanFrom(sent, send)
+		if err == binlog.ErrBinlogLSNTooOld {
+			return status.Error(codes.FailedPrecondition, "LSN too old, snapshot required")
+		}
+		if err != nil {
+			if _, isStatus := status.FromError(err); isStatus {
+				return err
+			}
+			return status.Error(codes.Internal, err.Error())
+		}
+		return nil
 	}
 
-	// 2. Subscribe to real-time entries and tail the binlog
-	ch := rs.server.Binlog.Subscribe(followerID)
-	defer rs.server.Binlog.Unsubscribe(followerID)
+	// 1. Historical entries, streamed from the file as they are read.
+	if err := catchUp(); err != nil {
+		return err
+	}
 
+	// 2. Live entries. The subscription is a bounded buffer and drops entries
+	// when a follower falls behind — during the replay above, or under a bulk
+	// import. LSNs are consecutive, so a gap is detectable: the missing
+	// entries are read back from the file instead of being lost. When the
+	// dropped entries were the last ones written, no later entry arrives to
+	// reveal the gap, so an idle stream also compares what it has sent with
+	// the log's current LSN.
+	idle := time.NewTicker(replicationGapCheck)
+	defer idle.Stop()
 	for {
 		select {
+		case <-idle.C:
+			if len(ch) == 0 && sent < rs.server.Binlog.CurrentLSN() {
+				if err := catchUp(); err != nil {
+					return err
+				}
+			}
 		case entry, ok := <-ch:
 			if !ok {
 				return nil // channel closed (binlog shutting down)
 			}
-			if err := stream.Send(entryToProto(entry)); err != nil {
+			if entry.LSN <= sent {
+				continue // already sent from the file
+			}
+			if entry.LSN != sent+1 {
+				if err := catchUp(); err != nil {
+					return err
+				}
+				if entry.LSN <= sent {
+					continue
+				}
+			}
+			if err := send(entry); err != nil {
 				return err
 			}
 		case <-stream.Context().Done():

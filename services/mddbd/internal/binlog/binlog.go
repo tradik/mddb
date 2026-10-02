@@ -2,9 +2,9 @@ package binlog
 
 import (
 	"bufio"
-	"encoding/binary"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -117,77 +117,44 @@ func (b *Binlog) recoverLSN() error {
 		return err
 	}
 
+	// Entries are read with the same decoder ScanFrom uses, so a torn or
+	// corrupt tail is recognised the same way: the end of what can be trusted.
+	// It used to be fatal — a crash in the middle of an append left a file the
+	// server refused to start with — or, when the tear fell inside the first
+	// eight bytes, was kept: the file is opened for appending, so every later
+	// entry landed after bytes no reader could get past, and followers stopped
+	// receiving anything written after the crash.
 	reader := bufio.NewReaderSize(b.file, binlogBufferSize)
 	var firstLSN, lastLSN uint64
-	first := true
-
+	var good int64
 	for {
-		// Try to read the first 8 bytes (LSN) to peek
-		lsnBytes := make([]byte, 8)
-		_, err := io.ReadFull(reader, lsnBytes)
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
+		entry, n, err := readEntry(reader)
+		if err != nil {
 			break
 		}
-		if err != nil {
-			return fmt.Errorf("error reading binlog LSN: %w", err)
+		if firstLSN == 0 {
+			firstLSN = entry.LSN
 		}
-
-		lsn := binary.BigEndian.Uint64(lsnBytes)
-		if first {
-			firstLSN = lsn
-			first = false //nolint:ineffassign // guard boolean read in subsequent iterations
-		}
-		lastLSN = lsn
-
-		// Read type(1) + timestamp(8) + bucketNameLen(2)
-		header := make([]byte, 11)
-		if _, err := io.ReadFull(reader, header); err != nil {
-			return fmt.Errorf("error reading binlog entry header: %w", err)
-		}
-
-		bucketNameLen := int(binary.BigEndian.Uint16(header[9:11]))
-		// Skip bucket name
-		if _, err := reader.Discard(bucketNameLen); err != nil {
-			return err
-		}
-
-		// Read keyLen(4), skip key
-		lenBuf := make([]byte, 4)
-		if _, err := io.ReadFull(reader, lenBuf); err != nil {
-			return err
-		}
-		keyLen := int(binary.BigEndian.Uint32(lenBuf))
-		if _, err := reader.Discard(keyLen); err != nil {
-			return err
-		}
-
-		// Read valueLen(4), skip value
-		if _, err := io.ReadFull(reader, lenBuf); err != nil {
-			return err
-		}
-		valueLen := int(binary.BigEndian.Uint32(lenBuf))
-		if _, err := reader.Discard(valueLen); err != nil {
-			return err
-		}
-
-		// Skip checksum(4)
-		if _, err := reader.Discard(4); err != nil {
-			return err
-		}
-
-		first = false
+		lastLSN = entry.LSN
+		good += int64(n)
 	}
 
-	if !first || lastLSN > 0 {
-		b.oldestLSN = firstLSN
-		b.lsn.Store(lastLSN)
+	if good < b.fileSize {
+		slog.Warn("binlog ends in an incomplete entry, most likely a write cut short by a crash; dropping it",
+			"path", b.path, "keptBytes", good, "droppedBytes", b.fileSize-good, "lastLSN", lastLSN)
+		if err := b.file.Truncate(good); err != nil {
+			return fmt.Errorf("truncating the incomplete tail: %w", err)
+		}
+		b.fileSize = good
 	}
+
+	b.oldestLSN = firstLSN
+	b.lsn.Store(lastLSN)
 
 	// Seek back to end for appending
 	if _, err := b.file.Seek(0, io.SeekEnd); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -274,42 +241,18 @@ func (b *Binlog) AppendBatch(entries []*BinlogEntry) error {
 	return nil
 }
 
-// ReadFrom reads all entries with LSN > fromLSN.
+// ReadFrom reads all entries with LSN > fromLSN into memory.
 // Returns ErrBinlogLSNTooOld if the requested LSN is no longer in the binlog.
+// For anything that may be large — a follower catching up — use ScanFrom.
 func (b *Binlog) ReadFrom(fromLSN uint64) ([]*BinlogEntry, error) {
-	b.mu.Lock()
-	// Flush pending writes first so they can be read
-	_ = b.flush()
-	b.mu.Unlock()
-
-	f, err := os.Open(b.path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open binlog for reading: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
-	data, err := io.ReadAll(bufio.NewReaderSize(f, binlogBufferSize))
+	var entries []*BinlogEntry
+	err := b.ScanFrom(fromLSN, func(e *BinlogEntry) error {
+		entries = append(entries, e)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	var entries []*BinlogEntry
-	pos := 0
-	for pos < len(data) {
-		entry, n, err := UnmarshalBinlogEntry(data[pos:])
-		if err != nil {
-			break // possibly truncated entry at end
-		}
-		pos += n
-		if entry.LSN > fromLSN {
-			entries = append(entries, entry)
-		}
-	}
-
-	if fromLSN > 0 && b.oldestLSN > 0 && fromLSN < b.oldestLSN {
-		return nil, ErrBinlogLSNTooOld
-	}
-
 	return entries, nil
 }
 
