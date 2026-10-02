@@ -2,7 +2,7 @@ module mddb
 
 go 1.27
 
-toolchain go1.27.0
+toolchain go1.27.1
 
 require (
 	github.com/99designs/gqlgen v0.17.95

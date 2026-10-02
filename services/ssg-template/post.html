@@ -24,9 +24,15 @@
         <article class="doc-article">
             <header class="doc-header">
                 <h1 class="doc-title">{{.Post.Title}}</h1>
-                {{if .Post.Date}}
-                <time class="doc-date" datetime="{{.Post.Date.Format "2006-01-02"}}">{{.Post.Date.Format "2 January 2006"}}</time>
-                {{end}}
+                {{/* ssg (1.8.66+) puts the "Listen" button into the slot when
+                     listen: is on in .ssg.yaml, and removes the slot when it
+                     is off. Exactly this markup — ssg matches it literally. */}}
+                <div class="doc-meta">
+                    {{if .Post.Date}}
+                    <time class="doc-date" datetime="{{.Post.Date.Format "2006-01-02"}}">{{.Post.Date.Format "2 January 2006"}}</time>
+                    {{end}}
+                    <span data-ssg-listen-slot></span>
+                </div>
             </header>
             <div class="doc-body">
                 {{.Post.Content | safeHTML}}

@@ -68,7 +68,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.15.3"
+  version: "2.15.4"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -817,7 +817,12 @@ paths:
       tags:
         - Export
       summary: Create backup
-      description: Create a backup of the database file
+      description: >
+        Copy the database through a read transaction (a consistent state even
+        while writes continue) and check the copy with bbolt's full integrity
+        check before keeping it. A failed check returns 500 and means the live
+        database is damaged; see docs/BACKUP.md. MDDB_BACKUP_VERIFY=false skips
+        the check.
       operationId: createBackup
       parameters:
         - name: to
@@ -840,6 +845,12 @@ paths:
                     example: backup-20250109.db
         "400":
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: The backup could not be written, or the copy failed the integrity check (the live database is damaged)
           content:
             application/json:
               schema:

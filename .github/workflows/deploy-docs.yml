@@ -52,7 +52,7 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@9014a9dc0059ae5f250ad78be63ba125dd89131d # v1.8.62
+        uses: spagu/ssg@8142d3c30473a04cd1d6205be9b6af603affddfc # v1.8.67
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
@@ -61,7 +61,10 @@ jobs:
           # to re-derive its own URL, which is how 23 tag pages shipped a
           # canonical pointing at /category/<slug>/ and a 404 — and, from
           # 1.8.57, `sitemap:` on a static_sources entry, which is the only way
-          # the API reference at /docs/api/swagger/ can enter sitemap.xml. The
+          # the API reference at /docs/api/swagger/ can enter sitemap.xml, and,
+          # from 1.8.66, the `listen:` button on blog posts (1.8.67 rebuilds
+          # fully after an ssg upgrade, so it appears without a content
+          # change). The
           # pin is also what made the last mismatch obvious rather than
           # intermittent.
           #
@@ -75,7 +78,7 @@ jobs:
           # not landed fails this job with a 404 on ssg-linux-amd64.tar.gz. The
           # check is one command:
           #   gh release view v1.8.58 --repo spagu/ssg --json assets
-          version: 'v1.8.58'
+          version: 'v1.8.67'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'

@@ -1358,7 +1358,12 @@ curl "http://localhost:11023/v1/backup?to=backup-$(date +%s).db"
 ```
 
 **Notes**:
-- Creates a copy of the entire BoltDB database file
+- Copies the database through a read transaction, so the copy is one
+  consistent state even while writes continue (v2.15.4; before that a copy
+  taken during writes could not be restored — #266)
+- The copy passes bbolt's full integrity check before it is kept. A failure
+  returns `500` and means the **live** database is damaged — see
+  [BACKUP.md](BACKUP.md). `MDDB_BACKUP_VERIFY=false` skips the check
 - Backup is created in the same directory as the database
 - Does not interrupt server operations
 
@@ -1394,8 +1399,9 @@ curl -X POST http://localhost:11023/v1/restore \
 - The server briefly closes and reopens the database connection
 - All current data will be replaced with the backup
 
-**Safety** (v2.12.0): the backup is validated (it must open as a database)
-before the live file is touched, the current database is kept as a snapshot
+**Safety** (v2.12.0, hardened in v2.15.4): the backup must pass bbolt's full
+integrity check, run in a separate process, before the live file is touched —
+a read-only open alone let a damaged backup through (#266) — the current database is kept as a snapshot
 until the swap succeeds, and any failure rolls back — the server never ends up
 with a closed or destroyed database. A failed restore returns `500` with the
 previous data still being served. The gRPC `Restore` RPC follows the same

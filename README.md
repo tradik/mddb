@@ -623,6 +623,7 @@ mddb-cli stats
 
 ### Operations
 - **[Docker Guide](docs/DOCKER.md)** - Container deployment
+- **[Backup, Restore & Repair](docs/BACKUP.md)** - Consistent verified backups, safe restores, `mddbd -verify-db` / `-repair-db` for a damaged database file
 - **[Deployment](docs/DEPLOYMENT.md)** - Production setup
 - **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes

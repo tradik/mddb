@@ -7,6 +7,155 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.4] - 2026-10-02
+
+Four production bug reports (#266, #267, #269, #270) and the bugs of the same
+kind found while fixing them. Most of these bugs failed silently: a search
+returned less than it should, a follower fell behind, or a backup was written
+that could not be restored.
+
+### Fixed
+
+- **Vector search panicked on a quantized collection whose quantization had
+  been changed (#269)**. The report showed about 15 panics per 10 minutes:
+  `index out of range [384] with length 384` in `CosineSimInt8`. 384 bytes is
+  a 768-dimension vector stored as int4. A collection changed from int8 to
+  int4 (or back) holds both types, and every vector was scored as the type
+  the collection started with. Each vector is now scored as its own type, and
+  the similarity functions never read past a payload.
+
+- **The same class of bug in every search algorithm**. A collection can hold
+  embeddings from two models until a reindex replaces the old ones. A test
+  that puts 384- and 768-dimension vectors into each index found:
+  - flat, IVF, PQ, OPQ, SQ, SQ4, BQ and the HNSW fallback returned vectors of
+    the other dimension with a score of 0, and a threshold of 0 let them
+    through as matches;
+  - PQ training panicked on such a collection. Training runs in a background
+    goroutine after a reindex and when a collection doubles, so the panic
+    **ended the server process**;
+  - SQ4 kept codes of the old dimension after retraining, and the next search
+    panicked.
+
+  Every algorithm now compares a query only with vectors of its own
+  dimension. Trained indexes train on the dimension most vectors have. Every
+  training call is protected, so a future bug of this kind costs one
+  collection its trained structure instead of the whole server.
+
+- **IVF kept a re-added document in its old cluster** as well as its new one,
+  so it could still be returned with the vector it had replaced.
+
+- **The filtered HNSW fallback never matched a chunk**. It compared chunk keys
+  (`doc#0`) with the filter's document IDs (`doc`). Filtered searches that
+  needed the fallback returned nothing.
+
+- **HNSW lost chunks in collections whose documents are rewritten in place
+  (#267)**. The report counted 642 panics in a week, all in collections whose
+  keys are reused: `HNSW Add panicked ... nil pointer dereference`. Each panic
+  left a chunk unsearchable until a reindex. An overwrite deleted the old node
+  through the graph library, whose `Delete` leaves other nodes with one-way
+  edges to the removed node. A later search descended onto that node and
+  dereferenced nil. Nodes are no longer deleted from the graph. Overwritten
+  and removed documents become tombstones that searches skip, and a rebuild
+  drops them once they make up half the graph (previously a fifth). A rebuild
+  costs one add per live vector, so this works out to one extra add per
+  overwrite. Reproduced exactly (`round 1, key 97: hnsw add panicked`) and
+  fixed.
+
+- **A follower starting from LSN 0 received about 1 KB and then nothing for
+  hours (#267)**. The leader read its whole binlog into memory before sending
+  the first entry, and the reporter's binlog was 20 GB. The binlog is now read
+  one entry at a time and sent as it is read. Three related ways a follower
+  lost entries without an error:
+  - an entry written between reading the history and subscribing to new
+    entries reached neither. The stream now subscribes first;
+  - a follower more than 4096 entries behind, for example during a bulk
+    import, had the excess dropped. The stream now detects the gap in LSNs,
+    including a gap at the very end of a burst, and reads the missing entries
+    back from the binlog file;
+  - a follower reconnecting under the same ID had its new stream closed and
+    its record removed by the old stream's cleanup. That is why
+    `mddb_replication_followers_connected` showed 0 while data flowed.
+
+- **A crash during a binlog append stopped the server from starting, or
+  stopped replication**. An incomplete last entry was fatal at startup. When
+  the tear fell inside the first eight bytes, the entry was kept, and because
+  the file is opened for appending, every later entry landed after bytes no
+  reader could get past. The incomplete entry is now dropped on open, with a
+  warning.
+
+- **`/v1/backup` produced files that could not be restored (#266)**. The HTTP
+  and MCP backups copied the database file while writes were landing. A copy
+  taken that way mixes pages from different commits, and bbolt refused it at
+  restore (`freepages: ... needs to be < than key of the next element`). All
+  three backup paths now copy through a read transaction, as gRPC already
+  did. The HTTP backup also lifts the 30-second write timeout for its own
+  response. Before, a large backup got no response at all
+  (`curl: (52) Empty reply`) while the file was still being written.
+
+- **Restoring a damaged backup left the server with no database (#266)**.
+  The backup was checked only by opening it read-only. That open skips the
+  freelist walk, which is where a damaged file fails, so a damaged backup
+  passed. The panic came afterwards, once the live database had been moved
+  aside and past the rollback. Restores and follower snapshots now have to
+  pass bbolt's full integrity check before the live file is touched, and the
+  server keeps serving the database it had.
+
+- **Integrity checks run in a separate process**. On a damaged file, bbolt's
+  freelist walk panics in a way the process running it cannot contain: its
+  goroutine can fault after the panic, or stay blocked holding a read
+  transaction, which is why `bbolt compact` hangs (#270). The server runs
+  every check as a second copy of `mddbd` and reads its exit status.
+
+### Added
+
+- **Every backup is checked before it is kept**. A consistent copy of a
+  healthy database always passes, so a failed check means the **live**
+  database is damaged. The backup reports this while the server is still
+  serving, before a restart finds it (#270). Set `MDDB_BACKUP_VERIFY=false`
+  to skip the check. `MDDB_VERIFY_TIMEOUT` (default `1h`) limits how long a
+  check may run.
+- **`mddbd -verify-db FILE`** runs bbolt's full integrity check on a file.
+- **`mddbd -repair-db FILE -repair-to NEW`** rebuilds a damaged database by
+  copying every bucket and key it can still read into a new file, then checks
+  the new file. Users, API keys and configuration are copied too. The repair
+  lists any bucket it could not read to the end (#270).
+- **`MDDB_FREELIST_SYNC=true`** writes the freelist on every commit, so
+  opening the database reads one page instead of walking the whole file. The
+  reporter of #270 measured over 40 minutes for that walk on a cold spinning
+  disk.
+- A damaged database at startup is reported with the remedy, instead of a raw
+  panic.
+- [docs/BACKUP.md](docs/BACKUP.md) covers backup, restore, checks and repair.
+- **Blog posts can be listened to.** Each post has a "Listen" button next to
+  its date, and the visitor's own browser voice reads the post (ssg 1.8.66
+  `listen:`). Nothing leaves the device and nothing is generated at build
+  time. Browsers without speech synthesis never show the button. The docs
+  site moves to ssg 1.8.67, and its two pins in `deploy-docs.yml` match
+  again: they had drifted to 1.8.62 for the action and 1.8.58 for the binary.
+
+### Changed
+
+- Changes that keep the API the same but behave differently:
+  - a vector query of a different dimension than the stored vectors returns
+    no results from every algorithm, including SQ4, which used to score a
+    shorter query;
+  - an HNSW graph is rebuilt when half of it is tombstones, previously a
+    fifth.
+
+### Dependencies
+
+- All open Dependabot updates (go-minor-patch, docker-minor-patch,
+  npm-minor-patch and the grouped npm/uv security bumps) are included, which
+  closes the open Dependabot alerts: `@grpc/grpc-js` 1.14.5,
+  `brace-expansion`, `undici`, `dompurify` 3.4.16, `moment` 2.31.0 and
+  `urllib3` 2.8.0.
+- Go 1.27.1 everywhere: the Docker images moved to it with the
+  docker-minor-patch update, so the toolchains and CI pins follow (15 pins).
+- Not changed: `npm audit` in `integrations/grafana-datasource` still reports
+  `react-router` inside `@grafana/ui`. The only fix it offers is a downgrade
+  of `@grafana/ui` from 13 to 11, and Grafana provides these packages at
+  runtime rather than the plugin shipping them.
+
 ## [2.15.3] - 2026-09-25
 
 Completes the 2.15.2 fix, which was only half a fix for five of the

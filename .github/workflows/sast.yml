@@ -30,7 +30,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-  GO_VERSION: "1.27.0"
+  GO_VERSION: "1.27.1"
   # Scan each module in isolation, mirroring the Tests and Vulnerability
   # workflows: what matters is what each module's own dependency graph makes
   # reachable, not the workspace-merged one.

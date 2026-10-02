@@ -599,6 +599,16 @@ Clusters vectors using k-means, then searches only the nearest clusters.
 > 2.15.3 a collection created while the server was running returned no results
 > from these five until a restart or reindex.
 
+> **Two embedding models in one collection (v2.15.4).** After a model change a
+> collection holds both models' vectors until a reindex replaces the old ones.
+> Every algorithm now compares a query only with vectors of its own dimension;
+> before, the others came back with a score of 0, and a threshold of 0 let
+> them through as matches. Trained indexes train on the dimension most vectors
+> have. A quantized collection whose quantization was changed holds int8 and
+> int4 vectors side by side, and each is scored as its own type — scoring them
+> all as the original type panicked on every search (#269). Reindex after
+> changing the model to bring every document back into one space.
+
 | Property | Value |
 |----------|-------|
 | Accuracy | ~90-98% recall (depends on nProbe) |
