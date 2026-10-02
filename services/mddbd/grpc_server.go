@@ -457,11 +457,7 @@ func (g *GRPCServer) Backup(ctx context.Context, req *proto.BackupRequest) (*pro
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = g.server.DBView(func(tx *bolt.Tx) error {
-		return tx.CopyFile(safeName, 0600)
-	})
-
-	if err != nil {
+	if err := g.server.backupTo(safeName); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

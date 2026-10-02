@@ -5,11 +5,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"time"
 
 	"mddb/internal/vector"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // Manual backup restore (SEC-015 / SEC-016).
@@ -70,14 +67,19 @@ func (s *Server) swapDatabase(source string, install func(dst string) error) err
 	// The source must be a database bolt can open at all — checked read-only,
 	// before the live file is touched, so a truncated file or a half-received
 	// stream can never destroy the current database.
-	check, err := bolt.Open(source, 0600, &bolt.Options{ReadOnly: true, Timeout: time.Second})
-	if err != nil {
+	//
+	// Opening it read-only is not enough: that skips the freelist walk every
+	// real open performs, which is where a damaged page tree panics. A backup
+	// copied while writes were landing passed that check, and the panic came
+	// in reopen below — after the live file had been moved aside, past the
+	// rollback, leaving the server with no open database (#266). The file is
+	// proven by the full check, in a child process (see db_integrity.go).
+	if err := verifyDatabase(source); err != nil {
 		return fmt.Errorf("%s is not a usable database: %w", filepath.Base(source), err)
 	}
-	_ = check.Close()
 
 	reopen := func() error {
-		db, err := bolt.Open(s.Path, 0600, getOptimizedBoltOptions())
+		db, err := openBolt(s.Path, getOptimizedBoltOptions())
 		if err != nil {
 			return err
 		}

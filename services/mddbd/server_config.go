@@ -143,6 +143,10 @@ func loadServerConfig() ServerConfig {
 		// a data server, and an unexpected restart is an incident. Installing
 		// is `mddb-cli self-update`, run on purpose.
 		checkUpdate = flag.Bool("check-update", false, "Report whether a newer release exists, then exit")
+		// #266/#270: offline tools for a database file, run instead of the server.
+		verifyDB = flag.String("verify-db", "", "Check a database file with bbolt's full integrity check, then exit")
+		repairDB = flag.String("repair-db", "", "Copy everything readable from a damaged database into -repair-to, then exit")
+		repairTo = flag.String("repair-to", "", "Where -repair-db writes the rebuilt database (must not exist)")
 	)
 	flag.StringVar(&configFile, "config", "", "Path to YAML config file")
 	flag.StringVar(&configFile, "c", "", "Path to YAML config file (shorthand)")
@@ -152,6 +156,12 @@ func loadServerConfig() ServerConfig {
 	// so nothing about this installation needs to be loaded to answer it.
 	if *checkUpdate {
 		reportUpdateAndExit()
+	}
+	if *verifyDB != "" {
+		os.Exit(runVerifyChild(*verifyDB))
+	}
+	if *repairDB != "" {
+		os.Exit(runRepair(*repairDB, *repairTo))
 	}
 
 	// 2. Load config file (lowest priority after defaults)

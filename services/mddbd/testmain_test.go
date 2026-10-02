@@ -15,6 +15,11 @@ import (
 // in ssrf_guard_test.go, which sets the variable back to empty where it asserts
 // that private/loopback targets are refused.
 func TestMain(m *testing.M) {
+	// verifyDatabase re-runs the current binary as its checker; under test
+	// that binary is this one.
+	if p := os.Getenv(verifyChildEnv); p != "" {
+		os.Exit(runVerifyChild(p))
+	}
 	if os.Getenv("MDDB_OUTBOUND_ALLOW_PRIVATE") == "" {
 		_ = os.Setenv("MDDB_OUTBOUND_ALLOW_PRIVATE", "true")
 	}
