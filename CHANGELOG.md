@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-10-11
+
+One feature, asked for by the operator of the public `versions` MCP server:
+the log did not say which packages clients asked for, nor which lookups
+came back empty.
+
+### Added
+
+- **A log record per MCP tool call, and per-tool counters.** With
+  `MDDB_MCP_LOGGING_ENABLED=true` the server logged one line per HTTP request
+  on the MCP listener: method, path, status. Every tool call is a `POST /mcp`
+  with status 200, so from that log a `version_check` for `golang` and a lookup
+  for a package the database does not hold were the same line. An operator
+  asking "what do clients query, and what do they ask for that we do not
+  have?" had nothing to read.
+
+  Each `tools/call` now also writes a `MCP tool call` record on every transport
+  (Streamable HTTP, SSE, `/mcp/tools/call`, stdio): the tool name, the `query`
+  argument (cut to 200 characters), `hits` and `found` read from the result's
+  `total` or `results`/`documents` array, the duration, and the caller the HTTP
+  middleware resolved (`key_name`, `client_ip`, `session_id`). A failed call
+  is logged at `WARN` with `error`. Behind the same switch as the request log;
+  `MDDB_LOG_FORMAT=json` makes the fields parseable by a log shipper.
+
+  Independent of the switch, three counters land in `/metrics`:
+  `mddb_operations_total{operation="mcp_tool_call"|"mcp_tool_miss"|"mcp_tool_error",label="<tool>"}`.
+  `MCPHandler` gained `HandleContext` and `HandleWithNotifierContext`, which the
+  HTTP transports call with the request's context so the record can say who
+  asked; `Handle` and `HandleWithNotifier` are unchanged for existing callers.
+  Documented in [docs/MCP.md](docs/MCP.md#request-logging) and
+  [docs/TELEMETRY.md](docs/TELEMETRY.md#mcp-tool-calls).
+
 ## [2.15.4] - 2026-10-02
 
 Four production bug reports (#266, #267, #269, #270) and the bugs of the same

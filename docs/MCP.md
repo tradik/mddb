@@ -258,11 +258,39 @@ Returns `429 Too Many Requests` with `Retry-After` header when exceeded.
 | `MDDB_MCP_LOGGING_ENABLED` | `false` | Enable structured JSON audit logs |
 | `MDDB_MCP_LOGGING_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 
-Logs are written to stderr in JSON format:
+Two records exist, both behind the same switch.
+
+**Request record** — one line per HTTP request on the MCP listener:
 
 ```json
 {"timestamp":"2026-03-26T10:30:00Z","method":"POST","path":"/mcp","status":200,"duration_ms":45,"client_ip":"1.2.3.4","key_name":"claude-prod","session_id":"abc123","user_agent":"claude-code/1.0"}
 ```
+
+**Tool-call record** (2.16.0) — one line per `tools/call`, on every transport
+(Streamable HTTP, SSE, `/mcp/tools/call`, stdio). Every tool call is a
+`POST /mcp` with status 200, so the request record cannot tell a lookup that
+found something from one that did not. This record can:
+
+```json
+{"time":"2026-10-11T18:54:33Z","level":"INFO","msg":"MCP tool call","tool":"version_check","query":"alloy","duration_ms":3,"hits":0,"found":false,"key_name":"claude-prod","client_ip":"1.2.3.4","session_id":"abc123"}
+```
+
+| Field | Meaning |
+|---|---|
+| `tool` | Tool name as the client sent it (built-in or custom) |
+| `query` | The `query` argument, cut to 200 characters; empty when the tool has none |
+| `hits`, `found` | Documents in the result (`total`, or the `results`/`documents` array). Absent when the result is not a search |
+| `key_name`, `client_ip`, `session_id` | Caller, when the HTTP middleware resolved one; absent on stdio |
+| `error` | The failure, logged at `WARN` instead of `INFO` |
+
+Set `MDDB_LOG_FORMAT=json` so a log shipper (Alloy, Promtail, Vector) can
+parse the fields with `| json`. A dashboard of "what do people ask for, and
+what do we not have?" is `sum by (query) (count_over_time({...} | json |
+msg="MCP tool call" | found="false" [24h]))`.
+
+Three counters land in `/metrics` whether or not the log is on (see
+[TELEMETRY.md](TELEMETRY.md#mcp-tool-calls)):
+`mddb_operations_total{operation="mcp_tool_call"|"mcp_tool_miss"|"mcp_tool_error",label="<tool>"}`.
 
 ## Agent Instructions
 

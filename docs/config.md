@@ -117,6 +117,10 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_MCP_LOGGING_ENABLED` | `false` | bool | Enable structured JSON audit logs for MCP requests |
 | `MDDB_MCP_LOGGING_LEVEL` | `"info"` | string | Minimum log level: `"debug"`, `"info"`, `"warn"`, `"error"` |
 
+With logging on, every `tools/call` also writes a `MCP tool call` record
+(tool, `query`, `hits`/`found`, caller). Per-tool call/miss/error counters are
+always exposed under `mddb_operations_total`. Details: [MCP.md](MCP.md#request-logging).
+
 ---
 
 ## HTTP/3 (QUIC)

@@ -38,7 +38,7 @@ import (
 )
 
 // VERSION is the current release version of the MDDB server.
-const VERSION = "2.15.4"
+const VERSION = "2.16.0"
 
 // AccessMode defines the database access mode (read, write, or both).
 type AccessMode string
@@ -1040,9 +1040,9 @@ func main() {
 		// Built before the goroutine so /health can read their session counts
 		// without racing the listener's startup.
 		mcpSSE := NewMCPSSETransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
-			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode))
+			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode).WithMetrics(s.Metrics))
 		mcpStreamable := NewMCPStreamableTransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
-			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode))
+			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode).WithMetrics(s.Metrics))
 		s.mcpSSE, s.mcpStreamable = mcpSSE, mcpStreamable
 
 		go func() {

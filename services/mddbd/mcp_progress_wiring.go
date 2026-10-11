@@ -49,8 +49,14 @@ func ReportProgress(ctx context.Context, progress, total int, message string) {
 // notify may be nil, which is what Handle passes: a transport that cannot
 // deliver notifications mid-request gets the same behaviour it always had.
 func (h *MCPHandler) HandleWithNotifier(req map[string]interface{}, notify func(map[string]interface{})) map[string]interface{} {
+	return h.HandleWithNotifierContext(context.Background(), req, notify)
+}
+
+// HandleWithNotifierContext is HandleWithNotifier with the caller's context
+// (see HandleContext).
+func (h *MCPHandler) HandleWithNotifierContext(ctx context.Context, req map[string]interface{}, notify func(map[string]interface{})) map[string]interface{} {
 	if notify == nil {
-		return h.Handle(req)
+		return h.HandleContext(ctx, req)
 	}
 
 	// The token may be nil: the client is then not listening for progress but
@@ -71,7 +77,7 @@ func (h *MCPHandler) HandleWithNotifier(req map[string]interface{}, notify func(
 		h.mu.Unlock()
 	}()
 
-	return h.Handle(req)
+	return h.HandleContext(ctx, req)
 }
 
 // progressSender builds a sender for the request in flight, or nil.

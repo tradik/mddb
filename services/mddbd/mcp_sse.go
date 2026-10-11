@@ -129,7 +129,7 @@ func (t *MCPSSETransport) HandleMessage(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Process through MCP handler
-	resp := t.handler.Handle(req)
+	resp := t.handler.HandleContext(withMCPCaller(r.Context(), r), req)
 
 	// Send response via SSE stream
 	respJSON, err := json.Marshal(resp)

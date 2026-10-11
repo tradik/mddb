@@ -107,6 +107,22 @@ Two supported options:
 
 Histogram buckets: 1ms, 5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s.
 
+### MCP tool calls
+
+Counted on every transport (Streamable HTTP, SSE, `/mcp/tools/call`, stdio),
+independent of `MDDB_MCP_LOGGING_ENABLED`. The `label` is the tool name as the
+client sent it, so custom tools count under their own names.
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `mddb_operations_total{operation="mcp_tool_call"}` | counter | `label` (tool) | Every `tools/call` |
+| `mddb_operations_total{operation="mcp_tool_miss"}` | counter | `label` (tool) | Calls whose result carried zero documents (`total` 0 or an empty `results`/`documents` array) |
+| `mddb_operations_total{operation="mcp_tool_error"}` | counter | `label` (tool) | Calls that failed |
+
+Miss ratio per tool: `sum by (label) (rate(mddb_operations_total{operation="mcp_tool_miss"}[1h])) / sum by (label) (rate(mddb_operations_total{operation="mcp_tool_call"}[1h]))`.
+The names behind the misses are in the log, not the metric — see
+[MCP.md](MCP.md#request-logging).
+
 ### Database
 
 | Metric | Type | Labels | Description |

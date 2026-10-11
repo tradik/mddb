@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 )
 
 // MCPHandler handles MCP JSON-RPC requests via stdio.
@@ -27,6 +28,9 @@ type MCPHandler struct {
 	// nowhere to put one.
 	notify        func(map[string]interface{})
 	progressToken interface{}
+
+	// observer logs and counts every tools/call (see mcp_tool_log.go).
+	observer mcpToolObserver
 }
 
 // NewMCPHandlerWithConfig creates a new MCP handler with custom server info, instructions, and access mode.
@@ -42,14 +46,21 @@ func NewMCPHandlerWithConfig(client MCPClient, customTools []MCPCustomToolConfig
 		globalMode:   globalMode,
 		mode:         protocolMode,
 		logLevel:     MCPLogWarning,
+		observer:     newMCPToolObserver(nil),
 	}
 }
 
 // Handle processes MCP request and returns response.
 func (h *MCPHandler) Handle(req map[string]interface{}) map[string]interface{} {
+	return h.HandleContext(context.Background(), req)
+}
+
+// HandleContext is Handle with the caller's context. An HTTP transport passes
+// a context carrying the request's caller (withMCPCaller) so a tool-call
+// record can say who asked; stdio and tests pass context.Background().
+func (h *MCPHandler) HandleContext(ctx context.Context, req map[string]interface{}) map[string]interface{} {
 	method, _ := req["method"].(string)
 	id := req["id"]
-	ctx := context.Background()
 
 	// Handle notifications (no response expected)
 	if id == nil {
@@ -275,7 +286,9 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 	ctx = withProgressSender(ctx, h.progressSender())
 
 	ts := &MCPToolServer{client: h.client, customTools: h.customTools, globalMode: h.globalMode, mode: h.mode}
+	start := time.Now()
 	result, err := ts.mcpCallTool(ctx, name, args)
+	h.observer.observe(ctx, name, args, result, err, time.Since(start))
 	if err != nil {
 		// The client sees the failure in the result either way; this is the
 		// copy that reaches its log, where a run of failing calls is visible
@@ -388,7 +401,7 @@ func (s *Server) runMCPStdio() {
 
 	customTools := loadMCPCustomTools()
 	client := NewDirectClient(s)
-	handler := NewMCPHandlerWithConfig(client, customTools, s.MCPInfo, s.MCPInstructions, s.Mode, s.Config.MCP.Mode)
+	handler := NewMCPHandlerWithConfig(client, customTools, s.MCPInfo, s.MCPInstructions, s.Mode, s.Config.MCP.Mode).WithMetrics(s.Metrics)
 
 	scanner := bufio.NewScanner(os.Stdin)
 	scanner.Buffer(make([]byte, 0, 4*1024*1024), 4*1024*1024) // 4MB buffer

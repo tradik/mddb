@@ -140,7 +140,7 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 	// session is known here and nowhere else, which is why the delivery
 	// function is supplied by the transport rather than held by the handler.
 	sessionForProgress := r.Header.Get("Mcp-Session-Id")
-	resp := t.handler.HandleWithNotifier(req, func(n map[string]interface{}) {
+	resp := t.handler.HandleWithNotifierContext(withMCPCaller(r.Context(), r), req, func(n map[string]interface{}) {
 		if sessionForProgress != "" {
 			t.SendNotification(sessionForProgress, n)
 		}

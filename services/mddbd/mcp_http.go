@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 // MCPHTTPServer provides MCP HTTP endpoints on the existing mux.
@@ -13,6 +14,7 @@ type MCPHTTPServer struct {
 	customTools []MCPCustomToolConfig
 	globalMode  AccessMode
 	mode        AccessMode
+	observer    mcpToolObserver // logs and counts /mcp/tools/call (mcp_tool_log.go)
 }
 
 // newMCPHTTPServer creates an MCPHTTPServer backed by the Server.
@@ -22,6 +24,7 @@ func (s *Server) newMCPHTTPServer() *MCPHTTPServer {
 		customTools: loadMCPCustomTools(),
 		globalMode:  s.Mode,
 		mode:        s.Config.MCP.Mode,
+		observer:    newMCPToolObserver(s.Metrics),
 	}
 }
 
@@ -84,7 +87,10 @@ func (m *MCPHTTPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ts := &MCPToolServer{client: m.client, customTools: m.customTools, globalMode: m.globalMode, mode: m.mode}
-	result, err := ts.mcpCallTool(r.Context(), req.Name, req.Arguments)
+	ctx := withMCPCaller(r.Context(), r)
+	start := time.Now()
+	result, err := ts.mcpCallTool(ctx, req.Name, req.Arguments)
+	m.observer.observe(ctx, req.Name, req.Arguments, result, err, time.Since(start))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

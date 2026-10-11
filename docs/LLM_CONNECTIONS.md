@@ -246,6 +246,14 @@ Log output (to stderr):
 {"timestamp":"2026-03-26T10:30:00Z","method":"POST","path":"/mcp","status":200,"duration_ms":45,"client_ip":"1.2.3.4","key_name":"claude-prod","session_id":"abc123","user_agent":"claude-code/1.0"}
 ```
 
+Since 2.16.0 the same switch also writes one record per `tools/call`, with the
+tool name, the `query` argument and whether the result carried any document
+(`hits`, `found`). This is the line to read when asking what clients query
+and which lookups come back empty — see [MCP.md](MCP.md#request-logging).
+```json
+{"time":"2026-10-11T18:54:33Z","level":"INFO","msg":"MCP tool call","tool":"version_check","query":"alloy","duration_ms":3,"hits":0,"found":false,"key_name":"claude-prod","client_ip":"1.2.3.4"}
+```
+
 ## MCP Protocol Features
 
 MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVISIONS.md) for what each requires:
