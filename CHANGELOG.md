@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Go 1.27.3 and `golang.org/x/net` v0.60.0.** govulncheck reported twelve
+  vulnerabilities reachable from mddbd under Go 1.27.1: `net/http` and its
+  HTTP/2 transport (GO-2026-6603, -6605, -6610, -6611, -6612, -6613, -6617),
+  `crypto/tls` (GO-2026-6607), `crypto/x509` (GO-2026-6809), `net/textproto`
+  (GO-2026-6608) and `html/template` (GO-2026-6599, -6600). The toolchain
+  pin in every `go.mod` and `go.work`, the `golang` builder images and the
+  `GO_VERSION` of the CI workflows move to 1.27.3; govulncheck now reports
+  none reachable.
+
 ## [2.16.0] - 2026-10-11
 
 One feature, asked for by the operator of the public `versions` MCP server:
