@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Go 1.27.3 and `golang.org/x/net` v0.60.0.** govulncheck reported twelve
+  vulnerabilities reachable from mddbd under Go 1.27.1: `net/http` and its
+  HTTP/2 transport (GO-2026-6603, -6605, -6610, -6611, -6612, -6613, -6617),
+  `crypto/tls` (GO-2026-6607), `crypto/x509` (GO-2026-6809), `net/textproto`
+  (GO-2026-6608) and `html/template` (GO-2026-6599, -6600). The toolchain
+  pin in every `go.mod` and `go.work`, the `golang` builder images and the
+  `GO_VERSION` of the CI workflows move to 1.27.3; govulncheck now reports
+  none reachable.
+- **mddb-chat: `quinn-proto` 0.11.19, `rustls` 0.23.46, `rustls-webpki`
+  0.103.16, `webpki-root-certs` 1.0.10.** `cargo audit` failed on eleven
+  advisories (RUSTSEC-2026-0338 to -0342, -0346 to -0349, -0382, -0383).
+
+### Changed
+
+- **gosec is pinned to a commit (`9b318063`) instead of v2.28.0.** Go 1.27.3
+  writes export data version 5; gosec releases up to v2.29.0 ship
+  `golang.org/x/tools` v0.49.0, which cannot read it, so every package failed
+  to type-check and the SAST job failed.
+
+### Fixed
+
+- **`replication_stream_test.go` passes golangci-lint again.** Four tests
+  dropped the error of a cancelled `StreamBinlog`; a helper,
+  `awaitCancelled`, now checks it is `context.Canceled`.
+- **Coverage floors hold under Go 1.27.3.** Go 1.27.1 wrote inflated
+  statement counts into coverage profiles (a six-statement block in
+  `routes.go` was counted as twenty), which hid how much of four tracked
+  areas was untested. Under 1.27.3 they read 3–5 points lower and four fell
+  below their floor. The floors stay; new tests cover what was missing: the
+  temporal and spell routes appear only with their managers, a restore that
+  cannot move the live database aside leaves it serving and never installs,
+  a sentiment-only trigger fires inside its window and not outside it, and
+  `DirectClient.Add` returns the error for a document without a key.
+
 ## [2.16.0] - 2026-10-11
 
 One feature, asked for by the operator of the public `versions` MCP server:

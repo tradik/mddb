@@ -5,6 +5,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"mddb/internal/spell"
+	"mddb/internal/temporal"
 )
 
 // TEST-002. These 107 registrations were unreachable inside a 1089-line main(),
@@ -92,6 +95,40 @@ func TestAuthRoutesFollowTheAuthFlag(t *testing.T) {
 	for _, p := range authPaths {
 		if !got[p] {
 			t.Errorf("%s is not served with auth enabled", p)
+		}
+	}
+}
+
+// Temporal tracking and spell correction are opt-in (MDDB_TEMPORAL,
+// MDDB_SPELL). Their endpoints must exist exactly when the subsystem does:
+// served without it they would dereference a nil manager.
+func TestOptionalSubsystemRoutesFollowTheirManagers(t *testing.T) {
+	srv, cleanup := routeServer(t)
+	defer cleanup()
+
+	optional := []string{
+		"/v1/temporal/query",
+		"/v1/temporal/hot",
+		"/v1/temporal/histogram",
+		"/v1/spell-suggest",
+		"/v1/spell-cleanup",
+		"/v1/spell-dictionary",
+	}
+
+	off := http.NewServeMux()
+	srv.registerRoutes(off, false)
+	if got := registeredRoutes(t, off, optional); len(got) != 0 {
+		t.Errorf("optional routes are served without their managers: %v", got)
+	}
+
+	srv.TemporalManager = temporal.NewTemporalManager(srv.DB)
+	srv.SpellManager = spell.NewSpellManager(srv.DB)
+	on := http.NewServeMux()
+	srv.registerRoutes(on, false)
+	got := registeredRoutes(t, on, optional)
+	for _, p := range optional {
+		if !got[p] {
+			t.Errorf("%s is not served with its manager enabled", p)
 		}
 	}
 }

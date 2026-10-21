@@ -202,6 +202,35 @@ func TestSwapDatabase_RollsBackWhenTheInstallFails(t *testing.T) {
 	assertDatabaseStillServing(t, s, "still here")
 }
 
+// The live file is moved aside before anything is installed. If that move
+// fails, nothing has been touched yet: the database must be reopened as it
+// was and the install must never run.
+func TestSwapDatabase_KeepsTheDatabaseWhenTheSnapshotCannotBeTaken(t *testing.T) {
+	s, cleanup := newTestServer(t)
+	defer cleanup()
+	seedKeptDocument(t, s, "still here")
+	source := backupNow(t, s)
+
+	// A non-empty directory where the snapshot goes: rename onto it fails.
+	blocker := filepath.Join(s.Path+".pre-restore", "occupied")
+	if err := os.MkdirAll(blocker, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	installed := false
+	err := s.withRestoreLock(func() error {
+		return s.swapDatabase(source, func(string) error { installed = true; return nil })
+	})
+	if err == nil {
+		t.Fatal("swapDatabase succeeded although the snapshot could not be taken")
+	}
+	if installed {
+		t.Error("install ran although the live database was never moved aside")
+	}
+
+	assertDatabaseStillServing(t, s, "still here")
+}
+
 func TestSwapDatabase_RollsBackWhenTheInstalledFileWillNotOpen(t *testing.T) {
 	s, cleanup := newTestServer(t)
 	defer cleanup()
