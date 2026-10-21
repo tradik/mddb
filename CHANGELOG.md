@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`replication_stream_test.go` passes golangci-lint again.** Four tests
   dropped the error of a cancelled `StreamBinlog`; a helper,
   `awaitCancelled`, now checks it is `context.Canceled`.
+- **Coverage floors hold under Go 1.27.3.** Go 1.27.1 wrote inflated
+  statement counts into coverage profiles (a six-statement block in
+  `routes.go` was counted as twenty), which hid how much of four tracked
+  areas was untested. Under 1.27.3 they read 3–5 points lower and four fell
+  below their floor. The floors stay; new tests cover what was missing: the
+  temporal and spell routes appear only with their managers, a restore that
+  cannot move the live database aside leaves it serving and never installs,
+  a sentiment-only trigger fires inside its window and not outside it, and
+  `DirectClient.Add` returns the error for a document without a key.
 
 ## [2.16.0] - 2026-10-11
 

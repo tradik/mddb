@@ -63,6 +63,23 @@ func TestDirectClientHealthReportsMode(t *testing.T) {
 	}
 }
 
+// An agent that leaves out a required field must get the reason back, not a
+// half-filled document.
+func TestDirectClientAddRejectsADocumentWithoutAKey(t *testing.T) {
+	client, _, cleanup := directClientServer(t)
+	defer cleanup()
+
+	doc, err := client.Add(context.Background(), &MCPAddRequest{
+		Collection: "docs", Lang: "en", ContentMD: "no key",
+	})
+	if err == nil {
+		t.Fatalf("Add without a key succeeded: %+v", doc)
+	}
+	if doc != nil {
+		t.Errorf("Add returned a document alongside its error: %+v", doc)
+	}
+}
+
 func TestUpdateBatchChangesContentAndReportsCounts(t *testing.T) {
 	client, srv, cleanup := directClientServer(t)
 	defer cleanup()

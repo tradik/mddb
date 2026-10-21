@@ -330,3 +330,43 @@ func TestRunTriggerRejectsAnUnknownSearchType(t *testing.T) {
 		t.Errorf("the error does not name the offending type: %v", err)
 	}
 }
+
+// A trigger can watch sentiment alone, with no search query. It fires when the
+// document's score falls inside the window and stays quiet when it does not.
+func TestSentimentOnlyTriggerFiresInsideItsWindow(t *testing.T) {
+	srv, cleanup := newTestServerForAutomation(t)
+	defer cleanup()
+
+	hook := newCaptureWebhook(t)
+	am := srv.AutomationManager
+
+	wh, err := am.Create(AutomationRule{
+		Name: "capture", Type: "webhook", Enabled: true, URL: hook.server.URL,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := am.Create(AutomationRule{
+		Name: "praise", Type: "trigger", Enabled: true, Collection: "docs",
+		SentimentEnabled: true, SentimentMin: 0.2, SentimentMax: 1.0, WebhookID: wh.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	am.EvaluateTriggers("docs", storage.Doc{
+		ID: "docs|bad|en", Key: "bad", Lang: "en",
+		ContentMD: "This is terrible, awful and broken. I hate it.",
+	}, "insert")
+	time.Sleep(300 * time.Millisecond)
+	if got := hook.received(); len(got) != 0 {
+		t.Fatalf("a negative document fired a positive-sentiment trigger: %+v", got)
+	}
+
+	am.EvaluateTriggers("docs", storage.Doc{
+		ID: "docs|good|en", Key: "good", Lang: "en",
+		ContentMD: "This is excellent, wonderful and great. I love it.",
+	}, "insert")
+	if got := hook.waitForRequests(t, 1); len(got) != 1 {
+		t.Errorf("a positive document fired %d webhooks, want 1", len(got))
+	}
+}
