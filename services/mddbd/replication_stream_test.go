@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -78,6 +79,15 @@ func runBinlogStream(t *testing.T, rs *ReplicationServer, id string, stream *rec
 	return cancelCtx, errc
 }
 
+// awaitCancelled waits for a stream whose context was cancelled to return,
+// and checks that it ended with the cancellation and nothing else.
+func awaitCancelled(t *testing.T, done <-chan error) {
+	t.Helper()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Errorf("stream ended with %v, want context.Canceled", err)
+	}
+}
+
 func lastOf(l []uint64) uint64 {
 	if len(l) == 0 {
 		return 0
@@ -113,7 +123,7 @@ func TestEntriesWrittenDuringTheReplayReachTheFollower(t *testing.T) {
 	}
 	cancel, done := runBinlogStream(t, rs, "f1", stream, 150)
 	cancel()
-	<-done
+	awaitCancelled(t, done)
 
 	assertContiguous(t, stream.received(), 150)
 }
@@ -150,7 +160,7 @@ func TestAFollowerThatFallsBehindTheBufferGetsEveryEntry(t *testing.T) {
 		time.Sleep(5 * time.Millisecond)
 	}
 	cancelCtx()
-	<-done
+	awaitCancelled(t, done)
 	assertContiguous(t, stream.received(), burst+1)
 }
 
@@ -166,10 +176,10 @@ func TestAReconnectedFollowerKeepsItsStream(t *testing.T) {
 	cancelOld, oldDone := runBinlogStream(t, rs, "f1", old, 1)
 	fresh := &recordingStream{ctx: authedReplCtx(t, "s")}
 	cancelFresh, freshDone := runBinlogStream(t, rs, "f1", fresh, 1)
-	defer func() { cancelFresh(); <-freshDone }()
+	defer func() { cancelFresh(); awaitCancelled(t, freshDone) }()
 
 	cancelOld()
-	<-oldDone
+	awaitCancelled(t, oldDone)
 
 	if got := bl.Stats().Subscribers; got != 1 {
 		t.Errorf("subscribers after the old stream ended = %d, want 1", got)

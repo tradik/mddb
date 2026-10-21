@@ -17,6 +17,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pin in every `go.mod` and `go.work`, the `golang` builder images and the
   `GO_VERSION` of the CI workflows move to 1.27.3; govulncheck now reports
   none reachable.
+- **mddb-chat: `quinn-proto` 0.11.19, `rustls` 0.23.46, `rustls-webpki`
+  0.103.16, `webpki-root-certs` 1.0.10.** `cargo audit` failed on eleven
+  advisories (RUSTSEC-2026-0338 to -0342, -0346 to -0349, -0382, -0383).
+
+### Changed
+
+- **gosec is pinned to a commit (`9b318063`) instead of v2.28.0.** Go 1.27.3
+  writes export data version 5; gosec releases up to v2.29.0 ship
+  `golang.org/x/tools` v0.49.0, which cannot read it, so every package failed
+  to type-check and the SAST job failed.
+
+### Fixed
+
+- **`replication_stream_test.go` passes golangci-lint again.** Four tests
+  dropped the error of a cancelled `StreamBinlog`; a helper,
+  `awaitCancelled`, now checks it is `context.Canceled`.
 
 ## [2.16.0] - 2026-10-11
 
