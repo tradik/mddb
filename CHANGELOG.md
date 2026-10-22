@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-10-22
+
+Two reports from running daemonports.org's search on mddb. A filtered search
+returned a handful of results where hundreds matched, because the filter ran
+after the limit; and a bulk load on spinning disks spent most of its time in
+fsync, most of which came from the embedding worker committing three times
+per document.
+
 ### Fixed
 
 - **The embedding worker commits once per document, not three times
