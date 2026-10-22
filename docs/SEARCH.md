@@ -1872,10 +1872,43 @@ curl -X POST http://localhost:11023/v1/fts \
 ```
 
 **Notes:**
-- `facetBy` accepts any metadata key — counts are computed over the documents actually returned (after filtering, boosts, curation).
+- `facetBy` accepts any metadata key. By default counts are computed over the documents actually returned (after filtering, boosts, curation and the limit).
 - `facetMaxValues` caps each key's bucket list. `0` or omitted = unlimited.
 - Missing keys still appear in the map with an empty bucket list, so UIs can render a stable facet group layout across queries.
 - Works with HybridSearch in the same way (parameter is also `facetBy` / `facetMaxValues`).
+
+### Counting over every match: `facetScope` (v2.17.0+, `/v1/fts`)
+
+A filter sidebar wants the number of matches per category, not the number on
+the current page. With `"facetScope": "all"` the counts cover every document
+that matched the query and `filterMeta` / `rangeMeta`, before pagination, and
+`matched` gives their total for an "N found" line:
+
+```bash
+curl -X POST http://localhost:11023/v1/fts \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "ports", "query": "library", "limit": 50,
+       "filterMeta": {"system": ["freebsd"]},
+       "facetBy": ["category"], "facetScope": "all"}'
+```
+
+```json
+{
+  "results": [ /* the 50 best */ ],
+  "total": 50,
+  "matched": 1525,
+  "facets": { "category": [ {"value": "devel", "count": 412}, … ] }
+}
+```
+
+`total` keeps its meaning — the number of results returned. Counts come from
+the metadata index, not from loading each document, so they stay cheap on a
+large match set (19,823 matches over 20,000 documents: 11 ms). Curation does
+not change them. HybridSearch has no `all` scope: its vector half ranks every
+document, so "every match" would be the whole collection.
+
+For multi-select facets, ask each group's counts with that group's own filter
+left out, as usual.
 
 ## Curation Rules — Pinned & Hidden Results (v2.9.14+)
 

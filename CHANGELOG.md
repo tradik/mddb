@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   embeddings committed 1,500 transactions in the background; it now commits
   500. `CleanStaleChunks` looks in a read transaction first and writes, once,
   only when something is stale.
+- **`filterMeta` on `/v1/fts` and `/v1/hybrid-search` sees every match, not
+  the top `limit` (#311).** The text index was asked for the best `limit`
+  documents of the unfiltered ranking and the filter was applied to those,
+  so it could only keep what happened to rank there: 100 documents matching
+  query and filter, `limit: 50`, and the response held 7. The filter now
+  runs over every text match and the limit after it. `rangeMeta` and `boost`
+  on `/v1/fts` had the same order and get the same fix — a boost can now lift
+  a document from below the limit, which was what it was for. The index
+  scored every match already; only the truncation moved.
 
 ### Added
 
@@ -26,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now took dtrace to see. DEPLOYMENT.md has a new section, *Spinning Disks and
   fsync*, with the commits each kind of write makes and when `sync=disabled`
   is a reasonable trade.
+- **`facetScope: "all"` on `/v1/fts` (#311).** `facetBy` counted over the
+  returned page, so the counts depended on `limit`. With `"all"`, they cover
+  every document that matched the query and filters, and `matched` reports
+  how many there were. Counted from the metadata index rather than by loading
+  documents: 11 ms over 19,823 matches. `"returned"` stays the default, and
+  `total` keeps meaning the number of results returned.
 
 ## [2.16.1] - 2026-10-22
 
