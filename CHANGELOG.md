@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A batch that took longer than 30 seconds lost its response (#315).** The
+  HTTP server's `WriteTimeout` was fixed at 30 s. net/http does not stop a
+  handler at that deadline; it closes the connection when the response is
+  written after it. So a large `add-batch` did all its work and the client
+  got `EOF`, with nothing in the server's log, and a client that retried sent
+  the batch twice. `add-batch`, `delete-batch` and `restore` now lift the
+  deadline for their own response, as `backup` already did.
+
+### Added
+
+- **`MDDB_HTTP_READ_TIMEOUT` and `MDDB_HTTP_WRITE_TIMEOUT` (#315).** Go
+  durations, default `30s` as before, `0` for no limit. They apply to the HTTP
+  API and the MCP HTTP listener.
+- **A `response not delivered` warning** for every request whose handler
+  finished after the write deadline, with the path, how long it took, and
+  which variable to raise. Until now the only sign was a client-side `EOF`.
+
 ## [2.17.0] - 2026-10-22
 
 Two reports from running daemonports.org's search on mddb. A filtered search

@@ -48,6 +48,9 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 
 // handleDeleteBatch deletes multiple documents in a single request.
 func (s *Server) handleDeleteBatch(w http.ResponseWriter, r *http.Request) {
+	// A batch's work outlives the write timeout on a large collection or a
+	// slow disk, and is not cancelled by it; only the answer was lost (#315).
+	liftWriteDeadline(w, r)
 	var req struct {
 		Collection string `json:"collection"`
 		Documents  []struct {
