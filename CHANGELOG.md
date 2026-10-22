@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.1] - 2026-10-22
+
+A large `add-batch` on a slow disk could take longer than the HTTP server's
+30-second write timeout, and its response was then dropped without a word:
+the work was done, the client saw `EOF`. Batch writes now always get their
+answer, and the timeouts are configurable. Also on the blog:
+[The Bugs That Looked Like Success](https://mddb.tradik.com/blog/the-bugs-that-looked-like-success/).
+
 ### Fixed
 
 - **A batch that took longer than 30 seconds lost its response (#315).** The

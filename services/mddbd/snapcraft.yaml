@@ -1,6 +1,6 @@
 name: mddbd
 title: MDDB Server
-version: "2.17.0"
+version: "2.17.1"
 summary: Embedded Markdown database server
 description: |
   MDDB (Markdown Database) is an embedded database server that stores documents
