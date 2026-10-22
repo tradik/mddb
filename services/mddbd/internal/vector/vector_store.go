@@ -217,51 +217,59 @@ type ChunkRemover interface {
 func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCount int, index ChunkRemover) {
 	prefix := []byte("vec|" + collection + "|" + docID + "#")
 
-	var bo binlog.BinlogOps
-	_ = vs.db.Update(func(tx *bolt.Tx) error {
+	// Find what is stale in a read transaction first. Every embedded document
+	// passes through here and almost none shrank, so committing unconditionally
+	// cost two empty write transactions — two fsyncs — per document (#306).
+	type staleKey struct {
+		key   []byte
+		index string // the key the in-memory indexes know it by
+	}
+	var stale []staleKey
+	_ = vs.db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
 		}
 		c := b.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && len(k) >= len(prefix) && string(k[:len(prefix)]) == string(prefix); k, _ = c.Next() {
-			suffix := string(k[len(prefix):])
-			idx, err := strconv.Atoi(suffix)
-			if err != nil {
+		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+			idx, err := strconv.Atoi(string(k[len(prefix):]))
+			if err != nil || idx < currentChunkCount {
 				continue
 			}
-			if idx >= currentChunkCount {
-				_ = b.Delete(k)
-				bo.Delete("vectors", k)
-				if index != nil {
-					chunkKey := fmt.Sprintf("%s#%d", docID, idx)
-					index.Remove(collection, chunkKey)
-				}
-			}
+			stale = append(stale, staleKey{bytes.Clone(k), fmt.Sprintf("%s#%d", docID, idx)})
+		}
+		// A document embedded before chunking kept one non-chunked key.
+		if oldKey := buildVecKey(collection, docID); currentChunkCount > 1 && b.Get(oldKey) != nil {
+			stale = append(stale, staleKey{oldKey, docID})
 		}
 		return nil
 	})
-	bo.FlushTo(vs.binlog)
+	if len(stale) == 0 {
+		return
+	}
 
-	// Also clean the old non-chunked key if chunks > 1
-	if currentChunkCount > 1 {
-		oldKey := buildVecKey(collection, docID)
-		var bo2 binlog.BinlogOps
-		_ = vs.db.Update(func(tx *bolt.Tx) error {
-			b := tx.Bucket(vs.bucketName)
-			if b == nil {
-				return nil
-			}
-			if v := b.Get(oldKey); v != nil {
-				_ = b.Delete(oldKey)
-				bo2.Delete("vectors", oldKey)
-				if index != nil {
-					index.Remove(collection, docID)
-				}
-			}
+	var bo binlog.BinlogOps
+	err := vs.db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket(vs.bucketName)
+		if b == nil {
 			return nil
-		})
-		bo2.FlushTo(vs.binlog)
+		}
+		for _, s := range stale {
+			if err := b.Delete(s.key); err != nil {
+				return err
+			}
+			bo.Delete("vectors", s.key)
+		}
+		return nil
+	})
+	if err != nil {
+		return
+	}
+	bo.FlushTo(vs.binlog)
+	if index != nil {
+		for _, s := range stale {
+			index.Remove(collection, s.index)
+		}
 	}
 }
 

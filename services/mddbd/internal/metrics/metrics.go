@@ -45,6 +45,10 @@ type StatsProvider interface {
 	ReplicationRole() string
 	BinlogStats() (s BinlogStatsView, present bool)
 	DBStats() DBStats
+	// DBWriteTransactions is the number of write transactions the database
+	// has committed since it was created. Read live, not from the DBStats
+	// cache: its rate per request is the point of it (#306).
+	DBWriteTransactions() uint64
 }
 
 // BinlogStatsView mirrors the binlog statistics needed for replication metrics.
@@ -301,6 +305,10 @@ func (m *Metrics) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 	writef(&buf, "# HELP mddb_database_size_bytes Database file size in bytes.\n")
 	writef(&buf, "# TYPE mddb_database_size_bytes gauge\n")
 	writef(&buf, "mddb_database_size_bytes %d\n\n", ds.SizeBytes)
+
+	writef(&buf, "# HELP mddb_db_write_transactions_total Write transactions committed to the database file; each costs an fsync.\n")
+	writef(&buf, "# TYPE mddb_db_write_transactions_total counter\n")
+	writef(&buf, "mddb_db_write_transactions_total %d\n\n", m.stats.DBWriteTransactions())
 
 	writef(&buf, "# HELP mddb_documents_total Total documents per collection.\n")
 	writef(&buf, "# TYPE mddb_documents_total gauge\n")
