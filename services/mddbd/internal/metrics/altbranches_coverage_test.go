@@ -21,6 +21,7 @@ func (altStats) EmbeddingCacheStats() (uint64, uint64, int, bool) { return 0, 0,
 func (s altStats) ReplicationRole() string                        { return s.role }
 func (altStats) BinlogStats() (BinlogStatsView, bool)             { return BinlogStatsView{}, false }
 func (altStats) DBStats() DBStats                                 { return DBStats{} }
+func (altStats) DBWriteTransactions() uint64                      { return 0 }
 
 func TestHandleMetricsAltBranches(t *testing.T) {
 	for _, role := range []string{"follower", "standalone"} { // follower -> 2, other -> default 0

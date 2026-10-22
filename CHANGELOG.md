@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The embedding worker commits once per document, not three times
+  (#306).** After storing a document's chunks it called `CleanStaleChunks`,
+  which opened two write transactions unconditionally: one for chunks past the
+  new count, one for the pre-chunking key. Almost no document shrinks, so both
+  were usually empty, and each still cost an fsync. A 500-document batch with
+  embeddings committed 1,500 transactions in the background; it now commits
+  500. `CleanStaleChunks` looks in a read transaction first and writes, once,
+  only when something is stale.
+
+### Added
+
+- **`mddb_db_write_transactions_total`.** The number of write transactions
+  committed to the database file, read live from its meta page. Its rate per
+  request is what a bulk load costs on a disk where fsync is slow, which until
+  now took dtrace to see. DEPLOYMENT.md has a new section, *Spinning Disks and
+  fsync*, with the commits each kind of write makes and when `sync=disabled`
+  is a reasonable trade.
+
 ## [2.16.1] - 2026-10-22
 
 A security release with no change in behaviour. The 2.16.0 binaries and

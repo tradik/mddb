@@ -381,7 +381,10 @@ else
 fi
 ```
 
-### Prometheus Metrics (Future)
+### Prometheus Metrics
+
+`GET /metrics` serves Prometheus text format; the metrics are listed in
+[TELEMETRY.md](TELEMETRY.md).
 
 ```yaml
 # prometheus.yml
@@ -418,6 +421,30 @@ curl -X POST http://localhost:11023/v1/truncate \
   -H 'Content-Type: application/json' \
   -d '{"collection":"blog","keepRevs":10,"dropCache":true}'
 ```
+
+### Spinning Disks and fsync
+
+Every write transaction ends in an fsync (see
+[Persistence Guarantees](#persistence-guarantees)). On an SSD that costs well
+under a millisecond; on a 7200 rpm disk, or ZFS with `sync=standard` and no
+SLOG, it costs several, and a bulk load spends most of its time waiting for
+them.
+
+What a load commits:
+
+| Work | Commits |
+|---|---|
+| `POST /v1/add-batch`, any size | 2 per request (documents with their meta index, then full-text) |
+| Embedding, when a provider is configured | 1 per document, written by the background worker |
+
+`mddb_db_write_transactions_total` counts them, so the rate is visible without
+dtrace: divide its increase by the documents loaded over the same window.
+
+If the database can be rebuilt from its sources — an index over a ports tree,
+a mirror of a CMS — a dataset with `sync=disabled` (ZFS) or a mount without
+barriers trades the last few seconds of writes on power loss for throughput.
+A database that is the only copy of its data should keep fsync and get a SLOG
+or an SSD instead.
 
 ## Security Hardening
 
