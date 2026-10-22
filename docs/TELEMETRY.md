@@ -128,6 +128,7 @@ The names behind the misses are in the log, not the metric — see
 | Metric | Type | Labels | Description |
 |---|---|---|---|
 | `mddb_database_size_bytes` | gauge | -- | Database file size |
+| `mddb_db_write_transactions_total` | counter | -- | Write transactions committed to the database file; each one is an fsync |
 | `mddb_documents_total` | gauge | `collection` | Documents per collection |
 | `mddb_revisions_total` | gauge | `collection` | Revisions per collection |
 | `mddb_meta_indices_total` | gauge | `collection` | Metadata index entries per collection |
@@ -242,6 +243,11 @@ histogram_quantile(0.50,
 **Database size over time:**
 ```promql
 mddb_database_size_bytes
+```
+
+**Commits per second (each an fsync — the cost that matters on spinning disks):**
+```promql
+rate(mddb_db_write_transactions_total[1m])
 ```
 
 **Documents per collection:**

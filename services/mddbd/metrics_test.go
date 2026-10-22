@@ -289,3 +289,27 @@ func BenchmarkMetricsHandler(b *testing.B) {
 		s.Metrics.HandleMetrics(rec, req)
 	}
 }
+
+// #306. The write-transaction counter is what shows, without dtrace, how many
+// commits — each an fsync — a request costs. It must count every commit and
+// nothing else.
+func TestDBWriteTransactionsCountsCommits(t *testing.T) {
+	s, cleanup := newTestServerForMetrics(t)
+	defer cleanup()
+	stats := &serverMetricsStats{s: s}
+
+	before := stats.DBWriteTransactions()
+	for i := 0; i < 3; i++ {
+		if err := s.DB.Update(func(tx *bolt.Tx) error {
+			_, err := tx.CreateBucketIfNotExists([]byte("commit-counter"))
+			return err
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = s.DB.View(func(*bolt.Tx) error { return nil })
+
+	if got := stats.DBWriteTransactions() - before; got != 3 {
+		t.Errorf("three commits and one read moved the counter by %d, want 3", got)
+	}
+}

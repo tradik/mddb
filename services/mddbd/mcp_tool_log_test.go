@@ -35,7 +35,8 @@ func (toolLogStubStats) ReplicationRole() string                          { retu
 func (toolLogStubStats) BinlogStats() (metrics.BinlogStatsView, bool) {
 	return metrics.BinlogStatsView{}, false
 }
-func (toolLogStubStats) DBStats() metrics.DBStats { return metrics.DBStats{} }
+func (toolLogStubStats) DBStats() metrics.DBStats    { return metrics.DBStats{} }
+func (toolLogStubStats) DBWriteTransactions() uint64 { return 0 }
 
 var versionCheckTool = MCPCustomToolConfig{
 	Name:     "version_check",

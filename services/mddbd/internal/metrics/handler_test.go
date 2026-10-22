@@ -29,6 +29,8 @@ func (stubStats) DBStats() DBStats {
 	}
 }
 
+func (stubStats) DBWriteTransactions() uint64 { return 77 }
+
 func TestHandleMetricsOutput(t *testing.T) {
 	m := NewMetrics(true, stubStats{})
 
@@ -49,7 +51,7 @@ func TestHandleMetricsOutput(t *testing.T) {
 		`mddb_http_requests_total{method="POST",path="/v1/add",status="200"} 1`,
 		"mddb_http_request_duration_seconds_bucket", "mddb_http_request_duration_seconds_sum",
 		`mddb_operations_total{operation="fts_search",label="bm25"} 1`,
-		"mddb_database_size_bytes 1024", `mddb_documents_total{collection="blog"} 2`,
+		"mddb_database_size_bytes 1024", "mddb_db_write_transactions_total 77", `mddb_documents_total{collection="blog"} 2`,
 		`mddb_revisions_total{collection="blog"} 1`, `mddb_meta_indices_total{collection="blog"} 3`,
 		`mddb_vector_embeddings_total{collection="blog"} 1`,
 		"mddb_vector_index_ready 1", "mddb_embedding_provider_configured 1",

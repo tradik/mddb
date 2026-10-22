@@ -65,3 +65,73 @@ func TestVectorStoreCleanStaleChunks(t *testing.T) {
 		return nil
 	})
 }
+
+// writeCommits counts the write transactions committed since the last call:
+// bbolt advances the meta txid once per commit, and nothing else does.
+func writeCommits(t *testing.T, db *bolt.DB) func() int {
+	t.Helper()
+	txid := func() int {
+		var id int
+		if err := db.View(func(tx *bolt.Tx) error { id = tx.ID(); return nil }); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	last := txid()
+	return func() int {
+		now := txid()
+		n := now - last
+		last = now
+		return n
+	}
+}
+
+// #306. The embedding worker calls CleanStaleChunks after every document it
+// embeds. When the document did not shrink there is nothing to delete, and it
+// must not commit: each commit is an fsync, and on a spinning disk two empty
+// commits per document were most of what a bulk load spent its time on.
+func TestCleanStaleChunksCommitsOnlyWhenSomethingIsStale(t *testing.T) {
+	vs := newTestVectorStore(t)
+	idx := NewVectorIndex()
+	chunks := []ChunkEmbedding{
+		{ChunkIndex: 0, Vector: []float32{1, 0}},
+		{ChunkIndex: 1, Vector: []float32{0, 1}},
+	}
+	if err := vs.PutChunks("c", "doc", chunks, "m", "h"); err != nil {
+		t.Fatal(err)
+	}
+	commits := writeCommits(t, vs.db)
+
+	vs.CleanStaleChunks("c", "doc", len(chunks), idx)
+	if n := commits(); n != 0 {
+		t.Errorf("nothing was stale, yet CleanStaleChunks committed %d transactions", n)
+	}
+
+	// A stale chunk and the legacy non-chunked key go in one commit.
+	if err := vs.db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(vs.bucketName).Put(buildVecKey("c", "doc"), []byte("legacy"))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := vs.PutChunks("c", "doc", append(chunks, ChunkEmbedding{ChunkIndex: 2, Vector: []float32{1, 1}}), "m", "h"); err != nil {
+		t.Fatal(err)
+	}
+	_ = commits()
+	vs.CleanStaleChunks("c", "doc", len(chunks), idx)
+	if n := commits(); n != 1 {
+		t.Errorf("removing a stale chunk and the legacy key took %d commits, want 1", n)
+	}
+	_ = vs.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(vs.bucketName)
+		if b.Get(buildChunkKey("c", "doc", 2)) != nil {
+			t.Error("stale chunk #2 survived the cleanup")
+		}
+		if b.Get(buildVecKey("c", "doc")) != nil {
+			t.Error("legacy non-chunked key survived the cleanup")
+		}
+		if b.Get(buildChunkKey("c", "doc", 1)) == nil {
+			t.Error("live chunk #1 was removed")
+		}
+		return nil
+	})
+}

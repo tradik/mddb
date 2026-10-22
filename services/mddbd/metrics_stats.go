@@ -137,6 +137,18 @@ func (a *serverMetricsStats) DBStats() metrics.DBStats {
 	return ds
 }
 
+// DBWriteTransactions reads the committed transaction ID from the database
+// meta page. bbolt advances it by one per write commit and never otherwise, so
+// it is an exact commit counter at the cost of one empty read transaction.
+func (a *serverMetricsStats) DBWriteTransactions() uint64 {
+	var id int
+	_ = a.s.DBView(func(tx *bolt.Tx) error {
+		id = tx.ID()
+		return nil
+	})
+	return uint64(max(id, 0))
+}
+
 // metricsExtractCollection pulls the collection name from a BoltDB key like "doc|blog|id".
 func metricsExtractCollection(key []byte) string {
 	i := bytes.IndexByte(key, '|')
