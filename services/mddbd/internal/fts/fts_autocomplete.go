@@ -71,7 +71,8 @@ func (f *FTSIndex) Autocomplete(collection, prefix, field string, topN int) ([]A
 	counts := make(map[string]int)
 
 	err := f.db.View(func(tx *bolt.Tx) error {
-		if field != "" {
+		// The body's terms are the main index's (#317).
+		if field != "" && field != contentField {
 			return autocompleteScanField(tx, collection, field, prefix, counts)
 		}
 		return autocompleteScanGlobal(tx, collection, prefix, counts)

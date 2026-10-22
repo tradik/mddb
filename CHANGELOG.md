@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The first large batch into an empty collection took 50 seconds (#317).**
+  A batch's full-text postings, one key per term and document, were written
+  in Go map order. bbolt keeps a leaf in memory until the commit splits it,
+  and every out-of-order insert shifted the whole leaf, so 500 documents into
+  an empty index cost 49.8 s and lost its HTTP response. They are now written
+  sorted by key, and the same batch takes 0.55 s. The effect shrinks as the
+  tree grows and gains splits, but it never went away.
+- **Bulk loads are about twice as fast as a collection grows (#317).** The
+  document body was indexed twice: in the main inverted index, and again as
+  BM25F's `content` field in the per-field index, with the same tokens and
+  counts. The `content` field now reads the main index, which removes a third
+  of every batch's index writes. 25,000 port-like documents in 500-document
+  requests: 151 s before, 69 s now; at 25,000 documents a request runs at
+  260 documents/s instead of 131.
+
+  Databases written by earlier versions keep their per-field `content`
+  entries until each document is re-indexed; nothing reads them, and BM25F
+  scores are unchanged.
+
 ## [2.17.1] - 2026-10-22
 
 A large `add-batch` on a slow disk could take longer than the HTTP server's

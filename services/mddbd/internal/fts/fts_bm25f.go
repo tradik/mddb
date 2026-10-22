@@ -46,17 +46,8 @@ func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit i
 	scores := make(map[string]*docScore)
 
 	err := f.db.View(func(tx *bolt.Tx) error {
-		bF := tx.Bucket(bucketFTSF)
-		if bF == nil {
-			return nil
-		}
-		bMeta := tx.Bucket(bucketFTSFMeta)
-		bStat := tx.Bucket(bucketFTSFStat)
-		if bMeta == nil || bStat == nil {
-			return nil
-		}
-
-		fstats := f.loadFieldStats(tx, collection, weights)
+		sources := fieldSources(tx, collection, weights)
+		fstats := loadFieldStats(sources)
 		if len(fstats) == 0 {
 			return nil
 		}
@@ -79,8 +70,12 @@ func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit i
 				if w <= 0 {
 					continue
 				}
-				prefix := ftsfKey(collection, field, term, "")
-				c := bF.Cursor()
+				src, ok := sources[field]
+				if !ok {
+					continue
+				}
+				prefix := src.termPrefix(term)
+				c := src.postings.Cursor()
 				for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
 					docID := string(k[len(prefix):])
 					if docID != "" {
@@ -105,8 +100,9 @@ func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit i
 				if avgdl == 0 {
 					avgdl = 1
 				}
-				prefix := ftsfKey(collection, field, term, "")
-				c := bF.Cursor()
+				src := sources[field]
+				prefix := src.termPrefix(term)
+				c := src.postings.Cursor()
 				for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 					docID := string(k[len(prefix):])
 					if docID == "" {
@@ -117,7 +113,7 @@ func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit i
 						tf = float64(binary.LittleEndian.Uint32(v))
 					}
 					dl := avgdl
-					if meta := bMeta.Get(ftsfMetaKey(collection, field, docID)); len(meta) >= 4 {
+					if meta := src.lengths.Get(src.lenKey(docID)); len(meta) >= 4 {
 						dl = float64(binary.LittleEndian.Uint32(meta))
 					}
 					norm := 1.0 - bm25B + bm25B*dl/avgdl
@@ -177,17 +173,8 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 	scores := make(map[string]*docScore)
 
 	err := f.db.View(func(tx *bolt.Tx) error {
-		bF := tx.Bucket(bucketFTSF)
-		if bF == nil {
-			return nil
-		}
-		bMeta := tx.Bucket(bucketFTSFMeta)
-		bStat := tx.Bucket(bucketFTSFStat)
-		if bMeta == nil || bStat == nil {
-			return nil
-		}
-
-		fstats := f.loadFieldStats(tx, collection, weights)
+		sources := fieldSources(tx, collection, weights)
+		fstats := loadFieldStats(sources)
 		if len(fstats) == 0 {
 			return nil
 		}
@@ -202,7 +189,7 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 			return nil
 		}
 
-		expanded := f.expandFuzzyFieldTerms(tx, collection, tokens, maxDist, weights)
+		expanded := expandFuzzyFieldTerms(sources, tokens, maxDist)
 		if len(expanded) == 0 {
 			return nil
 		}
@@ -215,8 +202,12 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 				if w <= 0 {
 					continue
 				}
-				prefix := ftsfKey(collection, field, term, "")
-				c := bF.Cursor()
+				src, ok := sources[field]
+				if !ok {
+					continue
+				}
+				prefix := src.termPrefix(term)
+				c := src.postings.Cursor()
 				for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
 					docID := string(k[len(prefix):])
 					if docID != "" {
@@ -240,8 +231,9 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 				if avgdl == 0 {
 					avgdl = 1
 				}
-				prefix := ftsfKey(collection, field, term, "")
-				c := bF.Cursor()
+				src := sources[field]
+				prefix := src.termPrefix(term)
+				c := src.postings.Cursor()
 				for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 					docID := string(k[len(prefix):])
 					if docID == "" {
@@ -252,7 +244,7 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 						tf = float64(binary.LittleEndian.Uint32(v))
 					}
 					dl := avgdl
-					if meta := bMeta.Get(ftsfMetaKey(collection, field, docID)); len(meta) >= 4 {
+					if meta := src.lengths.Get(src.lenKey(docID)); len(meta) >= 4 {
 						dl = float64(binary.LittleEndian.Uint32(meta))
 					}
 					norm := 1.0 - bm25B + bm25B*dl/avgdl
@@ -301,22 +293,14 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 	return results, nil
 }
 
-// loadFieldStats loads per-field collection statistics for the given weights.
-func (f *FTSIndex) loadFieldStats(tx *bolt.Tx, collection string, weights map[string]float64) map[string]fieldStats {
-	bStat := tx.Bucket(bucketFTSFStat)
-	if bStat == nil {
-		return nil
-	}
-	result := make(map[string]fieldStats, len(weights))
-	for field, w := range weights {
-		if w <= 0 {
+// loadFieldStats reads each field's collection statistics.
+func loadFieldStats(sources map[string]fieldSource) map[string]fieldStats {
+	result := make(map[string]fieldStats, len(sources))
+	for field, src := range sources {
+		if src.stats == nil {
 			continue
 		}
-		raw := bStat.Get(ftsfStatKey(collection, field))
-		if raw == nil {
-			continue
-		}
-		cs := decodeCollectionStats(raw)
+		cs := decodeCollectionStats(src.stats)
 		avgdl := float64(0)
 		if cs.TotalDocs > 0 {
 			avgdl = float64(cs.TotalTerms) / float64(cs.TotalDocs)
@@ -332,19 +316,11 @@ func (f *FTSIndex) loadFieldStats(tx *bolt.Tx, collection string, weights map[st
 
 // expandFuzzyFieldTerms scans the field-level FTS bucket for terms matching
 // query terms within the given edit distance.
-func (f *FTSIndex) expandFuzzyFieldTerms(tx *bolt.Tx, collection string, queryTerms map[string]int, maxDist int, weights map[string]float64) map[string]string {
-	bF := tx.Bucket(bucketFTSF)
-	if bF == nil {
-		return nil
-	}
-
+func expandFuzzyFieldTerms(sources map[string]fieldSource, queryTerms map[string]int, maxDist int) map[string]string {
 	indexedTerms := make(map[string]struct{})
-	for field, w := range weights {
-		if w <= 0 {
-			continue
-		}
-		prefix := []byte("ftsf|" + collection + "|" + field + "|")
-		c := bF.Cursor()
+	for _, src := range sources {
+		prefix := []byte(src.base)
+		c := src.postings.Cursor()
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
 			rest := string(k[len(prefix):])
 			pipe := strings.IndexByte(rest, '|')

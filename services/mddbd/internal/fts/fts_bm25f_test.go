@@ -9,14 +9,14 @@ func TestBM25FBasicSearch(t *testing.T) {
 	defer cleanup()
 
 	// Doc1: term "golang" in title only
-	if err := idx.IndexFields("blog", "doc1", map[string]string{
+	if err := indexWithFields(idx, "blog", "doc1", map[string]string{
 		"meta.title": "golang tutorial",
 		"content":    "this is a programming language tutorial for beginners",
 	}); err != nil {
 		t.Fatalf("IndexFields doc1: %v", err)
 	}
 	// Doc2: term "golang" in content only
-	if err := idx.IndexFields("blog", "doc2", map[string]string{
+	if err := indexWithFields(idx, "blog", "doc2", map[string]string{
 		"meta.title": "programming tutorial",
 		"content":    "golang is great for building systems",
 	}); err != nil {
@@ -44,7 +44,7 @@ func TestBM25FDefaultWeights(t *testing.T) {
 	defer cleanup()
 
 	// Index document with content and multiple meta fields
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"content":          "advanced database systems",
 		"meta.title":       "database performance guide",
 		"meta.tags":        "database optimization",
@@ -73,14 +73,14 @@ func TestBM25FCustomWeights(t *testing.T) {
 	defer cleanup()
 
 	// Doc1: term in tags
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"meta.tags": "golang performance",
 		"content":   "some other content here about nothing specific",
 	}); err != nil {
 		t.Fatalf("IndexFields d1: %v", err)
 	}
 	// Doc2: term in content
-	if err := idx.IndexFields("col", "d2", map[string]string{
+	if err := indexWithFields(idx, "col", "d2", map[string]string{
 		"meta.tags": "python scripting",
 		"content":   "golang is great for performance",
 	}); err != nil {
@@ -122,7 +122,7 @@ func TestBM25FCustomWeights(t *testing.T) {
 	}
 }
 
-func TestBM25FNoFieldData(t *testing.T) {
+func TestBM25FContentWithoutFieldData(t *testing.T) {
 	idx, cleanup := newTestFTSIndex(t)
 	defer cleanup()
 
@@ -136,9 +136,10 @@ func TestBM25FNoFieldData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchBM25F: %v", err)
 	}
-	// No field data → no results (graceful, no crash)
-	if len(results) != 0 {
-		t.Errorf("expected 0 results when no field data, got %d", len(results))
+	// No per-field data, but the body is in the main index, which serves
+	// the "content" field (#317): the document is found through it.
+	if len(results) != 1 || results[0].DocID != "doc1" {
+		t.Errorf("expected doc1 through the content field, got %v", results)
 	}
 }
 
@@ -146,19 +147,19 @@ func TestBM25FMultipleTerms(t *testing.T) {
 	idx, cleanup := newTestFTSIndex(t)
 	defer cleanup()
 
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"meta.title": "golang database tutorial",
 		"content":    "learn how to build databases with golang",
 	}); err != nil {
 		t.Fatalf("IndexFields d1: %v", err)
 	}
-	if err := idx.IndexFields("col", "d2", map[string]string{
+	if err := indexWithFields(idx, "col", "d2", map[string]string{
 		"meta.title": "python web scraping",
 		"content":    "golang is used for database management",
 	}); err != nil {
 		t.Fatalf("IndexFields d2: %v", err)
 	}
-	if err := idx.IndexFields("col", "d3", map[string]string{
+	if err := indexWithFields(idx, "col", "d3", map[string]string{
 		"meta.title": "rust systems programming",
 		"content":    "rust and golang are systems languages",
 	}); err != nil {
@@ -183,7 +184,7 @@ func TestBM25FFuzzy(t *testing.T) {
 	idx, cleanup := newTestFTSIndex(t)
 	defer cleanup()
 
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"meta.title": "golang tutorial",
 		"content":    "learn golang programming basics",
 	}); err != nil {
@@ -223,7 +224,7 @@ func TestBM25FFieldWeightZero(t *testing.T) {
 	defer cleanup()
 
 	// Index with term in both title and content
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"meta.title": "golang tutorial",
 		"content":    "golang programming basics",
 	}); err != nil {
@@ -265,7 +266,7 @@ func TestBM25FRemoveCleanup(t *testing.T) {
 	idx, cleanup := newTestFTSIndex(t)
 	defer cleanup()
 
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"meta.title": "golang tutorial",
 		"content":    "learn golang programming",
 	}); err != nil {
@@ -300,7 +301,7 @@ func TestBM25FReindex(t *testing.T) {
 	defer cleanup()
 
 	// Index initially
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"meta.title": "golang tutorial",
 		"content":    "learn programming basics",
 	}); err != nil {
@@ -308,7 +309,7 @@ func TestBM25FReindex(t *testing.T) {
 	}
 
 	// Re-index with different content
-	if err := idx.IndexFields("col", "d1", map[string]string{
+	if err := indexWithFields(idx, "col", "d1", map[string]string{
 		"meta.title": "python guide",
 		"content":    "learn python scripting",
 	}); err != nil {
@@ -334,4 +335,16 @@ func TestBM25FReindex(t *testing.T) {
 	if len(results) != 1 {
 		t.Errorf("expected 1 result for new term after reindex, got %d", len(results))
 	}
+}
+
+// indexWithFields indexes a document the way the server does: the body
+// through the main index, which also serves BM25F's "content" field (#317),
+// and every field through the per-field index.
+func indexWithFields(idx *FTSIndex, collection, docID string, fields map[string]string) error {
+	if body, ok := fields[contentField]; ok {
+		if err := idx.Index(collection, docID, body); err != nil {
+			return err
+		}
+	}
+	return idx.IndexFields(collection, docID, fields)
 }
