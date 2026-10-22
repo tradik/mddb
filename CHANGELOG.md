@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.1] - 2026-10-22
+
+A security release with no change in behaviour. The 2.16.0 binaries and
+images were built with Go 1.27.1, which carries twelve vulnerabilities
+reachable from mddbd's HTTP and TLS paths; upgrade if mddbd is exposed to
+clients you do not control.
+
 ### Security
 
 - **Go 1.27.3 and `golang.org/x/net` v0.60.0.** govulncheck reported twelve
