@@ -925,6 +925,10 @@ func main() {
 	// middleware is shielded — a crash in auth/rate-limit/etc.
 	// becomes an ops.panic_recovered event, not a process kill.
 	handler = PanicRecoveryMiddleware(s.WebhookManager, handler)
+	// #315: a response that misses the write deadline is dropped by net/http
+	// without a trace; say so.
+	httpReadTimeout, httpWriteTimeout := httpTimeouts()
+	handler = withDeadlineWarning(handler, httpWriteTimeout)
 	// GO-028: one line per request, off unless asked for. It wraps outside
 	// panic recovery so a recovered panic still reports its 500.
 	if envconf.String("MDDB_ACCESS_LOG", "false") == "true" {
@@ -980,8 +984,8 @@ func main() {
 				Addr:              httpAddr,
 				Handler:           handler,
 				ReadHeaderTimeout: 10 * time.Second,
-				ReadTimeout:       30 * time.Second,
-				WriteTimeout:      30 * time.Second,
+				ReadTimeout:       httpReadTimeout,
+				WriteTimeout:      httpWriteTimeout,
 				IdleTimeout:       120 * time.Second,
 			}
 			lis, err := openListener(httpAddr)
@@ -1094,8 +1098,8 @@ func main() {
 				Addr:              srvCfg.MCP.Addr,
 				Handler:           mcpHandler,
 				ReadHeaderTimeout: 10 * time.Second,
-				ReadTimeout:       30 * time.Second,
-				WriteTimeout:      30 * time.Second,
+				ReadTimeout:       httpReadTimeout,
+				WriteTimeout:      httpWriteTimeout,
 				IdleTimeout:       120 * time.Second,
 			}
 			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {

@@ -339,7 +339,7 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 	// A large database takes longer to copy and check than the server's write
 	// timeout allows; without this the client got no response at all while
 	// the backup went on being written (#266).
-	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
+	liftWriteDeadline(w, r)
 
 	dst := r.URL.Query().Get("to")
 	if dst == "" {
@@ -358,6 +358,9 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
+	// Verifying and installing a large database outlasts the write timeout,
+	// and the restore is not cancelled by it (#315).
+	liftWriteDeadline(w, r)
 	var body struct {
 		From string `json:"from"`
 	}

@@ -53,6 +53,9 @@ func (s *Server) handleAddBatch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	// A batch's work outlives the write timeout on a large collection or a
+	// slow disk, and is not cancelled by it; only the answer was lost (#315).
+	liftWriteDeadline(w, r)
 
 	var req AddBatchHTTPRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
