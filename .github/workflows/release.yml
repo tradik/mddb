@@ -330,7 +330,7 @@ jobs:
           find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddbd-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: mddbd-${{ matrix.platform }}
           path: |
@@ -340,7 +340,7 @@ jobs:
 
       - name: Upload binary for Docker
         if: matrix.goos == 'linux'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: mddbd-binary-${{ matrix.platform }}
           path: services/mddbd/mddbd-${{ matrix.platform }}
@@ -568,7 +568,7 @@ jobs:
           find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddb-cli-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: mddb-cli-${{ matrix.platform }}
           path: |
@@ -597,7 +597,7 @@ jobs:
           fi
 
       - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           path: release-artifacts
           pattern: md*
@@ -817,7 +817,7 @@ jobs:
           git push origin main
 
       - name: Upload Homebrew formulas as artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: homebrew-formulas
           path: homebrew-tap/Formula/*.rb
@@ -1016,13 +1016,13 @@ jobs:
           echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Download server binary (linux-amd64)
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: mddbd-binary-linux-amd64
           path: docker-ctx
 
       - name: Download server binary (linux-arm64)
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: mddbd-binary-linux-arm64
           path: docker-ctx
