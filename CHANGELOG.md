@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.2] - 2026-10-22
+
+Bulk loads, from the same ports index as the last three releases. The first
+500 documents into an empty collection took 50 seconds — long enough to lose
+the response — and a growing collection loaded at half the speed it could.
+No change to the file format or to search results.
+
 ### Fixed
 
 - **The first large batch into an empty collection took 50 seconds (#317).**
