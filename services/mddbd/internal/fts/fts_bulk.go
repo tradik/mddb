@@ -1,7 +1,9 @@
 package fts
 
 import (
+	"bytes"
 	"mddb/internal/binlog"
+	"sort"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -88,28 +90,90 @@ func (f *FTSIndex) IndexDocs(collection string, docs []BulkDoc) error {
 
 	var bo binlog.BinlogOps
 	err := f.db.Update(func(tx *bolt.Tx) error {
+		var deferred sortedPuts
+		seen := make(map[string]bool, len(batch))
 		for _, p := range batch {
+			// A document listed twice deletes its earlier postings through
+			// the reverse index; they must be in the tree before it does.
+			if seen[p.docID] {
+				if err := deferred.flush(); err != nil {
+					return err
+				}
+			}
+			seen[p.docID] = true
 			if len(p.terms) > 0 {
-				if err := f.indexTermsInTx(tx, &bo, collection, p.docID, p.terms); err != nil {
+				if err := f.indexTermsInTx(tx, &bo, deferred.put, collection, p.docID, p.terms); err != nil {
 					return err
 				}
 			}
 			if len(p.positions) > 0 {
-				if err := f.indexPositionsInTx(tx, collection, p.docID, p.positions); err != nil {
+				if err := f.indexPositionsInTx(tx, deferred.put, collection, p.docID, p.positions); err != nil {
 					return err
 				}
 			}
 			if len(p.fields) > 0 {
-				if err := f.indexFieldTokensInTx(tx, collection, p.docID, p.fields); err != nil {
+				if err := f.indexFieldTokensInTx(tx, deferred.put, collection, p.docID, p.fields); err != nil {
 					return err
 				}
 			}
 		}
-		return nil
+		return deferred.flush()
 	})
 	if err == nil {
 		bo.FlushTo(f.binlog)
 		f.InvalidatePMI(collection)
 	}
 	return err
+}
+
+// putFunc writes one posting. Single-document indexing writes at once
+// (putNow); a batch collects its postings and writes them in key order
+// (sortedPuts).
+type putFunc func(b *bolt.Bucket, key, value []byte) error
+
+func putNow(b *bolt.Bucket, key, value []byte) error { return b.Put(key, value) }
+
+// sortedPuts defers a batch's postings and writes them grouped by bucket and
+// sorted by key (#317). Postings are one key per (term, document), so a batch
+// arrives in an order that jumps across the whole tree; bbolt then searches
+// from the root for every key. In key order, consecutive writes land on the
+// same leaf.
+type sortedPuts struct {
+	pending []pendingPut
+	order   map[*bolt.Bucket]int
+}
+
+type pendingPut struct {
+	bucket     int
+	b          *bolt.Bucket
+	key, value []byte
+}
+
+func (s *sortedPuts) put(b *bolt.Bucket, key, value []byte) error {
+	if s.order == nil {
+		s.order = make(map[*bolt.Bucket]int)
+	}
+	n, ok := s.order[b]
+	if !ok {
+		n = len(s.order)
+		s.order[b] = n
+	}
+	s.pending = append(s.pending, pendingPut{n, b, key, bytes.Clone(value)})
+	return nil
+}
+
+func (s *sortedPuts) flush() error {
+	sort.Slice(s.pending, func(i, j int) bool {
+		if s.pending[i].bucket != s.pending[j].bucket {
+			return s.pending[i].bucket < s.pending[j].bucket
+		}
+		return bytes.Compare(s.pending[i].key, s.pending[j].key) < 0
+	})
+	for _, p := range s.pending {
+		if err := p.b.Put(p.key, p.value); err != nil {
+			return err
+		}
+	}
+	s.pending = s.pending[:0]
+	return nil
 }

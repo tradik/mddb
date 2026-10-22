@@ -2,6 +2,7 @@ package fts
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	bolt "go.etcd.io/bbolt"
@@ -208,5 +209,83 @@ func BenchmarkIndexDocsBatched(b *testing.B) {
 		idx := newBulkTestIndex(b)
 		b.StartTimer()
 		_ = idx.IndexDocs("c", docs)
+	}
+}
+
+// #317. A batch's postings are written in key order at the end of the
+// transaction. A document listed twice in one batch deletes its first
+// version's postings through the reverse index when the second is indexed;
+// those postings must already be in the tree, or the first version survives.
+func TestIndexDocsWithADocumentListedTwice(t *testing.T) {
+	twice := newBulkTestIndex(t)
+	if err := twice.IndexDocs("c", []BulkDoc{
+		{DocID: "d1", Content: "alpha beta gamma", Lang: "en", Fields: map[string]string{"meta.title": "old title"}},
+		{DocID: "d2", Content: "unrelated words here", Lang: "en"},
+		{DocID: "d1", Content: "delta epsilon", Lang: "en", Fields: map[string]string{"meta.title": "new heading"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	once := newBulkTestIndex(t)
+	if err := once.IndexDocs("c", []BulkDoc{
+		{DocID: "d2", Content: "unrelated words here", Lang: "en"},
+		{DocID: "d1", Content: "delta epsilon", Lang: "en", Fields: map[string]string{"meta.title": "new heading"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	want, got := dumpBuckets(t, once), dumpBuckets(t, twice)
+	for k, v := range got {
+		if _, ok := want[k]; !ok {
+			t.Errorf("the first version left %q = %q behind", k, v)
+		}
+	}
+	for k := range want {
+		if _, ok := got[k]; !ok {
+			t.Errorf("the second version is missing %q", k)
+		}
+	}
+}
+
+// BenchmarkIndexDocsFirstBatch indexes 500 documents into an empty index in
+// one batch: the case that took over 30 s when postings were inserted in map
+// order, because bbolt grows one leaf in memory until commit and every
+// out-of-order insert shifts it.
+func BenchmarkIndexDocsFirstBatch(b *testing.B) {
+	docs := make([]BulkDoc, 500)
+	for i := range docs {
+		var sb strings.Builder
+		for w := 0; w < 300; w++ {
+			fmt.Fprintf(&sb, "w%d ", (i*7919+w*104729)%30000)
+		}
+		docs[i] = BulkDoc{DocID: fmt.Sprintf("doc-%04d", i), Content: sb.String(), Lang: "en",
+			Fields: map[string]string{"content": sb.String()}}
+	}
+	for b.Loop() {
+		b.StopTimer()
+		idx := newBulkTestIndex(b)
+		b.StartTimer()
+		if err := idx.IndexDocs("c", docs); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// #317. The body is indexed once, in the main index; BM25F's "content" field
+// reads it from there. A copy in the per-field index was a third of every
+// batch's writes.
+func TestIndexDocsStoresTheBodyOnce(t *testing.T) {
+	idx := newBulkTestIndex(t)
+	if err := idx.IndexDocs("c", bulkTestDocs(5)); err != nil {
+		t.Fatal(err)
+	}
+	for k := range dumpBuckets(t, idx) {
+		if strings.Contains(k, "|c|content|") {
+			t.Fatalf("the body was stored in the per-field index: %q", k)
+		}
+	}
+	res, err := idx.SearchBM25F("c", idx.Tokenize("fox"), 10, map[string]float64{"content": 1})
+	if err != nil || len(res) != 5 {
+		t.Errorf("BM25F over content found %d of 5 (err %v)", len(res), err)
 	}
 }

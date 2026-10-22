@@ -53,7 +53,7 @@ func TestAutocomplete_FieldScoped(t *testing.T) {
 
 	// "market" lives in the title field, "marker" in content. Field-scoped
 	// autocomplete should return only the term present in that field.
-	_ = s.IndexFields("c", "d1", map[string]string{
+	_ = indexWithFields(s, "c", "d1", map[string]string{
 		"title":   "market news",
 		"content": "marker only",
 	})
@@ -132,7 +132,7 @@ func indexDocAC(t *testing.T, s *FTSIndex, collection, docID, field, content str
 	if err := s.Index(collection, docID, content); err != nil {
 		t.Fatalf("fts index: %v", err)
 	}
-	if err := s.IndexFields(collection, docID, map[string]string{field: content}); err != nil {
+	if err := indexWithFields(s, collection, docID, map[string]string{field: content}); err != nil {
 		t.Fatalf("fts index fields: %v", err)
 	}
 }

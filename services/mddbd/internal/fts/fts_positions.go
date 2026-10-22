@@ -129,14 +129,14 @@ func (f *FTSIndex) IndexPositionsWithLang(collection, docID, content, lang strin
 	}
 
 	return f.db.Update(func(tx *bolt.Tx) error {
-		return f.indexPositionsInTx(tx, collection, docID, positions)
+		return f.indexPositionsInTx(tx, putNow, collection, docID, positions)
 	})
 }
 
 // indexPositionsInTx writes one document's term positions inside a caller's
 // transaction — the shared body behind IndexPositionsWithLang and the bulk
 // path (GO-027).
-func (f *FTSIndex) indexPositionsInTx(tx *bolt.Tx, collection, docID string, positions map[string][]uint32) error {
+func (f *FTSIndex) indexPositionsInTx(tx *bolt.Tx, put putFunc, collection, docID string, positions map[string][]uint32) error {
 	bPos := tx.Bucket(bucketFTSPos)
 	if bPos == nil {
 		return nil
@@ -155,7 +155,7 @@ func (f *FTSIndex) indexPositionsInTx(tx *bolt.Tx, collection, docID string, pos
 	termList := make([]string, 0, len(positions))
 	for term, posSlice := range positions {
 		k := ftspKey(collection, term, docID)
-		if err := bPos.Put(k, encodePositions(posSlice)); err != nil {
+		if err := put(bPos, k, encodePositions(posSlice)); err != nil {
 			return err
 		}
 		termList = append(termList, term)

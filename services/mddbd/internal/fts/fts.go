@@ -256,7 +256,7 @@ func (f *FTSIndex) IndexWithLang(collection, docID, content, lang string) error 
 
 	var bo binlog.BinlogOps
 	err := f.db.Update(func(tx *bolt.Tx) error {
-		return f.indexTermsInTx(tx, &bo, collection, docID, terms)
+		return f.indexTermsInTx(tx, &bo, putNow, collection, docID, terms)
 	})
 	if err == nil {
 		bo.FlushTo(f.binlog)
@@ -270,7 +270,7 @@ func (f *FTSIndex) IndexWithLang(collection, docID, content, lang string) error 
 // documents in a single transaction (GO-027) while running exactly the same
 // logic — the batch path cannot drift from the single-document one because
 // there is only one implementation.
-func (f *FTSIndex) indexTermsInTx(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string, terms map[string]int) error {
+func (f *FTSIndex) indexTermsInTx(tx *bolt.Tx, bo *binlog.BinlogOps, put putFunc, collection, docID string, terms map[string]int) error {
 	bFTS := tx.Bucket(bucketFTS)
 	bRev := tx.Bucket(bucketFTSRev)
 
@@ -293,7 +293,7 @@ func (f *FTSIndex) indexTermsInTx(tx *bolt.Tx, bo *binlog.BinlogOps, collection,
 		var buf [4]byte
 		binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
 		k := ftsKey(collection, term, docID)
-		if err := bFTS.Put(k, buf[:]); err != nil {
+		if err := put(bFTS, k, buf[:]); err != nil {
 			return err
 		}
 		bo.Put("fts", k, buf[:])
@@ -335,14 +335,14 @@ func (f *FTSIndex) IndexFieldsWithLang(collection, docID string, fields map[stri
 	}
 
 	return f.db.Update(func(tx *bolt.Tx) error {
-		return f.indexFieldTokensInTx(tx, collection, docID, fieldTokens)
+		return f.indexFieldTokensInTx(tx, putNow, collection, docID, fieldTokens)
 	})
 }
 
 // indexFieldTokensInTx writes one document's per-field index entries inside a
 // caller's transaction — the shared body behind IndexFieldsWithLang and the
 // bulk path (GO-027).
-func (f *FTSIndex) indexFieldTokensInTx(tx *bolt.Tx, collection, docID string, fieldTokens map[string]map[string]int) error {
+func (f *FTSIndex) indexFieldTokensInTx(tx *bolt.Tx, put putFunc, collection, docID string, fieldTokens map[string]map[string]int) error {
 	{
 		if err := f.removeFieldData(tx, collection, docID); err != nil {
 			return err
@@ -358,11 +358,14 @@ func (f *FTSIndex) indexFieldTokensInTx(tx *bolt.Tx, collection, docID string, f
 
 		var allEntries []fieldTermEntry
 		for field, tokens := range fieldTokens {
+			if field == contentField {
+				continue // read from the main index (#317)
+			}
 			var docLength uint32
 			for term, count := range tokens {
 				var buf [4]byte
 				binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
-				if err := bF.Put(ftsfKey(collection, field, term, docID), buf[:]); err != nil {
+				if err := put(bF, ftsfKey(collection, field, term, docID), buf[:]); err != nil {
 					return err
 				}
 				allEntries = append(allEntries, fieldTermEntry{Field: field, Term: term})
@@ -696,6 +699,9 @@ func (f *FTSIndex) IndexFields(collection, docID string, fields map[string]strin
 
 		var allEntries []fieldTermEntry
 		for field, tokens := range fieldTokens {
+			if field == contentField {
+				continue // read from the main index (#317)
+			}
 			var docLength uint32
 			for term, count := range tokens {
 				var buf [4]byte
