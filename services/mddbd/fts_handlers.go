@@ -41,6 +41,10 @@ type FTSSearchRequest struct {
 	// aggregated over the matched documents. Cardinality per key is capped by FacetMaxValues.
 	FacetBy        []string `json:"facetBy,omitempty"`
 	FacetMaxValues int      `json:"facetMaxValues,omitempty"` // 0 = unlimited
+	// FacetScope picks what facetBy counts over (#311): "returned" (default)
+	// is the page in `results`; "all" is every document that matched the
+	// query and filters, before pagination, and also fills `matched`.
+	FacetScope string `json:"facetScope,omitempty"`
 	// CacheTTL opts this request into the search-result cache for the given
 	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
 	// caller that says nothing keeps today's behaviour and today's freshness.
@@ -62,6 +66,10 @@ type FTSSearchResponse struct {
 	Stats          *SearchStats               `json:"searchStats,omitempty"`
 	SpellCorrected *spell.SpellCorrectionInfo `json:"spellCorrected,omitempty"`
 	Facets         FacetResult                `json:"facets,omitempty"` // populated when request.facetBy is set (v2.9.14+)
+	// Matched is the number of documents that matched the query and filters,
+	// before pagination. Reported with facetScope "all", the one case that
+	// already has to find them all (#311).
+	Matched int `json:"matched,omitempty"`
 	// ContextTruncated reports that the collection's contextTokenBudget
 	// dropped results from the tail (RAG-001). Without it, a caller cannot
 	// tell a short result list from a capped one.
@@ -92,6 +100,12 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	}
 	// RAG-001: request > collection profile > this path's historical default.
 	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
+	switch req.FacetScope {
+	case "", facetScopeReturned, facetScopeAll:
+	default:
+		bad(w, fmt.Errorf("facetScope must be %q or %q, got %q", facetScopeReturned, facetScopeAll, req.FacetScope))
+		return
+	}
 
 	if s.FTSIndex == nil {
 		bad(w, fmt.Errorf("full-text search not initialized"))
@@ -199,18 +213,28 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	// Tokenize query (needed for bm25f, reused below) — language-aware
 	tokens := s.FTSIndex.TokenizeQueryLang(req.Collection, req.Query, queryLang)
 
+	// Filters, boosts and facetScope "all" act on the whole match set, so
+	// the index must return all of it; the limit is applied once they have
+	// run. Searching only the top req.Limit first let a filter keep just the
+	// matches that happened to rank there (#311). The search functions score
+	// every match either way — the limit only truncates their sorted output.
+	searchLimit := req.Limit
+	if allowed != nil || len(req.RangeMeta) > 0 || len(req.Boost) > 0 || req.FacetScope == facetScopeAll {
+		searchLimit = 0
+	}
+
 	var results []fts.FTSResult
 	var err error
 
 	switch mode {
 	case "boolean":
 		parsed := fts.ParseAdvancedQuery(req.Query)
-		results, err = s.FTSIndex.SearchBoolean(req.Collection, parsed, req.Limit)
+		results, err = s.FTSIndex.SearchBoolean(req.Collection, parsed, searchLimit)
 
 	case "phrase":
 		// Extract phrase text (strip quotes if present)
 		phraseText := strings.Trim(req.Query, "\"")
-		results, err = s.FTSIndex.SearchPhrase(req.Collection, phraseText, req.Limit)
+		results, err = s.FTSIndex.SearchPhrase(req.Collection, phraseText, searchLimit)
 
 	case "proximity":
 		parsed := fts.ParseAdvancedQuery(req.Query)
@@ -222,17 +246,17 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		for _, c := range parsed.Clauses {
 			if c.Type == "proximity" {
 				distance = c.Distance
-				results, err = s.FTSIndex.SearchProximity(req.Collection, c.Value, distance, req.Limit)
+				results, err = s.FTSIndex.SearchProximity(req.Collection, c.Value, distance, searchLimit)
 				break
 			}
 		}
 		if results == nil && err == nil {
 			phraseText := strings.Trim(req.Query, "\"")
-			results, err = s.FTSIndex.SearchProximity(req.Collection, phraseText, distance, req.Limit)
+			results, err = s.FTSIndex.SearchProximity(req.Collection, phraseText, distance, searchLimit)
 		}
 
 	case "wildcard":
-		results, err = s.FTSIndex.SearchWildcard(req.Collection, req.Query, req.Limit)
+		results, err = s.FTSIndex.SearchWildcard(req.Collection, req.Query, searchLimit)
 
 	case "expression":
 		var expr fts.QueryExpr
@@ -245,34 +269,34 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 			bad(w, err)
 			return
 		}
-		results, err = s.FTSIndex.EvaluateExpression(req.Collection, expr, req.Limit)
+		results, err = s.FTSIndex.EvaluateExpression(req.Collection, expr, searchLimit)
 
 	default: // "simple"
 		mode = "simple"
 		switch algo {
 		case "bm25f":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchBM25FFuzzy(req.Collection, tokens, req.Limit, fuzzy, req.FieldWeights)
+				results, err = s.FTSIndex.SearchBM25FFuzzy(req.Collection, tokens, searchLimit, fuzzy, req.FieldWeights)
 			} else {
-				results, err = s.FTSIndex.SearchBM25F(req.Collection, tokens, req.Limit, req.FieldWeights)
+				results, err = s.FTSIndex.SearchBM25F(req.Collection, tokens, searchLimit, req.FieldWeights)
 			}
 		case "bm25":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, req.Limit, fuzzy)
+				results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, fuzzy)
 			} else {
-				results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, req.Limit)
+				results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, searchLimit)
 			}
 		case "tfidf":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchFuzzy(req.Collection, req.Query, req.Limit, fuzzy)
+				results, err = s.FTSIndex.SearchFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
 			} else {
-				results, err = s.FTSIndex.Search(req.Collection, req.Query, req.Limit)
+				results, err = s.FTSIndex.Search(req.Collection, req.Query, searchLimit)
 			}
 		case "pmisparse":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, req.Limit, fuzzy)
+				results, err = s.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
 			} else {
-				results, err = s.FTSIndex.SearchPMISparse(req.Collection, req.Query, req.Limit)
+				results, err = s.FTSIndex.SearchPMISparse(req.Collection, req.Query, searchLimit)
 			}
 		default:
 			bad(w, fmt.Errorf("unknown algorithm: %s, available: tfidf, bm25, bm25f, pmisparse", algo))
@@ -312,6 +336,25 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	// Apply per-query boosts/demotions (metadata-based score multipliers).
 	results = s.applyBoostFTS(req.Collection, results, req.Boost)
 
+	// facetScope "all": count over every match, before pagination (#311).
+	var allFacets FacetResult
+	var matched int
+	if req.FacetScope == facetScopeAll {
+		ids := make(map[string]bool, len(results))
+		for _, r := range results {
+			ids[r.DocID] = true
+		}
+		matched = len(ids)
+		allFacets = s.computeFacetsOverMatches(req.Collection, ids, req.FacetBy, req.FacetMaxValues)
+	}
+
+	// Load only the page, unless curation may hide some of it: then load all
+	// and let the truncation after curation pick the page.
+	window := req.Limit
+	if s.CurationManager != nil && len(s.CurationManager.MatchingRules(req.Collection, req.Query)) > 0 {
+		window = 0
+	}
+
 	// Load full documents
 	var resp FTSSearchResponse
 	resp.Algorithm = algo
@@ -332,6 +375,9 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	_ = s.DBView(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		for _, res := range results {
+			if window > 0 && len(resp.Results) >= window {
+				break
+			}
 			v := bDocs.Get(storage.DocKey(req.Collection, res.DocID))
 			if v == nil {
 				continue
@@ -373,7 +419,10 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 
 	resp.Total = len(resp.Results)
 
-	if len(req.FacetBy) > 0 && len(resp.Results) > 0 {
+	if req.FacetScope == facetScopeAll {
+		resp.Facets = allFacets
+		resp.Matched = matched
+	} else if len(req.FacetBy) > 0 && len(resp.Results) > 0 {
 		docs := make([]storage.Doc, len(resp.Results))
 		for i, it := range resp.Results {
 			docs[i] = it.Document

@@ -1,6 +1,20 @@
 package main
 
-import "mddb/internal/storage"
+import (
+	"bytes"
+	"strings"
+
+	"mddb/internal/storage"
+
+	bolt "go.etcd.io/bbolt"
+)
+
+// Facet scopes (#311). "returned" counts over the page a search hands back;
+// "all" counts over every document that matched, before pagination.
+const (
+	facetScopeReturned = "returned"
+	facetScopeAll      = "all"
+)
 
 // FacetResult holds per-key bucket lists keyed by metadata field name.
 // Encoded as a JSON object so clients can index it like `facets.category[0]`.
@@ -39,6 +53,58 @@ func computeFacets(docs []storage.Doc, facetBy []string, maxPerKey int) FacetRes
 		}
 	}
 
+	return facetResultFrom(raw, maxPerKey)
+}
+
+// computeFacetsOverMatches counts facet values over a whole match set by
+// walking the metadata index, not the documents: a match set can be the whole
+// collection, and decoding every document to read its meta is the expensive
+// way to learn what the index already holds.
+//
+// Index keys are "meta|<coll>|<key>|<value>|<docID>", and a document ID itself
+// contains '|', so the boundary between value and ID cannot be found by
+// splitting. It is found by trying each '|' until the rest is a matched ID.
+func (s *Server) computeFacetsOverMatches(collection string, matches map[string]bool, facetBy []string, maxPerKey int) FacetResult {
+	if len(facetBy) == 0 {
+		return nil
+	}
+	raw := make(map[string]map[string]int, len(facetBy))
+	_ = s.DBView(func(tx *bolt.Tx) error {
+		bIdx := tx.Bucket([]byte("idxmeta"))
+		for _, k := range facetBy {
+			if k == "" {
+				continue
+			}
+			counts := make(map[string]int)
+			raw[k] = counts
+			if bIdx == nil || len(matches) == 0 {
+				continue
+			}
+			prefix := []byte("meta|" + collection + "|" + k + "|")
+			c := bIdx.Cursor()
+			for key, _ := c.Seek(prefix); key != nil && bytes.HasPrefix(key, prefix); key, _ = c.Next() {
+				rest := string(key[len(prefix):])
+				for i := strings.IndexByte(rest, '|'); i >= 0; {
+					if matches[rest[i+1:]] {
+						counts[rest[:i]]++
+						break
+					}
+					next := strings.IndexByte(rest[i+1:], '|')
+					if next < 0 {
+						break
+					}
+					i += next + 1
+				}
+			}
+		}
+		return nil
+	})
+	return facetResultFrom(raw, maxPerKey)
+}
+
+// facetResultFrom turns key → value → count tallies into sorted, capped
+// bucket lists.
+func facetResultFrom(raw map[string]map[string]int, maxPerKey int) FacetResult {
 	out := make(FacetResult, len(raw))
 	for k, counts := range raw {
 		buckets := make([]FacetBucket, 0, len(counts))

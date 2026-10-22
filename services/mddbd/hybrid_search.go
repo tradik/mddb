@@ -405,6 +405,13 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 	// Oversample: get more results for better merging (SRCH-005). A higher
 	// factor gives the fusion more to work with on both sides.
 	searchLimit := OversampledTopK(req.TopK, s.ResolveOversample(req.Collection, req.Oversample), 50)
+	// A metadata filter applies to every text match, not to the top
+	// searchLimit of the unfiltered ranking (#311): search them all, filter,
+	// then keep searchLimit.
+	candidates := searchLimit
+	if allowed != nil {
+		candidates = 0
+	}
 
 	tokens := s.FTSIndex.TokenizeQueryLang(req.Collection, req.Query, req.Lang)
 
@@ -414,27 +421,27 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 	switch req.Algorithm {
 	case "bm25f":
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchBM25FFuzzy(req.Collection, tokens, searchLimit, req.Fuzzy, req.FieldWeights)
+			results, err = s.FTSIndex.SearchBM25FFuzzy(req.Collection, tokens, candidates, req.Fuzzy, req.FieldWeights)
 		} else {
-			results, err = s.FTSIndex.SearchBM25F(req.Collection, tokens, searchLimit, req.FieldWeights)
+			results, err = s.FTSIndex.SearchBM25F(req.Collection, tokens, candidates, req.FieldWeights)
 		}
 	case "bm25":
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, req.Fuzzy)
+			results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
 		} else {
-			results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, searchLimit)
+			results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, candidates)
 		}
 	case "pmisparse":
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, searchLimit, req.Fuzzy)
+			results, err = s.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
 		} else {
-			results, err = s.FTSIndex.SearchPMISparse(req.Collection, req.Query, searchLimit)
+			results, err = s.FTSIndex.SearchPMISparse(req.Collection, req.Query, candidates)
 		}
 	default:
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, req.Fuzzy)
+			results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
 		} else {
-			results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, searchLimit)
+			results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, candidates)
 		}
 	}
 
@@ -451,6 +458,9 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 			}
 		}
 		results = filtered
+		if searchLimit > 0 && len(results) > searchLimit {
+			results = results[:searchLimit]
+		}
 	}
 
 	return results, nil

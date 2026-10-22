@@ -7118,13 +7118,21 @@ components:
             type: string
           description: |
             (v2.9.15+) Metadata keys to aggregate into `facets` on the response.
-            Counts are computed over the documents actually returned (after
-            filtering, boosts, curation).
+            What is counted is set by `facetScope`.
           example: [ category, lang ]
         facetMaxValues:
           type: integer
           description: (v2.9.15+) Cap per-key bucket count; 0 = unlimited
           default: 0
+        facetScope:
+          type: string
+          enum: [ returned, all ]
+          default: returned
+          description: |
+            (v2.17.0+) `returned` counts facets over the documents in
+            `results` (after filtering, boosts, curation, the limit). `all`
+            counts over every document that matched the query and filters,
+            before pagination, and reports their number in `matched`.
 
         cacheTtl:
           type: integer
@@ -7221,6 +7229,12 @@ components:
           $ref: "#/components/schemas/SearchStats"
         facets:
           $ref: "#/components/schemas/FacetMap"
+        matched:
+          type: integer
+          description: |
+            (v2.17.0+) Documents that matched the query and filters before
+            pagination. Present only with `facetScope: all`.
+          example: 1525
         stemmingActive:
           type: boolean
           description: Whether stemming was applied to this query
