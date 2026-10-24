@@ -89,7 +89,7 @@ func validateMCPCustomPrompts(prompts []MCPCustomPromptConfig) error {
 func (p MCPCustomPromptConfig) asMCPPrompt() MCPPrompt {
 	out := MCPPrompt{Name: p.Name, Description: p.Description}
 	for _, a := range p.Arguments {
-		out.Arguments = append(out.Arguments, MCPPromptArg{Name: a.Name, Description: a.Description, Required: a.Required})
+		out.Arguments = append(out.Arguments, MCPPromptArg(a))
 	}
 	return out
 }

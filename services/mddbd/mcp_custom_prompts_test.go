@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,7 +35,7 @@ func TestCustomPromptsAreListedAndRendered(t *testing.T) {
 	}
 
 	get := func(args map[string]interface{}) map[string]interface{} {
-		return h.handlePromptsGet(nil, map[string]interface{}{"params": map[string]interface{}{"name": "review_function", "arguments": args}})
+		return h.handlePromptsGet(context.Background(), map[string]interface{}{"params": map[string]interface{}{"name": "review_function", "arguments": args}})
 	}
 	res := get(map[string]interface{}{"function": "parse_request", "category": "error handling"})
 	msgs, _ := res["messages"].([]MCPPromptMessage)
