@@ -9118,10 +9118,10 @@ components:
             type: string
           description: >
             Collection-relative directories that C `#include <...>` resolves
-            against, as a compiler's -I does. ["sys"] makes `<sys/proc.h>` in
-            any file the document `sys/sys/proc.h`, which gives code_graph its
+            against, as a compiler's -I does. ["src"] makes `<net/conn.h>` in
+            any file the document `src/net/conn.h`, which gives code_graph its
             include edges. Applied when a document is written.
-          example: ["sys"]
+          example: ["src"]
     CollectionConfig:
       type: object
       properties:

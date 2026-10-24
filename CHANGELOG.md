@@ -9,15 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.18.0] - 2026-10-24
 
-C, C++ and assembly as code (#319), requested by the team loading the
-FreeBSD kernel tree into MDDB to query it over MCP.
+C, C++ and assembly as code (#319): which file defines a function, what
+calls it, and who includes a header.
 
 ### Added
 
 - **C, C++ and assembly documents get symbols and graph edges (#319).**
   `.c` and `.h` files used to be indexed as prose unless the client said
   otherwise. Prose indexing stems words, drops `if` and `for`, and stores
-  `vm_page_alloc` as three separate words. C files never got `defines`,
+  `buf_alloc` as two separate words. C files never got `defines`,
   `uses` or `imports`, so `code_graph` had no edges for them.
   - Extensions: `.c .h` are `c`; `.cc .cpp .cxx .hpp .hh .hxx` are `cpp`;
     `.S .s .asm` are `asm`; `.m4` is `m4`. Every one of them gets code
@@ -31,20 +31,20 @@ FreeBSD kernel tree into MDDB to query it over MCP.
 
     A non-static prototype is not a define, otherwise every header would
     claim every function it declares. A name written in capitals only and
-    invoked at file scope (`SYSCTL_NODE(...)`, `DB_SHOW_COMMAND(...) { }`)
+    invoked at file scope (`REGISTER_HANDLER(...)`, `DEFINE_COMMAND(...) { }`)
     is treated as a macro, not a function.
   - Assembly: `ENTRY(x)` and `.globl` become defines, `call`, `bl` and `jal`
     targets become uses, and `#include` becomes imports.
   - **`code.includePaths`** in collection config (REST, gRPC
-    `CodeConfigProto`, MCP `set_collection_config`). With `["sys"]`,
-    `#include <sys/proc.h>` resolves to the document `sys/sys/proc.h`, as
+    `CodeConfigProto`, MCP `set_collection_config`). With `["src"]`,
+    `#include <net/conn.h>` resolves to the document `src/net/conn.h`, as
     `-I` does. `"x.h"` resolves next to the including file.
   - `code_graph` has a new edge kind, **`calls`**, for uses matched to
     defines from C, C++ and assembly documents.
-  - Measured on FreeBSD `main` `sys/`: 15,617 files in about 5 seconds. The
-    extractor says 730 files include `<sys/mbuf.h>`, and `grep` finds the
-    same 730.
-- Blog: [Indexing the FreeBSD kernel source in MDDB](blog/2026-10-24-reading-the-freebsd-kernel-with-mddb.md).
+  - Checked on a large open-source C codebase: 15,617 files in about
+    5 seconds, and for a widely included header the extractor and `grep`
+    agree on the same 730 including files.
+- Blog: [MDDB reads C, C++ and assembly](blog/2026-10-24-mddb-reads-c-code.md).
 
 ### Fixed
 

@@ -3790,25 +3790,25 @@ What each language contributes:
 **C details.** A non-static prototype is a declaration of something defined
 elsewhere, so it is not a define — otherwise every header would claim every
 function it declares. An all-capitals name invoked at file scope
-(`SYSCTL_NODE(...)`, `DB_SHOW_COMMAND(...) { }`) is a macro, not a function:
+(`REGISTER_HANDLER(...)`, `DEFINE_COMMAND(...) { }`) is a macro, not a function:
 its body still contributes calls, and a variable declared with a macro type
-(`static SLIST_HEAD(, foo) foo_list;`) is a define. Calls through a struct
-member (`ops->start()`) are not global symbols and are left out. Measured on
-the FreeBSD `sys/` tree: 15,617 files in about 5 seconds, and the 730 files
-the extractor says include `<sys/mbuf.h>` are the 730 that `grep` finds.
+(`static LIST_HEAD(, conn) idle_conns;`) is a define. Calls through a struct
+member (`ops->start()`) are not global symbols and are left out. Checked on a
+large open-source C codebase: 15,617 files in about 5 seconds, and for a
+widely included header the extractor and `grep` agree on the same 730 files.
 
-`#include "x.h"` resolves next to the including file. `#include <sys/proc.h>`
+`#include "x.h"` resolves next to the including file. `#include <net/conn.h>`
 resolves against the collection's **include paths**, as a compiler's `-I`
 does — set them in the collection config:
 
 ```bash
 curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' \
-  -d '{"collection":"kernel","code":{"includePaths":["sys"]}}'
+  -d '{"collection":"myproject","code":{"includePaths":["src"]}}'
 ```
 
-With `["sys"]`, `<sys/proc.h>` in any file is recorded as `sys/sys/proc.h`
+With `["src"]`, `<net/conn.h>` in any file is recorded as `src/net/conn.h`
 and matches that document's key. Without include paths it is taken as
-collection-relative (`sys/proc.h`), which suits a tree keyed from its include
+collection-relative (`net/conn.h`), which suits a tree keyed from its include
 root. Set them before loading: documents written earlier keep their imports
 until they are written again.
 
