@@ -1,16 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"log/slog"
-	"mddb/internal/binlog"
 	json "mddb/internal/jsonx"
-	"mddb/internal/storage"
 	"net/http"
 	"strings"
 
-	bolt "go.etcd.io/bbolt"
 )
 
 // handleDelete deletes a single document from a collection
@@ -126,89 +122,10 @@ func (s *Server) handleDeleteCollection(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
-	var deletedCount int
-	var bo binlog.BinlogOps
-
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		bRev := tx.Bucket([]byte("rev"))
-		bByK := tx.Bucket([]byte("bykey"))
-
-		// Delete all documents in collection
-		c := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			// Load document to get metadata for index cleanup
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			doc := *docPtr
-
-			// Delete document
-			if err := bDocs.Delete(k); err != nil {
-				return err
-			}
-			bo.Delete("docs", k)
-
-			// Delete all revisions
-			rc := bRev.Cursor()
-			rp := storage.RevPrefix(req.Collection, doc.ID)
-			for rk, _ := rc.Seek(rp); rk != nil && bytes.HasPrefix(rk, rp); rk, _ = rc.Next() {
-				if err := bRev.Delete(rk); err != nil {
-					return err
-				}
-				bo.Delete("rev", rk)
-			}
-
-			// Delete metadata indices
-			for mk, vals := range doc.Meta {
-				for _, mv := range vals {
-					mkey := append(storage.MetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-					if err := bIdx.Delete(mkey); err != nil {
-						return err
-					}
-					bo.Delete("idxmeta", mkey)
-				}
-			}
-
-			deletedCount++
-		}
-
-		// DOC-016: every key-index entry for this collection, cleared by
-		// prefix. The per-document delete above named one spelling, so a
-		// document written as "README.md" and again as "readme.md" left the
-		// other entry pointing at a document that no longer exists.
-		if err := deleteCollectionByKeyEntries(bByK, req.Collection, &bo); err != nil {
-			return err
-		}
-
-		return nil
-	})
-	if err == nil {
-		bo.FlushTo(s.Binlog)
-	}
-
+	deletedCount, err := s.deleteCollection(req.Collection)
 	if err != nil {
 		bad(w, err)
 		return
-	}
-
-	// Clean up collection config
-	if s.CollectionManager != nil {
-		_ = s.CollectionManager.Delete(req.Collection)
-	}
-
-	// Clean up both geo indexes and persisted geo points for this collection.
-	if s.GeoIndex != nil {
-		s.GeoIndex.Clear(req.Collection)
-	}
-	if s.GeoHashIndex != nil {
-		s.GeoHashIndex.Clear(req.Collection)
-	}
-	if s.GeoStore != nil {
-		_ = s.GeoStore.DeleteCollection(req.Collection)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

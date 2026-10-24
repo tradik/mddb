@@ -2,7 +2,10 @@ package main
 
 import (
 	"mddb/internal/embedding"
+	"mddb/internal/storage"
 	"mddb/internal/vector"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // Putting one chunk's vector into the in-memory indexes (#252).
@@ -60,6 +63,18 @@ type serverIndexes struct{ s *Server }
 // quantized index alone.
 func (x serverIndexes) IndexChunk(collection, chunkKey string, vec []float32) error {
 	return x.s.indexChunk(collection, chunkKey, vec, x.s.collectionDiskOnly(collection))
+}
+
+// DocumentExists reports whether a document is still stored.
+func (x serverIndexes) DocumentExists(collection, docID string) bool {
+	exists := false
+	_ = x.s.DBView(func(tx *bolt.Tx) error {
+		if b := tx.Bucket(x.s.BucketNames.Docs); b != nil {
+			exists = b.Get(storage.DocKey(collection, docID)) != nil
+		}
+		return nil
+	})
+	return exists
 }
 
 // Remove drops a chunk from every index. The quantized index is one of the

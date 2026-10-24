@@ -62,6 +62,12 @@ type EmbeddingWorker struct {
 }
 
 // chunkIndexer is where freshly embedded chunks go.
+// documentChecker is implemented by an indexer that can tell whether a
+// document still exists; the worker asks before storing vectors.
+type documentChecker interface {
+	DocumentExists(collection, docID string) bool
+}
+
 type chunkIndexer interface {
 	IndexChunk(collection, chunkKey string, vector []float32) error
 	Remove(collection, chunkKey string)
@@ -290,6 +296,15 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 		slog.Debug("reused unchanged chunk embeddings",
 			"collection", job.Collection, "docID", job.DocID,
 			"reused", reusedCount, "embedded", len(chunks)-reusedCount)
+	}
+
+	// A document deleted while its embedding was in flight — alone, or with
+	// its collection — must not get vectors back afterwards: they would count
+	// as embedded and rank in searches with nothing behind them (#331).
+	if checker, ok := w.indexer.(documentChecker); ok && !checker.DocumentExists(job.Collection, job.DocID) {
+		slog.Debug("document deleted while it was being embedded; vectors discarded",
+			"collection", job.Collection, "docID", job.DocID)
+		return
 	}
 
 	// Store all chunks in BoltDB

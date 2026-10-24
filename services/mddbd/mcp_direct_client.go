@@ -378,55 +378,13 @@ func (c *DirectClient) Delete(ctx context.Context, req *MCPDeleteRequest) error 
 
 // DeleteCollection removes an entire collection via the direct client.
 func (c *DirectClient) DeleteCollection(ctx context.Context, req *MCPDeleteCollectionRequest) (*MCPDeleteCollectionResponse, error) {
-	var deletedCount int
-
-	err := c.server.DBUpdate(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		bRev := tx.Bucket([]byte("rev"))
-		bByK := tx.Bucket([]byte("bykey"))
-
-		cur := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			doc := *docPtr
-			if err := bDocs.Delete(k); err != nil {
-				return err
-			}
-
-			rc := bRev.Cursor()
-			rp := storage.RevPrefix(req.Collection, doc.ID)
-			for rk, _ := rc.Seek(rp); rk != nil && bytes.HasPrefix(rk, rp); rk, _ = rc.Next() {
-				if err := bRev.Delete(rk); err != nil {
-					return err
-				}
-			}
-
-			for mk, vals := range doc.Meta {
-				for _, mv := range vals {
-					mkey := append(storage.MetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-					if err := bIdx.Delete(mkey); err != nil {
-						return err
-					}
-				}
-			}
-
-			deletedCount++
-		}
-
-		// DOC-016: every key-index entry for this collection, cleared by
-		// prefix rather than one spelling per document — see
-		// document_key_case.go.
-		return deleteCollectionByKeyEntries(bByK, req.Collection, nil)
-	})
+	if req.Collection == "" {
+		return nil, errors.New("missing collection")
+	}
+	deletedCount, err := c.server.deleteCollection(req.Collection)
 	if err != nil {
 		return nil, err
 	}
-
 	return &MCPDeleteCollectionResponse{Deleted: deletedCount}, nil
 }
 

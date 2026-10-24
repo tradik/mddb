@@ -21,6 +21,9 @@ type VectorSearcher interface {
 	CollectionSize(collection string) int
 	// Collections returns all collection names that have vectors.
 	Collections() []string
+	// DropCollection removes everything the index holds for a collection
+	// (#331). A collection recreated under the same name starts empty.
+	DropCollection(collection string)
 	// IsReady returns whether the index is loaded and ready.
 	IsReady() bool
 	// SetReady marks the index as ready for queries.

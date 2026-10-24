@@ -469,40 +469,67 @@ func (f *FTSIndex) Index(collection, docID, content string) error {
 
 // Remove deletes all FTS entries for a document.
 func (f *FTSIndex) Remove(collection, docID string) error {
-	var bo binlog.BinlogOps
-	err := f.db.Update(func(tx *bolt.Tx) error {
-		bFTS := tx.Bucket(bucketFTS)
-		bRev := tx.Bucket(bucketFTSRev)
+	return f.RemoveDocs(collection, []string{docID})
+}
 
-		revKey := ftsRevKey(collection, docID)
-		if old := bRev.Get(revKey); old != nil {
-			oldTerms := strings.Split(string(old), ",")
-			for _, term := range oldTerms {
-				if term != "" {
-					k := ftsKey(collection, term, docID)
-					_ = bFTS.Delete(k)
-					bo.Delete("fts", k)
+// removeBatch bounds a write transaction in RemoveDocs: a collection delete
+// removes tens of thousands of documents, and one transaction per document
+// paid an fsync each.
+const removeBatch = 1000
+
+// RemoveDocs removes documents from every FTS structure — postings, BM25
+// metadata, field data and positions — in transactions of up to removeBatch
+// documents (#331: a deleted collection kept its whole index).
+func (f *FTSIndex) RemoveDocs(collection string, docIDs []string) error {
+	for start := 0; start < len(docIDs); start += removeBatch {
+		end := min(start+removeBatch, len(docIDs))
+		var bo binlog.BinlogOps
+		err := f.db.Update(func(tx *bolt.Tx) error {
+			for _, docID := range docIDs[start:end] {
+				if err := f.removeInTx(tx, &bo, collection, docID); err != nil {
+					return err
 				}
 			}
-		}
-		// Clean up BM25 metadata
-		if err := f.RemoveBM25Meta(tx, collection, docID); err != nil {
+			return nil
+		})
+		if err != nil {
 			return err
 		}
-		// Clean up field-level FTS data (BM25F)
-		if err := f.removeFieldData(tx, collection, docID); err != nil {
-			return err
-		}
-		// Clean up positional index
-		f.removePositionsInTx(tx, collection, docID)
-		bo.Delete("ftsrev", revKey)
-		return bRev.Delete(revKey)
-	})
-	if err == nil {
 		bo.FlushTo(f.binlog)
+	}
+	if len(docIDs) > 0 {
 		f.InvalidatePMI(collection)
 	}
-	return err
+	return nil
+}
+
+func (f *FTSIndex) removeInTx(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string) error {
+	bFTS := tx.Bucket(bucketFTS)
+	bRev := tx.Bucket(bucketFTSRev)
+
+	revKey := ftsRevKey(collection, docID)
+	if old := bRev.Get(revKey); old != nil {
+		oldTerms := strings.Split(string(old), ",")
+		for _, term := range oldTerms {
+			if term != "" {
+				k := ftsKey(collection, term, docID)
+				_ = bFTS.Delete(k)
+				bo.Delete("fts", k)
+			}
+		}
+	}
+	// Clean up BM25 metadata
+	if err := f.RemoveBM25Meta(tx, collection, docID); err != nil {
+		return err
+	}
+	// Clean up field-level FTS data (BM25F)
+	if err := f.removeFieldData(tx, collection, docID); err != nil {
+		return err
+	}
+	// Clean up positional index
+	f.removePositionsInTx(tx, collection, docID)
+	bo.Delete("ftsrev", revKey)
+	return bRev.Delete(revKey)
 }
 
 // Search performs a full-text search and returns matching document IDs with scores.

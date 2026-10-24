@@ -497,66 +497,9 @@ func (g *GRPCServer) DeleteCollection(ctx context.Context, req *proto.DeleteColl
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
 	}
 
-	var deletedCount int
-	var bo binlog.BinlogOps
-
-	err := g.server.DBUpdate(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		bRev := tx.Bucket([]byte("rev"))
-		bByK := tx.Bucket([]byte("bykey"))
-
-		c := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			doc := *docPtr
-
-			if err := bDocs.Delete(k); err != nil {
-				return err
-			}
-			bo.Delete("docs", k)
-
-			bykKey := storage.ByKeyKey(req.Collection, doc.Key, doc.Lang)
-			if err := bByK.Delete(bykKey); err != nil {
-				return err
-			}
-			bo.Delete("bykey", bykKey)
-
-			rc := bRev.Cursor()
-			rp := storage.RevPrefix(req.Collection, doc.ID)
-			for rk, _ := rc.Seek(rp); rk != nil && bytes.HasPrefix(rk, rp); rk, _ = rc.Next() {
-				if err := bRev.Delete(rk); err != nil {
-					return err
-				}
-				bo.Delete("rev", rk)
-			}
-
-			for mk, vals := range doc.Meta {
-				for _, mv := range vals {
-					mkey := append(storage.MetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-					if err := bIdx.Delete(mkey); err != nil {
-						return err
-					}
-					bo.Delete("idxmeta", mkey)
-				}
-			}
-			deletedCount++
-		}
-		return nil
-	})
-	if err == nil {
-		bo.FlushTo(g.server.Binlog)
-	}
+	deletedCount, err := g.server.deleteCollection(req.Collection)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if g.server.CollectionManager != nil {
-		_ = g.server.CollectionManager.Delete(req.Collection)
 	}
 
 	return &proto.DeleteCollectionResponse{
