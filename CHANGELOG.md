@@ -7,7 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **OAuth 2.1 on the MCP listener (#322).** claude.ai custom connectors
+  accept only OAuth or no authentication, so connecting one meant an MCP
+  endpoint without authentication. With `MDDB_MCP_OAUTH_ENABLED=true` the
+  listener serves protected-resource and authorization-server metadata,
+  dynamic client registration, the authorization-code grant with PKCE (S256)
+  and refresh tokens. The consent page asks for an MCP API key, and every
+  token stands for that key: it can do what the key can, and deleting the key
+  revokes it. Tokens are sealed with `MDDB_MCP_OAUTH_SECRET` and stored
+  nowhere. Off by default; API keys work as before.
+- **Chunk size and mode per collection (#325).** `embedding: {chunkSize,
+  chunkMode}` in a collection's config overrides `MDDB_EMBEDDING_CHUNK_SIZE`
+  and `MDDB_EMBEDDING_CHUNK_MODE`, over REST, gRPC and MCP. Embedding,
+  vector-reindex and the passages search returns all use it, and
+  `vector-stats` reports each collection's effective size.
+- **Custom MCP prompts (#323).** `custom_prompts` in `MDDB_MCP_CONFIG` add
+  prompts beside the built-in ones, with `{{argument}}` substitution.
+- **Custom tools wrap more actions (#321).** Besides `semantic_search`,
+  `search_documents` and `full_text_search`, a custom tool can wrap
+  `hybrid_search`, `code_graph`, `aggregate` and `fts_languages`.
+- **`MDDB_MCP_INSTRUCTIONS_FILE` (#327)** reads the MCP server instructions
+  from a file, for text too long for a compose `.env` file.
+- **Startup progress (#329).** Each startup phase is logged when it starts and
+  with its duration when it ends, and `/health` answers from the first moment
+  with `warming_up` and the phase, so a slow start on a large database is
+  distinguishable from a hang. A database open longer than 30 seconds logs a
+  hint about `MDDB_FREELIST_SYNC`. The container health check allows 60
+  seconds to start.
+
 ### Fixed
+
+- **Deleting a collection left its vectors behind (#331)**, and, depending on
+  the transport, its full-text index, TTL entries, geo points, config,
+  binlog entry and S3/memory bodies. A collection deleted and written again
+  reported more embedded documents than it held. HTTP, gRPC and MCP now share
+  one delete that removes all of it, and the embedding worker skips documents
+  deleted while queued.
+- **Identifiers were not found in code collections (#326).** A query for
+  `conn_open` was split as prose and missed the whole identifier the code
+  tokenizer had indexed; it now matches both readings, including in phrase
+  search. `disableStem` turned stemming off on the shared index for every
+  concurrent search (a data race); it now applies to its own request only.
+- **MCP `full_text_search` ignored most of its arguments (#328).** It now runs
+  the same search as `/v1/fts`, with `filterMeta`, `disableStem`,
+  `disableSynonyms`, `mode`, `distance` and facets. A custom tool's defaults
+  are checked against what its action accepts, and an unknown or misspelt
+  key in `MDDB_MCP_CONFIG` is an error at startup instead of being dropped.
 
 - **Vector search found nothing for documents whose key contains `#`.**
   Code collections key functions as `file#function`, which is also the form
@@ -22,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SQ4 returned nothing for `topK: 0`.** Every other algorithm treats it
   as the default of 5, so the same request answered differently depending
   on the algorithm named.
+
+### Documentation
+
+- `BULK-IMPORT.md`: sizing a batch — the 32 MB body cap, the job queue, which
+  endpoints the import profile applies to, and measured throughput (#324).
+- `DEPLOYMENT.md`: startup time and memory on large databases (#329).
 
 ### Tests
 
