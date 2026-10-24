@@ -238,11 +238,13 @@ func TestDiskMonitorZeroWhenNoWM(t *testing.T) {
 func TestDiskMonitorFiresAtThreshold(t *testing.T) {
 	wm := newIncidentWebhookManager(t)
 	ch := captureEvents(t, wm, webhooks.EventDiskUsageHigh)
-	// 0%% threshold ⇒ always over.
+	// A 1% threshold is over on any filesystem holding real data. Not
+	// os.TempDir(): where /tmp is a fresh tmpfs it is under 1% used and the
+	// event never fires. The package directory is on the build's own disk.
 	t.Setenv("MDDB_INCIDENT_DISK_THRESHOLD_PCT", "1")
 	t.Setenv("MDDB_INCIDENT_DISK_INTERVAL_SEC", "1")
 	t.Setenv("MDDB_INCIDENT_DISK_COOLDOWN_SEC", "1")
-	m := NewDiskUsageMonitor(wm, os.TempDir())
+	m := NewDiskUsageMonitor(wm, ".")
 	if m == nil {
 		t.Fatal("nil monitor")
 	}
