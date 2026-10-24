@@ -78,7 +78,7 @@ func mcpInstructionsFromEnv() string {
 	if path == "" {
 		return ""
 	}
-	data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- operator-supplied config path
+	data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 G703 -- path from the operator's environment, like MDDB_MCP_CONFIG
 	if err != nil {
 		slog.Warn("MDDB_MCP_INSTRUCTIONS_FILE could not be read; MCP instructions are unset", "path", path, "err", err)
 		return ""
