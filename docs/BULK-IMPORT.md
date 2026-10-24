@@ -153,6 +153,53 @@ Control progress update frequency:
 
 Default is 10 files per progress update.
 
+## Sizing a batch
+
+These limits apply when you send documents yourself, over `/v1/ingest`,
+`/v1/add-batch` or `/v1/bulk-ingest-job` (#324).
+
+**The body cap is for the whole request.** `MDDB_MAX_BODY_BYTES` (default
+32 MB, [config.md](config.md)) limits the entire JSON body, so the whole
+`documents` array counts against it, not each document. Keep a margin for
+JSON escaping and metadata, for example 24 MB of content per request.
+
+**Endpoints and what they accept:**
+
+| Endpoint | Returns | `options.profile` (`fast`) | Notes |
+|---|---|---|---|
+| `POST /v1/ingest` | when written | yes | Synchronous. `options.skipEmbeddings` and the other ingest options apply. |
+| `POST /v1/add-batch` | when written | no | Synchronous. Takes the documents only. |
+| `POST /v1/bulk-ingest-job` | at once (202), with a job ID | no | Body shaped like `add-batch` plus `callbackUrl`. |
+
+`profile: fast` turns off revisions and webhooks, skips duplicates and
+indexes text only. It does not turn off embeddings: send
+`skipEmbeddings: true` for that. For a large load you want to tune, use
+`/v1/ingest`.
+
+**Jobs run one at a time.** `/v1/bulk-ingest-job` hands each job to a single
+FIFO worker, which writes it in chunks of 500 documents. Splitting a load into
+many small jobs does not make them run in parallel; they queue. The queue
+holds 64 jobs, and a job's documents are kept in memory until written. A
+restart marks jobs in flight as failed and their documents are lost: resubmit
+them, or use the synchronous `/v1/ingest` when you need to know each batch is
+stored.
+
+**Recommended batch for source code:** 500 documents or 24 MB, whichever
+comes first. 500 matches the job chunk size. Source files are larger than
+prose: on a C codebase the average file was about 28 KB, so 500 files is
+about 14 MB.
+
+**Throughput, measured.** 889 C files and 16,053 functions split from them
+(16,942 documents, 45.6 MB) were loaded with `/v1/ingest` in 500-document
+requests, with `profile: fast` and `skipEmbeddings: true`. The load took
+**18 seconds**, about 940 documents and 2.5 MB of content per second, on
+tmpfs. 2.17.2 (#317) removed the slow first batch into an empty collection
+and about halved the time of a load into a growing one. Expect a disk with
+fsync to be slower than tmpfs. The database file grew to 908 MB, about 20×
+the content, because code is indexed whole, in parts and with positions. See
+[DEPLOYMENT.md](DEPLOYMENT.md#large-databases-startup-time-and-memory) for
+what that means at startup.
+
 ## Watching a job finish
 
 An async import returns a job ID immediately. Rather than polling

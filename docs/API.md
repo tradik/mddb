@@ -273,7 +273,7 @@ curl -X POST http://localhost:11023/v1/add-batch \
 
 ### POST /v1/bulk-ingest-job
 
-Queue a long-running bulk ingest job and return immediately with a job ID. Poll `/v1/bulk-ingest-job/{id}` or supply `callbackUrl` for a webhook on completion. Jobs are processed by a single FIFO worker in chunks of 500 documents.
+Queue a long-running bulk ingest job and return immediately with a job ID. Poll `/v1/bulk-ingest-job/{id}` or supply `callbackUrl` for a webhook on completion. Jobs are processed by a single FIFO worker in chunks of 500 documents, so many small jobs queue rather than run in parallel. The whole request body counts against `MDDB_MAX_BODY_BYTES` (32 MB by default), and ingest options such as `profile: fast` do not apply here (use `/v1/ingest` for those). See [BULK-IMPORT.md](BULK-IMPORT.md#sizing-a-batch).
 
 **Request Body**: same shape as `/v1/add-batch`, plus optional `callbackUrl`.
 
