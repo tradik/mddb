@@ -363,7 +363,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Web Panel** - React UI with REST/GraphQL toggle
 
 ### Security & Access
-- ✅ **Authentication** - JWT tokens and API keys
+- ✅ **Authentication** - JWT tokens and API keys; OAuth 2.1 on the MCP listener for claude.ai connectors ([MCP.md](docs/MCP.md#oauth-21-for-claudeai-connectors-v2181))
 - ✅ **Authorization** - Collection-level RBAC (Read/Write/Admin)
 - ✅ **Per-Protocol Access Modes** - `MDDB_MCP_MODE=read` (MCP read-only), `MDDB_API_MODE`, `MDDB_GRPC_MODE`, `MDDB_HTTP3_MODE`
 - ✅ **MCP Tool Control** - `MDDB_MCP_BUILTIN_TOOLS=false` to expose only custom YAML tools
@@ -614,7 +614,7 @@ mddb-cli stats
 - **[Automations](docs/AUTOMATIONS.md)** - Triggers, crons, webhooks, sentiment, template variables
 - **[Temporal Tracking](docs/TEMPORAL-TRACK.md)** - Document event history, hot-docs leaderboard, activity histograms
 - **[Spell Correction](docs/SYMSPELL.md)** - SymSpell FTS spell suggestions, text cleanup, custom dictionaries
-- **[Authentication](docs/AUTHENTICATION.md)** - JWT & API keys, RBAC
+- **[Authentication](docs/AUTHENTICATION.md)** - JWT & API keys, RBAC, MCP OAuth 2.1
 - **[Web Panel](docs/PANEL.md)** - Admin UI guide
 - **[LLM Connections](docs/LLM_CONNECTIONS.md)** - MCP for Claude, ChatGPT, Ollama, DeepSeek
 - **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension
