@@ -362,7 +362,8 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 | `MDDB_EMBEDDING_MODEL` | *(see below)* | string | Embedding model name |
 | `MDDB_EMBEDDING_DIMENSIONS` | *(see below)* | int | Vector dimensionality |
 | `MDDB_EMBEDDING_CHUNK_ENABLED` | `true` | bool | Enable text chunking before embedding |
-| `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters |
+| `MDDB_EMBEDDING_CHUNK_MODE` | `""` | string | `code` or `prose` for every document; empty decides per document. A collection's `embedding.chunkMode` takes precedence (v2.18.1+) |
+| `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters. A collection can set its own with `embedding.chunkSize` in its collection config (v2.18.1+) |
 | `MDDB_EMBEDDING_QUEUE_SIZE` | `1000` | int | (v2.15.0+) Pending embedding jobs the worker will hold. Raise it for large imports; it was hardcoded before |
 | `MDDB_EMBEDDING_QUEUE_WAIT` | `5s` | duration | (v2.15.0+) How long a write waits for room in a full queue before the document is stored without its vector. `0` restores the pre-2.15.0 behaviour of giving up immediately — faster ingest, and documents that no vector or hybrid search can reach until reindexed |
 | `MDDB_EMBEDDING_CACHE_SIZE` | `1024` | int | (v2.12.0+) Embeddings held in the query cache; `0` disables caching and restores the pre-2.12.0 path exactly |

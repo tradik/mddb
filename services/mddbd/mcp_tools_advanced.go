@@ -59,6 +59,12 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 	if code, ok := args["code"].(map[string]interface{}); ok {
 		req.Code = &CodeConfigDef{IncludePaths: mcpGetStringSlice(code, "include_paths")}
 	}
+	if emb, ok := args["embedding"].(map[string]interface{}); ok {
+		req.Embedding = &EmbeddingChunkingDef{
+			ChunkSize: mcpGetInt(emb, "chunk_size"),
+			ChunkMode: mcpGetString(emb, "chunk_mode"),
+		}
+	}
 	if err := s.client.SetCollectionConfig(ctx, req); err != nil {
 		return "", err
 	}

@@ -7042,6 +7042,60 @@ func (x *CodeConfigProto) GetIncludePaths() []string {
 	return nil
 }
 
+// EmbeddingChunkingProto mirrors EmbeddingChunkingDef (#325): a collection's
+// own chunk size and mode for embeddings.
+type EmbeddingChunkingProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ChunkSize     int32                  `protobuf:"varint,1,opt,name=chunk_size,json=chunkSize,proto3" json:"chunk_size,omitempty"` // characters, 100-100000; 0 = MDDB_EMBEDDING_CHUNK_SIZE
+	ChunkMode     string                 `protobuf:"bytes,2,opt,name=chunk_mode,json=chunkMode,proto3" json:"chunk_mode,omitempty"`  // "code", "prose", or "" for each document's kind
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EmbeddingChunkingProto) Reset() {
+	*x = EmbeddingChunkingProto{}
+	mi := &file_mddb_proto_msgTypes[111]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EmbeddingChunkingProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EmbeddingChunkingProto) ProtoMessage() {}
+
+func (x *EmbeddingChunkingProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[111]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EmbeddingChunkingProto.ProtoReflect.Descriptor instead.
+func (*EmbeddingChunkingProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{111}
+}
+
+func (x *EmbeddingChunkingProto) GetChunkSize() int32 {
+	if x != nil {
+		return x.ChunkSize
+	}
+	return 0
+}
+
+func (x *EmbeddingChunkingProto) GetChunkMode() string {
+	if x != nil {
+		return x.ChunkMode
+	}
+	return ""
+}
+
 type CollectionConfigProto struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
@@ -7055,24 +7109,25 @@ type CollectionConfigProto struct {
 	// (v2.12.0+, GO-035) The rest of CollectionConfig. Until these existed a
 	// gRPC client saw a partially configured collection and could not tell that
 	// from a partially configured one.
-	StorageBackend  string                `protobuf:"bytes,9,opt,name=storage_backend,json=storageBackend,proto3" json:"storage_backend,omitempty"`        // "boltdb" (default), "memory", "s3"
-	StorageConfig   *StorageConfigProto   `protobuf:"bytes,10,opt,name=storage_config,json=storageConfig,proto3" json:"storage_config,omitempty"`          // backend-specific settings (required for s3)
-	Quantization    string                `protobuf:"bytes,11,opt,name=quantization,proto3" json:"quantization,omitempty"`                                 // "float32" (default), "int8", "int4"
-	DiskOnlyVectors bool                  `protobuf:"varint,12,opt,name=disk_only_vectors,json=diskOnlyVectors,proto3" json:"disk_only_vectors,omitempty"` // RAM holds only quantized vectors; full vectors stay on disk
-	Encrypted       bool                  `protobuf:"varint,13,opt,name=encrypted,proto3" json:"encrypted,omitempty"`                                      // AES-256-GCM at rest
-	TrackAccess     bool                  `protobuf:"varint,14,opt,name=track_access,json=trackAccess,proto3" json:"track_access,omitempty"`               // record per-read access events
-	TrackHot        bool                  `protobuf:"varint,15,opt,name=track_hot,json=trackHot,proto3" json:"track_hot,omitempty"`                        // maintain hot-docs leaderboard
-	SpellCorrect    bool                  `protobuf:"varint,16,opt,name=spell_correct,json=spellCorrect,proto3" json:"spell_correct,omitempty"`            // auto-correct FTS queries
-	SpellLang       string                `protobuf:"bytes,17,opt,name=spell_lang,json=spellLang,proto3" json:"spell_lang,omitempty"`                      // override language for spell correction
-	Wordpress       *WordPressTargetProto `protobuf:"bytes,18,opt,name=wordpress,proto3" json:"wordpress,omitempty"`                                       // outbound publishing target (mddb-sync plugin)
-	Code            *CodeConfigProto      `protobuf:"bytes,19,opt,name=code,proto3" json:"code,omitempty"`                                                 // (v2.18.0+) source-code settings (#319)
+	StorageBackend  string                  `protobuf:"bytes,9,opt,name=storage_backend,json=storageBackend,proto3" json:"storage_backend,omitempty"`        // "boltdb" (default), "memory", "s3"
+	StorageConfig   *StorageConfigProto     `protobuf:"bytes,10,opt,name=storage_config,json=storageConfig,proto3" json:"storage_config,omitempty"`          // backend-specific settings (required for s3)
+	Quantization    string                  `protobuf:"bytes,11,opt,name=quantization,proto3" json:"quantization,omitempty"`                                 // "float32" (default), "int8", "int4"
+	DiskOnlyVectors bool                    `protobuf:"varint,12,opt,name=disk_only_vectors,json=diskOnlyVectors,proto3" json:"disk_only_vectors,omitempty"` // RAM holds only quantized vectors; full vectors stay on disk
+	Encrypted       bool                    `protobuf:"varint,13,opt,name=encrypted,proto3" json:"encrypted,omitempty"`                                      // AES-256-GCM at rest
+	TrackAccess     bool                    `protobuf:"varint,14,opt,name=track_access,json=trackAccess,proto3" json:"track_access,omitempty"`               // record per-read access events
+	TrackHot        bool                    `protobuf:"varint,15,opt,name=track_hot,json=trackHot,proto3" json:"track_hot,omitempty"`                        // maintain hot-docs leaderboard
+	SpellCorrect    bool                    `protobuf:"varint,16,opt,name=spell_correct,json=spellCorrect,proto3" json:"spell_correct,omitempty"`            // auto-correct FTS queries
+	SpellLang       string                  `protobuf:"bytes,17,opt,name=spell_lang,json=spellLang,proto3" json:"spell_lang,omitempty"`                      // override language for spell correction
+	Wordpress       *WordPressTargetProto   `protobuf:"bytes,18,opt,name=wordpress,proto3" json:"wordpress,omitempty"`                                       // outbound publishing target (mddb-sync plugin)
+	Code            *CodeConfigProto        `protobuf:"bytes,19,opt,name=code,proto3" json:"code,omitempty"`                                                 // (v2.18.0+) source-code settings (#319)
+	Embedding       *EmbeddingChunkingProto `protobuf:"bytes,20,opt,name=embedding,proto3" json:"embedding,omitempty"`                                       // (v2.18.1+) chunking for embeddings (#325)
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CollectionConfigProto) Reset() {
 	*x = CollectionConfigProto{}
-	mi := &file_mddb_proto_msgTypes[111]
+	mi := &file_mddb_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7084,7 +7139,7 @@ func (x *CollectionConfigProto) String() string {
 func (*CollectionConfigProto) ProtoMessage() {}
 
 func (x *CollectionConfigProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[111]
+	mi := &file_mddb_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7097,7 +7152,7 @@ func (x *CollectionConfigProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectionConfigProto.ProtoReflect.Descriptor instead.
 func (*CollectionConfigProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{111}
+	return file_mddb_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *CollectionConfigProto) GetType() string {
@@ -7233,6 +7288,13 @@ func (x *CollectionConfigProto) GetCode() *CodeConfigProto {
 	return nil
 }
 
+func (x *CollectionConfigProto) GetEmbedding() *EmbeddingChunkingProto {
+	if x != nil {
+		return x.Embedding
+	}
+	return nil
+}
+
 type GetCollectionConfigRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
@@ -7242,7 +7304,7 @@ type GetCollectionConfigRequest struct {
 
 func (x *GetCollectionConfigRequest) Reset() {
 	*x = GetCollectionConfigRequest{}
-	mi := &file_mddb_proto_msgTypes[112]
+	mi := &file_mddb_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7254,7 +7316,7 @@ func (x *GetCollectionConfigRequest) String() string {
 func (*GetCollectionConfigRequest) ProtoMessage() {}
 
 func (x *GetCollectionConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[112]
+	mi := &file_mddb_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7267,7 +7329,7 @@ func (x *GetCollectionConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCollectionConfigRequest.ProtoReflect.Descriptor instead.
 func (*GetCollectionConfigRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{112}
+	return file_mddb_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *GetCollectionConfigRequest) GetCollection() string {
@@ -7288,7 +7350,7 @@ type GetCollectionConfigResponse struct {
 
 func (x *GetCollectionConfigResponse) Reset() {
 	*x = GetCollectionConfigResponse{}
-	mi := &file_mddb_proto_msgTypes[113]
+	mi := &file_mddb_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7300,7 +7362,7 @@ func (x *GetCollectionConfigResponse) String() string {
 func (*GetCollectionConfigResponse) ProtoMessage() {}
 
 func (x *GetCollectionConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[113]
+	mi := &file_mddb_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7313,7 +7375,7 @@ func (x *GetCollectionConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCollectionConfigResponse.ProtoReflect.Descriptor instead.
 func (*GetCollectionConfigResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{113}
+	return file_mddb_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *GetCollectionConfigResponse) GetCollection() string {
@@ -7356,24 +7418,25 @@ type SetCollectionConfigRequest struct {
 	// would arrive as false and turn off encryption on a collection whose owner
 	// only wanted to change the icon. That exact shape was the RAG-001 data-loss
 	// bug; presence keeps it from coming back through a different door.
-	StorageBackend  string                `protobuf:"bytes,10,opt,name=storage_backend,json=storageBackend,proto3" json:"storage_backend,omitempty"` // "" leaves the stored backend alone
-	StorageConfig   *StorageConfigProto   `protobuf:"bytes,11,opt,name=storage_config,json=storageConfig,proto3" json:"storage_config,omitempty"`    // nil leaves the stored settings alone
-	Quantization    string                `protobuf:"bytes,12,opt,name=quantization,proto3" json:"quantization,omitempty"`                           // "" leaves the stored setting alone
-	DiskOnlyVectors *bool                 `protobuf:"varint,13,opt,name=disk_only_vectors,json=diskOnlyVectors,proto3,oneof" json:"disk_only_vectors,omitempty"`
-	Encrypted       *bool                 `protobuf:"varint,14,opt,name=encrypted,proto3,oneof" json:"encrypted,omitempty"`
-	TrackAccess     *bool                 `protobuf:"varint,15,opt,name=track_access,json=trackAccess,proto3,oneof" json:"track_access,omitempty"`
-	TrackHot        *bool                 `protobuf:"varint,16,opt,name=track_hot,json=trackHot,proto3,oneof" json:"track_hot,omitempty"`
-	SpellCorrect    *bool                 `protobuf:"varint,17,opt,name=spell_correct,json=spellCorrect,proto3,oneof" json:"spell_correct,omitempty"`
-	SpellLang       string                `protobuf:"bytes,18,opt,name=spell_lang,json=spellLang,proto3" json:"spell_lang,omitempty"` // "" leaves the stored setting alone
-	Wordpress       *WordPressTargetProto `protobuf:"bytes,19,opt,name=wordpress,proto3" json:"wordpress,omitempty"`                  // nil leaves the stored target alone
-	Code            *CodeConfigProto      `protobuf:"bytes,20,opt,name=code,proto3" json:"code,omitempty"`                            // (v2.18.0+) nil leaves the stored settings alone
+	StorageBackend  string                  `protobuf:"bytes,10,opt,name=storage_backend,json=storageBackend,proto3" json:"storage_backend,omitempty"` // "" leaves the stored backend alone
+	StorageConfig   *StorageConfigProto     `protobuf:"bytes,11,opt,name=storage_config,json=storageConfig,proto3" json:"storage_config,omitempty"`    // nil leaves the stored settings alone
+	Quantization    string                  `protobuf:"bytes,12,opt,name=quantization,proto3" json:"quantization,omitempty"`                           // "" leaves the stored setting alone
+	DiskOnlyVectors *bool                   `protobuf:"varint,13,opt,name=disk_only_vectors,json=diskOnlyVectors,proto3,oneof" json:"disk_only_vectors,omitempty"`
+	Encrypted       *bool                   `protobuf:"varint,14,opt,name=encrypted,proto3,oneof" json:"encrypted,omitempty"`
+	TrackAccess     *bool                   `protobuf:"varint,15,opt,name=track_access,json=trackAccess,proto3,oneof" json:"track_access,omitempty"`
+	TrackHot        *bool                   `protobuf:"varint,16,opt,name=track_hot,json=trackHot,proto3,oneof" json:"track_hot,omitempty"`
+	SpellCorrect    *bool                   `protobuf:"varint,17,opt,name=spell_correct,json=spellCorrect,proto3,oneof" json:"spell_correct,omitempty"`
+	SpellLang       string                  `protobuf:"bytes,18,opt,name=spell_lang,json=spellLang,proto3" json:"spell_lang,omitempty"` // "" leaves the stored setting alone
+	Wordpress       *WordPressTargetProto   `protobuf:"bytes,19,opt,name=wordpress,proto3" json:"wordpress,omitempty"`                  // nil leaves the stored target alone
+	Code            *CodeConfigProto        `protobuf:"bytes,20,opt,name=code,proto3" json:"code,omitempty"`                            // (v2.18.0+) nil leaves the stored settings alone
+	Embedding       *EmbeddingChunkingProto `protobuf:"bytes,21,opt,name=embedding,proto3" json:"embedding,omitempty"`                  // (v2.18.1+) nil leaves the stored chunking alone (#325)
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SetCollectionConfigRequest) Reset() {
 	*x = SetCollectionConfigRequest{}
-	mi := &file_mddb_proto_msgTypes[114]
+	mi := &file_mddb_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7385,7 +7448,7 @@ func (x *SetCollectionConfigRequest) String() string {
 func (*SetCollectionConfigRequest) ProtoMessage() {}
 
 func (x *SetCollectionConfigRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[114]
+	mi := &file_mddb_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7398,7 +7461,7 @@ func (x *SetCollectionConfigRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetCollectionConfigRequest.ProtoReflect.Descriptor instead.
 func (*SetCollectionConfigRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{114}
+	return file_mddb_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *SetCollectionConfigRequest) GetCollection() string {
@@ -7541,6 +7604,13 @@ func (x *SetCollectionConfigRequest) GetCode() *CodeConfigProto {
 	return nil
 }
 
+func (x *SetCollectionConfigRequest) GetEmbedding() *EmbeddingChunkingProto {
+	if x != nil {
+		return x.Embedding
+	}
+	return nil
+}
+
 type SetCollectionConfigResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
@@ -7551,7 +7621,7 @@ type SetCollectionConfigResponse struct {
 
 func (x *SetCollectionConfigResponse) Reset() {
 	*x = SetCollectionConfigResponse{}
-	mi := &file_mddb_proto_msgTypes[115]
+	mi := &file_mddb_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7563,7 +7633,7 @@ func (x *SetCollectionConfigResponse) String() string {
 func (*SetCollectionConfigResponse) ProtoMessage() {}
 
 func (x *SetCollectionConfigResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[115]
+	mi := &file_mddb_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7576,7 +7646,7 @@ func (x *SetCollectionConfigResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetCollectionConfigResponse.ProtoReflect.Descriptor instead.
 func (*SetCollectionConfigResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{115}
+	return file_mddb_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *SetCollectionConfigResponse) GetStatus() string {
@@ -7601,7 +7671,7 @@ type ListCollectionConfigsRequest struct {
 
 func (x *ListCollectionConfigsRequest) Reset() {
 	*x = ListCollectionConfigsRequest{}
-	mi := &file_mddb_proto_msgTypes[116]
+	mi := &file_mddb_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7613,7 +7683,7 @@ func (x *ListCollectionConfigsRequest) String() string {
 func (*ListCollectionConfigsRequest) ProtoMessage() {}
 
 func (x *ListCollectionConfigsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[116]
+	mi := &file_mddb_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7626,7 +7696,7 @@ func (x *ListCollectionConfigsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCollectionConfigsRequest.ProtoReflect.Descriptor instead.
 func (*ListCollectionConfigsRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{116}
+	return file_mddb_proto_rawDescGZIP(), []int{117}
 }
 
 type CollectionConfigEntry struct {
@@ -7639,7 +7709,7 @@ type CollectionConfigEntry struct {
 
 func (x *CollectionConfigEntry) Reset() {
 	*x = CollectionConfigEntry{}
-	mi := &file_mddb_proto_msgTypes[117]
+	mi := &file_mddb_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7651,7 +7721,7 @@ func (x *CollectionConfigEntry) String() string {
 func (*CollectionConfigEntry) ProtoMessage() {}
 
 func (x *CollectionConfigEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[117]
+	mi := &file_mddb_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7664,7 +7734,7 @@ func (x *CollectionConfigEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectionConfigEntry.ProtoReflect.Descriptor instead.
 func (*CollectionConfigEntry) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{117}
+	return file_mddb_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *CollectionConfigEntry) GetCollection() string {
@@ -7691,7 +7761,7 @@ type ListCollectionConfigsResponse struct {
 
 func (x *ListCollectionConfigsResponse) Reset() {
 	*x = ListCollectionConfigsResponse{}
-	mi := &file_mddb_proto_msgTypes[118]
+	mi := &file_mddb_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7703,7 +7773,7 @@ func (x *ListCollectionConfigsResponse) String() string {
 func (*ListCollectionConfigsResponse) ProtoMessage() {}
 
 func (x *ListCollectionConfigsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[118]
+	mi := &file_mddb_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7716,7 +7786,7 @@ func (x *ListCollectionConfigsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCollectionConfigsResponse.ProtoReflect.Descriptor instead.
 func (*ListCollectionConfigsResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{118}
+	return file_mddb_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *ListCollectionConfigsResponse) GetConfigs() []*CollectionConfigEntry {
@@ -7752,7 +7822,7 @@ type CrossSearchRequest struct {
 
 func (x *CrossSearchRequest) Reset() {
 	*x = CrossSearchRequest{}
-	mi := &file_mddb_proto_msgTypes[119]
+	mi := &file_mddb_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7764,7 +7834,7 @@ func (x *CrossSearchRequest) String() string {
 func (*CrossSearchRequest) ProtoMessage() {}
 
 func (x *CrossSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[119]
+	mi := &file_mddb_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7777,7 +7847,7 @@ func (x *CrossSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CrossSearchRequest.ProtoReflect.Descriptor instead.
 func (*CrossSearchRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{119}
+	return file_mddb_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *CrossSearchRequest) GetSourceCollection() string {
@@ -7869,7 +7939,7 @@ type CrossSearchResultItem struct {
 
 func (x *CrossSearchResultItem) Reset() {
 	*x = CrossSearchResultItem{}
-	mi := &file_mddb_proto_msgTypes[120]
+	mi := &file_mddb_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7881,7 +7951,7 @@ func (x *CrossSearchResultItem) String() string {
 func (*CrossSearchResultItem) ProtoMessage() {}
 
 func (x *CrossSearchResultItem) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[120]
+	mi := &file_mddb_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7894,7 +7964,7 @@ func (x *CrossSearchResultItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CrossSearchResultItem.ProtoReflect.Descriptor instead.
 func (*CrossSearchResultItem) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{120}
+	return file_mddb_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *CrossSearchResultItem) GetCollection() string {
@@ -7940,7 +8010,7 @@ type CrossSearchResponse struct {
 
 func (x *CrossSearchResponse) Reset() {
 	*x = CrossSearchResponse{}
-	mi := &file_mddb_proto_msgTypes[121]
+	mi := &file_mddb_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7952,7 +8022,7 @@ func (x *CrossSearchResponse) String() string {
 func (*CrossSearchResponse) ProtoMessage() {}
 
 func (x *CrossSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[121]
+	mi := &file_mddb_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7965,7 +8035,7 @@ func (x *CrossSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CrossSearchResponse.ProtoReflect.Descriptor instead.
 func (*CrossSearchResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{121}
+	return file_mddb_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *CrossSearchResponse) GetResults() []*CrossSearchResultItem {
@@ -8031,7 +8101,7 @@ type FindDuplicatesRequest struct {
 
 func (x *FindDuplicatesRequest) Reset() {
 	*x = FindDuplicatesRequest{}
-	mi := &file_mddb_proto_msgTypes[122]
+	mi := &file_mddb_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8043,7 +8113,7 @@ func (x *FindDuplicatesRequest) String() string {
 func (*FindDuplicatesRequest) ProtoMessage() {}
 
 func (x *FindDuplicatesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[122]
+	mi := &file_mddb_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8056,7 +8126,7 @@ func (x *FindDuplicatesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindDuplicatesRequest.ProtoReflect.Descriptor instead.
 func (*FindDuplicatesRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{122}
+	return file_mddb_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *FindDuplicatesRequest) GetCollection() string {
@@ -8114,7 +8184,7 @@ type DuplicateDocInfoProto struct {
 
 func (x *DuplicateDocInfoProto) Reset() {
 	*x = DuplicateDocInfoProto{}
-	mi := &file_mddb_proto_msgTypes[123]
+	mi := &file_mddb_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8126,7 +8196,7 @@ func (x *DuplicateDocInfoProto) String() string {
 func (*DuplicateDocInfoProto) ProtoMessage() {}
 
 func (x *DuplicateDocInfoProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[123]
+	mi := &file_mddb_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8139,7 +8209,7 @@ func (x *DuplicateDocInfoProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DuplicateDocInfoProto.ProtoReflect.Descriptor instead.
 func (*DuplicateDocInfoProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{123}
+	return file_mddb_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *DuplicateDocInfoProto) GetDocId() string {
@@ -8189,7 +8259,7 @@ type DuplicateGroupProto struct {
 
 func (x *DuplicateGroupProto) Reset() {
 	*x = DuplicateGroupProto{}
-	mi := &file_mddb_proto_msgTypes[124]
+	mi := &file_mddb_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8201,7 +8271,7 @@ func (x *DuplicateGroupProto) String() string {
 func (*DuplicateGroupProto) ProtoMessage() {}
 
 func (x *DuplicateGroupProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[124]
+	mi := &file_mddb_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8214,7 +8284,7 @@ func (x *DuplicateGroupProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DuplicateGroupProto.ProtoReflect.Descriptor instead.
 func (*DuplicateGroupProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{124}
+	return file_mddb_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *DuplicateGroupProto) GetGroupId() int32 {
@@ -8263,7 +8333,7 @@ type FindDuplicatesResponse struct {
 
 func (x *FindDuplicatesResponse) Reset() {
 	*x = FindDuplicatesResponse{}
-	mi := &file_mddb_proto_msgTypes[125]
+	mi := &file_mddb_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8275,7 +8345,7 @@ func (x *FindDuplicatesResponse) String() string {
 func (*FindDuplicatesResponse) ProtoMessage() {}
 
 func (x *FindDuplicatesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[125]
+	mi := &file_mddb_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8288,7 +8358,7 @@ func (x *FindDuplicatesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FindDuplicatesResponse.ProtoReflect.Descriptor instead.
 func (*FindDuplicatesResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{125}
+	return file_mddb_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *FindDuplicatesResponse) GetCollection() string {
@@ -8378,7 +8448,7 @@ type IngestDocument struct {
 
 func (x *IngestDocument) Reset() {
 	*x = IngestDocument{}
-	mi := &file_mddb_proto_msgTypes[126]
+	mi := &file_mddb_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8390,7 +8460,7 @@ func (x *IngestDocument) String() string {
 func (*IngestDocument) ProtoMessage() {}
 
 func (x *IngestDocument) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[126]
+	mi := &file_mddb_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8403,7 +8473,7 @@ func (x *IngestDocument) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestDocument.ProtoReflect.Descriptor instead.
 func (*IngestDocument) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{126}
+	return file_mddb_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *IngestDocument) GetUrl() string {
@@ -8483,7 +8553,7 @@ type IngestOptions struct {
 
 func (x *IngestOptions) Reset() {
 	*x = IngestOptions{}
-	mi := &file_mddb_proto_msgTypes[127]
+	mi := &file_mddb_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8495,7 +8565,7 @@ func (x *IngestOptions) String() string {
 func (*IngestOptions) ProtoMessage() {}
 
 func (x *IngestOptions) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[127]
+	mi := &file_mddb_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8508,7 +8578,7 @@ func (x *IngestOptions) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestOptions.ProtoReflect.Descriptor instead.
 func (*IngestOptions) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{127}
+	return file_mddb_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *IngestOptions) GetSkipDuplicates() bool {
@@ -8564,7 +8634,7 @@ type IngestRequest struct {
 
 func (x *IngestRequest) Reset() {
 	*x = IngestRequest{}
-	mi := &file_mddb_proto_msgTypes[128]
+	mi := &file_mddb_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8576,7 +8646,7 @@ func (x *IngestRequest) String() string {
 func (*IngestRequest) ProtoMessage() {}
 
 func (x *IngestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[128]
+	mi := &file_mddb_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8589,7 +8659,7 @@ func (x *IngestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestRequest.ProtoReflect.Descriptor instead.
 func (*IngestRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{128}
+	return file_mddb_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *IngestRequest) GetCollection() string {
@@ -8628,7 +8698,7 @@ type IngestResponse struct {
 
 func (x *IngestResponse) Reset() {
 	*x = IngestResponse{}
-	mi := &file_mddb_proto_msgTypes[129]
+	mi := &file_mddb_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8640,7 +8710,7 @@ func (x *IngestResponse) String() string {
 func (*IngestResponse) ProtoMessage() {}
 
 func (x *IngestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[129]
+	mi := &file_mddb_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8653,7 +8723,7 @@ func (x *IngestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IngestResponse.ProtoReflect.Descriptor instead.
 func (*IngestResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{129}
+	return file_mddb_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *IngestResponse) GetAdded() int32 {
@@ -8716,7 +8786,7 @@ type ListRevisionsRequest struct {
 
 func (x *ListRevisionsRequest) Reset() {
 	*x = ListRevisionsRequest{}
-	mi := &file_mddb_proto_msgTypes[130]
+	mi := &file_mddb_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8728,7 +8798,7 @@ func (x *ListRevisionsRequest) String() string {
 func (*ListRevisionsRequest) ProtoMessage() {}
 
 func (x *ListRevisionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[130]
+	mi := &file_mddb_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8741,7 +8811,7 @@ func (x *ListRevisionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRevisionsRequest.ProtoReflect.Descriptor instead.
 func (*ListRevisionsRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{130}
+	return file_mddb_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *ListRevisionsRequest) GetCollection() string {
@@ -8777,7 +8847,7 @@ type RevisionEntryProto struct {
 
 func (x *RevisionEntryProto) Reset() {
 	*x = RevisionEntryProto{}
-	mi := &file_mddb_proto_msgTypes[131]
+	mi := &file_mddb_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8789,7 +8859,7 @@ func (x *RevisionEntryProto) String() string {
 func (*RevisionEntryProto) ProtoMessage() {}
 
 func (x *RevisionEntryProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[131]
+	mi := &file_mddb_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8802,7 +8872,7 @@ func (x *RevisionEntryProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevisionEntryProto.ProtoReflect.Descriptor instead.
 func (*RevisionEntryProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{131}
+	return file_mddb_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *RevisionEntryProto) GetTimestamp() int64 {
@@ -8846,7 +8916,7 @@ type ListRevisionsResponse struct {
 
 func (x *ListRevisionsResponse) Reset() {
 	*x = ListRevisionsResponse{}
-	mi := &file_mddb_proto_msgTypes[132]
+	mi := &file_mddb_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8858,7 +8928,7 @@ func (x *ListRevisionsResponse) String() string {
 func (*ListRevisionsResponse) ProtoMessage() {}
 
 func (x *ListRevisionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[132]
+	mi := &file_mddb_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8871,7 +8941,7 @@ func (x *ListRevisionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRevisionsResponse.ProtoReflect.Descriptor instead.
 func (*ListRevisionsResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{132}
+	return file_mddb_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *ListRevisionsResponse) GetCollection() string {
@@ -8921,7 +8991,7 @@ type RestoreRevisionRequest struct {
 
 func (x *RestoreRevisionRequest) Reset() {
 	*x = RestoreRevisionRequest{}
-	mi := &file_mddb_proto_msgTypes[133]
+	mi := &file_mddb_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8933,7 +9003,7 @@ func (x *RestoreRevisionRequest) String() string {
 func (*RestoreRevisionRequest) ProtoMessage() {}
 
 func (x *RestoreRevisionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[133]
+	mi := &file_mddb_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8946,7 +9016,7 @@ func (x *RestoreRevisionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RestoreRevisionRequest.ProtoReflect.Descriptor instead.
 func (*RestoreRevisionRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{133}
+	return file_mddb_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *RestoreRevisionRequest) GetCollection() string {
@@ -8987,7 +9057,7 @@ type SnapshotRequest struct {
 
 func (x *SnapshotRequest) Reset() {
 	*x = SnapshotRequest{}
-	mi := &file_mddb_proto_msgTypes[134]
+	mi := &file_mddb_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8999,7 +9069,7 @@ func (x *SnapshotRequest) String() string {
 func (*SnapshotRequest) ProtoMessage() {}
 
 func (x *SnapshotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[134]
+	mi := &file_mddb_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9012,7 +9082,7 @@ func (x *SnapshotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapshotRequest.ProtoReflect.Descriptor instead.
 func (*SnapshotRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{134}
+	return file_mddb_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *SnapshotRequest) GetFollowerId() string {
@@ -9042,7 +9112,7 @@ type SnapshotChunk struct {
 
 func (x *SnapshotChunk) Reset() {
 	*x = SnapshotChunk{}
-	mi := &file_mddb_proto_msgTypes[135]
+	mi := &file_mddb_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9054,7 +9124,7 @@ func (x *SnapshotChunk) String() string {
 func (*SnapshotChunk) ProtoMessage() {}
 
 func (x *SnapshotChunk) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[135]
+	mi := &file_mddb_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9067,7 +9137,7 @@ func (x *SnapshotChunk) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapshotChunk.ProtoReflect.Descriptor instead.
 func (*SnapshotChunk) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{135}
+	return file_mddb_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *SnapshotChunk) GetData() []byte {
@@ -9115,7 +9185,7 @@ type StreamBinlogRequest struct {
 
 func (x *StreamBinlogRequest) Reset() {
 	*x = StreamBinlogRequest{}
-	mi := &file_mddb_proto_msgTypes[136]
+	mi := &file_mddb_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9127,7 +9197,7 @@ func (x *StreamBinlogRequest) String() string {
 func (*StreamBinlogRequest) ProtoMessage() {}
 
 func (x *StreamBinlogRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[136]
+	mi := &file_mddb_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9140,7 +9210,7 @@ func (x *StreamBinlogRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamBinlogRequest.ProtoReflect.Descriptor instead.
 func (*StreamBinlogRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{136}
+	return file_mddb_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *StreamBinlogRequest) GetFollowerId() string {
@@ -9172,7 +9242,7 @@ type BinlogEntryProto struct {
 
 func (x *BinlogEntryProto) Reset() {
 	*x = BinlogEntryProto{}
-	mi := &file_mddb_proto_msgTypes[137]
+	mi := &file_mddb_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9184,7 +9254,7 @@ func (x *BinlogEntryProto) String() string {
 func (*BinlogEntryProto) ProtoMessage() {}
 
 func (x *BinlogEntryProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[137]
+	mi := &file_mddb_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9197,7 +9267,7 @@ func (x *BinlogEntryProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BinlogEntryProto.ProtoReflect.Descriptor instead.
 func (*BinlogEntryProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{137}
+	return file_mddb_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *BinlogEntryProto) GetLsn() uint64 {
@@ -9257,7 +9327,7 @@ type ReplicationStatusRequest struct {
 
 func (x *ReplicationStatusRequest) Reset() {
 	*x = ReplicationStatusRequest{}
-	mi := &file_mddb_proto_msgTypes[138]
+	mi := &file_mddb_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9269,7 +9339,7 @@ func (x *ReplicationStatusRequest) String() string {
 func (*ReplicationStatusRequest) ProtoMessage() {}
 
 func (x *ReplicationStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[138]
+	mi := &file_mddb_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9282,7 +9352,7 @@ func (x *ReplicationStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicationStatusRequest.ProtoReflect.Descriptor instead.
 func (*ReplicationStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{138}
+	return file_mddb_proto_rawDescGZIP(), []int{139}
 }
 
 type ReplicationStatusResponse struct {
@@ -9302,7 +9372,7 @@ type ReplicationStatusResponse struct {
 
 func (x *ReplicationStatusResponse) Reset() {
 	*x = ReplicationStatusResponse{}
-	mi := &file_mddb_proto_msgTypes[139]
+	mi := &file_mddb_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9314,7 +9384,7 @@ func (x *ReplicationStatusResponse) String() string {
 func (*ReplicationStatusResponse) ProtoMessage() {}
 
 func (x *ReplicationStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[139]
+	mi := &file_mddb_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9327,7 +9397,7 @@ func (x *ReplicationStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicationStatusResponse.ProtoReflect.Descriptor instead.
 func (*ReplicationStatusResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{139}
+	return file_mddb_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *ReplicationStatusResponse) GetNodeId() string {
@@ -9406,7 +9476,7 @@ type FollowerInfo struct {
 
 func (x *FollowerInfo) Reset() {
 	*x = FollowerInfo{}
-	mi := &file_mddb_proto_msgTypes[140]
+	mi := &file_mddb_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9418,7 +9488,7 @@ func (x *FollowerInfo) String() string {
 func (*FollowerInfo) ProtoMessage() {}
 
 func (x *FollowerInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[140]
+	mi := &file_mddb_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9431,7 +9501,7 @@ func (x *FollowerInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FollowerInfo.ProtoReflect.Descriptor instead.
 func (*FollowerInfo) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{140}
+	return file_mddb_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *FollowerInfo) GetFollowerId() string {
@@ -9479,7 +9549,7 @@ type AcknowledgeLSNRequest struct {
 
 func (x *AcknowledgeLSNRequest) Reset() {
 	*x = AcknowledgeLSNRequest{}
-	mi := &file_mddb_proto_msgTypes[141]
+	mi := &file_mddb_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9491,7 +9561,7 @@ func (x *AcknowledgeLSNRequest) String() string {
 func (*AcknowledgeLSNRequest) ProtoMessage() {}
 
 func (x *AcknowledgeLSNRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[141]
+	mi := &file_mddb_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9504,7 +9574,7 @@ func (x *AcknowledgeLSNRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcknowledgeLSNRequest.ProtoReflect.Descriptor instead.
 func (*AcknowledgeLSNRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{141}
+	return file_mddb_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *AcknowledgeLSNRequest) GetFollowerId() string {
@@ -9531,7 +9601,7 @@ type AcknowledgeLSNResponse struct {
 
 func (x *AcknowledgeLSNResponse) Reset() {
 	*x = AcknowledgeLSNResponse{}
-	mi := &file_mddb_proto_msgTypes[142]
+	mi := &file_mddb_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9543,7 +9613,7 @@ func (x *AcknowledgeLSNResponse) String() string {
 func (*AcknowledgeLSNResponse) ProtoMessage() {}
 
 func (x *AcknowledgeLSNResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[142]
+	mi := &file_mddb_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9556,7 +9626,7 @@ func (x *AcknowledgeLSNResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcknowledgeLSNResponse.ProtoReflect.Descriptor instead.
 func (*AcknowledgeLSNResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{142}
+	return file_mddb_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *AcknowledgeLSNResponse) GetOk() bool {
@@ -9588,7 +9658,7 @@ type TemporalQueryRequest struct {
 
 func (x *TemporalQueryRequest) Reset() {
 	*x = TemporalQueryRequest{}
-	mi := &file_mddb_proto_msgTypes[143]
+	mi := &file_mddb_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9600,7 +9670,7 @@ func (x *TemporalQueryRequest) String() string {
 func (*TemporalQueryRequest) ProtoMessage() {}
 
 func (x *TemporalQueryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[143]
+	mi := &file_mddb_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9613,7 +9683,7 @@ func (x *TemporalQueryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalQueryRequest.ProtoReflect.Descriptor instead.
 func (*TemporalQueryRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{143}
+	return file_mddb_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *TemporalQueryRequest) GetCollection() string {
@@ -9677,7 +9747,7 @@ type TemporalEventProto struct {
 
 func (x *TemporalEventProto) Reset() {
 	*x = TemporalEventProto{}
-	mi := &file_mddb_proto_msgTypes[144]
+	mi := &file_mddb_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9689,7 +9759,7 @@ func (x *TemporalEventProto) String() string {
 func (*TemporalEventProto) ProtoMessage() {}
 
 func (x *TemporalEventProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[144]
+	mi := &file_mddb_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9702,7 +9772,7 @@ func (x *TemporalEventProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalEventProto.ProtoReflect.Descriptor instead.
 func (*TemporalEventProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{144}
+	return file_mddb_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *TemporalEventProto) GetDocId() string {
@@ -9745,7 +9815,7 @@ type TemporalQueryResponse struct {
 
 func (x *TemporalQueryResponse) Reset() {
 	*x = TemporalQueryResponse{}
-	mi := &file_mddb_proto_msgTypes[145]
+	mi := &file_mddb_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9757,7 +9827,7 @@ func (x *TemporalQueryResponse) String() string {
 func (*TemporalQueryResponse) ProtoMessage() {}
 
 func (x *TemporalQueryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[145]
+	mi := &file_mddb_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9770,7 +9840,7 @@ func (x *TemporalQueryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalQueryResponse.ProtoReflect.Descriptor instead.
 func (*TemporalQueryResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{145}
+	return file_mddb_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *TemporalQueryResponse) GetCollection() string {
@@ -9812,7 +9882,7 @@ type TemporalHotRequest struct {
 
 func (x *TemporalHotRequest) Reset() {
 	*x = TemporalHotRequest{}
-	mi := &file_mddb_proto_msgTypes[146]
+	mi := &file_mddb_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9824,7 +9894,7 @@ func (x *TemporalHotRequest) String() string {
 func (*TemporalHotRequest) ProtoMessage() {}
 
 func (x *TemporalHotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[146]
+	mi := &file_mddb_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9837,7 +9907,7 @@ func (x *TemporalHotRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalHotRequest.ProtoReflect.Descriptor instead.
 func (*TemporalHotRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{146}
+	return file_mddb_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *TemporalHotRequest) GetCollection() string {
@@ -9873,7 +9943,7 @@ type TemporalHotEntry struct {
 
 func (x *TemporalHotEntry) Reset() {
 	*x = TemporalHotEntry{}
-	mi := &file_mddb_proto_msgTypes[147]
+	mi := &file_mddb_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9885,7 +9955,7 @@ func (x *TemporalHotEntry) String() string {
 func (*TemporalHotEntry) ProtoMessage() {}
 
 func (x *TemporalHotEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[147]
+	mi := &file_mddb_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9898,7 +9968,7 @@ func (x *TemporalHotEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalHotEntry.ProtoReflect.Descriptor instead.
 func (*TemporalHotEntry) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{147}
+	return file_mddb_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *TemporalHotEntry) GetDocument() *Document {
@@ -9939,7 +10009,7 @@ type TemporalHotResponse struct {
 
 func (x *TemporalHotResponse) Reset() {
 	*x = TemporalHotResponse{}
-	mi := &file_mddb_proto_msgTypes[148]
+	mi := &file_mddb_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9951,7 +10021,7 @@ func (x *TemporalHotResponse) String() string {
 func (*TemporalHotResponse) ProtoMessage() {}
 
 func (x *TemporalHotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[148]
+	mi := &file_mddb_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9964,7 +10034,7 @@ func (x *TemporalHotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemporalHotResponse.ProtoReflect.Descriptor instead.
 func (*TemporalHotResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{148}
+	return file_mddb_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *TemporalHotResponse) GetCollection() string {
@@ -9993,7 +10063,7 @@ type SpellSuggestRequest struct {
 
 func (x *SpellSuggestRequest) Reset() {
 	*x = SpellSuggestRequest{}
-	mi := &file_mddb_proto_msgTypes[149]
+	mi := &file_mddb_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10005,7 +10075,7 @@ func (x *SpellSuggestRequest) String() string {
 func (*SpellSuggestRequest) ProtoMessage() {}
 
 func (x *SpellSuggestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[149]
+	mi := &file_mddb_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10018,7 +10088,7 @@ func (x *SpellSuggestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpellSuggestRequest.ProtoReflect.Descriptor instead.
 func (*SpellSuggestRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{149}
+	return file_mddb_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *SpellSuggestRequest) GetCollection() string {
@@ -10060,7 +10130,7 @@ type SpellSuggestionProto struct {
 
 func (x *SpellSuggestionProto) Reset() {
 	*x = SpellSuggestionProto{}
-	mi := &file_mddb_proto_msgTypes[150]
+	mi := &file_mddb_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10072,7 +10142,7 @@ func (x *SpellSuggestionProto) String() string {
 func (*SpellSuggestionProto) ProtoMessage() {}
 
 func (x *SpellSuggestionProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[150]
+	mi := &file_mddb_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10085,7 +10155,7 @@ func (x *SpellSuggestionProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpellSuggestionProto.ProtoReflect.Descriptor instead.
 func (*SpellSuggestionProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{150}
+	return file_mddb_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *SpellSuggestionProto) GetOriginal() string {
@@ -10120,7 +10190,7 @@ type SpellSuggestResponse struct {
 
 func (x *SpellSuggestResponse) Reset() {
 	*x = SpellSuggestResponse{}
-	mi := &file_mddb_proto_msgTypes[151]
+	mi := &file_mddb_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10132,7 +10202,7 @@ func (x *SpellSuggestResponse) String() string {
 func (*SpellSuggestResponse) ProtoMessage() {}
 
 func (x *SpellSuggestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[151]
+	mi := &file_mddb_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10145,7 +10215,7 @@ func (x *SpellSuggestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpellSuggestResponse.ProtoReflect.Descriptor instead.
 func (*SpellSuggestResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{151}
+	return file_mddb_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *SpellSuggestResponse) GetOriginalText() string {
@@ -10180,7 +10250,7 @@ type SpellCleanupRequest struct {
 
 func (x *SpellCleanupRequest) Reset() {
 	*x = SpellCleanupRequest{}
-	mi := &file_mddb_proto_msgTypes[152]
+	mi := &file_mddb_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10192,7 +10262,7 @@ func (x *SpellCleanupRequest) String() string {
 func (*SpellCleanupRequest) ProtoMessage() {}
 
 func (x *SpellCleanupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[152]
+	mi := &file_mddb_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10205,7 +10275,7 @@ func (x *SpellCleanupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpellCleanupRequest.ProtoReflect.Descriptor instead.
 func (*SpellCleanupRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{152}
+	return file_mddb_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *SpellCleanupRequest) GetCollection() string {
@@ -10240,7 +10310,7 @@ type SpellCleanupResponse struct {
 
 func (x *SpellCleanupResponse) Reset() {
 	*x = SpellCleanupResponse{}
-	mi := &file_mddb_proto_msgTypes[153]
+	mi := &file_mddb_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10252,7 +10322,7 @@ func (x *SpellCleanupResponse) String() string {
 func (*SpellCleanupResponse) ProtoMessage() {}
 
 func (x *SpellCleanupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[153]
+	mi := &file_mddb_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10265,7 +10335,7 @@ func (x *SpellCleanupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpellCleanupResponse.ProtoReflect.Descriptor instead.
 func (*SpellCleanupResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{153}
+	return file_mddb_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *SpellCleanupResponse) GetOriginal() string {
@@ -10305,7 +10375,7 @@ type GeoSearchRequest struct {
 
 func (x *GeoSearchRequest) Reset() {
 	*x = GeoSearchRequest{}
-	mi := &file_mddb_proto_msgTypes[154]
+	mi := &file_mddb_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10317,7 +10387,7 @@ func (x *GeoSearchRequest) String() string {
 func (*GeoSearchRequest) ProtoMessage() {}
 
 func (x *GeoSearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[154]
+	mi := &file_mddb_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10330,7 +10400,7 @@ func (x *GeoSearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoSearchRequest.ProtoReflect.Descriptor instead.
 func (*GeoSearchRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{154}
+	return file_mddb_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *GeoSearchRequest) GetCollection() string {
@@ -10394,7 +10464,7 @@ type GeoSearchResultItem struct {
 
 func (x *GeoSearchResultItem) Reset() {
 	*x = GeoSearchResultItem{}
-	mi := &file_mddb_proto_msgTypes[155]
+	mi := &file_mddb_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10406,7 +10476,7 @@ func (x *GeoSearchResultItem) String() string {
 func (*GeoSearchResultItem) ProtoMessage() {}
 
 func (x *GeoSearchResultItem) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[155]
+	mi := &file_mddb_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10419,7 +10489,7 @@ func (x *GeoSearchResultItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoSearchResultItem.ProtoReflect.Descriptor instead.
 func (*GeoSearchResultItem) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{155}
+	return file_mddb_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *GeoSearchResultItem) GetDocument() *Document {
@@ -10455,7 +10525,7 @@ type GeoSearchResponse struct {
 
 func (x *GeoSearchResponse) Reset() {
 	*x = GeoSearchResponse{}
-	mi := &file_mddb_proto_msgTypes[156]
+	mi := &file_mddb_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10467,7 +10537,7 @@ func (x *GeoSearchResponse) String() string {
 func (*GeoSearchResponse) ProtoMessage() {}
 
 func (x *GeoSearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[156]
+	mi := &file_mddb_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10480,7 +10550,7 @@ func (x *GeoSearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoSearchResponse.ProtoReflect.Descriptor instead.
 func (*GeoSearchResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{156}
+	return file_mddb_proto_rawDescGZIP(), []int{157}
 }
 
 func (x *GeoSearchResponse) GetResults() []*GeoSearchResultItem {
@@ -10528,7 +10598,7 @@ type GeoWithinRequest struct {
 
 func (x *GeoWithinRequest) Reset() {
 	*x = GeoWithinRequest{}
-	mi := &file_mddb_proto_msgTypes[157]
+	mi := &file_mddb_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10540,7 +10610,7 @@ func (x *GeoWithinRequest) String() string {
 func (*GeoWithinRequest) ProtoMessage() {}
 
 func (x *GeoWithinRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[157]
+	mi := &file_mddb_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10553,7 +10623,7 @@ func (x *GeoWithinRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoWithinRequest.ProtoReflect.Descriptor instead.
 func (*GeoWithinRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{157}
+	return file_mddb_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *GeoWithinRequest) GetCollection() string {
@@ -10616,7 +10686,7 @@ type GeoWithinResponse struct {
 
 func (x *GeoWithinResponse) Reset() {
 	*x = GeoWithinResponse{}
-	mi := &file_mddb_proto_msgTypes[158]
+	mi := &file_mddb_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10628,7 +10698,7 @@ func (x *GeoWithinResponse) String() string {
 func (*GeoWithinResponse) ProtoMessage() {}
 
 func (x *GeoWithinResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[158]
+	mi := &file_mddb_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10641,7 +10711,7 @@ func (x *GeoWithinResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoWithinResponse.ProtoReflect.Descriptor instead.
 func (*GeoWithinResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{158}
+	return file_mddb_proto_rawDescGZIP(), []int{159}
 }
 
 func (x *GeoWithinResponse) GetResults() []*GeoSearchResultItem {
@@ -10676,7 +10746,7 @@ type GeoPostcodeLoadProto struct {
 
 func (x *GeoPostcodeLoadProto) Reset() {
 	*x = GeoPostcodeLoadProto{}
-	mi := &file_mddb_proto_msgTypes[159]
+	mi := &file_mddb_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10688,7 +10758,7 @@ func (x *GeoPostcodeLoadProto) String() string {
 func (*GeoPostcodeLoadProto) ProtoMessage() {}
 
 func (x *GeoPostcodeLoadProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[159]
+	mi := &file_mddb_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10701,7 +10771,7 @@ func (x *GeoPostcodeLoadProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoPostcodeLoadProto.ProtoReflect.Descriptor instead.
 func (*GeoPostcodeLoadProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{159}
+	return file_mddb_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *GeoPostcodeLoadProto) GetCountry() string {
@@ -10730,7 +10800,7 @@ type GeoReindexRequest struct {
 
 func (x *GeoReindexRequest) Reset() {
 	*x = GeoReindexRequest{}
-	mi := &file_mddb_proto_msgTypes[160]
+	mi := &file_mddb_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10742,7 +10812,7 @@ func (x *GeoReindexRequest) String() string {
 func (*GeoReindexRequest) ProtoMessage() {}
 
 func (x *GeoReindexRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[160]
+	mi := &file_mddb_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10755,7 +10825,7 @@ func (x *GeoReindexRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoReindexRequest.ProtoReflect.Descriptor instead.
 func (*GeoReindexRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{160}
+	return file_mddb_proto_rawDescGZIP(), []int{161}
 }
 
 func (x *GeoReindexRequest) GetCollection() string {
@@ -10784,7 +10854,7 @@ type GeoReindexResponse struct {
 
 func (x *GeoReindexResponse) Reset() {
 	*x = GeoReindexResponse{}
-	mi := &file_mddb_proto_msgTypes[161]
+	mi := &file_mddb_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10796,7 +10866,7 @@ func (x *GeoReindexResponse) String() string {
 func (*GeoReindexResponse) ProtoMessage() {}
 
 func (x *GeoReindexResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[161]
+	mi := &file_mddb_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10809,7 +10879,7 @@ func (x *GeoReindexResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoReindexResponse.ProtoReflect.Descriptor instead.
 func (*GeoReindexResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{161}
+	return file_mddb_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *GeoReindexResponse) GetPoints() int32 {
@@ -10849,7 +10919,7 @@ type GeoStatsRequest struct {
 
 func (x *GeoStatsRequest) Reset() {
 	*x = GeoStatsRequest{}
-	mi := &file_mddb_proto_msgTypes[162]
+	mi := &file_mddb_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10861,7 +10931,7 @@ func (x *GeoStatsRequest) String() string {
 func (*GeoStatsRequest) ProtoMessage() {}
 
 func (x *GeoStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[162]
+	mi := &file_mddb_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10874,7 +10944,7 @@ func (x *GeoStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoStatsRequest.ProtoReflect.Descriptor instead.
 func (*GeoStatsRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{162}
+	return file_mddb_proto_rawDescGZIP(), []int{163}
 }
 
 // GeoCollectionStatProto mirrors GeoCollectionStat on the HTTP side.
@@ -10888,7 +10958,7 @@ type GeoCollectionStatProto struct {
 
 func (x *GeoCollectionStatProto) Reset() {
 	*x = GeoCollectionStatProto{}
-	mi := &file_mddb_proto_msgTypes[163]
+	mi := &file_mddb_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10900,7 +10970,7 @@ func (x *GeoCollectionStatProto) String() string {
 func (*GeoCollectionStatProto) ProtoMessage() {}
 
 func (x *GeoCollectionStatProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[163]
+	mi := &file_mddb_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10913,7 +10983,7 @@ func (x *GeoCollectionStatProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoCollectionStatProto.ProtoReflect.Descriptor instead.
 func (*GeoCollectionStatProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{163}
+	return file_mddb_proto_rawDescGZIP(), []int{164}
 }
 
 func (x *GeoCollectionStatProto) GetPoints() int32 {
@@ -10941,7 +11011,7 @@ type GeoStatsResponse struct {
 
 func (x *GeoStatsResponse) Reset() {
 	*x = GeoStatsResponse{}
-	mi := &file_mddb_proto_msgTypes[164]
+	mi := &file_mddb_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10953,7 +11023,7 @@ func (x *GeoStatsResponse) String() string {
 func (*GeoStatsResponse) ProtoMessage() {}
 
 func (x *GeoStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[164]
+	mi := &file_mddb_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10966,7 +11036,7 @@ func (x *GeoStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoStatsResponse.ProtoReflect.Descriptor instead.
 func (*GeoStatsResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{164}
+	return file_mddb_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *GeoStatsResponse) GetCollections() map[string]*GeoCollectionStatProto {
@@ -11002,7 +11072,7 @@ type GeoEncodeRequest struct {
 
 func (x *GeoEncodeRequest) Reset() {
 	*x = GeoEncodeRequest{}
-	mi := &file_mddb_proto_msgTypes[165]
+	mi := &file_mddb_proto_msgTypes[166]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11014,7 +11084,7 @@ func (x *GeoEncodeRequest) String() string {
 func (*GeoEncodeRequest) ProtoMessage() {}
 
 func (x *GeoEncodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[165]
+	mi := &file_mddb_proto_msgTypes[166]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11027,7 +11097,7 @@ func (x *GeoEncodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoEncodeRequest.ProtoReflect.Descriptor instead.
 func (*GeoEncodeRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{165}
+	return file_mddb_proto_rawDescGZIP(), []int{166}
 }
 
 func (x *GeoEncodeRequest) GetLat() float64 {
@@ -11061,7 +11131,7 @@ type GeoEncodeResponse struct {
 
 func (x *GeoEncodeResponse) Reset() {
 	*x = GeoEncodeResponse{}
-	mi := &file_mddb_proto_msgTypes[166]
+	mi := &file_mddb_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11073,7 +11143,7 @@ func (x *GeoEncodeResponse) String() string {
 func (*GeoEncodeResponse) ProtoMessage() {}
 
 func (x *GeoEncodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[166]
+	mi := &file_mddb_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11086,7 +11156,7 @@ func (x *GeoEncodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoEncodeResponse.ProtoReflect.Descriptor instead.
 func (*GeoEncodeResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{166}
+	return file_mddb_proto_rawDescGZIP(), []int{167}
 }
 
 func (x *GeoEncodeResponse) GetGeohash() string {
@@ -11113,7 +11183,7 @@ type GeoDecodeRequest struct {
 
 func (x *GeoDecodeRequest) Reset() {
 	*x = GeoDecodeRequest{}
-	mi := &file_mddb_proto_msgTypes[167]
+	mi := &file_mddb_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11125,7 +11195,7 @@ func (x *GeoDecodeRequest) String() string {
 func (*GeoDecodeRequest) ProtoMessage() {}
 
 func (x *GeoDecodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[167]
+	mi := &file_mddb_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11138,7 +11208,7 @@ func (x *GeoDecodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoDecodeRequest.ProtoReflect.Descriptor instead.
 func (*GeoDecodeRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{167}
+	return file_mddb_proto_rawDescGZIP(), []int{168}
 }
 
 func (x *GeoDecodeRequest) GetGeohash() string {
@@ -11162,7 +11232,7 @@ type GeoDecodeResponse struct {
 
 func (x *GeoDecodeResponse) Reset() {
 	*x = GeoDecodeResponse{}
-	mi := &file_mddb_proto_msgTypes[168]
+	mi := &file_mddb_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11174,7 +11244,7 @@ func (x *GeoDecodeResponse) String() string {
 func (*GeoDecodeResponse) ProtoMessage() {}
 
 func (x *GeoDecodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[168]
+	mi := &file_mddb_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11187,7 +11257,7 @@ func (x *GeoDecodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GeoDecodeResponse.ProtoReflect.Descriptor instead.
 func (*GeoDecodeResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{168}
+	return file_mddb_proto_rawDescGZIP(), []int{169}
 }
 
 func (x *GeoDecodeResponse) GetLat() float64 {
@@ -11243,7 +11313,7 @@ type PinnedDocProto struct {
 
 func (x *PinnedDocProto) Reset() {
 	*x = PinnedDocProto{}
-	mi := &file_mddb_proto_msgTypes[169]
+	mi := &file_mddb_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11255,7 +11325,7 @@ func (x *PinnedDocProto) String() string {
 func (*PinnedDocProto) ProtoMessage() {}
 
 func (x *PinnedDocProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[169]
+	mi := &file_mddb_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11268,7 +11338,7 @@ func (x *PinnedDocProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PinnedDocProto.ProtoReflect.Descriptor instead.
 func (*PinnedDocProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{169}
+	return file_mddb_proto_rawDescGZIP(), []int{170}
 }
 
 func (x *PinnedDocProto) GetKey() string {
@@ -11309,7 +11379,7 @@ type CurationRuleProto struct {
 
 func (x *CurationRuleProto) Reset() {
 	*x = CurationRuleProto{}
-	mi := &file_mddb_proto_msgTypes[170]
+	mi := &file_mddb_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11321,7 +11391,7 @@ func (x *CurationRuleProto) String() string {
 func (*CurationRuleProto) ProtoMessage() {}
 
 func (x *CurationRuleProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[170]
+	mi := &file_mddb_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11334,7 +11404,7 @@ func (x *CurationRuleProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CurationRuleProto.ProtoReflect.Descriptor instead.
 func (*CurationRuleProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{170}
+	return file_mddb_proto_rawDescGZIP(), []int{171}
 }
 
 func (x *CurationRuleProto) GetId() string {
@@ -11409,7 +11479,7 @@ type ListCurationRulesRequest struct {
 
 func (x *ListCurationRulesRequest) Reset() {
 	*x = ListCurationRulesRequest{}
-	mi := &file_mddb_proto_msgTypes[171]
+	mi := &file_mddb_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11421,7 +11491,7 @@ func (x *ListCurationRulesRequest) String() string {
 func (*ListCurationRulesRequest) ProtoMessage() {}
 
 func (x *ListCurationRulesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[171]
+	mi := &file_mddb_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11434,7 +11504,7 @@ func (x *ListCurationRulesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCurationRulesRequest.ProtoReflect.Descriptor instead.
 func (*ListCurationRulesRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{171}
+	return file_mddb_proto_rawDescGZIP(), []int{172}
 }
 
 func (x *ListCurationRulesRequest) GetCollection() string {
@@ -11455,7 +11525,7 @@ type ListCurationRulesResponse struct {
 
 func (x *ListCurationRulesResponse) Reset() {
 	*x = ListCurationRulesResponse{}
-	mi := &file_mddb_proto_msgTypes[172]
+	mi := &file_mddb_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11467,7 +11537,7 @@ func (x *ListCurationRulesResponse) String() string {
 func (*ListCurationRulesResponse) ProtoMessage() {}
 
 func (x *ListCurationRulesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[172]
+	mi := &file_mddb_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11480,7 +11550,7 @@ func (x *ListCurationRulesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListCurationRulesResponse.ProtoReflect.Descriptor instead.
 func (*ListCurationRulesResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{172}
+	return file_mddb_proto_rawDescGZIP(), []int{173}
 }
 
 func (x *ListCurationRulesResponse) GetRules() []*CurationRuleProto {
@@ -11513,7 +11583,7 @@ type CreateCurationRuleRequest struct {
 
 func (x *CreateCurationRuleRequest) Reset() {
 	*x = CreateCurationRuleRequest{}
-	mi := &file_mddb_proto_msgTypes[173]
+	mi := &file_mddb_proto_msgTypes[174]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11525,7 +11595,7 @@ func (x *CreateCurationRuleRequest) String() string {
 func (*CreateCurationRuleRequest) ProtoMessage() {}
 
 func (x *CreateCurationRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[173]
+	mi := &file_mddb_proto_msgTypes[174]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11538,7 +11608,7 @@ func (x *CreateCurationRuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateCurationRuleRequest.ProtoReflect.Descriptor instead.
 func (*CreateCurationRuleRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{173}
+	return file_mddb_proto_rawDescGZIP(), []int{174}
 }
 
 func (x *CreateCurationRuleRequest) GetRule() *CurationRuleProto {
@@ -11557,7 +11627,7 @@ type UpdateCurationRuleRequest struct {
 
 func (x *UpdateCurationRuleRequest) Reset() {
 	*x = UpdateCurationRuleRequest{}
-	mi := &file_mddb_proto_msgTypes[174]
+	mi := &file_mddb_proto_msgTypes[175]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11569,7 +11639,7 @@ func (x *UpdateCurationRuleRequest) String() string {
 func (*UpdateCurationRuleRequest) ProtoMessage() {}
 
 func (x *UpdateCurationRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[174]
+	mi := &file_mddb_proto_msgTypes[175]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11582,7 +11652,7 @@ func (x *UpdateCurationRuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateCurationRuleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateCurationRuleRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{174}
+	return file_mddb_proto_rawDescGZIP(), []int{175}
 }
 
 func (x *UpdateCurationRuleRequest) GetRule() *CurationRuleProto {
@@ -11601,7 +11671,7 @@ type DeleteCurationRuleRequest struct {
 
 func (x *DeleteCurationRuleRequest) Reset() {
 	*x = DeleteCurationRuleRequest{}
-	mi := &file_mddb_proto_msgTypes[175]
+	mi := &file_mddb_proto_msgTypes[176]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11613,7 +11683,7 @@ func (x *DeleteCurationRuleRequest) String() string {
 func (*DeleteCurationRuleRequest) ProtoMessage() {}
 
 func (x *DeleteCurationRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[175]
+	mi := &file_mddb_proto_msgTypes[176]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11626,7 +11696,7 @@ func (x *DeleteCurationRuleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteCurationRuleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteCurationRuleRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{175}
+	return file_mddb_proto_rawDescGZIP(), []int{176}
 }
 
 func (x *DeleteCurationRuleRequest) GetId() string {
@@ -11646,7 +11716,7 @@ type DeleteCurationRuleResponse struct {
 
 func (x *DeleteCurationRuleResponse) Reset() {
 	*x = DeleteCurationRuleResponse{}
-	mi := &file_mddb_proto_msgTypes[176]
+	mi := &file_mddb_proto_msgTypes[177]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11658,7 +11728,7 @@ func (x *DeleteCurationRuleResponse) String() string {
 func (*DeleteCurationRuleResponse) ProtoMessage() {}
 
 func (x *DeleteCurationRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[176]
+	mi := &file_mddb_proto_msgTypes[177]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11671,7 +11741,7 @@ func (x *DeleteCurationRuleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteCurationRuleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteCurationRuleResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{176}
+	return file_mddb_proto_rawDescGZIP(), []int{177}
 }
 
 func (x *DeleteCurationRuleResponse) GetStatus() string {
@@ -11698,7 +11768,7 @@ type SearchAdvisorRequest struct {
 
 func (x *SearchAdvisorRequest) Reset() {
 	*x = SearchAdvisorRequest{}
-	mi := &file_mddb_proto_msgTypes[177]
+	mi := &file_mddb_proto_msgTypes[178]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11710,7 +11780,7 @@ func (x *SearchAdvisorRequest) String() string {
 func (*SearchAdvisorRequest) ProtoMessage() {}
 
 func (x *SearchAdvisorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[177]
+	mi := &file_mddb_proto_msgTypes[178]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11723,7 +11793,7 @@ func (x *SearchAdvisorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchAdvisorRequest.ProtoReflect.Descriptor instead.
 func (*SearchAdvisorRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{177}
+	return file_mddb_proto_rawDescGZIP(), []int{178}
 }
 
 func (x *SearchAdvisorRequest) GetCollection() string {
@@ -11757,7 +11827,7 @@ type CollectionProfile struct {
 
 func (x *CollectionProfile) Reset() {
 	*x = CollectionProfile{}
-	mi := &file_mddb_proto_msgTypes[178]
+	mi := &file_mddb_proto_msgTypes[179]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11769,7 +11839,7 @@ func (x *CollectionProfile) String() string {
 func (*CollectionProfile) ProtoMessage() {}
 
 func (x *CollectionProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[178]
+	mi := &file_mddb_proto_msgTypes[179]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11782,7 +11852,7 @@ func (x *CollectionProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CollectionProfile.ProtoReflect.Descriptor instead.
 func (*CollectionProfile) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{178}
+	return file_mddb_proto_rawDescGZIP(), []int{179}
 }
 
 func (x *CollectionProfile) GetCollection() string {
@@ -11891,7 +11961,7 @@ type SearchAdvisorResponse struct {
 
 func (x *SearchAdvisorResponse) Reset() {
 	*x = SearchAdvisorResponse{}
-	mi := &file_mddb_proto_msgTypes[179]
+	mi := &file_mddb_proto_msgTypes[180]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11903,7 +11973,7 @@ func (x *SearchAdvisorResponse) String() string {
 func (*SearchAdvisorResponse) ProtoMessage() {}
 
 func (x *SearchAdvisorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[179]
+	mi := &file_mddb_proto_msgTypes[180]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11916,7 +11986,7 @@ func (x *SearchAdvisorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchAdvisorResponse.ProtoReflect.Descriptor instead.
 func (*SearchAdvisorResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{179}
+	return file_mddb_proto_rawDescGZIP(), []int{180}
 }
 
 func (x *SearchAdvisorResponse) GetProfile() *CollectionProfile {
@@ -12677,7 +12747,12 @@ const file_mddb_proto_rawDesc = "" +
 	"\aapi_key\x18\x02 \x01(\tR\x06apiKey\x12\x1e\n" +
 	"\vapi_key_set\x18\x03 \x01(\bR\tapiKeySet\"6\n" +
 	"\x0fCodeConfigProto\x12#\n" +
-	"\rinclude_paths\x18\x01 \x03(\tR\fincludePaths\"\xce\x06\n" +
+	"\rinclude_paths\x18\x01 \x03(\tR\fincludePaths\"V\n" +
+	"\x16EmbeddingChunkingProto\x12\x1d\n" +
+	"\n" +
+	"chunk_size\x18\x01 \x01(\x05R\tchunkSize\x12\x1d\n" +
+	"\n" +
+	"chunk_mode\x18\x02 \x01(\tR\tchunkMode\"\x8a\a\n" +
 	"\x15CollectionConfigProto\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x12\n" +
@@ -12700,7 +12775,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"spell_lang\x18\x11 \x01(\tR\tspellLang\x128\n" +
 	"\twordpress\x18\x12 \x01(\v2\x1a.mddb.WordPressTargetProtoR\twordpress\x12)\n" +
-	"\x04code\x18\x13 \x01(\v2\x15.mddb.CodeConfigProtoR\x04code\x1a=\n" +
+	"\x04code\x18\x13 \x01(\v2\x15.mddb.CodeConfigProtoR\x04code\x12:\n" +
+	"\tembedding\x18\x14 \x01(\v2\x1c.mddb.EmbeddingChunkingProtoR\tembedding\x1a=\n" +
 	"\x0fCustomMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"<\n" +
@@ -12715,7 +12791,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06config\x18\x02 \x01(\v2\x1b.mddb.CollectionConfigProtoR\x06config\x12\x1e\n" +
 	"\n" +
 	"configured\x18\x03 \x01(\bR\n" +
-	"configured\"\xe6\a\n" +
+	"configured\"\xa2\b\n" +
 	"\x1aSetCollectionConfigRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -12741,7 +12817,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"spell_lang\x18\x12 \x01(\tR\tspellLang\x128\n" +
 	"\twordpress\x18\x13 \x01(\v2\x1a.mddb.WordPressTargetProtoR\twordpress\x12)\n" +
-	"\x04code\x18\x14 \x01(\v2\x15.mddb.CodeConfigProtoR\x04code\x1a=\n" +
+	"\x04code\x18\x14 \x01(\v2\x15.mddb.CodeConfigProtoR\x04code\x12:\n" +
+	"\tembedding\x18\x15 \x01(\v2\x1c.mddb.EmbeddingChunkingProtoR\tembedding\x1a=\n" +
 	"\x0fCustomMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x14\n" +
@@ -13279,7 +13356,7 @@ func file_mddb_proto_rawDescGZIP() []byte {
 	return file_mddb_proto_rawDescData
 }
 
-var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 212)
+var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 213)
 var file_mddb_proto_goTypes = []any{
 	(*Document)(nil),                      // 0: mddb.Document
 	(*MetaValues)(nil),                    // 1: mddb.MetaValues
@@ -13392,376 +13469,379 @@ var file_mddb_proto_goTypes = []any{
 	(*StorageConfigProto)(nil),            // 108: mddb.StorageConfigProto
 	(*WordPressTargetProto)(nil),          // 109: mddb.WordPressTargetProto
 	(*CodeConfigProto)(nil),               // 110: mddb.CodeConfigProto
-	(*CollectionConfigProto)(nil),         // 111: mddb.CollectionConfigProto
-	(*GetCollectionConfigRequest)(nil),    // 112: mddb.GetCollectionConfigRequest
-	(*GetCollectionConfigResponse)(nil),   // 113: mddb.GetCollectionConfigResponse
-	(*SetCollectionConfigRequest)(nil),    // 114: mddb.SetCollectionConfigRequest
-	(*SetCollectionConfigResponse)(nil),   // 115: mddb.SetCollectionConfigResponse
-	(*ListCollectionConfigsRequest)(nil),  // 116: mddb.ListCollectionConfigsRequest
-	(*CollectionConfigEntry)(nil),         // 117: mddb.CollectionConfigEntry
-	(*ListCollectionConfigsResponse)(nil), // 118: mddb.ListCollectionConfigsResponse
-	(*CrossSearchRequest)(nil),            // 119: mddb.CrossSearchRequest
-	(*CrossSearchResultItem)(nil),         // 120: mddb.CrossSearchResultItem
-	(*CrossSearchResponse)(nil),           // 121: mddb.CrossSearchResponse
-	(*FindDuplicatesRequest)(nil),         // 122: mddb.FindDuplicatesRequest
-	(*DuplicateDocInfoProto)(nil),         // 123: mddb.DuplicateDocInfoProto
-	(*DuplicateGroupProto)(nil),           // 124: mddb.DuplicateGroupProto
-	(*FindDuplicatesResponse)(nil),        // 125: mddb.FindDuplicatesResponse
-	(*IngestDocument)(nil),                // 126: mddb.IngestDocument
-	(*IngestOptions)(nil),                 // 127: mddb.IngestOptions
-	(*IngestRequest)(nil),                 // 128: mddb.IngestRequest
-	(*IngestResponse)(nil),                // 129: mddb.IngestResponse
-	(*ListRevisionsRequest)(nil),          // 130: mddb.ListRevisionsRequest
-	(*RevisionEntryProto)(nil),            // 131: mddb.RevisionEntryProto
-	(*ListRevisionsResponse)(nil),         // 132: mddb.ListRevisionsResponse
-	(*RestoreRevisionRequest)(nil),        // 133: mddb.RestoreRevisionRequest
-	(*SnapshotRequest)(nil),               // 134: mddb.SnapshotRequest
-	(*SnapshotChunk)(nil),                 // 135: mddb.SnapshotChunk
-	(*StreamBinlogRequest)(nil),           // 136: mddb.StreamBinlogRequest
-	(*BinlogEntryProto)(nil),              // 137: mddb.BinlogEntryProto
-	(*ReplicationStatusRequest)(nil),      // 138: mddb.ReplicationStatusRequest
-	(*ReplicationStatusResponse)(nil),     // 139: mddb.ReplicationStatusResponse
-	(*FollowerInfo)(nil),                  // 140: mddb.FollowerInfo
-	(*AcknowledgeLSNRequest)(nil),         // 141: mddb.AcknowledgeLSNRequest
-	(*AcknowledgeLSNResponse)(nil),        // 142: mddb.AcknowledgeLSNResponse
-	(*TemporalQueryRequest)(nil),          // 143: mddb.TemporalQueryRequest
-	(*TemporalEventProto)(nil),            // 144: mddb.TemporalEventProto
-	(*TemporalQueryResponse)(nil),         // 145: mddb.TemporalQueryResponse
-	(*TemporalHotRequest)(nil),            // 146: mddb.TemporalHotRequest
-	(*TemporalHotEntry)(nil),              // 147: mddb.TemporalHotEntry
-	(*TemporalHotResponse)(nil),           // 148: mddb.TemporalHotResponse
-	(*SpellSuggestRequest)(nil),           // 149: mddb.SpellSuggestRequest
-	(*SpellSuggestionProto)(nil),          // 150: mddb.SpellSuggestionProto
-	(*SpellSuggestResponse)(nil),          // 151: mddb.SpellSuggestResponse
-	(*SpellCleanupRequest)(nil),           // 152: mddb.SpellCleanupRequest
-	(*SpellCleanupResponse)(nil),          // 153: mddb.SpellCleanupResponse
-	(*GeoSearchRequest)(nil),              // 154: mddb.GeoSearchRequest
-	(*GeoSearchResultItem)(nil),           // 155: mddb.GeoSearchResultItem
-	(*GeoSearchResponse)(nil),             // 156: mddb.GeoSearchResponse
-	(*GeoWithinRequest)(nil),              // 157: mddb.GeoWithinRequest
-	(*GeoWithinResponse)(nil),             // 158: mddb.GeoWithinResponse
-	(*GeoPostcodeLoadProto)(nil),          // 159: mddb.GeoPostcodeLoadProto
-	(*GeoReindexRequest)(nil),             // 160: mddb.GeoReindexRequest
-	(*GeoReindexResponse)(nil),            // 161: mddb.GeoReindexResponse
-	(*GeoStatsRequest)(nil),               // 162: mddb.GeoStatsRequest
-	(*GeoCollectionStatProto)(nil),        // 163: mddb.GeoCollectionStatProto
-	(*GeoStatsResponse)(nil),              // 164: mddb.GeoStatsResponse
-	(*GeoEncodeRequest)(nil),              // 165: mddb.GeoEncodeRequest
-	(*GeoEncodeResponse)(nil),             // 166: mddb.GeoEncodeResponse
-	(*GeoDecodeRequest)(nil),              // 167: mddb.GeoDecodeRequest
-	(*GeoDecodeResponse)(nil),             // 168: mddb.GeoDecodeResponse
-	(*PinnedDocProto)(nil),                // 169: mddb.PinnedDocProto
-	(*CurationRuleProto)(nil),             // 170: mddb.CurationRuleProto
-	(*ListCurationRulesRequest)(nil),      // 171: mddb.ListCurationRulesRequest
-	(*ListCurationRulesResponse)(nil),     // 172: mddb.ListCurationRulesResponse
-	(*CreateCurationRuleRequest)(nil),     // 173: mddb.CreateCurationRuleRequest
-	(*UpdateCurationRuleRequest)(nil),     // 174: mddb.UpdateCurationRuleRequest
-	(*DeleteCurationRuleRequest)(nil),     // 175: mddb.DeleteCurationRuleRequest
-	(*DeleteCurationRuleResponse)(nil),    // 176: mddb.DeleteCurationRuleResponse
-	(*SearchAdvisorRequest)(nil),          // 177: mddb.SearchAdvisorRequest
-	(*CollectionProfile)(nil),             // 178: mddb.CollectionProfile
-	(*SearchAdvisorResponse)(nil),         // 179: mddb.SearchAdvisorResponse
-	nil,                                   // 180: mddb.Document.MetaEntry
-	nil,                                   // 181: mddb.AddRequest.MetaEntry
-	nil,                                   // 182: mddb.BatchDocument.MetaEntry
-	nil,                                   // 183: mddb.GetRequest.EnvEntry
-	nil,                                   // 184: mddb.SearchRequest.FilterMetaEntry
-	nil,                                   // 185: mddb.ExportRequest.FilterMetaEntry
-	nil,                                   // 186: mddb.UpdateDocument.MetaEntry
-	nil,                                   // 187: mddb.VectorSearchRequest.FilterMetaEntry
-	nil,                                   // 188: mddb.VectorStatsResponse.CollectionsEntry
-	nil,                                   // 189: mddb.ImportURLRequest.MetaEntry
-	nil,                                   // 190: mddb.FTSRequest.FilterMetaEntry
-	nil,                                   // 191: mddb.FTSRequest.BoostEntry
-	nil,                                   // 192: mddb.FTSResponse.FacetsEntry
-	nil,                                   // 193: mddb.HybridSearchRequest.FilterMetaEntry
-	nil,                                   // 194: mddb.HybridSearchRequest.FieldWeightsEntry
-	nil,                                   // 195: mddb.HybridSearchRequest.BoostEntry
-	nil,                                   // 196: mddb.HybridSearchResponse.FacetsEntry
-	nil,                                   // 197: mddb.ValidateDocumentRequest.MetaEntry
-	nil,                                   // 198: mddb.UpdateDocumentRequest.MetaEntry
-	nil,                                   // 199: mddb.GetDocumentMetaResponse.MetaEntry
-	nil,                                   // 200: mddb.GetMetaKeysResponse.MetaEntry
-	nil,                                   // 201: mddb.AutomationRuleProto.HeadersEntry
-	nil,                                   // 202: mddb.CollectionConfigProto.CustomMetaEntry
-	nil,                                   // 203: mddb.SetCollectionConfigRequest.CustomMetaEntry
-	nil,                                   // 204: mddb.CrossSearchRequest.FilterMetaEntry
-	nil,                                   // 205: mddb.IngestDocument.MetaEntry
-	nil,                                   // 206: mddb.RevisionEntryProto.MetaEntry
-	nil,                                   // 207: mddb.GeoSearchRequest.FilterMetaEntry
-	nil,                                   // 208: mddb.GeoWithinRequest.FilterMetaEntry
-	nil,                                   // 209: mddb.GeoReindexResponse.PostcodesLoadedEntry
-	nil,                                   // 210: mddb.GeoStatsResponse.CollectionsEntry
-	nil,                                   // 211: mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	(*EmbeddingChunkingProto)(nil),        // 111: mddb.EmbeddingChunkingProto
+	(*CollectionConfigProto)(nil),         // 112: mddb.CollectionConfigProto
+	(*GetCollectionConfigRequest)(nil),    // 113: mddb.GetCollectionConfigRequest
+	(*GetCollectionConfigResponse)(nil),   // 114: mddb.GetCollectionConfigResponse
+	(*SetCollectionConfigRequest)(nil),    // 115: mddb.SetCollectionConfigRequest
+	(*SetCollectionConfigResponse)(nil),   // 116: mddb.SetCollectionConfigResponse
+	(*ListCollectionConfigsRequest)(nil),  // 117: mddb.ListCollectionConfigsRequest
+	(*CollectionConfigEntry)(nil),         // 118: mddb.CollectionConfigEntry
+	(*ListCollectionConfigsResponse)(nil), // 119: mddb.ListCollectionConfigsResponse
+	(*CrossSearchRequest)(nil),            // 120: mddb.CrossSearchRequest
+	(*CrossSearchResultItem)(nil),         // 121: mddb.CrossSearchResultItem
+	(*CrossSearchResponse)(nil),           // 122: mddb.CrossSearchResponse
+	(*FindDuplicatesRequest)(nil),         // 123: mddb.FindDuplicatesRequest
+	(*DuplicateDocInfoProto)(nil),         // 124: mddb.DuplicateDocInfoProto
+	(*DuplicateGroupProto)(nil),           // 125: mddb.DuplicateGroupProto
+	(*FindDuplicatesResponse)(nil),        // 126: mddb.FindDuplicatesResponse
+	(*IngestDocument)(nil),                // 127: mddb.IngestDocument
+	(*IngestOptions)(nil),                 // 128: mddb.IngestOptions
+	(*IngestRequest)(nil),                 // 129: mddb.IngestRequest
+	(*IngestResponse)(nil),                // 130: mddb.IngestResponse
+	(*ListRevisionsRequest)(nil),          // 131: mddb.ListRevisionsRequest
+	(*RevisionEntryProto)(nil),            // 132: mddb.RevisionEntryProto
+	(*ListRevisionsResponse)(nil),         // 133: mddb.ListRevisionsResponse
+	(*RestoreRevisionRequest)(nil),        // 134: mddb.RestoreRevisionRequest
+	(*SnapshotRequest)(nil),               // 135: mddb.SnapshotRequest
+	(*SnapshotChunk)(nil),                 // 136: mddb.SnapshotChunk
+	(*StreamBinlogRequest)(nil),           // 137: mddb.StreamBinlogRequest
+	(*BinlogEntryProto)(nil),              // 138: mddb.BinlogEntryProto
+	(*ReplicationStatusRequest)(nil),      // 139: mddb.ReplicationStatusRequest
+	(*ReplicationStatusResponse)(nil),     // 140: mddb.ReplicationStatusResponse
+	(*FollowerInfo)(nil),                  // 141: mddb.FollowerInfo
+	(*AcknowledgeLSNRequest)(nil),         // 142: mddb.AcknowledgeLSNRequest
+	(*AcknowledgeLSNResponse)(nil),        // 143: mddb.AcknowledgeLSNResponse
+	(*TemporalQueryRequest)(nil),          // 144: mddb.TemporalQueryRequest
+	(*TemporalEventProto)(nil),            // 145: mddb.TemporalEventProto
+	(*TemporalQueryResponse)(nil),         // 146: mddb.TemporalQueryResponse
+	(*TemporalHotRequest)(nil),            // 147: mddb.TemporalHotRequest
+	(*TemporalHotEntry)(nil),              // 148: mddb.TemporalHotEntry
+	(*TemporalHotResponse)(nil),           // 149: mddb.TemporalHotResponse
+	(*SpellSuggestRequest)(nil),           // 150: mddb.SpellSuggestRequest
+	(*SpellSuggestionProto)(nil),          // 151: mddb.SpellSuggestionProto
+	(*SpellSuggestResponse)(nil),          // 152: mddb.SpellSuggestResponse
+	(*SpellCleanupRequest)(nil),           // 153: mddb.SpellCleanupRequest
+	(*SpellCleanupResponse)(nil),          // 154: mddb.SpellCleanupResponse
+	(*GeoSearchRequest)(nil),              // 155: mddb.GeoSearchRequest
+	(*GeoSearchResultItem)(nil),           // 156: mddb.GeoSearchResultItem
+	(*GeoSearchResponse)(nil),             // 157: mddb.GeoSearchResponse
+	(*GeoWithinRequest)(nil),              // 158: mddb.GeoWithinRequest
+	(*GeoWithinResponse)(nil),             // 159: mddb.GeoWithinResponse
+	(*GeoPostcodeLoadProto)(nil),          // 160: mddb.GeoPostcodeLoadProto
+	(*GeoReindexRequest)(nil),             // 161: mddb.GeoReindexRequest
+	(*GeoReindexResponse)(nil),            // 162: mddb.GeoReindexResponse
+	(*GeoStatsRequest)(nil),               // 163: mddb.GeoStatsRequest
+	(*GeoCollectionStatProto)(nil),        // 164: mddb.GeoCollectionStatProto
+	(*GeoStatsResponse)(nil),              // 165: mddb.GeoStatsResponse
+	(*GeoEncodeRequest)(nil),              // 166: mddb.GeoEncodeRequest
+	(*GeoEncodeResponse)(nil),             // 167: mddb.GeoEncodeResponse
+	(*GeoDecodeRequest)(nil),              // 168: mddb.GeoDecodeRequest
+	(*GeoDecodeResponse)(nil),             // 169: mddb.GeoDecodeResponse
+	(*PinnedDocProto)(nil),                // 170: mddb.PinnedDocProto
+	(*CurationRuleProto)(nil),             // 171: mddb.CurationRuleProto
+	(*ListCurationRulesRequest)(nil),      // 172: mddb.ListCurationRulesRequest
+	(*ListCurationRulesResponse)(nil),     // 173: mddb.ListCurationRulesResponse
+	(*CreateCurationRuleRequest)(nil),     // 174: mddb.CreateCurationRuleRequest
+	(*UpdateCurationRuleRequest)(nil),     // 175: mddb.UpdateCurationRuleRequest
+	(*DeleteCurationRuleRequest)(nil),     // 176: mddb.DeleteCurationRuleRequest
+	(*DeleteCurationRuleResponse)(nil),    // 177: mddb.DeleteCurationRuleResponse
+	(*SearchAdvisorRequest)(nil),          // 178: mddb.SearchAdvisorRequest
+	(*CollectionProfile)(nil),             // 179: mddb.CollectionProfile
+	(*SearchAdvisorResponse)(nil),         // 180: mddb.SearchAdvisorResponse
+	nil,                                   // 181: mddb.Document.MetaEntry
+	nil,                                   // 182: mddb.AddRequest.MetaEntry
+	nil,                                   // 183: mddb.BatchDocument.MetaEntry
+	nil,                                   // 184: mddb.GetRequest.EnvEntry
+	nil,                                   // 185: mddb.SearchRequest.FilterMetaEntry
+	nil,                                   // 186: mddb.ExportRequest.FilterMetaEntry
+	nil,                                   // 187: mddb.UpdateDocument.MetaEntry
+	nil,                                   // 188: mddb.VectorSearchRequest.FilterMetaEntry
+	nil,                                   // 189: mddb.VectorStatsResponse.CollectionsEntry
+	nil,                                   // 190: mddb.ImportURLRequest.MetaEntry
+	nil,                                   // 191: mddb.FTSRequest.FilterMetaEntry
+	nil,                                   // 192: mddb.FTSRequest.BoostEntry
+	nil,                                   // 193: mddb.FTSResponse.FacetsEntry
+	nil,                                   // 194: mddb.HybridSearchRequest.FilterMetaEntry
+	nil,                                   // 195: mddb.HybridSearchRequest.FieldWeightsEntry
+	nil,                                   // 196: mddb.HybridSearchRequest.BoostEntry
+	nil,                                   // 197: mddb.HybridSearchResponse.FacetsEntry
+	nil,                                   // 198: mddb.ValidateDocumentRequest.MetaEntry
+	nil,                                   // 199: mddb.UpdateDocumentRequest.MetaEntry
+	nil,                                   // 200: mddb.GetDocumentMetaResponse.MetaEntry
+	nil,                                   // 201: mddb.GetMetaKeysResponse.MetaEntry
+	nil,                                   // 202: mddb.AutomationRuleProto.HeadersEntry
+	nil,                                   // 203: mddb.CollectionConfigProto.CustomMetaEntry
+	nil,                                   // 204: mddb.SetCollectionConfigRequest.CustomMetaEntry
+	nil,                                   // 205: mddb.CrossSearchRequest.FilterMetaEntry
+	nil,                                   // 206: mddb.IngestDocument.MetaEntry
+	nil,                                   // 207: mddb.RevisionEntryProto.MetaEntry
+	nil,                                   // 208: mddb.GeoSearchRequest.FilterMetaEntry
+	nil,                                   // 209: mddb.GeoWithinRequest.FilterMetaEntry
+	nil,                                   // 210: mddb.GeoReindexResponse.PostcodesLoadedEntry
+	nil,                                   // 211: mddb.GeoStatsResponse.CollectionsEntry
+	nil,                                   // 212: mddb.GeoStatsResponse.PostcodeDatasetsEntry
 }
 var file_mddb_proto_depIdxs = []int32{
-	180, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
-	181, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
+	181, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
+	182, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
 	4,   // 2: mddb.AddBatchRequest.documents:type_name -> mddb.BatchDocument
-	182, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
-	183, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
-	184, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
+	183, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
+	184, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
+	185, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
 	0,   // 6: mddb.SearchResponse.documents:type_name -> mddb.Document
-	185, // 7: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
+	186, // 7: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
 	19,  // 8: mddb.StatsResponse.collections:type_name -> mddb.CollectionStats
 	21,  // 9: mddb.DeleteBatchRequest.documents:type_name -> mddb.DeleteDocument
 	24,  // 10: mddb.UpdateBatchRequest.documents:type_name -> mddb.UpdateDocument
-	186, // 11: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
-	187, // 12: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
+	187, // 11: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
+	188, // 12: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
 	0,   // 13: mddb.VectorSearchResult.document:type_name -> mddb.Document
 	27,  // 14: mddb.VectorSearchResponse.results:type_name -> mddb.VectorSearchResult
-	188, // 15: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
-	189, // 16: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
-	190, // 17: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
-	191, // 18: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
+	189, // 15: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
+	190, // 16: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
+	191, // 17: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
+	192, // 18: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
 	0,   // 19: mddb.FTSResult.document:type_name -> mddb.Document
 	38,  // 20: mddb.FacetBucketList.buckets:type_name -> mddb.FacetBucketProto
 	37,  // 21: mddb.FTSResponse.results:type_name -> mddb.FTSResult
-	192, // 22: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
+	193, // 22: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
 	44,  // 23: mddb.FTSLanguagesResponse.languages:type_name -> mddb.FTSLanguageInfo
-	193, // 24: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
-	194, // 25: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
-	195, // 26: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
+	194, // 24: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
+	195, // 25: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
+	196, // 26: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
 	0,   // 27: mddb.HybridSearchResult.document:type_name -> mddb.Document
 	47,  // 28: mddb.HybridSearchResponse.results:type_name -> mddb.HybridSearchResult
-	196, // 29: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
+	197, // 29: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
 	49,  // 30: mddb.ListWebhooksResponse.webhooks:type_name -> mddb.WebhookProto
 	63,  // 31: mddb.ListSchemasResponse.schemas:type_name -> mddb.SchemaInfo
-	197, // 32: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
-	198, // 33: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
-	199, // 34: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
+	198, // 32: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
+	199, // 33: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
+	200, // 34: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
 	70,  // 35: mddb.ClassifyResponse.results:type_name -> mddb.ClassifyLabelScore
 	76,  // 36: mddb.ListSynonymsResponse.entries:type_name -> mddb.SynonymEntry
 	83,  // 37: mddb.ListStopwordsResponse.entries:type_name -> mddb.StopwordEntry
-	200, // 38: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
-	201, // 39: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
+	201, // 38: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
+	202, // 39: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
 	94,  // 40: mddb.ListAutomationResponse.rules:type_name -> mddb.AutomationRuleProto
 	94,  // 41: mddb.CreateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
 	94,  // 42: mddb.UpdateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
 	94,  // 43: mddb.TestAutomationResponse.trigger:type_name -> mddb.AutomationRuleProto
 	0,   // 44: mddb.TestAutomationResponse.matches:type_name -> mddb.Document
 	104, // 45: mddb.GetAutomationLogsResponse.logs:type_name -> mddb.AutomationLogEntryProto
-	202, // 46: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
+	203, // 46: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
 	107, // 47: mddb.CollectionConfigProto.retrieval:type_name -> mddb.RetrievalProfileProto
 	108, // 48: mddb.CollectionConfigProto.storage_config:type_name -> mddb.StorageConfigProto
 	109, // 49: mddb.CollectionConfigProto.wordpress:type_name -> mddb.WordPressTargetProto
 	110, // 50: mddb.CollectionConfigProto.code:type_name -> mddb.CodeConfigProto
-	111, // 51: mddb.GetCollectionConfigResponse.config:type_name -> mddb.CollectionConfigProto
-	203, // 52: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
-	107, // 53: mddb.SetCollectionConfigRequest.retrieval:type_name -> mddb.RetrievalProfileProto
-	108, // 54: mddb.SetCollectionConfigRequest.storage_config:type_name -> mddb.StorageConfigProto
-	109, // 55: mddb.SetCollectionConfigRequest.wordpress:type_name -> mddb.WordPressTargetProto
-	110, // 56: mddb.SetCollectionConfigRequest.code:type_name -> mddb.CodeConfigProto
-	111, // 57: mddb.CollectionConfigEntry.config:type_name -> mddb.CollectionConfigProto
-	117, // 58: mddb.ListCollectionConfigsResponse.configs:type_name -> mddb.CollectionConfigEntry
-	204, // 59: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
-	0,   // 60: mddb.CrossSearchResultItem.document:type_name -> mddb.Document
-	120, // 61: mddb.CrossSearchResponse.results:type_name -> mddb.CrossSearchResultItem
-	123, // 62: mddb.DuplicateGroupProto.documents:type_name -> mddb.DuplicateDocInfoProto
-	124, // 63: mddb.FindDuplicatesResponse.exact_groups:type_name -> mddb.DuplicateGroupProto
-	124, // 64: mddb.FindDuplicatesResponse.similar_groups:type_name -> mddb.DuplicateGroupProto
-	205, // 65: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
-	126, // 66: mddb.IngestRequest.documents:type_name -> mddb.IngestDocument
-	127, // 67: mddb.IngestRequest.options:type_name -> mddb.IngestOptions
-	206, // 68: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
-	131, // 69: mddb.ListRevisionsResponse.revisions:type_name -> mddb.RevisionEntryProto
-	140, // 70: mddb.ReplicationStatusResponse.followers:type_name -> mddb.FollowerInfo
-	144, // 71: mddb.TemporalQueryResponse.events:type_name -> mddb.TemporalEventProto
-	0,   // 72: mddb.TemporalHotEntry.document:type_name -> mddb.Document
-	147, // 73: mddb.TemporalHotResponse.entries:type_name -> mddb.TemporalHotEntry
-	150, // 74: mddb.SpellSuggestResponse.token_suggestions:type_name -> mddb.SpellSuggestionProto
-	207, // 75: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
-	0,   // 76: mddb.GeoSearchResultItem.document:type_name -> mddb.Document
-	155, // 77: mddb.GeoSearchResponse.results:type_name -> mddb.GeoSearchResultItem
-	208, // 78: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
-	155, // 79: mddb.GeoWithinResponse.results:type_name -> mddb.GeoSearchResultItem
-	159, // 80: mddb.GeoReindexRequest.load_postcodes:type_name -> mddb.GeoPostcodeLoadProto
-	209, // 81: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
-	210, // 82: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
-	211, // 83: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
-	169, // 84: mddb.CurationRuleProto.pins:type_name -> mddb.PinnedDocProto
-	170, // 85: mddb.ListCurationRulesResponse.rules:type_name -> mddb.CurationRuleProto
-	170, // 86: mddb.CreateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
-	170, // 87: mddb.UpdateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
-	178, // 88: mddb.SearchAdvisorResponse.profile:type_name -> mddb.CollectionProfile
-	1,   // 89: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 90: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 91: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 92: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 93: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 94: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 95: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	33,  // 96: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
-	1,   // 97: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 98: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	39,  // 99: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 100: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	39,  // 101: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 102: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 103: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 104: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 105: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 106: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 107: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 108: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 109: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 110: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	163, // 111: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
-	2,   // 112: mddb.MDDB.Add:input_type -> mddb.AddRequest
-	3,   // 113: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
-	20,  // 114: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
-	23,  // 115: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
-	6,   // 116: mddb.MDDB.Get:input_type -> mddb.GetRequest
-	7,   // 117: mddb.MDDB.Search:input_type -> mddb.SearchRequest
-	9,   // 118: mddb.MDDB.Export:input_type -> mddb.ExportRequest
-	11,  // 119: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
-	13,  // 120: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
-	15,  // 121: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
-	17,  // 122: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
-	26,  // 123: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
-	29,  // 124: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
-	31,  // 125: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
-	154, // 126: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
-	157, // 127: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
-	160, // 128: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
-	162, // 129: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
-	165, // 130: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
-	167, // 131: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
-	34,  // 132: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
-	35,  // 133: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
-	36,  // 134: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
-	41,  // 135: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
-	43,  // 136: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
-	46,  // 137: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
-	50,  // 138: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
-	51,  // 139: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
-	53,  // 140: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
-	55,  // 141: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
-	57,  // 142: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
-	59,  // 143: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
-	61,  // 144: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
-	64,  // 145: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
-	66,  // 146: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
-	67,  // 147: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
-	69,  // 148: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
-	177, // 149: mddb.MDDB.SearchAdvisor:input_type -> mddb.SearchAdvisorRequest
-	72,  // 150: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
-	74,  // 151: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
-	77,  // 152: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
-	79,  // 153: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
-	81,  // 154: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
-	84,  // 155: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
-	86,  // 156: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
-	88,  // 157: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
-	90,  // 158: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
-	92,  // 159: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
-	95,  // 160: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
-	97,  // 161: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
-	98,  // 162: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
-	99,  // 163: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
-	101, // 164: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
-	102, // 165: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
-	105, // 166: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
-	112, // 167: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
-	114, // 168: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
-	116, // 169: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
-	119, // 170: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
-	122, // 171: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
-	128, // 172: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
-	130, // 173: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
-	133, // 174: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
-	143, // 175: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
-	146, // 176: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
-	149, // 177: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
-	152, // 178: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
-	171, // 179: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
-	173, // 180: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
-	174, // 181: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
-	175, // 182: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
-	134, // 183: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
-	136, // 184: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
-	138, // 185: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
-	141, // 186: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
-	0,   // 187: mddb.MDDB.Add:output_type -> mddb.Document
-	5,   // 188: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
-	22,  // 189: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
-	25,  // 190: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
-	0,   // 191: mddb.MDDB.Get:output_type -> mddb.Document
-	8,   // 192: mddb.MDDB.Search:output_type -> mddb.SearchResponse
-	10,  // 193: mddb.MDDB.Export:output_type -> mddb.ExportChunk
-	12,  // 194: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
-	14,  // 195: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
-	16,  // 196: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
-	18,  // 197: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
-	28,  // 198: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
-	30,  // 199: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
-	32,  // 200: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
-	156, // 201: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
-	158, // 202: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
-	161, // 203: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
-	164, // 204: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
-	166, // 205: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
-	168, // 206: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
-	0,   // 207: mddb.MDDB.ImportURL:output_type -> mddb.Document
-	0,   // 208: mddb.MDDB.SetTTL:output_type -> mddb.Document
-	40,  // 209: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
-	42,  // 210: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
-	45,  // 211: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
-	48,  // 212: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
-	49,  // 213: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
-	52,  // 214: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
-	54,  // 215: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
-	56,  // 216: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
-	58,  // 217: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
-	60,  // 218: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
-	62,  // 219: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
-	65,  // 220: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
-	0,   // 221: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
-	68,  // 222: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
-	71,  // 223: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
-	179, // 224: mddb.MDDB.SearchAdvisor:output_type -> mddb.SearchAdvisorResponse
-	73,  // 225: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
-	75,  // 226: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
-	78,  // 227: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
-	80,  // 228: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
-	82,  // 229: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
-	85,  // 230: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
-	87,  // 231: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
-	89,  // 232: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
-	91,  // 233: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
-	93,  // 234: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
-	96,  // 235: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
-	94,  // 236: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
-	94,  // 237: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
-	94,  // 238: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
-	100, // 239: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
-	103, // 240: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
-	106, // 241: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
-	113, // 242: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
-	115, // 243: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
-	118, // 244: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
-	121, // 245: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
-	125, // 246: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
-	129, // 247: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
-	132, // 248: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
-	0,   // 249: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
-	145, // 250: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
-	148, // 251: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
-	151, // 252: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
-	153, // 253: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
-	172, // 254: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
-	170, // 255: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
-	170, // 256: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
-	176, // 257: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
-	135, // 258: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
-	137, // 259: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
-	139, // 260: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
-	142, // 261: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
-	187, // [187:262] is the sub-list for method output_type
-	112, // [112:187] is the sub-list for method input_type
-	112, // [112:112] is the sub-list for extension type_name
-	112, // [112:112] is the sub-list for extension extendee
-	0,   // [0:112] is the sub-list for field type_name
+	111, // 51: mddb.CollectionConfigProto.embedding:type_name -> mddb.EmbeddingChunkingProto
+	112, // 52: mddb.GetCollectionConfigResponse.config:type_name -> mddb.CollectionConfigProto
+	204, // 53: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
+	107, // 54: mddb.SetCollectionConfigRequest.retrieval:type_name -> mddb.RetrievalProfileProto
+	108, // 55: mddb.SetCollectionConfigRequest.storage_config:type_name -> mddb.StorageConfigProto
+	109, // 56: mddb.SetCollectionConfigRequest.wordpress:type_name -> mddb.WordPressTargetProto
+	110, // 57: mddb.SetCollectionConfigRequest.code:type_name -> mddb.CodeConfigProto
+	111, // 58: mddb.SetCollectionConfigRequest.embedding:type_name -> mddb.EmbeddingChunkingProto
+	112, // 59: mddb.CollectionConfigEntry.config:type_name -> mddb.CollectionConfigProto
+	118, // 60: mddb.ListCollectionConfigsResponse.configs:type_name -> mddb.CollectionConfigEntry
+	205, // 61: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
+	0,   // 62: mddb.CrossSearchResultItem.document:type_name -> mddb.Document
+	121, // 63: mddb.CrossSearchResponse.results:type_name -> mddb.CrossSearchResultItem
+	124, // 64: mddb.DuplicateGroupProto.documents:type_name -> mddb.DuplicateDocInfoProto
+	125, // 65: mddb.FindDuplicatesResponse.exact_groups:type_name -> mddb.DuplicateGroupProto
+	125, // 66: mddb.FindDuplicatesResponse.similar_groups:type_name -> mddb.DuplicateGroupProto
+	206, // 67: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
+	127, // 68: mddb.IngestRequest.documents:type_name -> mddb.IngestDocument
+	128, // 69: mddb.IngestRequest.options:type_name -> mddb.IngestOptions
+	207, // 70: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
+	132, // 71: mddb.ListRevisionsResponse.revisions:type_name -> mddb.RevisionEntryProto
+	141, // 72: mddb.ReplicationStatusResponse.followers:type_name -> mddb.FollowerInfo
+	145, // 73: mddb.TemporalQueryResponse.events:type_name -> mddb.TemporalEventProto
+	0,   // 74: mddb.TemporalHotEntry.document:type_name -> mddb.Document
+	148, // 75: mddb.TemporalHotResponse.entries:type_name -> mddb.TemporalHotEntry
+	151, // 76: mddb.SpellSuggestResponse.token_suggestions:type_name -> mddb.SpellSuggestionProto
+	208, // 77: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
+	0,   // 78: mddb.GeoSearchResultItem.document:type_name -> mddb.Document
+	156, // 79: mddb.GeoSearchResponse.results:type_name -> mddb.GeoSearchResultItem
+	209, // 80: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
+	156, // 81: mddb.GeoWithinResponse.results:type_name -> mddb.GeoSearchResultItem
+	160, // 82: mddb.GeoReindexRequest.load_postcodes:type_name -> mddb.GeoPostcodeLoadProto
+	210, // 83: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
+	211, // 84: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
+	212, // 85: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	170, // 86: mddb.CurationRuleProto.pins:type_name -> mddb.PinnedDocProto
+	171, // 87: mddb.ListCurationRulesResponse.rules:type_name -> mddb.CurationRuleProto
+	171, // 88: mddb.CreateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
+	171, // 89: mddb.UpdateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
+	179, // 90: mddb.SearchAdvisorResponse.profile:type_name -> mddb.CollectionProfile
+	1,   // 91: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 92: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 93: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 94: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 95: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 96: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 97: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	33,  // 98: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
+	1,   // 99: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 100: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	39,  // 101: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 102: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	39,  // 103: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 104: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 105: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 106: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 107: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 108: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 109: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 110: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 111: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 112: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	164, // 113: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
+	2,   // 114: mddb.MDDB.Add:input_type -> mddb.AddRequest
+	3,   // 115: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
+	20,  // 116: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
+	23,  // 117: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
+	6,   // 118: mddb.MDDB.Get:input_type -> mddb.GetRequest
+	7,   // 119: mddb.MDDB.Search:input_type -> mddb.SearchRequest
+	9,   // 120: mddb.MDDB.Export:input_type -> mddb.ExportRequest
+	11,  // 121: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
+	13,  // 122: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
+	15,  // 123: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
+	17,  // 124: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
+	26,  // 125: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
+	29,  // 126: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
+	31,  // 127: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
+	155, // 128: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
+	158, // 129: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
+	161, // 130: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
+	163, // 131: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
+	166, // 132: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
+	168, // 133: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
+	34,  // 134: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
+	35,  // 135: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
+	36,  // 136: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
+	41,  // 137: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
+	43,  // 138: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
+	46,  // 139: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
+	50,  // 140: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
+	51,  // 141: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
+	53,  // 142: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
+	55,  // 143: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
+	57,  // 144: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
+	59,  // 145: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
+	61,  // 146: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
+	64,  // 147: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
+	66,  // 148: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
+	67,  // 149: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
+	69,  // 150: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
+	178, // 151: mddb.MDDB.SearchAdvisor:input_type -> mddb.SearchAdvisorRequest
+	72,  // 152: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
+	74,  // 153: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
+	77,  // 154: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
+	79,  // 155: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
+	81,  // 156: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
+	84,  // 157: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
+	86,  // 158: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
+	88,  // 159: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
+	90,  // 160: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
+	92,  // 161: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
+	95,  // 162: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
+	97,  // 163: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
+	98,  // 164: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
+	99,  // 165: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
+	101, // 166: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
+	102, // 167: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
+	105, // 168: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
+	113, // 169: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
+	115, // 170: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
+	117, // 171: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
+	120, // 172: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
+	123, // 173: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
+	129, // 174: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
+	131, // 175: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
+	134, // 176: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
+	144, // 177: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
+	147, // 178: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
+	150, // 179: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
+	153, // 180: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
+	172, // 181: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
+	174, // 182: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
+	175, // 183: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
+	176, // 184: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
+	135, // 185: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
+	137, // 186: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
+	139, // 187: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
+	142, // 188: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
+	0,   // 189: mddb.MDDB.Add:output_type -> mddb.Document
+	5,   // 190: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
+	22,  // 191: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
+	25,  // 192: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
+	0,   // 193: mddb.MDDB.Get:output_type -> mddb.Document
+	8,   // 194: mddb.MDDB.Search:output_type -> mddb.SearchResponse
+	10,  // 195: mddb.MDDB.Export:output_type -> mddb.ExportChunk
+	12,  // 196: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
+	14,  // 197: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
+	16,  // 198: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
+	18,  // 199: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
+	28,  // 200: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
+	30,  // 201: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
+	32,  // 202: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
+	157, // 203: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
+	159, // 204: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
+	162, // 205: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
+	165, // 206: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
+	167, // 207: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
+	169, // 208: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
+	0,   // 209: mddb.MDDB.ImportURL:output_type -> mddb.Document
+	0,   // 210: mddb.MDDB.SetTTL:output_type -> mddb.Document
+	40,  // 211: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
+	42,  // 212: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
+	45,  // 213: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
+	48,  // 214: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
+	49,  // 215: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
+	52,  // 216: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
+	54,  // 217: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
+	56,  // 218: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
+	58,  // 219: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
+	60,  // 220: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
+	62,  // 221: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
+	65,  // 222: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
+	0,   // 223: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
+	68,  // 224: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
+	71,  // 225: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
+	180, // 226: mddb.MDDB.SearchAdvisor:output_type -> mddb.SearchAdvisorResponse
+	73,  // 227: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
+	75,  // 228: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
+	78,  // 229: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
+	80,  // 230: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
+	82,  // 231: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
+	85,  // 232: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
+	87,  // 233: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
+	89,  // 234: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
+	91,  // 235: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
+	93,  // 236: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
+	96,  // 237: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
+	94,  // 238: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
+	94,  // 239: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
+	94,  // 240: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
+	100, // 241: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
+	103, // 242: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
+	106, // 243: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
+	114, // 244: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
+	116, // 245: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
+	119, // 246: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
+	122, // 247: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
+	126, // 248: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
+	130, // 249: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
+	133, // 250: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
+	0,   // 251: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
+	146, // 252: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
+	149, // 253: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
+	152, // 254: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
+	154, // 255: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
+	173, // 256: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
+	171, // 257: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
+	171, // 258: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
+	177, // 259: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
+	136, // 260: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
+	138, // 261: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
+	140, // 262: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
+	143, // 263: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
+	189, // [189:264] is the sub-list for method output_type
+	114, // [114:189] is the sub-list for method input_type
+	114, // [114:114] is the sub-list for extension type_name
+	114, // [114:114] is the sub-list for extension extendee
+	0,   // [0:114] is the sub-list for field type_name
 }
 
 func init() { file_mddb_proto_init() }
@@ -13769,14 +13849,14 @@ func file_mddb_proto_init() {
 	if File_mddb_proto != nil {
 		return
 	}
-	file_mddb_proto_msgTypes[114].OneofWrappers = []any{}
+	file_mddb_proto_msgTypes[115].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mddb_proto_rawDesc), len(file_mddb_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   212,
+			NumMessages:   213,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

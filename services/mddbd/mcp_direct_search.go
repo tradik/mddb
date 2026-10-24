@@ -165,7 +165,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 				idx := chunkIndex
 				item.ChunkIndex = &idx
 				item.ChunkText, item.StartLine, item.EndLine =
-					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize, ChunkModeFor(&doc))
+					chunkPassageWithLinesSize(doc.ContentMD, chunkIndex, windowSize,
+						c.server.chunkModeFor(req.Collection, &doc), c.server.chunkSizeFor(req.Collection))
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""
@@ -234,7 +235,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 			if err != nil {
 				continue
 			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: ChunkModeFor(d)})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: c.server.chunkModeFor(req.Collection, d)})
 		}
 		return nil
 	})
@@ -276,7 +277,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 		}
 
 		// Split into chunks
-		chunkSize := envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500)
+		chunkSize := c.server.chunkSizeFor(req.Collection) // #325
 		chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
 		var chunks []string
 		if chunkEnabled {

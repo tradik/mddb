@@ -867,6 +867,14 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 							"include_paths": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
 						},
 					},
+					"embedding": map[string]interface{}{
+						"type":        "object",
+						"description": "(v2.18.1+) Chunking for this collection's embeddings, overriding MDDB_EMBEDDING_CHUNK_SIZE / MDDB_EMBEDDING_CHUNK_MODE. Takes effect for documents embedded afterwards; run vector_reindex with force to re-chunk existing ones.",
+						"properties": map[string]interface{}{
+							"chunk_size": map[string]interface{}{"type": "integer", "description": "Target chunk length in characters, 100-100000; 0 = server default"},
+							"chunk_mode": map[string]interface{}{"type": "string", "enum": []string{"", "code", "prose"}, "description": "code = split at function/declaration boundaries, prose = paragraphs; empty = per document kind"},
+						},
+					},
 				},
 				"required": []string{"collection"},
 			},

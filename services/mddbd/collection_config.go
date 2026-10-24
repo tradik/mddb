@@ -62,6 +62,8 @@ type CollectionConfig struct {
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
 	// Code holds settings for collections of source code (#319).
 	Code *CodeConfigDef `json:"code,omitempty"`
+	// Embedding overrides the server's chunk size and mode (#325).
+	Embedding *EmbeddingChunkingDef `json:"embedding,omitempty"`
 }
 
 // CodeConfigDef configures how source documents in a collection are read.
@@ -257,6 +259,7 @@ type SetCollectionConfigRequest struct {
 	Retrieval       *RetrievalProfileDef   `json:"retrieval,omitempty"`       // per-collection retrieval defaults (RAG-001)
 	ResponsePrompt  string                 `json:"responsePrompt,omitempty"`  // how to format answers from this collection (RAG-002)
 	Code            *CodeConfigDef         `json:"code,omitempty"`            // source-code settings, e.g. include paths (#319)
+	Embedding       *EmbeddingChunkingDef  `json:"embedding,omitempty"`       // chunk size and mode for embeddings (#325)
 	// Temporal tracking and spell correction. These live in CollectionConfig
 	// and are read on every request, but were missing here — so the panel's
 	// toggles sent values the handler ignored, and every config save silently
@@ -385,6 +388,10 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		bad(w, err)
 		return
 	}
+	if err := validateChunking(req.Embedding); err != nil {
+		bad(w, err)
+		return
+	}
 
 	cfg := &CollectionConfig{
 		Type:            req.Type,
@@ -406,6 +413,7 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		SpellLang:       req.SpellLang,
 		ResponsePrompt:  req.ResponsePrompt,
 		Code:            req.Code,
+		Embedding:       req.Embedding,
 	}
 	// GO-035: a client that read this config back saw masked credentials, so
 	// an empty one means "unchanged", not "remove it". Runs before the backend

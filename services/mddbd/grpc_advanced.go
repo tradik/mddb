@@ -394,6 +394,9 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	// GO-035: the fields the proto gained in v2.12.0, each with the same
 	// "omitted means leave it alone" rule.
 	applyCollectionConfigRequest(cfg, req)
+	if err := validateChunking(cfg.Embedding); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 
 	// RAG-001: a nil retrieval block means "not sent", which leaves any
 	// profile configured over REST in place.

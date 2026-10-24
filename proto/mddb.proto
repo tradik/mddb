@@ -1026,6 +1026,13 @@ message CodeConfigProto {
   repeated string include_paths = 1;
 }
 
+// EmbeddingChunkingProto mirrors EmbeddingChunkingDef (#325): a collection's
+// own chunk size and mode for embeddings.
+message EmbeddingChunkingProto {
+  int32 chunk_size = 1;                          // characters, 100-100000; 0 = MDDB_EMBEDDING_CHUNK_SIZE
+  string chunk_mode = 2;                         // "code", "prose", or "" for each document's kind
+}
+
 message CollectionConfigProto {
   string type = 1;
   string description = 2;
@@ -1049,6 +1056,7 @@ message CollectionConfigProto {
   string spell_lang = 17;                        // override language for spell correction
   WordPressTargetProto wordpress = 18;           // outbound publishing target (mddb-sync plugin)
   CodeConfigProto code = 19;                     // (v2.18.0+) source-code settings (#319)
+  EmbeddingChunkingProto embedding = 20;         // (v2.18.1+) chunking for embeddings (#325)
 }
 
 message GetCollectionConfigRequest {
@@ -1090,6 +1098,7 @@ message SetCollectionConfigRequest {
   string spell_lang = 18;                        // "" leaves the stored setting alone
   WordPressTargetProto wordpress = 19;           // nil leaves the stored target alone
   CodeConfigProto code = 20;                     // (v2.18.0+) nil leaves the stored settings alone
+  EmbeddingChunkingProto embedding = 21;         // (v2.18.1+) nil leaves the stored chunking alone (#325)
 }
 
 message SetCollectionConfigResponse {

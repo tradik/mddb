@@ -330,7 +330,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 				idx := chunkIndex
 				item.ChunkIndex = &idx
 				item.ChunkText, item.StartLine, item.EndLine =
-					chunkPassageWithLines(doc.ContentMD, chunkIndex, windowSize, ChunkModeFor(&doc))
+					chunkPassageWithLinesSize(doc.ContentMD, chunkIndex, windowSize,
+						s.chunkModeFor(req.Collection, &doc), s.chunkSizeFor(req.Collection))
 			}
 			if !req.IncludeContent {
 				doc.ContentMD = ""
@@ -408,7 +409,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	chunkSize := envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500)
+	chunkSize := s.chunkSizeFor(req.Collection) // #325
 	chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
 
 	// Resolve quantization for this collection. Disk-only collections store
@@ -448,7 +449,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				continue
 			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: ChunkModeFor(d)})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(req.Collection, d)})
 		}
 		return nil
 	})
@@ -621,6 +622,10 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 			"total_documents":    docCounts[coll],
 			"embedded_documents": vectorCounts[coll],
 			"total_chunks":       chunkCounts[coll],
+			"chunkSize":          s.chunkSizeFor(coll), // effective, after the collection's override (#325)
+		}
+		if c := s.collectionChunking(coll); c != nil && c.ChunkMode != "" {
+			collInfo["chunkMode"] = c.ChunkMode
 		}
 		// Add quantization info if configured
 		if s.CollectionManager != nil {

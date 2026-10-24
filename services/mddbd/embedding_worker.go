@@ -24,6 +24,8 @@ type EmbeddingJob struct {
 	// disagree, chunk 3 at read time is not chunk 3 at write time and every
 	// passage is wrong.
 	ChunkMode ChunkMode
+	// ChunkSize is the collection's chunk size (#325); 0 uses the worker's.
+	ChunkSize int
 }
 
 // EmbeddingWorker processes embedding jobs asynchronously.
@@ -231,7 +233,11 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	// Split into chunks if enabled
 	var chunks []string
 	if w.chunkEnabled {
-		chunks = chunkTextsMode(job.ContentMD, w.chunkSize, job.ChunkMode)
+		size := job.ChunkSize
+		if size <= 0 {
+			size = w.chunkSize
+		}
+		chunks = chunkTextsMode(job.ContentMD, size, job.ChunkMode)
 	} else {
 		chunks = []string{job.ContentMD}
 	}

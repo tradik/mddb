@@ -60,7 +60,7 @@ Complete list of MDDB features organized by category.
 - **Configurable Models** - Switch providers/models without code changes
 - **Background Indexing** - Non-blocking embedding generation
 - **Automatic Fallback** - Falls back to flat if ANN index not ready
-- **Embedding Chunking** - Auto-split long documents into paragraph-based chunks before embedding with sentence and hard-split fallbacks. Multi-key chunk storage with deduplication in search results. Configurable via `MDDB_EMBEDDING_CHUNK_SIZE` and `MDDB_EMBEDDING_CHUNK_ENABLED`.
+- **Embedding Chunking** - Auto-split long documents into paragraph-based chunks before embedding with sentence and hard-split fallbacks. Multi-key chunk storage with deduplication in search results. Configurable via `MDDB_EMBEDDING_CHUNK_SIZE` and `MDDB_EMBEDDING_CHUNK_ENABLED`; since v2.18.1 a collection can override size and mode with `embedding: {chunkSize, chunkMode}` in its collection config.
 - **Embedding Cache** - Repeated queries are served from memory instead of the provider, and a reindex reuses the vectors of chunks whose text did not change — editing one paragraph of a fifty-chunk document no longer re-embeds all fifty. Hit/miss counters in `/metrics`; `MDDB_EMBEDDING_CACHE_SIZE=0` disables it.
 
 #### Full-Text Search

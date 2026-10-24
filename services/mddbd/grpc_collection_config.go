@@ -120,6 +120,7 @@ func collectionConfigToProto(cfg *CollectionConfig) *proto.CollectionConfigProto
 		SpellLang:       cfg.SpellLang,
 		Wordpress:       wordPressToProto(cfg.WordPress),
 		Code:            codeConfigToProto(cfg.Code),
+		Embedding:       chunkingToProto(cfg.Embedding),
 	}
 }
 
@@ -178,7 +179,22 @@ func applyCollectionConfigRequest(cfg *CollectionConfig, req *proto.SetCollectio
 	if req.GetWordpress() != nil {
 		cfg.WordPress = wordPressFromProto(req.GetWordpress(), cfg.WordPress)
 	}
+	if req.GetEmbedding() != nil {
+		cfg.Embedding = chunkingFromProto(req.GetEmbedding()) // validated by the caller
+	}
 	if req.GetCode() != nil {
 		cfg.Code = codeConfigFromProto(req.GetCode())
 	}
+}
+
+// chunkingToProto and chunkingFromProto carry EmbeddingChunkingDef (#325).
+func chunkingToProto(c *EmbeddingChunkingDef) *proto.EmbeddingChunkingProto {
+	if c == nil {
+		return nil
+	}
+	return &proto.EmbeddingChunkingProto{ChunkSize: int32(min(c.ChunkSize, 100000)), ChunkMode: c.ChunkMode} // #nosec G115 -- bounded above
+}
+
+func chunkingFromProto(in *proto.EmbeddingChunkingProto) *EmbeddingChunkingDef {
+	return &EmbeddingChunkingDef{ChunkSize: int(in.GetChunkSize()), ChunkMode: in.GetChunkMode()}
 }

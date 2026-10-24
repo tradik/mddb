@@ -3812,6 +3812,23 @@ collection-relative (`net/conn.h`), which suits a tree keyed from its include
 root. Set them before loading: documents written earlier keep their imports
 until they are written again.
 
+**Chunk size per collection (v2.18.1+).** `MDDB_EMBEDDING_CHUNK_SIZE` is one
+number for the whole server, and 1500 characters suits prose but cuts a long
+C function in two. A collection can set its own size and mode:
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' \
+  -d '{"collection":"myproject","embedding":{"chunkSize":4000,"chunkMode":"code"}}'
+```
+
+`chunkSize` is 100–100000 characters, or 0 for the server's size. `chunkMode`
+is `code`, `prose`, or empty to decide per document. The setting covers
+documents embedded afterwards and the passages search returns for them;
+vectors already stored keep their chunks until `POST /v1/vector-reindex` with
+`"force": true`. `GET /v1/vector-stats` reports each collection's effective
+`chunkSize`. The same object is `embedding` in MCP `set_collection_config`
+(`chunk_size`, `chunk_mode`) and in gRPC `SetCollectionConfig`.
+
 Three deliberate limits:
 
 - **The extractor owns these keys.** They are rewritten on every save and

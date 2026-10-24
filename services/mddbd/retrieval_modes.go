@@ -95,7 +95,12 @@ func chunkPassage(contentMD string, chunkIndex, windowSize int, mode ChunkMode) 
 // reading the file to find out where the chunk was. Both come from the same
 // segmentation, so the text and its range can never disagree.
 func chunkPassageWithLines(contentMD string, chunkIndex, windowSize int, mode ChunkMode) (text string, startLine, endLine int) {
-	chunkSize := envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500)
+	return chunkPassageWithLinesSize(contentMD, chunkIndex, windowSize, mode, envconf.Int("MDDB_EMBEDDING_CHUNK_SIZE", 1500))
+}
+
+// chunkPassageWithLinesSize is chunkPassageWithLines at a given chunk size,
+// which must be the size the collection was embedded with (#325).
+func chunkPassageWithLinesSize(contentMD string, chunkIndex, windowSize int, mode ChunkMode, chunkSize int) (text string, startLine, endLine int) {
 	spans := ChunkSpansMode(contentMD, chunkSize, mode)
 	if len(spans) == 0 {
 		return "", 0, 0

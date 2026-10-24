@@ -263,6 +263,12 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 	if req.Code != nil {
 		cfg.Code = req.Code
 	}
+	if req.Embedding != nil {
+		if err := validateChunking(req.Embedding); err != nil {
+			return err
+		}
+		cfg.Embedding = req.Embedding
+	}
 	// GO-035: a nil target means "not sent". Assigning it unconditionally
 	// deleted a configured publishing target whenever an agent touched
 	// anything else — the same shape as the bug the merge above exists to

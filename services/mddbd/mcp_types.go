@@ -670,6 +670,7 @@ type MCPSetCollectionConfigRequest struct {
 	MaxRevisions *int                   `json:"maxRevisions,omitempty"`
 	WordPress    *WordPressTargetConfig `json:"wordpress,omitempty"`
 	Code         *CodeConfigDef         `json:"code,omitempty"`
+	Embedding    *EmbeddingChunkingDef  `json:"embedding,omitempty"` // #325
 	// Retrieval and ResponsePrompt are nil/empty when the caller did not
 	// mention them, and are then left as stored (RAG-001, RAG-002).
 	Retrieval      *RetrievalProfileDef `json:"retrieval,omitempty"`

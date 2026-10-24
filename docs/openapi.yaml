@@ -4922,6 +4922,8 @@ paths:
                   description: (v2.12.0+) How to format answers from this collection (RAG-002)
                 code:
                   $ref: "#/components/schemas/CodeConfig"
+                embedding:
+                  $ref: "#/components/schemas/EmbeddingChunking"
                 trackAccess:
                   type: boolean
                   description: Record per-read access events for temporal analytics
@@ -6936,6 +6938,13 @@ components:
                 type: integer
                 description: Total embedding chunks (including multi-chunk documents)
                 example: 280
+              chunkSize:
+                type: integer
+                description: (v2.18.1+) Effective chunk size — the collection's own, else the server's
+                example: 1500
+              chunkMode:
+                type: string
+                description: (v2.18.1+) The collection's chunk mode; absent when it has none
           description: Per-collection embedding statistics
           example:
             blog:
@@ -9122,6 +9131,27 @@ components:
             any file the document `src/net/conn.h`, which gives code_graph its
             include edges. Applied when a document is written.
           example: ["src"]
+    EmbeddingChunking:
+      type: object
+      description: >
+        (v2.18.1+) This collection's chunking for embeddings (#325), overriding
+        MDDB_EMBEDDING_CHUNK_SIZE and MDDB_EMBEDDING_CHUNK_MODE. Applies to
+        documents embedded afterwards and to the passages search returns for
+        them; existing vectors keep their chunks until a forced vector-reindex.
+      properties:
+        chunkSize:
+          type: integer
+          minimum: 0
+          maximum: 100000
+          description: Target chunk length in characters, 100-100000. 0 = the server's size.
+          example: 4000
+        chunkMode:
+          type: string
+          enum: ["", code, prose]
+          description: >
+            code splits at function and declaration boundaries, prose at
+            paragraphs. Empty decides per document from its kind.
+          example: code
     CollectionConfig:
       type: object
       properties:
@@ -9190,6 +9220,7 @@ components:
             When `> 0`, older revisions are trimmed synchronously on every write so
             history stays capped even under high write-churn.
           default: 0
+          example: 20
         retrieval:
           $ref: "#/components/schemas/RetrievalProfile"
         responsePrompt:
@@ -9204,10 +9235,11 @@ components:
             placeholders. Plain text for a model; never rendered as markup.
             Capped at 4 KiB because it is prepended to prompts automatically and
             would otherwise eat the context the answer needs.
+          example: "Answer as numbered steps. Quote the exact command for each step."
         code:
           $ref: "#/components/schemas/CodeConfig"
-          example: "Answer as numbered steps. Quote the exact command for each step."
-          example: 20
+        embedding:
+          $ref: "#/components/schemas/EmbeddingChunking"
         wordpress:
           $ref: "#/components/schemas/WordPressTargetConfig"
 

@@ -495,7 +495,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `code_graph` | Code connection graph: what a document depends on and what depends on it (which stylesheet declares a selector, which pages load a script). |
 | `delete_collection` | Delete an entire collection and all its documents, revisions, and metadata indices. |
 | `get_collection_config` | Get configuration attributes for a collection (type, description, icon, color, custom metadata). |
-| `set_collection_config` | Set or update configuration attributes for a collection. Only the arguments sent change (v2.18.0; before, an update erased the icon, colour, custom meta and revision cap it did not mention). `code.include_paths` sets where C `#include <...>` resolves (#319). |
+| `set_collection_config` | Set or update configuration attributes for a collection. Only the arguments sent change (v2.18.0; before, an update erased the icon, colour, custom meta and revision cap it did not mention). `code.include_paths` sets where C `#include <...>` resolves (#319). `embedding.chunk_size` / `embedding.chunk_mode` set the collection's chunking for embeddings (v2.18.1, #325). |
 | `list_collection_configs` | List all collections that have custom configuration set. |
 
 ## Access Modes

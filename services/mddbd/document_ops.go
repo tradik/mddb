@@ -213,7 +213,8 @@ func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew b
 			Collection: collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,
-			ChunkMode:  ChunkModeFor(&saved),
+			ChunkMode:  s.chunkModeFor(collection, &saved),
+			ChunkSize:  s.chunkSizeFor(collection),
 		})
 	}
 
@@ -438,7 +439,8 @@ func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.
 			Collection: collection,
 			DocID:      saved.ID,
 			ContentMD:  saved.ContentMD,
-			ChunkMode:  ChunkModeFor(&saved),
+			ChunkMode:  s.chunkModeFor(collection, &saved),
+			ChunkSize:  s.chunkSizeFor(collection),
 		})
 	}
 
