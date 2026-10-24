@@ -68,7 +68,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.17.2"
+  version: "2.18.0"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb

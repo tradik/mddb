@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.0] - 2026-10-24
+
+C, C++ and assembly as code (#319), requested by the team loading the
+FreeBSD kernel tree into MDDB to query it over MCP.
+
+### Added
+
+- **C, C++ and assembly documents get symbols and graph edges (#319).**
+  `.c` and `.h` files used to be indexed as prose unless the client said
+  otherwise. Prose indexing stems words, drops `if` and `for`, and stores
+  `vm_page_alloc` as three separate words. C files never got `defines`,
+  `uses` or `imports`, so `code_graph` had no edges for them.
+  - Extensions: `.c .h` are `c`; `.cc .cpp .cxx .hpp .hh .hxx` are `cpp`;
+    `.S .s .asm` are `asm`; `.m4` is `m4`. Every one of them gets code
+    tokenizing and code chunking.
+  - C extractor (a scanner, not a compiler):
+    - `defines`: function definitions, `static` prototypes, `struct`,
+      `union` and `enum` tags, `typedef` names, `#define` macros and
+      file-scope variables;
+    - `uses`: names called in function bodies that the file does not define;
+    - `imports`: `#include` targets.
+
+    A non-static prototype is not a define, otherwise every header would
+    claim every function it declares. A name written in capitals only and
+    invoked at file scope (`SYSCTL_NODE(...)`, `DB_SHOW_COMMAND(...) { }`)
+    is treated as a macro, not a function.
+  - Assembly: `ENTRY(x)` and `.globl` become defines, `call`, `bl` and `jal`
+    targets become uses, and `#include` becomes imports.
+  - **`code.includePaths`** in collection config (REST, gRPC
+    `CodeConfigProto`, MCP `set_collection_config`). With `["sys"]`,
+    `#include <sys/proc.h>` resolves to the document `sys/sys/proc.h`, as
+    `-I` does. `"x.h"` resolves next to the including file.
+  - `code_graph` has a new edge kind, **`calls`**, for uses matched to
+    defines from C, C++ and assembly documents.
+  - Measured on FreeBSD `main` `sys/`: 15,617 files in about 5 seconds. The
+    extractor says 730 files include `<sys/mbuf.h>`, and `grep` finds the
+    same 730.
+- Blog: [Indexing the FreeBSD kernel source in MDDB](blog/2026-10-24-reading-the-freebsd-kernel-with-mddb.md).
+
+### Fixed
+
+- **MCP `set_collection_config` erased fields it was not given.** The code
+  documents that it merges with the stored config, but it assigned `type`,
+  `description`, `icon`, `color`, `customMeta` and `maxRevisions`
+  unconditionally. An agent that changed only the description cleared the
+  icon, colour and custom meta, and reset the revision cap to unlimited.
+  The tool also advertised `max_revisions` but never read it. Now only the
+  arguments that are sent change, and `max_revisions` works, including `0`.
+- **API.md misdescribed gRPC `SetCollectionConfig`.** It said every omitted
+  field is left alone. That is true for the fields added in 2.12 and for
+  `code`. `type`, `description`, `icon`, `color`, `custom_meta`,
+  `max_revisions` and `response_prompt` have always been set as sent, as
+  REST `PUT` does. The documentation now matches the code; the code did not
+  change.
+
+### Security and dependencies
+
+- `integrations/grafana-datasource`: `dompurify` 3.4.17 (critical advisory),
+  `zod` 4.6.7 (high), `serialize-javascript` 7.1.4, `fast-uri` 3.1.9.
+- `services/mddb-panel`: `zod` 4.6.7, `body-parser` 2.4.0, `qs` 6.16.1. The
+  open `braces` alert was dismissed because GitHub withdrew the advisory
+  (GHSA-vfj7-8cjw-p6xm) and no fixed version will exist.
+- `integrations/github-action`: `undici` 6.29.1, `dist/` rebuilt.
+- Docs site on ssg 1.8.80. Both pins in `deploy-docs.yml` match again: they
+  had drifted to 1.8.72 for the action and 1.8.67 for the binary. ssg's new
+  unread-content warning lists `docs/examples/`, which `content_exclude`
+  leaves out on purpose; reported as spagu/ssg#360.
+- `.ssg-cache/` is no longer tracked. A local docs build had put it in the
+  2.15.4 release commit.
+
 ## [2.17.2] - 2026-10-22
 
 Bulk loads, from the same ports index as the last three releases. The first
