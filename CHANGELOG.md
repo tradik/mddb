@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.1] - 2026-10-24
+
 ### Added
 
 - **OAuth 2.1 on the MCP listener (#322).** claude.ai custom connectors
