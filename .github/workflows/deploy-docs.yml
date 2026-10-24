@@ -52,7 +52,7 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@23e60e161ac330910eab55205601eefe3b2d021b # v1.8.72
+        uses: spagu/ssg@464c732acc19648269f43d174c0534361af74919 # v1.8.80
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
@@ -78,7 +78,7 @@ jobs:
           # not landed fails this job with a 404 on ssg-linux-amd64.tar.gz. The
           # check is one command:
           #   gh release view v1.8.58 --repo spagu/ssg --json assets
-          version: 'v1.8.67'
+          version: 'v1.8.80'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'

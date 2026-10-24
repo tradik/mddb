@@ -649,14 +649,17 @@ type MCPCollectionConfigResponse struct {
 
 // MCPSetCollectionConfigRequest is the request for set_collection_config.
 type MCPSetCollectionConfigRequest struct {
-	Collection   string                 `json:"collection"`
-	Type         string                 `json:"type,omitempty"`
-	Description  string                 `json:"description,omitempty"`
-	Icon         string                 `json:"icon,omitempty"`
-	Color        string                 `json:"color,omitempty"`
-	CustomMeta   map[string]string      `json:"customMeta,omitempty"`
-	MaxRevisions int                    `json:"maxRevisions,omitempty"`
+	Collection  string            `json:"collection"`
+	Type        string            `json:"type,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Icon        string            `json:"icon,omitempty"`
+	Color       string            `json:"color,omitempty"`
+	CustomMeta  map[string]string `json:"customMeta,omitempty"`
+	// MaxRevisions is nil when not sent: 0 is a real value (unlimited), so
+	// a plain int could not tell "unlimited" from "leave it alone".
+	MaxRevisions *int                   `json:"maxRevisions,omitempty"`
 	WordPress    *WordPressTargetConfig `json:"wordpress,omitempty"`
+	Code         *CodeConfigDef         `json:"code,omitempty"`
 	// Retrieval and ResponsePrompt are nil/empty when the caller did not
 	// mention them, and are then left as stored (RAG-001, RAG-002).
 	Retrieval      *RetrievalProfileDef `json:"retrieval,omitempty"`

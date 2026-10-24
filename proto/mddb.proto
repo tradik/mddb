@@ -1018,6 +1018,14 @@ message WordPressTargetProto {
   bool api_key_set = 3;                          // read-only: a key is stored, its value is withheld
 }
 
+// CodeConfigProto mirrors CodeConfigDef (#319): settings for collections of
+// source code.
+message CodeConfigProto {
+  // Collection-relative directories that angle-bracket includes resolve
+  // against, as a compiler's -I does: ["sys"] makes <sys/proc.h> sys/sys/proc.h.
+  repeated string include_paths = 1;
+}
+
 message CollectionConfigProto {
   string type = 1;
   string description = 2;
@@ -1040,6 +1048,7 @@ message CollectionConfigProto {
   bool spell_correct = 16;                       // auto-correct FTS queries
   string spell_lang = 17;                        // override language for spell correction
   WordPressTargetProto wordpress = 18;           // outbound publishing target (mddb-sync plugin)
+  CodeConfigProto code = 19;                     // (v2.18.0+) source-code settings (#319)
 }
 
 message GetCollectionConfigRequest {
@@ -1080,6 +1089,7 @@ message SetCollectionConfigRequest {
   optional bool spell_correct = 17;
   string spell_lang = 18;                        // "" leaves the stored setting alone
   WordPressTargetProto wordpress = 19;           // nil leaves the stored target alone
+  CodeConfigProto code = 20;                     // (v2.18.0+) nil leaves the stored settings alone
 }
 
 message SetCollectionConfigResponse {

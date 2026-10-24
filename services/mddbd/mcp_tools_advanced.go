@@ -51,10 +51,18 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 			APIKey: mcpGetString(wp, "api_key"),
 		}
 	}
+	// Advertised in the schema since v2.9.14 and never read until now.
+	if v, ok := args["max_revisions"].(float64); ok {
+		n := int(v)
+		req.MaxRevisions = &n
+	}
+	if code, ok := args["code"].(map[string]interface{}); ok {
+		req.Code = &CodeConfigDef{IncludePaths: mcpGetStringSlice(code, "include_paths")}
+	}
 	if err := s.client.SetCollectionConfig(ctx, req); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("Collection %q config updated (type=%s)", collection, req.Type), nil
+	return fmt.Sprintf("Collection %q config updated", collection), nil
 }
 
 func (s *MCPToolServer) toolListCollectionConfigs(ctx context.Context, args map[string]interface{}) (string, error) {

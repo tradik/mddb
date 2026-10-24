@@ -37,6 +37,12 @@ var codeExtensions = map[string]string{
 	".go": "go", ".py": "python", ".rb": "ruby", ".php": "php",
 	".rs": "rust", ".java": "java", ".sh": "shell", ".bash": "shell",
 	".sql": "sql", ".xml": "xml", ".svg": "svg",
+	// #319: a kernel tree. Extensions are compared lower-cased, so .S —
+	// assembly run through the C preprocessor — is .s here.
+	".c": "c", ".h": "c",
+	".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
+	".s": "asm", ".asm": "asm",
+	".m4": "m4",
 }
 
 // InferCodeLanguage returns the language for a document key or path, or "" when
@@ -138,6 +144,12 @@ const (
 // letting a stale hand-written `defines` survive a content change would make
 // the graph describe a document that no longer exists.
 func EnrichCodeSymbols(doc *storage.Doc) {
+	EnrichCodeSymbolsWith(doc, nil)
+}
+
+// EnrichCodeSymbolsWith is EnrichCodeSymbols with the collection's include
+// paths, which angle-bracket C includes resolve against (#319).
+func EnrichCodeSymbolsWith(doc *storage.Doc, includePaths []string) {
 	if doc == nil {
 		return
 	}
@@ -164,7 +176,7 @@ func EnrichCodeSymbols(doc *storage.Doc) {
 	for key, vals := range map[string][]string{
 		MetaKeyDefines: syms.Defines,
 		MetaKeyUses:    syms.Uses,
-		MetaKeyImports: resolveImportPaths(doc.Key, language, syms.Imports),
+		MetaKeyImports: resolveImportPaths(doc.Key, language, syms.Imports, includePaths),
 	} {
 		if len(vals) > 0 {
 			doc.Meta[key] = vals
@@ -192,7 +204,7 @@ func clearSymbolMeta(doc *storage.Doc) {
 //
 // Resolution is lexical — an extension-less specifier stays extension-less and
 // the graph resolver tries the code extensions when it looks the target up.
-func resolveImportPaths(fromKey, language string, specs []string) []string {
+func resolveImportPaths(fromKey, language string, specs, includePaths []string) []string {
 	if len(specs) == 0 {
 		return nil
 	}
@@ -203,9 +215,44 @@ func resolveImportPaths(fromKey, language string, specs []string) []string {
 	bareIsRelative := !isModuleLanguage(language)
 	out := make([]string, 0, len(specs))
 	for _, spec := range specs {
+		// A C system include, `<sys/proc.h>`, is found on the include path,
+		// not next to the file. With no include paths configured it is taken
+		// as collection-relative, which is right for a tree keyed from its
+		// include root.
+		if inner, ok := strings.CutPrefix(spec, "<"); ok {
+			inner = path.Clean(strings.TrimSuffix(inner, ">"))
+			if len(includePaths) == 0 {
+				out = append(out, inner)
+			}
+			for _, root := range includePaths {
+				out = append(out, path.Clean(root+"/"+inner))
+			}
+			continue
+		}
 		out = append(out, resolveImportPath(dir, spec, bareIsRelative))
 	}
 	return sliceutil.Unique(out)
+}
+
+// codeIncludePaths returns a collection's include paths, cleaned so that a
+// value cannot climb out of the collection ("../x") or carry slashes that
+// would make every resolved key differ from the document keys.
+func (s *Server) codeIncludePaths(collection string) []string {
+	if s.CollectionManager == nil {
+		return nil
+	}
+	cfg, ok := s.CollectionManager.Get(collection)
+	if !ok || cfg.Code == nil {
+		return nil
+	}
+	var out []string
+	for _, p := range cfg.Code.IncludePaths {
+		p = strings.Trim(path.Clean("/"+strings.TrimSpace(p)), "/")
+		if p != "" && p != "." {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // isModuleLanguage reports whether a bare specifier names a package rather than

@@ -59,7 +59,7 @@ type CodeGraph struct {
 type CodeGraphEdge struct {
 	From string `json:"from"`
 	To   string `json:"to"`
-	// uses-selector or imports
+	// uses-selector, calls or imports
 	Kind string `json:"kind"`
 	// The symbol or path that justifies this edge.
 	Symbol    string `json:"symbol"`

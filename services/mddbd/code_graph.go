@@ -32,7 +32,20 @@ const (
 	// EdgeImports connects a document to one it pulls in by path — a
 	// `<script src>`, a `<link href>`, an `@import`, an ES import.
 	EdgeImports EdgeKind = "imports"
+	// EdgeCalls connects a C, C++ or assembly document calling a function or
+	// macro to the document defining it (#319).
+	EdgeCalls EdgeKind = "calls"
 )
+
+// usesEdgeKind names a uses↔defines edge by the language of the document
+// doing the using: a C file calls, a template applies a selector.
+func usesEdgeKind(language string) EdgeKind {
+	switch language {
+	case "c", "cpp", "asm":
+		return EdgeCalls
+	}
+	return EdgeUsesSelector
+}
 
 // Traversal limits. A popular selector such as `.title` is referenced by nearly
 // every template, so an unbounded walk of a real theme returns the whole theme.

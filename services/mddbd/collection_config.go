@@ -60,6 +60,19 @@ type CollectionConfig struct {
 	// the instruction travels with the data instead of living in every client.
 	// Plain text for a model, never rendered as markup. Max 4 KiB.
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
+	// Code holds settings for collections of source code (#319).
+	Code *CodeConfigDef `json:"code,omitempty"`
+}
+
+// CodeConfigDef configures how source documents in a collection are read.
+type CodeConfigDef struct {
+	// IncludePaths are collection-relative directories that angle-bracket
+	// includes resolve against, as a compiler's -I does. For a FreeBSD tree
+	// keyed sys/..., ["sys"] makes `#include <sys/proc.h>` in any file point
+	// at the document sys/sys/proc.h, which is what gives code_graph its
+	// include edges. Applied when a document is written; documents stored
+	// before it was set keep their old imports until they are written again.
+	IncludePaths []string `json:"includePaths,omitempty"`
 }
 
 // WordPressTargetConfig holds the outbound publishing endpoint for a collection.
@@ -243,6 +256,7 @@ type SetCollectionConfigRequest struct {
 	WordPress       *WordPressTargetConfig `json:"wordpress,omitempty"`       // outbound publishing target (mddb-sync plugin)
 	Retrieval       *RetrievalProfileDef   `json:"retrieval,omitempty"`       // per-collection retrieval defaults (RAG-001)
 	ResponsePrompt  string                 `json:"responsePrompt,omitempty"`  // how to format answers from this collection (RAG-002)
+	Code            *CodeConfigDef         `json:"code,omitempty"`            // source-code settings, e.g. include paths (#319)
 	// Temporal tracking and spell correction. These live in CollectionConfig
 	// and are read on every request, but were missing here — so the panel's
 	// toggles sent values the handler ignored, and every config save silently
@@ -391,6 +405,7 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		SpellCorrect:    req.SpellCorrect,
 		SpellLang:       req.SpellLang,
 		ResponsePrompt:  req.ResponsePrompt,
+		Code:            req.Code,
 	}
 	// GO-035: a client that read this config back saw masked credentials, so
 	// an empty one means "unchanged", not "remove it". Runs before the backend

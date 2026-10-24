@@ -234,12 +234,35 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 	if existing, found := c.server.CollectionManager.Get(req.Collection); found && existing != nil {
 		*cfg = *existing
 	}
-	cfg.Type = req.Type
-	cfg.Description = req.Description
-	cfg.Icon = req.Icon
-	cfg.Color = req.Color
-	cfg.CustomMeta = req.CustomMeta
-	cfg.MaxRevisions = req.MaxRevisions
+	// Only what was sent changes. These six used to be assigned
+	// unconditionally, so an agent setting a description erased the icon,
+	// the colour and the custom meta — and reset maxRevisions to unlimited,
+	// since the tool never sent it — two lines below the comment saying the
+	// config is merged.
+	if req.Type != "" {
+		cfg.Type = req.Type
+	}
+	if req.Description != "" {
+		cfg.Description = req.Description
+	}
+	if req.Icon != "" {
+		cfg.Icon = req.Icon
+	}
+	if req.Color != "" {
+		cfg.Color = req.Color
+	}
+	if req.CustomMeta != nil {
+		cfg.CustomMeta = req.CustomMeta
+	}
+	if req.MaxRevisions != nil {
+		if *req.MaxRevisions < 0 {
+			return errors.New("invalid maxRevisions: must be >= 0 (0 = unlimited)")
+		}
+		cfg.MaxRevisions = *req.MaxRevisions
+	}
+	if req.Code != nil {
+		cfg.Code = req.Code
+	}
 	// GO-035: a nil target means "not sent". Assigning it unconditionally
 	// deleted a configured publishing target whenever an agent touched
 	// anything else — the same shape as the bug the merge above exists to
