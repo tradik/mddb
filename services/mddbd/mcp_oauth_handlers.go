@@ -106,6 +106,9 @@ func readAuthzRequest(v url.Values) authzRequest {
 
 // checkClient validates the client and its redirect URI. Until both are
 // known good, an error is shown here and never sent to the redirect URI.
+// On success a.RedirectURI is replaced by the registered copy from the
+// sealed client ID, so the browser is only ever sent to a value the server
+// issued, never to the request parameter itself.
 func (o *mcpOAuth) checkClient(a *authzRequest) bool {
 	c, err := o.open(oauthClientPrefix, "client", a.ClientID)
 	if err != nil || !o.validRedirect(a.RedirectURI) {
@@ -113,7 +116,7 @@ func (o *mcpOAuth) checkClient(a *authzRequest) bool {
 	}
 	for _, u := range c.RedirectURIs {
 		if u == a.RedirectURI {
-			a.ClientName = c.ClientName
+			a.RedirectURI, a.ClientName = u, c.ClientName
 			return true
 		}
 	}
@@ -165,6 +168,8 @@ func (o *mcpOAuth) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	redirectWith(w, r, a.RedirectURI, url.Values{"code": {code}, "state": {a.State}, "iss": {o.issuer}})
 }
 
+// redirectWith sends the browser back to the client. target is always the
+// registered redirect URI checkClient took from the sealed client ID.
 func redirectWith(w http.ResponseWriter, r *http.Request, target string, v url.Values) {
 	u, _ := url.Parse(target) // validated by checkClient
 	q := u.Query()
