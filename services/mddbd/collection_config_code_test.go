@@ -18,12 +18,12 @@ func TestGRPCSetsCodeConfigWithoutTouchingTheRest(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := gs.SetCollectionConfig(context.Background(), &pb.SetCollectionConfigRequest{
-		Collection: "k", Code: &pb.CodeConfigProto{IncludePaths: []string{"sys"}},
+		Collection: "k", Code: &pb.CodeConfigProto{IncludePaths: []string{"src"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	cfg, _ := gs.server.CollectionManager.Get("k")
-	if cfg.Code == nil || len(cfg.Code.IncludePaths) != 1 || cfg.Code.IncludePaths[0] != "sys" {
+	if cfg.Code == nil || len(cfg.Code.IncludePaths) != 1 || cfg.Code.IncludePaths[0] != "src" {
 		t.Errorf("code = %+v", cfg.Code)
 	}
 	// The merged fields stay; type, description, icon, color, custom_meta,
@@ -40,12 +40,12 @@ func TestRESTSetsCodeConfig(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
 	rec := doRequest(t, s.handleCollectionConfigSet, map[string]any{
-		"collection": "kernel", "code": map[string]any{"includePaths": []string{"sys"}},
+		"collection": "myproject", "code": map[string]any{"includePaths": []string{"src"}},
 	})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 	}
-	if got := s.codeIncludePaths("kernel"); len(got) != 1 || got[0] != "sys" {
+	if got := s.codeIncludePaths("myproject"); len(got) != 1 || got[0] != "src" {
 		t.Errorf("include paths = %v", got)
 	}
 }
@@ -76,7 +76,7 @@ func TestMCPSetCollectionConfigChangesOnlyWhatWasSent(t *testing.T) {
 	}
 
 	if _, err := ts.toolSetCollectionConfig(context.Background(), map[string]interface{}{
-		"collection": "blog", "max_revisions": float64(0), "code": map[string]interface{}{"include_paths": []interface{}{"sys"}},
+		"collection": "blog", "max_revisions": float64(0), "code": map[string]interface{}{"include_paths": []interface{}{"src"}},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestMCPSetCollectionConfigChangesOnlyWhatWasSent(t *testing.T) {
 	if cfg.MaxRevisions != 0 {
 		t.Errorf("max_revisions 0 (unlimited) was not applied: %d", cfg.MaxRevisions)
 	}
-	if cfg.Code == nil || cfg.Code.IncludePaths[0] != "sys" {
+	if cfg.Code == nil || cfg.Code.IncludePaths[0] != "src" {
 		t.Errorf("code = %+v", cfg.Code)
 	}
 

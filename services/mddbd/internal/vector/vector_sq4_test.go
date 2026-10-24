@@ -191,8 +191,9 @@ func TestSQ4EmptyAndDegenerateInputs(t *testing.T) {
 	idx.Train("zero-dim", map[string][]float32{"a": {}})
 
 	trained := trainedSQ4(t, map[string][]float32{"a": {1, 0}})
-	if got := trained.Search("c", []float32{1, 0}, 0, 0, nil); got != nil {
-		t.Errorf("topK of zero returned %v", got)
+	// topK of zero means the default, as in every other searcher.
+	if got := trained.Search("c", []float32{1, 0}, 0, 0, nil); len(got) != 1 {
+		t.Errorf("topK of zero returned %v, want the one stored vector", got)
 	}
 	// A query shorter than the indexed vectors cannot be compared with them:
 	// no crash and no results, the same answer every index gives.

@@ -67,9 +67,9 @@ type CollectionConfig struct {
 // CodeConfigDef configures how source documents in a collection are read.
 type CodeConfigDef struct {
 	// IncludePaths are collection-relative directories that angle-bracket
-	// includes resolve against, as a compiler's -I does. For a FreeBSD tree
-	// keyed sys/..., ["sys"] makes `#include <sys/proc.h>` in any file point
-	// at the document sys/sys/proc.h, which is what gives code_graph its
+	// includes resolve against, as a compiler's -I does. For a tree keyed
+	// src/..., ["src"] makes `#include <net/conn.h>` in any file point at
+	// the document src/net/conn.h, which is what gives code_graph its
 	// include edges. Applied when a document is written; documents stored
 	// before it was set keep their old imports until they are written again.
 	IncludePaths []string `json:"includePaths,omitempty"`

@@ -1022,7 +1022,7 @@ message WordPressTargetProto {
 // source code.
 message CodeConfigProto {
   // Collection-relative directories that angle-bracket includes resolve
-  // against, as a compiler's -I does: ["sys"] makes <sys/proc.h> sys/sys/proc.h.
+  // against, as a compiler's -I does: ["src"] makes <net/conn.h> src/net/conn.h.
   repeated string include_paths = 1;
 }
 

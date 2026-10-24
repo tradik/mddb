@@ -7,9 +7,10 @@ import (
 
 // C, C++ and assembly (#319).
 //
-// The questions a kernel audit starts with — "which file defines do_execve",
-// "what calls vm_page_alloc", "who includes sys/mbuf.h" — need defines, uses
-// and imports for C. Like the other extractors this is a scanner, not a
+// The questions a C codebase raises first — "which file defines
+// parse_request", "what calls buf_alloc", "who includes net/conn.h" — need
+// defines, uses and imports for C. Like the other extractors this is a
+// scanner, not a
 // parser: C's surface is regular enough at file scope that brace depth, paren
 // depth and the token before a '(' find the declarations people search for,
 // and a scanner never fails on code a compiler would reject or on macros it
@@ -83,8 +84,8 @@ func extractC(content string) Symbols {
 	return s
 }
 
-// extractAsm handles assembly sources, which in a kernel tree are run through
-// the C preprocessor: #include and comments follow C rules.
+// extractAsm handles assembly sources, which are usually run through the C
+// preprocessor: #include and comments follow C rules.
 func extractAsm(content string) Symbols {
 	var s Symbols
 	code, includes, _ := cPreprocess(stripCComments(content))

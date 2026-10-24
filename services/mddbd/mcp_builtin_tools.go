@@ -857,7 +857,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					},
 					"code": map[string]interface{}{
 						"type":        "object",
-						"description": "(v2.18.0+) Source-code settings. include_paths: collection-relative directories that C #include <...> resolves against, like -I — [\"sys\"] makes <sys/proc.h> the document sys/sys/proc.h, which gives code_graph its include edges.",
+						"description": "(v2.18.0+) Source-code settings. include_paths: collection-relative directories that C #include <...> resolves against, like -I — [\"src\"] makes <net/conn.h> the document src/net/conn.h, which gives code_graph its include edges.",
 						"properties": map[string]interface{}{
 							"include_paths": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
 						},

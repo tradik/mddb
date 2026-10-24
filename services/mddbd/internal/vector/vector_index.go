@@ -242,12 +242,23 @@ func ResolveSimilarity(name string) SimilarityFunc {
 }
 
 // BaseDocID extracts the base document ID from a possibly chunked key.
-// "docID#0" -> "docID", "docID" -> "docID"
+// "docID#0" -> "docID", "docID" -> "docID".
+//
+// The chunk suffix is the last '#' followed by a number. Cutting at the first
+// '#' broke every document whose key contains one — code collections key
+// functions as file#function — because `t|a0#f|en#0` became `t|a0`, a
+// document that does not exist, and every vector hit on it was dropped.
 func BaseDocID(key string) string {
-	if idx := strings.IndexByte(key, '#'); idx >= 0 {
-		return key[:idx]
+	idx := strings.LastIndexByte(key, '#')
+	if idx < 0 || idx == len(key)-1 {
+		return key
 	}
-	return key
+	for _, c := range key[idx+1:] {
+		if c < '0' || c > '9' {
+			return key
+		}
+	}
+	return key[:idx]
 }
 
 // DeduplicateChunkResults groups vector results by base docID and returns

@@ -2,53 +2,51 @@ package codeintel
 
 import "testing"
 
-// #319: C and assembly, for a kernel tree loaded one document per file.
+// #319: C and assembly, for a codebase loaded one document per file.
 
-// The example from the issue, verbatim in shape: a static prototype, a
-// definition in FreeBSD style (return type on its own line), calls, and
-// angle-bracket includes.
-const kernExec = `
-#include <sys/param.h>
-#include <sys/proc.h>
-#include "opt_ktrace.h"
+// The example from the blog post: a static prototype, a definition with the
+// return type on its own line, calls, and both include forms.
+const requestC = `
+#include <net/conn.h>
+#include <util/buf.h>
+#include "request_internal.h"
 
-static int do_execve(struct thread *td, struct image_args *args, ...);
+static int parse_header(struct conn *c, struct buf *b);
 
 int
-sys_execve(struct thread *td, struct execve_args *uap)
+parse_request(struct conn *c)
 {
-	int error;
+	struct buf *b = buf_alloc(c->rx_len);
 
-	error = exec_copyin_args(&args, uap->fname, uap->argv, uap->envv);
-	if (error == 0)
-		error = kern_execve(td, &args, NULL, oldvmspace);
-	return (error);
+	if (parse_header(c, b) != 0)
+		return (conn_close(c, ERR_BAD_REQUEST));
+	return (dispatch(c, b));
 }
 `
 
-func TestCExtractsTheIssueExample(t *testing.T) {
-	s := ExtractWithLimit("c", kernExec, 0)
-	hasAll(t, s.Defines, "do_execve", "sys_execve")
-	hasAll(t, s.Uses, "exec_copyin_args", "kern_execve")
-	hasNone(t, s.Uses, "if", "return", "sys_execve", "do_execve")
-	hasAll(t, s.Imports, "<sys/param.h>", "<sys/proc.h>", "opt_ktrace.h")
+func TestCExtractsTheBlogExample(t *testing.T) {
+	s := ExtractWithLimit("c", requestC, 0)
+	hasAll(t, s.Defines, "parse_header", "parse_request")
+	hasAll(t, s.Uses, "buf_alloc", "conn_close", "dispatch")
+	hasNone(t, s.Uses, "if", "return", "parse_header", "parse_request", "ERR_BAD_REQUEST")
+	hasAll(t, s.Imports, "<net/conn.h>", "<util/buf.h>", "request_internal.h")
 }
 
 func TestCDefinitionsTypesMacrosAndGlobals(t *testing.T) {
 	src := `
-#define	VM_PAGE_BITS_ALL 0xffu
-#define vm_page_assert_locked(m) \
-	KASSERT(1, ("locked"))
-struct vm_page {
+#define	BUF_FLAGS_ALL 0xffu
+#define buf_assert_owned(b) \
+	ASSERT(1, ("owned"))
+struct buf {
 	int flags;
 };
 union u_tag { int a; float b; };
-enum vm_state { VM_A, VM_B };
-typedef struct vm_page *vm_page_t;
-typedef int (*vm_pager_fn)(int);
+enum buf_state { BUF_A, BUF_B };
+typedef struct buf *buf_t;
+typedef int (*buf_reader_fn)(int);
 typedef struct { int x; } anon_t;
-static struct mtx vm_page_queue_lock;
-int vm_page_count = 0, vm_other[4];
+static struct lock buf_pool_lock;
+int buf_count = 0, buf_other[4];
 extern int not_here;
 static int helper(void) __unused;
 static __inline int
@@ -57,19 +55,19 @@ inline_one(int a)
 	return (a);
 }
 void *
-vm_page_alloc(vm_object_t object, int req)
+buf_alloc(size_t size, int flags)
 {
-	struct vm_page *m = NULL;
+	struct buf *m = NULL;
 	return (m);
 }
 `
 	s := ExtractWithLimit("c", src, 0)
 	hasAll(t, s.Defines,
-		"VM_PAGE_BITS_ALL", "vm_page_assert_locked", // macros
-		"vm_page", "u_tag", "vm_state", // tags
-		"vm_page_t", "vm_pager_fn", "anon_t", // typedefs
-		"vm_page_queue_lock", "vm_page_count", "vm_other", // globals
-		"helper", "inline_one", "vm_page_alloc", // functions
+		"BUF_FLAGS_ALL", "buf_assert_owned", // macros
+		"buf", "u_tag", "buf_state", // tags
+		"buf_t", "buf_reader_fn", "anon_t", // typedefs
+		"buf_pool_lock", "buf_count", "buf_other", // globals
+		"helper", "inline_one", "buf_alloc", // functions
 	)
 	hasNone(t, s.Defines, "not_here", "__unused", "flags", "m", "a", "x", "int", "struct")
 }
@@ -80,20 +78,20 @@ func TestCUsesAreExternalCallsOnly(t *testing.T) {
 	src := `
 static void local(void) { }
 void
-f(struct softc *sc)
+f(struct conn *c)
 {
 	local();
-	sc->ops->start(sc);
+	c->ops->send(c);
 	obj.method(1);
-	mtx_lock(&sc->mtx);
+	lock_acquire(&c->lock);
 	x = sizeof(struct foo) + (int)(y);
 	while (cond(z)) { switch (k) { } }
-	KASSERT(x != 0, ("msg %d", g(1)));
+	ASSERT(x != 0, ("msg %d", g(1)));
 }
 `
 	s := ExtractWithLimit("c", src, 0)
-	hasAll(t, s.Uses, "mtx_lock", "cond", "KASSERT", "g")
-	hasNone(t, s.Uses, "local", "start", "method", "sizeof", "while", "switch", "int", "f")
+	hasAll(t, s.Uses, "lock_acquire", "cond", "ASSERT", "g")
+	hasNone(t, s.Uses, "local", "send", "method", "sizeof", "while", "switch", "int", "f")
 }
 
 // Comments and literals hide braces and parentheses that would otherwise
@@ -128,42 +126,42 @@ func TestCPlusPlusUsesTheCExtractor(t *testing.T) {
 
 func TestAssemblyEntriesCallsAndIncludes(t *testing.T) {
 	src := `
-#include <machine/asmacros.h>
-#include "assym.inc"
+#include <arch/asm.h>
+#include "offsets.inc"
 	.text
 /* ENTRY(commented) */
-ENTRY(copyin)
-	call	copyin_nosmap
+ENTRY(memcpy_fast)
+	call	memcpy_slow
 	jmp	done
-END(copyin)
-	.globl	fillw
-fillw:
+END(memcpy_fast)
+	.globl	fill_words
+fill_words:
 	callq	*%rax
 	bl	arm_helper
 `
 	s := ExtractWithLimit("asm", src, 0)
-	hasAll(t, s.Defines, "copyin", "fillw")
+	hasAll(t, s.Defines, "memcpy_fast", "fill_words")
 	hasNone(t, s.Defines, "commented")
-	hasAll(t, s.Uses, "copyin_nosmap", "arm_helper")
-	hasAll(t, s.Imports, "<machine/asmacros.h>", "assym.inc")
+	hasAll(t, s.Uses, "memcpy_slow", "arm_helper")
+	hasAll(t, s.Imports, "<arch/asm.h>", "offsets.inc")
 }
 
-// Kernel macros at file scope are not functions: found on the FreeBSD tree,
-// where SLIST_HEAD and SYSCTL_NODE came out as definitions.
+// Macros invoked at file scope are not functions: on a large real codebase
+// the first run reported list-head and registration macros as definitions.
 func TestCFileScopeMacrosAreNotFunctions(t *testing.T) {
 	src := `
-static SLIST_HEAD(, exec_args_kva) exec_args_kva_freelist;
-static SYSCTL_NODE(_vm, OID_AUTO, stats, CTLFLAG_RW, 0, "VM stats");
-TAILQ_HEAD(, proc) allproc_list = TAILQ_HEAD_INITIALIZER(allproc_list);
-DB_SHOW_COMMAND(vmpage, db_show_vmpage)
+static LIST_HEAD(, conn) idle_conns;
+static REGISTER_HANDLER(net, status, FLAG_RW, 0, "status");
+QUEUE_HEAD(, job) pending_jobs = QUEUE_HEAD_INITIALIZER(pending_jobs);
+DEFINE_COMMAND(status, cmd_status)
 {
-	db_printf("%p", addr);
+	print_status(addr);
 }
 `
 	s := ExtractWithLimit("c", src, 0)
-	hasAll(t, s.Defines, "exec_args_kva_freelist")
-	hasNone(t, s.Defines, "SLIST_HEAD", "SYSCTL_NODE", "DB_SHOW_COMMAND", "TAILQ_HEAD")
-	hasAll(t, s.Uses, "db_printf")
+	hasAll(t, s.Defines, "idle_conns")
+	hasNone(t, s.Defines, "LIST_HEAD", "REGISTER_HANDLER", "DEFINE_COMMAND", "QUEUE_HEAD")
+	hasAll(t, s.Uses, "print_status")
 }
 
 // Malformed and truncated input must still return, not loop or panic.

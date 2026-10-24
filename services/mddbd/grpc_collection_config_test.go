@@ -34,7 +34,7 @@ func fullConfig() *CollectionConfig {
 		Encrypted:       true,
 		WordPress:       &WordPressTargetConfig{URL: "https://blog.example.com", APIKey: "wp-key"},
 		ResponsePrompt:  "answer in numbered steps",
-		Code:            &CodeConfigDef{IncludePaths: []string{"sys", "include"}},
+		Code:            &CodeConfigDef{IncludePaths: []string{"src", "include"}},
 	}
 }
 

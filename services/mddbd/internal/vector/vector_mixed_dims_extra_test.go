@@ -66,3 +66,24 @@ func TestSameDimensionPicksTheMajorityAndBreaksTiesUpward(t *testing.T) {
 		t.Errorf("tie: dim %d, want 5", dim)
 	}
 }
+
+// Only a trailing "#<number>" is a chunk suffix; a '#' inside the key is part
+// of the key.
+func TestBaseDocIDCutsOnlyTheChunkSuffix(t *testing.T) {
+	for in, want := range map[string]string{
+		"t|a0|en#0":             "t|a0|en",
+		"t|a0#f|en#3":           "t|a0#f|en",
+		"t|src/x.c#parse|en#12": "t|src/x.c#parse|en",
+		"t|a0#f|en":             "t|a0#f|en", // no chunk suffix
+		"t|a0|en#":              "t|a0|en#",
+		"t|a0|en#x1":            "t|a0|en#x1",
+		"plain":                 "plain",
+	} {
+		if got := BaseDocID(in); got != want {
+			t.Errorf("BaseDocID(%q) = %q, want %q", in, got, want)
+		}
+		if got := baseDocIDQ(in); got != want {
+			t.Errorf("baseDocIDQ(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

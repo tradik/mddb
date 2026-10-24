@@ -37,7 +37,7 @@ var codeExtensions = map[string]string{
 	".go": "go", ".py": "python", ".rb": "ruby", ".php": "php",
 	".rs": "rust", ".java": "java", ".sh": "shell", ".bash": "shell",
 	".sql": "sql", ".xml": "xml", ".svg": "svg",
-	// #319: a kernel tree. Extensions are compared lower-cased, so .S —
+	// #319: C, C++ and assembly. Extensions are compared lower-cased, so .S —
 	// assembly run through the C preprocessor — is .s here.
 	".c": "c", ".h": "c",
 	".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
@@ -215,7 +215,7 @@ func resolveImportPaths(fromKey, language string, specs, includePaths []string) 
 	bareIsRelative := !isModuleLanguage(language)
 	out := make([]string, 0, len(specs))
 	for _, spec := range specs {
-		// A C system include, `<sys/proc.h>`, is found on the include path,
+		// A C system include, `<net/conn.h>`, is found on the include path,
 		// not next to the file. With no include paths configured it is taken
 		// as collection-relative, which is right for a tree keyed from its
 		// include root.

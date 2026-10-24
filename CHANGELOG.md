@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Vector search found nothing for documents whose key contains `#`.**
+  Code collections key functions as `file#function`, which is also the form
+  the `code_graph` documentation uses. A chunk's index key is
+  `<docID>#<chunk>`, and the parent document was recovered by cutting at
+  the first `#`, so `t|a0#f|en#0` became `t|a0`, a document that does not
+  exist. Every vector hit was dropped, `vector-search` returned `total: 0`
+  and `hybrid-search` scored the vector side 0, while `vector-stats`
+  counted every document as embedded. Only a trailing `#<number>` is now
+  treated as the chunk suffix, in all eight algorithms and in the quantized
+  index.
+- **SQ4 returned nothing for `topK: 0`.** Every other algorithm treats it
+  as the default of 5, so the same request answered differently depending
+  on the algorithm named.
+
+### Tests
+
+- `internal/vector` coverage back above 96% (96.2%). It had dropped to
+  95.1% since 2.15.4.
+- C extractor and `code_graph` tests use generic example code. The example
+  in the 2.18 blog post is now an end-to-end test.
+
 ## [2.18.0] - 2026-10-24
 
 C, C++ and assembly as code (#319): which file defines a function, what

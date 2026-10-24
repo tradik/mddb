@@ -6999,7 +6999,7 @@ func (x *WordPressTargetProto) GetApiKeySet() bool {
 type CodeConfigProto struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Collection-relative directories that angle-bracket includes resolve
-	// against, as a compiler's -I does: ["sys"] makes <sys/proc.h> sys/sys/proc.h.
+	// against, as a compiler's -I does: ["src"] makes <net/conn.h> src/net/conn.h.
 	IncludePaths  []string `protobuf:"bytes,1,rep,name=include_paths,json=includePaths,proto3" json:"include_paths,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

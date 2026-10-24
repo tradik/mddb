@@ -267,8 +267,11 @@ func (s *SQ4Index) SearchWithFilter(collection string, query []float32, topK int
 	if !ok || !c.trained || len(c.codes) == 0 || len(query) != c.dim {
 		return nil
 	}
+	// topK 0 means the default, as in every other searcher; SQ4 alone
+	// returned nothing for it, so the same request answered differently
+	// depending on the algorithm named.
 	if topK <= 0 {
-		return nil
+		topK = 5
 	}
 
 	// Asymmetric distance: the query stays in float32 and contributes no

@@ -35,7 +35,7 @@ func cScan(toks []string) (defines, calls []string) {
 			// t == "{" at paren depth zero.
 			end := matchingBrace(toks, i)
 			if name, ok := cFunctionName(item); ok {
-				// DB_SHOW_COMMAND(x, y) { ... } is a macro that expands to a
+				// DEFINE_COMMAND(x, y) { ... } is a macro that expands to a
 				// function: its body still calls things, but the macro's
 				// name is not what it defines.
 				if !isMacroName(name) {
@@ -168,13 +168,13 @@ func cDeclaration(item []string) []string {
 		p := groups[0]
 		if name, ok := calleeBefore(item, p); ok {
 			// A name after the group means the group was part of the type:
-			// `static SLIST_HEAD(, foo) foo_list;` declares foo_list.
+			// `static LIST_HEAD(, conn) idle_conns;` declares idle_conns.
 			if after := lastName(afterGroup(item, p)); after != "" {
 				return append(out, after)
 			}
 			// A prototype, or a macro invoked at file scope. Only a static
 			// prototype promises the definition is in this file, and an
-			// all-capitals name is a macro (static SYSCTL_NODE(...);).
+			// all-capitals name is a macro (static REGISTER_HANDLER(...);).
 			if containsTopBefore(item, "static", p) && !isMacroName(name) {
 				out = append(out, name)
 			}
@@ -218,8 +218,8 @@ func afterGroup(item []string, p int) []string {
 }
 
 // isMacroName reports a name written the way C macros are: letters, all of
-// them capitals. Kernel functions are lower case; SLIST_HEAD, SYSCTL_NODE and
-// DB_SHOW_COMMAND are not functions.
+// them capitals. In most C codebases functions are lower case; LIST_HEAD,
+// REGISTER_HANDLER and DEFINE_COMMAND are not functions.
 func isMacroName(name string) bool {
 	letters := false
 	for _, r := range name {

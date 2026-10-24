@@ -2,7 +2,6 @@ package vector
 
 import (
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 )
@@ -224,10 +223,6 @@ func (qi *QuantizedVectorIndex) resolveQuantType(collection string) Quantization
 	return QuantNone
 }
 
-// baseDocIDQ is equivalent to BaseDocID but local to avoid import cycles.
-func baseDocIDQ(key string) string {
-	if idx := strings.IndexByte(key, '#'); idx >= 0 {
-		return key[:idx]
-	}
-	return key
-}
+// baseDocIDQ is BaseDocID; kept as a name for the callers in this file. It
+// used to be a copy that cut at the first '#', with the same bug.
+func baseDocIDQ(key string) string { return BaseDocID(key) }
