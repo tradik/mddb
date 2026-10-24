@@ -466,7 +466,7 @@ func applyEnvConfig(cfg *ServerConfig) {
 	if v := os.Getenv("MDDB_MCP_SERVER_HOMEPAGE"); v != "" {
 		cfg.MCP.ServerInfo.Homepage = v
 	}
-	if v := os.Getenv("MDDB_MCP_INSTRUCTIONS"); v != "" {
+	if v := mcpInstructionsFromEnv(); v != "" {
 		cfg.MCP.Instructions = v
 	}
 	if v := os.Getenv("MDDB_MCP_MODE"); v != "" {

@@ -159,6 +159,7 @@ curl -X POST http://localhost:9000/mcp \
 | `MDDB_MCP_SERVER_VENDOR` | — | Vendor name |
 | `MDDB_MCP_SERVER_HOMEPAGE` | — | Homepage URL |
 | `MDDB_MCP_INSTRUCTIONS` | — | System prompt for LLM — guidance on how to use this server |
+| `MDDB_MCP_INSTRUCTIONS_FILE` | — | (v2.18.1) Path to a file holding the instructions, read at startup. For multi-paragraph text that cannot go into a compose `.env` file. `MDDB_MCP_INSTRUCTIONS` wins when both are set. |
 
 ### Tools
 

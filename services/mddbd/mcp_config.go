@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -60,4 +61,27 @@ func loadMCPConfig(path string) (*MCPFileConfig, error) {
 	}
 
 	return &cfg, nil
+}
+
+// mcpInstructionsFromEnv returns the MCP server instructions from the
+// environment (#327). MDDB_MCP_INSTRUCTIONS wins when both are set.
+// MDDB_MCP_INSTRUCTIONS_FILE names a file holding them, because several
+// paragraphs of text cannot be written into a compose .env file, and wrapping
+// the entrypoint in `sh -c '... $(cat file)'` ties a deployment to the image's
+// shell and binary path. A file that cannot be read is reported and the
+// instructions stay unset, as they would be with neither variable.
+func mcpInstructionsFromEnv() string {
+	if v := os.Getenv("MDDB_MCP_INSTRUCTIONS"); v != "" {
+		return v
+	}
+	path := os.Getenv("MDDB_MCP_INSTRUCTIONS_FILE")
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Clean(path)) // #nosec G304 -- operator-supplied config path
+	if err != nil {
+		slog.Warn("MDDB_MCP_INSTRUCTIONS_FILE could not be read; MCP instructions are unset", "path", path, "err", err)
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }

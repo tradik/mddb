@@ -401,6 +401,7 @@ Customize the MCP server profile returned in the `initialize` response. Useful f
 | `MDDB_MCP_SERVER_VENDOR` | `""` | string | Organization / vendor name |
 | `MDDB_MCP_SERVER_HOMEPAGE` | `""` | string | URL to server documentation or homepage |
 | `MDDB_MCP_INSTRUCTIONS` | `""` | string | System prompt for LLM — tells the AI how to use this server |
+| `MDDB_MCP_INSTRUCTIONS_FILE` | `""` | string | Path to a file with the instructions, read at startup; `MDDB_MCP_INSTRUCTIONS` wins when both are set (v2.18.1) |
 
 Or via YAML config:
 
