@@ -267,7 +267,21 @@ func main() {
 	persistence := CheckPersistence(dbPath)
 	logPersistenceStatus(persistence, slog.Warn)
 
+	// #329: /health answers before anything slow happens, with the phase in
+	// progress, and every phase logs its duration.
+	clock := newStartupClock()
+	var earlyServer *http.Server
+	if srvCfg.HTTP.Enabled {
+		earlyServer = clock.startEarlyHealth(srvCfg.HTTP.Addr)
+	}
+	clock.begin("opening database")
+	openStart := time.Now()
 	db, err := openBolt(dbPath, getOptimizedBoltOptions())
+	if d := time.Since(openStart); d > 30*time.Second && os.Getenv("MDDB_FREELIST_SYNC") != "true" {
+		slog.Warn("opening the database walked every page to rebuild the freelist",
+			"elapsed", d.Round(time.Second),
+			"remedy", "MDDB_FREELIST_SYNC=true stores the freelist so the next start reads one page (docs/BACKUP.md)")
+	}
 	if err != nil {
 		logging.Fatal("startup step failed", "step", "bolt.Open", "err", err,
 			"remedy", "if the file is damaged: mddbd -verify-db FILE, then mddbd -repair-db FILE -repair-to NEWFILE (docs/BACKUP.md)")
@@ -309,25 +323,8 @@ func main() {
 	}
 	s.IndexQueue.SetStore(serverIndexStore{s: s}) // wire persistence (server now ready)
 
-	// Start early health-only HTTP server so clients can poll readiness during init.
-	// This server is shut down gracefully before the main HTTP server starts.
-	var earlyServer *http.Server
-	if srvCfg.HTTP.Enabled {
-		earlyMux := http.NewServeMux()
-		earlyMux.HandleFunc("/health", s.handleHealth)
-		earlyMux.HandleFunc("/v1/health", s.handleHealth)
-		earlyServer = &http.Server{
-			Addr:              srvCfg.HTTP.Addr,
-			Handler:           earlyMux,
-			ReadHeaderTimeout: 5 * time.Second,
-		}
-		go func() {
-			if err := earlyServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				slog.Warn("early health server stopped", "err", err)
-			}
-		}()
-		slog.Info("health endpoint listening while the server warms up", "addr", srvCfg.HTTP.Addr)
-	}
+	clock.srv.Store(s)
+	clock.begin("initialising indexes and managers")
 
 	// Initialize extreme performance features
 	if useExtreme {
@@ -436,7 +433,8 @@ func main() {
 	}
 
 	// Load vectors into memory asynchronously
-	go s.loadVectorIndex()
+	go s.loadVectorIndex() // in the background; logs "vector index loaded" with its duration
+	clock.begin("loading geo indexes")
 
 	// Load geo indexes from BoltDB asynchronously. Both R-tree and geohash
 	// are populated from the same "geo" bucket so the /v1/geo-search
@@ -512,6 +510,7 @@ func main() {
 
 	// Initialize TTL manager
 	s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})
+	clock.begin("starting managers")
 	if err := s.TTLManager.EnsureBuckets(); err != nil {
 		logging.Fatal("startup step failed", "step", "TTLManager.EnsureBuckets", "err", err)
 	}
@@ -630,6 +629,7 @@ func main() {
 	if err := s.CollectionManager.EnsureBucket(); err != nil {
 		logging.Fatal("startup step failed", "step", "CollectionManager.EnsureBucket", "err", err)
 	}
+	clock.begin("loading collection settings and storage backends")
 	if err := s.CollectionManager.LoadAll(); err != nil {
 		logging.Fatal("startup step failed", "step", "CollectionManager.LoadAll", "err", err)
 	}
@@ -829,6 +829,7 @@ func main() {
 		if err := s.AuthManager.EnsureBuckets(); err != nil {
 			logging.Fatal("startup step failed", "step", "AuthManager.EnsureBuckets", "err", err)
 		}
+		clock.begin("loading users and API keys")
 		if err := s.AuthManager.LoadAll(); err != nil {
 			logging.Fatal("startup step failed", "step", "AuthManager.LoadAll", "err", err)
 		}
@@ -957,6 +958,7 @@ func main() {
 	}
 
 	// Shut down early health server before starting the main one
+	clock.begin("starting listeners")
 	if earlyServer != nil {
 		_ = earlyServer.Close()
 		time.Sleep(50 * time.Millisecond) // brief pause to release port
@@ -969,6 +971,7 @@ func main() {
 
 	// Mark server as ready — health check will now return "healthy" instead of "warming_up"
 	s.Ready = true
+	clock.done()
 	slog.Info("Server initialization complete — ready to serve")
 
 	// OPS-019: after ready, and in the background. Someone running a release

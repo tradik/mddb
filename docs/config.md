@@ -567,7 +567,7 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 | `MDDB_REPLICATION_LEADER_ADDR` | `""` | string | Leader address for follower nodes |
 | `MDDB_BINLOG_ENABLED` | `false` | bool | Enable binary log (auto-enabled for leaders) |
 | `MDDB_BINLOG_PATH` | `""` | string | Custom binlog file path |
-| `MDDB_FREELIST_SYNC` | `false` | bool | Write bbolt's freelist on every commit so opening the database reads one page instead of walking the file ([BACKUP.md](BACKUP.md)) |
+| `MDDB_FREELIST_SYNC` | `false` | bool | Write bbolt's freelist on every commit so opening the database reads one page instead of the whole file. On a 908 MB database: 7 ms and 37 MB RSS instead of ~400 ms and 938 MB; minutes from a cold disk on large files ([DEPLOYMENT.md](DEPLOYMENT.md#large-databases-startup-time-and-memory)) |
 | `MDDB_BACKUP_VERIFY` | `true` | bool | Check every backup with bbolt's full integrity check before keeping it |
 | `MDDB_VERIFY_TIMEOUT` | `1h` | duration | Longest an integrity check (backup, restore, follower snapshot) may run |
 

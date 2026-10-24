@@ -306,7 +306,7 @@ networks:
 ### Built-in Health Check
 
 ```dockerfile
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
     CMD wget --spider http://localhost:11023/v1/stats || exit 1
 ```
 
@@ -328,7 +328,7 @@ healthcheck:
   interval: 10s
   timeout: 5s
   retries: 5
-  start_period: 10s
+  start_period: 60s
 ```
 
 ## Security

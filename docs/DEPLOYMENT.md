@@ -422,6 +422,45 @@ curl -X POST http://localhost:11023/v1/truncate \
   -d '{"collection":"blog","keepRevs":10,"dropCache":true}'
 ```
 
+### Large Databases: Startup Time and Memory
+
+By default bbolt does not store its freelist, so every start rebuilds it by
+reading **every page of the database file**. Measured on a 908 MB database of
+C code (889 file documents and 16,053 function documents, 45.6 MB of
+content):
+
+| | default | `MDDB_FREELIST_SYNC=true` (second start on) |
+|---|---|---|
+| opening the database | 390–425 ms | 7 ms |
+| RSS after start | 938 MB | 37 MB |
+
+The walk takes about 0.4 ms per MB when the file is in the page cache. From a
+cold disk it costs a full read of the file: a 21 GB database at about 30 MB/s
+takes over 10 minutes. The memory is the file's pages in the page cache. The
+kernel can reclaim them, but they show up as RSS, and a container memory limit
+counts them.
+
+`MDDB_FREELIST_SYNC=true` stores the freelist with each commit, so a start
+reads one page. The first start with the variable set still walks the file
+once, to write the freelist. The cost is paid at write time. On tmpfs, without
+fsync, a small commit went from 0.15 ms to 0.66 ms with about 16,000 free
+pages. On a disk, where every commit already waits for fsync, the relative
+cost is smaller. Use it for any database over a few gigabytes.
+
+Since 2.18.1, every startup phase is logged with its duration (`startup phase
+finished phase=... elapsed=...`). `/health` answers from the first moment with
+`{"status":"warming_up","phase":"opening database",...}`, so a slow start can
+be told apart from a hang. When opening takes longer than 30 seconds without
+`MDDB_FREELIST_SYNC`, the log says so and names the setting. The Docker image's
+health check allows 60 seconds before it counts failures. Raise
+`start_period` further for a large database that has not been switched to
+freelist sync yet.
+
+**Size.** For code documents, the database file came to about 20× the content
+(908 MB for 45.6 MB of source). Each identifier is stored whole and in parts,
+with positions for phrase search and per-field data for BM25F. Plan disk space
+accordingly.
+
 ### Spinning Disks and fsync
 
 Every write transaction ends in an fsync (see
