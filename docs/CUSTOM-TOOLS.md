@@ -156,6 +156,11 @@ Each parameter defines an argument that the LLM can provide.
 | `required` | bool | no | Whether the LLM must provide this argument |
 | `description` | string | no | Description shown to the LLM |
 
+## Custom prompts
+
+The same file can hold `custom_prompts:` for MCP `prompts/list` and
+`prompts/get` (v2.18.1). See [MCP.md](MCP.md#custom-prompts-v2181).
+
 ## How It Works
 
 ```

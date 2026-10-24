@@ -14,7 +14,8 @@ import (
 
 // MCPFileConfig is the YAML file structure for custom tools.
 type MCPFileConfig struct {
-	CustomTools []MCPCustomToolConfig `yaml:"custom_tools"`
+	CustomTools   []MCPCustomToolConfig   `yaml:"custom_tools"`
+	CustomPrompts []MCPCustomPromptConfig `yaml:"custom_prompts"` // #323
 }
 
 // loadMCPCustomTools loads custom tool definitions from YAML file (if configured).

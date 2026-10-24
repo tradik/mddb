@@ -645,6 +645,30 @@ Built-in MCP tools for conversational memory and RAG:
 | `import-guide` | `source` (required) | Step-by-step import from wordpress/url/file/api/scraping |
 | `rag-pipeline` | `collection` (required), `model` | RAG pipeline design with embedding and search strategy |
 
+### Custom prompts (v2.18.1)
+
+Prompts of your own go in the `MDDB_MCP_CONFIG` file, next to
+`custom_tools`. They are listed by `prompts/list` after the built-in ones,
+and `prompts/get` renders them by substituting `{{argument}}`, the same
+substitution `responsePrompt` and automations use:
+
+```yaml
+custom_prompts:
+  - name: review_function
+    description: "Review one function for a given category"
+    arguments:
+      - { name: function, required: true }
+      - { name: category, required: true }
+    template: |
+      Review `{{function}}` for {{category}}: fetch it with codeFunctionFind,
+      then similar changes with codeChangesSimilar, then report.
+```
+
+A missing required argument is an error. A missing optional one becomes
+empty. A name that clashes with a built-in prompt or another custom prompt,
+an unnamed argument, or a prompt without a template makes the set invalid:
+it is logged at startup and no custom prompts are served.
+
 ---
 
 **[← Back to README](../README.md)** | **[→ LLM Connections](LLM_CONNECTIONS.md)** | **[→ Custom Tools](CUSTOM-TOOLS.md)**

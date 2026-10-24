@@ -13,12 +13,13 @@ import (
 
 // MCPHandler handles MCP JSON-RPC requests via stdio.
 type MCPHandler struct {
-	client       MCPClient
-	customTools  []MCPCustomToolConfig
-	serverInfo   MCPServerInfo
-	instructions string     // system prompt for LLM — how to use this server
-	globalMode   AccessMode // server-wide mode (from MDDB_MODE / follower)
-	mode         AccessMode // per-protocol override (from MDDB_MCP_MODE, "" = inherit global)
+	client        MCPClient
+	customTools   []MCPCustomToolConfig
+	customPrompts []MCPCustomPromptConfig // #323, from MDDB_MCP_CONFIG
+	serverInfo    MCPServerInfo
+	instructions  string     // system prompt for LLM — how to use this server
+	globalMode    AccessMode // server-wide mode (from MDDB_MODE / follower)
+	mode          AccessMode // per-protocol override (from MDDB_MCP_MODE, "" = inherit global)
 
 	mu       sync.RWMutex
 	logLevel MCPLogLevel // minimum log level from client
@@ -39,14 +40,15 @@ func NewMCPHandlerWithConfig(client MCPClient, customTools []MCPCustomToolConfig
 		info.Name = "mddbd"
 	}
 	return &MCPHandler{
-		client:       client,
-		customTools:  customTools,
-		serverInfo:   info,
-		instructions: instructions,
-		globalMode:   globalMode,
-		mode:         protocolMode,
-		logLevel:     MCPLogWarning,
-		observer:     newMCPToolObserver(nil),
+		client:        client,
+		customTools:   customTools,
+		customPrompts: loadMCPCustomPrompts(),
+		serverInfo:    info,
+		instructions:  instructions,
+		globalMode:    globalMode,
+		mode:          protocolMode,
+		logLevel:      MCPLogWarning,
+		observer:      newMCPToolObserver(nil),
 	}
 }
 
@@ -319,8 +321,12 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 // ---- Prompts ----
 
 func (h *MCPHandler) handlePromptsList(req map[string]interface{}) map[string]interface{} {
+	prompts := mcpBuiltinPrompts()
+	for _, p := range h.customPrompts {
+		prompts = append(prompts, p.asMCPPrompt())
+	}
 	return map[string]interface{}{
-		"prompts": mcpBuiltinPrompts(),
+		"prompts": prompts,
 	}
 }
 
@@ -329,7 +335,14 @@ func (h *MCPHandler) handlePromptsGet(ctx context.Context, req map[string]interf
 	name, _ := params["name"].(string)
 	args, _ := params["arguments"].(map[string]interface{})
 
-	messages, description, err := mcpGetPrompt(ctx, h.client, name, args)
+	var messages []MCPPromptMessage
+	var description string
+	var err error
+	if p, ok := h.customPrompt(name); ok {
+		messages, description, err = p.render(args)
+	} else {
+		messages, description, err = mcpGetPrompt(ctx, h.client, name, args)
+	}
 	if err != nil {
 		return map[string]interface{}{
 			"error": mcpError(mcpErrInvalidParams, err.Error()),
@@ -340,6 +353,16 @@ func (h *MCPHandler) handlePromptsGet(ctx context.Context, req map[string]interf
 		"description": description,
 		"messages":    messages,
 	}
+}
+
+// customPrompt finds a custom prompt by name.
+func (h *MCPHandler) customPrompt(name string) (MCPCustomPromptConfig, bool) {
+	for _, p := range h.customPrompts {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return MCPCustomPromptConfig{}, false
 }
 
 // ---- Completion ----
