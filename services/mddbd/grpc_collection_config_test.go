@@ -34,6 +34,7 @@ func fullConfig() *CollectionConfig {
 		Encrypted:       true,
 		WordPress:       &WordPressTargetConfig{URL: "https://blog.example.com", APIKey: "wp-key"},
 		ResponsePrompt:  "answer in numbered steps",
+		Code:            &CodeConfigDef{IncludePaths: []string{"sys", "include"}},
 	}
 }
 
@@ -82,6 +83,8 @@ func TestGRPCCollectionConfigRoundTripsEveryField(t *testing.T) {
 		{"storage_config.prefix", got.GetStorageConfig().GetPrefix(), want.StorageConfig.Prefix},
 		{"storage_config.use_tls", got.GetStorageConfig().GetUseTls(), want.StorageConfig.UseTLS},
 		{"wordpress.url", got.GetWordpress().GetUrl(), want.WordPress.URL},
+		{"code.include_paths", len(got.GetCode().GetIncludePaths()), len(want.Code.IncludePaths)},
+		{"code.include_paths[0]", got.GetCode().GetIncludePaths()[0], want.Code.IncludePaths[0]},
 	}
 	for _, c := range checks {
 		if c.got != c.want {

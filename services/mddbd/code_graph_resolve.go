@@ -201,6 +201,13 @@ func (r *edgeResolver) matchSymbol(sym, otherKey string, kind EdgeKind, inbound 
 			continue
 		}
 		e := GraphEdge{Kind: kind, Symbol: sym}
+		if kind == EdgeUsesSelector {
+			user := r.from
+			if inbound {
+				user = doc
+			}
+			e.Kind = usesEdgeKind(user.Language)
+		}
 		if inbound {
 			e.From, e.To, e.Direction = doc.Key, r.from.Key, string(GraphIn)
 		} else {

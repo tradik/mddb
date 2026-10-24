@@ -91,6 +91,10 @@ func ExtractWithLimit(language, content string, max int) Symbols {
 		s = extractJS(content)
 	case "html", "htm":
 		s = extractHTML(content)
+	case "c", "cpp":
+		s = extractC(content)
+	case "asm":
+		s = extractAsm(content)
 	default:
 		return Symbols{}
 	}

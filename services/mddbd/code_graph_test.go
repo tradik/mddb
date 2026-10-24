@@ -391,12 +391,12 @@ func TestResolveImportPaths(t *testing.T) {
 		{"theme/style.css", "css", "reset.css", "theme/reset.css"},
 	}
 	for _, c := range cases {
-		got := resolveImportPaths(c.from, c.language, []string{c.spec})
+		got := resolveImportPaths(c.from, c.language, []string{c.spec}, nil)
 		if len(got) != 1 || got[0] != c.want {
 			t.Errorf("from %s (%s), %q resolved to %v, want %s", c.from, c.language, c.spec, got, c.want)
 		}
 	}
-	if got := resolveImportPaths("a.js", "javascript", nil); got != nil {
+	if got := resolveImportPaths("a.js", "javascript", nil, nil); got != nil {
 		t.Errorf("no specifiers should give nil, got %v", got)
 	}
 }

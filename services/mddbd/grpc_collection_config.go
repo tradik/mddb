@@ -119,7 +119,23 @@ func collectionConfigToProto(cfg *CollectionConfig) *proto.CollectionConfigProto
 		SpellCorrect:    cfg.SpellCorrect,
 		SpellLang:       cfg.SpellLang,
 		Wordpress:       wordPressToProto(cfg.WordPress),
+		Code:            codeConfigToProto(cfg.Code),
 	}
+}
+
+// codeConfigToProto and codeConfigFromProto carry CodeConfigDef (#319).
+func codeConfigToProto(cfg *CodeConfigDef) *proto.CodeConfigProto {
+	if cfg == nil {
+		return nil
+	}
+	return &proto.CodeConfigProto{IncludePaths: cfg.IncludePaths}
+}
+
+func codeConfigFromProto(in *proto.CodeConfigProto) *CodeConfigDef {
+	if in == nil {
+		return nil
+	}
+	return &CodeConfigDef{IncludePaths: in.GetIncludePaths()}
 }
 
 // applyCollectionConfigRequest merges a SetCollectionConfig request into cfg.
@@ -161,5 +177,8 @@ func applyCollectionConfigRequest(cfg *CollectionConfig, req *proto.SetCollectio
 	}
 	if req.GetWordpress() != nil {
 		cfg.WordPress = wordPressFromProto(req.GetWordpress(), cfg.WordPress)
+	}
+	if req.GetCode() != nil {
+		cfg.Code = codeConfigFromProto(req.GetCode())
 	}
 }

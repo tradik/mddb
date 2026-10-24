@@ -441,7 +441,7 @@ type CodeGraphNode {
 type CodeGraphEdge {
   from: String!
   to: String!
-  """uses-selector or imports"""
+  """uses-selector, calls or imports"""
   kind: String!
   """The symbol or path that justifies this edge."""
   symbol: String!

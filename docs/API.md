@@ -2393,8 +2393,14 @@ did not mention encryption" from "the client wants encryption off". Since the
 handler merges into the stored config, an unset bool arriving as `false` would
 switch encryption off on a collection whose owner only wanted a new icon —
 after which the next document is written as plaintext. Presence keeps that from
-happening. **Omitted means "leave it alone" for every field on this RPC**,
-strings included.
+happening. **Omitted means "leave it alone"** for those fields and for
+`storage_backend`, `storage_config`, `quantization`, `spell_lang`,
+`wordpress` and `code` (v2.18.0). The original fields — `type`,
+`description`, `icon`, `color`, `custom_meta`, `max_revisions` and
+`response_prompt` — are set as sent, as REST `PUT` does, because proto3
+cannot tell an omitted string or `0` from an empty one: send their current
+values when changing something else. (Before v2.18.0 this paragraph said
+every field was merged; the code never did that for these seven.)
 
 #### PUT /v1/collection-config
 
@@ -3778,6 +3784,33 @@ What each language contributes:
 | CSS / SCSS / LESS | Selectors, their component classes and ids, `--custom-properties` | `url(...)` targets | `@import` targets |
 | JavaScript / TypeScript | Function, class, and arrow-const names | — | `import` and `require` specifiers |
 | HTML | `id` attributes | `class` names, `on*` handler names | Local `src` / `href` targets |
+| C / C++ (`.c .h .cc .cpp .hpp …`, v2.18.0) | Function definitions, `static` prototypes, `struct`/`union`/`enum` tags, `typedef` names, `#define` macros, file-scope variables | Functions and macros called in function bodies that the file does not define | `#include` targets |
+| Assembly (`.S .s .asm`, v2.18.0) | `ENTRY(x)` and similar macros, `.globl` symbols | `call` / `bl` / `jal` targets | `#include` targets |
+
+**C details.** A non-static prototype is a declaration of something defined
+elsewhere, so it is not a define — otherwise every header would claim every
+function it declares. An all-capitals name invoked at file scope
+(`SYSCTL_NODE(...)`, `DB_SHOW_COMMAND(...) { }`) is a macro, not a function:
+its body still contributes calls, and a variable declared with a macro type
+(`static SLIST_HEAD(, foo) foo_list;`) is a define. Calls through a struct
+member (`ops->start()`) are not global symbols and are left out. Measured on
+the FreeBSD `sys/` tree: 15,617 files in about 5 seconds, and the 730 files
+the extractor says include `<sys/mbuf.h>` are the 730 that `grep` finds.
+
+`#include "x.h"` resolves next to the including file. `#include <sys/proc.h>`
+resolves against the collection's **include paths**, as a compiler's `-I`
+does — set them in the collection config:
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' \
+  -d '{"collection":"kernel","code":{"includePaths":["sys"]}}'
+```
+
+With `["sys"]`, `<sys/proc.h>` in any file is recorded as `sys/sys/proc.h`
+and matches that document's key. Without include paths it is taken as
+collection-relative (`sys/proc.h`), which suits a tree keyed from its include
+root. Set them before loading: documents written earlier keep their imports
+until they are written again.
 
 Three deliberate limits:
 
@@ -3839,12 +3872,16 @@ knows what to look at. Add `&lines=true` to get the first line the symbol
 appears on for both sides — off by default, because it is the only part of a
 traversal that reads document content.
 
-Two kinds of edge:
+Three kinds of edge:
 
 | Kind | Meaning | Derived from |
 |---|---|---|
 | `uses-selector` | A template applies a class or id a stylesheet declares | `uses` ↔ `defines` |
-| `imports` | A document pulls another in by path | `imports` ↔ document key |
+| `calls` | A C, C++ or assembly file calls a function or macro another file defines (v2.18.0) | `uses` ↔ `defines` |
+| `imports` | A document pulls another in by path or `#include` | `imports` ↔ document key |
+
+The `uses` ↔ `defines` kind is named by the language of the document doing the
+using, so a C file calling into assembly is a `calls` edge.
 
 Import paths are resolved against the referring document when it is stored, so
 `href="style.css"` inside `theme/index.html` is recorded as `theme/style.css`

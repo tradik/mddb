@@ -855,6 +855,13 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 							"api_key": map[string]interface{}{"type": "string", "description": "mddb-sync publish key (Settings → MDDB Sync)"},
 						},
 					},
+					"code": map[string]interface{}{
+						"type":        "object",
+						"description": "(v2.18.0+) Source-code settings. include_paths: collection-relative directories that C #include <...> resolves against, like -I — [\"sys\"] makes <sys/proc.h> the document sys/sys/proc.h, which gives code_graph its include edges.",
+						"properties": map[string]interface{}{
+							"include_paths": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+						},
+					},
 				},
 				"required": []string{"collection"},
 			},
