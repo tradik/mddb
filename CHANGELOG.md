@@ -70,6 +70,8 @@ FreeBSD kernel tree into MDDB to query it over MCP.
   open `braces` alert was dismissed because GitHub withdrew the advisory
   (GHSA-vfj7-8cjw-p6xm) and no fixed version will exist.
 - `integrations/github-action`: `undici` 6.29.1, `dist/` rebuilt.
+- `services/mddb-chat`: `ctutils` 0.4.5 (RUSTSEC-2026-0385, non-constant-time
+  comparisons; published 2026-10-23, pulled in by `hmac` and `sha2`).
 - Docs site on ssg 1.8.80. Both pins in `deploy-docs.yml` match again: they
   had drifted to 1.8.72 for the action and 1.8.67 for the binary. ssg's new
   unread-content warning lists `docs/examples/`, which `content_exclude`
