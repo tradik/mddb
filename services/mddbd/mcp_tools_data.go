@@ -322,6 +322,15 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		HighlightTag:  mcpGetString(args, "highlight_tag"),
 		MaxHighlights: mcpGetInt(args, "max_highlights"),
 		FragmentSize:  mcpGetInt(args, "fragment_size"),
+		// #328: what POST /v1/fts accepts. facet_by and facet_max_values were
+		// in the schema and never read.
+		FilterMeta:      mcpGetMetaMap(args, "filter_meta"),
+		DisableStem:     mcpGetBool(args, "disable_stem"),
+		DisableSynonyms: mcpGetBool(args, "disable_synonyms"),
+		Mode:            mcpGetString(args, "mode"),
+		Distance:        mcpGetInt(args, "distance"),
+		FacetBy:         mcpGetStringSlice(args, "facet_by"),
+		FacetMaxValues:  mcpGetInt(args, "facet_max_values"),
 	}
 
 	resp, err := s.client.FTSSearch(ctx, req)

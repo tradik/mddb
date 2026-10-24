@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
-	"mddb/internal/fts"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	"time"
@@ -499,112 +498,59 @@ func (c *DirectClient) SetTTL(ctx context.Context, req *MCPSetTTLRequest) (*MCPD
 
 // FTSSearch performs a full-text search via the direct client.
 func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) (*MCPFTSSearchResponse, error) {
-	if req.Collection == "" || req.Query == "" {
-		return nil, errors.New("missing required fields: collection, query")
-	}
-	if c.server.FTSIndex == nil {
-		return nil, errors.New("full-text search not initialized")
-	}
-
-	// RAG-001: request > collection profile > historical default.
-	limit := c.server.ResolveTopK(req.Collection, req.Limit, 50)
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "tfidf"
-	}
-	fuzzy := req.Fuzzy
-	if fuzzy < 0 {
-		fuzzy = 0
-	}
-	if fuzzy > 2 {
-		fuzzy = 2
-	}
-
-	var results []fts.FTSResult
-	var err error
-	switch algo {
-	case "bm25":
-		if fuzzy > 0 {
-			results, err = c.server.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, limit, fuzzy)
-		} else {
-			results, err = c.server.FTSIndex.SearchBM25(req.Collection, req.Query, limit)
-		}
-	case "tfidf":
-		if fuzzy > 0 {
-			results, err = c.server.FTSIndex.SearchFuzzy(req.Collection, req.Query, limit, fuzzy)
-		} else {
-			results, err = c.server.FTSIndex.Search(req.Collection, req.Query, limit)
-		}
-	case "pmisparse":
-		if fuzzy > 0 {
-			results, err = c.server.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, limit, fuzzy)
-		} else {
-			results, err = c.server.FTSIndex.SearchPMISparse(req.Collection, req.Query, limit)
-		}
-	default:
-		return nil, fmt.Errorf("unknown algorithm: %s, available: tfidf, bm25, pmisparse", algo)
-	}
+	// One implementation with POST /v1/fts (#328): filters, modes, BM25F,
+	// stemming and synonym control, curation and highlights come with it.
+	full, err := c.server.searchFTS(FTSSearchRequest{
+		Collection:        req.Collection,
+		Query:             req.Query,
+		Limit:             req.Limit,
+		Algorithm:         req.Algorithm,
+		Fuzzy:             req.Fuzzy,
+		Lang:              req.Lang,
+		Boost:             req.Boost,
+		Highlight:         req.Highlight,
+		HighlightTag:      req.HighlightTag,
+		MaxHighlights:     req.MaxHighlights,
+		FragmentSize:      req.FragmentSize,
+		FilterMeta:        req.FilterMeta,
+		DisableStem:       req.DisableStem,
+		DisableSynonyms:   req.DisableSynonyms,
+		Mode:              req.Mode,
+		Distance:          req.Distance,
+		FacetBy:           req.FacetBy,
+		FacetMaxValues:    req.FacetMaxValues,
+		skipContextBudget: true,
+	}, time.Now())
 	if err != nil {
 		return nil, err
 	}
 
-	// Apply per-query boosts/demotions (metadata-based score multipliers).
-	results = c.server.applyBoostFTS(req.Collection, results, req.Boost)
-
 	resp := &MCPFTSSearchResponse{
-		Algorithm:      algo,
-		Fuzzy:          fuzzy,
+		Algorithm:      full.Algorithm,
+		Fuzzy:          full.Fuzzy,
 		Lang:           req.Lang,
-		Results:        make([]MCPFTSResult, 0, len(results)),
+		Results:        make([]MCPFTSResult, 0, len(full.Results)),
+		Facets:         full.Facets,
 		ResponsePrompt: c.server.ResponsePrompt(req.Collection, req.Query),
 	}
-
-	_ = c.server.DBView(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		for _, res := range results {
-			v := bDocs.Get(storage.DocKey(req.Collection, res.DocID))
-			if v == nil {
-				continue
-			}
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < time.Now().Unix() {
-				continue
-			}
-			// CODE-002: fragments and their line ranges are extracted before
-			// the body is dropped — the whole point is to answer without
-			// carrying the document, so the body must go and the lines stay.
-			var highlights []fts.Highlight
-			if req.Highlight && docPtr.ContentMD != "" {
-				highlights = fts.ExtractHighlights(docPtr.ContentMD, res.MatchedTerms, fts.HighlightOptions{
-					OpenTag:      req.HighlightTag,
-					MaxFragments: req.MaxHighlights,
-					FragmentSize: req.FragmentSize,
-				})
-			}
-			if !req.IncludeContent {
-				docPtr.ContentMD = "" // GO-022: don't carry a body the caller discards
-			}
-			resp.Results = append(resp.Results, MCPFTSResult{
-				Document:     docToMCPDocument(*docPtr),
-				Score:        res.Score,
-				MatchedTerms: res.MatchedTerms,
-				Highlights:   highlights,
-			})
+	for _, r := range full.Results {
+		doc := r.Document
+		if !req.IncludeContent {
+			doc.ContentMD = "" // GO-022: don't carry a body the caller discards
 		}
-		return nil
-	})
-	// RAG-001: cap what this collection hands back. The MCP paths resolved
-	// topK from the profile and returned its responsePrompt, and then skipped
-	// the budget — so the caller the cap exists for, an agent assembling a
-	// prompt, was the one path that never had it applied.
+		resp.Results = append(resp.Results, MCPFTSResult{
+			Document:     docToMCPDocument(doc),
+			Score:        r.Score,
+			MatchedTerms: r.MatchedTerms,
+			Highlights:   r.Highlights,
+		})
+	}
+	// RAG-001: the budget counts what this answer carries, so it applies
+	// after bodies the agent did not ask for have been dropped.
 	resp.Results, resp.ContextTruncated = applyContextBudget(c.server, req.Collection, resp.Results,
 		func(r MCPFTSResult) int { return approxTokens(r.Document.ContentMD) })
 
 	resp.Total = len(resp.Results)
-
 	return resp, nil
 }
 

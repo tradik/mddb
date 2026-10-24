@@ -324,6 +324,15 @@ type MCPFTSSearchRequest struct {
 	HighlightTag  string `json:"highlightTag,omitempty"`
 	MaxHighlights int    `json:"maxHighlights,omitempty"`
 	FragmentSize  int    `json:"fragmentSize,omitempty"`
+	// The rest of what POST /v1/fts accepts (#328): for code, stemming has to
+	// be off and the search scoped by metadata on every call.
+	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`
+	DisableStem     bool                `json:"disableStem,omitempty"`
+	DisableSynonyms bool                `json:"disableSynonyms,omitempty"`
+	Mode            string              `json:"mode,omitempty"`
+	Distance        int                 `json:"distance,omitempty"`
+	FacetBy         []string            `json:"facetBy,omitempty"`
+	FacetMaxValues  int                 `json:"facetMaxValues,omitempty"`
 }
 
 // MCPFTSResult represents a single FTS result.
@@ -343,6 +352,7 @@ type MCPFTSSearchResponse struct {
 	Algorithm string         `json:"algorithm"`
 	Fuzzy     int            `json:"fuzzy"`
 	Lang      string         `json:"lang,omitempty"`
+	Facets    FacetResult    `json:"facets,omitempty"`
 	// ContextTruncated reports that the collection's contextTokenBudget cut
 	// results from this answer (RAG-001). A caller assembling a prompt needs
 	// to know it is holding part of the answer, not all of it.

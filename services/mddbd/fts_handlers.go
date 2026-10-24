@@ -45,6 +45,9 @@ type FTSSearchRequest struct {
 	// is the page in `results`; "all" is every document that matched the
 	// query and filters, before pagination, and also fills `matched`.
 	FacetScope string `json:"facetScope,omitempty"`
+	// skipContextBudget lets a caller apply the collection's context budget
+	// itself — MCP does, after dropping bodies the agent did not ask for.
+	skipContextBudget bool
 	// CacheTTL opts this request into the search-result cache for the given
 	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
 	// caller that says nothing keeps today's behaviour and today's freshness.
@@ -94,21 +97,8 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
-	if req.Collection == "" || req.Query == "" {
-		bad(w, fmt.Errorf("missing required fields: collection, query"))
-		return
-	}
-	// RAG-001: request > collection profile > this path's historical default.
-	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
-	switch req.FacetScope {
-	case "", facetScopeReturned, facetScopeAll:
-	default:
-		bad(w, fmt.Errorf("facetScope must be %q or %q, got %q", facetScopeReturned, facetScopeAll, req.FacetScope))
-		return
-	}
-
-	if s.FTSIndex == nil {
-		bad(w, fmt.Errorf("full-text search not initialized"))
+	if err := s.normalizeFTSRequest(&req); err != nil {
+		bad(w, err)
 		return
 	}
 
@@ -131,6 +121,52 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-MDDB-Cache", "miss")
 	}
 
+	resp, err := s.searchFTS(req, start)
+	if err != nil {
+		bad(w, err)
+		return
+	}
+
+	if cacheKey != "" {
+		if body, err := json.Marshal(resp); err == nil {
+			s.SearchCache.Set(cacheKey, body, int64(cacheTTL))
+			w.Header().Set("Content-Type", "application/json")
+			if _, err := w.Write(body); err != nil {
+				slog.Debug("writing a search response failed", "err", err)
+			}
+			return
+		}
+	}
+	ok(w, resp)
+}
+
+// normalizeFTSRequest validates a full-text request and resolves its limit.
+// Shared by HTTP and MCP so both reject the same requests (#328).
+func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
+	if req.Collection == "" || req.Query == "" {
+		return fmt.Errorf("missing required fields: collection, query")
+	}
+	// RAG-001: request > collection profile > this path's historical default.
+	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
+	switch req.FacetScope {
+	case "", facetScopeReturned, facetScopeAll:
+	default:
+		return fmt.Errorf("facetScope must be %q or %q, got %q", facetScopeReturned, facetScopeAll, req.FacetScope)
+	}
+	if s.FTSIndex == nil {
+		return fmt.Errorf("full-text search not initialized")
+	}
+	return nil
+}
+
+// searchFTS runs a full-text search: spell correction, mode, filters, ranges,
+// boosts, facets, highlights and the context budget. It is the one
+// implementation behind POST /v1/fts and the MCP full_text_search tool; MCP
+// had a reduced copy without filters, modes or stemming control (#328).
+func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchResponse, error) {
+	if err := s.normalizeFTSRequest(&req); err != nil {
+		return nil, err
+	}
 	// Spell-correct the query when enabled for this collection
 	var spellCorrected *spell.SpellCorrectionInfo
 	if s.SpellManager != nil && s.SpellManager.Ready() && s.CollectionManager != nil {
@@ -191,13 +227,12 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	if len(req.FilterMeta) > 0 {
 		allowed = s.getDocIDsByMeta(req.Collection, req.FilterMeta)
 		if len(allowed) == 0 {
-			ok(w, FTSSearchResponse{
+			return &FTSSearchResponse{
 				Results:   []FTSResultWithDoc{},
 				Algorithm: algo,
 				Mode:      mode,
 				Fuzzy:     fuzzy,
-			})
-			return
+			}, nil
 		}
 	}
 
@@ -257,8 +292,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 			// query passes the earlier non-empty check but means nothing, and
 			// used to return an empty result set as though it had been asked
 			// a real question (TEST-003).
-			bad(w, err)
-			return
+			return nil, err
 		}
 		results, err = idx.EvaluateExpression(req.Collection, expr, searchLimit)
 
@@ -290,13 +324,11 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 				results, err = idx.SearchPMISparse(req.Collection, req.Query, searchLimit)
 			}
 		default:
-			bad(w, fmt.Errorf("unknown algorithm: %s, available: tfidf, bm25, bm25f, pmisparse", algo))
-			return
+			return nil, fmt.Errorf("unknown algorithm: %s, available: tfidf, bm25, bm25f, pmisparse", algo)
 		}
 	}
 	if err != nil {
-		bad(w, err)
-		return
+		return nil, err
 	}
 
 	// Track FTS search operation
@@ -319,8 +351,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	if len(req.RangeMeta) > 0 && len(results) > 0 {
 		results, err = s.FilterByRange(req.Collection, results, req.RangeMeta)
 		if err != nil {
-			bad(w, err)
-			return
+			return nil, err
 		}
 	}
 
@@ -403,10 +434,12 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	// RAG-001: cap the total context this collection hands back. Applied
 	// before Total and facets so both describe what the caller actually
 	// receives — a count that includes dropped results is worse than no count.
-	var contextTruncated bool
-	resp.Results, contextTruncated = applyContextBudget(s, req.Collection, resp.Results,
-		func(r FTSResultWithDoc) int { return approxTokens(r.Document.ContentMD) })
-	resp.ContextTruncated = contextTruncated
+	if !req.skipContextBudget {
+		var contextTruncated bool
+		resp.Results, contextTruncated = applyContextBudget(s, req.Collection, resp.Results,
+			func(r FTSResultWithDoc) int { return approxTokens(r.Document.ContentMD) })
+		resp.ContextTruncated = contextTruncated
+	}
 
 	resp.Total = len(resp.Results)
 
@@ -436,17 +469,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 
 	resp.SpellCorrected = spellCorrected
 
-	if cacheKey != "" {
-		if body, err := json.Marshal(resp); err == nil {
-			s.SearchCache.Set(cacheKey, body, int64(cacheTTL))
-			w.Header().Set("Content-Type", "application/json")
-			if _, err := w.Write(body); err != nil {
-				slog.Debug("writing a search response failed", "err", err)
-			}
-			return
-		}
-	}
-	ok(w, resp)
+	return &resp, nil
 }
 
 // FTSReindexRequest is the HTTP request for FTS reindexing.

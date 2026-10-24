@@ -371,7 +371,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
 | `semantic_search` | Search documents by meaning using semantic similarity. |
-| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. |
+| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
 | `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. |
@@ -513,8 +513,7 @@ Each protocol can have its own read/write mode:
 In read-only mode:
 - Built-in tools with `readOnlyHint=true` (search, stats, list, export) → **allowed**
 - Built-in tools with writes/deletes → **blocked** with error
-- Custom tools with read-only actions (`semantic_search`, `search_documents`, `full_text_search`) → **allowed**
-- Custom tools with write actions → **blocked**
+- Custom tools → **allowed**: every action a custom tool can wrap is read-only (`semantic_search`, `search_documents`, `full_text_search`, `hybrid_search`, `code_graph`, `aggregate`, `fts_languages`; see [CUSTOM-TOOLS.md](CUSTOM-TOOLS.md#supported-actions))
 
 ```bash
 # Public MCP: read-only, custom tools only, API keys, rate limited

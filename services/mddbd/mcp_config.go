@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -55,8 +57,12 @@ func loadMCPConfig(path string) (*MCPFileConfig, error) {
 		return nil, err
 	}
 
+	// Unknown keys are errors (#328): a misspelt default used to be dropped
+	// in silence, leaving a tool that looked configured and was not.
 	var cfg MCPFileConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&cfg); err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
 

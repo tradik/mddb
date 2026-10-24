@@ -75,6 +75,13 @@ custom_tools:
 | `semantic_search` | `toolSemanticSearch` → `/v1/vector-search` | Find documents by meaning |
 | `search_documents` | `toolSearchDocuments` → `/v1/search` | Filter/sort by metadata |
 | `full_text_search` | `toolFTSSearch` → `/v1/fts` | Keyword search with TF scoring |
+| `hybrid_search` | `hybrid_search` → `/v1/hybrid-search` | (v2.18.1) Keyword + meaning, the "start here when unsure" tool |
+| `code_graph` | `code_graph` → `/v1/code-graph` | (v2.18.1) What depends on a file or symbol, without the whole built-in catalogue |
+| `aggregate` | `aggregate` → `/v1/aggregate` | (v2.18.1) Counts per metadata value, for dashboards |
+| `fts_languages` | `fts_languages` | Languages the FTS index stems; accepted by validation before 2.18.1 but failed on every call |
+
+Every action is read-only. A custom tool exists to give a locked-down surface,
+which a write action would defeat.
 
 ### Defaults
 
@@ -91,8 +98,21 @@ All defaults are optional. Declared user parameters override most defaults — *
 | `asc` | bool | search_documents | Sort ascending (default false) |
 | `limit` | int | search_documents, full_text_search | Max results |
 | `offset` | int | search_documents | Pagination offset |
-| `filterMeta` | object | semantic_search, search_documents | Metadata filter |
+| `filterMeta` | object | semantic_search, search_documents, full_text_search, hybrid_search, aggregate | Metadata filter. Before 2.18.1 `full_text_search` ignored it and searched the whole collection |
 | `query` | string | semantic_search, full_text_search | Default query (usually overridden) |
+| `algorithm` | string | full_text_search, hybrid_search | `tfidf`, `bm25`, `bm25f`, `pmisparse` (v2.18.1) |
+| `fuzzy` | int | full_text_search, hybrid_search | Typo tolerance 0–2 (v2.18.1) |
+| `highlight`, `highlightTag`, `maxHighlights`, `fragmentSize` | bool, string, int, int | full_text_search | Matching fragments with their line ranges (v2.18.1) |
+| `disableStem`, `disableSynonyms` | bool | full_text_search | Exact terms, for code and identifiers (v2.18.1) |
+| `mode` | string | full_text_search | `simple`, `boolean`, `phrase`, `wildcard`, `proximity`, `auto` (v2.18.1) |
+| `strategy`, `alpha`, `oversample`, `vectorAlgorithm` | string, float, float, string | hybrid_search | Fusion and recall settings (v2.18.1) |
+| `direction`, `depth`, `maxDegree`, `lines` | string, int, int, bool | code_graph | Graph walk (v2.18.1) |
+| `groupBy`, `maxFacetSize` | list, int | aggregate | Metadata keys to count values of, and how many values per key (v2.18.1) |
+
+A default the action does not take, such as `topK` on `full_text_search`, is
+refused when the configuration loads, and so is any key the configuration does
+not know, such as a misspelt `fragmnetSize` (v2.18.1). Both used to be dropped
+without a word, leaving a tool that looked configured and was not.
 
 ### Cutting client token usage (`includeContent` + `fields`)
 
@@ -157,13 +177,17 @@ Argument merging follows three rules (v2.11.0+, SEC-010):
 
 At startup, `mddbd` validates all custom tools:
 
-- **Name conflicts**: Custom tool names cannot match any of the 44 built-in names
+- **Name conflicts**: Custom tool names cannot match any built-in tool name
 - **Duplicate names**: No two custom tools can share the same name
-- **Valid action**: Must be one of `semantic_search`, `search_documents`, `full_text_search`
+- **Valid action**: Must be one of the actions in [Supported Actions](#supported-actions)
+- **Defaults fit the action**: a default the action does not take is refused (v2.18.1)
+- **Known keys only**: any key the configuration does not define, at any level, is refused (v2.18.1)
 - **Valid parameter types**: Must be valid JSON Schema types
 - **Required fields**: `name`, `description`, and `action` are required
 
-Invalid configuration causes a startup error with a descriptive message.
+An invalid configuration is logged at startup with a descriptive message, and
+the server starts **without** its custom tools rather than with a subset of
+them.
 
 ## Docker Deployment
 

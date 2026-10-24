@@ -10,7 +10,7 @@ import (
 type MCPCustomToolConfig struct {
 	Name        string               `yaml:"name"`
 	Description string               `yaml:"description"`
-	Action      string               `yaml:"action"` // semantic_search, search_documents, full_text_search
+	Action      string               `yaml:"action"` // see customToolActions
 	Defaults    MCPCustomToolDefs    `yaml:"defaults"`
 	Parameters  []MCPCustomToolParam `yaml:"parameters"`
 }
@@ -30,6 +30,33 @@ type MCPCustomToolDefs struct {
 	// Fields restricts the returned meta keys to the listed names (empty = all).
 	// Applies to semantic_search, search_documents and full_text_search.
 	Fields []string `yaml:"fields"`
+
+	// Full-text and hybrid search (#328). Which action takes which key is in
+	// customToolActions; a key set for an action that ignores it is refused
+	// at startup.
+	Algorithm       string  `yaml:"algorithm"`
+	Fuzzy           int     `yaml:"fuzzy"`
+	Highlight       *bool   `yaml:"highlight"`
+	HighlightTag    string  `yaml:"highlightTag"`
+	MaxHighlights   int     `yaml:"maxHighlights"`
+	FragmentSize    int     `yaml:"fragmentSize"`
+	DisableStem     *bool   `yaml:"disableStem"`
+	DisableSynonyms *bool   `yaml:"disableSynonyms"`
+	Mode            string  `yaml:"mode"`
+	Strategy        string  `yaml:"strategy"`
+	Alpha           float64 `yaml:"alpha"`
+	Oversample      float64 `yaml:"oversample"`
+	VectorAlgorithm string  `yaml:"vectorAlgorithm"`
+
+	// code_graph (#321).
+	Direction string `yaml:"direction"`
+	Depth     int    `yaml:"depth"`
+	MaxDegree int    `yaml:"maxDegree"`
+	Lines     *bool  `yaml:"lines"`
+
+	// aggregate (#321): groupBy lists the metadata keys to count values of.
+	GroupBy      []string `yaml:"groupBy"`
+	MaxFacetSize int      `yaml:"maxFacetSize"`
 }
 
 // MCPCustomToolParam defines a parameter exposed to the AI.
@@ -147,55 +174,6 @@ func (s *MCPToolServer) mcpCallCustomTool(ctx context.Context, ct MCPCustomToolC
 	return s.mcpCallTool(ctx, ct.Action, merged)
 }
 
-// mcpMergeActionDefaults fills action-specific default arguments into merged.
-func mcpMergeActionDefaults(action string, d MCPCustomToolDefs, merged map[string]interface{}) error {
-	switch action {
-	case "semantic_search":
-		mcpMergeSemanticDefaults(d, merged)
-	case "search_documents":
-		mcpMergeSearchDocDefaults(d, merged)
-	case "full_text_search":
-		if d.Limit > 0 {
-			merged["limit"] = float64(d.Limit)
-		}
-	default:
-		return fmt.Errorf("unknown custom tool action: %s", action)
-	}
-	return nil
-}
-
-// mcpMergeSemanticDefaults fills semantic_search default arguments into merged.
-func mcpMergeSemanticDefaults(d MCPCustomToolDefs, merged map[string]interface{}) {
-	if d.TopK > 0 {
-		merged["top_k"] = float64(d.TopK)
-	}
-	if d.Threshold > 0 {
-		merged["threshold"] = d.Threshold
-	}
-	if d.FilterMeta != nil {
-		merged["filter_meta"] = mcpMetaToInterface(d.FilterMeta)
-	}
-}
-
-// mcpMergeSearchDocDefaults fills search_documents default arguments into merged.
-func mcpMergeSearchDocDefaults(d MCPCustomToolDefs, merged map[string]interface{}) {
-	if d.Sort != "" {
-		merged["sort"] = d.Sort
-	}
-	if d.Asc != nil {
-		merged["asc"] = *d.Asc
-	}
-	if d.Limit > 0 {
-		merged["limit"] = float64(d.Limit)
-	}
-	if d.Offset > 0 {
-		merged["offset"] = float64(d.Offset)
-	}
-	if d.FilterMeta != nil {
-		merged["filter_meta"] = mcpMetaToInterface(d.FilterMeta)
-	}
-}
-
 // mcpMergeProjectionDefaults wires the token-saving projection controls
 // (includeContent + fields) shared by every search action, so a custom tool
 // can drop the document body and/or restrict returned meta keys via YAML.
@@ -233,9 +211,6 @@ func validateMCPCustomTools(tools []MCPCustomToolConfig) error {
 	for _, tool := range mcpBuiltinTools() {
 		builtinNames[tool.Name] = true
 	}
-	validActions := map[string]bool{
-		"semantic_search": true, "search_documents": true, "full_text_search": true, "fts_languages": true,
-	}
 	validTypes := map[string]bool{
 		"string": true, "integer": true, "number": true, "boolean": true, "object": true,
 	}
@@ -252,8 +227,11 @@ func validateMCPCustomTools(tools []MCPCustomToolConfig) error {
 			return fmt.Errorf("custom_tools[%d]: duplicate name %q", i, t.Name)
 		}
 		seen[t.Name] = true
-		if !validActions[t.Action] {
-			return fmt.Errorf("custom_tools[%d] (%s): invalid action %q (must be semantic_search, search_documents, or full_text_search)", i, t.Name, t.Action)
+		if _, ok := customToolActions[t.Action]; !ok {
+			return fmt.Errorf("custom_tools[%d] (%s): invalid action %q (must be one of %s)", i, t.Name, t.Action, customToolActionNames())
+		}
+		if err := validateCustomToolDefaults(t.Action, t.Defaults); err != nil {
+			return fmt.Errorf("custom_tools[%d] (%s): %w", i, t.Name, err)
 		}
 		if t.Description == "" {
 			return fmt.Errorf("custom_tools[%d] (%s): description is required", i, t.Name)
