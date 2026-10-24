@@ -235,7 +235,59 @@ func (f *FTSIndex) removePositionsInTx(tx *bolt.Tx, collection, docID string) {
 
 // SearchPhrase finds documents containing an exact phrase (consecutive terms).
 func (f *FTSIndex) SearchPhrase(collection string, phrase string, limit int) ([]FTSResult, error) {
-	phraseTerms := f.tokenizeOrdered(phrase)
+	results, err := f.searchPhraseTerms(collection, f.tokenizeOrdered(phrase))
+	if err != nil {
+		return nil, err
+	}
+	// Source stores whole identifiers as positions, so "mem_page_alloc" is
+	// one term there, not three (#326). Both readings are searched; a
+	// document found by both keeps the higher count.
+	if code := tokenizeOrderedCode(phrase); len(code) > 0 && !sameTerms(code, f.tokenizeOrdered(phrase)) {
+		more, err := f.searchPhraseTerms(collection, code)
+		if err != nil {
+			return nil, err
+		}
+		results = mergePhraseResults(results, more)
+	}
+	sortByScore(results)
+	if limit > 0 && len(results) > limit {
+		results = results[:limit]
+	}
+	return results, nil
+}
+
+func sameTerms(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func mergePhraseResults(a, b []FTSResult) []FTSResult {
+	byID := make(map[string]int, len(a))
+	for i, r := range a {
+		byID[r.DocID] = i
+	}
+	for _, r := range b {
+		if i, ok := byID[r.DocID]; ok {
+			if r.Score > a[i].Score {
+				a[i] = r
+			}
+			continue
+		}
+		byID[r.DocID] = len(a)
+		a = append(a, r)
+	}
+	return a
+}
+
+// searchPhraseTerms finds documents where phraseTerms occur consecutively.
+func (f *FTSIndex) searchPhraseTerms(collection string, phraseTerms []string) ([]FTSResult, error) {
 	if len(phraseTerms) == 0 {
 		return nil, nil
 	}
@@ -302,11 +354,6 @@ func (f *FTSIndex) SearchPhrase(collection string, phrase string, limit int) ([]
 			Score:        float64(ds.count),
 			MatchedTerms: phraseTerms,
 		})
-	}
-
-	sortByScore(results)
-	if limit > 0 && len(results) > limit {
-		results = results[:limit]
 	}
 	return results, nil
 }

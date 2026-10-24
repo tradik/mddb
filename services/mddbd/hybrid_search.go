@@ -379,19 +379,9 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 		return nil, nil
 	}
 
-	// Per-query stemming/synonym control
-	origStemmer := s.FTSIndex.Stemmer()
-	origSynonyms := s.FTSIndex.SynonymManager()
-	if req.DisableStem {
-		s.FTSIndex.SetStemmer(nil)
-	}
-	if req.DisableSynonyms {
-		s.FTSIndex.SetSynonymManager(nil)
-	}
-	defer func() {
-		s.FTSIndex.SetStemmer(origStemmer)
-		s.FTSIndex.SetSynonymManager(origSynonyms)
-	}()
+	// Per-query stemming/synonym control on a view of the index, never on
+	// the shared one (see FTSIndex.QueryView).
+	idx := s.FTSIndex.QueryView(req.DisableStem, req.DisableSynonyms)
 
 	// Pre-filter by metadata if provided
 	var allowed map[string]bool
@@ -413,7 +403,7 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 		candidates = 0
 	}
 
-	tokens := s.FTSIndex.TokenizeQueryLang(req.Collection, req.Query, req.Lang)
+	tokens := idx.TokenizeQueryLang(req.Collection, req.Query, req.Lang)
 
 	var results []fts.FTSResult
 	var err error
@@ -421,27 +411,27 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 	switch req.Algorithm {
 	case "bm25f":
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchBM25FFuzzy(req.Collection, tokens, candidates, req.Fuzzy, req.FieldWeights)
+			results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, candidates, req.Fuzzy, req.FieldWeights)
 		} else {
-			results, err = s.FTSIndex.SearchBM25F(req.Collection, tokens, candidates, req.FieldWeights)
+			results, err = idx.SearchBM25F(req.Collection, tokens, candidates, req.FieldWeights)
 		}
 	case "bm25":
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
+			results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
 		} else {
-			results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, candidates)
+			results, err = idx.SearchBM25(req.Collection, req.Query, candidates)
 		}
 	case "pmisparse":
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
+			results, err = idx.SearchPMISparseFuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
 		} else {
-			results, err = s.FTSIndex.SearchPMISparse(req.Collection, req.Query, candidates)
+			results, err = idx.SearchPMISparse(req.Collection, req.Query, candidates)
 		}
 	default:
 		if req.Fuzzy > 0 {
-			results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
+			results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
 		} else {
-			results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, candidates)
+			results, err = idx.SearchBM25(req.Collection, req.Query, candidates)
 		}
 	}
 

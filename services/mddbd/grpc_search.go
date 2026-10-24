@@ -644,11 +644,8 @@ func (g *GRPCServer) FTSReindex(ctx context.Context, req *proto.FTSReindexReques
 	}
 
 	// Collect docs first (read tx), then index outside to avoid deadlock
-	type reindexDoc struct {
-		ID, ContentMD, Lang string
-		Meta                map[string][]string
-	}
-	var docs []reindexDoc
+
+	var docs []*storage.Doc
 	var skipped int
 	// GO-009: propagate the read error instead of silently reporting 0 reindexed
 	// with Status "ok" (e.g. when the DB is mid-restore).
@@ -669,7 +666,7 @@ func (g *GRPCServer) FTSReindex(ctx context.Context, req *proto.FTSReindexReques
 				skipped++
 				continue
 			}
-			docs = append(docs, reindexDoc{docPtr.ID, docPtr.ContentMD, docPtr.Lang, docPtr.Meta})
+			docs = append(docs, docPtr)
 		}
 		return nil
 	}); err != nil {
@@ -681,19 +678,11 @@ func (g *GRPCServer) FTSReindex(ctx context.Context, req *proto.FTSReindexReques
 	// and any failure downgrades the status to "partial".
 	reindexed, failed := 0, 0
 	for _, d := range docs {
-		if err := g.server.FTSIndex.IndexWithLang(req.Collection, d.ID, d.ContentMD, d.Lang); err != nil {
+		if err := g.server.indexDocumentFTS(req.Collection, d); err != nil {
 			failed++
 			slog.Warn("FTS reindex failed", "collection", req.Collection, "iD", d.ID, "err", err)
 			continue
 		}
-		_ = g.server.FTSIndex.IndexPositionsWithLang(req.Collection, d.ID, d.ContentMD, d.Lang)
-		fields := map[string]string{"content": d.ContentMD}
-		for mk, vals := range d.Meta {
-			if len(vals) > 0 {
-				fields["meta."+mk] = strings.Join(vals, " ")
-			}
-		}
-		_ = g.server.FTSIndex.IndexFieldsWithLang(req.Collection, d.ID, fields, d.Lang)
 		reindexed++
 	}
 

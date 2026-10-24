@@ -140,11 +140,14 @@ func TestTrainingOnNothingAndOnTinyVectors(t *testing.T) {
 			}
 		})
 	}
-	pq := NewPQIndex(4, 4, 2) // 4 subspaces, 1-dimensional vectors
-	for i := 0; i < 6; i++ {
-		_ = pq.Add("c", fmt.Sprint(i), []float32{float32(i)})
+	// 4 subspaces for 2-dimensional vectors: trained with one per dimension.
+	// Two dimensions rather than one, because in one dimension every
+	// positive vector has cosine 1 with every other and the winner is chance.
+	pq := NewPQIndex(4, 4, 2)
+	for id, v := range map[string][]float32{"x": {1, 0}, "y": {0, 1}, "xy": {1, 1}, "x2": {0.9, 0.1}, "y2": {0.1, 0.9}} {
+		_ = pq.Add("c", id, v)
 	}
-	if got := pq.Search("c", []float32{3}, 1, -1, nil); len(got) != 1 || got[0].DocID != "3" {
-		t.Errorf("1-dimensional PQ search = %v, want 3", got)
+	if got := pq.Search("c", []float32{0, 1}, 1, -1, nil); len(got) != 1 || got[0].DocID != "y" {
+		t.Errorf("PQ search with more subspaces than dimensions = %v, want y", got)
 	}
 }

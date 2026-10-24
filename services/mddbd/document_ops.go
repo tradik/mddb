@@ -9,7 +9,6 @@ import (
 	"mddb/internal/storage"
 	"mddb/internal/temporal"
 	"strconv"
-	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -223,20 +222,9 @@ func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew b
 		_ = s.TTLManager.Set(collection, saved.ID, saved.ExpiresAt)
 	}
 
-	// FTS indexing (language-aware)
-	if s.FTSIndex != nil && saved.ContentMD != "" {
-		_ = s.FTSIndex.IndexWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
-		// Positional index for phrase/proximity search
-		_ = s.FTSIndex.IndexPositionsWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
-		// Field-level indexing for BM25F
-		fields := map[string]string{"content": saved.ContentMD}
-		for k, vals := range saved.Meta {
-			if len(vals) > 0 {
-				fields["meta."+k] = strings.Join(vals, " ")
-			}
-		}
-		_ = s.FTSIndex.IndexFieldsWithLang(collection, saved.ID, fields, saved.Lang)
-	}
+	// FTS indexing: terms, positions and fields, with the tokeniser the
+	// document's kind calls for (#326).
+	_ = s.indexDocumentFTS(collection, &saved)
 
 	// Geo indexing: persist resolved lat/lng to BoltDB and mirror into
 	// BOTH in-memory indexes (R-tree + geohash). Coordinates are extracted
@@ -462,16 +450,8 @@ func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.
 		}
 	}
 
-	if contentChanged && s.FTSIndex != nil && saved.ContentMD != "" {
-		_ = s.FTSIndex.IndexWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
-		_ = s.FTSIndex.IndexPositionsWithLang(collection, saved.ID, saved.ContentMD, saved.Lang)
-		fields := map[string]string{"content": saved.ContentMD}
-		for k, vals := range saved.Meta {
-			if len(vals) > 0 {
-				fields["meta."+k] = strings.Join(vals, " ")
-			}
-		}
-		_ = s.FTSIndex.IndexFieldsWithLang(collection, saved.ID, fields, saved.Lang)
+	if contentChanged {
+		_ = s.indexDocumentFTS(collection, &saved)
 	}
 
 	// Geo re-index on partial update. Mirrors the Add/Upsert path: if meta now

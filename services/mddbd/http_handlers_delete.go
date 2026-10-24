@@ -6,7 +6,6 @@ import (
 	json "mddb/internal/jsonx"
 	"net/http"
 	"strings"
-
 )
 
 // handleDelete deletes a single document from a collection

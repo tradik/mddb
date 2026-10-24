@@ -155,3 +155,80 @@ func (f *FTSIndex) TokenizePositionsCode(text string) map[string][]uint32 {
 
 	return positions
 }
+
+// Query terms for source (#326).
+//
+// A query was tokenised as prose even against an index built from code:
+// `do_parse` became `pars` — `do` dropped as a stop word, `parse` stemmed,
+// the whole identifier never looked up — while the code index holds
+// `do_parse`, `do` and `parse`, unstemmed. A search for a function by name
+// did not rank its definition first, and phrase mode found nothing.
+//
+// The query now carries both readings. A prose index has no unstemmed forms
+// or whole identifiers in it, so the extra terms match nothing there; a code
+// index finds the identifier, which is rare and so outweighs any one of its
+// parts. Plain words are added unstemmed but not if they are stop words: a
+// stop word matches nothing in a prose index, but under fuzzy search it would
+// be expanded to words that do.
+
+// mergeCodeQueryTerms adds the code reading of a query to terms in place.
+func mergeCodeQueryTerms(terms map[string]int, text string, stopWords map[string]bool) {
+	add := func(t string) {
+		if t == "" {
+			return
+		}
+		if _, ok := terms[t]; !ok {
+			terms[t] = 1
+		}
+	}
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() == 0 {
+			return
+		}
+		raw := cur.String()
+		cur.Reset()
+		whole := strings.ToLower(raw)
+		parts := splitIdentifier(raw)
+		if len(parts) > 1 || strings.ContainsAny(raw, "_-") {
+			add(whole)
+			for _, p := range parts {
+				add(strings.ToLower(p))
+			}
+			return
+		}
+		if !stopWords[whole] && len(whole) >= 2 {
+			add(whole)
+		}
+	}
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+			cur.WriteRune(r)
+			continue
+		}
+		flush()
+	}
+	flush()
+}
+
+// tokenizeOrderedCode is the phrase reading of source: whole identifiers in
+// order, as TokenizePositionsCode stored them.
+func tokenizeOrderedCode(text string) []string {
+	var out []string
+	var cur strings.Builder
+	flush := func() {
+		if cur.Len() > 0 {
+			out = append(out, strings.ToLower(cur.String()))
+			cur.Reset()
+		}
+	}
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+			cur.WriteRune(r)
+			continue
+		}
+		flush()
+	}
+	flush()
+	return out
+}

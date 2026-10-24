@@ -147,19 +147,10 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Per-query stemming/synonym control (thread-safe: no mutation of shared state)
+	// Per-query stemming/synonym control on a view of the index, never on
+	// the shared one (see FTSIndex.QueryView).
 	origStemmer := s.FTSIndex.Stemmer()
-	origSynonyms := s.FTSIndex.SynonymManager()
-	if req.DisableStem {
-		s.FTSIndex.SetStemmer(nil)
-	}
-	if req.DisableSynonyms {
-		s.FTSIndex.SetSynonymManager(nil)
-	}
-	defer func() {
-		s.FTSIndex.SetStemmer(origStemmer)
-		s.FTSIndex.SetSynonymManager(origSynonyms)
-	}()
+	idx := s.FTSIndex.QueryView(req.DisableStem, req.DisableSynonyms)
 
 	// Resolve query language
 	queryLang := req.Lang
@@ -211,7 +202,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Tokenize query (needed for bm25f, reused below) — language-aware
-	tokens := s.FTSIndex.TokenizeQueryLang(req.Collection, req.Query, queryLang)
+	tokens := idx.TokenizeQueryLang(req.Collection, req.Query, queryLang)
 
 	// Filters, boosts and facetScope "all" act on the whole match set, so
 	// the index must return all of it; the limit is applied once they have
@@ -229,12 +220,12 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	switch mode {
 	case "boolean":
 		parsed := fts.ParseAdvancedQuery(req.Query)
-		results, err = s.FTSIndex.SearchBoolean(req.Collection, parsed, searchLimit)
+		results, err = idx.SearchBoolean(req.Collection, parsed, searchLimit)
 
 	case "phrase":
 		// Extract phrase text (strip quotes if present)
 		phraseText := strings.Trim(req.Query, "\"")
-		results, err = s.FTSIndex.SearchPhrase(req.Collection, phraseText, searchLimit)
+		results, err = idx.SearchPhrase(req.Collection, phraseText, searchLimit)
 
 	case "proximity":
 		parsed := fts.ParseAdvancedQuery(req.Query)
@@ -246,17 +237,17 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		for _, c := range parsed.Clauses {
 			if c.Type == "proximity" {
 				distance = c.Distance
-				results, err = s.FTSIndex.SearchProximity(req.Collection, c.Value, distance, searchLimit)
+				results, err = idx.SearchProximity(req.Collection, c.Value, distance, searchLimit)
 				break
 			}
 		}
 		if results == nil && err == nil {
 			phraseText := strings.Trim(req.Query, "\"")
-			results, err = s.FTSIndex.SearchProximity(req.Collection, phraseText, distance, searchLimit)
+			results, err = idx.SearchProximity(req.Collection, phraseText, distance, searchLimit)
 		}
 
 	case "wildcard":
-		results, err = s.FTSIndex.SearchWildcard(req.Collection, req.Query, searchLimit)
+		results, err = idx.SearchWildcard(req.Collection, req.Query, searchLimit)
 
 	case "expression":
 		var expr fts.QueryExpr
@@ -269,34 +260,34 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 			bad(w, err)
 			return
 		}
-		results, err = s.FTSIndex.EvaluateExpression(req.Collection, expr, searchLimit)
+		results, err = idx.EvaluateExpression(req.Collection, expr, searchLimit)
 
 	default: // "simple"
 		mode = "simple"
 		switch algo {
 		case "bm25f":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchBM25FFuzzy(req.Collection, tokens, searchLimit, fuzzy, req.FieldWeights)
+				results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, searchLimit, fuzzy, req.FieldWeights)
 			} else {
-				results, err = s.FTSIndex.SearchBM25F(req.Collection, tokens, searchLimit, req.FieldWeights)
+				results, err = idx.SearchBM25F(req.Collection, tokens, searchLimit, req.FieldWeights)
 			}
 		case "bm25":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, fuzzy)
+				results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, fuzzy)
 			} else {
-				results, err = s.FTSIndex.SearchBM25(req.Collection, req.Query, searchLimit)
+				results, err = idx.SearchBM25(req.Collection, req.Query, searchLimit)
 			}
 		case "tfidf":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
+				results, err = idx.SearchFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
 			} else {
-				results, err = s.FTSIndex.Search(req.Collection, req.Query, searchLimit)
+				results, err = idx.Search(req.Collection, req.Query, searchLimit)
 			}
 		case "pmisparse":
 			if fuzzy > 0 {
-				results, err = s.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
+				results, err = idx.SearchPMISparseFuzzy(req.Collection, req.Query, searchLimit, fuzzy)
 			} else {
-				results, err = s.FTSIndex.SearchPMISparse(req.Collection, req.Query, searchLimit)
+				results, err = idx.SearchPMISparse(req.Collection, req.Query, searchLimit)
 			}
 		default:
 			bad(w, fmt.Errorf("unknown algorithm: %s, available: tfidf, bm25, bm25f, pmisparse", algo))
@@ -362,7 +353,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 	resp.Fuzzy = fuzzy
 	resp.Lang = queryLang
 	resp.StemmingActive = origStemmer != nil && !req.DisableStem
-	resp.SynonymsActive = origSynonyms != nil && !req.DisableSynonyms
+	resp.SynonymsActive = s.FTSIndex.SynonymManager() != nil && !req.DisableSynonyms
 	if algo == "bm25f" {
 		resp.FieldWeights = req.FieldWeights
 	}
@@ -483,13 +474,7 @@ func (s *Server) handleFTSReindex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Collect docs first (read tx), then index outside tx to avoid deadlock
-	type reindexDoc struct {
-		ID        string
-		ContentMD string
-		Lang      string
-		Meta      map[string][]string
-	}
-	var docs []reindexDoc
+	var docs []*storage.Doc
 	var skipped int
 	_ = s.DBView(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
@@ -509,12 +494,7 @@ func (s *Server) handleFTSReindex(w http.ResponseWriter, r *http.Request) {
 				skipped++
 				continue
 			}
-			docs = append(docs, reindexDoc{
-				ID:        docPtr.ID,
-				ContentMD: docPtr.ContentMD,
-				Lang:      docPtr.Lang,
-				Meta:      docPtr.Meta,
-			})
+			docs = append(docs, docPtr)
 		}
 		return nil
 	})
@@ -522,16 +502,7 @@ func (s *Server) handleFTSReindex(w http.ResponseWriter, r *http.Request) {
 	// Index outside the read tx to avoid BoltDB nested tx deadlock
 	reindexed := 0
 	for _, d := range docs {
-		_ = s.FTSIndex.IndexWithLang(req.Collection, d.ID, d.ContentMD, d.Lang)
-		_ = s.FTSIndex.IndexPositionsWithLang(req.Collection, d.ID, d.ContentMD, d.Lang)
-
-		fields := map[string]string{"content": d.ContentMD}
-		for mk, vals := range d.Meta {
-			if len(vals) > 0 {
-				fields["meta."+mk] = strings.Join(vals, " ")
-			}
-		}
-		_ = s.FTSIndex.IndexFieldsWithLang(req.Collection, d.ID, fields, d.Lang)
+		_ = s.indexDocumentFTS(req.Collection, d)
 		reindexed++
 	}
 

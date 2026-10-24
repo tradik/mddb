@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"mddb/internal/fts"
@@ -203,22 +202,9 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 		// FTS indexing is collected here and written once for the whole batch
 		// below (GO-027) — see indexBatchFTS.
 		if !opts.SkipFTS && s.FTSIndex != nil && p.Doc.ContentMD != "" {
-			fields := map[string]string{"content": p.Doc.ContentMD}
-			for k, vals := range p.Doc.Meta {
-				if len(vals) > 0 {
-					fields["meta."+k] = strings.Join(vals, " ")
-				}
-			}
-			ftsBatch = append(ftsBatch, fts.BulkDoc{
-				DocID:   p.DocID,
-				Content: p.Doc.ContentMD,
-				Lang:    p.Doc.Lang,
-				// CODE-001: source is tokenised differently from prose. The
-				// kind comes from meta, or from the key's extension when meta
-				// does not say.
-				Kind:   DocumentKind(&p.Doc),
-				Fields: fields,
-			})
+			bd := ftsBulkDoc(&p.Doc)
+			bd.DocID = p.DocID
+			ftsBatch = append(ftsBatch, bd)
 		}
 
 		// Webhooks + SSE
@@ -275,11 +261,8 @@ func (s *Server) indexBatchFTS(collection string, batch []fts.BulkDoc) {
 			"collection", collection, "documents", len(batch), "err", err)
 	}
 	for _, d := range batch {
-		if err := s.FTSIndex.IndexWithLang(collection, d.DocID, d.Content, d.Lang); err != nil {
+		if err := s.FTSIndex.IndexDocs(collection, []fts.BulkDoc{d}); err != nil {
 			slog.Warn("FTS indexing failed", "collection", collection, "docID", d.DocID, "err", err)
-			continue
 		}
-		_ = s.FTSIndex.IndexPositionsWithLang(collection, d.DocID, d.Content, d.Lang)
-		_ = s.FTSIndex.IndexFieldsWithLang(collection, d.DocID, d.Fields, d.Lang)
 	}
 }

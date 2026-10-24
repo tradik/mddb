@@ -10,7 +10,6 @@ import (
 	"mddb/internal/fts"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
-	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -619,11 +618,8 @@ func (c *DirectClient) FTSReindex(ctx context.Context, req *MCPFTSReindexRequest
 	}
 
 	// Collect docs first (read tx), then index outside to avoid deadlock
-	type reindexDoc struct {
-		ID, ContentMD, Lang string
-		Meta                map[string][]string
-	}
-	var docs []reindexDoc
+
+	var docs []*storage.Doc
 	var skipped int
 	_ = c.server.DBView(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
@@ -642,22 +638,14 @@ func (c *DirectClient) FTSReindex(ctx context.Context, req *MCPFTSReindexRequest
 				skipped++
 				continue
 			}
-			docs = append(docs, reindexDoc{docPtr.ID, docPtr.ContentMD, docPtr.Lang, docPtr.Meta})
+			docs = append(docs, docPtr)
 		}
 		return nil
 	})
 
 	reindexed := 0
 	for _, d := range docs {
-		_ = c.server.FTSIndex.IndexWithLang(req.Collection, d.ID, d.ContentMD, d.Lang)
-		_ = c.server.FTSIndex.IndexPositionsWithLang(req.Collection, d.ID, d.ContentMD, d.Lang)
-		fields := map[string]string{"content": d.ContentMD}
-		for mk, vals := range d.Meta {
-			if len(vals) > 0 {
-				fields["meta."+mk] = strings.Join(vals, " ")
-			}
-		}
-		_ = c.server.FTSIndex.IndexFieldsWithLang(req.Collection, d.ID, fields, d.Lang)
+		_ = c.server.indexDocumentFTS(req.Collection, d)
 		reindexed++
 	}
 

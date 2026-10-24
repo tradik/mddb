@@ -34,6 +34,33 @@ type FTSIndex struct {
 	synonymManager  *SynonymManager
 	stopWordManager *StopWordManager
 	pmiData         *PMIData
+	// noStem is set only on a QueryView: it turns off every stemmer,
+	// including the per-language ones the registry resolves.
+	noStem bool
+}
+
+// QueryView returns the index as one request should see it: the same storage,
+// with stemming and/or synonym expansion off for that request alone.
+//
+// The HTTP and hybrid handlers used to implement disableStem by setting the
+// shared index's stemmer to nil for the duration of the request. Every other
+// request in flight lost stemming meanwhile, and a document written at the
+// same moment was indexed unstemmed, where no stemmed query would find it.
+// The index holds only pointers, so a copy shares everything but the two
+// switches.
+func (f *FTSIndex) QueryView(noStem, noSynonyms bool) *FTSIndex {
+	if f == nil || (!noStem && !noSynonyms) {
+		return f
+	}
+	v := *f
+	if noStem {
+		v.stemmer = nil
+		v.noStem = true
+	}
+	if noSynonyms {
+		v.synonymManager = nil
+	}
+	return &v
 }
 
 // SetStemmer sets the stemmer for term normalization.
@@ -149,6 +176,7 @@ func (f *FTSIndex) Tokenize(text string) map[string]int {
 func (f *FTSIndex) TokenizeQuery(collection, text string) map[string]int {
 	terms := f.Tokenize(text)
 	if f.synonymManager == nil {
+		mergeCodeQueryTerms(terms, text, f.stopWords)
 		return terms
 	}
 	// Expand with synonyms
@@ -170,6 +198,7 @@ func (f *FTSIndex) TokenizeQuery(collection, text string) map[string]int {
 			}
 		}
 	}
+	mergeCodeQueryTerms(expanded, text, f.stopWords)
 	return expanded
 }
 
@@ -179,6 +208,9 @@ func (f *FTSIndex) resolveLang(lang string) (Stemmer, map[string]bool) {
 	if f.langRegistry != nil && lang != "" {
 		cfg := f.langRegistry.Resolve(lang)
 		if cfg != nil {
+			if f.noStem {
+				return nil, cfg.StopWords
+			}
 			return cfg.Stemmer, cfg.StopWords
 		}
 	}
@@ -223,7 +255,9 @@ func (f *FTSIndex) TokenizeLang(text, lang string) map[string]int {
 // TokenizeQueryLang tokenizes query text with synonym expansion, language-aware.
 func (f *FTSIndex) TokenizeQueryLang(collection, text, lang string) map[string]int {
 	terms := f.TokenizeLang(text, lang)
+	_, stopWords := f.resolveLang(lang)
 	if f.synonymManager == nil {
+		mergeCodeQueryTerms(terms, text, stopWords)
 		return terms
 	}
 	stemmer, _ := f.resolveLang(lang)
@@ -244,6 +278,7 @@ func (f *FTSIndex) TokenizeQueryLang(collection, text, lang string) map[string]i
 			}
 		}
 	}
+	mergeCodeQueryTerms(expanded, text, stopWords)
 	return expanded
 }
 
