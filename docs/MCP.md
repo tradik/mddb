@@ -239,6 +239,49 @@ Key features:
 - **Cache** — lookups cached for `MDDB_MCP_API_KEY_CACHE_TTL` (default 60s), auto-invalidated on create/delete/disable
 - **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab)
 
+### OAuth 2.1 for claude.ai connectors (v2.18.1)
+
+Claude Code and the Claude API's MCP connector send an API key. claude.ai's
+"Add custom connector" cannot: it supports OAuth or no authentication at all.
+With OAuth on, the MCP listener is its own minimal authorization server, as
+the MCP authorization spec describes:
+
+- `GET /.well-known/oauth-protected-resource` and
+  `GET /.well-known/oauth-authorization-server` — discovery metadata
+  (RFC 9728, RFC 8414). A request to `/mcp` without credentials gets a 401
+  whose `WWW-Authenticate` header points at the first one.
+- `POST /oauth/register` — dynamic client registration (RFC 7591). Public
+  clients only; a redirect URI must be in `MDDB_MCP_OAUTH_REDIRECT_URIS` or an
+  `http://localhost` / `127.0.0.1` / `[::1]` URI on any port.
+- `GET|POST /oauth/authorize` — authorization code with PKCE (S256 only). The
+  consent page asks for an **MCP API key**: mddb has no user accounts, so the
+  key is what identifies the person authorizing.
+- `POST /oauth/token` — `authorization_code` and `refresh_token` grants.
+
+Every token stands for the API key entered on the consent page, and the
+listener checks it as that key. A token can do what its key can; deleting or
+disabling the key revokes its tokens within `MDDB_MCP_API_KEY_CACHE_TTL`, and
+refreshing fails from then on. API keys keep working beside OAuth.
+
+```bash
+MDDB_MCP_API_KEY_ENABLED=true            # required: tokens stand for keys
+MDDB_MCP_OAUTH_ENABLED=true
+MDDB_MCP_OAUTH_ISSUER=https://mcp.example.com    # the listener's public URL
+MDDB_MCP_OAUTH_SECRET=<32+ random characters>    # e.g. openssl rand -base64 48
+```
+
+Then add `https://mcp.example.com/mcp` as a custom connector in claude.ai,
+and paste an MCP API key on the page that opens.
+
+Tokens and client IDs are sealed with AES-256-GCM under
+`MDDB_MCP_OAUTH_SECRET` and stored nowhere, so they survive restarts and work
+on every replica that shares the secret. Without the secret a random one is
+used and every token dies with the process. Authorization codes live in memory
+for one minute and are single-use. Refresh tokens are not rotated server-side
+(nothing is stored to rotate); they expire after
+`MDDB_MCP_OAUTH_REFRESH_TTL`. Expose the listener over HTTPS — through
+cloudflared or a reverse proxy — since the issuer must be an `https` URL.
+
 ### Rate Limiting
 
 | Env Var | Default | Description |

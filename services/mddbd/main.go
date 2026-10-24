@@ -1070,7 +1070,7 @@ func main() {
 			mcpMux.HandleFunc("/mcp", mcpStreamable.Handle)
 			slog.Info("MCP Streamable HTTP transport enabled at /mcp")
 
-			// MCP middleware chain: CORS → API Key Auth → Rate Limit → Request Logging → JSON → Routes
+			// MCP middleware chain: CORS → OAuth (#322) → API Key Auth → Rate Limit → Request Logging → JSON → Routes
 			var mcpHandler http.Handler = mcpMux
 			mcpHandler = withJSON(mcpHandler)
 
@@ -1091,6 +1091,10 @@ func main() {
 			// anonymous full-R/W bypass; warn loudly if MCP is unauthenticated
 			// and bound beyond loopback.
 			mcpHandler = s.applyMCPAuth(mcpHandler, srvCfg.MCP.Addr)
+
+			// #322: OAuth 2.1 for clients that cannot send an API key
+			// (claude.ai connectors). Off unless MDDB_MCP_OAUTH_ENABLED=true.
+			mcpHandler = newMCPOAuthFromEnv(mcpAuth).Wrap(mcpHandler)
 
 			if panelMode != "external" {
 				mcpHandler = withCORS(mcpHandler)

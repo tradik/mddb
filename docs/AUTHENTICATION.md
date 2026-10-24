@@ -126,6 +126,10 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 
 **Best for:** Services, CI/CD pipelines, MCP servers
 
+> The MCP listener has its own keys (`MDDB_MCP_API_KEYS`, `/v1/mcp/keys`)
+> and, since v2.18.1, OAuth 2.1 for clients that cannot send a key, such as
+> claude.ai connectors. See [MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181).
+
 Create an API key:
 
 ```bash

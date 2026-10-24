@@ -102,6 +102,21 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_MCP_API_KEYS` | `""` | string | Static API keys: `key1:name1,key2:name2` |
 | `MDDB_MCP_API_KEY_CACHE_TTL` | `"5m"` | duration | Cache TTL for dynamic API key lookups |
 
+### MCP OAuth 2.1 (v2.18.1+)
+
+OAuth for clients that cannot send an API key, such as claude.ai custom
+connectors. Every token stands for an MCP API key; see
+[MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181).
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_MCP_OAUTH_ENABLED` | `false` | bool | Serve OAuth discovery, registration, authorization and token endpoints on the MCP listener. Requires `MDDB_MCP_API_KEY_ENABLED=true` |
+| `MDDB_MCP_OAUTH_ISSUER` | `""` | string | Public base URL of the MCP listener, `https://...` (plain http only for loopback). Required |
+| `MDDB_MCP_OAUTH_SECRET` | random | string | At least 32 characters; seals tokens and client IDs. Unset: random per process, so tokens stop working on restart |
+| `MDDB_MCP_OAUTH_REDIRECT_URIS` | claude.ai and claude.com callbacks | string | Comma-separated redirect URIs clients may register, matched exactly. Loopback http URIs are always allowed |
+| `MDDB_MCP_OAUTH_ACCESS_TTL` | `3600` | int | Access token lifetime in seconds |
+| `MDDB_MCP_OAUTH_REFRESH_TTL` | `2592000` | int | Refresh token lifetime in seconds (30 days) |
+
 ### MCP Rate Limiting
 
 | Env Var | Default | Type | Description |

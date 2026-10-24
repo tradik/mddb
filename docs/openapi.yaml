@@ -4137,6 +4137,111 @@ paths:
         "404":
           description: Document or revision not found
 
+  /.well-known/oauth-protected-resource:
+    get:
+      tags: [MCP]
+      summary: (v2.18.1+) OAuth protected-resource metadata, RFC 9728 (MCP listener)
+      description: Served on the MCP listener when MDDB_MCP_OAUTH_ENABLED=true (#322).
+      security: []
+      responses:
+        "200":
+          description: Resource metadata
+          content:
+            application/json:
+              example:
+                resource: https://mcp.example.com/mcp
+                authorization_servers: [https://mcp.example.com]
+                bearer_methods_supported: [header]
+  /.well-known/oauth-authorization-server:
+    get:
+      tags: [MCP]
+      summary: (v2.18.1+) OAuth authorization-server metadata, RFC 8414 (MCP listener)
+      security: []
+      responses:
+        "200":
+          description: Server metadata
+          content:
+            application/json:
+              example:
+                issuer: https://mcp.example.com
+                authorization_endpoint: https://mcp.example.com/oauth/authorize
+                token_endpoint: https://mcp.example.com/oauth/token
+                registration_endpoint: https://mcp.example.com/oauth/register
+                response_types_supported: [code]
+                grant_types_supported: [authorization_code, refresh_token]
+                code_challenge_methods_supported: [S256]
+                token_endpoint_auth_methods_supported: [none]
+  /oauth/register:
+    post:
+      tags: [MCP]
+      summary: (v2.18.1+) Dynamic client registration, RFC 7591 (MCP listener)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [redirect_uris]
+              properties:
+                redirect_uris:
+                  type: array
+                  maxItems: 10
+                  items: {type: string}
+                  description: Each must be in MDDB_MCP_OAUTH_REDIRECT_URIS or an http loopback URI.
+                client_name: {type: string, maxLength: 200}
+      responses:
+        "201":
+          description: Registered; client_id is the sealed registration, nothing is stored
+        "400":
+          description: invalid_client_metadata or invalid_redirect_uri
+  /oauth/authorize:
+    get:
+      tags: [MCP]
+      summary: (v2.18.1+) Authorization endpoint — consent page (MCP listener)
+      description: >
+        Authorization code with PKCE (S256 only). Renders a page asking for an
+        MCP API key; POSTing it redirects to redirect_uri with code, state and iss.
+      security: []
+      parameters:
+        - {name: response_type, in: query, required: true, schema: {type: string, enum: [code]}}
+        - {name: client_id, in: query, required: true, schema: {type: string}}
+        - {name: redirect_uri, in: query, required: true, schema: {type: string}}
+        - {name: code_challenge, in: query, required: true, schema: {type: string}}
+        - {name: code_challenge_method, in: query, required: true, schema: {type: string, enum: [S256]}}
+        - {name: state, in: query, schema: {type: string}}
+      responses:
+        "200": {description: Consent page (text/html)}
+        "302": {description: Redirect to the client with an error}
+        "400": {description: Unknown client or redirect URI}
+  /oauth/token:
+    post:
+      tags: [MCP]
+      summary: (v2.18.1+) Token endpoint (MCP listener)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type, client_id]
+              properties:
+                grant_type: {type: string, enum: [authorization_code, refresh_token]}
+                client_id: {type: string}
+                code: {type: string}
+                redirect_uri: {type: string}
+                code_verifier: {type: string}
+                refresh_token: {type: string}
+      responses:
+        "200":
+          description: Tokens. The access token stands for the MCP API key entered on the consent page.
+          content:
+            application/json:
+              example: {access_token: mddb_oat_..., token_type: Bearer, expires_in: 3600, refresh_token: mddb_ort_...}
+        "400": {description: invalid_grant or unsupported_grant_type}
+        "401": {description: invalid_client}
+
   /mcp:
     post:
       tags:
