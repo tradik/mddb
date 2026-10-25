@@ -96,11 +96,19 @@ func (m *spellModel) suggest(token string) (SpellSuggestion, bool) {
 // SpellManager manages per-language and per-collection spell-check dictionaries.
 type SpellManager struct {
 	db     *bolt.DB
+	follow func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 	mu     sync.RWMutex
 	models map[string]*spellModel // key: lang or "col:collection:lang"
 	ready  atomic.Bool
 	binlog *binlog.Binlog
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (sm *SpellManager) FollowDB(src func() *bolt.DB) { sm.follow = src }
+
+func (sm *SpellManager) handle() *bolt.DB { return boltx.Current(sm.db, sm.follow) }
 
 // NewSpellManager creates a SpellManager backed by BoltDB.
 func NewSpellManager(db *bolt.DB) *SpellManager {
@@ -117,7 +125,7 @@ func (sm *SpellManager) SetBinlog(bl *binlog.Binlog) {
 
 // EnsureBucket creates the spelldicts bucket if needed.
 func (sm *SpellManager) EnsureBucket() error {
-	return boltx.EnsureBuckets(sm.db, bucketSpellDicts)
+	return boltx.EnsureBuckets(sm.handle(), bucketSpellDicts)
 }
 
 // Ready reports whether the initial dictionary load has completed.
@@ -128,7 +136,7 @@ func (sm *SpellManager) Ready() bool {
 // LoadAll reads all stored words from BoltDB into memory asynchronously.
 func (sm *SpellManager) LoadAll() {
 	go func() {
-		_ = sm.db.View(func(tx *bolt.Tx) error {
+		_ = sm.handle().View(func(tx *bolt.Tx) error {
 			b := tx.Bucket(bucketSpellDicts)
 			if b == nil {
 				return nil
@@ -206,7 +214,7 @@ func (sm *SpellManager) AddWord(collection, lang, word string, freq uint32) erro
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], freq)
 
-	err := sm.db.Update(func(tx *bolt.Tx) error {
+	err := sm.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketSpellDicts)
 		if b == nil {
 			return nil
@@ -238,7 +246,7 @@ func (sm *SpellManager) RemoveWord(collection, lang, word string) error {
 	} else {
 		dbKey = lang + "|" + lower
 	}
-	err := sm.db.Update(func(tx *bolt.Tx) error {
+	err := sm.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketSpellDicts)
 		if b == nil {
 			return nil
@@ -263,7 +271,7 @@ func (sm *SpellManager) RemoveWord(collection, lang, word string) error {
 // ListWords returns all words stored for a collection+lang combination.
 func (sm *SpellManager) ListWords(collection, lang string) ([]string, error) {
 	var words []string
-	err := sm.db.View(func(tx *bolt.Tx) error {
+	err := sm.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketSpellDicts)
 		if b == nil {
 			return nil

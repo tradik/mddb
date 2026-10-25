@@ -6,7 +6,7 @@ type: post
 date: 2026-10-25
 tags: [release, storage, mcp, search]
 excerpt: "MDDB 2.18 reads C code, then spent two patch releases on what large databases taught it: restarts in milliseconds, reads during crash recovery, one file per collection, and OAuth for claude.ai connectors."
-description: "MDDB 2.18.0 to 2.18.2: C, C++ and assembly in code_graph; vector search for keys with '#'; collection deletes that remove vectors; OAuth 2.1 on the MCP listener; stored freelists, background recovery, per-collection storage files, storage breakdown and an importable Go client."
+description: "MDDB 2.18.0 to 2.18.3: C, C++ and assembly in code_graph; vector search for keys with '#'; collection deletes that remove vectors; OAuth 2.1 on the MCP listener; stored freelists, background recovery, per-collection storage files, storage breakdown and an importable Go client."
 ---
 
 MDDB 2.18.0 taught the server to read C, C++ and assembly. The two patch
@@ -15,7 +15,7 @@ into it: a database of about a million documents and 101 GB on disk, and the
 problems that only show up at that size.
 
 The full list is in the
-[changelog](https://github.com/tradik/mddb/blob/2.18.2/CHANGELOG.md). This
+[changelog](https://github.com/tradik/mddb/blob/2.18.3/CHANGELOG.md). This
 article covers what changes for you.
 
 ## 2.18.0: C, C++ and assembly
@@ -47,7 +47,7 @@ Three changes in 2.18.2 remove most of that:
   the progress until it is done, and `/health` reports `degraded` with
   `reads: true`, `writes: false`, a percentage and an ETA. This needed a
   change to bbolt itself, which MDDB now carries as a small patch
-  ([MDDB-PATCH.md](https://github.com/tradik/mddb/blob/2.18.2/services/mddbd/third_party/bbolt/MDDB-PATCH.md)).
+  ([MDDB-PATCH.md](https://github.com/tradik/mddb/blob/2.18.3/services/mddbd/third_party/bbolt/MDDB-PATCH.md)).
 - **Files of 4 GiB or more store the list on every commit**, unless
   `MDDB_FREELIST_SYNC` says otherwise. Past that size a rebuild costs too
   much to risk; below it, commits stay as fast as they were.
@@ -79,7 +79,7 @@ own, so a large collection does not hold up writes to a small one.
 `-merge-collections` moves it back. Both copy every key, check it arrived,
 and only then delete it from where it was. The default layout has not
 changed. Replication snapshots are not available in this layout yet; the
-binlog is. [STORAGE-LAYOUT.md](https://github.com/tradik/mddb/blob/2.18.2/docs/STORAGE-LAYOUT.md)
+binlog is. [STORAGE-LAYOUT.md](https://github.com/tradik/mddb/blob/2.18.3/docs/STORAGE-LAYOUT.md)
 covers backups and the limits.
 
 ## Where the bytes are
@@ -92,13 +92,17 @@ searched only by metadata or vectors can turn them off with
 `"fts": {"enabled": false}` in its configuration. `mddbd -compact-db` copies
 a database into a new file without its free space.
 
-[STORAGE-TUNING.md](https://github.com/tradik/mddb/blob/2.18.2/docs/STORAGE-TUNING.md)
+[STORAGE-TUNING.md](https://github.com/tradik/mddb/blob/2.18.3/docs/STORAGE-TUNING.md)
 collects what matters for disks and filesystems: cloud volumes and their
 IOPS limits, ZFS record sizes, and settings for WSL2, macOS and Windows.
 
-## Fixes from 2.18.1
+## Fixes
 
-- **Vector search found nothing for keys containing `#`.** Code collections
+- **After a restore, writes to users, keys, configurations and automations
+  failed until a restart** (2.18.3): those managers kept the database handle
+  the restore had closed.
+
+- **Vector search found nothing for keys containing `#`** (2.18.1). Code collections
   key functions as `file#function`, and the chunk suffix was cut at the first
   `#`. Every vector hit for those documents was dropped while `vector-stats`
   counted them as embedded.

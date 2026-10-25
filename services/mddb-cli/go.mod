@@ -7,7 +7,7 @@ toolchain go1.27.3
 require (
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
-	github.com/tradik/mddb/clients/go/mddb/v2 v2.18.2
+	github.com/tradik/mddb/clients/go/mddb/v2 v2.18.3
 )
 
 require github.com/inconshreveable/mousetrap v1.1.0 // indirect

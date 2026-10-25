@@ -169,6 +169,25 @@ func (s *Server) rebuildInMemoryState() {
 		}
 	}
 
+	// The managers of the server's own data follow s.DB (FollowDB), so they
+	// already write to the new file; their in-memory state is reloaded from
+	// it here. Before 2.18.3 they kept the closed handle, and every write to
+	// users, keys, automations, configs or curation rules failed until a
+	// restart.
+	for name, reload := range map[string]func() error{
+		"collection configs": func() error { return reloadIf(s.CollectionManager != nil, s.CollectionManager.LoadAll) },
+		"auth":               func() error { return reloadIf(s.AuthManager != nil, s.AuthManager.LoadAll) },
+		"automations":        func() error { return reloadIf(s.AutomationManager != nil, s.AutomationManager.LoadAll) },
+		"curation rules":     func() error { return reloadIf(s.CurationManager != nil, s.CurationManager.LoadAll) },
+	} {
+		if err := reload(); err != nil {
+			slog.Warn("reload after restore failed", "what", name, "err", err)
+		}
+	}
+	if s.SpellManager != nil {
+		s.SpellManager.LoadAll()
+	}
+
 	// Reload webhooks in place.
 	if s.WebhookManager != nil {
 		if err := s.WebhookManager.Reload(s.DB); err != nil {
@@ -195,4 +214,12 @@ func (s *Server) rebuildInMemoryState() {
 	s.SearchCache.Clear()
 
 	slog.Info("in-memory state rebuilt after database swap")
+}
+
+// reloadIf calls load when ok, for managers that may not exist.
+func reloadIf(ok bool, load func() error) error {
+	if !ok {
+		return nil
+	}
+	return load()
 }

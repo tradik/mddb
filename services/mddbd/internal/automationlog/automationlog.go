@@ -35,9 +35,17 @@ type Entry struct {
 // Store persists and queries automation execution logs in BoltDB.
 type Store struct {
 	db     *bolt.DB
+	follow func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 	ttl    time.Duration
 	stopCh chan struct{}
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (ls *Store) FollowDB(src func() *bolt.DB) { ls.follow = src }
+
+func (ls *Store) handle() *bolt.DB { return boltx.Current(ls.db, ls.follow) }
 
 // NewStore creates a new log store with the given TTL retention.
 func NewStore(db *bolt.DB, ttl time.Duration) *Store {
@@ -50,7 +58,7 @@ func NewStore(db *bolt.DB, ttl time.Duration) *Store {
 
 // EnsureBucket creates the automation_log bucket if it doesn't exist.
 func (ls *Store) EnsureBucket() error {
-	return boltx.EnsureBuckets(ls.db, bucketAutomationLog)
+	return boltx.EnsureBuckets(ls.handle(), bucketAutomationLog)
 }
 
 // Log writes a single log entry. Called inline after webhook fire.
@@ -68,7 +76,7 @@ func (ls *Store) Log(entry Entry) error {
 	}
 
 	key := []byte(entry.ID)
-	return ls.db.Update(func(tx *bolt.Tx) error {
+	return ls.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomationLog)
 		return b.Put(key, data)
 	})
@@ -87,7 +95,7 @@ func (ls *Store) List(limit int, cursor string, ruleID string, status string) ([
 	var entries []Entry
 	var nextCursor string
 
-	err := ls.db.View(func(tx *bolt.Tx) error {
+	err := ls.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomationLog)
 		if b == nil {
 			return nil
@@ -155,7 +163,7 @@ func (ls *Store) List(limit int, cursor string, ruleID string, status string) ([
 // Count returns the total number of log entries, optionally filtered.
 func (ls *Store) Count(ruleID string, status string) (int, error) {
 	var count int
-	err := ls.db.View(func(tx *bolt.Tx) error {
+	err := ls.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomationLog)
 		if b == nil {
 			return nil
@@ -222,7 +230,7 @@ func (ls *Store) cleanup() {
 	cutoffKey := fmt.Sprintf("%020d|", cutoffNano)
 
 	var deleted int
-	_ = ls.db.Update(func(tx *bolt.Tx) error {
+	_ = ls.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomationLog)
 		if b == nil {
 			return nil

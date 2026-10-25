@@ -50,12 +50,20 @@ type CurationRule struct {
 // by rule ID, plus a per-collection index for fast lookup during search.
 type CurationManager struct {
 	db        *bolt.DB
+	follow    func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 	mu        sync.RWMutex
 	byID      map[string]*CurationRule
 	byColl    map[string][]*CurationRule // collection -> rules
 	binlog    *binlog.Binlog
 	marshaler func(v any) ([]byte, error) // override for tests
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (cm *CurationManager) FollowDB(src func() *bolt.DB) { cm.follow = src }
+
+func (cm *CurationManager) handle() *bolt.DB { return boltx.Current(cm.db, cm.follow) }
 
 // NewCurationManager constructs a manager bound to db; callers must invoke
 // EnsureBucket then LoadAll before search traffic.
@@ -73,7 +81,7 @@ func (cm *CurationManager) SetBinlog(bl *binlog.Binlog) { cm.binlog = bl }
 
 // EnsureBucket is called once during server startup.
 func (cm *CurationManager) EnsureBucket() error {
-	return boltx.EnsureBuckets(cm.db, bucketCuration)
+	return boltx.EnsureBuckets(cm.handle(), bucketCuration)
 }
 
 // LoadAll rebuilds the in-memory cache from bolt. Called on startup and
@@ -85,7 +93,7 @@ func (cm *CurationManager) LoadAll() error {
 	cm.byID = make(map[string]*CurationRule)
 	cm.byColl = make(map[string][]*CurationRule)
 
-	return cm.db.View(func(tx *bolt.Tx) error {
+	return cm.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketCuration)
 		if b == nil {
 			return nil
@@ -146,7 +154,7 @@ func (cm *CurationManager) Set(rule *CurationRule) error {
 	}
 	key := []byte(rule.ID)
 
-	if err := cm.db.Update(func(tx *bolt.Tx) error {
+	if err := cm.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketCuration)
 		if b == nil {
 			return errors.New("curation bucket missing")
@@ -216,7 +224,7 @@ func (cm *CurationManager) ListAll() []*CurationRule {
 // Delete removes a rule by ID. No-op if already gone.
 func (cm *CurationManager) Delete(id string) error {
 	key := []byte(id)
-	if err := cm.db.Update(func(tx *bolt.Tx) error {
+	if err := cm.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketCuration)
 		if b == nil {
 			return nil

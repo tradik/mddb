@@ -36,6 +36,7 @@ type AuditEvent struct {
 // background goroutine so hot-path handlers never block on disk I/O.
 type AuditManager struct {
 	db            *bolt.DB
+	follow        func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 	enabled       bool
 	retentionDays int
 	ch            chan AuditEvent
@@ -45,6 +46,13 @@ type AuditManager struct {
 	exMu          sync.RWMutex
 	exporters     []AuditExporter // optional fan-out to SIEM / syslog
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (a *AuditManager) FollowDB(src func() *bolt.DB) { a.follow = src }
+
+func (a *AuditManager) handle() *bolt.DB { return boltx.Current(a.db, a.follow) }
 
 // AddExporter registers an external sink. Safe to call before or
 // after Start. nil receivers and nil exporters are silently ignored.
@@ -104,7 +112,7 @@ func (a *AuditManager) EnsureBuckets() error {
 	if a == nil || !a.enabled {
 		return nil
 	}
-	return boltx.EnsureBuckets(a.db, bucketAudit)
+	return boltx.EnsureBuckets(a.handle(), bucketAudit)
 }
 
 // Start launches the writer and the retention trimmer.
@@ -200,7 +208,7 @@ func (a *AuditManager) writer() {
 }
 
 func (a *AuditManager) flushBatch(batch []AuditEvent) error {
-	if err := a.db.Update(func(tx *bolt.Tx) error {
+	if err := a.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAudit)
 		if b == nil {
 			return errors.New("audit bucket missing")
@@ -268,7 +276,7 @@ func (a *AuditManager) PurgeOlderThan(cutoffNanos int64) error {
 	if a == nil || !a.enabled {
 		return nil
 	}
-	return a.db.Update(func(tx *bolt.Tx) error {
+	return a.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAudit)
 		if b == nil {
 			return nil
@@ -313,7 +321,7 @@ func (a *AuditManager) Query(f QueryFilter) ([]AuditEvent, error) {
 		f.Limit = 100
 	}
 	var out []AuditEvent
-	err := a.db.View(func(tx *bolt.Tx) error {
+	err := a.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAudit)
 		if b == nil {
 			return nil

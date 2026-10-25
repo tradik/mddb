@@ -108,11 +108,19 @@ type StorageConfigDef struct {
 // CollectionManager manages per-collection configuration in a dedicated BoltDB bucket.
 type CollectionManager struct {
 	db        *bolt.DB
+	follow    func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 	mu        sync.RWMutex
 	cache     map[string]*CollectionConfig
 	binlog    *binlog.Binlog
 	encryptor *encryption.Encryptor // optional; when set, cache changes are mirrored into it
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (cm *CollectionManager) FollowDB(src func() *bolt.DB) { cm.follow = src }
+
+func (cm *CollectionManager) handle() *bolt.DB { return boltx.Current(cm.db, cm.follow) }
 
 // NewCollectionManager creates a new collection config manager.
 func NewCollectionManager(db *bolt.DB) *CollectionManager {
@@ -141,15 +149,18 @@ func (cm *CollectionManager) SetEncryptor(e *encryption.Encryptor) {
 
 // EnsureBucket creates the colmeta bucket if it doesn't exist.
 func (cm *CollectionManager) EnsureBucket() error {
-	return boltx.EnsureBuckets(cm.db, bucketColMeta)
+	return boltx.EnsureBuckets(cm.handle(), bucketColMeta)
 }
 
 // LoadAll loads all collection configs from BoltDB into the in-memory cache.
 func (cm *CollectionManager) LoadAll() error {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
+	// Started empty: after a restore, configurations the restored database
+	// does not have must not survive from the old one.
+	cm.cache = make(map[string]*CollectionConfig)
 
-	return cm.db.View(func(tx *bolt.Tx) error {
+	return cm.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketColMeta)
 		if b == nil {
 			return nil
@@ -185,7 +196,7 @@ func (cm *CollectionManager) Set(collection string, cfg *CollectionConfig) error
 	}
 	key := []byte(collection)
 
-	if err := cm.db.Update(func(tx *bolt.Tx) error {
+	if err := cm.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketColMeta)
 		return b.Put(key, val)
 	}); err != nil {
@@ -208,7 +219,7 @@ func (cm *CollectionManager) Set(collection string, cfg *CollectionConfig) error
 // Delete removes the config for a collection.
 func (cm *CollectionManager) Delete(collection string) error {
 	key := []byte(collection)
-	if err := cm.db.Update(func(tx *bolt.Tx) error {
+	if err := cm.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketColMeta)
 		return b.Delete(key)
 	}); err != nil {

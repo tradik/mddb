@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.3] - 2026-10-25
+
+### Fixed
+
+- **After a restore or a replication snapshot, writes to the server's own
+  data failed until a restart.** The managers of users and API keys,
+  collection configurations, automations and their logs, curation rules,
+  spelling dictionaries, the audit log and MCP keys kept the database handle
+  they were built with, which the restore had closed: every write answered
+  `database not open`. They now follow the server's current handle, and their
+  in-memory state is reloaded from the restored database; collection
+  configurations that exist only in the old database no longer survive the
+  restore.
+
 ## [2.18.2] - 2026-10-25
 
 ### Added

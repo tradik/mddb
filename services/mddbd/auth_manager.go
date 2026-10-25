@@ -25,6 +25,7 @@ var (
 // AuthManager manages authentication and authorization
 type AuthManager struct {
 	db      *bolt.DB
+	follow  func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 	config  AuthConfig
 	enabled bool
 	server  *Server // set after construction; used only for audit log hooks
@@ -41,6 +42,13 @@ type AuthManager struct {
 	groups           map[string]*Group             // groupName -> Group
 	groupPermissions map[string][]*GroupPermission // groupName -> permissions
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (am *AuthManager) FollowDB(src func() *bolt.DB) { am.follow = src }
+
+func (am *AuthManager) handle() *bolt.DB { return boltx.Current(am.db, am.follow) }
 
 // SetServer wires the owning Server for audit log emission.
 func (am *AuthManager) SetServer(s *Server) {
@@ -72,7 +80,7 @@ func (am *AuthManager) IsEnabled() bool {
 
 // EnsureBuckets creates auth buckets if they don't exist
 func (am *AuthManager) EnsureBuckets() error {
-	return boltx.EnsureBuckets(am.db, bucketAuthUsers, bucketAuthAPIKeys, bucketAuthPerms, bucketAuthGroups, bucketAuthGroupPerms)
+	return boltx.EnsureBuckets(am.handle(), bucketAuthUsers, bucketAuthAPIKeys, bucketAuthPerms, bucketAuthGroups, bucketAuthGroupPerms)
 }
 
 // LoadAll loads all auth data from database into memory
@@ -83,7 +91,7 @@ func (am *AuthManager) LoadAll() error {
 	var groups []*Group
 	var groupPermissions []*GroupPermission
 
-	err := am.db.View(func(tx *bolt.Tx) error {
+	err := am.handle().View(func(tx *bolt.Tx) error {
 		// Load users
 		b := tx.Bucket(bucketAuthUsers)
 		if b != nil {
@@ -279,7 +287,7 @@ func (am *AuthManager) CreateTenantUser(username, password, tenant string) (*Use
 
 	// Save to database
 	data, _ := json.Marshal(user)
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAuthUsers)
 		return b.Put([]byte("user|"+username), data)
 	}); err != nil {
@@ -358,7 +366,7 @@ func (am *AuthManager) DeleteUser(username string) error {
 
 	// One transaction: a delete that half-succeeds leaves a user without a
 	// record but with the keys and grants that let them in.
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		if err := tx.Bucket(bucketAuthUsers).Delete([]byte("user|" + username)); err != nil {
 			return err
 		}
@@ -486,7 +494,7 @@ func (am *AuthManager) CreateAPIKey(username, description string, expiresAt int6
 
 	// Save to database
 	data, _ := json.Marshal(apiKey)
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAuthAPIKeys)
 		return b.Put([]byte("apikey|"+keyHash), data)
 	}); err != nil {
@@ -551,7 +559,7 @@ func (am *AuthManager) DeleteAPIKey(username, keyHash string) error {
 	}
 
 	// Delete from database
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAuthAPIKeys)
 		return b.Delete([]byte("apikey|" + keyHash))
 	}); err != nil {
@@ -578,7 +586,7 @@ func (am *AuthManager) SetPermission(perm *Permission) error {
 	// Save to database
 	key := fmt.Sprintf("perm|%s|%s", perm.Username, perm.Collection)
 	data, _ := json.Marshal(perm)
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAuthPerms)
 		return b.Put([]byte(key), data)
 	}); err != nil {
@@ -746,7 +754,7 @@ func (am *AuthManager) CreateGroup(name, description string, members []string) (
 	}
 
 	// Save to database
-	err := am.db.Update(func(tx *bolt.Tx) error {
+	err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAuthGroups)
 		data, err := json.Marshal(group)
 		if err != nil {
@@ -807,7 +815,7 @@ func (am *AuthManager) UpdateGroup(name, description string, members []string) (
 	group.Members = members
 
 	// Save to database
-	err := am.db.Update(func(tx *bolt.Tx) error {
+	err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAuthGroups)
 		data, err := json.Marshal(group)
 		if err != nil {
@@ -834,7 +842,7 @@ func (am *AuthManager) DeleteGroup(name string) error {
 	}
 
 	// Delete from database
-	err := am.db.Update(func(tx *bolt.Tx) error {
+	err := am.handle().Update(func(tx *bolt.Tx) error {
 		// Delete group
 		b := tx.Bucket(bucketAuthGroups)
 		if err := b.Delete([]byte(name)); err != nil {
@@ -882,7 +890,7 @@ func (am *AuthManager) SetGroupPermission(gp *GroupPermission) error {
 	key := fmt.Sprintf("%s|%s", gp.GroupName, gp.Collection)
 
 	// Save to database
-	err := am.db.Update(func(tx *bolt.Tx) error {
+	err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAuthGroupPerms)
 		data, err := json.Marshal(gp)
 		if err != nil {

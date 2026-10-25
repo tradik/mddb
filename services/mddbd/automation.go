@@ -55,12 +55,20 @@ type AutomationRule struct {
 // AutomationManager manages automation rules (webhooks, triggers, crons).
 type AutomationManager struct {
 	db       *bolt.DB
+	follow   func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 	mu       sync.RWMutex
 	rules    []AutomationRule
 	binlog   *binlog.Binlog
 	server   *Server
 	logStore *automationlog.Store
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (am *AutomationManager) FollowDB(src func() *bolt.DB) { am.follow = src }
+
+func (am *AutomationManager) handle() *bolt.DB { return boltx.Current(am.db, am.follow) }
 
 // NewAutomationManager creates a new automation manager.
 func NewAutomationManager(db *bolt.DB) *AutomationManager {
@@ -86,13 +94,13 @@ func (am *AutomationManager) SetLogStore(ls *automationlog.Store) {
 
 // EnsureBucket creates the automation bucket if it doesn't exist.
 func (am *AutomationManager) EnsureBucket() error {
-	return boltx.EnsureBuckets(am.db, bucketAutomation)
+	return boltx.EnsureBuckets(am.handle(), bucketAutomation)
 }
 
 // LoadAll loads all automation rules from BoltDB into memory.
 func (am *AutomationManager) LoadAll() error {
 	var rules []AutomationRule
-	err := am.db.View(func(tx *bolt.Tx) error {
+	err := am.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomation)
 		if b == nil {
 			return nil
@@ -136,7 +144,7 @@ func (am *AutomationManager) Create(rule AutomationRule) (*AutomationRule, error
 	}
 
 	key := autoKey(rule.ID)
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomation)
 		return b.Put(key, data)
 	}); err != nil {
@@ -200,7 +208,7 @@ func (am *AutomationManager) Update(id string, update AutomationRule) (*Automati
 	}
 
 	key := autoKey(id)
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomation)
 		return b.Put(key, data)
 	}); err != nil {
@@ -226,7 +234,7 @@ func (am *AutomationManager) Update(id string, update AutomationRule) (*Automati
 // Delete removes an automation rule by ID.
 func (am *AutomationManager) Delete(id string) error {
 	key := autoKey(id)
-	if err := am.db.Update(func(tx *bolt.Tx) error {
+	if err := am.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketAutomation)
 		return b.Delete(key)
 	}); err != nil {
@@ -337,7 +345,7 @@ func (am *AutomationManager) UpdateLastRun(id string, ts int64) {
 			go func(rule AutomationRule) {
 				data, _ := json.Marshal(rule)
 				key := autoKey(rule.ID)
-				_ = am.db.Update(func(tx *bolt.Tx) error {
+				_ = am.handle().Update(func(tx *bolt.Tx) error {
 					b := tx.Bucket(bucketAutomation)
 					return b.Put(key, data)
 				})

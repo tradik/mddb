@@ -73,3 +73,16 @@ func ViewOneOrAll(r Router, collection string, fn func(*bolt.Tx) error) error {
 	}
 	return View(r, collection, fn)
 }
+
+// Current is the database a long-lived component should use: what follow
+// returns when it is set and gives one, else db. A restore or replication
+// snapshot replaces the server's handle; components built on the old one
+// used it, closed, until restart. Following the server's handle fixes that.
+func Current(db *bolt.DB, follow func() *bolt.DB) *bolt.DB {
+	if follow != nil {
+		if d := follow(); d != nil {
+			return d
+		}
+	}
+	return db
+}

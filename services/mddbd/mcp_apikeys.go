@@ -43,8 +43,16 @@ type MCPAPIKey struct {
 
 // mcpAPIKeyStore provides CRUD for MCP API keys in BoltDB.
 type mcpAPIKeyStore struct {
-	db *bolt.DB
+	db     *bolt.DB
+	follow func() *bolt.DB // set by FollowDB: the server's current handle after a restore
 }
+
+// FollowDB makes it use the database src returns — the server's current
+// handle — so a restore or replication snapshot does not leave it on the
+// closed old one.
+func (s *mcpAPIKeyStore) FollowDB(src func() *bolt.DB) { s.follow = src }
+
+func (s *mcpAPIKeyStore) handle() *bolt.DB { return boltx.Current(s.db, s.follow) }
 
 func newMCPAPIKeyStore(db *bolt.DB) *mcpAPIKeyStore {
 	_ = boltx.EnsureBuckets(db, []byte(mcpAPIKeyBucket))
@@ -76,7 +84,7 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64) (*MCPAPIKey, strin
 		return nil, "", err
 	}
 
-	err = s.db.Update(func(tx *bolt.Tx) error {
+	err = s.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(mcpAPIKeyBucket))
 		return b.Put([]byte(key), data)
 	})
@@ -91,7 +99,7 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64) (*MCPAPIKey, strin
 // Get retrieves an API key by its key string.
 func (s *mcpAPIKeyStore) Get(key string) (*MCPAPIKey, error) {
 	var apiKey MCPAPIKey
-	err := s.db.View(func(tx *bolt.Tx) error {
+	err := s.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(mcpAPIKeyBucket))
 		if b == nil {
 			return fmt.Errorf("key not found")
@@ -120,7 +128,7 @@ func (s *mcpAPIKeyStore) Get(key string) (*MCPAPIKey, error) {
 // List returns all API keys (without the full key — only prefix shown).
 func (s *mcpAPIKeyStore) List() ([]MCPAPIKeySummary, error) {
 	var keys []MCPAPIKeySummary
-	err := s.db.View(func(tx *bolt.Tx) error {
+	err := s.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(mcpAPIKeyBucket))
 		if b == nil {
 			return nil
@@ -149,7 +157,7 @@ func (s *mcpAPIKeyStore) List() ([]MCPAPIKeySummary, error) {
 
 // Delete removes an API key.
 func (s *mcpAPIKeyStore) Delete(key string) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+	return s.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(mcpAPIKeyBucket))
 		if b == nil {
 			return fmt.Errorf("key not found")
@@ -164,7 +172,7 @@ func (s *mcpAPIKeyStore) Delete(key string) error {
 
 // Disable marks a key as disabled without deleting it.
 func (s *mcpAPIKeyStore) Disable(key string) error {
-	return s.db.Update(func(tx *bolt.Tx) error {
+	return s.handle().Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(mcpAPIKeyBucket))
 		if b == nil {
 			return fmt.Errorf("key not found")
@@ -190,7 +198,7 @@ func (s *mcpAPIKeyStore) Disable(key string) error {
 // Count returns the number of stored keys.
 func (s *mcpAPIKeyStore) Count() int {
 	count := 0
-	_ = s.db.View(func(tx *bolt.Tx) error {
+	_ = s.handle().View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(mcpAPIKeyBucket))
 		if b == nil {
 			return nil

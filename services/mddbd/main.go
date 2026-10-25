@@ -39,7 +39,7 @@ import (
 )
 
 // VERSION is the current release version of the MDDB server.
-const VERSION = "2.18.2"
+const VERSION = "2.18.3"
 
 // AccessMode defines the database access mode (read, write, or both).
 type AccessMode string
@@ -496,6 +496,7 @@ func main() {
 		}
 	}
 	s.AuditManager = audit.NewAuditManager(db, auditEnabled, auditRetention)
+	s.AuditManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 	if err := s.AuditManager.EnsureBuckets(); err != nil {
 		logging.Fatal("startup step failed", "step", "AuditManager.EnsureBuckets", "err", err)
 	}
@@ -617,6 +618,7 @@ func main() {
 	automationsEnabled := env("MDDB_AUTOMATIONS", "enable") != "disable"
 	if automationsEnabled {
 		s.AutomationManager = NewAutomationManager(db)
+		s.AutomationManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 		s.AutomationManager.SetServer(s)
 		if err := s.AutomationManager.EnsureBucket(); err != nil {
 			logging.Fatal("startup step failed", "step", "AutomationManager.EnsureBucket", "err", err)
@@ -634,6 +636,7 @@ func main() {
 				logging.Fatal("Invalid MDDB_AUTOMATION_LOGS_TTL", "err", err)
 			}
 			s.AutomationLogStore = automationlog.NewStore(db, logTTL)
+			s.AutomationLogStore.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 			if err := s.AutomationLogStore.EnsureBucket(); err != nil {
 				logging.Fatal("startup step failed", "step", "AutomationLogStore.EnsureBucket", "err", err)
 			}
@@ -655,6 +658,7 @@ func main() {
 
 	// Initialize collection config manager
 	s.CollectionManager = NewCollectionManager(db)
+	s.CollectionManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 	if err := s.CollectionManager.EnsureBucket(); err != nil {
 		logging.Fatal("startup step failed", "step", "CollectionManager.EnsureBucket", "err", err)
 	}
@@ -704,6 +708,7 @@ func main() {
 	// Curation manager: loads all pinning/hiding rules into memory so the
 	// search hot path never hits disk.
 	s.CurationManager = NewCurationManager(db)
+	s.CurationManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 	if err := s.CurationManager.EnsureBucket(); err != nil {
 		logging.Fatal("startup step failed", "step", "CurationManager.EnsureBucket", "err", err)
 	}
@@ -726,6 +731,7 @@ func main() {
 	// Initialize spell checker (disabled by default; set MDDB_SPELL=true to enable)
 	if env("MDDB_SPELL", "false") == "true" {
 		s.SpellManager = spell.NewSpellManager(db)
+		s.SpellManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 		if err := s.SpellManager.EnsureBucket(); err != nil {
 			logging.Fatal("startup step failed", "step", "SpellManager.EnsureBucket", "err", err)
 		}
@@ -748,6 +754,7 @@ func main() {
 
 	// Initialize MCP API key store (BoltDB-backed, persists across restarts)
 	s.mcpKeyStore = newMCPAPIKeyStore(s.DB)
+	s.mcpKeyStore.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 
 	// Initialize metrics (enabled by default, set MDDB_METRICS=false to disable)
 	metricsEnabled := env("MDDB_METRICS", "true") != "false"
@@ -856,6 +863,7 @@ func main() {
 			AdminUsername: env("MDDB_AUTH_ADMIN_USERNAME", "admin"),
 			AdminPassword: env("MDDB_AUTH_ADMIN_PASSWORD", ""),
 		})
+		s.AuthManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 
 		if err := s.AuthManager.EnsureBuckets(); err != nil {
 			logging.Fatal("startup step failed", "step", "AuthManager.EnsureBuckets", "err", err)
