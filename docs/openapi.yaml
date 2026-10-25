@@ -261,6 +261,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /v1/storage:
+    get:
+      tags:
+        - Health
+      summary: (v2.18.2+) Bytes per bucket and per collection, and free space
+      description: >
+        Attributes every key and value to its bucket and collection (#335).
+        Without `collection` it reads the whole file, holding one read
+        transaction meanwhile — minutes on a large database. With it, only that
+        collection's keys are read and `buckets` is omitted.
+      parameters:
+        - name: collection
+          in: query
+          required: false
+          schema: {type: string}
+      responses:
+        "200":
+          description: Storage breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fileBytes: {type: integer}
+                  pageSize: {type: integer}
+                  freePages: {type: integer}
+                  freeBytes: {type: integer, description: What a compaction would give back}
+                  buckets:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        allocBytes: {type: integer}
+                        inUseBytes: {type: integer}
+                        keys: {type: integer}
+                  collections:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        totalBytes: {type: integer}
+                        byBucket: {type: object, additionalProperties: {type: integer}}
+                        byCategory:
+                          type: object
+                          description: content, metadata, fullText, vectors, other
+                          additionalProperties: {type: integer}
+                  elapsedMs: {type: integer}
   /v1/stats:
     get:
       tags:
@@ -1530,11 +1577,21 @@ paths:
               schema:
                 type: object
                 properties:
+                  status:
+                    type: string
+                    enum: [ok, partial, removed]
+                    description: >
+                      partial when some documents failed to index; removed when
+                      the collection has full-text indexing off and its
+                      postings were deleted (v2.18.2+)
                   reindexed:
                     type: integer
                     description: Number of documents reindexed
-                  collection:
-                    type: string
+                  skipped:
+                    type: integer
+                    description: Documents without content, expired, unreadable or failed
+        "500":
+          description: The documents could not be read
         "400":
           description: Missing collection parameter
           content:
@@ -5029,6 +5086,8 @@ paths:
                   $ref: "#/components/schemas/CodeConfig"
                 embedding:
                   $ref: "#/components/schemas/EmbeddingChunking"
+                fts:
+                  $ref: "#/components/schemas/CollectionFTS"
                 trackAccess:
                   type: boolean
                   description: Record per-read access events for temporal analytics
@@ -9236,6 +9295,17 @@ components:
             any file the document `src/net/conn.h`, which gives code_graph its
             include edges. Applied when a document is written.
           example: ["src"]
+    CollectionFTS:
+      type: object
+      description: >
+        (v2.18.2+) Full-text indexing for the collection (#335). With
+        enabled=false no postings are written; fts-reindex removes existing
+        ones and reports status "removed".
+      properties:
+        enabled:
+          type: boolean
+          description: Unset means on.
+          example: false
     EmbeddingChunking:
       type: object
       description: >
@@ -9345,6 +9415,8 @@ components:
           $ref: "#/components/schemas/CodeConfig"
         embedding:
           $ref: "#/components/schemas/EmbeddingChunking"
+        fts:
+          $ref: "#/components/schemas/CollectionFTS"
         wordpress:
           $ref: "#/components/schemas/WordPressTargetConfig"
 

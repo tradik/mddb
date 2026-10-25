@@ -1026,6 +1026,11 @@ message CodeConfigProto {
   repeated string include_paths = 1;
 }
 
+// CollectionFTSProto mirrors CollectionFTSDef (#335).
+message CollectionFTSProto {
+  optional bool enabled = 1;                     // unset = on
+}
+
 // EmbeddingChunkingProto mirrors EmbeddingChunkingDef (#325): a collection's
 // own chunk size and mode for embeddings.
 message EmbeddingChunkingProto {
@@ -1057,6 +1062,7 @@ message CollectionConfigProto {
   WordPressTargetProto wordpress = 18;           // outbound publishing target (mddb-sync plugin)
   CodeConfigProto code = 19;                     // (v2.18.0+) source-code settings (#319)
   EmbeddingChunkingProto embedding = 20;         // (v2.18.1+) chunking for embeddings (#325)
+  CollectionFTSProto fts = 21;                   // (v2.18.2+) full-text indexing on or off (#335)
 }
 
 message GetCollectionConfigRequest {
@@ -1099,6 +1105,7 @@ message SetCollectionConfigRequest {
   WordPressTargetProto wordpress = 19;           // nil leaves the stored target alone
   CodeConfigProto code = 20;                     // (v2.18.0+) nil leaves the stored settings alone
   EmbeddingChunkingProto embedding = 21;         // (v2.18.1+) nil leaves the stored chunking alone (#325)
+  CollectionFTSProto fts = 22;                   // (v2.18.2+) nil leaves the stored setting alone (#335)
 }
 
 message SetCollectionConfigResponse {

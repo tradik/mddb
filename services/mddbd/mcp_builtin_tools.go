@@ -867,6 +867,13 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 							"include_paths": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
 						},
 					},
+					"fts": map[string]interface{}{
+						"type":        "object",
+						"description": "(v2.18.2+) Full-text indexing for this collection. enabled=false stops postings being written (they are most of a database's size); run fts_reindex afterwards to remove the ones already there. Full-text and hybrid search then find nothing in it.",
+						"properties": map[string]interface{}{
+							"enabled": map[string]interface{}{"type": "boolean"},
+						},
+					},
 					"embedding": map[string]interface{}{
 						"type":        "object",
 						"description": "(v2.18.1+) Chunking for this collection's embeddings, overriding MDDB_EMBEDDING_CHUNK_SIZE / MDDB_EMBEDDING_CHUNK_MODE. Takes effect for documents embedded afterwards; run vector_reindex with force to re-chunk existing ones.",

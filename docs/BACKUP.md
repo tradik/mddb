@@ -125,6 +125,30 @@ over 40 minutes on a busy spinning disk
 | Variable | Default | Effect |
 |---|---|---|
 | `MDDB_FREELIST_SYNC` | `false` | `true` writes the freelist on every commit, so an open reads one page instead of walking the file. Writes are slightly slower. The first open with it set still walks once, to write the freelist. |
+| `MDDB_PREWARM` | `auto` | (v2.18.2+) Before a walk, read the file sequentially into the page cache if it fits in half the available memory. |
+
+Since v2.18.2 a clean shutdown stores the freelist whatever the setting, so a
+planned restart reads one page. `MDDB_FREELIST_SYNC=true` is what covers the
+start after a crash. See [STORAGE-TUNING.md](STORAGE-TUNING.md).
+
+## Compacting a database
+
+A bbolt file never shrinks: deleting a large collection frees pages for
+reuse but does not give them back to the filesystem. `GET /v1/storage`
+reports the free space (`freeBytes`) and what each collection takes. To
+reclaim it, copy the database into a new file with the server stopped:
+
+```bash
+mddbd -compact-db /data/mddb.db -compact-to /data/mddb.compact.db
+# then: stop the server, move mddb.compact.db over mddb.db, start it
+```
+
+The copy holds every key in order with full pages, passes bbolt's integrity
+check before the command reports success, and starts without a freelist walk.
+Key order also helps cold reads: on a 2.5 GB file the walk after a crash fell
+from 57 s to 44 s. `-compact-page-size` (4096–65536) sets a larger page; on
+the same file 16 KiB made it 24% smaller but the walk slower (58 s), so
+measure before using it.
 
 ## When the database is damaged at startup
 

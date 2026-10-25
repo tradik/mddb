@@ -35,6 +35,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/delete-batch", s.guardWrite(s.handleDeleteBatch))
 	mux.HandleFunc("/v1/delete-collection", s.guardWrite(s.handleDeleteCollection))
 	mux.HandleFunc("/v1/stats", s.handleStats)
+	mux.HandleFunc("/v1/storage", s.handleStorage) // #335: bytes per bucket and collection
 	// GO-033: the four query paths that hold working memory for the length of
 	// the request queue behind a semaphore, so a burst becomes a 503 a client
 	// can retry rather than an OOM that takes every other request with it.

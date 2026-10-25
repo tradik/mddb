@@ -1453,6 +1453,38 @@ curl -X POST http://localhost:11023/v1/truncate \
 
 ---
 
+### GET /v1/storage
+
+(v2.18.2+) Where the bytes of the database file are: bytes per top-level
+bucket, key and value bytes per collection split by bucket and category
+(`content`, `metadata`, `fullText`, `vectors`, `other`), and the free space a
+[compaction](BACKUP.md#compacting-a-database) would give back.
+
+```bash
+curl "$MDDB/v1/storage"                     # every collection: reads the whole file
+curl "$MDDB/v1/storage?collection=src"      # one collection: reads only its keys
+```
+
+```json
+{
+  "fileBytes": 2690252800, "pageSize": 4096, "freePages": 812, "freeBytes": 3325952,
+  "buckets": {"ftsp": {"allocBytes": 1214251008, "inUseBytes": 1003141120, "keys": 9120334}},
+  "collections": {
+    "src": {"totalBytes": 2410000000,
+            "byCategory": {"content": 98000000, "metadata": 41000000, "fullText": 2190000000, "vectors": 81000000},
+            "byBucket": {"docs": 98000000, "ftsp": 1003141120}}
+  },
+  "elapsedMs": 41210
+}
+```
+
+The full breakdown reads every page and holds one read transaction while it
+does; on a large file that is minutes, and pages freed meanwhile cannot be
+reused until it ends. `buckets` is present only in the full breakdown. Turn
+full-text indexing off for a collection that does not need it with
+`"fts": {"enabled": false}` in its [collection config](#get-v1collection-config),
+then `POST /v1/fts-reindex` to remove its postings.
+
 ### GET /v1/stats
 
 Get server and database statistics.
@@ -3828,6 +3860,16 @@ vectors already stored keep their chunks until `POST /v1/vector-reindex` with
 `"force": true`. `GET /v1/vector-stats` reports each collection's effective
 `chunkSize`. The same object is `embedding` in MCP `set_collection_config`
 (`chunk_size`, `chunk_mode`) and in gRPC `SetCollectionConfig`.
+
+**Full-text indexing per collection (v2.18.2+).** Postings are usually most
+of the file. A collection searched only by metadata or vectors can turn them
+off; `POST /v1/fts-reindex` then removes the ones it has (`"status":
+"removed"`), and full-text and hybrid search find nothing in it:
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' \
+  -d '{"collection":"vectors-only","fts":{"enabled":false}}'
+```
 
 Three deliberate limits:
 

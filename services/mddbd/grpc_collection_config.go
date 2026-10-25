@@ -121,6 +121,7 @@ func collectionConfigToProto(cfg *CollectionConfig) *proto.CollectionConfigProto
 		Wordpress:       wordPressToProto(cfg.WordPress),
 		Code:            codeConfigToProto(cfg.Code),
 		Embedding:       chunkingToProto(cfg.Embedding),
+		Fts:             ftsToProto(cfg.FTS),
 	}
 }
 
@@ -179,6 +180,9 @@ func applyCollectionConfigRequest(cfg *CollectionConfig, req *proto.SetCollectio
 	if req.GetWordpress() != nil {
 		cfg.WordPress = wordPressFromProto(req.GetWordpress(), cfg.WordPress)
 	}
+	if req.GetFts() != nil {
+		cfg.FTS = &CollectionFTSDef{Enabled: req.GetFts().Enabled}
+	}
 	if req.GetEmbedding() != nil {
 		cfg.Embedding = chunkingFromProto(req.GetEmbedding()) // validated by the caller
 	}
@@ -197,4 +201,12 @@ func chunkingToProto(c *EmbeddingChunkingDef) *proto.EmbeddingChunkingProto {
 
 func chunkingFromProto(in *proto.EmbeddingChunkingProto) *EmbeddingChunkingDef {
 	return &EmbeddingChunkingDef{ChunkSize: int(in.GetChunkSize()), ChunkMode: in.GetChunkMode()}
+}
+
+// ftsToProto carries CollectionFTSDef (#335).
+func ftsToProto(f *CollectionFTSDef) *proto.CollectionFTSProto {
+	if f == nil {
+		return nil
+	}
+	return &proto.CollectionFTSProto{Enabled: f.Enabled}
 }

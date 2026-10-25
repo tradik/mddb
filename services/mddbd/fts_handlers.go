@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"log/slog"
 	"mddb/internal/fts"
@@ -496,43 +495,17 @@ func (s *Server) handleFTSReindex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Collect docs first (read tx), then index outside tx to avoid deadlock
-	var docs []*storage.Doc
-	var skipped int
-	_ = s.DBView(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
-		}
-
-		prefix := []byte("doc|" + req.Collection + "|")
-		c := bDocs.Cursor()
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			docPtr, err := loadDoc(v)
-			if err != nil || docPtr.ContentMD == "" {
-				skipped++
-				continue
-			}
-			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < currentUnix() {
-				skipped++
-				continue
-			}
-			docs = append(docs, docPtr)
-		}
-		return nil
-	})
-
-	// Index outside the read tx to avoid BoltDB nested tx deadlock
-	reindexed := 0
-	for _, d := range docs {
-		_ = s.indexDocumentFTS(req.Collection, d)
-		reindexed++
+	res, err := s.reindexCollectionFTS(req.Collection)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
 	}
-
 	ok(w, map[string]interface{}{
-		"status":    "ok",
-		"reindexed": reindexed,
-		"skipped":   skipped,
+		"status":    res.Status,
+		"reindexed": res.Reindexed,
+		"skipped":   res.Skipped + res.Failed,
 	})
 }
 

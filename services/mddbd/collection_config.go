@@ -64,6 +64,8 @@ type CollectionConfig struct {
 	Code *CodeConfigDef `json:"code,omitempty"`
 	// Embedding overrides the server's chunk size and mode (#325).
 	Embedding *EmbeddingChunkingDef `json:"embedding,omitempty"`
+	// FTS turns full-text indexing off for the collection (#335).
+	FTS *CollectionFTSDef `json:"fts,omitempty"`
 }
 
 // CodeConfigDef configures how source documents in a collection are read.
@@ -260,6 +262,7 @@ type SetCollectionConfigRequest struct {
 	ResponsePrompt  string                 `json:"responsePrompt,omitempty"`  // how to format answers from this collection (RAG-002)
 	Code            *CodeConfigDef         `json:"code,omitempty"`            // source-code settings, e.g. include paths (#319)
 	Embedding       *EmbeddingChunkingDef  `json:"embedding,omitempty"`       // chunk size and mode for embeddings (#325)
+	FTS             *CollectionFTSDef      `json:"fts,omitempty"`             // full-text indexing on or off (#335)
 	// Temporal tracking and spell correction. These live in CollectionConfig
 	// and are read on every request, but were missing here — so the panel's
 	// toggles sent values the handler ignored, and every config save silently
@@ -414,6 +417,7 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		ResponsePrompt:  req.ResponsePrompt,
 		Code:            req.Code,
 		Embedding:       req.Embedding,
+		FTS:             req.FTS,
 	}
 	// GO-035: a client that read this config back saw masked credentials, so
 	// an empty one means "unchanged", not "remove it". Runs before the backend

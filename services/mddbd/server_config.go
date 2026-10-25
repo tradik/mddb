@@ -147,6 +147,10 @@ func loadServerConfig() ServerConfig {
 		verifyDB = flag.String("verify-db", "", "Check a database file with bbolt's full integrity check, then exit")
 		repairDB = flag.String("repair-db", "", "Copy everything readable from a damaged database into -repair-to, then exit")
 		repairTo = flag.String("repair-to", "", "Where -repair-db writes the rebuilt database (must not exist)")
+		// #335: shrink a file after large deletes, optionally with larger pages.
+		compactDB       = flag.String("compact-db", "", "Copy a database into -compact-to without its free space, then exit (server stopped)")
+		compactTo       = flag.String("compact-to", "", "Where -compact-db writes the compacted database (must not exist)")
+		compactPageSize = flag.Int("compact-page-size", 0, "Page size of the compacted database, 4096-65536 (default: the system's)")
 	)
 	flag.StringVar(&configFile, "config", "", "Path to YAML config file")
 	flag.StringVar(&configFile, "c", "", "Path to YAML config file (shorthand)")
@@ -162,6 +166,9 @@ func loadServerConfig() ServerConfig {
 	}
 	if *repairDB != "" {
 		os.Exit(runRepair(*repairDB, *repairTo))
+	}
+	if *compactDB != "" {
+		os.Exit(runCompact(*compactDB, *compactTo, *compactPageSize))
 	}
 
 	// 2. Load config file (lowest priority after defaults)

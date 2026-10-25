@@ -59,6 +59,11 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 	if code, ok := args["code"].(map[string]interface{}); ok {
 		req.Code = &CodeConfigDef{IncludePaths: mcpGetStringSlice(code, "include_paths")}
 	}
+	if f, ok := args["fts"].(map[string]interface{}); ok {
+		if v, set := f["enabled"].(bool); set {
+			req.FTS = &CollectionFTSDef{Enabled: &v}
+		}
+	}
 	if emb, ok := args["embedding"].(map[string]interface{}); ok {
 		req.Embedding = &EmbeddingChunkingDef{
 			ChunkSize: mcpGetInt(emb, "chunk_size"),

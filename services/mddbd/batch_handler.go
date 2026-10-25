@@ -252,7 +252,7 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 // before batching — it swallowed individual failures — so the fallback keeps
 // that contract while the fast path handles the normal case.
 func (s *Server) indexBatchFTS(collection string, batch []fts.BulkDoc) {
-	if len(batch) == 0 || s.FTSIndex == nil {
+	if len(batch) == 0 || s.FTSIndex == nil || !s.ftsEnabledFor(collection) {
 		return
 	}
 	if err := s.FTSIndex.IndexDocs(collection, batch); err == nil {

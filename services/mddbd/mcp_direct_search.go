@@ -564,42 +564,14 @@ func (c *DirectClient) FTSReindex(ctx context.Context, req *MCPFTSReindexRequest
 		return nil, errors.New("full-text search not initialized")
 	}
 
-	// Collect docs first (read tx), then index outside to avoid deadlock
-
-	var docs []*storage.Doc
-	var skipped int
-	_ = c.server.DBView(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
-		}
-		prefix := []byte("doc|" + req.Collection + "|")
-		cur := bDocs.Cursor()
-		for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
-			docPtr, err := loadDoc(v)
-			if err != nil || docPtr.ContentMD == "" {
-				skipped++
-				continue
-			}
-			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < time.Now().Unix() {
-				skipped++
-				continue
-			}
-			docs = append(docs, docPtr)
-		}
-		return nil
-	})
-
-	reindexed := 0
-	for _, d := range docs {
-		_ = c.server.indexDocumentFTS(req.Collection, d)
-		reindexed++
+	res, err := c.server.reindexCollectionFTS(req.Collection)
+	if err != nil {
+		return nil, err
 	}
-
 	return &MCPFTSReindexResponse{
-		Status:    "ok",
-		Reindexed: reindexed,
-		Skipped:   skipped,
+		Status:    res.Status,
+		Reindexed: res.Reindexed,
+		Skipped:   res.Skipped + res.Failed,
 	}, nil
 }
 

@@ -38,7 +38,7 @@ func ftsBulkDoc(doc *storage.Doc) fts.BulkDoc {
 
 // indexDocumentFTS (re)indexes one document.
 func (s *Server) indexDocumentFTS(collection string, doc *storage.Doc) error {
-	if s.FTSIndex == nil || doc.ContentMD == "" {
+	if s.FTSIndex == nil || doc.ContentMD == "" || !s.ftsEnabledFor(collection) {
 		return nil
 	}
 	return s.FTSIndex.IndexDocs(collection, []fts.BulkDoc{ftsBulkDoc(doc)})

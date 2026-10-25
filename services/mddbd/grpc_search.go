@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
 	"math"
 	"mddb/internal/embedding"
 	"mddb/internal/fts"
@@ -643,57 +641,16 @@ func (g *GRPCServer) FTSReindex(ctx context.Context, req *proto.FTSReindexReques
 		return nil, status.Error(codes.FailedPrecondition, "full-text search not initialized")
 	}
 
-	// Collect docs first (read tx), then index outside to avoid deadlock
-
-	var docs []*storage.Doc
-	var skipped int
-	// GO-009: propagate the read error instead of silently reporting 0 reindexed
-	// with Status "ok" (e.g. when the DB is mid-restore).
-	if err := g.server.DBView(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
-		}
-		prefix := []byte("doc|" + req.Collection + "|")
-		c := bDocs.Cursor()
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			docPtr, err := loadDoc(v)
-			if err != nil || docPtr.ContentMD == "" {
-				skipped++
-				continue
-			}
-			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < time.Now().Unix() {
-				skipped++
-				continue
-			}
-			docs = append(docs, docPtr)
-		}
-		return nil
-	}); err != nil {
+	// GO-009: a read error is an error, and a failed document makes the
+	// status "partial" rather than "ok".
+	res, err := g.server.reindexCollectionFTS(req.Collection)
+	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	// GO-009: count indexing failures instead of swallowing every error and
-	// always returning Status "ok". A failed doc does not increment reindexed,
-	// and any failure downgrades the status to "partial".
-	reindexed, failed := 0, 0
-	for _, d := range docs {
-		if err := g.server.indexDocumentFTS(req.Collection, d); err != nil {
-			failed++
-			slog.Warn("FTS reindex failed", "collection", req.Collection, "iD", d.ID, "err", err)
-			continue
-		}
-		reindexed++
-	}
-
-	st := "ok"
-	if failed > 0 {
-		st = "partial"
-	}
 	return &proto.FTSReindexResponse{
-		Status:    st,
-		Reindexed: safeInt32(reindexed),
-		Skipped:   safeInt32(skipped + failed),
+		Status:    res.Status,
+		Reindexed: safeInt32(res.Reindexed),
+		Skipped:   safeInt32(res.Skipped + res.Failed),
 	}, nil
 }
 
