@@ -123,7 +123,7 @@ func (bu *BatchUpdater) processDocument(collection string, updateDoc *proto.Upda
 
 	// Load existing
 	existing := storage.Doc{}
-	err := bu.server.DBView(func(tx *bolt.Tx) error {
+	err := bu.server.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(bu.server.BucketNames.Docs)
 		if v := bDocs.Get(storage.DocKey(collection, docID)); v != nil {
 			existingDoc, err := unmarshalDoc(v)
@@ -203,7 +203,7 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 	// never run inside this one (GO-010 — would deadlock BoltDB's single writer).
 	var indexJobs []*indexqueue.IndexJob
 	// Single transaction for all updates
-	err := bu.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := bu.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(bu.server.BucketNames.Docs)
 		bRev := tx.Bucket(bu.server.BucketNames.Rev)
 

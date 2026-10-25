@@ -114,9 +114,9 @@ type testStore struct {
 	DB *bolt.DB
 }
 
-func (s *testStore) DBUpdate(fn func(*bolt.Tx) error) error { return s.DB.Update(fn) }
-func (s *testStore) IdxMetaBucket() []byte                  { return []byte("idxmeta") }
-func (s *testStore) Binlog() *binlog.Binlog                 { return nil }
+func (s *testStore) DBUpdate(_ string, fn func(*bolt.Tx) error) error { return s.DB.Update(fn) }
+func (s *testStore) IdxMetaBucket() []byte                            { return []byte("idxmeta") }
+func (s *testStore) Binlog() *binlog.Binlog                           { return nil }
 
 // newTestStore creates a testStore with a temp BoltDB and the required buckets.
 func newTestStore(t *testing.T) (*testStore, func()) {

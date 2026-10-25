@@ -92,7 +92,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	var bo binlog.BinlogOps
 	var metaDidChange bool
 
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		bRev := tx.Bucket([]byte("rev"))
@@ -237,7 +237,7 @@ func (s *Server) handleDocMeta(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var doc storage.Doc
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))
 		bDocs := tx.Bucket([]byte("docs"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
@@ -309,7 +309,7 @@ func (s *Server) handleMetaKeys(w http.ResponseWriter, r *http.Request) {
 
 	meta := make(map[string][]string)
 
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		if bIdx == nil {
 			return nil
@@ -400,7 +400,7 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 	tenant := TenantFromContext(r.Context())
 	collectionMap := make(map[string]*CollectionStats)
 
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewAll(func(tx *bolt.Tx) error {
 		// Count documents per collection
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs != nil {

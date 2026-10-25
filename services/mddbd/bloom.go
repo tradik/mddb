@@ -120,7 +120,7 @@ func (bfm *BloomFilterManager) Rebuild(s *Server, collection string) error {
 
 	// Count documents first
 	var count uint
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		c := bDocs.Cursor()
 		prefix := []byte("doc|" + collection + "|")
@@ -142,7 +142,7 @@ func (bfm *BloomFilterManager) Rebuild(s *Server, collection string) error {
 	safeFilter := bfm.GetOrCreate(collection, count+1000) // +1000 for growth
 
 	// Populate filter
-	return s.DBView(func(tx *bolt.Tx) error {
+	return s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		c := bDocs.Cursor()
 		prefix := []byte("doc|" + collection + "|")

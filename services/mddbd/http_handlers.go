@@ -74,7 +74,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var doc storage.Doc
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bByK := tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
@@ -141,7 +141,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	type row struct{ Doc storage.Doc }
 	var rows []row
 
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		seen := make(map[string]bool)
@@ -417,7 +417,7 @@ func (s *Server) handleTruncate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var bo binlog.BinlogOps
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		bDocs := tx.Bucket([]byte("docs"))
 
@@ -576,7 +576,7 @@ func (s *Server) collectionChecksum(collection string) (string, int) {
 	var checksum uint32
 	var count int
 
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil

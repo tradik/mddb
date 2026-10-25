@@ -306,7 +306,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Load full documents for results
 	items := make([]VectorSearchResultItem, 0, len(results))
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -437,7 +437,7 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 	}
 	var docs []docEntry
 
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -593,7 +593,7 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 
 	// Count total docs per collection
 	docCounts := make(map[string]int)
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewAll(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -669,7 +669,7 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getDocIDsByMeta(collection string, filterMeta map[string][]string) map[string]bool {
 	result := make(map[string]bool)
 
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		if bIdx == nil {
 			return nil

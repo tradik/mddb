@@ -155,7 +155,7 @@ func (s *Server) loadPinnedFTS(collection string, pins []pinResolved) []pinnedFT
 		return nil
 	}
 	out := make([]pinnedFTS, 0, len(pins))
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bByK := tx.Bucket([]byte("bykey"))
 		for _, p := range pins {
@@ -182,7 +182,7 @@ func (s *Server) loadPinnedHybrid(collection string, pins []pinResolved) []pinne
 		return nil
 	}
 	out := make([]pinnedHybrid, 0, len(pins))
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bByK := tx.Bucket([]byte("bykey"))
 		for _, p := range pins {

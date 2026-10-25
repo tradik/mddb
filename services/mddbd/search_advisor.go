@@ -167,7 +167,7 @@ func (s *Server) profileCollection(collection string) (*CollectionProfile, error
 	terms := make(map[string]struct{})
 	totalTerms := 0
 
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		if b == nil {
 			return nil

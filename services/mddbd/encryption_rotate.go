@@ -102,7 +102,7 @@ func (rm *RotationManager) Status() (*RotationStatus, error) {
 	rm.mu.Unlock()
 
 	per := make(map[string]*CollectionStat)
-	err := rm.server.DBView(func(tx *bolt.Tx) error {
+	err := rm.server.DBViewAll(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		if b == nil {
 			return nil
@@ -292,7 +292,7 @@ func (rm *RotationManager) processBucket(ctx context.Context, job *RotationJob, 
 	// the number of keys (small per-key overhead) instead of holding
 	// every value in RAM.
 	var keys [][]byte
-	if err := rm.server.DBView(func(tx *bolt.Tx) error {
+	if err := rm.server.DBViewAll(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
 			return nil
@@ -334,7 +334,7 @@ func (rm *RotationManager) processBucket(ctx context.Context, job *RotationJob, 
 // already sealed with the primary key).
 func (rm *RotationManager) processOne(bucket string, key []byte) (bool, error) {
 	var val []byte
-	if err := rm.server.DBView(func(tx *bolt.Tx) error {
+	if err := rm.server.DBViewC(rotationKeyCollection(bucket, key), func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
 			return nil
@@ -386,7 +386,7 @@ func (rm *RotationManager) processOne(bucket string, key []byte) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("seal %s/%s: %w", bucket, string(key), err)
 	}
-	if err := rm.server.DBUpdate(func(tx *bolt.Tx) error {
+	if err := rm.server.DBUpdateC(rotationKeyCollection(bucket, key), func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if b == nil {
 			return errors.New("bucket missing")
@@ -451,4 +451,11 @@ func newRotationID() string {
 	var b [8]byte
 	_, _ = rand.Read(b[:])
 	return "rot-" + hex.EncodeToString(b[:])
+}
+
+// rotationKeyCollection is the collection a docs or rev key belongs to, so a
+// rewrite lands in that collection's file (#336).
+func rotationKeyCollection(bucket string, key []byte) string {
+	c, _ := keyCollection(bucket, key)
+	return c
 }

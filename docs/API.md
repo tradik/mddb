@@ -1478,6 +1478,10 @@ curl "$MDDB/v1/storage?collection=src"      # one collection: reads only its key
 }
 ```
 
+In the per-collection layout ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md)) each
+collection also reports `fileBytes`, the size of its own file, and the totals
+cover every file.
+
 The full breakdown reads every page and holds one read transaction while it
 does; on a large file that is minutes, and pages freed meanwhile cannot be
 reused until it ends. `buckets` is present only in the full breakdown. Turn

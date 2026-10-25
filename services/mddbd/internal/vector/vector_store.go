@@ -44,6 +44,7 @@ type EmbeddingRecord struct {
 // VectorStore handles persistence of embedding vectors in BoltDB.
 type VectorStore struct {
 	db         *bolt.DB
+	router     boltx.Router // #336: which file holds a collection; nil means db
 	bucketName []byte
 	binlog     *binlog.Binlog
 
@@ -52,6 +53,12 @@ type VectorStore struct {
 	provMu sync.RWMutex
 	prov   map[string]Provenance
 }
+
+// SetRouter makes it read and write each collection in the file the router
+// names (#336). Without one, everything goes to the db it was built on.
+func (vs *VectorStore) SetRouter(r boltx.Router) { vs.router = r }
+
+func (vs *VectorStore) rt() boltx.Router { return boltx.Or(vs.router, vs.db) }
 
 // NewVectorStore creates a new vector store backed by BoltDB.
 func NewVectorStore(db *bolt.DB) *VectorStore {
@@ -88,7 +95,7 @@ func (vs *VectorStore) PutQuantized(collection, docID string, vector []float32, 
 	}
 	data := marshalEmbeddingRecordQuantized(rec, qt)
 
-	err := vs.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return fmt.Errorf("vectors bucket not found")
@@ -108,7 +115,7 @@ func (vs *VectorStore) PutChunksQuantized(collection, docID string, chunks []Chu
 	}
 	now := time.Now().Unix()
 
-	return vs.db.Update(func(tx *bolt.Tx) error {
+	return boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return fmt.Errorf("vectors bucket not found")
@@ -151,7 +158,7 @@ func (vs *VectorStore) Put(collection, docID string, vector []float32, model str
 		ContentHash: contentHash,
 	})
 
-	err := vs.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return fmt.Errorf("vectors bucket not found")
@@ -169,7 +176,7 @@ func (vs *VectorStore) Put(collection, docID string, vector []float32, model str
 func (vs *VectorStore) PutChunks(collection, docID string, chunks []ChunkEmbedding, model string, contentHash string) error {
 	now := time.Now().Unix()
 
-	return vs.db.Update(func(tx *bolt.Tx) error {
+	return boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return fmt.Errorf("vectors bucket not found")
@@ -223,7 +230,7 @@ func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCo
 		index string // the key the in-memory indexes know it by
 	}
 	var stale []staleKey
-	_ = vs.db.View(func(tx *bolt.Tx) error {
+	_ = boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -247,7 +254,7 @@ func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCo
 	}
 
 	var bo binlog.BinlogOps
-	err := vs.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -276,7 +283,7 @@ func (vs *VectorStore) Get(collection, docID string) (*EmbeddingRecord, error) {
 	chunkKey := buildChunkKey(collection, docID, 0)
 	var rec *EmbeddingRecord
 
-	err := vs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -307,7 +314,7 @@ func (vs *VectorStore) Delete(collection, docID string) error {
 	prefix := []byte("vec|" + collection + "|" + docID + "#")
 
 	var bo binlog.BinlogOps
-	err := vs.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -339,7 +346,7 @@ func (vs *VectorStore) LoadCollection(collection string) (map[string]*EmbeddingR
 	prefix := []byte("vec|" + collection + "|")
 	records := make(map[string]*EmbeddingRecord)
 
-	err := vs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -372,7 +379,7 @@ func (vs *VectorStore) LoadCollectionQuantized(collection string) (map[string]*E
 	records := make(map[string]*EmbeddingRecord)
 	quantized := make(map[string]*QuantizedVector)
 
-	err := vs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -407,7 +414,7 @@ func (vs *VectorStore) LoadCollectionQuantized(collection string) (map[string]*E
 // vectors kept on disk. Missing keys are simply absent from the result.
 func (vs *VectorStore) GetVectors(collection string, ids []string) map[string][]float32 {
 	out := make(map[string][]float32, len(ids))
-	_ = vs.db.View(func(tx *bolt.Tx) error {
+	_ = boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -440,7 +447,7 @@ func (vs *VectorStore) CountByCollection() (map[string]int, error) {
 	counts := make(map[string]int)
 	seen := make(map[string]bool)
 
-	err := vs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.ViewAll(vs.rt(), func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -483,7 +490,7 @@ func (vs *VectorStore) CountByCollection() (map[string]int, error) {
 func (vs *VectorStore) CountChunksByCollection() (map[string]int, error) {
 	counts := make(map[string]int)
 
-	err := vs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.ViewAll(vs.rt(), func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil
@@ -780,7 +787,7 @@ func (vs *VectorStore) ChunkVectorsByHash(collection, docID string) map[string][
 	prefix := []byte("vec|" + collection + "|" + docID + "#")
 	out := make(map[string][]float32)
 
-	_ = vs.db.View(func(tx *bolt.Tx) error {
+	_ = boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil

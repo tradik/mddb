@@ -89,7 +89,7 @@ func (f *FTSIndex) IndexDocs(collection string, docs []BulkDoc) error {
 	}
 
 	var bo binlog.BinlogOps
-	err := f.db.Update(func(tx *bolt.Tx) error {
+	err := f.update(collection, func(tx *bolt.Tx) error {
 		var deferred sortedPuts
 		seen := make(map[string]bool, len(batch))
 		for _, p := range batch {

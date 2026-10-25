@@ -72,7 +72,7 @@ func (m boltMeta) bytesInUse() int64 {
 
 // readBoltMeta reads the two meta pages and returns the newer valid one.
 func readBoltMeta(path string) (boltMeta, error) {
-	f, err := os.Open(filepath.Clean(path)) // #nosec G304 -- the operator's database path
+	f, err := os.Open(filepath.Clean(path)) // #nosec G304 G703 -- the operator's database path
 	if err != nil {
 		return boltMeta{}, err
 	}
@@ -135,7 +135,7 @@ func freelistSyncFor(path string) bool {
 	if path == "" {
 		return false
 	}
-	fi, err := os.Stat(filepath.Clean(path))
+	fi, err := os.Stat(filepath.Clean(path)) // #nosec G703 -- the operator's database path
 	if err != nil {
 		return false
 	}
@@ -182,7 +182,7 @@ func prewarmFile(path string, progress func(done int64)) error {
 }
 
 func readThrough(path string, progress func(done int64)) error {
-	f, err := os.Open(filepath.Clean(path)) // #nosec G304 -- the operator's database path
+	f, err := os.Open(filepath.Clean(path)) // #nosec G304 G703 -- the operator's database path
 	if err != nil {
 		return err
 	}

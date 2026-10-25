@@ -393,7 +393,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 		MaxFragments: req.MaxHighlights,
 		FragmentSize: req.FragmentSize,
 	}
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		for _, res := range results {
 			if window > 0 && len(resp.Results) >= window {

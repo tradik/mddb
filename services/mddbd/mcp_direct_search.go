@@ -141,7 +141,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	}
 
 	items := make([]MCPVectorSearchResult, 0, len(results))
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -223,7 +223,7 @@ func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexR
 	}
 	var docs []docEntry
 
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -377,7 +377,7 @@ func (c *DirectClient) VectorStats(ctx context.Context) (*MCPVectorStatsResponse
 	vectorCounts, _ := s.VectorStore.CountByCollection()
 
 	docCounts := make(map[string]int)
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewAll(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -462,7 +462,7 @@ func (c *DirectClient) SetTTL(ctx context.Context, req *MCPSetTTLRequest) (*MCPD
 	}
 
 	var updated storage.Doc
-	err := c.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := c.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		dk := storage.DocKey(req.Collection, docID)
 		v := bDocs.Get(dk)

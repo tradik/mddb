@@ -121,6 +121,9 @@ func TestSwapContract_RejectsAnUnusableSourceWithoutLosingData(t *testing.T) {
 // and keep serving the old data; the MCP path left the caches holding documents
 // the new database does not have.
 func TestSwapContract_ServesTheNewDataImmediately(t *testing.T) {
+	if perCollectionLayout() {
+		t.Skip("builds a single-file backup by hand, which the per-collection layout refuses (#336)")
+	}
 	for _, caller := range swapCallers {
 		t.Run(caller.name, func(t *testing.T) {
 			s, cleanup := newTestServer(t)
@@ -286,6 +289,9 @@ func assertDatabaseStillServing(t *testing.T, s *Server, wantContent string) {
 // covered this: every server in the restore suite runs with s.Binlog nil, so
 // the branch that does it had never executed.
 func TestRestore_ResetsTheBinlogSoFollowersReSnapshot(t *testing.T) {
+	if perCollectionLayout() {
+		t.Skip("builds a single-file backup by hand, which the per-collection layout refuses (#336)")
+	}
 	s, bl, cleanup := replTestServer(t)
 	defer cleanup()
 

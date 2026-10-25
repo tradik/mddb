@@ -13,6 +13,8 @@ type serverIndexStore struct {
 	s *Server
 }
 
-func (a serverIndexStore) DBUpdate(fn func(*bolt.Tx) error) error { return a.s.DBUpdate(fn) }
-func (a serverIndexStore) IdxMetaBucket() []byte                  { return a.s.BucketNames.IdxMeta }
-func (a serverIndexStore) Binlog() *binlog.Binlog                 { return a.s.Binlog }
+func (a serverIndexStore) DBUpdate(collection string, fn func(*bolt.Tx) error) error {
+	return a.s.DBUpdateC(collection, fn)
+}
+func (a serverIndexStore) IdxMetaBucket() []byte  { return a.s.BucketNames.IdxMeta }
+func (a serverIndexStore) Binlog() *binlog.Binlog { return a.s.Binlog }

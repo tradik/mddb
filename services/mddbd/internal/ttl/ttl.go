@@ -34,10 +34,17 @@ type Reaper interface {
 // TTLManager handles document time-to-live expiry.
 type TTLManager struct {
 	db     *bolt.DB
+	router boltx.Router // #336: which file holds a collection; nil means db
 	reaper Reaper
 	stopCh chan struct{}
 	binlog *binlog.Binlog
 }
+
+// SetRouter makes it read and write each collection in the file the router
+// names (#336). Without one, everything goes to the db it was built on.
+func (t *TTLManager) SetRouter(r boltx.Router) { t.router = r }
+
+func (t *TTLManager) rt() boltx.Router { return boltx.Or(t.router, t.db) }
 
 // SetBinlog sets the binlog for replication logging.
 func (t *TTLManager) SetBinlog(bl *binlog.Binlog) {
@@ -57,7 +64,7 @@ func (t *TTLManager) EnsureBuckets() error {
 // Set stores a TTL entry for a document. Removes any previous TTL first.
 func (t *TTLManager) Set(collection, docID string, expiresAt int64) error {
 	var bo binlog.BinlogOps
-	err := t.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(t.rt(), collection, func(tx *bolt.Tx) error {
 		bTTL := tx.Bucket(bucketTTL)
 		bRev := tx.Bucket(bucketTTLRev)
 
@@ -98,7 +105,7 @@ func (t *TTLManager) Set(collection, docID string, expiresAt int64) error {
 // Remove deletes TTL entries for a document.
 func (t *TTLManager) Remove(collection, docID string) error {
 	var bo binlog.BinlogOps
-	err := t.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(t.rt(), collection, func(tx *bolt.Tx) error {
 		bTTL := tx.Bucket(bucketTTL)
 		bRev := tx.Bucket(bucketTTLRev)
 
@@ -150,7 +157,7 @@ func (t *TTLManager) cleanup() {
 	}
 	var expired []expiredDoc
 
-	_ = t.db.View(func(tx *bolt.Tx) error {
+	_ = boltx.ViewAll(t.rt(), func(tx *bolt.Tx) error {
 		bTTL := tx.Bucket(bucketTTL)
 		if bTTL == nil {
 			return nil

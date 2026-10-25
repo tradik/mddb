@@ -138,6 +138,8 @@ type Server struct {
 	mcpKeyStore     *mcpAPIKeyStore           // BoltDB-backed MCP API key store
 	mcpAuth         *MCPAPIKeyMiddleware      // MCP API key middleware (for cache invalidation)
 	freelistLoad    *backgroundFreelist       // #333: set while writes wait for the freelist
+	collMu          sync.Mutex                // #336: guards collFiles
+	collFiles       *collectionFiles          // #336: per-collection files, nil in the single-file layout
 	// GO-021: both MCP transports count their open sessions and nothing ever
 	// asked. A session that a client abandoned without closing stays until it
 	// times out, so the count is how an operator sees leaks accumulating.
@@ -332,6 +334,20 @@ func main() {
 	s.IndexQueue.SetStore(serverIndexStore{s: s}) // wire persistence (server now ready)
 	freelistLoad.start()                          // #333: writes wait for it, reads do not
 
+	// #336: in the per-collection layout the main file must hold no
+	// collection data, and every collection file opens now, in parallel.
+	if perCollectionLayout() {
+		if held, err := mainFileHoldsCollections(db); err != nil || held {
+			logging.Fatal("startup step failed", "step", "per-collection layout",
+				"err", fmt.Errorf("the main file still holds collection data (%v)", err),
+				"remedy", "stop the server and run mddbd -split-collections "+dbPath+" (docs/STORAGE-LAYOUT.md)")
+		}
+		if s.collectionStore() == nil {
+			logging.Fatal("startup step failed", "step", "opening per-collection files", "dir", collectionDir(dbPath))
+		}
+	}
+	defer s.closeCollectionFiles()
+
 	clock.srv.Store(s)
 	clock.begin("initialising indexes and managers")
 
@@ -372,6 +388,7 @@ func main() {
 
 	// Initialize vector search
 	s.VectorStore = vector.NewVectorStore(db)
+	s.VectorStore.SetRouter(s.router()) // #336
 	if err := s.VectorStore.EnsureBucket(); err != nil {
 		logging.Fatal("startup step failed", "step", "VectorStore.EnsureBucket", "err", err)
 	}
@@ -383,6 +400,7 @@ func main() {
 	// of the same underlying data, picked by the /v1/geo-search?algorithm=...
 	// parameter at query time.
 	s.GeoStore = geo.NewGeoStore(db)
+	s.GeoStore.SetRouter(s.router()) // #336
 	if err := s.GeoStore.EnsureBucket(); err != nil {
 		logging.Fatal("startup step failed", "step", "GeoStore.EnsureBucket", "err", err)
 	}
@@ -519,6 +537,7 @@ func main() {
 
 	// Initialize TTL manager
 	s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})
+	s.TTLManager.SetRouter(s.router()) // #336
 	clock.begin("starting managers")
 	if err := s.TTLManager.EnsureBuckets(); err != nil {
 		logging.Fatal("startup step failed", "step", "TTLManager.EnsureBuckets", "err", err)
@@ -534,6 +553,7 @@ func main() {
 
 	// Initialize FTS index
 	s.FTSIndex = fts.NewFTSIndex(db)
+	s.FTSIndex.SetRouter(s.router()) // #336
 	if err := s.FTSIndex.EnsureBuckets(); err != nil {
 		logging.Fatal("startup step failed", "step", "FTSIndex.EnsureBuckets", "err", err)
 	}
@@ -695,6 +715,7 @@ func main() {
 	// Initialize temporal event tracking (disabled by default; set MDDB_TEMPORAL=true to enable)
 	if env("MDDB_TEMPORAL", "false") == "true" {
 		s.TemporalManager = temporal.NewTemporalManager(db)
+		s.TemporalManager.SetRouter(s.router()) // #336
 		if err := s.TemporalManager.EnsureBuckets(); err != nil {
 			logging.Fatal("startup step failed", "step", "TemporalManager.EnsureBuckets", "err", err)
 		}
@@ -795,6 +816,7 @@ func main() {
 	if s.ReplicationRole == "follower" {
 		s.TTLManager.Stop() // don't run TTL cleanup, leader handles it
 		s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})
+		s.TTLManager.SetRouter(s.router()) // #336
 		_ = s.TTLManager.EnsureBuckets()
 		// Don't start cleanup — deletes come from binlog
 

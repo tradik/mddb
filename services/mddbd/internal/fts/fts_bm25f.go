@@ -34,7 +34,7 @@ func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit i
 		return nil, nil
 	}
 	scores := make(map[string]*bm25fDocScore)
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		scorer, ok := newBM25FScorer(tx, collection, bm25fWeights(fieldWeights))
 		if !ok {
 			return nil
@@ -58,7 +58,7 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 		return nil, nil
 	}
 	scores := make(map[string]*bm25fDocScore)
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		scorer, ok := newBM25FScorer(tx, collection, bm25fWeights(fieldWeights))
 		if !ok {
 			return nil

@@ -74,6 +74,11 @@ func (s *Server) shutdownSteps() []shutdownStep {
 		if err := persistFreelist(s.DB); err != nil {
 			slog.Warn("the next start will walk the database", "err", err)
 		}
+		for _, db := range s.collectionFileDBs() { // #336
+			if err := persistFreelist(db); err != nil {
+				slog.Warn("the next start will walk a collection file", "file", db.Path(), "err", err)
+			}
+		}
 	})
 
 	// 5. Caches last: they hold no durable state, but readers may still be in

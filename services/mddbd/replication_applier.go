@@ -24,45 +24,57 @@ func NewReplicationApplier(s *Server) *ReplicationApplier {
 
 // Apply applies a single binlog entry to the local database.
 func (ra *ReplicationApplier) Apply(entry *binlog.BinlogEntry) error {
-	err := ra.server.DBUpdate(func(tx *bolt.Tx) error {
-		bucket, err := tx.CreateBucketIfNotExists([]byte(entry.BucketName))
-		if err != nil {
-			return err
-		}
-
-		switch entry.Type {
-		case binlog.BinlogPut:
-			return bucket.Put(entry.Key, entry.Value)
-		case binlog.BinlogDelete:
-			return bucket.Delete(entry.Key)
-		case binlog.BinlogDeleteBucket:
-			return tx.DeleteBucket([]byte(entry.BucketName))
-		case binlog.BinlogCheckpoint:
-			// No-op, just a marker
-			return nil
-		}
-		return nil
-	})
-
-	if err != nil {
-		return err
-	}
-
-	// Update in-memory state based on bucket type
-	ra.updateInMemoryState(entry)
-	ra.lastApplied.Store(entry.LSN)
-
-	return nil
+	return ra.ApplyBatch([]*binlog.BinlogEntry{entry})
 }
 
-// ApplyBatch applies multiple binlog entries in a single BoltDB transaction for efficiency.
+// ApplyBatch applies entries in as few BoltDB transactions as their files
+// allow: all in one in the single-file layout, one per run of entries for
+// the same collection file in the per-collection layout (#336), in order.
 func (ra *ReplicationApplier) ApplyBatch(entries []*binlog.BinlogEntry) error {
 	if len(entries) == 0 {
 		return nil
 	}
+	for start := 0; start < len(entries); {
+		target, everywhere := ra.target(entries[start])
+		end := start + 1
+		for !everywhere && end < len(entries) {
+			t, all := ra.target(entries[end])
+			if all || t != target {
+				break
+			}
+			end++
+		}
+		if err := ra.applyGroup(target, everywhere, entries[start:end]); err != nil {
+			return err
+		}
+		start = end
+	}
 
-	err := ra.server.DBUpdate(func(tx *bolt.Tx) error {
-		for _, entry := range entries {
+	// Update in-memory state for each entry
+	for _, entry := range entries {
+		ra.updateInMemoryState(entry)
+	}
+	ra.lastApplied.Store(entries[len(entries)-1].LSN)
+	return nil
+}
+
+// target is the collection whose file an entry belongs to ("" for the main
+// file), and whether it must be applied to every collection file — a
+// collection bucket deleted outright.
+func (ra *ReplicationApplier) target(entry *binlog.BinlogEntry) (string, bool) {
+	if ra.server.collectionStore() == nil || !isCollectionBucket([]byte(entry.BucketName)) {
+		return "", false
+	}
+	if entry.Type == binlog.BinlogDeleteBucket {
+		return "", true
+	}
+	c, _ := keyCollection(entry.BucketName, entry.Key)
+	return c, false
+}
+
+func (ra *ReplicationApplier) applyGroup(target string, everywhere bool, group []*binlog.BinlogEntry) error {
+	apply := func(tx *bolt.Tx) error {
+		for _, entry := range group {
 			if entry.Type == binlog.BinlogDeleteBucket {
 				if err := tx.DeleteBucket([]byte(entry.BucketName)); err != nil {
 					slog.Warn("Replication applier failed to delete bucket", "bucketName", entry.BucketName, "err", err)
@@ -72,12 +84,10 @@ func (ra *ReplicationApplier) ApplyBatch(entries []*binlog.BinlogEntry) error {
 			if entry.Type == binlog.BinlogCheckpoint {
 				continue
 			}
-
 			bucket, err := tx.CreateBucketIfNotExists([]byte(entry.BucketName))
 			if err != nil {
 				return err
 			}
-
 			switch entry.Type {
 			case binlog.BinlogPut:
 				if err := bucket.Put(entry.Key, entry.Value); err != nil {
@@ -90,19 +100,19 @@ func (ra *ReplicationApplier) ApplyBatch(entries []*binlog.BinlogEntry) error {
 			}
 		}
 		return nil
-	})
-
-	if err != nil {
-		return err
 	}
-
-	// Update in-memory state for each entry
-	for _, entry := range entries {
-		ra.updateInMemoryState(entry)
+	if everywhere {
+		for _, db := range ra.server.collectionDBs() {
+			if err := db.Update(apply); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-
-	ra.lastApplied.Store(entries[len(entries)-1].LSN)
-	return nil
+	if target != "" {
+		return ra.server.DBUpdateC(target, apply)
+	}
+	return ra.server.DBUpdate(apply)
 }
 
 // LastAppliedLSN returns the last applied LSN

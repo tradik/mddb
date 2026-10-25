@@ -48,7 +48,7 @@ func (s *Server) reindexCollectionFTS(collection string) (ftsReindexResult, erro
 	res := ftsReindexResult{Status: "ok"}
 	now := currentUnix()
 	// Collected first, indexed outside the read transaction: indexing writes.
-	if err := s.DBView(func(tx *bolt.Tx) error {
+	if err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		if bDocs == nil {
 			return nil

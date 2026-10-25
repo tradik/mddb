@@ -69,7 +69,7 @@ func (s *Server) computeFacetsOverMatches(collection string, matches map[string]
 		return nil
 	}
 	raw := make(map[string]map[string]int, len(facetBy))
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		for _, k := range facetBy {
 			if k == "" {

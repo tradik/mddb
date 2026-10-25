@@ -29,6 +29,7 @@ var (
 // FTSIndex provides full-text search using an inverted index in BoltDB.
 type FTSIndex struct {
 	db              *bolt.DB
+	router          boltx.Router // #336: which file holds a collection; nil means db
 	stopWords       map[string]bool
 	binlog          *binlog.Binlog
 	stemmer         Stemmer
@@ -110,6 +111,26 @@ func NewFTSIndex(db *bolt.DB) *FTSIndex {
 		db:        db,
 		stopWords: defaultStopWords,
 	}
+}
+
+// SetRouter makes the index read and write each collection in the file the
+// router names (#336). Without one, everything goes to the db it was built on.
+func (f *FTSIndex) SetRouter(r boltx.Router) { f.router = r }
+
+func (f *FTSIndex) rt() boltx.Router {
+	if f.router != nil {
+		return f.router
+	}
+	return boltx.Single{DB: f.db}
+}
+
+// view and update run a transaction on the file holding collection.
+func (f *FTSIndex) view(collection string, fn func(*bolt.Tx) error) error {
+	return boltx.View(f.rt(), collection, fn)
+}
+
+func (f *FTSIndex) update(collection string, fn func(*bolt.Tx) error) error {
+	return boltx.Update(f.rt(), collection, fn)
 }
 
 // Reload points the index at a freshly swapped database handle after a
@@ -281,7 +302,7 @@ func (f *FTSIndex) IndexWithLang(collection, docID, content, lang string) error 
 	}
 
 	var bo binlog.BinlogOps
-	err := f.db.Update(func(tx *bolt.Tx) error {
+	err := f.update(collection, func(tx *bolt.Tx) error {
 		return f.indexTermsInTx(tx, &bo, putNow, collection, docID, terms)
 	})
 	if err == nil {
@@ -360,7 +381,7 @@ func (f *FTSIndex) IndexFieldsWithLang(collection, docID string, fields map[stri
 		return nil
 	}
 
-	return f.db.Update(func(tx *bolt.Tx) error {
+	return f.update(collection, func(tx *bolt.Tx) error {
 		return f.indexFieldTokensInTx(tx, putNow, collection, docID, fieldTokens)
 	})
 }
@@ -440,7 +461,7 @@ func (f *FTSIndex) Index(collection, docID, content string) error {
 	}
 
 	var bo binlog.BinlogOps
-	err := f.db.Update(func(tx *bolt.Tx) error {
+	err := f.update(collection, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		bRev := tx.Bucket(bucketFTSRev)
 
@@ -510,7 +531,7 @@ func (f *FTSIndex) RemoveDocs(collection string, docIDs []string) error {
 	for start := 0; start < len(docIDs); start += removeBatch {
 		end := min(start+removeBatch, len(docIDs))
 		var bo binlog.BinlogOps
-		err := f.db.Update(func(tx *bolt.Tx) error {
+		err := f.update(collection, func(tx *bolt.Tx) error {
 			for _, docID := range docIDs[start:end] {
 				if err := f.removeInTx(tx, &bo, collection, docID); err != nil {
 					return err
@@ -573,7 +594,7 @@ func (f *FTSIndex) Search(collection, query string, limit int) ([]FTSResult, err
 
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		if bFTS == nil {
 			return nil
@@ -736,7 +757,7 @@ func (f *FTSIndex) IndexFields(collection, docID string, fields map[string]strin
 		return nil
 	}
 
-	return f.db.Update(func(tx *bolt.Tx) error {
+	return f.update(collection, func(tx *bolt.Tx) error {
 		// Remove old field data first (handles re-indexing)
 		if err := f.removeFieldData(tx, collection, docID); err != nil {
 			return err

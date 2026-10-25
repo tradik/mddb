@@ -98,7 +98,7 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 
 	// Load documents
 	protoResults := make([]*proto.VectorSearchResult, 0, len(results))
-	_ = g.server.DBView(func(tx *bolt.Tx) error {
+	_ = g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 		for rank, vr := range results {
 			v := bDocs.Get(storage.DocKey(req.Collection, vr.DocID))
@@ -161,7 +161,7 @@ func (g *GRPCServer) VectorReindex(ctx context.Context, req *proto.VectorReindex
 	}
 	var docs []docEntry
 
-	err := g.server.DBView(func(tx *bolt.Tx) error {
+	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 		c := bDocs.Cursor()
 		prefix := []byte("doc|" + req.Collection + "|")
@@ -249,7 +249,7 @@ func (g *GRPCServer) VectorStats(ctx context.Context, req *proto.VectorStatsRequ
 	vectorCounts, _ := g.server.VectorStore.CountByCollection()
 
 	docCounts := make(map[string]int)
-	_ = g.server.DBView(func(tx *bolt.Tx) error {
+	_ = g.server.DBViewAll(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 		if bDocs == nil {
 			return nil
@@ -423,7 +423,7 @@ func (g *GRPCServer) SetTTL(ctx context.Context, req *proto.SetTTLRequest) (*pro
 	}
 
 	var updated storage.Doc
-	err := g.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := g.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		v := bDocs.Get(storage.DocKey(req.Collection, docID))
 		if v == nil {
@@ -565,7 +565,7 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 	// accumulate FTSResultWithDoc locally so curation + facets see the full
 	// shape identical to the HTTP handler.
 	docResults := make([]FTSResultWithDoc, 0, len(results))
-	_ = g.server.DBView(func(tx *bolt.Tx) error {
+	_ = g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		for _, res := range results {
 			v := bDocs.Get(storage.DocKey(req.Collection, res.DocID))

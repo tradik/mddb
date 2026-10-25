@@ -238,7 +238,7 @@ func (g *GRPCServer) TestAutomation(ctx context.Context, req *proto.TestAutomati
 
 	// Load matched documents
 	var protoDocs []*proto.Document
-	_ = g.server.DBView(func(tx *bolt.Tx) error {
+	_ = g.server.DBViewC(rule.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -562,32 +562,26 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 
 	// Load full documents
 	protoResults := make([]*proto.CrossSearchResultItem, 0, len(allTagged))
-	_ = g.server.DBView(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
+	// #336: documents of several collections, each read from its own file.
+	for rank, tr := range allTagged {
+		v := g.server.docBytes(tr.collection, tr.result.DocID)
+		if v == nil {
+			continue
 		}
-		for rank, tr := range allTagged {
-			v := bDocs.Get(storage.DocKey(tr.collection, tr.result.DocID))
-			if v == nil {
-				continue
-			}
-			d, err := unmarshalDoc(v)
-			if err != nil {
-				continue
-			}
-			if !req.IncludeContent {
-				d.ContentMD = ""
-			}
-			protoResults = append(protoResults, &proto.CrossSearchResultItem{
-				Collection: tr.collection,
-				Document:   docToProto(d),
-				Score:      tr.result.Score,
-				Rank:       int32(rank + 1),
-			})
+		d, err := unmarshalDoc(v)
+		if err != nil {
+			continue
 		}
-		return nil
-	})
+		if !req.IncludeContent {
+			d.ContentMD = ""
+		}
+		protoResults = append(protoResults, &proto.CrossSearchResultItem{
+			Collection: tr.collection,
+			Document:   docToProto(d),
+			Score:      tr.result.Score,
+			Rank:       int32(rank + 1),
+		})
+	}
 
 	return &proto.CrossSearchResponse{
 		Results:           protoResults,
@@ -692,7 +686,7 @@ func (g *GRPCServer) ListRevisions(ctx context.Context, req *proto.ListRevisions
 	docID := genID(req.Collection, req.Key, req.Lang)
 
 	var revisions []*proto.RevisionEntryProto
-	err := g.server.DBView(func(tx *bolt.Tx) error {
+	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		if bRev == nil {
 			return nil
@@ -763,7 +757,7 @@ func (g *GRPCServer) RestoreRevision(ctx context.Context, req *proto.RestoreRevi
 	revKey := append(storage.RevPrefix(req.Collection, docID), []byte(tsKey)...)
 
 	var revDoc *storage.Doc
-	err := g.server.DBView(func(tx *bolt.Tx) error {
+	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		if bRev == nil {
 			return errors.New("revision not found")

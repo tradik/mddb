@@ -322,6 +322,7 @@ paths:
                     additionalProperties:
                       type: object
                       properties:
+                        fileBytes: {type: integer, description: "Size of the collection's own file, per-collection layout only (#336)"}
                         totalBytes: {type: integer}
                         byBucket: {type: object, additionalProperties: {type: integer}}
                         byCategory:

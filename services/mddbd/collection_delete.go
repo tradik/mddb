@@ -38,7 +38,7 @@ func (s *Server) deleteCollection(collection string) (int, error) {
 	var docs []deletedDocRef
 	var bo binlog.BinlogOps
 
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		bIdx := tx.Bucket(s.BucketNames.IdxMeta)
 		bRev := tx.Bucket(s.BucketNames.Rev)
@@ -142,6 +142,12 @@ func (s *Server) cleanUpDeletedCollection(collection string, docs []deletedDocRe
 	}
 	if s.CollectionManager != nil {
 		_ = s.CollectionManager.Delete(collection)
+	}
+	// #336: the collection's own file goes, and with it the disk space.
+	if cf := s.collectionStore(); cf != nil {
+		if err := cf.remove(collection); err != nil {
+			slog.Warn("removing a deleted collection's file failed", "collection", collection, "err", err)
+		}
 	}
 }
 

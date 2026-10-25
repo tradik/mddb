@@ -130,7 +130,7 @@ func (f *FTSIndex) SearchFuzzy(collection, query string, limit, maxDist int) ([]
 	}
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		if bFTS == nil {
 			return nil
@@ -217,7 +217,7 @@ func (f *FTSIndex) SearchBM25Fuzzy(collection, query string, limit, maxDist int)
 	}
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		if bFTS == nil {
 			return nil

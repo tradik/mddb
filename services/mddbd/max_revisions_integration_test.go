@@ -13,7 +13,7 @@ import (
 func revCount(t *testing.T, s *Server, coll, docID string) int {
 	t.Helper()
 	var n int
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(coll, func(tx *bolt.Tx) error {
 		prefix := storage.RevPrefix(coll, docID)
 		c := tx.Bucket([]byte("rev")).Cursor()
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
@@ -30,7 +30,7 @@ func revCount(t *testing.T, s *Server, coll, docID string) int {
 func seedFakeRevisions(t *testing.T, s *Server, coll, key, lang string, count int) string {
 	t.Helper()
 	docID := genID(coll, key, lang)
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC(coll, func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("rev"))
 		for i := 0; i < count; i++ {
 			rkey := append(storage.RevPrefix(coll, docID), []byte(fmt.Sprintf("%020d", int64(100+i)))...)

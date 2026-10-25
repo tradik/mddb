@@ -18,8 +18,9 @@ var ErrQueueClosed = errors.New("index queue closed")
 // the daemon implements it over its *Server, so the queue no longer holds a
 // back-reference to the Server god-object.
 type Store interface {
-	// DBUpdate runs fn inside a writable BoltDB transaction.
-	DBUpdate(func(*bolt.Tx) error) error
+	// DBUpdate runs fn inside a writable BoltDB transaction on the file that
+	// holds collection (#336: one file per collection is possible).
+	DBUpdate(collection string, fn func(*bolt.Tx) error) error
 	// IdxMetaBucket returns the name of the metadata-index bucket.
 	IdxMetaBucket() []byte
 	// Binlog returns the replication binary log (may be nil), read lazily so a
@@ -145,7 +146,7 @@ func (iq *IndexQueue) worker(id int) {
 // processJob processes a single indexing job
 func (iq *IndexQueue) processJob(job *IndexJob) error {
 	var bo binlog.BinlogOps
-	err := iq.store.DBUpdate(func(tx *bolt.Tx) error {
+	err := iq.store.DBUpdate(job.Collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(iq.store.IdxMetaBucket())
 
 		// Delete old indices

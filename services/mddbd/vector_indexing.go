@@ -68,7 +68,7 @@ func (x serverIndexes) IndexChunk(collection, chunkKey string, vec []float32) er
 // DocumentExists reports whether a document is still stored.
 func (x serverIndexes) DocumentExists(collection, docID string) bool {
 	exists := false
-	_ = x.s.DBView(func(tx *bolt.Tx) error {
+	_ = x.s.DBViewC(collection, func(tx *bolt.Tx) error {
 		if b := tx.Bucket(x.s.BucketNames.Docs); b != nil {
 			exists = b.Get(storage.DocKey(collection, docID)) != nil
 		}

@@ -236,6 +236,9 @@ func (rc *ReplicationClient) replicate() error {
 
 // requestSnapshot downloads a full database snapshot from the leader
 func (rc *ReplicationClient) requestSnapshot(ctx context.Context) error {
+	if rc.server.collectionStore() != nil {
+		return errSnapshotPerCollection
+	}
 	ctx = withReplicationSecret(ctx)
 	stream, err := rc.client.RequestSnapshot(ctx, &proto.SnapshotRequest{
 		FollowerId: rc.followerID,

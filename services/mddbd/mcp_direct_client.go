@@ -53,7 +53,7 @@ func (c *DirectClient) Stats(ctx context.Context) (*MCPStats, error) {
 
 	collectionMap := make(map[string]*MCPCollectionStats)
 
-	err := c.server.DBView(func(tx *bolt.Tx) error {
+	err := c.server.DBViewAll(func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs != nil {
 			c2 := bDocs.Cursor()
@@ -216,7 +216,7 @@ func (c *DirectClient) DeleteBatch(ctx context.Context, req *MCPDeleteBatchReque
 // Get retrieves a document via the direct client.
 func (c *DirectClient) Get(ctx context.Context, req *MCPGetRequest) (*MCPDocument, error) {
 	var doc storage.Doc
-	err := c.server.DBView(func(tx *bolt.Tx) error {
+	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
 		if docID == nil {
@@ -259,7 +259,7 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 	type row struct{ Doc storage.Doc }
 	var rows []row
 
-	err := c.server.DBView(func(tx *bolt.Tx) error {
+	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		seen := make(map[string]bool)
@@ -396,7 +396,7 @@ func (c *DirectClient) DeleteCollection(ctx context.Context, req *MCPDeleteColle
 func (c *DirectClient) collectExportDocs(req *MCPExportRequest) ([]storage.Doc, error) {
 	var docs []storage.Doc
 
-	err := c.server.DBView(func(tx *bolt.Tx) error {
+	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
 
@@ -534,7 +534,7 @@ func (c *DirectClient) Restore(ctx context.Context, req *MCPRestoreRequest) (*MC
 
 // Truncate removes all documents from a collection via the direct client.
 func (c *DirectClient) Truncate(ctx context.Context, req *MCPTruncateRequest) (*MCPTruncateResponse, error) {
-	err := c.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := c.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		bDocs := tx.Bucket([]byte("docs"))
 

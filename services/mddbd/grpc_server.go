@@ -266,7 +266,7 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 
 	var doc storage.Doc
 	var docData []byte
-	err := g.server.DBView(func(tx *bolt.Tx) error {
+	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bByK := tx.Bucket(g.server.BucketNames.ByKey)
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
@@ -338,7 +338,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 	var docs []storage.Doc
 	var docIDs []string
 
-	err := g.server.DBView(func(tx *bolt.Tx) error {
+	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
@@ -514,7 +514,7 @@ func (g *GRPCServer) Truncate(ctx context.Context, req *proto.TruncateRequest) (
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
 	}
 
-	err := g.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := g.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
 		bRev := tx.Bucket(g.server.BucketNames.Rev)
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
@@ -580,7 +580,7 @@ func (g *GRPCServer) Stats(ctx context.Context, req *proto.StatsRequest) (*proto
 	// Collect statistics
 	collectionMap := make(map[string]*proto.CollectionStats)
 
-	err := g.server.DBView(func(tx *bolt.Tx) error {
+	err := g.server.DBViewAll(func(tx *bolt.Tx) error {
 		// Count documents
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 		if bDocs != nil {

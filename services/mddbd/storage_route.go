@@ -96,7 +96,7 @@ func (s *Server) docPayload(tx *bolt.Tx, collection, docID string) ([]byte, erro
 	}
 
 	var out []byte
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(s.BucketNames.Docs)
 		if b == nil {
 			return errDocsBucketMissing

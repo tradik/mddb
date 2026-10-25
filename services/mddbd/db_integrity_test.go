@@ -241,7 +241,7 @@ func countDocs(t *testing.T, s *Server, collection string) int {
 	t.Helper()
 	n := 0
 	prefix := []byte("bykey|" + collection + "|")
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		c := tx.Bucket(s.BucketNames.ByKey).Cursor()
 		for k, _ := c.Seek(prefix); k != nil && strings.HasPrefix(string(k), string(prefix)); k, _ = c.Next() {
 			n++

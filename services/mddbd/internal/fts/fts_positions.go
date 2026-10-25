@@ -128,7 +128,7 @@ func (f *FTSIndex) IndexPositionsWithLang(collection, docID, content, lang strin
 		return nil
 	}
 
-	return f.db.Update(func(tx *bolt.Tx) error {
+	return f.update(collection, func(tx *bolt.Tx) error {
 		return f.indexPositionsInTx(tx, putNow, collection, docID, positions)
 	})
 }
@@ -174,7 +174,7 @@ func (f *FTSIndex) IndexPositions(collection, docID, content string) error {
 		return nil
 	}
 
-	return f.db.Update(func(tx *bolt.Tx) error {
+	return f.update(collection, func(tx *bolt.Tx) error {
 		bPos := tx.Bucket(bucketFTSPos)
 		if bPos == nil {
 			return nil
@@ -208,7 +208,7 @@ func (f *FTSIndex) IndexPositions(collection, docID, content string) error {
 
 // RemovePositions removes positional index entries for a document.
 func (f *FTSIndex) RemovePositions(collection, docID string) error {
-	return f.db.Update(func(tx *bolt.Tx) error {
+	return f.update(collection, func(tx *bolt.Tx) error {
 		f.removePositionsInTx(tx, collection, docID)
 		return nil
 	})
@@ -298,7 +298,7 @@ func (f *FTSIndex) searchPhraseTerms(collection string, phraseTerms []string) ([
 	}
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bPos := tx.Bucket(bucketFTSPos)
 		if bPos == nil {
 			return nil
@@ -372,7 +372,7 @@ func (f *FTSIndex) SearchProximity(collection string, phrase string, distance in
 	}
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bPos := tx.Bucket(bucketFTSPos)
 		if bPos == nil {
 			return nil

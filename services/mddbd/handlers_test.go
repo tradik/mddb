@@ -840,7 +840,7 @@ func TestHandleTruncate_Success(t *testing.T) {
 	// Manually insert additional revision entries with distinct timestamps
 	// because addDocument uses time.Now().Unix() which has second resolution
 	// and all updates within the same second share the same revision key.
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		for i := 1; i <= 4; i++ {
 			ts := doc.AddedAt + int64(i)
@@ -857,7 +857,7 @@ func TestHandleTruncate_Success(t *testing.T) {
 
 	// Count revisions before truncation
 	var revsBefore int
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		c := tx.Bucket([]byte("rev")).Cursor()
 		prefix := storage.RevPrefix("blog", doc.ID)
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
@@ -878,7 +878,7 @@ func TestHandleTruncate_Success(t *testing.T) {
 
 	// Count revisions after
 	var revsAfter int
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		c := tx.Bucket([]byte("rev")).Cursor()
 		prefix := storage.RevPrefix("blog", doc.ID)
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
@@ -1412,7 +1412,7 @@ func TestHandleTruncate_DropAllRevisions(t *testing.T) {
 
 	// Verify all revisions are gone
 	var count int
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		c := tx.Bucket([]byte("rev")).Cursor()
 		prefix := []byte("rev|blog|")
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {

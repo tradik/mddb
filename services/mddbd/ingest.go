@@ -300,7 +300,7 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 func (s *Server) buildContentHashMap(collection string, docs []IngestDocumentHTTP) map[string]uint32 {
 	hashes := make(map[string]uint32)
 
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		if bDocs == nil {
 			return nil

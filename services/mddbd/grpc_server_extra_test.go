@@ -551,7 +551,7 @@ func TestGRPCSearch_MultipleMetaFilters(t *testing.T) {
 	})
 
 	// Manually index meta
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(s.BucketNames.IdxMeta)
 		_ = bIdx.Put(append(storage.MetaKeyPrefix("blog", "category", "tech"), []byte("id-mf1")...), []byte("1"))
 		_ = bIdx.Put(append(storage.MetaKeyPrefix("blog", "category", "tech"), []byte("id-mf2")...), []byte("1"))

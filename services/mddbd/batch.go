@@ -138,7 +138,7 @@ func (bp *BatchProcessor) processDocument(collection string, batchDoc *proto.Bat
 
 	// Load existing (in read transaction)
 	existing := storage.Doc{}
-	err := bp.server.DBView(func(tx *bolt.Tx) error {
+	err := bp.server.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(bp.server.BucketNames.Docs)
 		if v := bDocs.Get(storage.DocKey(collection, docID)); v != nil {
 			existingDoc, err := unmarshalDoc(v)
@@ -199,7 +199,7 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 
 	var bo binlog.BinlogOps
 	// Single transaction for all documents
-	err := bp.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := bp.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(bp.server.BucketNames.Docs)
 		bIdx := tx.Bucket(bp.server.BucketNames.IdxMeta)
 		bRev := tx.Bucket(bp.server.BucketNames.Rev)

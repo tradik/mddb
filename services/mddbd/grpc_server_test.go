@@ -180,7 +180,7 @@ func addDocForSearch(t *testing.T, s *Server, coll, docID, key, lang, content st
 	if err != nil {
 		t.Fatalf("addDocForSearch marshal: %v", err)
 	}
-	err = s.DB.Update(func(tx *bolt.Tx) error {
+	err = s.DBUpdateC(coll, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		return bDocs.Put(storage.DocKey(coll, docID), buf)
 	})
@@ -328,7 +328,7 @@ func TestGRPCAdd_WithRevision(t *testing.T) {
 
 	// Check that a revision was stored in the rev bucket
 	var revCount int
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket(s.BucketNames.Rev)
 		c := bRev.Cursor()
 		prefix := storage.RevPrefix("blog", genID("blog", "rev-doc", "en"))
@@ -553,7 +553,7 @@ func TestGRPCSearch_WithMetaFilter(t *testing.T) {
 		"category": {"cooking"},
 	})
 	// Manually add meta index entries so the filter path works
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(s.BucketNames.IdxMeta)
 		_ = bIdx.Put(append(storage.MetaKeyPrefix("blog", "category", "tech"), []byte("id-p1")...), []byte("1"))
 		_ = bIdx.Put(append(storage.MetaKeyPrefix("blog", "category", "cooking"), []byte("id-p2")...), []byte("1"))
@@ -826,7 +826,7 @@ func TestGRPCTruncate_Success(t *testing.T) {
 			t.Fatal(err)
 		}
 		revKey := []byte("rev|blog|" + docID + "|" + string(rune('0'+i)))
-		_ = s.DB.Update(func(tx *bolt.Tx) error {
+		_ = s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 			bRev := tx.Bucket(s.BucketNames.Rev)
 			return bRev.Put(revKey, buf)
 		})
@@ -834,13 +834,13 @@ func TestGRPCTruncate_Success(t *testing.T) {
 
 	// Also ensure a doc exists in docs bucket so Truncate can find docIDs
 	docBuf, _ := marshalDoc(&doc)
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		return tx.Bucket(s.BucketNames.Docs).Put(storage.DocKey("blog", docID), docBuf)
 	})
 
 	// Verify revisions exist
 	var revCountBefore int
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket(s.BucketNames.Rev)
 		c := bRev.Cursor()
 		prefix := storage.RevPrefix("blog", docID)
@@ -867,7 +867,7 @@ func TestGRPCTruncate_Success(t *testing.T) {
 
 	// Check revisions after
 	var revCountAfter int
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket(s.BucketNames.Rev)
 		c := bRev.Cursor()
 		prefix := storage.RevPrefix("blog", docID)

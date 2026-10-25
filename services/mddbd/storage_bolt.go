@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"mddb/internal/boltx"
 
 	bolt "go.etcd.io/bbolt"
 
@@ -23,8 +24,15 @@ import (
 // storage format.
 type BoltBackend struct {
 	db      *bolt.DB
+	router  boltx.Router // #336: which file holds a collection; nil means db
 	buckets BucketNames
 }
+
+// SetRouter makes it read and write each collection in the file the router
+// names (#336). Without one, everything goes to the db it was built on.
+func (b *BoltBackend) SetRouter(r boltx.Router) { b.router = r }
+
+func (b *BoltBackend) rt() boltx.Router { return boltx.Or(b.router, b.db) }
 
 // NewBoltBackend wraps an open database as the default storage backend.
 func NewBoltBackend(db *bolt.DB, buckets BucketNames) *BoltBackend {
@@ -36,7 +44,7 @@ func (b *BoltBackend) Name() string { return "boltdb" }
 
 // PutDoc implements the StorageBackend interface.
 func (b *BoltBackend) PutDoc(collection, docID string, data []byte) error {
-	return b.db.Update(func(tx *bolt.Tx) error {
+	return boltx.Update(b.rt(), collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.buckets.Docs)
 		if bucket == nil {
 			return errDocsBucketMissing
@@ -49,7 +57,7 @@ func (b *BoltBackend) PutDoc(collection, docID string, data []byte) error {
 // matching the interface's contract rather than inventing a not-found error.
 func (b *BoltBackend) GetDoc(collection, docID string) ([]byte, error) {
 	var out []byte
-	err := b.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(b.rt(), collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.buckets.Docs)
 		if bucket == nil {
 			return errDocsBucketMissing
@@ -66,7 +74,7 @@ func (b *BoltBackend) GetDoc(collection, docID string) ([]byte, error) {
 
 // DeleteDoc implements the StorageBackend interface.
 func (b *BoltBackend) DeleteDoc(collection, docID string) error {
-	return b.db.Update(func(tx *bolt.Tx) error {
+	return boltx.Update(b.rt(), collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.buckets.Docs)
 		if bucket == nil {
 			return errDocsBucketMissing
@@ -77,7 +85,7 @@ func (b *BoltBackend) DeleteDoc(collection, docID string) error {
 
 // ListDocs implements the StorageBackend interface.
 func (b *BoltBackend) ListDocs(collection string, fn func(docID string, data []byte) error) error {
-	return b.db.View(func(tx *bolt.Tx) error {
+	return boltx.View(b.rt(), collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.buckets.Docs)
 		if bucket == nil {
 			return errDocsBucketMissing
@@ -95,7 +103,7 @@ func (b *BoltBackend) ListDocs(collection string, fn func(docID string, data []b
 
 // PutByKey implements the StorageBackend interface.
 func (b *BoltBackend) PutByKey(collection, key, lang, docID string) error {
-	return b.db.Update(func(tx *bolt.Tx) error {
+	return boltx.Update(b.rt(), collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.buckets.ByKey)
 		if bucket == nil {
 			return errByKeyBucketMissing
@@ -107,7 +115,7 @@ func (b *BoltBackend) PutByKey(collection, key, lang, docID string) error {
 // GetByKey implements the StorageBackend interface.
 func (b *BoltBackend) GetByKey(collection, key, lang string) (string, error) {
 	var out string
-	err := b.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(b.rt(), collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.buckets.ByKey)
 		if bucket == nil {
 			return errByKeyBucketMissing
@@ -122,7 +130,7 @@ func (b *BoltBackend) GetByKey(collection, key, lang string) (string, error) {
 
 // DeleteByKey implements the StorageBackend interface.
 func (b *BoltBackend) DeleteByKey(collection, key, lang string) error {
-	return b.db.Update(func(tx *bolt.Tx) error {
+	return boltx.Update(b.rt(), collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(b.buckets.ByKey)
 		if bucket == nil {
 			return errByKeyBucketMissing

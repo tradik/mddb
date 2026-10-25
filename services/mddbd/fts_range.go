@@ -38,7 +38,7 @@ func (s *Server) SearchRange(collection string, ranges []RangeFilter, limit int)
 		results = make([]fts.FTSResult, 0, limit)
 	}
 
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		if bDocs == nil {
 			return nil
@@ -98,7 +98,7 @@ func (s *Server) FilterByRange(collection string, results []fts.FTSResult, range
 	}
 
 	filtered := results[:0]
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		if bDocs == nil {
 			return nil

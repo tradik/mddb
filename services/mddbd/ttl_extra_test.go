@@ -90,7 +90,7 @@ func ttlExtraInsertDoc(t *testing.T, s *Server, collection, key, lang, content s
 		UpdatedAt: time.Now().Unix(),
 	}
 	data, _ := marshalDoc(&doc)
-	err := s.DB.Update(func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		return bDocs.Put(storage.DocKey(collection, docID), data)
 	})

@@ -12,8 +12,6 @@ import (
 	"time"
 
 	json "mddb/internal/jsonx"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // CrossSearchRequest represents a cross-collection vector search request.
@@ -201,33 +199,27 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Load full documents
 	items := make([]CrossSearchResultItem, 0, len(allTagged))
-	_ = s.DBView(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
+	// #336: documents of several collections, each read from its own file.
+	for rank, tr := range allTagged {
+		v := s.docBytes(tr.collection, tr.result.DocID)
+		if v == nil {
+			continue
 		}
-		for rank, tr := range allTagged {
-			v := bDocs.Get(storage.DocKey(tr.collection, tr.result.DocID))
-			if v == nil {
-				continue
-			}
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			doc := *docPtr
-			if !req.IncludeContent {
-				doc.ContentMD = ""
-			}
-			items = append(items, CrossSearchResultItem{
-				Collection: tr.collection,
-				Document:   doc,
-				Score:      tr.result.Score,
-				Rank:       rank + 1,
-			})
+		docPtr, err := loadDoc(v)
+		if err != nil {
+			continue
 		}
-		return nil
-	})
+		doc := *docPtr
+		if !req.IncludeContent {
+			doc.ContentMD = ""
+		}
+		items = append(items, CrossSearchResultItem{
+			Collection: tr.collection,
+			Document:   doc,
+			Score:      tr.result.Score,
+			Rank:       rank + 1,
+		})
+	}
 
 	resp := CrossSearchResponse{
 		Results:           items,

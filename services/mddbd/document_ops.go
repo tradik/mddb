@@ -58,7 +58,7 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 	var isNew bool
 	var bo binlog.BinlogOps
 	var cachedBuf []byte // marshaled doc, reused to refresh the read cache (GO-002)
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		bRev := tx.Bucket([]byte("rev"))
@@ -285,7 +285,7 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 
 	var bo binlog.BinlogOps
 	var deletedDoc storage.Doc // captured for trigger evaluation
-	err := s.DBUpdate(func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		bRev := tx.Bucket([]byte("rev"))

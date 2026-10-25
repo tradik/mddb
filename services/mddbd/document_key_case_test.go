@@ -147,7 +147,7 @@ func TestDeletingACollectionLeavesNoOrphanedKeyEntries(t *testing.T) {
 func countByKeyEntries(t *testing.T, s *Server, collection string) int {
 	t.Helper()
 	var n int
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte("bykey"))
 		if bucket == nil {
 			return nil
@@ -183,7 +183,7 @@ func TestDeleteCollectionByKeyEntriesLeavesOtherCollectionsAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.DBUpdate(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("drop", func(tx *bolt.Tx) error {
 		return deleteCollectionByKeyEntries(tx.Bucket([]byte("bykey")), "drop", nil)
 	}); err != nil {
 		t.Fatalf("delete: %v", err)

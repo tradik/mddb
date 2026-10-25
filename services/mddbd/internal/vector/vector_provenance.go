@@ -2,6 +2,7 @@ package vector
 
 import (
 	"encoding/json"
+	"mddb/internal/boltx"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -57,7 +58,7 @@ func (vs *VectorStore) NoteProvenance(collection, model, variant string) error {
 	if err != nil {
 		return err
 	}
-	err = vs.db.Update(func(tx *bolt.Tx) error {
+	err = boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(provenanceBucket)
 		if err != nil {
 			return err
@@ -83,7 +84,7 @@ func (vs *VectorStore) Provenance(collection string) (Provenance, bool, error) {
 		p     Provenance
 		found bool
 	)
-	err := vs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(provenanceBucket)
 		if b == nil {
 			return nil
@@ -128,7 +129,7 @@ func (vs *VectorStore) StaleCollections(model, variant string) ([]string, error)
 // allProvenance reads every recorded provenance, keyed by collection.
 func (vs *VectorStore) allProvenance() (map[string]Provenance, error) {
 	out := make(map[string]Provenance)
-	err := vs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.ViewAll(vs.rt(), func(tx *bolt.Tx) error {
 		b := tx.Bucket(provenanceBucket)
 		if b == nil {
 			return nil
@@ -156,7 +157,7 @@ func (vs *VectorStore) collectionsWithVectors() []string {
 		seen = make(map[string]bool)
 		out  []string
 	)
-	_ = vs.db.View(func(tx *bolt.Tx) error {
+	_ = boltx.ViewAll(vs.rt(), func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
 		if b == nil {
 			return nil

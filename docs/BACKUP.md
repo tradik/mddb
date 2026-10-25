@@ -131,6 +131,12 @@ Since v2.18.2 a clean shutdown stores the freelist whatever the setting, so a
 planned restart reads one page. `MDDB_FREELIST_SYNC=true` is what covers the
 start after a crash. See [STORAGE-TUNING.md](STORAGE-TUNING.md).
 
+## One file per collection
+
+With `MDDB_STORAGE_LAYOUT=per-collection` a backup is the main file plus a
+`.d` directory holding one file per collection, and a restore puts both back.
+See [STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#backup-and-restore).
+
 ## Compacting a database
 
 A bbolt file never shrinks: deleting a large collection frees pages for

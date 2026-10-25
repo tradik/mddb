@@ -254,7 +254,7 @@ func TestRotation_EndToEnd(t *testing.T) {
 	}
 
 	// Post-rotation: every docs entry must carry V2 magic with keyID=2.
-	if err := s.DB.View(func(tx *bolt.Tx) error {
+	if err := s.DBViewC("secrets", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		return b.ForEach(func(k, v []byte) error {
 			if collectionFromDocKey(k) != "secrets" {
@@ -414,7 +414,7 @@ func TestCollectionFromRevKey(t *testing.T) {
 func assertDocsReadable(t *testing.T, s *Server, coll string, want int) error {
 	t.Helper()
 	got := 0
-	if err := s.DB.View(func(tx *bolt.Tx) error {
+	if err := s.DBViewC(coll, func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		return b.ForEach(func(k, v []byte) error {
 			if collectionFromDocKey(k) != coll {
@@ -536,7 +536,7 @@ func TestProcessOne_DecryptError(t *testing.T) {
 	bogus := append([]byte{}, encryption.MagicV2...)
 	bogus = append(bogus, 99) // unknown keyID
 	bogus = append(bogus, make([]byte, encryption.NonceLen+16)...)
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("c", func(tx *bolt.Tx) error {
 		b, _ := tx.CreateBucketIfNotExists([]byte("docs"))
 		return b.Put(storage.DocKey("c", "x"), bogus)
 	}); err != nil {

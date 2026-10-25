@@ -33,9 +33,20 @@ func (s *Server) restoreFromBackup(safeFrom string) error {
 	// The swap drains every in-flight DBView/DBUpdate (GO-004) so no handler
 	// observes a closed or half-swapped *bolt.DB.
 	if err := s.withRestoreLock(func() error {
-		return s.swapDatabase(safeFrom, func(dst string) error {
+		// #336: the collection files come first; if the main file then fails
+		// to swap, they are put back.
+		undo, err := s.swapCollectionFiles(collectionDir(safeFrom))
+		if err != nil {
+			return err
+		}
+		if err := s.swapDatabase(safeFrom, func(dst string) error {
 			return copyFile(safeFrom, dst)
-		})
+		}); err != nil {
+			undo()
+			return err
+		}
+		_ = os.RemoveAll(collectionDir(s.Path) + ".pre-restore")
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -137,6 +148,7 @@ func (s *Server) rebuildInMemoryState() {
 	// via DBView, so it waits until this restore releases the write lock).
 	if s.VectorIndex != nil && s.VectorStore != nil {
 		s.VectorStore = vector.NewVectorStore(s.DB)
+		s.VectorStore.SetRouter(s.router()) // #336
 		go s.loadVectorIndex()
 	}
 

@@ -143,7 +143,7 @@ func (f *FTSIndex) SearchBM25(collection, query string, limit int) ([]FTSResult,
 
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		if bFTS == nil {
 			return nil

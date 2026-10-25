@@ -82,7 +82,7 @@ func (a *serverMetricsStats) DBStats() metrics.DBStats {
 		ds.SizeBytes = info.Size()
 	}
 
-	_ = a.s.DBView(func(tx *bolt.Tx) error {
+	_ = a.s.DBViewAll(func(tx *bolt.Tx) error {
 		if b := tx.Bucket([]byte("docs")); b != nil {
 			c := b.Cursor()
 			for k, _ := c.First(); k != nil; k, _ = c.Next() {
@@ -140,13 +140,21 @@ func (a *serverMetricsStats) DBStats() metrics.DBStats {
 // DBWriteTransactions reads the committed transaction ID from the database
 // meta page. bbolt advances it by one per write commit and never otherwise, so
 // it is an exact commit counter at the cost of one empty read transaction.
+// With one file per collection (#336) it is the sum over the main file and
+// every collection file.
 func (a *serverMetricsStats) DBWriteTransactions() uint64 {
-	var id int
+	var total int
 	_ = a.s.DBView(func(tx *bolt.Tx) error {
-		id = tx.ID()
+		total = tx.ID()
 		return nil
 	})
-	return uint64(max(id, 0))
+	if a.s.collectionStore() != nil {
+		_ = a.s.DBViewAll(func(tx *bolt.Tx) error {
+			total += tx.ID()
+			return nil
+		})
+	}
+	return uint64(max(total, 0))
 }
 
 // metricsExtractCollection pulls the collection name from a BoltDB key like "doc|blog|id".

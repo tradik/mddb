@@ -47,7 +47,9 @@ import (
 // are refused instead of silently landing on the default backend, which is the
 // behaviour this whole change exists to remove.
 func (s *Server) InitStorageBackends() {
-	s.Backends = NewBackendRegistry(NewBoltBackend(s.DB, s.BucketNames))
+	bb := NewBoltBackend(s.DB, s.BucketNames)
+	bb.SetRouter(s.router()) // #336
+	s.Backends = NewBackendRegistry(bb)
 
 	if s.CollectionManager == nil {
 		return

@@ -135,7 +135,7 @@ func (c *DirectClient) UpdateDocument(ctx context.Context, req *MCPUpdateDocumen
 	now := time.Now().Unix()
 	var saved storage.Doc
 
-	err := c.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := c.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))
 		bDocs := tx.Bucket([]byte("docs"))
 
@@ -195,7 +195,7 @@ func (c *DirectClient) GetDocumentMeta(ctx context.Context, req *MCPGetDocMetaRe
 	}
 
 	var doc storage.Doc
-	err := c.server.DBView(func(tx *bolt.Tx) error {
+	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))
 		bDocs := tx.Bucket([]byte("docs"))
 		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
@@ -335,7 +335,7 @@ func (c *DirectClient) DeleteStopWords(ctx context.Context, collection string, w
 // GetMetaKeys returns all metadata keys for a collection via the direct client.
 func (c *DirectClient) GetMetaKeys(ctx context.Context, collection string) (*MCPMetaKeysResponse, error) {
 	meta := make(map[string][]string)
-	_ = c.server.DBView(func(tx *bolt.Tx) error {
+	_ = c.server.DBViewC(collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		if bIdx == nil {
 			return nil

@@ -51,7 +51,7 @@ func (s *Server) annotateLines(collection string, res *GraphResult) {
 
 func (s *Server) loadContentFor(collection string, res *GraphResult) map[string]string {
 	byKey := make(map[string]string, len(res.Nodes))
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		if bDocs == nil {
 			return nil

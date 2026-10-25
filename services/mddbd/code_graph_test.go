@@ -425,7 +425,7 @@ func TestGraphSkipsDanglingIndexEntries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.DBUpdate(func(tx *bolt.Tx) error {
+	if err := srv.DBUpdateC("theme", func(tx *bolt.Tx) error {
 		return tx.Bucket(srv.BucketNames.Docs).Delete(storage.DocKey("theme", ref.DocID))
 	}); err != nil {
 		t.Fatal(err)

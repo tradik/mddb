@@ -175,7 +175,7 @@ func (s *Server) handleVectorProjection(w http.ResponseWriter, r *http.Request) 
 // sampled points in a single read transaction.
 func (s *Server) projectionDocKeys(collection string, ids []string) map[string]string {
 	keys := make(map[string]string)
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil

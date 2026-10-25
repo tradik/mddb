@@ -51,12 +51,19 @@ type temporalJob struct {
 // TemporalManager tracks document lifecycle events and hot-doc leaderboards.
 type TemporalManager struct {
 	db     *bolt.DB
+	router boltx.Router // #336: which file holds a collection; nil means db
 	ch     chan temporalJob
 	done   chan struct{}
 	once   sync.Once
 	seq    atomic.Uint64
 	binlog *binlog.Binlog
 }
+
+// SetRouter makes it read and write each collection in the file the router
+// names (#336). Without one, everything goes to the db it was built on.
+func (tm *TemporalManager) SetRouter(r boltx.Router) { tm.router = r }
+
+func (tm *TemporalManager) rt() boltx.Router { return boltx.Or(tm.router, tm.db) }
 
 // NewTemporalManager creates a TemporalManager backed by the given BoltDB.
 func NewTemporalManager(db *bolt.DB) *TemporalManager {
@@ -124,52 +131,63 @@ func (tm *TemporalManager) run() {
 		if len(pending) == 0 {
 			return
 		}
-		jobs := pending
+		// #336: events of different collections go to different files, so
+		// they are written one Batch per collection.
+		byCollection := map[string][]temporalJob{}
+		for _, j := range pending {
+			byCollection[j.collection] = append(byCollection[j.collection], j)
+		}
 		pending = nil
-		_ = tm.db.Batch(func(tx *bolt.Tx) error {
-			bEvt := tx.Bucket(bucketTemporal)
-			bHot := tx.Bucket(bucketTemporalHot)
-			if bEvt == nil || bHot == nil {
-				return nil
+		for collection, jobs := range byCollection {
+			db, err := tm.rt().ForWrite(collection)
+			if err != nil {
+				continue
 			}
-			for _, j := range jobs {
-				// Key: nanoseconds + monotonic seq suffix to guarantee uniqueness.
-				// Public Timestamp is in Unix seconds for readability.
-				evtKey := fmt.Sprintf("evt|%s|%s|%s|%020d-%016d", j.collection, j.docID, string(j.eventType), j.ts, j.seq)
-				evtVal, _ := json.Marshal(TemporalEvent{
-					DocID:     j.docID,
-					EventType: j.eventType,
-					Timestamp: j.ts / 1e9, // convert to seconds for the public API
-					Actor:     j.actor,
-				})
-				_ = bEvt.Put([]byte(evtKey), evtVal)
-
-				// Update hot-doc counter (only for access events)
-				if j.eventType == EventAccess {
-					hotKey := fmt.Sprintf("hot|%s|%s", j.collection, j.docID)
-					hotKeyB := []byte(hotKey)
-					existing := bHot.Get(hotKeyB)
-					var count uint64
-					var lastTS int64
-					if len(existing) == 16 {
-						count = binary.LittleEndian.Uint64(existing[:8])
-						raw := binary.LittleEndian.Uint64(existing[8:])
-						if raw <= uint64(math.MaxInt64) {
-							lastTS = int64(raw) //nolint:gosec
-						}
-					}
-					count++
-					if j.ts > lastTS {
-						lastTS = j.ts
-					}
-					var buf [16]byte
-					binary.LittleEndian.PutUint64(buf[:8], count)
-					binary.LittleEndian.PutUint64(buf[8:], uint64(lastTS))
-					_ = bHot.Put(hotKeyB, buf[:])
+			_ = db.Batch(func(tx *bolt.Tx) error {
+				bEvt := tx.Bucket(bucketTemporal)
+				bHot := tx.Bucket(bucketTemporalHot)
+				if bEvt == nil || bHot == nil {
+					return nil
 				}
-			}
-			return nil
-		})
+				for _, j := range jobs {
+					// Key: nanoseconds + monotonic seq suffix to guarantee uniqueness.
+					// Public Timestamp is in Unix seconds for readability.
+					evtKey := fmt.Sprintf("evt|%s|%s|%s|%020d-%016d", j.collection, j.docID, string(j.eventType), j.ts, j.seq)
+					evtVal, _ := json.Marshal(TemporalEvent{
+						DocID:     j.docID,
+						EventType: j.eventType,
+						Timestamp: j.ts / 1e9, // convert to seconds for the public API
+						Actor:     j.actor,
+					})
+					_ = bEvt.Put([]byte(evtKey), evtVal)
+
+					// Update hot-doc counter (only for access events)
+					if j.eventType == EventAccess {
+						hotKey := fmt.Sprintf("hot|%s|%s", j.collection, j.docID)
+						hotKeyB := []byte(hotKey)
+						existing := bHot.Get(hotKeyB)
+						var count uint64
+						var lastTS int64
+						if len(existing) == 16 {
+							count = binary.LittleEndian.Uint64(existing[:8])
+							raw := binary.LittleEndian.Uint64(existing[8:])
+							if raw <= uint64(math.MaxInt64) {
+								lastTS = int64(raw) //nolint:gosec
+							}
+						}
+						count++
+						if j.ts > lastTS {
+							lastTS = j.ts
+						}
+						var buf [16]byte
+						binary.LittleEndian.PutUint64(buf[:8], count)
+						binary.LittleEndian.PutUint64(buf[8:], uint64(lastTS))
+						_ = bHot.Put(hotKeyB, buf[:])
+					}
+				}
+				return nil
+			})
+		}
 	}
 
 	for {
@@ -195,7 +213,7 @@ func (tm *TemporalManager) QueryRange(collection, docID string, from, to int64, 
 		limit = 200
 	}
 	var events []TemporalEvent
-	err := tm.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(tm.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketTemporal)
 		if b == nil {
 			return nil
@@ -247,7 +265,7 @@ func (tm *TemporalManager) GetHotDocs(collection string, topN int, since int64) 
 		topN = 10
 	}
 	var entries []HotEntry
-	err := tm.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(tm.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketTemporalHot)
 		if b == nil {
 			return nil
@@ -308,7 +326,7 @@ func (tm *TemporalManager) scanCollectionEvents(collection, eventType string, fr
 		limit = 100000
 	}
 	var events []TemporalEvent
-	err := tm.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(tm.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(bucketTemporal)
 		if b == nil {
 			return nil

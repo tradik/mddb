@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so the next start reads one page: a 2.5 GB file opened in 0.014 s instead of
   56–60 s. Commits after that start clear it again, so after a crash the open
   still walks, as it must. The shutdown step runs after the queues drain.
+- **One storage file per collection (#336).** `MDDB_STORAGE_LAYOUT=per-collection`
+  keeps each collection's documents, indexes, postings, vectors, geo points,
+  TTL entries and temporal events in `<database>.d/<collection>.db`, and the
+  server's own data in the main file. Deleting a collection removes its file,
+  so the space comes back at once; after a crash each file is walked on its
+  own, in the background. Collection files open in parallel. Backups cover
+  every file and restores put them all back. `mddbd -split-collections` and
+  `-merge-collections` move a database between the layouts, offline, copying
+  and checking every key before deleting it. Replication snapshots are not
+  available in this layout (the binlog is); see `docs/STORAGE-LAYOUT.md`.
+  The default layout is unchanged.
 - **Reads at once after a crash; the freelist is rebuilt in the background
   (#333).** When the freelist is not stored, the database now opens after
   reading its meta pages, the server starts and serves reads, and the walk

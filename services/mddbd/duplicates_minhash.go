@@ -136,7 +136,7 @@ func (s *Server) findMinHashDuplicates(collection string, threshold float64, inc
 func (s *Server) collectMinHashDocs(collection string) ([]minhashDoc, error) {
 	var docs []minhashDoc
 
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		if b == nil {
 			return nil
@@ -167,7 +167,7 @@ func (s *Server) collectMinHashDocs(collection string) ([]minhashDoc, error) {
 // LoadDocByID reads one document by its stored ID.
 func (s *Server) LoadDocByID(collection, docID string) (*storage.Doc, error) {
 	var doc *storage.Doc
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		if b == nil {
 			return nil

@@ -105,6 +105,12 @@ func (rs *ReplicationServer) RequestSnapshot(req *proto.SnapshotRequest, stream 
 		return status.Error(codes.InvalidArgument, "follower_id is required")
 	}
 
+	// #336: a snapshot is one file streamed; the per-collection layout has
+	// many. Followers of such a leader catch up from the binlog.
+	if rs.server.collectionStore() != nil {
+		return status.Error(codes.Unimplemented, errSnapshotPerCollection.Error())
+	}
+
 	slog.Info("Replication follower requested snapshot", "followerID", followerID)
 
 	// Record the LSN at snapshot time

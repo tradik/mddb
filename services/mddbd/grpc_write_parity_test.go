@@ -55,7 +55,7 @@ func TestGRPCAdd_MetaIndexParity(t *testing.T) {
 
 	docID := genID("blog", "meta-doc", "en")
 	found := false
-	err := s.DB.View(func(tx *bolt.Tx) error {
+	err := s.DBViewC("blog", func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(s.BucketNames.IdxMeta)
 		mkey := append(storage.MetaKeyPrefix("blog", "author", "alice"), []byte(docID)...)
 		found = bIdx.Get(mkey) != nil

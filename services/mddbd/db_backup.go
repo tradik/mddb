@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -34,7 +35,33 @@ import (
 // symlink-resolved filepath.Rel check as a barrier. Dismissed as false
 // positives, as the copyFile alerts were.
 func (s *Server) backupTo(dst string) error {
-	// #nosec G703 -- every caller passes safeBackupPath's output; see copyFile
+	if err := backupFile(s.DB, &s.restoreMu, dst); err != nil {
+		return err
+	}
+	// #336: with one file per collection, each collection file is copied
+	// into "<dst>.d/" under its own name. Every file is a consistent copy;
+	// the files are copied one after another, not at one instant.
+	if cf := s.collectionStore(); cf != nil {
+		dir := collectionDir(dst)
+		if err := os.MkdirAll(dir, 0o700); err != nil { // #nosec G703 -- dst is safeBackupPath's output
+			return err
+		}
+		for _, c := range cf.names() {
+			db := cf.get(c)
+			if db == nil {
+				continue
+			}
+			if err := backupFile(db, &s.restoreMu, filepath.Join(dir, collectionFileName(c))); err != nil {
+				return fmt.Errorf("collection %q: %w", c, err)
+			}
+		}
+	}
+	return nil
+}
+
+// backupFile writes a consistent copy of db to dst, verified before it
+// replaces dst.
+func backupFile(db *bolt.DB, restoreMu *sync.RWMutex, dst string) error {
 	tmp, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp-*")
 	if err != nil {
 		return err
@@ -42,10 +69,12 @@ func (s *Server) backupTo(dst string) error {
 	name := tmp.Name()
 	defer func() { _ = os.Remove(name) }() // #nosec G703 -- os.CreateTemp produced name; no-op once renamed
 
-	err = s.DBView(func(tx *bolt.Tx) error {
+	restoreMu.RLock()
+	err = db.View(func(tx *bolt.Tx) error {
 		_, err := tx.WriteTo(tmp)
 		return err
 	})
+	restoreMu.RUnlock()
 	if err == nil {
 		err = tmp.Sync()
 	}

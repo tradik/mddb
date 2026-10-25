@@ -150,7 +150,7 @@ func (s *Server) loadDocByRef(collection, key, lang string) (*storage.Doc, error
 	// transaction, where a network round trip would hold the view open.
 	if s.usesExternalBackend(collection) {
 		var docID string
-		if err := s.DBView(func(tx *bolt.Tx) error {
+		if err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 			bByK := tx.Bucket([]byte("bykey"))
 			if bByK == nil {
 				return errors.New("not found")
@@ -176,7 +176,7 @@ func (s *Server) loadDocByRef(collection, key, lang string) (*storage.Doc, error
 	}
 
 	var doc storage.Doc
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))
 		bDocs := tx.Bucket([]byte("docs"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))

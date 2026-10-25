@@ -77,7 +77,7 @@ func TestReplicationApplierPut(t *testing.T) {
 
 	// Verify data in BoltDB
 	var val []byte
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		val = b.Get([]byte("doc|blog|post1"))
 		return nil
@@ -122,7 +122,7 @@ func TestReplicationApplierDelete(t *testing.T) {
 
 	// Verify deleted
 	var val []byte
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		val = b.Get([]byte("doc|blog|post1"))
 		return nil
@@ -153,7 +153,7 @@ func TestReplicationApplierBatch(t *testing.T) {
 	}
 
 	// Verify all docs exist
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		for _, key := range []string{"doc|blog|a", "doc|blog|b", "doc|blog|c"} {
 			if b.Get([]byte(key)) == nil {

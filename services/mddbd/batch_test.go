@@ -157,7 +157,7 @@ func TestBatchProcessor_AddSingleDocument(t *testing.T) {
 
 	// Verify document is stored in BoltDB
 	docID := genID("blog", "post1", "en")
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		v := bDocs.Get(storage.DocKey("blog", docID))
 		if v == nil {
@@ -221,7 +221,7 @@ func TestBatchProcessor_AddWithMeta(t *testing.T) {
 
 	// Verify metadata indices created
 	docID := genID("blog", "post1", "en")
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
 
 		// Check tag=go index
@@ -264,7 +264,7 @@ func TestBatchProcessor_AddWithRevision(t *testing.T) {
 	docID := genID("blog", "post1", "en")
 	revPrefix := storage.RevPrefix("blog", docID)
 	revCount := 0
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		c := bRev.Cursor()
 		for k, _ := c.Seek(revPrefix); k != nil && len(k) >= len(revPrefix); k, _ = c.Next() {
@@ -345,7 +345,7 @@ func TestBatchProcessor_UpdateExistingDocument(t *testing.T) {
 
 	// Verify updated content
 	docID := genID("blog", "post1", "en")
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		v := bDocs.Get(storage.DocKey("blog", docID))
 		if v == nil {
@@ -381,7 +381,7 @@ func TestBatchProcessor_ByKeyIndex(t *testing.T) {
 	}
 
 	// Verify bykey index
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("site", func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))
 		byKeyK := storage.ByKeyKey("site", "homepage", "en_US")
 		v := bByK.Get(byKeyK)
@@ -485,7 +485,7 @@ func TestFinalBatchProcessor_AddDocuments(t *testing.T) {
 	// Verify documents exist in DB
 	for _, key := range []string{"p1", "p2"} {
 		docID := genID("blog", key, "en")
-		err = srv.DB.View(func(tx *bolt.Tx) error {
+		err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 			bDocs := tx.Bucket([]byte("docs"))
 			if v := bDocs.Get(storage.DocKey("blog", docID)); v == nil {
 				t.Errorf("document %s not found in docs bucket", key)
@@ -501,7 +501,7 @@ func TestFinalBatchProcessor_AddDocuments(t *testing.T) {
 	docID := genID("blog", "p3", "fr")
 	revPrefix := storage.RevPrefix("blog", docID)
 	revCount := 0
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		c := bRev.Cursor()
 		for k, _ := c.Seek(revPrefix); k != nil && len(k) >= len(revPrefix); k, _ = c.Next() {
@@ -690,7 +690,7 @@ func TestBatchUpdater_UpdateExistingDocuments(t *testing.T) {
 
 	// Verify updated content
 	docID1 := genID("blog", "post1", "en")
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		v := bDocs.Get(storage.DocKey("blog", docID1))
 		if v == nil {
@@ -799,7 +799,7 @@ func TestBatchUpdater_WithRevision(t *testing.T) {
 	docID := genID("blog", "post1", "en")
 	revPrefix := storage.RevPrefix("blog", docID)
 	revCount := 0
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		c := bRev.Cursor()
 		for k, _ := c.Seek(revPrefix); k != nil && len(k) >= len(revPrefix); k, _ = c.Next() {
@@ -944,7 +944,7 @@ func TestBatchDeleter_DeleteExistingDocuments(t *testing.T) {
 
 	// Verify documents are gone
 	docID1 := genID("blog", "post1", "en")
-	err = srv.DB.View(func(tx *bolt.Tx) error {
+	err = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if v := bDocs.Get(storage.DocKey("blog", docID1)); v != nil {
 			t.Error("post1 should be deleted from docs bucket")
@@ -1082,7 +1082,7 @@ func TestBatchDeleter_DeleteWithRevisions(t *testing.T) {
 	docID := genID("blog", "rev-doc", "en")
 	revPrefix := storage.RevPrefix("blog", docID)
 	revCount := 0
-	_ = srv.DB.View(func(tx *bolt.Tx) error {
+	_ = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		c := bRev.Cursor()
 		for k, _ := c.Seek(revPrefix); k != nil && len(k) >= len(revPrefix); k, _ = c.Next() {
@@ -1112,7 +1112,7 @@ func TestBatchDeleter_DeleteWithRevisions(t *testing.T) {
 
 	// Verify revisions are cleaned up
 	revCount = 0
-	_ = srv.DB.View(func(tx *bolt.Tx) error {
+	_ = srv.DBViewC("blog", func(tx *bolt.Tx) error {
 		bRev := tx.Bucket([]byte("rev"))
 		c := bRev.Cursor()
 		for k, _ := c.Seek(revPrefix); k != nil && len(k) >= len(revPrefix); k, _ = c.Next() {

@@ -42,6 +42,7 @@ type bucketUsage struct {
 
 // collectionUsage is the key and value bytes a collection holds, per bucket.
 type collectionUsage struct {
+	FileBytes  int64            `json:"fileBytes,omitempty"` // its own file, in the per-collection layout (#336)
 	TotalBytes int64            `json:"totalBytes"`
 	ByBucket   map[string]int64 `json:"byBucket"`
 	ByCategory map[string]int64 `json:"byCategory"`
@@ -92,12 +93,14 @@ func (s *Server) handleStorage(w http.ResponseWriter, r *http.Request) {
 	ok(w, out)
 }
 
-// storageUsage computes the breakdown, for one collection or for all.
+// storageUsage computes the breakdown, for one collection or for all. With
+// one file per collection (#336) it covers the main file and every
+// collection file, and each collection also reports its file's size.
 func (s *Server) storageUsage(only string) (*storageBreakdown, error) {
 	start := time.Now()
 	out := &storageBreakdown{Collections: map[string]*collectionUsage{}}
-	if fi, err := os.Stat(s.Path); err == nil {
-		out.FileBytes = fi.Size()
+	if only == "" {
+		out.Buckets = map[string]bucketUsage{}
 	}
 	usage := func(c string) *collectionUsage {
 		u := out.Collections[c]
@@ -108,33 +111,66 @@ func (s *Server) storageUsage(only string) (*storageBreakdown, error) {
 		return u
 	}
 
-	err := s.DBView(func(tx *bolt.Tx) error {
-		out.PageSize = tx.DB().Info().PageSize
-		out.FreePages = tx.DB().Stats().FreePageN
-		out.FreeBytes = int64(out.FreePages) * int64(out.PageSize)
-		if only == "" {
-			out.Buckets = map[string]bucketUsage{}
+	scan := func(db *bolt.DB) error {
+		if fi, err := os.Stat(db.Path()); err == nil {
+			out.FileBytes += fi.Size()
 		}
-		return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
-			bucket := string(name)
-			if only != "" {
-				scanCollectionKeys(b, only, func(n int64) { usage(only).add(bucket, n) })
-				return nil
-			}
-			st := b.Stats()
-			out.Buckets[bucket] = bucketUsage{
-				AllocBytes: st.BranchAlloc + st.LeafAlloc,
-				InUseBytes: st.BranchInuse + st.LeafInuse,
-				Keys:       st.KeyN,
-			}
-			return b.ForEach(func(k, v []byte) error {
-				if c, found := collectionOf(k); found {
-					usage(c).add(bucket, int64(len(k)+len(v)))
+		return db.View(func(tx *bolt.Tx) error {
+			out.PageSize = tx.DB().Info().PageSize
+			free := tx.DB().Stats().FreePageN
+			out.FreePages += free
+			out.FreeBytes += int64(free) * int64(out.PageSize)
+			return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
+				bucket := string(name)
+				if only != "" {
+					scanCollectionKeys(b, only, func(n int64) { usage(only).add(bucket, n) })
+					return nil
 				}
-				return nil
+				st := b.Stats()
+				u := out.Buckets[bucket]
+				u.AllocBytes += st.BranchAlloc + st.LeafAlloc
+				u.InUseBytes += st.BranchInuse + st.LeafInuse
+				u.Keys += st.KeyN
+				out.Buckets[bucket] = u
+				return b.ForEach(func(k, v []byte) error {
+					if c, found := keyCollection(bucket, k); found && isCollectionBucket(name) {
+						usage(c).add(bucket, int64(len(k)+len(v)))
+					} else if c, found := collectionOf(k); found {
+						usage(c).add(bucket, int64(len(k)+len(v)))
+					}
+					return nil
+				})
 			})
 		})
-	})
+	}
+
+	s.restoreMu.RLock()
+	defer s.restoreMu.RUnlock()
+	dbs := []*bolt.DB{s.DB}
+	if cf := s.collectionStore(); cf != nil {
+		if only != "" {
+			if db := cf.get(only); db != nil {
+				dbs = append(dbs, db)
+			}
+		} else {
+			for _, c := range cf.names() {
+				if db := cf.get(c); db != nil {
+					dbs = append(dbs, db)
+				}
+			}
+		}
+		for c, db := range cf.all() {
+			if fi, err := os.Stat(db.Path()); err == nil && (only == "" || only == c) {
+				usage(c).FileBytes = fi.Size()
+			}
+		}
+	}
+	var err error
+	for _, db := range dbs {
+		if err = scan(db); err != nil {
+			break
+		}
+	}
 	out.ElapsedMs = time.Since(start).Milliseconds()
 	return out, err
 }
@@ -150,7 +186,12 @@ func scanCollectionKeys(b *bolt.Bucket, collection string, add func(int64)) {
 			continue
 		}
 		tag := append([]byte(nil), k[:i]...)
-		prefix := append(append(append([]byte(nil), tag...), '|'), collection+"|"...)
+		// "<tag>|<collection>" on its own: a per-collection total.
+		exact := append(append(append([]byte(nil), tag...), '|'), collection...)
+		if ek, ev := c.Seek(exact); bytes.Equal(ek, exact) {
+			add(int64(len(ek) + len(ev)))
+		}
+		prefix := append(exact, '|')
 		var v []byte
 		for k, v = c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 			add(int64(len(k) + len(v)))

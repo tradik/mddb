@@ -14,9 +14,9 @@ import (
 // failure-counting branch.
 type failStore struct{}
 
-func (failStore) DBUpdate(func(*bolt.Tx) error) error { return errors.New("db down") }
-func (failStore) IdxMetaBucket() []byte               { return []byte("idxmeta") }
-func (failStore) Binlog() *binlog.Binlog              { return nil }
+func (failStore) DBUpdate(string, func(*bolt.Tx) error) error { return errors.New("db down") }
+func (failStore) IdxMetaBucket() []byte                       { return []byte("idxmeta") }
+func (failStore) Binlog() *binlog.Binlog                      { return nil }
 
 // waitFor delegates to the shared helper, keeping this file's call sites as
 // they were (TEST-004).

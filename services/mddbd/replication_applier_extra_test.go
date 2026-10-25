@@ -119,7 +119,7 @@ func TestApplyBatch_WithDeletes(t *testing.T) {
 
 	// Verify deleted
 	var val []byte
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		val = b.Get([]byte("doc|blog|x"))
 		return nil
@@ -154,7 +154,7 @@ func TestApplyBatch_WithCheckpoints(t *testing.T) {
 
 	// The put should have been applied
 	var val []byte
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("blog", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		val = b.Get([]byte("doc|blog|y"))
 		return nil

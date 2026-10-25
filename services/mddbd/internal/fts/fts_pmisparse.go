@@ -95,7 +95,7 @@ func (f *FTSIndex) TrainPMI(collection string) error {
 	}
 	var docs []docTerms
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bRev := tx.Bucket(bucketFTSRev)
 		if bRev == nil {
 			return nil
@@ -254,7 +254,7 @@ func (f *FTSIndex) SearchPMISparse(collection, query string, limit int) ([]FTSRe
 
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		if bFTS == nil {
 			return nil
@@ -391,7 +391,7 @@ func (f *FTSIndex) SearchPMISparseFuzzy(collection, query string, limit, maxDist
 
 	scores := make(map[string]*docScore)
 
-	err := f.db.View(func(tx *bolt.Tx) error {
+	err := f.view(collection, func(tx *bolt.Tx) error {
 		bFTS := tx.Bucket(bucketFTS)
 		if bFTS == nil {
 			return nil

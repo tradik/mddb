@@ -53,7 +53,7 @@ func refFrom(doc *storage.Doc) *codeDocRef {
 // stored — a stylesheet has no translations.
 func (s *Server) loadCodeDocByKey(collection, key string) (*codeDocRef, error) {
 	var ref *codeDocRef
-	err := s.DBView(func(tx *bolt.Tx) error {
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 		d := s.lookupByKeyTx(tx, collection, key)
 		if d == nil {
 			return fmt.Errorf("%w: %s/%s", errGraphDocNotFound, collection, key)
@@ -110,7 +110,7 @@ func (s *Server) neighbours(req GraphRequest, from *codeDocRef) ([]resolvedEdge,
 	var out []resolvedEdge
 	truncated := false
 
-	_ = s.DBView(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket(s.BucketNames.IdxMeta)
 		bDocs := tx.Bucket(s.BucketNames.Docs)
 		if bIdx == nil || bDocs == nil {

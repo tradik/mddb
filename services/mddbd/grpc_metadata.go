@@ -265,7 +265,7 @@ func (g *GRPCServer) UpdateDocument(ctx context.Context, req *proto.UpdateDocume
 	var metaDidChange bool
 	var bo binlog.BinlogOps
 
-	err := g.server.DBUpdate(func(tx *bolt.Tx) error {
+	err := g.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		bRev := tx.Bucket([]byte("rev"))
@@ -377,7 +377,7 @@ func (g *GRPCServer) GetDocumentMeta(ctx context.Context, req *proto.GetDocument
 	}
 
 	var doc storage.Doc
-	err := g.server.DBView(func(tx *bolt.Tx) error {
+	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bByK := tx.Bucket([]byte("bykey"))
 		bDocs := tx.Bucket([]byte("docs"))
 		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
@@ -648,7 +648,7 @@ func (g *GRPCServer) GetMetaKeys(ctx context.Context, req *proto.GetMetaKeysRequ
 
 	meta := make(map[string][]string)
 
-	_ = g.server.DBView(func(tx *bolt.Tx) error {
+	_ = g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bIdx := tx.Bucket([]byte("idxmeta"))
 		if bIdx == nil {
 			return nil

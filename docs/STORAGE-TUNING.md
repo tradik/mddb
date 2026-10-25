@@ -33,6 +33,10 @@ an ETA.
 | after a clean shutdown | 0.014 s |
 | after a crash, sequential prewarm first | 1.5 s + 0.4 s |
 
+With `MDDB_STORAGE_LAYOUT=per-collection` every collection has its own file,
+so a deleted collection gives its space back at once and a large collection's
+walk does not hold up writes to a small one ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md)).
+
 ## Rules that hold everywhere
 
 1. **Let the server shut down.** SIGTERM, then wait: the shutdown has a 15 s

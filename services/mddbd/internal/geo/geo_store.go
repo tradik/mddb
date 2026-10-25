@@ -21,8 +21,15 @@ var geoBucketName = []byte("geo")
 // in-memory R-tree from BoltDB at startup. Mirrors VectorStore.
 type GeoStore struct {
 	db     *bolt.DB
+	router boltx.Router // #336: which file holds a collection; nil means db
 	binlog *binlog.Binlog
 }
+
+// SetRouter makes it read and write each collection in the file the router
+// names (#336). Without one, everything goes to the db it was built on.
+func (gs *GeoStore) SetRouter(r boltx.Router) { gs.router = r }
+
+func (gs *GeoStore) rt() boltx.Router { return boltx.Or(gs.router, gs.db) }
 
 // NewGeoStore creates a new geo store backed by BoltDB.
 func NewGeoStore(db *bolt.DB) *GeoStore {
@@ -42,7 +49,7 @@ func (gs *GeoStore) EnsureBucket() error {
 func (gs *GeoStore) Put(collection, docID string, lat, lng float64) error {
 	key := buildGeoKey(collection, docID)
 	value := encodeGeoValue(lat, lng)
-	err := gs.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(gs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return fmt.Errorf("geo bucket not found")
@@ -63,7 +70,7 @@ func (gs *GeoStore) Put(collection, docID string, lat, lng float64) error {
 // Delete removes a (collection, docID) point. No-op if absent.
 func (gs *GeoStore) Delete(collection, docID string) error {
 	key := buildGeoKey(collection, docID)
-	err := gs.db.Update(func(tx *bolt.Tx) error {
+	err := boltx.Update(gs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return nil
@@ -84,7 +91,7 @@ func (gs *GeoStore) Delete(collection, docID string) error {
 // regular /v1/delete-collection path alongside the FTS/vector cleanup.
 func (gs *GeoStore) DeleteCollection(collection string) error {
 	prefix := buildGeoPrefix(collection)
-	return gs.db.Update(func(tx *bolt.Tx) error {
+	return boltx.Update(gs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return nil
@@ -123,7 +130,7 @@ func (gs *GeoStore) Rebuild(idx *GeoIndex, collection string) (int, error) {
 		idx.Clear(collection)
 	}
 	count := 0
-	err := gs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.ViewOneOrAll(gs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return nil
@@ -178,7 +185,7 @@ func (gs *GeoStore) RebuildHash(idx *GeoHashIndex, collection string) (int, erro
 		idx.Clear(collection)
 	}
 	count := 0
-	err := gs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.ViewOneOrAll(gs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return nil
@@ -215,7 +222,7 @@ func (gs *GeoStore) Get(collection, docID string) (float64, float64, bool, error
 	key := buildGeoKey(collection, docID)
 	var lat, lng float64
 	var found bool
-	err := gs.db.View(func(tx *bolt.Tx) error {
+	err := boltx.View(gs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(geoBucketName)
 		if b == nil {
 			return nil

@@ -151,6 +151,9 @@ func loadServerConfig() ServerConfig {
 		compactDB       = flag.String("compact-db", "", "Copy a database into -compact-to without its free space, then exit (server stopped)")
 		compactTo       = flag.String("compact-to", "", "Where -compact-db writes the compacted database (must not exist)")
 		compactPageSize = flag.Int("compact-page-size", 0, "Page size of the compacted database, 4096-65536 (default: the system's)")
+		// #336: move collections between the single-file and per-collection layouts.
+		splitCollectionsDB = flag.String("split-collections", "", "Move every collection out of this database into one file per collection (<file>.d/), then exit (server stopped)")
+		mergeCollectionsDB = flag.String("merge-collections", "", "Move every collection file back into this database, then exit (server stopped)")
 	)
 	flag.StringVar(&configFile, "config", "", "Path to YAML config file")
 	flag.StringVar(&configFile, "c", "", "Path to YAML config file (shorthand)")
@@ -169,6 +172,12 @@ func loadServerConfig() ServerConfig {
 	}
 	if *compactDB != "" {
 		os.Exit(runCompact(*compactDB, *compactTo, *compactPageSize))
+	}
+	if *splitCollectionsDB != "" {
+		os.Exit(runSplitCollections(*splitCollectionsDB))
+	}
+	if *mergeCollectionsDB != "" {
+		os.Exit(runMergeCollections(*mergeCollectionsDB))
 	}
 
 	// 2. Load config file (lowest priority after defaults)
