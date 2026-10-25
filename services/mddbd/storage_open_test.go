@@ -184,3 +184,27 @@ func TestBytesInUseDoesNotOverflow(t *testing.T) {
 		t.Error("a zero page size should not divide by zero")
 	}
 }
+
+func TestFreelistSyncFollowsSizeUnlessSet(t *testing.T) {
+	path := newWalkingDB(t) // a small file
+	t.Setenv("MDDB_FREELIST_SYNC", "")
+	if freelistSyncFor(path) {
+		t.Error("a small file should not store the freelist on every commit")
+	}
+	t.Setenv("MDDB_FREELIST_SYNC_THRESHOLD", "1024")
+	if !freelistSyncFor(path) || boltOptionsFor(path).NoFreelistSync {
+		t.Error("a file past the threshold should")
+	}
+	t.Setenv("MDDB_FREELIST_SYNC", "false")
+	if freelistSyncFor(path) {
+		t.Error("an explicit false wins")
+	}
+	t.Setenv("MDDB_FREELIST_SYNC", "true")
+	if !freelistSyncFor(filepath.Join(t.TempDir(), "new.db")) {
+		t.Error("an explicit true wins")
+	}
+	t.Setenv("MDDB_FREELIST_SYNC", "auto")
+	if freelistSyncFor("") || freelistSyncFor(filepath.Join(t.TempDir(), "missing.db")) {
+		t.Error("unknown or missing file: off")
+	}
+}

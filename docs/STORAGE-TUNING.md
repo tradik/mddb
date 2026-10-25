@@ -37,9 +37,10 @@ progress and an ETA.
    budget (`MDDB_SHUTDOWN_TIMEOUT_SEC`) and stores the freelist at the end.
    Docker kills after 10 s by default, so set `stop_grace_period: 20s` (the
    bundled compose files do); Kubernetes waits 30 s by default.
-2. **Set `MDDB_FREELIST_SYNC=true` where crashes happen or the file is larger
-   than memory.** It protects the start after a crash, which the clean-shutdown
-   store cannot. It costs a little per commit (0.15 → 0.66 ms on tmpfs,
+2. **Keep `MDDB_FREELIST_SYNC` on for large files.** Since 2.18.2 it is on by
+   default for a file of 4 GiB or more (`MDDB_FREELIST_SYNC_THRESHOLD`); set it
+   to `true` for smaller ones where crashes happen. It protects the start
+   after a crash, which the clean-shutdown store cannot. It costs a little per commit (0.15 → 0.66 ms on tmpfs,
    *measured*), less on a disk that already waits for fsync.
 3. **Give it memory for the hot part of the file.** A container memory limit
    counts the page cache; a limit below the working set turns every read into

@@ -231,11 +231,16 @@ type DeleteCollectionRequest struct {
 // MDDB_FREELIST_SYNC=true writes it on every commit instead, so an open reads
 // one page. The first open with it set still walks once, to write it.
 
-// getOptimizedBoltOptions returns optimized BoltDB options for performance
-func getOptimizedBoltOptions() *bolt.Options {
+// getOptimizedBoltOptions returns optimized BoltDB options for performance,
+// for a database whose size is not known.
+func getOptimizedBoltOptions() *bolt.Options { return boltOptionsFor("") }
+
+// boltOptionsFor returns the options for the database at path; its size
+// decides the freelist setting when MDDB_FREELIST_SYNC is not set.
+func boltOptionsFor(path string) *bolt.Options {
 	return &bolt.Options{
 		Timeout:         2 * time.Second,
-		NoFreelistSync:  os.Getenv("MDDB_FREELIST_SYNC") != "true", // see freelistSyncNote
+		NoFreelistSync:  !freelistSyncFor(path), // see freelistSyncNote
 		FreelistType:    bolt.FreelistMapType,                      // Use hashmap for freelist (faster than array)
 		NoGrowSync:      false,                                     // Sync after growing mmap (safer)
 		InitialMmapSize: 100 * 1024 * 1024,                         // 100MB initial mmap (reduce remapping)
@@ -276,7 +281,7 @@ func main() {
 	}
 	clock.begin("opening database")
 	openStart := time.Now()
-	db, walked, err := openDatabase(clock, dbPath, getOptimizedBoltOptions()) // #333, #334
+	db, walked, err := openDatabase(clock, dbPath, boltOptionsFor(dbPath)) // #333, #334
 	if d := time.Since(openStart); walked && d > 30*time.Second {
 		slog.Warn("opening the database walked every page to rebuild the freelist",
 			"elapsed", d.Round(time.Second),

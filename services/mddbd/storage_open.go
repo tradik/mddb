@@ -114,6 +114,40 @@ func parseBoltMeta(page []byte) (boltMeta, bool) {
 		pgid: le.Uint64(b[40:]), txid: le.Uint64(b[48:])}, true
 }
 
+// freelistSyncAutoBytes is the size from which the freelist is stored on
+// every commit unless MDDB_FREELIST_SYNC says otherwise.
+const freelistSyncAutoBytes = 4 << 30
+
+// freelistSyncFor decides MDDB_FREELIST_SYNC for the database at path: true
+// or false as set, and when unset (or "auto"), on for a file of 4 GiB or more
+// (MDDB_FREELIST_SYNC_THRESHOLD, in bytes). Past that size a walk after a
+// crash costs minutes to hours, and a stored freelist costs a little on each
+// commit; below it the walk is seconds and commits stay as fast as they were.
+// The size is read at start, so a file that grows past it switches at the
+// next start.
+func freelistSyncFor(path string) bool {
+	switch strings.ToLower(os.Getenv("MDDB_FREELIST_SYNC")) {
+	case "true", "on":
+		return true
+	case "false", "off":
+		return false
+	}
+	if path == "" {
+		return false
+	}
+	fi, err := os.Stat(filepath.Clean(path))
+	if err != nil {
+		return false
+	}
+	threshold := envconf.Int64("MDDB_FREELIST_SYNC_THRESHOLD", freelistSyncAutoBytes)
+	on := fi.Size() >= threshold
+	if on {
+		slog.Info("storing the freelist on every commit: the database is past MDDB_FREELIST_SYNC_THRESHOLD",
+			"bytes", fi.Size(), "threshold", threshold, "override", "MDDB_FREELIST_SYNC=false")
+	}
+	return on
+}
+
 // shouldPrewarm decides whether to read the file through before opening it.
 // MDDB_PREWARM is auto (default), on or off. Auto reads it only when the
 // open is going to walk and the file fits in half the memory available, so

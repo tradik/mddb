@@ -79,7 +79,7 @@ func (s *Server) swapDatabase(source string, install func(dst string) error) err
 	}
 
 	reopen := func() error {
-		db, err := openBolt(s.Path, getOptimizedBoltOptions())
+		db, err := openBolt(s.Path, boltOptionsFor(s.Path))
 		if err != nil {
 			return err
 		}

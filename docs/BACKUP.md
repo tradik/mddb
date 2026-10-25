@@ -124,7 +124,7 @@ over 40 minutes on a busy spinning disk
 
 | Variable | Default | Effect |
 |---|---|---|
-| `MDDB_FREELIST_SYNC` | `false` | `true` writes the freelist on every commit, so an open reads one page instead of walking the file. Writes are slightly slower. The first open with it set still walks once, to write the freelist. |
+| `MDDB_FREELIST_SYNC` | on from 4 GiB | `true` writes the freelist on every commit, so an open reads one page instead of walking the file. Writes are slightly slower. The first open with it set still walks once, to write the freelist. Unset, it is on for files of 4 GiB or more (`MDDB_FREELIST_SYNC_THRESHOLD`, v2.18.2+). |
 | `MDDB_PREWARM` | `auto` | (v2.18.2+) Before a walk, read the file sequentially into the page cache if it fits in half the available memory. |
 
 Since v2.18.2 a clean shutdown stores the freelist whatever the setting, so a

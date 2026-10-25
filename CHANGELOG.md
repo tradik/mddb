@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so the next start reads one page: a 2.5 GB file opened in 0.014 s instead of
   56–60 s. Commits after that start clear it again, so after a crash the open
   still walks, as it must. The shutdown step runs after the queues drain.
+- **`MDDB_FREELIST_SYNC` defaults to on for files of 4 GiB or more (#333).**
+  Past that size a walk after a crash costs minutes to hours; below it,
+  commits stay as they were. `MDDB_FREELIST_SYNC_THRESHOLD` moves the line,
+  and `true`/`false` still force it. The size is read at start.
 - **Prewarm before a walk (#333).** When the open has to walk and the file
   fits in half the available memory (cgroup limit included), the file is read
   sequentially into the page cache first, twice — once is not enough when the
