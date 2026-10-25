@@ -1,3 +1,10 @@
+---
+title: "MDDB Storage Tuning"
+slug: "docs/storage-tuning"
+description: "Disks, filesystems and settings that keep MDDB fast as it grows: freelist, prewarm, ZFS, Linux, WSL2, macOS, FreeBSD and Windows."
+status: publish
+---
+
 # Storage Tuning
 
 How mddb uses the disk, and what to set on each platform so that starts, reads

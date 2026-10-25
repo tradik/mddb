@@ -1,3 +1,10 @@
+---
+title: "MDDB Storage Layout"
+slug: "docs/storage-layout"
+description: "One file or one file per collection: MDDB_STORAGE_LAYOUT, moving between layouts, backups, restores and the limits of each."
+status: publish
+---
+
 # Storage Layout: One File or One File per Collection
 
 Since 2.18.2 mddb can keep each collection in a bbolt file of its own
