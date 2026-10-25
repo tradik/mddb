@@ -32,6 +32,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`mddbd -compact-db SRC -compact-to DST` (#335)** copies a database into a
   new file without its free space, in key order, verified before it reports
   success. `-compact-page-size` sets another page size.
+- **The Go client can be imported (#337).** Its module path is now
+  `github.com/tradik/mddb/clients/go/mddb/v2`, tagged
+  `clients/go/mddb/v2.X.Y` with each release, so
+  `go get github.com/tradik/mddb/clients/go/mddb/v2@latest` works. New typed
+  methods: `Ingest`, `DeleteBatch`, `Aggregate`, `GetCollectionConfig`,
+  `SetCollectionConfig`, `Storage`, `SearchFTS`, `SearchVectors`,
+  `SearchHybrid`, `GetVectorStats`, `ReindexVectors` and `CodeGraph`. Existing
+  methods keep their signatures. `Status` returns a warm-up answer (503 with
+  `warming_up`, phase, progress) as a status, not an error. A context deadline
+  can now exceed the 30 s default; `WithTimeout` sets the default for calls
+  without one and no longer modifies an `http.Client` passed in with
+  `WithHTTPClient`.
 - **`docs/STORAGE-TUNING.md`:** disks, filesystems, ZFS, Linux, WSL2, macOS,
   FreeBSD and Windows settings for mddb, with what was measured.
 

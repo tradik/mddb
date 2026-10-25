@@ -4,7 +4,7 @@ import (
 	"os"
 	"time"
 
-	mddb "mddb-client"
+	mddb "github.com/tradik/mddb/clients/go/mddb/v2"
 )
 
 // newClient builds the shared MDDB Go client (clients/go/mddb) from the CLI's

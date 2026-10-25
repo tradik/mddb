@@ -234,7 +234,7 @@ The daemon was refactored from one flat ~58k-LOC `package main` into importable,
 | Subsystems | `internal/cache`, `internal/metrics` (inverted via `StatsProvider`), `internal/indexqueue` (inverted via `Store`), `internal/ttl` (inverted via `Reaper`), `internal/encryption`, `internal/webhooks`, `internal/automationlog`, `internal/schema`, `internal/temporal`, `internal/audit` |
 | Shared utilities | `internal/envconf`, `internal/sliceutil`, `internal/httpclient` (pooled SSRF-safe client), `internal/wikitext`, `internal/sentiment` |
 
-HTTP/gRPC/MCP/GraphQL handlers stay in `package main` as thin transport over these packages. The HTTP API client is a separate shared module, [`clients/go/mddb`](clients/go/mddb/) (`mddb-client`), consumed by `mddb-cli` and external Go integrations.
+HTTP/gRPC/MCP/GraphQL handlers stay in `package main` as thin transport over these packages. The HTTP API client is a separate shared module, [`clients/go/mddb`](clients/go/mddb/) (`github.com/tradik/mddb/clients/go/mddb/v2`), consumed by `mddb-cli` and external Go integrations.
 
 **CI runs in module-isolation mode** (`GOWORK=off` in [`.github/workflows/test.yml`](.github/workflows/test.yml) and [`release.yml`](.github/workflows/release.yml)) so each module builds and tests independently. This catches missing `require` entries that workspace mode would transparently resolve from sibling modules.
 
@@ -298,10 +298,10 @@ High-performance clients generated from Protocol Buffers:
 
 Proto definitions at `proto/mddb.proto` - generate clients for any language supported by protobuf.
 
-The Go HTTP SDK is a standalone module (`mddb-client`); import it directly:
+The Go HTTP SDK is a standalone module, `github.com/tradik/mddb/clients/go/mddb/v2`, tagged `clients/go/mddb/vX.Y.Z` with each server release (`go get github.com/tradik/mddb/clients/go/mddb/v2@latest`):
 
 ```go
-import mddb "mddb-client" // replace => ./clients/go/mddb in the monorepo
+import mddb "github.com/tradik/mddb/clients/go/mddb/v2" // replace => ./clients/go/mddb in the monorepo
 
 c := mddb.New("http://localhost:11023", mddb.WithAPIKey(os.Getenv("MDDB_API_KEY")))
 doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "en", ContentMD: "# Hi"})

@@ -8,6 +8,11 @@
 //
 //	c := mddb.New("http://localhost:8080", mddb.WithAPIKey(os.Getenv("MDDB_API_KEY")))
 //	doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "en", ContentMD: "# Hi"})
+//
+// Timeouts: a call whose context has no deadline is bounded by the client's
+// default timeout (DefaultTimeout, changed with WithTimeout). A call whose
+// context carries its own deadline uses that deadline instead, so a long bulk
+// ingest or reindex can be given more than the default by the caller.
 package mddb
 
 import (
@@ -21,7 +26,8 @@ import (
 	"time"
 )
 
-// DefaultTimeout is the request timeout used when none is configured.
+// DefaultTimeout is the request timeout applied to calls whose context has no
+// deadline of its own.
 const DefaultTimeout = 30 * time.Second
 
 // Client talks to an MDDB server over its HTTP/JSON API. Construct one with New
@@ -32,6 +38,7 @@ type Client struct {
 	apiKey  string
 	token   string
 	verbose io.Writer
+	timeout time.Duration // applied only when the call's context has no deadline
 }
 
 // Option configures a Client at construction time.
@@ -44,7 +51,9 @@ func WithAPIKey(key string) Option { return func(c *Client) { c.apiKey = key } }
 // Ignored when an API key is also set (the API key takes precedence).
 func WithToken(tok string) Option { return func(c *Client) { c.token = tok } }
 
-// WithHTTPClient supplies a custom *http.Client (timeouts, transport, proxies).
+// WithHTTPClient supplies a custom *http.Client (transport, proxies). A
+// Timeout set on h is a hard cap the client cannot lift; leave it zero and use
+// WithTimeout or a context deadline instead.
 func WithHTTPClient(h *http.Client) Option {
 	return func(c *Client) {
 		if h != nil {
@@ -53,9 +62,11 @@ func WithHTTPClient(h *http.Client) Option {
 	}
 }
 
-// WithTimeout overrides the per-request timeout on the default HTTP client.
+// WithTimeout sets the timeout applied to calls whose context has no deadline
+// (default DefaultTimeout; 0 disables it). A context deadline always wins, so
+// it may be longer or shorter than d.
 func WithTimeout(d time.Duration) Option {
-	return func(c *Client) { c.httpc.Timeout = d }
+	return func(c *Client) { c.timeout = d }
 }
 
 // WithVerbose writes the JSON request body of each call to w (e.g. os.Stderr).
@@ -66,7 +77,8 @@ func WithVerbose(w io.Writer) Option { return func(c *Client) { c.verbose = w } 
 func New(baseURL string, opts ...Option) *Client {
 	c := &Client{
 		baseURL: strings.TrimRight(baseURL, "/"),
-		httpc:   &http.Client{Timeout: DefaultTimeout},
+		httpc:   &http.Client{},
+		timeout: DefaultTimeout,
 	}
 	for _, o := range opts {
 		o(c)
@@ -92,11 +104,30 @@ func (e *APIError) Error() string {
 // >= 400 into an *APIError. It is the low-level escape hatch behind every typed
 // method; callers needing an undocumented endpoint can use it directly.
 func (c *Client) Do(ctx context.Context, method, path string, body any) ([]byte, error) {
+	status, respBody, err := c.send(ctx, method, path, body)
+	if err != nil {
+		return nil, err
+	}
+	if status >= 400 {
+		return nil, &APIError{StatusCode: status, Body: string(respBody)}
+	}
+	return respBody, nil
+}
+
+// send issues the request and returns the status code and body without
+// judging the status, so callers such as Status can read a non-2xx body.
+func (c *Client) send(ctx context.Context, method, path string, body any) (int, []byte, error) {
+	if _, ok := ctx.Deadline(); !ok && c.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
+	}
+
 	var reqBody io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
-			return nil, fmt.Errorf("mddb: encode request: %w", err)
+			return 0, nil, fmt.Errorf("mddb: encode request: %w", err)
 		}
 		reqBody = bytes.NewReader(data)
 		if c.verbose != nil {
@@ -106,7 +137,7 @@ func (c *Client) Do(ctx context.Context, method, path string, body any) ([]byte,
 
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, reqBody)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
@@ -119,18 +150,15 @@ func (c *Client) Do(ctx context.Context, method, path string, body any) ([]byte,
 
 	resp, err := c.httpc.Do(req)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
-	if resp.StatusCode >= 400 {
-		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(respBody)}
-	}
-	return respBody, nil
+	return resp.StatusCode, respBody, nil
 }
 
 // doJSON issues a request and unmarshals the response body into out (when non-nil).

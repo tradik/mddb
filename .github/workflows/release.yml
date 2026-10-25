@@ -394,7 +394,7 @@ jobs:
         working-directory: services/mddb-cli
         run: |
           # go mod verify is intentionally skipped here: mddb-cli pins the shared
-          # client via a local `replace mddb-client => ../../clients/go/mddb`,
+          # client via a local `replace github.com/tradik/mddb/clients/go/mddb/v2 => ../../clients/go/mddb`,
           # which has no module-cache ziphash, so verify fails with
           # "missing ziphash". CI (test.yml) builds mddb-cli without verify for
           # the same reason.

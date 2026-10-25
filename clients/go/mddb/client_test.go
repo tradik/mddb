@@ -80,8 +80,11 @@ func TestOptions(t *testing.T) {
 	if c.httpc != custom {
 		t.Error("WithHTTPClient not applied")
 	}
-	if c.httpc.Timeout != 5*time.Second {
+	if c.timeout != 5*time.Second {
 		t.Error("WithTimeout not applied")
+	}
+	if custom.Timeout != time.Second {
+		t.Error("WithTimeout must not change the supplied http.Client")
 	}
 	// WithHTTPClient(nil) must be a no-op.
 	before := c.httpc

@@ -65,22 +65,6 @@ type ImportURLRequest struct {
 	TTL        int64               `json:"ttl,omitempty"`
 }
 
-// FTSRequest is a full-text search query.
-type FTSRequest struct {
-	Collection string `json:"collection"`
-	Query      string `json:"query"`
-	Lang       string `json:"lang,omitempty"`
-	Limit      int    `json:"limit,omitempty"`
-}
-
-// VectorSearchRequest is a semantic (embedding) search query.
-type VectorSearchRequest struct {
-	Collection string  `json:"collection"`
-	Query      string  `json:"query"`
-	TopK       int     `json:"topK,omitempty"`
-	Threshold  float64 `json:"threshold,omitempty"`
-}
-
 // SchemaRequest targets a single collection's metadata schema.
 type SchemaRequest struct {
 	Collection string `json:"collection"`
