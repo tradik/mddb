@@ -1,2 +1,2 @@
-airbyte-cdk>=7.37.0,<8.0.0
+airbyte-cdk>=7.39.0,<8.0.0
 requests>=2.34.2
