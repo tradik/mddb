@@ -26,10 +26,10 @@
     "all": "npm run format:check && npm run lint && npm run test:coverage && npm run build && npm run package"
   },
   "devDependencies": {
-    "@types/chrome": "^0.3.5",
+    "@types/chrome": "^0.3.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.5",
-    "@typescript-eslint/eslint-plugin": "^8.71.2",
+    "@typescript-eslint/eslint-plugin": "^8.72.0",
     "@typescript-eslint/parser": "^8.20.0",
     "esbuild": "^0.28.2",
     "eslint": "^10.13.0",
@@ -38,6 +38,6 @@
     "prettier": "^3.9.10",
     "ts-jest": "^29.4.15",
     "typescript": "^6.0.3",
-    "undici": "^8.12.2"
+    "undici": "^8.12.3"
   }
 }
