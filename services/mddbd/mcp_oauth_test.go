@@ -288,3 +288,39 @@ func TestOAuthForgedClientAndStaleCodes(t *testing.T) {
 		t.Error("an expired code was not swept")
 	}
 }
+
+// CodeQL alert 64: the final redirect is checked again, so a target that
+// never went through checkClient cannot be redirected to.
+func TestOAuthRedirectChecksTheFinalAddress(t *testing.T) {
+	o, _, _, _ := newTestOAuth(t)
+	o.allowedURIs["https://app.example/cb?tenant=1"] = true
+	for loc, want := range map[string]bool{
+		"https://claude.ai/api/mcp/auth_callback?code=x&state=y": true,
+		"http://127.0.0.1:5000/cb?code=x":                        true,
+		"https://app.example/cb?tenant=1&code=x":                 true,
+		"https://evil.example/cb?code=x":                         false,
+		"https://claude.ai/other?code=x":                         false,
+		"http://evil.example:80/cb":                              false,
+		"%zz":                                                    false,
+	} {
+		if got := o.isValidRedirect(loc); got != want {
+			t.Errorf("%s: %v, want %v", loc, got, want)
+		}
+	}
+
+	rec := httptest.NewRecorder()
+	o.redirectWith(rec, httptest.NewRequest(http.MethodGet, "/oauth/authorize", nil), "https://evil.example/cb", url.Values{"code": {"x"}})
+	if rec.Code != http.StatusBadRequest || rec.Header().Get("Location") != "" {
+		t.Errorf("redirected to an unregistered address: %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	rec = httptest.NewRecorder()
+	o.redirectWith(rec, httptest.NewRequest(http.MethodGet, "/oauth/authorize", nil), "%zz", nil)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("unparseable target: %d", rec.Code)
+	}
+	rec = httptest.NewRecorder()
+	o.redirectWith(rec, httptest.NewRequest(http.MethodGet, "/oauth/authorize", nil), "https://claude.ai/api/mcp/auth_callback", url.Values{"code": {"x"}, "state": {""}})
+	if rec.Code != http.StatusFound || !strings.Contains(rec.Header().Get("Location"), "code=x") || strings.Contains(rec.Header().Get("Location"), "state=") {
+		t.Errorf("allowed redirect: %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+}

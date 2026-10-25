@@ -137,7 +137,7 @@ func (o *mcpOAuth) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Form.Get("response_type") != "code" || a.Method != "S256" || len(a.Challenge) < 43 || len(a.Challenge) > 128 {
-		redirectWith(w, r, a.RedirectURI, url.Values{"error": {"invalid_request"},
+		o.redirectWith(w, r, a.RedirectURI, url.Values{"error": {"invalid_request"},
 			"error_description": {"response_type=code with an S256 code_challenge is required"}, "state": {a.State}})
 		return
 	}
@@ -146,7 +146,7 @@ func (o *mcpOAuth) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Form.Get("decision") == "deny" {
-		redirectWith(w, r, a.RedirectURI, url.Values{"error": {"access_denied"}, "state": {a.State}})
+		o.redirectWith(w, r, a.RedirectURI, url.Values{"error": {"access_denied"}, "state": {a.State}})
 		return
 	}
 	key := r.Form.Get("api_key")
@@ -165,13 +165,20 @@ func (o *mcpOAuth) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	o.codes[code] = oauthCode{clientID: a.ClientID, redirectURI: a.RedirectURI, challenge: a.Challenge,
 		apiKey: key, expires: now.Add(oauthCodeTTL)}
 	o.codesMu.Unlock()
-	redirectWith(w, r, a.RedirectURI, url.Values{"code": {code}, "state": {a.State}, "iss": {o.issuer}})
+	o.redirectWith(w, r, a.RedirectURI, url.Values{"code": {code}, "state": {a.State}, "iss": {o.issuer}})
 }
 
 // redirectWith sends the browser back to the client. target is always the
 // registered redirect URI checkClient took from the sealed client ID.
-func redirectWith(w http.ResponseWriter, r *http.Request, target string, v url.Values) {
-	u, _ := url.Parse(target) // validated by checkClient
+// The final address is checked again before the redirect (CodeQL alert 64):
+// a later change that let an unchecked value reach this point would then
+// fail closed instead of becoming an open redirect.
+func (o *mcpOAuth) redirectWith(w http.ResponseWriter, r *http.Request, target string, v url.Values) {
+	u, err := url.Parse(target)
+	if err != nil {
+		renderOAuthError(w, "The redirect address could not be read.")
+		return
+	}
 	q := u.Query()
 	for k, vals := range v {
 		if len(vals) > 0 && vals[0] != "" {
@@ -179,7 +186,38 @@ func redirectWith(w http.ResponseWriter, r *http.Request, target string, v url.V
 		}
 	}
 	u.RawQuery = q.Encode()
-	http.Redirect(w, r, u.String(), http.StatusFound)
+	location := u.String()
+	if !o.isValidRedirect(location) {
+		renderOAuthError(w, "Refusing to redirect to an address that is not allowed.")
+		return
+	}
+	http.Redirect(w, r, location, http.StatusFound)
+}
+
+// isValidRedirect reports whether the browser may be sent to location: its
+// address without the query is an allowed redirect URI (the query carries
+// code, state and iss) or an http loopback URI.
+func (o *mcpOAuth) isValidRedirect(location string) bool {
+	base := withoutQuery(location)
+	if base == "" {
+		return false
+	}
+	for allowed := range o.allowedURIs {
+		if withoutQuery(allowed) == base {
+			return true
+		}
+	}
+	return o.validRedirect(base)
+}
+
+// withoutQuery is raw without its query and fragment, or "" if unparseable.
+func withoutQuery(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	u.RawQuery, u.ForceQuery, u.Fragment, u.RawFragment = "", false, "", ""
+	return u.String()
 }
 
 func (o *mcpOAuth) handleToken(w http.ResponseWriter, r *http.Request) {
