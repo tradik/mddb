@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	bolt "go.etcd.io/bbolt"
