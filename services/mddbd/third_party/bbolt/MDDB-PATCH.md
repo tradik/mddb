@@ -13,7 +13,8 @@ monorepo's toolchain. Two changes:
    returns after reading the meta pages, read transactions run at once, and
    writers wait until the freelist is loaded. Readers that begin before it
    exists are registered with it when it is installed, so pages they can see
-   are not reused.
+   are not reused. A load that runs after the database was closed returns
+   `ErrDatabaseNotOpen` instead of reading the unmapped file.
 2. **A damaged page during the freelist walk is an error, not a crash.**
    `freepages` walked the tree in a goroutine of its own, where a panic on a
    damaged page could not be recovered by any caller and ended the process.

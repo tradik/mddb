@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 	"os"
 	"path/filepath"
 	"sync"
@@ -43,6 +44,11 @@ func (s *Server) backupTo(dst string) error {
 	// the files are copied one after another, not at one instant.
 	if cf := s.collectionStore(); cf != nil {
 		dir := collectionDir(dst)
+		// dst has been through safeBackupPath; the derived directory is
+		// checked again so it cannot climb out of where dst points.
+		if strings.Contains(dir, "..") {
+			return fmt.Errorf("invalid backup path %q", dst)
+		}
 		if err := os.MkdirAll(dir, 0o700); err != nil { // #nosec G703 -- dst is safeBackupPath's output
 			return err
 		}

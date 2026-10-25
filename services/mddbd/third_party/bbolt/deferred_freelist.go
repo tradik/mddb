@@ -3,6 +3,8 @@ package bbolt
 import (
 	"fmt"
 
+	berrors "go.etcd.io/bbolt/errors"
+
 	"go.etcd.io/bbolt/internal/common"
 	fl "go.etcd.io/bbolt/internal/freelist"
 )
@@ -48,12 +50,24 @@ func (db *DB) buildFreelist() (f fl.Interface, err error) {
 		}
 	}()
 	f = newFreelist(db.FreelistType)
-	if !db.hasSyncedFreelist() {
-		// Reconstruct free list by scanning the DB.
-		f.Init(db.freepages())
-	} else {
+	// A deferred load runs beside the caller, which may close the database
+	// meanwhile: the meta and freelist pages are read only while the map is
+	// held and known to be valid. The walk takes its own read transaction,
+	// which fails cleanly on a closed database.
+	db.mmaplock.RLock()
+	if !db.opened || db.data == nil {
+		db.mmaplock.RUnlock()
+		return nil, berrors.ErrDatabaseNotOpen
+	}
+	synced := db.hasSyncedFreelist()
+	if synced {
 		// Read free list from freelist page.
 		f.Read(db.page(db.meta().Freelist()))
+	}
+	db.mmaplock.RUnlock()
+	if !synced {
+		// Reconstruct free list by scanning the DB.
+		f.Init(db.freepages())
 	}
 	return f, nil
 }

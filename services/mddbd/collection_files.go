@@ -15,6 +15,7 @@ import (
 	"mddb/internal/envconf"
 
 	bolt "go.etcd.io/bbolt"
+	bolterrors "go.etcd.io/bbolt/errors"
 )
 
 // One storage file per collection (#336).
@@ -298,6 +299,11 @@ func (s *Server) swapCollectionFiles(srcDir string) (undo func(), err error) {
 	if !perCollectionLayout() {
 		return noop, nil
 	}
+	// srcDir is derived from a path safeBackupPath accepted; checked again so
+	// it cannot climb out of the backup directory.
+	if strings.Contains(srcDir, "..") {
+		return noop, fmt.Errorf("invalid backup path %q", srcDir)
+	}
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
 		return noop, fmt.Errorf("this backup has no collection files (%s): it was taken in the single-file layout; "+
@@ -372,7 +378,9 @@ func openCollectionFile(path string, opts *bolt.Options) (*bolt.DB, error) {
 	}
 	go func() {
 		if err := db.LoadFreelist(); err != nil {
-			slog.Error("rebuilding a collection file's freelist failed; its writes fail", "file", path, "err", err)
+			if !errors.Is(err, bolterrors.ErrDatabaseNotOpen) { // closed meanwhile: nothing to rebuild
+				slog.Error("rebuilding a collection file's freelist failed; its writes fail", "file", path, "err", err)
+			}
 			return
 		}
 		slog.Info("collection file freelist rebuilt", "file", filepath.Base(path))

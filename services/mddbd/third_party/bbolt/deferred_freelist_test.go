@@ -163,3 +163,17 @@ func TestDeferredFreelistReportsDamage(t *testing.T) {
 		t.Error("a damaged walk at open returned no error")
 	}
 }
+
+func TestDeferredFreelistAfterClose(t *testing.T) {
+	db, err := bolt.Open(deferredDB(t), 0o600, &bolt.Options{NoFreelistSync: true, DeferFreelistLoad: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	// Loading after the map is gone must report it, not read freed memory.
+	if err := db.LoadFreelist(); err == nil {
+		t.Error("loaded the freelist of a closed database")
+	}
+}
