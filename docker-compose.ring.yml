@@ -58,6 +58,11 @@ x-leader-healthy: &leader-healthy
 
 # Healthcheck timings shared by every node; only the probed URL differs
 # (OPS-013: followers listen on 11033/11043, not the Dockerfile default 11023).
+# Longer than MDDB_SHUTDOWN_TIMEOUT_SEC (15 s): Docker sends SIGKILL after
+# 10 s by default, which cuts the shutdown before it stores the freelist, and
+# the next start then walks the whole file (#333).
+x-stop-grace: &stop-grace 20s
+
 x-healthcheck-defaults: &healthcheck-defaults
   interval: 10s
   timeout: 3s
@@ -86,6 +91,7 @@ services:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11023/health"]
       interval: 5s
+    stop_grace_period: *stop-grace
     logging: *default-logging
     deploy: *deploy-server
 
@@ -107,6 +113,7 @@ services:
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11033/health"]
+    stop_grace_period: *stop-grace
     logging: *default-logging
     deploy: *deploy-server
 
@@ -128,6 +135,7 @@ services:
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:11043/health"]
+    stop_grace_period: *stop-grace
     logging: *default-logging
     deploy: *deploy-server
 

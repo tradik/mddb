@@ -625,6 +625,7 @@ mddb-cli stats
 - **[Docker Guide](docs/DOCKER.md)** - Container deployment
 - **[Backup, Restore & Repair](docs/BACKUP.md)** - Consistent verified backups, safe restores, `mddbd -verify-db` / `-repair-db` for a damaged database file
 - **[Deployment](docs/DEPLOYMENT.md)** - Production setup
+- **[Storage Tuning](docs/STORAGE-TUNING.md)** - Disks, filesystems, WSL2, macOS, FreeBSD, ZFS; fast restarts of large databases
 - **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes
 - **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured

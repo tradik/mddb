@@ -276,11 +276,11 @@ func main() {
 	}
 	clock.begin("opening database")
 	openStart := time.Now()
-	db, err := openBolt(dbPath, getOptimizedBoltOptions())
-	if d := time.Since(openStart); d > 30*time.Second && os.Getenv("MDDB_FREELIST_SYNC") != "true" {
+	db, walked, err := openDatabase(clock, dbPath, getOptimizedBoltOptions()) // #333, #334
+	if d := time.Since(openStart); walked && d > 30*time.Second {
 		slog.Warn("opening the database walked every page to rebuild the freelist",
 			"elapsed", d.Round(time.Second),
-			"remedy", "MDDB_FREELIST_SYNC=true stores the freelist so the next start reads one page (docs/BACKUP.md)")
+			"remedy", "a clean shutdown (SIGTERM) stores the freelist for the next start; MDDB_FREELIST_SYNC=true stores it on every commit, so a crash does not cost a walk either (docs/STORAGE-TUNING.md)")
 	}
 	if err != nil {
 		logging.Fatal("startup step failed", "step", "bolt.Open", "err", err,

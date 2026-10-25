@@ -456,6 +456,27 @@ health check allows 60 seconds before it counts failures. Raise
 `start_period` further for a large database that has not been switched to
 freelist sync yet.
 
+**Since 2.18.2 a planned restart no longer walks the file.** A clean shutdown
+(SIGTERM, SIGINT) stores the freelist with one commit, whatever
+`MDDB_FREELIST_SYNC` says, and the next start reads it. Commits after that
+start clear the stored list again, so after a crash the open still walks —
+that is what keeps it correct. When it does walk, mddb first reads the file
+front to back into the page cache if it fits in half the available memory
+(`MDDB_PREWARM=auto`), and `/health` reports `progress` with bytes done, a
+percentage and an ETA. Measured on a 2.5 GB fragmented file on WSL2 ext4,
+page cache dropped before each start:
+
+| start | opening the database |
+|---|---|
+| walk, cold (2.18.1) | 56–60 s |
+| after a clean shutdown | 0.014 s |
+| after a crash, with prewarm | 1.5 s read + 0.4 s walk |
+
+`MDDB_FREELIST_SYNC=true` still matters where crashes are expected, or where
+the file is larger than memory: there the prewarm is skipped and the walk runs
+at the disk's random-read speed. See [STORAGE-TUNING.md](STORAGE-TUNING.md)
+for disks, filesystems and per-platform settings.
+
 **Size.** For code documents, the database file came to about 20× the content
 (908 MB for 45.6 MB of source). Each identifier is stored whole and in parts,
 with positions for phrase search and per-field data for BM25F. Plan disk space

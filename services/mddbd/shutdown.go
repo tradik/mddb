@@ -67,6 +67,15 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	//    client mid-write would abort an upload the indexes already record.
 	add("storage-backends", s.Backends != nil, s.CloseStorageBackends)
 
+	//    The freelist (#333), after the last queued write: stored once, the
+	//    next start reads it rather than walking the file. Commits after
+	//    this one store it too.
+	add("freelist", s.DB != nil, func() {
+		if err := persistFreelist(s.DB); err != nil {
+			slog.Warn("the next start will walk the database", "err", err)
+		}
+	})
+
 	// 5. Caches last: they hold no durable state, but readers may still be in
 	//    flight until the steps above return.
 	add("lockfree-cache", s.LockFreeCache != nil, func() { s.LockFreeCache.Close() })

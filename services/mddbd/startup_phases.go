@@ -1,12 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	json "mddb/internal/jsonx"
 )
 
 // Startup progress (#329).
@@ -25,6 +26,11 @@ type startupClock struct {
 	since   time.Time
 	phase   string
 	srv     atomic.Pointer[Server]
+
+	// Progress of the current phase in bytes (#334), when it can be measured.
+	progressDone, progressTotal int64
+	progressSince               time.Time
+	progressLogged              time.Time
 }
 
 func newStartupClock() *startupClock {
@@ -41,6 +47,7 @@ func (c *startupClock) begin(phase string) {
 		slog.Info("startup phase finished", "phase", c.phase, "elapsed", now.Sub(c.since).Round(time.Millisecond))
 	}
 	c.phase, c.since = phase, now
+	c.progressDone, c.progressTotal = 0, 0
 	slog.Info("startup phase", "phase", phase)
 }
 
@@ -58,6 +65,50 @@ func (c *startupClock) current() (string, time.Duration) {
 	return c.phase, time.Since(c.started)
 }
 
+// startupProgress is the progress block of /health during a measurable phase.
+type startupProgress struct {
+	BytesDone  int64   `json:"bytesDone"`
+	BytesTotal int64   `json:"bytesTotal"`
+	Percent    float64 `json:"percent"`
+	EtaSeconds int     `json:"etaSeconds"`
+}
+
+// setProgress records how far the current phase is, and logs it every minute.
+func (c *startupClock) setProgress(done, total int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	if c.progressTotal == 0 {
+		c.progressSince, c.progressLogged = now, now
+	}
+	c.progressDone, c.progressTotal = min(done, total), total
+	if now.Sub(c.progressLogged) >= time.Minute {
+		c.progressLogged = now
+		p := c.progressLocked(now)
+		slog.Info("startup progress", "phase", c.phase, "percent", p.Percent, "etaSeconds", p.EtaSeconds)
+	}
+}
+
+func (c *startupClock) progress() *startupProgress {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.progressTotal <= 0 {
+		return nil
+	}
+	p := c.progressLocked(time.Now())
+	return &p
+}
+
+func (c *startupClock) progressLocked(now time.Time) startupProgress {
+	p := startupProgress{BytesDone: c.progressDone, BytesTotal: c.progressTotal,
+		Percent: float64(int(1000*float64(c.progressDone)/float64(c.progressTotal))) / 10, EtaSeconds: -1}
+	if elapsed := now.Sub(c.progressSince).Seconds(); c.progressDone > 0 && elapsed > 0 {
+		rate := float64(c.progressDone) / elapsed
+		p.EtaSeconds = int(float64(c.progressTotal-c.progressDone) / rate)
+	}
+	return p
+}
+
 // healthHandler answers /health during startup: from the server once it
 // exists, and before that with the phase in progress.
 func (c *startupClock) healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -66,9 +117,13 @@ func (c *startupClock) healthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	phase, elapsed := c.current()
+	body := map[string]any{"status": "warming_up", "phase": phase, "elapsedSeconds": int(elapsed.Seconds())}
+	if p := c.progress(); p != nil {
+		body["progress"] = p
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusServiceUnavailable)
-	_, _ = fmt.Fprintf(w, `{"status":"warming_up","phase":%q,"elapsedSeconds":%d}`, phase, int(elapsed.Seconds()))
+	_ = json.NewEncoder(w).Encode(body)
 }
 
 // startEarlyHealth listens on addr for /health while the server starts. The
