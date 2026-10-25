@@ -28,12 +28,12 @@
   "dependencies": {
     "@actions/core": "^3.0.1",
     "@actions/glob": "^0.7.0",
-    "undici": "^8.12.2"
+    "undici": "^8.12.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.5",
-    "@typescript-eslint/eslint-plugin": "^8.71.2",
+    "@typescript-eslint/eslint-plugin": "^8.72.0",
     "@typescript-eslint/parser": "^8.20.0",
     "@vercel/ncc": "^0.45.0",
     "eslint": "^10.13.0",
