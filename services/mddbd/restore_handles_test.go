@@ -20,6 +20,9 @@ import (
 func TestManagersFollowTheDatabaseAcrossARestore(t *testing.T) {
 	s, cleanup := newTestServerForCollectionConfig(t)
 	defer cleanup()
+	// The restore opens a new handle that cleanup does not know about;
+	// Windows cannot remove the temp directory while it is open.
+	defer func() { _ = s.DB.Close() }()
 	s.CollectionManager.FollowDB(func() *bolt.DB { return s.DB })
 	s.AutomationManager = NewAutomationManager(s.DB)
 	s.AutomationManager.FollowDB(func() *bolt.DB { return s.DB })

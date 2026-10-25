@@ -247,7 +247,9 @@ func TestBulkIngestManager_ConcurrentSubmits(t *testing.T) {
 		if id == "" {
 			continue
 		}
-		final := waitForStatus(t, m, id, 3*time.Second, BulkJobCompleted, BulkJobFailed)
+		// One worker runs the jobs in turn, so the last waits for every
+		// other; a slow runner needed more than 3 s.
+		final := waitForStatus(t, m, id, 15*time.Second, BulkJobCompleted, BulkJobFailed)
 		if final.Status != BulkJobCompleted {
 			t.Errorf("job %d (%s): expected completed, got %s (errors=%v processed=%d total=%d added=%d updated=%d failed=%d)",
 				i, id, final.Status, final.Errors, final.Processed, final.Total, final.Added, final.Updated, final.Failed)
