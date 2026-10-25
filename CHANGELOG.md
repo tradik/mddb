@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A planned restart no longer walks the database (#333).** A clean shutdown
+  stores bbolt's freelist with one commit, whatever `MDDB_FREELIST_SYNC` says,
+  so the next start reads one page: a 2.5 GB file opened in 0.014 s instead of
+  56–60 s. Commits after that start clear it again, so after a crash the open
+  still walks, as it must. The shutdown step runs after the queues drain.
+- **Prewarm before a walk (#333).** When the open has to walk and the file
+  fits in half the available memory (cgroup limit included), the file is read
+  sequentially into the page cache first, twice — once is not enough when the
+  cache is already full. 1.5 s of reading plus a 0.4 s walk instead of 57 s.
+  `MDDB_PREWARM=auto|on|off`.
+- **Open progress on `/health` (#334).** During the walk and the prewarm,
+  `/health` reports `progress` with `bytesDone`, `bytesTotal`, `percent` and
+  `etaSeconds`, and the log repeats it every minute. On Linux the walk's
+  progress is estimated from storage reads and stops at 99%.
+- **Full-text indexing per collection (#335).** `fts: {enabled: false}` in a
+  collection's config stops postings being written, over REST, gRPC and MCP;
+  `fts-reindex` of such a collection removes the postings it has.
+- **`GET /v1/storage` (#335):** bytes per bucket, key and value bytes per
+  collection by bucket and category, and the free space. `?collection=` reads
+  only that collection's keys.
+- **`mddbd -compact-db SRC -compact-to DST` (#335)** copies a database into a
+  new file without its free space, in key order, verified before it reports
+  success. `-compact-page-size` sets another page size.
+- **`docs/STORAGE-TUNING.md`:** disks, filesystems, ZFS, Linux, WSL2, macOS,
+  FreeBSD and Windows settings for mddb, with what was measured.
+
+### Fixed
+
+- HTTP and MCP `fts-reindex` reported `"ok"` whatever failed; all three
+  transports now share one implementation that reports `"partial"` when
+  documents fail, as gRPC already did.
+- `docker-compose.ring.yml` gave its nodes Docker's default 10 s to stop, less
+  than the server's 15 s shutdown budget; they now get 20 s.
+- The `fts-reindex` response schema in `openapi.yaml` listed a `collection`
+  field the server never sent and omitted `status` and `skipped`.
+
+### CI
+
+- `bufbuild/buf-action` replaces `bufbuild/buf-setup-action`, which is
+  archived and ran on Node.js 20. `snapcore/action-build` and
+  `action-publish` still target Node.js 20 upstream with no newer release;
+  they keep running under `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`.
+
 ## [2.18.1] - 2026-10-24
 
 ### Added
