@@ -1,8 +1,10 @@
 # bbolt v1.5.0 with mddb patches
 
 This is go.etcd.io/bbolt v1.5.0 (MIT, see LICENSE), used by mddbd through a
-`replace` directive in `services/mddbd/go.mod`. The `cmd/`, `.github/` and
-`scripts/` directories of the release are left out. Two changes:
+`replace` directive in `services/mddbd/go.mod`. The `cmd/`, `.github/`,
+`scripts/` and `tests/` directories of the release are left out (`tests/`
+holds integration suites that need gofail or root), and `go.mod` names the
+monorepo's toolchain. Two changes:
 
 1. **Deferred freelist loading** (mddb #333) — `Options.DeferFreelistLoad`,
    `DB.LoadFreelist()` and `DB.FreelistLoaded()`, in `deferred_freelist.go`
@@ -20,8 +22,7 @@ This is go.etcd.io/bbolt v1.5.0 (MIT, see LICENSE), used by mddbd through a
 
 Tests: `deferred_freelist_test.go`, run with
 `GOWORK=off go test -race -run Deferred .` in this directory. The release's
-own suite passes (`go test -short ./...`), apart from `tests/failpoint`, which
-needs a gofail-instrumented build (`make test-failpoint`).
+own unit suite passes (`go test -short ./...`).
 
 **Upgrading bbolt:** copy the new release over this directory, keep this file
 and `deferred_freelist*.go`, re-apply the hunks marked `mddb patch` in
