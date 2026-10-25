@@ -557,6 +557,24 @@ cache for the whole server whatever requests ask for; see
 
 ## Vector Search
 
+### Loading the index at startup
+
+Vectors are stored on disk and the indexes are rebuilt in memory at every
+start. Each stored vector goes into every algorithm's index (flat, HNSW, IVF,
+PQ, OPQ, SQ, SQ4, BQ), and IVF, PQ and OPQ train with k-means on each
+collection, so the load time grows with the number of vectors, not of
+documents, and HNSW insertion and the training dominate it. Collections with
+vectors enabled but none stored cost nothing. A disk-only collection loads its
+quantized vectors only.
+
+Since v2.18.4 collections load smallest first, and each one is searchable as
+soon as its own vectors are in: a small collection answers while a large one
+is still loading, and a collection without vectors answers at once. Until a
+collection is loaded, a vector search on it answers `503` with `Retry-After`;
+hybrid search answers from full text alone. The progress is on
+`/v1/vector-stats` (`indexProgress`) and `/health` (`vectorIndex`), and in the
+log every minute.
+
 Vector search embeds the query text into a high-dimensional vector and finds documents with the most similar embeddings using cosine similarity. Similarity computation is hardware-accelerated on ARM64 via NEON (all ARM64) and SME (Apple M4+) SIMD instructions, with automatic runtime detection and fallback to scalar Go on other platforms. Search is parallelized across multiple goroutines for collections above 2048 vectors (~2.5x speedup on 50K collections).
 
 ### Flat (default)

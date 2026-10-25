@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.4] - 2026-10-25
+
+### Added
+
+- **Vector index load progress and per-collection readiness (#346).** After a
+  restart, vector search answered "loading, please retry" for every
+  collection until the last one was loaded, with no progress and no error,
+  so a slow load and a hung one looked the same. Collections now load
+  smallest first and each answers as soon as its own vectors are in; one with
+  no vectors answers at once. `/v1/vector-stats` reports `indexProgress`
+  (collections and vectors done and total, percent, ETA, current collection,
+  ready collections), `/health` reports it as `vectorIndex`, and the log
+  repeats it every minute. A search on a collection still loading answers
+  `503` with `Retry-After` and the progress. The five copies of the
+  "is the index ready" choice (HTTP, cross-search, two gRPC, MCP) are one,
+  and hybrid search and automation triggers use it too.
+- **Vector reindex as a job (#347).** `POST /v1/vector-reindex` with
+  `"async": true` answers `202` at once with a job;
+  `GET /v1/vector-reindex/jobs/{id}` gives its progress (done, percent, ETA)
+  and, at the end, its result. A second reindex of the same collection while
+  one runs answers `409`. Without `async` the call stays synchronous, and its
+  write deadline is now lifted, as for `add-batch` and backups: a large
+  reindex used to outlast `MDDB_HTTP_WRITE_TIMEOUT` and the client got `EOF`
+  though the reindex finished.
+- `docs/SEARCH.md`: what decides how long the index takes to load.
+
+### Fixed
+
+- **gRPC `VectorReindex` stored one whole-document vector instead of chunks
+  and never updated the in-memory indexes**, so what it wrote was invisible to
+  search until a restart, and **MCP `vector_reindex` ignored the collection's
+  quantization**. HTTP, gRPC and MCP now share one implementation (#347).
+
+### Dependencies
+
+- gqlgen 0.17.97 (the GraphQL code is regenerated: its API changed),
+  quic-go 0.64.1, golang.org/x/net 0.61.0 (#342).
+- npm minor and patch updates in the Chrome extension, the GitHub Action
+  (its `dist/` rebuilt), the Grafana data source, the chat widget and the
+  panel (#344).
+
 ## [2.18.3] - 2026-10-25
 
 ### Fixed

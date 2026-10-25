@@ -44,16 +44,9 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 	if algo == "" {
 		algo = "flat"
 	}
-	searcher, algoOk := g.server.VectorSearchers[algo]
-	if !algoOk {
-		return nil, status.Error(codes.InvalidArgument, "unknown algorithm: "+algo)
-	}
-	if !searcher.IsReady() {
-		searcher = g.server.VectorSearchers["flat"]
-		algo = "flat"
-	}
-	if !searcher.IsReady() {
-		return nil, status.Error(codes.Unavailable, "vector index is loading")
+	searcher, algo, err := g.server.readySearcher(req.Collection, algo)
+	if err != nil {
+		return nil, vectorSearcherStatus(err)
 	}
 
 	// Get query vector
@@ -154,75 +147,17 @@ func (g *GRPCServer) VectorReindex(ctx context.Context, req *proto.VectorReindex
 		return nil, status.Error(codes.FailedPrecondition, "no embedding provider configured")
 	}
 
-	// Collect documents
-	type docEntry struct {
-		ID        string
-		ContentMD string
-	}
-	var docs []docEntry
-
-	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-		c := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := c.Seek(prefix); k != nil && strings.HasPrefix(string(k), string(prefix)); k, v = c.Next() {
-			d, err := unmarshalDoc(v)
-			if err != nil {
-				continue
-			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD})
-		}
-		return nil
-	})
+	// #347: the shared implementation. This copy stored one whole-document
+	// vector instead of chunks and never touched the in-memory indexes.
+	res, err := g.server.reindexVectors(ctx, req.Collection, req.Force, nil)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	var embedded, skipped, failed int32
-	var errs []string
-
-	for _, d := range docs {
-		if d.ContentMD == "" {
-			skipped++
-			continue
-		}
-		if !req.Force {
-			existing, err := g.server.VectorStore.Get(req.Collection, d.ID)
-			if err == nil && existing != nil && existing.ContentHash == vec.ContentHash(d.ContentMD) {
-				skipped++
-				continue
-			}
-		}
-
-		vector, err := g.server.Embedding.Embed(ctx, d.ContentMD, embedding.RoleDocument)
-		if err != nil {
-			failed++
-			errs = append(errs, d.ID+": "+err.Error())
-			continue
-		}
-
-		noteEmbeddingProvenance(g.server.VectorStore, req.Collection, g.server.Embedding)
-		if err := g.server.VectorStore.Put(req.Collection, d.ID, vector, g.server.Embedding.Model(), vec.ContentHash(d.ContentMD)); err != nil {
-			failed++
-			errs = append(errs, d.ID+": store: "+err.Error())
-			continue
-		}
-		// Every index, not flat alone — the same view the HTTP reindex has.
-		if err := (serverIndexes{g.server}).IndexChunk(req.Collection, d.ID, vector); err != nil {
-			// The gRPC reindex reports failures the same way the HTTP one
-			// does (#252) — a vector the index refused is not embedded.
-			failed++
-			errs = append(errs, d.ID+": index: "+err.Error())
-			continue
-		}
-		embedded++
-	}
-
 	return &proto.VectorReindexResponse{
-		Embedded: embedded,
-		Skipped:  skipped,
-		Failed:   failed,
-		Errors:   errs,
+		Embedded: safeInt32(res.Embedded),
+		Skipped:  safeInt32(res.Skipped),
+		Failed:   safeInt32(res.Failed),
+		Errors:   res.Errors,
 	}, nil
 }
 

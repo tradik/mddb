@@ -182,7 +182,7 @@ func (am *AutomationManager) evalVector(trigger *AutomationRule, doc *storage.Do
 	}
 
 	searcher, ok := s.VectorSearchers["flat"]
-	if !ok || !searcher.IsReady() {
+	if !ok || !s.vectorCollectionReady(trigger.Collection, searcher) {
 		return 0, false
 	}
 
@@ -336,7 +336,7 @@ func (am *AutomationManager) runTriggerVector(trigger *AutomationRule) ([]Trigge
 	}
 
 	searcher, ok := s.VectorSearchers["flat"]
-	if !ok || !searcher.IsReady() {
+	if !ok || !s.vectorCollectionReady(trigger.Collection, searcher) {
 		return nil, nil
 	}
 

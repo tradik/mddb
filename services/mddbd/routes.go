@@ -42,6 +42,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/vector-search", s.withSearchLimit(s.handleVectorSearch))
 	mux.HandleFunc("/v1/vector-reindex", s.guardWrite(s.handleVectorReindex))
 	mux.HandleFunc("/v1/vector-stats", s.handleVectorStats)
+	mux.HandleFunc("/v1/vector-reindex/jobs", s.handleVectorReindexJobs)  // #347
+	mux.HandleFunc("/v1/vector-reindex/jobs/", s.handleVectorReindexJobs) // #347
 	mux.HandleFunc("/v1/vector-projection", s.handleVectorProjection)
 	mux.HandleFunc("/v1/geo-search", s.handleGeoSearch)
 	mux.HandleFunc("/v1/geo-within", s.handleGeoWithin)

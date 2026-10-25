@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"mddb/internal/embedding"
-	"mddb/internal/envconf"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	"time"
@@ -34,16 +32,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if algo == "flat" && s.QuantizedVecIndex != nil && s.QuantizedVecIndex.HasCollection(req.Collection) {
 		algo = "quantized"
 	}
-	searcher, ok := s.VectorSearchers[algo]
-	if !ok {
-		return nil, errors.New("unknown algorithm: " + algo)
-	}
-	if !searcher.IsReady() {
-		searcher = s.VectorSearchers["flat"]
-		algo = "flat"
-	}
-	if !searcher.IsReady() {
-		return nil, errors.New("vector index is loading, please retry")
+	searcher, algo, err := s.readySearcher(req.Collection, algo)
+	if err != nil {
+		return nil, err
 	}
 
 	var queryVector []float32
@@ -204,159 +195,16 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 
 // VectorReindex rebuilds the vector index via the direct client.
 func (c *DirectClient) VectorReindex(ctx context.Context, req *MCPVectorReindexRequest) (*MCPVectorReindexResponse, error) {
-	s := c.server
-
-	if req.Collection == "" {
-		return nil, errors.New("missing collection")
-	}
-	if s.Embedding == nil {
-		return nil, errors.New("no embedding provider configured")
-	}
-
-	type docEntry struct {
-		ID        string
-		ContentMD string
-		// Mode has to travel with the document: reindexing must segment it
-		// exactly as the embedding worker did, or the stored chunk indices
-		// stop pointing at the passages they named (CODE-003).
-		Mode ChunkMode
-	}
-	var docs []docEntry
-
-	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
-		}
-		cur := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
-			d, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: c.server.chunkModeFor(req.Collection, d)})
-		}
-		return nil
-	})
+	// #347: the shared implementation; this copy ignored quantization.
+	res, err := c.server.reindexVectors(ctx, req.Collection, req.Force, nil)
 	if err != nil {
 		return nil, err
 	}
-
-	embedded, skipped, failed := 0, 0, 0
-	var errs []string
-
-	// GO-021: reindexing a large collection embeds every document, one
-	// network call at a time. Without progress it is indistinguishable from a
-	// hung call, which is when someone kills it half-finished. Reported every
-	// few documents rather than every one — a notification per document would
-	// be more traffic than the work.
-	const progressEvery = 25
-	ReportProgress(ctx, 0, len(docs), "starting reindex")
-
-	for i, d := range docs {
-		if (i+1)%progressEvery == 0 {
-			ReportProgress(ctx, i+1, len(docs),
-				fmt.Sprintf("embedded %d, skipped %d", embedded, skipped))
-		}
-
-		if d.ContentMD == "" {
-			skipped++
-			continue
-		}
-
-		if !req.Force {
-			existing, err := s.VectorStore.Get(req.Collection, d.ID)
-			if err == nil && existing != nil {
-				currentHash := vec.ContentHash(d.ContentMD)
-				if existing.ContentHash == currentHash {
-					skipped++
-					continue
-				}
-			}
-		}
-
-		// Split into chunks
-		chunkSize := c.server.chunkSizeFor(req.Collection) // #325
-		chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
-		var chunks []string
-		if chunkEnabled {
-			chunks = chunkTextsMode(d.ContentMD, chunkSize, d.Mode)
-		} else {
-			chunks = []string{d.ContentMD}
-		}
-		if len(chunks) == 0 {
-			skipped++
-			continue
-		}
-
-		// Embed each chunk
-		var chunkEmbeddings []vec.ChunkEmbedding
-		chunkFailed := false
-		for i, chunk := range chunks {
-			embedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-			vector, err := s.Embedding.Embed(embedCtx, chunk, embedding.RoleDocument)
-			cancel()
-			if err != nil {
-				failed++
-				errs = append(errs, fmt.Sprintf("%s chunk %d: %s", d.ID, i, err.Error()))
-				chunkFailed = true
-				break
-			}
-			chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{ChunkIndex: i, Vector: vector})
-		}
-		if chunkFailed {
-			continue
-		}
-
-		contentHash := vec.ContentHash(d.ContentMD)
-		noteEmbeddingProvenance(s.VectorStore, req.Collection, s.Embedding)
-		if err := s.VectorStore.PutChunks(req.Collection, d.ID, chunkEmbeddings, s.Embedding.Model(), contentHash); err != nil {
-			failed++
-			errs = append(errs, d.ID+": store: "+err.Error())
-			continue
-		}
-		// Same indexing as the HTTP reindex, through the same helper: this
-		// copy also added full-precision vectors to disk-only collections,
-		// which the other two paths never did.
-		diskOnly := s.collectionDiskOnly(req.Collection)
-		var indexErr error
-		for _, ce := range chunkEmbeddings {
-			chunkKey := fmt.Sprintf("%s#%d", d.ID, ce.ChunkIndex)
-			if err := s.indexChunk(req.Collection, chunkKey, ce.Vector, diskOnly); err != nil && indexErr == nil {
-				indexErr = fmt.Errorf("chunk %d: %w", ce.ChunkIndex, err)
-			}
-		}
-		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), serverIndexes{s})
-		if indexErr != nil {
-			failed++
-			errs = append(errs, d.ID+": index: "+indexErr.Error())
-			continue
-		}
-		embedded++
-	}
-
-	if embedded > 0 {
-		if records, loadErr := s.VectorStore.LoadCollection(req.Collection); loadErr == nil {
-			collVecs := make(map[string][]float32, len(records))
-			for docID, rec := range records {
-				collVecs[docID] = rec.Vector
-			}
-			for _, searcher := range s.VectorSearchers {
-				if trainer, ok := searcher.(vec.Trainable); ok {
-					go vec.TrainSafely(trainer, req.Collection, collVecs)
-				}
-			}
-		}
-	}
-
-	ReportProgress(ctx, len(docs), len(docs), "reindex complete")
-
 	return &MCPVectorReindexResponse{
-		Embedded: embedded,
-		Skipped:  skipped,
-		Failed:   failed,
-		Errors:   errs,
+		Embedded: res.Embedded,
+		Skipped:  res.Skipped,
+		Failed:   res.Failed,
+		Errors:   res.Errors,
 	}, nil
 }
 

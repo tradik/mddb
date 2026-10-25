@@ -470,16 +470,9 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 	if algo == "" {
 		algo = "flat"
 	}
-	searcher, algoOk := g.server.VectorSearchers[algo]
-	if !algoOk {
-		return nil, status.Error(codes.InvalidArgument, "unknown algorithm: "+algo)
-	}
-	if !searcher.IsReady() {
-		searcher = g.server.VectorSearchers["flat"]
-		algo = "flat"
-	}
-	if !searcher.IsReady() {
-		return nil, status.Error(codes.Unavailable, "vector index is loading")
+	searcher, algo, err := g.server.readySearcher(req.SourceCollection, algo)
+	if err != nil {
+		return nil, vectorSearcherStatus(err)
 	}
 
 	// Resolve query vector

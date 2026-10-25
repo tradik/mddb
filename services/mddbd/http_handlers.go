@@ -524,7 +524,12 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if update := s.UpdateStatus; update != nil {
 		body["update"] = update
 	}
-	s.healthFreelist(body) // #333: reads served, writes waiting for the freelist
+	s.healthFreelist(body)                  // #333: reads served, writes waiting for the freelist
+	if l := s.vectorLoad.Load(); l != nil { // #346
+		if p := l.progress(); p != nil {
+			body["vectorIndex"] = map[string]any{"ready": false, "progress": p}
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)

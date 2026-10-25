@@ -462,15 +462,13 @@ func (s *Server) runVectorSearch(ctx context.Context, req HybridSearchRequest) (
 		return nil, nil
 	}
 
-	searcher, ok2 := s.VectorSearchers[req.VectorAlgorithm]
-	if !ok2 {
-		searcher = s.VectorSearchers["flat"]
+	algo := req.VectorAlgorithm
+	if _, ok := s.VectorSearchers[algo]; !ok {
+		algo = "flat"
 	}
-	if !searcher.IsReady() {
-		searcher = s.VectorSearchers["flat"]
-	}
-	if !searcher.IsReady() {
-		return nil, nil
+	searcher, _, err := s.readySearcher(req.Collection, algo)
+	if err != nil {
+		return nil, nil // the full-text half still answers (#346: per collection now)
 	}
 
 	embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)

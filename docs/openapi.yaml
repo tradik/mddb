@@ -68,7 +68,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.18.3"
+  version: "2.18.4"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -1330,12 +1330,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "202":
+          description: (v2.18.4+) With async true, the job started; Location points at it
+        "409":
+          description: (v2.18.4+) A reindex of this collection is already running; the body holds it
         "403":
           description: Read-only mode
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/vector-reindex/jobs:
+    get:
+      tags:
+        - Vector Search
+      summary: (v2.18.4+) Recent reindex jobs, newest first
+      responses:
+        "200":
+          description: Jobs
+  /v1/vector-reindex/jobs/{id}:
+    get:
+      tags:
+        - Vector Search
+      summary: (v2.18.4+) A reindex job's progress and result
+      description: >
+        status is running, completed or failed; done, percent and etaSeconds
+        give the progress; result holds total, embedded, skipped, failed,
+        totalChunks and errors. Jobs are kept in memory, the last 50.
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: The job
+        "404":
+          description: No such job (a restart forgets jobs)
 
   /v1/vector-stats:
     get:
@@ -7058,6 +7087,10 @@ components:
           description: If true, re-embed even if content is unchanged
           default: false
           example: false
+        async:
+          type: boolean
+          description: (v2.18.4+) Run as a background job; poll /v1/vector-reindex/jobs/{id}
+          default: false
 
     VectorReindexResponse:
       type: object
@@ -7107,6 +7140,18 @@ components:
           type: boolean
           description: Whether the vector index is loaded and ready
           example: true
+        indexProgress:
+          type: object
+          description: (v2.18.4+) Present while the index loads at startup (#346).
+          properties:
+            collectionsDone: {type: integer}
+            collectionsTotal: {type: integer}
+            vectorsDone: {type: integer}
+            vectorsTotal: {type: integer}
+            percent: {type: number}
+            etaSeconds: {type: integer, description: "-1 until it can be estimated"}
+            current: {type: string, description: Collection being loaded}
+            readyCollections: {type: array, items: {type: string}, description: Collections that already answer}
         collections:
           type: object
           additionalProperties:

@@ -833,6 +833,27 @@ worse ranking rather than as an error. Reindexing is your call.
 **Parameters**:
 - `collection` (required): Collection name
 - `force` (optional): If `true`, re-embed all documents regardless of content changes. If `false`, skip documents whose content hasn't changed (default: false)
+- `async` (optional, v2.18.4+): If `true`, start the reindex as a background job and answer at once (see below)
+
+**Long reindexes (v2.18.4+).** Re-embedding tens of thousands of documents
+takes as long as the provider needs, often over an hour on a CPU. The
+synchronous call keeps working: its write deadline is lifted, as for
+`add-batch` and backups, so the result is delivered however long it takes, as
+long as the client waits. With `"async": true` the call answers `202` with a
+job instead, and `Location` points at it:
+
+```bash
+curl -X POST "$MDDB/v1/vector-reindex" -d '{"collection":"docs","force":true,"async":true}'
+# {"jobId":"reindex_3f2a...","collection":"docs","status":"running",...}
+curl "$MDDB/v1/vector-reindex/jobs/reindex_3f2a..."
+# {"status":"running","done":12000,"percent":41.3,"etaSeconds":2280,"result":{"total":29040,"embedded":11800,...}}
+curl "$MDDB/v1/vector-reindex/jobs"   # recent jobs, newest first
+```
+
+`status` ends as `completed` or `failed` (with `error`), and `result` then
+holds the final counts and errors. A second reindex of a collection while one
+runs answers `409` with the running job. Jobs are kept in memory, the last 50;
+a restart forgets them, but the vectors written stay.
 
 **Response**:
 ```json
@@ -893,6 +914,15 @@ Get embedding/vector search statistics.
 | `depth` | Jobs waiting right now — above zero means embedding is still running |
 | `dropped` | Documents stored **without** a vector since startup, because the queue was full and the write gave up waiting. Repair with `POST /v1/vector-reindex` |
 | `wait` | How long a write waits for room before dropping (`MDDB_EMBEDDING_QUEUE_WAIT`) |
+
+While the index loads at startup (v2.18.4+), `indexProgress` says how far
+it is: `collectionsDone`/`collectionsTotal`, `vectorsDone`/`vectorsTotal`,
+`percent`, `etaSeconds` (-1 until it can be estimated), the collection being
+loaded (`current`) and `readyCollections`, the ones that already answer.
+`/health` carries the same block as `vectorIndex.progress`. A vector search
+on a collection that is not loaded yet answers `503` with `Retry-After`,
+the collection and the progress; other collections are searched normally.
+See [SEARCH.md](SEARCH.md#loading-the-index-at-startup).
 
 **cURL Example**:
 ```bash

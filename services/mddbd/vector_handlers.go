@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
@@ -79,6 +78,7 @@ type VectorSearchResponseHTTP struct {
 type VectorReindexRequestHTTP struct {
 	Collection string `json:"collection"`
 	Force      bool   `json:"force"`
+	Async      bool   `json:"async"` // #347: return a job at once
 }
 
 // loadVectorIndex loads all vectors from BoltDB into all in-memory indexes.
@@ -96,11 +96,19 @@ func (s *Server) loadVectorIndex() {
 		return
 	}
 
+	// #346: progress, smallest collections first, each searchable when done.
+	load := newVectorLoadState(counts)
+	s.vectorLoad.Store(load)
+	defer load.finish()
+
 	totalLoaded := 0
-	for collection, count := range counts {
+	for _, collection := range load.order() {
+		count := counts[collection]
+		load.begin(collection)
 		records, err := s.VectorStore.LoadCollection(collection)
 		if err != nil {
 			slog.Error("failed to load vectors for collection", "collection", collection, "err", err)
+			load.finishCollection(collection) // searchable, with what it has: nothing
 			continue
 		}
 
@@ -111,8 +119,12 @@ func (s *Server) loadVectorIndex() {
 		// vectors are never loaded into the float32 searchers.
 		diskOnly := s.collectionDiskOnly(collection)
 
-		refused := 0
+		refused, sinceReport := 0, 0
 		for docID, rec := range records {
+			if sinceReport++; sinceReport == 1000 {
+				load.add(sinceReport)
+				sinceReport = 0
+			}
 			// docID may be "id" or "id#0", "id#1", etc.
 			if err := s.indexChunk(collection, docID, rec.Vector, diskOnly); err != nil {
 				// A store written by 2.15.0 or earlier can hold vectors a
@@ -141,6 +153,8 @@ func (s *Server) loadVectorIndex() {
 			}
 		}
 
+		load.add(sinceReport)
+		load.finishCollection(collection)
 		totalLoaded += count
 	}
 
@@ -197,19 +211,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		algo = "quantized"
 	}
 
-	searcher, ok2 := s.VectorSearchers[algo]
-	if !ok2 {
-		bad(w, errors.New("unknown algorithm: "+algo+", available: flat, hnsw, ivf, pq, quantized"))
-		return
-	}
-	if !searcher.IsReady() {
-		// Fallback to flat if the requested algorithm isn't ready
-		searcher = s.VectorSearchers["flat"]
-		algo = "flat"
-	}
-	if !searcher.IsReady() {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte(`{"error":"vector index is loading, please retry"}`))
+	searcher, algo, err := s.readySearcher(req.Collection, algo)
+	if err != nil {
+		s.writeVectorUnavailable(w, err, "flat, hnsw, ivf, pq, quantized")
 		return
 	}
 
@@ -405,171 +409,37 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.Embedding == nil {
-		bad(w, errors.New("no embedding provider configured"))
+		bad(w, errNoEmbeddingProvider)
 		return
 	}
-
-	chunkSize := s.chunkSizeFor(req.Collection) // #325
-	chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
-
-	// Resolve quantization for this collection. Disk-only collections store
-	// FULL-precision vectors on disk (the quantized form lives only in RAM),
-	// so storage quantization is disabled for them.
-	var qt vec.QuantizationType
-	if s.CollectionManager != nil {
-		if cfg, ok := s.CollectionManager.Get(req.Collection); ok && cfg.Quantization != "" {
-			qt = vec.ParseQuantization(cfg.Quantization)
+	// #347: a large reindex outlasts any sensible request; run it as a job.
+	if req.Async {
+		job, err := s.startReindexJob(req.Collection, req.Force)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Location", "/v1/vector-reindex/jobs/"+job.ID)
+		if errors.Is(err, errReindexRunning) {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]any{"error": err.Error(), "job": job})
+			return
 		}
+		w.WriteHeader(http.StatusAccepted)
+		_ = json.NewEncoder(w).Encode(job)
+		return
 	}
-	diskOnly := s.collectionDiskOnly(req.Collection)
-	if diskOnly {
-		qt = vec.QuantNone
-	}
-
-	// Load all documents in collection
-	type docEntry struct {
-		ID        string
-		ContentMD string
-		// Mode has to travel with the document: reindexing must segment it
-		// exactly as the embedding worker did, or the stored chunk indices
-		// stop pointing at the passages they named (CODE-003).
-		Mode ChunkMode
-	}
-	var docs []docEntry
-
-	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
-		}
-		c := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			d, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(req.Collection, d)})
-		}
-		return nil
-	})
+	// Synchronous, as before: the write deadline is lifted, as for add-batch
+	// and backup, so a long reindex still delivers its result.
+	liftWriteDeadline(w, r)
+	res, err := s.reindexVectors(r.Context(), req.Collection, req.Force, nil)
 	if err != nil {
 		bad(w, err)
 		return
 	}
-
-	embedded, skipped, failed, totalChunks := 0, 0, 0, 0
-	var errs []string
-
-	for _, d := range docs {
-		if d.ContentMD == "" {
-			skipped++
-			continue
-		}
-
-		// Check if already embedded with same content hash
-		if !req.Force {
-			existing, err := s.VectorStore.Get(req.Collection, d.ID)
-			if err == nil && existing != nil {
-				currentHash := vec.ContentHash(d.ContentMD)
-				if existing.ContentHash == currentHash {
-					skipped++
-					continue
-				}
-			}
-		}
-
-		// Split into chunks
-		var chunks []string
-		if chunkEnabled {
-			chunks = chunkTextsMode(d.ContentMD, chunkSize, d.Mode)
-		} else {
-			chunks = []string{d.ContentMD}
-		}
-
-		if len(chunks) == 0 {
-			skipped++
-			continue
-		}
-
-		// Generate embedding for each chunk
-		var chunkEmbeddings []vec.ChunkEmbedding
-		chunkFailed := false
-		for i, chunk := range chunks {
-			ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-			vector, err := s.Embedding.Embed(ctx, chunk, embedding.RoleDocument)
-			cancel()
-			if err != nil {
-				failed++
-				errs = append(errs, fmt.Sprintf("%s chunk %d: %s", d.ID, i, err.Error()))
-				chunkFailed = true
-				break
-			}
-			chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{
-				ChunkIndex: i,
-				Vector:     vector,
-			})
-		}
-		if chunkFailed {
-			continue
-		}
-
-		// Store all chunks (with quantization if configured)
-		contentHash := vec.ContentHash(d.ContentMD)
-		noteEmbeddingProvenance(s.VectorStore, req.Collection, s.Embedding)
-		if err := s.VectorStore.PutChunksQuantized(req.Collection, d.ID, chunkEmbeddings, s.Embedding.Model(), contentHash, qt); err != nil {
-			failed++
-			errs = append(errs, d.ID+": store: "+err.Error())
-			continue
-		}
-
-		// Update in-memory indexes (disk-only: quantized index exclusively).
-		// A chunk an index refuses is a failed chunk (#252): it is stored, and
-		// no search that uses that index will find it. It used to be counted
-		// as embedded, which is how a reindex could report "failed": 0 while
-		// a collection lost its graph.
-		indexErr := error(nil)
-		for _, ce := range chunkEmbeddings {
-			chunkKey := fmt.Sprintf("%s#%d", d.ID, ce.ChunkIndex)
-			if err := s.indexChunk(req.Collection, chunkKey, ce.Vector, diskOnly); err != nil && indexErr == nil {
-				indexErr = fmt.Errorf("chunk %d: %w", ce.ChunkIndex, err)
-			}
-		}
-
-		// Clean stale chunks
-		s.VectorStore.CleanStaleChunks(req.Collection, d.ID, len(chunkEmbeddings), serverIndexes{s})
-
-		if indexErr != nil {
-			failed++
-			errs = append(errs, d.ID+": index: "+indexErr.Error())
-			continue
-		}
-		embedded++
-		totalChunks += len(chunkEmbeddings)
-	}
-
-	// Trigger training for trainable indexes after reindex
-	// (disk-only collections have no float32 indexes to train)
-	if embedded > 0 && !diskOnly {
-		if records, loadErr := s.VectorStore.LoadCollection(req.Collection); loadErr == nil {
-			collVecs := make(map[string][]float32, len(records))
-			for docID, rec := range records {
-				collVecs[docID] = rec.Vector
-			}
-			for _, searcher := range s.VectorSearchers {
-				if trainer, isTrainable := searcher.(vec.Trainable); isTrainable {
-					go vec.TrainSafely(trainer, req.Collection, collVecs)
-				}
-			}
-		}
-	}
-
 	ok(w, map[string]interface{}{
-		"embedded":    embedded,
-		"skipped":     skipped,
-		"failed":      failed,
-		"totalChunks": totalChunks,
-		"errors":      errs,
+		"embedded":    res.Embedded,
+		"skipped":     res.Skipped,
+		"failed":      res.Failed,
+		"totalChunks": res.TotalChunks,
+		"errors":      res.Errors,
 	})
 }
 
@@ -641,6 +511,12 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 
 	resp["collections"] = collections
 	resp["index_ready"] = s.VectorIndex.IsReady()
+	// #346: while loading, how far it is and which collections already answer.
+	if l := s.vectorLoad.Load(); l != nil {
+		if p := l.progress(); p != nil {
+			resp["indexProgress"] = p
+		}
+	}
 
 	// Chunk configuration
 	resp["chunking"] = map[string]interface{}{

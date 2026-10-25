@@ -98,18 +98,9 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	if algo == "" {
 		algo = "flat"
 	}
-	searcher, ok2 := s.VectorSearchers[algo]
-	if !ok2 {
-		bad(w, errors.New("unknown algorithm: "+algo))
-		return
-	}
-	if !searcher.IsReady() {
-		searcher = s.VectorSearchers["flat"]
-		algo = "flat"
-	}
-	if !searcher.IsReady() {
-		w.WriteHeader(http.StatusServiceUnavailable)
-		_, _ = w.Write([]byte(`{"error":"vector index is loading, please retry"}`))
+	searcher, algo, err := s.readySearcher(req.SourceCollection, algo)
+	if err != nil {
+		s.writeVectorUnavailable(w, err, "flat, hnsw, ivf, pq, quantized")
 		return
 	}
 

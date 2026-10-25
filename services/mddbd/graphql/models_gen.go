@@ -385,7 +385,7 @@ func (e *Permission) UnmarshalGQL(v any) error {
 }
 
 func (e Permission) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *Permission) UnmarshalJSON(b []byte) error {
@@ -440,7 +440,7 @@ func (e *Role) UnmarshalGQL(v any) error {
 }
 
 func (e Role) MarshalGQL(w io.Writer) {
-	fmt.Fprint(w, strconv.Quote(e.String()))
+	_, _ = fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 func (e *Role) UnmarshalJSON(b []byte) error {
