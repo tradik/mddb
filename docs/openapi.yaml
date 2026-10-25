@@ -170,7 +170,28 @@ paths:
                 properties:
                   status:
                     type: string
+                    enum: [ healthy, degraded ]
+                    description: >-
+                      degraded (v2.18.2+): reads are served but writes wait
+                      for the freelist to be rebuilt after a crash (#333);
+                      see reads, writes, phase and progress.
                     example: healthy
+                  reads:
+                    type: boolean
+                    description: (v2.18.2+) Present when degraded.
+                  writes:
+                    type: boolean
+                    description: (v2.18.2+) Present when degraded; false until the freelist is rebuilt.
+                  phase:
+                    type: string
+                    example: rebuilding freelist
+                  progress:
+                    type: object
+                    properties:
+                      bytesDone: {type: integer}
+                      bytesTotal: {type: integer}
+                      percent: {type: number}
+                      etaSeconds: {type: integer}
                   mode:
                     type: string
                     enum: [ read, write, wr ]

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"strings"
 	"sync"
 	"time"
@@ -72,10 +73,7 @@ func (cm *CurationManager) SetBinlog(bl *binlog.Binlog) { cm.binlog = bl }
 
 // EnsureBucket is called once during server startup.
 func (cm *CurationManager) EnsureBucket() error {
-	return cm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketCuration)
-		return err
-	})
+	return boltx.EnsureBuckets(cm.db, bucketCuration)
 }
 
 // LoadAll rebuilds the in-memory cache from bolt. Called on startup and

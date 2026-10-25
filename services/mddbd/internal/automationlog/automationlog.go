@@ -4,12 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
+	"mddb/internal/boltx"
 	json "mddb/internal/jsonx"
 	"strconv"
 	"strings"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var bucketAutomationLog = []byte("automation_log")
@@ -48,10 +50,7 @@ func NewStore(db *bolt.DB, ttl time.Duration) *Store {
 
 // EnsureBucket creates the automation_log bucket if it doesn't exist.
 func (ls *Store) EnsureBucket() error {
-	return ls.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketAutomationLog)
-		return err
-	})
+	return boltx.EnsureBuckets(ls.db, bucketAutomationLog)
 }
 
 // Log writes a single log entry. Called inline after webhook fire.

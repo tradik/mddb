@@ -21,9 +21,11 @@ mddb stores everything in one bbolt file:
   minutes, at about 17 MB/s.
 
 Since 2.18.2 a clean shutdown stores the freelist, so planned restarts open in
-milliseconds. When a walk does happen, mddb reads the file sequentially into
-the cache first if it fits in half the available memory, and `/health` reports
-progress and an ETA.
+milliseconds. After a crash the server starts at once and serves reads while
+the freelist is rebuilt in the background; writes wait for it (503 with
+`Retry-After`). The rebuild reads the file sequentially into the cache first
+if it fits in half the available memory, and `/health` reports progress and
+an ETA.
 
 | start, 2.5 GB file, WSL2 ext4, cache dropped (*measured*) | open |
 |---|---|

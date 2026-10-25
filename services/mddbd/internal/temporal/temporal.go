@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"math"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // TemporalEventType classifies document lifecycle events.
@@ -72,14 +74,7 @@ func (tm *TemporalManager) SetBinlog(bl *binlog.Binlog) {
 
 // EnsureBuckets creates the required BoltDB buckets.
 func (tm *TemporalManager) EnsureBuckets() error {
-	return tm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketTemporal)
-		if err != nil {
-			return err
-		}
-		_, err = tx.CreateBucketIfNotExists(bucketTemporalHot)
-		return err
-	})
+	return boltx.EnsureBuckets(tm.db, bucketTemporal, bucketTemporalHot)
 }
 
 // Start begins the background event writer goroutine.

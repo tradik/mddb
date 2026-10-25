@@ -6,9 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"mddb/internal/httpclient"
 	json "mddb/internal/jsonx"
 	"mddb/internal/metrics"
@@ -16,6 +16,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var bucketWebhooks = []byte("webhooks")
@@ -78,10 +80,7 @@ func (wm *WebhookManager) Reload(db *bolt.DB) error {
 
 // EnsureBucket creates the webhooks bucket.
 func (wm *WebhookManager) EnsureBucket() error {
-	return wm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketWebhooks)
-		return err
-	})
+	return boltx.EnsureBuckets(wm.db, bucketWebhooks)
 }
 
 // LoadAll loads all webhooks from the database into memory.

@@ -3,6 +3,7 @@ package spell
 import (
 	"encoding/binary"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -116,10 +117,7 @@ func (sm *SpellManager) SetBinlog(bl *binlog.Binlog) {
 
 // EnsureBucket creates the spelldicts bucket if needed.
 func (sm *SpellManager) EnsureBucket() error {
-	return sm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketSpellDicts)
-		return err
-	})
+	return boltx.EnsureBuckets(sm.db, bucketSpellDicts)
 }
 
 // Ready reports whether the initial dictionary load has completed.

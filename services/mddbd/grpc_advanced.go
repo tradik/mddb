@@ -111,8 +111,8 @@ func (g *GRPCServer) ListAutomation(ctx context.Context, req *proto.ListAutomati
 
 // CreateAutomation implements the CreateAutomation RPC.
 func (g *GRPCServer) CreateAutomation(ctx context.Context, req *proto.CreateAutomationRequest) (*proto.AutomationRuleProto, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, "*", PermAdmin); err != nil {
@@ -158,8 +158,8 @@ func (g *GRPCServer) GetAutomation(ctx context.Context, req *proto.GetAutomation
 
 // UpdateAutomation implements the UpdateAutomation RPC.
 func (g *GRPCServer) UpdateAutomation(ctx context.Context, req *proto.UpdateAutomationRequest) (*proto.AutomationRuleProto, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, "*", PermAdmin); err != nil {
@@ -185,8 +185,8 @@ func (g *GRPCServer) UpdateAutomation(ctx context.Context, req *proto.UpdateAuto
 
 // DeleteAutomation implements the DeleteAutomation RPC.
 func (g *GRPCServer) DeleteAutomation(ctx context.Context, req *proto.DeleteAutomationRequest) (*proto.DeleteAutomationResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, "*", PermAdmin); err != nil {
@@ -340,8 +340,8 @@ func (g *GRPCServer) GetCollectionConfig(ctx context.Context, req *proto.GetColl
 
 // SetCollectionConfig implements the SetCollectionConfig RPC.
 func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetCollectionConfigRequest) (*proto.SetCollectionConfigResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if req.Collection == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
@@ -746,8 +746,8 @@ func (g *GRPCServer) ListRevisions(ctx context.Context, req *proto.ListRevisions
 
 // RestoreRevision implements the RestoreRevision RPC — restore a document from a specific revision.
 func (g *GRPCServer) RestoreRevision(ctx context.Context, req *proto.RestoreRevisionRequest) (*proto.Document, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if req.Collection == "" || req.Key == "" || req.Lang == "" || req.Timestamp == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, key, lang, timestamp")

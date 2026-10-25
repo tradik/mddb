@@ -3,12 +3,14 @@ package ttl
 import (
 	"encoding/binary"
 	"fmt"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"mddb/internal/storage"
 	"strings"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -49,13 +51,7 @@ func NewTTLManager(db *bolt.DB, reaper Reaper) *TTLManager {
 
 // EnsureBuckets creates the TTL buckets if they don't exist.
 func (t *TTLManager) EnsureBuckets() error {
-	return t.db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists(bucketTTL); err != nil {
-			return err
-		}
-		_, err := tx.CreateBucketIfNotExists(bucketTTLRev)
-		return err
-	})
+	return boltx.EnsureBuckets(t.db, bucketTTL, bucketTTLRev)
 }
 
 // Set stores a TTL entry for a document. Removes any previous TTL first.

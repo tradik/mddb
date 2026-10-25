@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"mddb/internal/boltx"
 	"net/http"
 	"time"
 
@@ -46,11 +47,7 @@ type mcpAPIKeyStore struct {
 }
 
 func newMCPAPIKeyStore(db *bolt.DB) *mcpAPIKeyStore {
-	// Ensure bucket exists
-	_ = db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists([]byte(mcpAPIKeyBucket))
-		return err
-	})
+	_ = boltx.EnsureBuckets(db, []byte(mcpAPIKeyBucket))
 	return &mcpAPIKeyStore{db: db}
 }
 

@@ -223,12 +223,25 @@ func persistFreelist(db *bolt.DB) error {
 	return nil
 }
 
-// openDatabase opens the bolt file, reporting the walk's progress on the
-// startup clock, and reads the file into the cache first when that is
-// faster. It reports whether the open walked the file.
-func openDatabase(clock *startupClock, path string, opts *bolt.Options) (*bolt.DB, bool, error) {
+// openDatabase opens the bolt file. When the open would walk the file and
+// MDDB_FREELIST_BACKGROUND is on, it opens without the freelist and returns
+// the background rebuild to start once the server exists. Otherwise it
+// walks now, reporting progress on the startup clock and reading the file
+// into the cache first when that is faster. It reports whether it walked.
+func openDatabase(clock *startupClock, path string, opts *bolt.Options) (*bolt.DB, bool, *backgroundFreelist, error) {
 	meta, metaErr := readBoltMeta(path)
 	walk := metaErr == nil && meta.needsWalk()
+	if walk && backgroundFreelistEnabled() {
+		o := *opts
+		o.DeferFreelistLoad = true
+		db, err := openBolt(path, &o)
+		if err != nil {
+			return nil, false, nil, err
+		}
+		slog.Info("the freelist is not stored; serving reads now and rebuilding it in the background",
+			"bytes", meta.bytesInUse(), "writes", "refused with 503 until it is rebuilt")
+		return db, false, &backgroundFreelist{clock: newStartupClock(), db: db, path: path, meta: meta}, nil
+	}
 	if walk {
 		slog.Info("the freelist is not stored, so opening walks every page",
 			"why", "the last shutdown was not clean, or the server ran with MDDB_FREELIST_SYNC=false and an older version",
@@ -252,7 +265,7 @@ func openDatabase(clock *startupClock, path string, opts *bolt.Options) (*bolt.D
 	}
 	db, err := openBolt(path, opts)
 	close(stop)
-	return db, walk, err
+	return db, walk, nil, err
 }
 
 // sampleWalkProgress reports the bytes the walk has read from storage. The

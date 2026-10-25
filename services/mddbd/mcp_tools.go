@@ -20,22 +20,17 @@ func (s *MCPToolServer) isToolReadOnly(name string) bool {
 	if ann, ok := mcpToolAnnotations[name]; ok {
 		return ann.ReadOnlyHint != nil && *ann.ReadOnlyHint
 	}
-	// Check custom tools — their underlying actions are all read-only
-	// (semantic_search, search_documents, full_text_search, fts_languages)
+	// Custom tools: every action one may wrap is read-only (see
+	// customToolActions). This had its own list, which the actions added in
+	// 2.18.1 — hybrid_search, code_graph, aggregate — never joined, so a
+	// custom tool wrapping one was refused in read-only mode.
 	for _, ct := range s.customTools {
 		if ct.Name == name {
-			return mcpCustomToolActionReadOnly[ct.Action]
+			_, known := customToolActions[ct.Action]
+			return known
 		}
 	}
 	return false
-}
-
-// mcpCustomToolActionReadOnly maps custom tool action names to their read-only status.
-var mcpCustomToolActionReadOnly = map[string]bool{
-	"semantic_search":  true,
-	"search_documents": true,
-	"full_text_search": true,
-	"fts_languages":    true,
 }
 
 // mcpCallTool invokes an MCP tool by name.
@@ -45,6 +40,12 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 	if em == ModeRead {
 		if !s.isToolReadOnly(name) {
 			return "", fmt.Errorf("tool %q is not available in read-only mode", name)
+		}
+	}
+	// #333: writes wait while the freelist is rebuilt; reads do not.
+	if dc, ok := s.client.(*DirectClient); ok && !s.isToolReadOnly(name) {
+		if err := dc.server.writeBlocked(); err != nil {
+			return "", fmt.Errorf("tool %q: %w", name, err)
 		}
 	}
 

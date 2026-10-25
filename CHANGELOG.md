@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so the next start reads one page: a 2.5 GB file opened in 0.014 s instead of
   56–60 s. Commits after that start clear it again, so after a crash the open
   still walks, as it must. The shutdown step runs after the queues drain.
+- **Reads at once after a crash; the freelist is rebuilt in the background
+  (#333).** When the freelist is not stored, the database now opens after
+  reading its meta pages, the server starts and serves reads, and the walk
+  runs in the background (after a sequential prewarm when the file fits in
+  memory). Writes get 503 with `Retry-After` and the progress (gRPC
+  `Unavailable`, MCP an error) until it ends; `/health` says
+  `{"status":"degraded","reads":true,"writes":false,"phase":...,"progress":...}`.
+  Measured on a 2.5 GB file, cache dropped: reads served 56 ms after start,
+  writes resumed after the 71 s walk. `MDDB_FREELIST_BACKGROUND=false`
+  restores the blocking open. This needs a patch to bbolt, which is vendored
+  in `services/mddbd/third_party/bbolt` (`MDDB-PATCH.md`); the same patch
+  turns a damaged page met during the walk into an error instead of a crash.
+  Startup no longer writes to create buckets that already exist.
 - **`MDDB_FREELIST_SYNC` defaults to on for files of 4 GiB or more (#333).**
   Past that size a walk after a crash costs minutes to hours; below it,
   commits stay as they were. `MDDB_FREELIST_SYNC_THRESHOLD` moves the line,
@@ -53,6 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A custom MCP tool wrapping `hybrid_search`, `code_graph` or `aggregate`
+  (added in 2.18.1) was refused in read-only mode: the read-only check had
+  its own list of actions, which they never joined.
+- CodeQL alert 64: the OAuth authorization endpoint checks the final
+  redirect address again before redirecting.
 - HTTP and MCP `fts-reindex` reported `"ok"` whatever failed; all three
   transports now share one implementation that reports `"partial"` when
   documents fail, as gRPC already did.

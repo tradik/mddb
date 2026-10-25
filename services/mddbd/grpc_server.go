@@ -123,8 +123,8 @@ func startGRPCServer(s *Server, addr string, opts ...grpc.ServerOption) error {
 // fired no live events. Routing through addDocument makes every transport
 // behave identically.
 func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Document, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -164,8 +164,8 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 // AddBatch implements the AddBatch RPC - adds multiple documents in a single transaction
 // Uses parallel processing for preparation, then single transaction for commit
 func (g *GRPCServer) AddBatch(ctx context.Context, req *proto.AddBatchRequest) (*proto.AddBatchResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	if req.Collection == "" {
@@ -202,8 +202,8 @@ func (g *GRPCServer) AddBatch(ctx context.Context, req *proto.AddBatchRequest) (
 
 // Ingest implements the Ingest RPC — bulk ingest with URL key derivation, dedup, and auto-metadata.
 func (g *GRPCServer) Ingest(ctx context.Context, req *proto.IngestRequest) (*proto.IngestResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	if req.Collection == "" {
@@ -466,8 +466,8 @@ func (g *GRPCServer) Backup(ctx context.Context, req *proto.BackupRequest) (*pro
 
 // Restore implements the Restore RPC
 func (g *GRPCServer) Restore(ctx context.Context, req *proto.RestoreRequest) (*proto.RestoreResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check admin permission
@@ -499,8 +499,8 @@ func (g *GRPCServer) Restore(ctx context.Context, req *proto.RestoreRequest) (*p
 
 // Truncate implements the Truncate RPC
 func (g *GRPCServer) Truncate(ctx context.Context, req *proto.TruncateRequest) (*proto.TruncateResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission

@@ -20,8 +20,8 @@ import (
 
 // RegisterWebhook implements the RegisterWebhook RPC
 func (g *GRPCServer) RegisterWebhook(ctx context.Context, req *proto.RegisterWebhookRequest) (*proto.WebhookProto, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -79,8 +79,8 @@ func (g *GRPCServer) ListWebhooks(ctx context.Context, req *proto.ListWebhooksRe
 
 // DeleteWebhook implements the DeleteWebhook RPC
 func (g *GRPCServer) DeleteWebhook(ctx context.Context, req *proto.DeleteWebhookRequest) (*proto.DeleteWebhookResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission (using "*" since we need to find the webhook's collection)
@@ -106,8 +106,8 @@ func (g *GRPCServer) DeleteWebhook(ctx context.Context, req *proto.DeleteWebhook
 
 // SetSchema implements the SetSchema RPC
 func (g *GRPCServer) SetSchema(ctx context.Context, req *proto.SetSchemaRequest) (*proto.SetSchemaResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -151,8 +151,8 @@ func (g *GRPCServer) GetSchema(ctx context.Context, req *proto.GetSchemaRequest)
 
 // DeleteSchema implements the DeleteSchema RPC
 func (g *GRPCServer) DeleteSchema(ctx context.Context, req *proto.DeleteSchemaRequest) (*proto.DeleteSchemaResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -230,8 +230,8 @@ func (g *GRPCServer) ValidateDocument(ctx context.Context, req *proto.ValidateDo
 
 // UpdateDocument implements the UpdateDocument RPC - partial document update
 func (g *GRPCServer) UpdateDocument(ctx context.Context, req *proto.UpdateDocumentRequest) (*proto.Document, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	if g.server.AuthManager != nil {
@@ -461,8 +461,8 @@ func (g *GRPCServer) Classify(ctx context.Context, req *proto.ClassifyRequest) (
 
 // DeleteDocument implements the DeleteDocument RPC — deletes a single document.
 func (g *GRPCServer) DeleteDocument(ctx context.Context, req *proto.DeleteDocumentRequest) (*proto.DeleteDocumentResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermWrite); err != nil {
@@ -485,8 +485,8 @@ func (g *GRPCServer) DeleteDocument(ctx context.Context, req *proto.DeleteDocume
 
 // DeleteCollection implements the DeleteCollection RPC — deletes all documents in a collection.
 func (g *GRPCServer) DeleteCollection(ctx context.Context, req *proto.DeleteCollectionRequest) (*proto.DeleteCollectionResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermWrite); err != nil {
@@ -536,8 +536,8 @@ func (g *GRPCServer) ListSynonyms(ctx context.Context, req *proto.ListSynonymsRe
 
 // AddSynonym implements the AddSynonym RPC.
 func (g *GRPCServer) AddSynonym(ctx context.Context, req *proto.AddSynonymRequest) (*proto.AddSynonymResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if req.Collection == "" || req.Term == "" || len(req.Synonyms) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, term, synonyms")
@@ -553,8 +553,8 @@ func (g *GRPCServer) AddSynonym(ctx context.Context, req *proto.AddSynonymReques
 
 // DeleteSynonym implements the DeleteSynonym RPC.
 func (g *GRPCServer) DeleteSynonym(ctx context.Context, req *proto.DeleteSynonymRequest) (*proto.DeleteSynonymResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if req.Collection == "" || req.Term == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, term")
@@ -597,8 +597,8 @@ func (g *GRPCServer) ListStopwords(ctx context.Context, req *proto.ListStopwords
 
 // AddStopwords implements the AddStopwords RPC.
 func (g *GRPCServer) AddStopwords(ctx context.Context, req *proto.AddStopwordsRequest) (*proto.AddStopwordsResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if req.Collection == "" || len(req.Words) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, words")
@@ -614,8 +614,8 @@ func (g *GRPCServer) AddStopwords(ctx context.Context, req *proto.AddStopwordsRe
 
 // DeleteStopwords implements the DeleteStopwords RPC.
 func (g *GRPCServer) DeleteStopwords(ctx context.Context, req *proto.DeleteStopwordsRequest) (*proto.DeleteStopwordsResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if req.Collection == "" || len(req.Words) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, words")

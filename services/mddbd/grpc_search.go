@@ -136,8 +136,8 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 
 // VectorReindex implements the VectorReindex RPC
 func (g *GRPCServer) VectorReindex(ctx context.Context, req *proto.VectorReindexRequest) (*proto.VectorReindexResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -303,8 +303,8 @@ func docToProto(doc *storage.Doc) *proto.Document {
 
 // DeleteBatch implements the DeleteBatch RPC - deletes multiple documents in a single transaction
 func (g *GRPCServer) DeleteBatch(ctx context.Context, req *proto.DeleteBatchRequest) (*proto.DeleteBatchResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -328,8 +328,8 @@ func (g *GRPCServer) DeleteBatch(ctx context.Context, req *proto.DeleteBatchRequ
 
 // UpdateBatch implements the UpdateBatch RPC - updates multiple documents in a single transaction
 func (g *GRPCServer) UpdateBatch(ctx context.Context, req *proto.UpdateBatchRequest) (*proto.UpdateBatchResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -353,8 +353,8 @@ func (g *GRPCServer) UpdateBatch(ctx context.Context, req *proto.UpdateBatchRequ
 
 // ImportURL implements the ImportURL RPC
 func (g *GRPCServer) ImportURL(ctx context.Context, req *proto.ImportURLRequest) (*proto.Document, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -400,8 +400,8 @@ func (g *GRPCServer) ImportURL(ctx context.Context, req *proto.ImportURLRequest)
 
 // SetTTL implements the SetTTL RPC
 func (g *GRPCServer) SetTTL(ctx context.Context, req *proto.SetTTLRequest) (*proto.Document, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 
 	// Check write permission
@@ -626,8 +626,8 @@ func (g *GRPCServer) FTSReindex(ctx context.Context, req *proto.FTSReindexReques
 	// GO-009: FTSReindex rewrites the FTS index — a write — so it must honour
 	// read-only mode like every other mutating RPC, or a read-only replica
 	// could clobber its index and race the replication applier.
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermWrite); err != nil {

@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"fmt"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var bucketSchemas = []byte("schemas")
@@ -71,10 +73,7 @@ func (sm *SchemaManager) Reload(db *bolt.DB) error {
 
 // EnsureBucket creates the schemas bucket if it doesn't exist.
 func (sm *SchemaManager) EnsureBucket() error {
-	return sm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketSchemas)
-		return err
-	})
+	return boltx.EnsureBuckets(sm.db, bucketSchemas)
 }
 
 // LoadAll loads all schemas from BoltDB into memory.

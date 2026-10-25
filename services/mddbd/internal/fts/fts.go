@@ -6,13 +6,15 @@ import (
 	"fmt"
 	"math"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"mddb/internal/sliceutil"
 	"sort"
 	"strings"
 	"unicode"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var (
@@ -123,18 +125,7 @@ func (f *FTSIndex) Reload(db *bolt.DB) {
 
 // EnsureBuckets creates the FTS buckets if they don't exist.
 func (f *FTSIndex) EnsureBuckets() error {
-	return f.db.Update(func(tx *bolt.Tx) error {
-		for _, b := range [][]byte{
-			bucketFTS, bucketFTSRev,
-			bucketFTSF, bucketFTSFMeta, bucketFTSFStat, bucketFTSFRev,
-			bucketFTSPos,
-		} {
-			if _, err := tx.CreateBucketIfNotExists(b); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	return boltx.EnsureBuckets(f.db, bucketFTS, bucketFTSRev, bucketFTSF, bucketFTSFMeta, bucketFTSFStat, bucketFTSFRev, bucketFTSPos)
 }
 
 // Tokenize splits text into a frequency map of normalized terms.

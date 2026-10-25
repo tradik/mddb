@@ -3,11 +3,13 @@ package fts
 import (
 	"fmt"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"strings"
 	"sync"
 
-	bolt "go.etcd.io/bbolt"
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var bucketSynonyms = []byte("synonyms")
@@ -44,10 +46,7 @@ func (sm *SynonymManager) Reload(db *bolt.DB) error {
 }
 
 func (sm *SynonymManager) EnsureBucket() error {
-	return sm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketSynonyms)
-		return err
-	})
+	return boltx.EnsureBuckets(sm.db, bucketSynonyms)
 }
 
 // LoadAll loads all synonym entries from BoltDB into the in-memory cache.

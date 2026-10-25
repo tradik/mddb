@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mddb/internal/boltx"
 	json "mddb/internal/jsonx"
 	"sync"
 	"time"
@@ -71,24 +72,7 @@ func (am *AuthManager) IsEnabled() bool {
 
 // EnsureBuckets creates auth buckets if they don't exist
 func (am *AuthManager) EnsureBuckets() error {
-	return am.db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists(bucketAuthUsers); err != nil {
-			return err
-		}
-		if _, err := tx.CreateBucketIfNotExists(bucketAuthAPIKeys); err != nil {
-			return err
-		}
-		if _, err := tx.CreateBucketIfNotExists(bucketAuthPerms); err != nil {
-			return err
-		}
-		if _, err := tx.CreateBucketIfNotExists(bucketAuthGroups); err != nil {
-			return err
-		}
-		if _, err := tx.CreateBucketIfNotExists(bucketAuthGroupPerms); err != nil {
-			return err
-		}
-		return nil
-	})
+	return boltx.EnsureBuckets(am.db, bucketAuthUsers, bucketAuthAPIKeys, bucketAuthPerms, bucketAuthGroups, bucketAuthGroupPerms)
 }
 
 // LoadAll loads all auth data from database into memory

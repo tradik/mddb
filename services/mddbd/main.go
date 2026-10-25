@@ -7,6 +7,7 @@ import (
 	"mddb/internal/audit"
 	"mddb/internal/automationlog"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"mddb/internal/cache"
 	"mddb/internal/compression"
 	"mddb/internal/delta"
@@ -136,6 +137,7 @@ type Server struct {
 	MCPInstructions string                    // System prompt for LLM — how to use this server
 	mcpKeyStore     *mcpAPIKeyStore           // BoltDB-backed MCP API key store
 	mcpAuth         *MCPAPIKeyMiddleware      // MCP API key middleware (for cache invalidation)
+	freelistLoad    *backgroundFreelist       // #333: set while writes wait for the freelist
 	// GO-021: both MCP transports count their open sessions and nothing ever
 	// asked. A session that a client abandoned without closing stays until it
 	// times out, so the count is how an operator sees leaks accumulating.
@@ -241,9 +243,9 @@ func boltOptionsFor(path string) *bolt.Options {
 	return &bolt.Options{
 		Timeout:         2 * time.Second,
 		NoFreelistSync:  !freelistSyncFor(path), // see freelistSyncNote
-		FreelistType:    bolt.FreelistMapType,                      // Use hashmap for freelist (faster than array)
-		NoGrowSync:      false,                                     // Sync after growing mmap (safer)
-		InitialMmapSize: 100 * 1024 * 1024,                         // 100MB initial mmap (reduce remapping)
+		FreelistType:    bolt.FreelistMapType,   // Use hashmap for freelist (faster than array)
+		NoGrowSync:      false,                  // Sync after growing mmap (safer)
+		InitialMmapSize: 100 * 1024 * 1024,      // 100MB initial mmap (reduce remapping)
 	}
 }
 
@@ -281,7 +283,7 @@ func main() {
 	}
 	clock.begin("opening database")
 	openStart := time.Now()
-	db, walked, err := openDatabase(clock, dbPath, boltOptionsFor(dbPath)) // #333, #334
+	db, walked, freelistLoad, err := openDatabase(clock, dbPath, boltOptionsFor(dbPath)) // #333, #334
 	if d := time.Since(openStart); walked && d > 30*time.Second {
 		slog.Warn("opening the database walked every page to rebuild the freelist",
 			"elapsed", d.Round(time.Second),
@@ -301,10 +303,11 @@ func main() {
 	useExtreme := srvCfg.HTTP3.Enabled
 
 	s := &Server{
-		DB:     db,
-		Path:   dbPath,
-		Mode:   mode,
-		Config: srvCfg,
+		DB:           db,
+		Path:         dbPath,
+		Mode:         mode,
+		freelistLoad: freelistLoad,
+		Config:       srvCfg,
 		BucketNames: BucketNames{
 			Docs:    []byte("docs"),
 			IdxMeta: []byte("idxmeta"),
@@ -327,6 +330,7 @@ func main() {
 		UseExtreme:    useExtreme,
 	}
 	s.IndexQueue.SetStore(serverIndexStore{s: s}) // wire persistence (server now ready)
+	freelistLoad.start()                          // #333: writes wait for it, reads do not
 
 	clock.srv.Store(s)
 	clock.begin("initialising indexes and managers")
@@ -1257,13 +1261,13 @@ func main() {
 // --- helpers / buckets
 
 func (s *Server) ensureBuckets() error {
-	return s.DBUpdate(func(tx *bolt.Tx) error {
-		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.Docs)          // doc|collection|id -> json
-		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.IdxMeta)       // meta|collection|key|value|docID -> 1
-		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.Rev)           // rev|collection|docID|ts -> json
-		_, _ = tx.CreateBucketIfNotExists(s.BucketNames.ByKey)         // bykey|collection|key|lang -> docID
-		_, _ = tx.CreateBucketIfNotExists([]byte("embedding_configs")) // embedding model configurations
-		_, _ = tx.CreateBucketIfNotExists(bucketBulkJobs)              // bulk ingest job tracking
-		return nil
-	})
+	// #333: written only when one is missing; see boltx.EnsureBuckets.
+	return boltx.EnsureBuckets(s.DB,
+		s.BucketNames.Docs,          // doc|collection|id -> json
+		s.BucketNames.IdxMeta,       // meta|collection|key|value|docID -> 1
+		s.BucketNames.Rev,           // rev|collection|docID|ts -> json
+		s.BucketNames.ByKey,         // bykey|collection|key|lang -> docID
+		[]byte("embedding_configs"), // embedding model configurations
+		bucketBulkJobs,              // bulk ingest job tracking
+	)
 }

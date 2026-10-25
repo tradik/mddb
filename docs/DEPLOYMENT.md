@@ -472,9 +472,15 @@ page cache dropped before each start:
 | after a clean shutdown | 0.014 s |
 | after a crash, with prewarm | 1.5 s read + 0.4 s walk |
 
-`MDDB_FREELIST_SYNC=true` still matters where crashes are expected, or where
-the file is larger than memory: there the prewarm is skipped and the walk runs
-at the disk's random-read speed. See [STORAGE-TUNING.md](STORAGE-TUNING.md)
+After a crash the walk no longer blocks the start: the database opens after
+reading its meta pages, reads are served at once, and the freelist is rebuilt
+in the background (`MDDB_FREELIST_BACKGROUND`, on by default). Until it is,
+writes answer 503 with `Retry-After`, and `/health` answers 200 with
+`{"status":"degraded","reads":true,"writes":false,"phase":"rebuilding freelist","progress":{...}}`.
+On the 2.5 GB file: reads 56 ms after start, writes after the 71 s walk.
+
+`MDDB_FREELIST_SYNC` still matters where crashes are expected: it is what
+spares the walk itself. It is on by default for files of 4 GiB or more. See [STORAGE-TUNING.md](STORAGE-TUNING.md)
 for disks, filesystems and per-platform settings.
 
 **Size.** For code documents, the database file came to about 20× the content

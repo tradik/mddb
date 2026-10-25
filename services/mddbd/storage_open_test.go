@@ -118,10 +118,11 @@ func TestShouldPrewarm(t *testing.T) {
 func TestOpenDatabaseReportsTheWalk(t *testing.T) {
 	path := newWalkingDB(t)
 	t.Setenv("MDDB_PREWARM", "on")
+	t.Setenv("MDDB_FREELIST_BACKGROUND", "false")
 	clock := newStartupClock()
 	var seen []string
 	clock.begin("opening database")
-	db, walked, err := openDatabase(clock, path, getOptimizedBoltOptions())
+	db, walked, _, err := openDatabase(clock, path, getOptimizedBoltOptions())
 	if err != nil || !walked {
 		t.Fatalf("walked=%v err=%v", walked, err)
 	}
@@ -131,7 +132,7 @@ func TestOpenDatabaseReportsTheWalk(t *testing.T) {
 	_ = db.Close()
 
 	t.Setenv("MDDB_PREWARM", "off")
-	db, walked, err = openDatabase(clock, path, getOptimizedBoltOptions())
+	db, walked, _, err = openDatabase(clock, path, getOptimizedBoltOptions())
 	if err != nil || walked {
 		t.Fatalf("after a clean shutdown: walked=%v err=%v", walked, err)
 	}

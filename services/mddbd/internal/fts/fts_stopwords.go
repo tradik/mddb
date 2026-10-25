@@ -3,6 +3,7 @@ package fts
 import (
 	"fmt"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"sort"
 	"strings"
 	"sync"
@@ -50,10 +51,7 @@ func (swm *StopWordManager) Reload(db *bolt.DB) error {
 }
 
 func (swm *StopWordManager) EnsureBucket() error {
-	return swm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketStopWords)
-		return err
-	})
+	return boltx.EnsureBuckets(swm.db, bucketStopWords)
 }
 
 // LoadAll loads all custom stop word entries from BoltDB into the in-memory cache.

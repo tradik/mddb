@@ -64,6 +64,10 @@ func (s *Server) guardWrite(next http.HandlerFunc) http.HandlerFunc {
 			http.Error(w, `{"error":"read-only mode"}`, http.StatusForbidden)
 			return
 		}
+		if err := s.writeBlocked(); err != nil { // #333
+			s.writeUnavailable(w, err)
+			return
+		}
 		if s.AuditManager == nil || !s.AuditManager.Enabled() {
 			next(w, r)
 			return

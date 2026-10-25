@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mddb/internal/automationlog"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"strings"
 	"sync"
 	"time"
@@ -85,10 +86,7 @@ func (am *AutomationManager) SetLogStore(ls *automationlog.Store) {
 
 // EnsureBucket creates the automation bucket if it doesn't exist.
 func (am *AutomationManager) EnsureBucket() error {
-	return am.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketAutomation)
-		return err
-	})
+	return boltx.EnsureBuckets(am.db, bucketAutomation)
 }
 
 // LoadAll loads all automation rules from BoltDB into memory.

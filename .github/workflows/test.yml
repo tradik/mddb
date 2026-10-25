@@ -109,6 +109,14 @@ jobs:
         working-directory: clients/go/mddb
         run: go test -race ./...
 
+      # #333: bbolt is vendored with a patch (third_party/bbolt/MDDB-PATCH.md).
+      # Its own module, so the server's ./... does not reach it.
+      - name: Test patched bbolt
+        working-directory: services/mddbd/third_party/bbolt
+        env:
+          GOWORK: "off"
+        run: go test -race -run 'Deferred|TestDB_|TestTx_' .
+
       # TEST-001: the CLI had one test file covering four helpers (0.9% of the
       # module) because every command was an anonymous closure inside a
       # 1447-line main(). The commands are now testable, and the floor keeps

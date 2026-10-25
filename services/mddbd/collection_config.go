@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"mddb/internal/encryption"
 	"net/http"
 	"sync"
@@ -140,10 +141,7 @@ func (cm *CollectionManager) SetEncryptor(e *encryption.Encryptor) {
 
 // EnsureBucket creates the colmeta bucket if it doesn't exist.
 func (cm *CollectionManager) EnsureBucket() error {
-	return cm.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketColMeta)
-		return err
-	})
+	return boltx.EnsureBuckets(cm.db, bucketColMeta)
 }
 
 // LoadAll loads all collection configs from BoltDB into the in-memory cache.

@@ -99,8 +99,8 @@ func (g *GRPCServer) ListCurationRules(ctx context.Context, req *proto.ListCurat
 
 // CreateCurationRule implements the CreateCurationRule RPC.
 func (g *GRPCServer) CreateCurationRule(ctx context.Context, req *proto.CreateCurationRuleRequest) (*proto.CurationRuleProto, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.CurationManager == nil {
 		return nil, status.Error(codes.FailedPrecondition, "curation manager not initialized")
@@ -123,8 +123,8 @@ func (g *GRPCServer) CreateCurationRule(ctx context.Context, req *proto.CreateCu
 
 // UpdateCurationRule implements the UpdateCurationRule RPC.
 func (g *GRPCServer) UpdateCurationRule(ctx context.Context, req *proto.UpdateCurationRuleRequest) (*proto.CurationRuleProto, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.CurationManager == nil {
 		return nil, status.Error(codes.FailedPrecondition, "curation manager not initialized")
@@ -154,8 +154,8 @@ func (g *GRPCServer) UpdateCurationRule(ctx context.Context, req *proto.UpdateCu
 
 // DeleteCurationRule implements the DeleteCurationRule RPC.
 func (g *GRPCServer) DeleteCurationRule(ctx context.Context, req *proto.DeleteCurationRuleRequest) (*proto.DeleteCurationRuleResponse, error) {
-	if g.isReadOnly() {
-		return nil, status.Error(codes.PermissionDenied, "read-only mode")
+	if err := g.checkWritable(); err != nil {
+		return nil, err
 	}
 	if g.server.CurationManager == nil {
 		return nil, status.Error(codes.FailedPrecondition, "curation manager not initialized")

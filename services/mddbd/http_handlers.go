@@ -524,6 +524,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if update := s.UpdateStatus; update != nil {
 		body["update"] = update
 	}
+	s.healthFreelist(body) // #333: reads served, writes waiting for the freelist
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 	"strconv"
 	"strings"
 	"sync"
@@ -68,10 +69,7 @@ func (vs *VectorStore) SetBinlog(bl *binlog.Binlog) {
 
 // EnsureBucket creates the vectors bucket if it doesn't exist.
 func (vs *VectorStore) EnsureBucket() error {
-	return vs.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(vs.bucketName)
-		return err
-	})
+	return boltx.EnsureBuckets(vs.db, vs.bucketName)
 }
 
 // PutQuantized stores a single embedding record with optional quantization.

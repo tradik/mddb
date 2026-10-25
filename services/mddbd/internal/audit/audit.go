@@ -3,12 +3,14 @@ package audit
 import (
 	"encoding/binary"
 	"errors"
-	bolt "go.etcd.io/bbolt"
 	"log/slog"
+	"mddb/internal/boltx"
 	json "mddb/internal/jsonx"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 var bucketAudit = []byte("audit")
@@ -102,10 +104,7 @@ func (a *AuditManager) EnsureBuckets() error {
 	if a == nil || !a.enabled {
 		return nil
 	}
-	return a.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(bucketAudit)
-		return err
-	})
+	return boltx.EnsureBuckets(a.db, bucketAudit)
 }
 
 // Start launches the writer and the retention trimmer.

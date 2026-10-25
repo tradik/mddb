@@ -70,3 +70,5 @@ require (
 //
 // REMOVE THIS once that PR is merged and tagged — tracked as WIN-005.
 replace github.com/coder/hnsw => github.com/tradik/hnsw v0.6.2-0.20260824091751-ad04fee59f41
+
+replace go.etcd.io/bbolt => ./third_party/bbolt

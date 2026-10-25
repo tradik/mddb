@@ -10,6 +10,9 @@ WORKDIR /build
 
 # Copy go mod files first for better layer caching
 COPY services/mddbd/go.mod services/mddbd/go.sum ./
+# bbolt is vendored with an mddb patch (#333) and replaced in go.mod, so it
+# has to be present before the download resolves the module graph.
+COPY services/mddbd/third_party/bbolt/ ./third_party/bbolt/
 
 # Download dependencies
 RUN go mod download

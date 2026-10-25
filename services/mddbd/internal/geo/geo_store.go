@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"mddb/internal/binlog"
+	"mddb/internal/boltx"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -34,10 +35,7 @@ func (gs *GeoStore) SetBinlog(bl *binlog.Binlog) { gs.binlog = bl }
 
 // EnsureBucket creates the "geo" bucket if it does not exist.
 func (gs *GeoStore) EnsureBucket() error {
-	return gs.db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucketIfNotExists(geoBucketName)
-		return err
-	})
+	return boltx.EnsureBuckets(gs.db, geoBucketName)
 }
 
 // Put upserts a (collection, docID) point.
