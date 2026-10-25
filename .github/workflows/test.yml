@@ -329,9 +329,12 @@ jobs:
           fetch-depth: 0
 
       - name: Set up buf
-        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+        # buf-action replaces the archived buf-setup-action, which targeted
+        # Node.js 20; setup_only installs buf and runs nothing else.
+        uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7 # v1.6.0
         with:
           version: "1.72.0"
+          setup_only: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # The protocolbuffers/go plugin in buf.gen.yaml generates the code that
@@ -481,9 +484,12 @@ jobs:
       # was added in this release and had never passed for exactly that
       # reason — it tested an import of a module the checkout did not contain.
       - name: Set up buf
-        uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 # v1.50.0
+        # buf-action replaces the archived buf-setup-action, which targeted
+        # Node.js 20; setup_only installs buf and runs nothing else.
+        uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7 # v1.6.0
         with:
           version: "1.72.0"
+          setup_only: true
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       # generate.sh, not `buf generate`: the Python gRPC plugin emits an
