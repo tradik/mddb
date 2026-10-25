@@ -305,7 +305,9 @@ jobs:
         with:
           version: latest
           working-directory: services/mddbd
-          args: --timeout=5m
+          # The server package grew in 2.18.2 (per-collection storage); on a
+          # cold runner loading it alone took past five minutes.
+          args: --timeout=10m
 
       - name: Run golangci-lint (shared Go client)
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
