@@ -9,7 +9,6 @@ import (
 	"mddb/internal/storage"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -382,6 +381,10 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		TotalMetaIndices int               `json:"totalMetaIndices"`
 		IndexQueue       *IndexQueueStats  `json:"indexQueue,omitempty"`
 		Uptime           string            `json:"uptime"`
+		// #349: the counts come from a snapshot computed in the background.
+		StatsComputedAt string `json:"statsComputedAt,omitempty"`
+		StatsAgeSeconds int    `json:"statsAgeSeconds"`
+		StatsPending    bool   `json:"statsPending,omitempty"` // no snapshot yet; ask again shortly
 	}
 
 	stats := Stats{
@@ -389,106 +392,36 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		Mode:         string(s.Mode),
 		Collections:  []CollectionStats{},
 	}
-
-	// Get database file size
 	if info, err := os.Stat(s.Path); err == nil {
 		stats.DatabaseSize = info.Size()
 	}
 
-	// Collect statistics per collection. Tenant users only see (and count)
-	// collections inside their namespace.
+	// Tenant users only see (and count) collections inside their namespace.
 	tenant := TenantFromContext(r.Context())
-	collectionMap := make(map[string]*CollectionStats)
-
-	err := s.DBViewAll(func(tx *bolt.Tx) error {
-		// Count documents per collection
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs != nil {
-			c := bDocs.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				// key format: doc|collection|id
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 && CollectionInTenant(tenant, parts[1]) {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &CollectionStats{Name: coll}
-					}
-					collectionMap[coll].DocumentCount++
-					stats.TotalDocuments++
+	snap := s.dbStats(statsWait())
+	if snap == nil {
+		stats.StatsPending = true
+	} else {
+		stats.StatsComputedAt = snap.ComputedAt.UTC().Format(time.RFC3339)
+		stats.StatsAgeSeconds = int(time.Since(snap.ComputedAt).Seconds())
+		for _, name := range snap.sortedNames() {
+			if !CollectionInTenant(tenant, name) {
+				continue
+			}
+			cc := snap.Collections[name]
+			cs := CollectionStats{Name: name, DocumentCount: cc.Documents, RevisionCount: cc.Revisions,
+				MetaIndexCount: cc.MetaIndices, Checksum: cc.Checksum}
+			if s.CollectionManager != nil {
+				if cfg, ok := s.CollectionManager.Get(name); ok {
+					cs.Type, cs.Description, cs.Icon, cs.Color = cfg.Type, cfg.Description, cfg.Icon, cfg.Color
 				}
 			}
-		}
-
-		// Count revisions per collection
-		bRev := tx.Bucket([]byte("rev"))
-		if bRev != nil {
-			c := bRev.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				// key format: rev|collection|docID|ts
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 && CollectionInTenant(tenant, parts[1]) {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &CollectionStats{Name: coll}
-					}
-					collectionMap[coll].RevisionCount++
-					stats.TotalRevisions++
-				}
-			}
-		}
-
-		// Count meta indices per collection
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		if bIdx != nil {
-			c := bIdx.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				// key format: meta|collection|key|value|docID
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 && CollectionInTenant(tenant, parts[1]) {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &CollectionStats{Name: coll}
-					}
-					collectionMap[coll].MetaIndexCount++
-					stats.TotalMetaIndices++
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		bad(w, err)
-		return
-	}
-
-	// Compute checksums per collection
-	for name, cs := range collectionMap {
-		cs.Checksum, _ = s.collectionChecksum(name)
-	}
-
-	// Enrich with collection config attributes
-	if s.CollectionManager != nil {
-		for name, cs := range collectionMap {
-			if cfg, ok := s.CollectionManager.Get(name); ok {
-				cs.Type = cfg.Type
-				cs.Description = cfg.Description
-				cs.Icon = cfg.Icon
-				cs.Color = cfg.Color
-			}
+			stats.Collections = append(stats.Collections, cs)
+			stats.TotalDocuments += cc.Documents
+			stats.TotalRevisions += cc.Revisions
+			stats.TotalMetaIndices += cc.MetaIndices
 		}
 	}
-
-	// Convert map to slice
-	for _, cs := range collectionMap {
-		stats.Collections = append(stats.Collections, *cs)
-	}
-
-	// Sort collections by name
-	sort.Slice(stats.Collections, func(i, j int) bool {
-		return stats.Collections[i].Name < stats.Collections[j].Name
-	})
 
 	// Async meta-indexing queue health
 	if s.IndexQueue != nil {

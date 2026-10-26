@@ -9,7 +9,6 @@ import (
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	proto "mddb/proto"
-	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -181,23 +180,15 @@ func (g *GRPCServer) VectorStats(ctx context.Context, req *proto.VectorStatsRequ
 		resp.Dimensions = safeInt32(g.server.Embedding.Dimensions())
 	}
 
-	vectorCounts, _ := g.server.VectorStore.CountByCollection()
-
-	docCounts := make(map[string]int)
-	_ = g.server.DBViewAll(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-		if bDocs == nil {
-			return nil
-		}
-		c := bDocs.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			parts := strings.Split(string(k), "|")
-			if len(parts) >= 2 {
-				docCounts[parts[1]]++
+	// #349: counts from the shared snapshot, not a walk per call.
+	docCounts, vectorCounts := map[string]int{}, map[string]int{}
+	if snap := g.server.dbStats(statsWait()); snap != nil {
+		for name, cc := range snap.Collections {
+			if cc.Documents > 0 || cc.Embeddings > 0 {
+				docCounts[name], vectorCounts[name] = cc.Documents, cc.Embeddings
 			}
 		}
-		return nil
-	})
+	}
 
 	allColls := make(map[string]bool)
 	for c := range docCounts {

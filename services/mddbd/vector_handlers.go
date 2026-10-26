@@ -455,36 +455,26 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 		resp["dimensions"] = s.Embedding.Dimensions()
 	}
 
-	// Count embeddings per collection (unique documents)
-	vectorCounts, _ := s.VectorStore.CountByCollection()
-
-	// Count total chunks per collection
-	chunkCounts, _ := s.VectorStore.CountChunksByCollection()
-
-	// Count total docs per collection
-	docCounts := make(map[string]int)
-	_ = s.DBViewAll(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
+	// #349: the counts come from the shared snapshot; this walked the
+	// documents and every vector on each call, and never returned on a
+	// large database.
+	docCounts, vectorCounts, chunkCounts := map[string]int{}, map[string]int{}, map[string]int{}
+	if snap := s.dbStats(statsWait()); snap == nil {
+		resp["statsPending"] = true
+	} else {
+		resp["statsComputedAt"] = snap.ComputedAt.UTC().Format(time.RFC3339)
+		resp["statsAgeSeconds"] = int(time.Since(snap.ComputedAt).Seconds())
+		for name, cc := range snap.Collections {
+			docCounts[name], vectorCounts[name], chunkCounts[name] = cc.Documents, cc.Embeddings, cc.Chunks
 		}
-		c := bDocs.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			parts := vec.SplitKey(k)
-			if len(parts) >= 2 {
-				docCounts[parts[1]]++
-			}
-		}
-		return nil
-	})
+	}
 
 	collections := make(map[string]interface{})
 	allColls := make(map[string]bool)
-	for c := range docCounts {
-		allColls[c] = true
-	}
-	for c := range vectorCounts {
-		allColls[c] = true
+	for c, n := range docCounts {
+		if n > 0 || vectorCounts[c] > 0 {
+			allColls[c] = true
+		}
 	}
 
 	for coll := range allColls {

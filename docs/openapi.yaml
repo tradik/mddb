@@ -68,7 +68,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.18.4"
+  version: "2.18.5"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -330,6 +330,9 @@ paths:
                           description: content, metadata, fullText, vectors, other
                           additionalProperties: {type: integer}
                   elapsedMs: {type: integer}
+                  statsComputedAt: {type: string, format: date-time, description: "(v2.18.5+) When this breakdown was computed (#349)"}
+                  statsAgeSeconds: {type: integer, description: "(v2.18.5+) Its age"}
+                  statsPending: {type: boolean, description: "(v2.18.5+) The first breakdown is still being computed; only this field is present"}
   /v1/stats:
     get:
       tags:
@@ -6877,6 +6880,16 @@ components:
         totalMetaIndices:
           type: integer
           example: 84
+        statsComputedAt:
+          type: string
+          format: date-time
+          description: (v2.18.5+) When the counts were computed (#349)
+        statsAgeSeconds:
+          type: integer
+          description: (v2.18.5+) Age of the counts. Zero-ish on a database written since only by cheap walks
+        statsPending:
+          type: boolean
+          description: (v2.18.5+) The first walk after a start is still running; counts are omitted, ask again shortly
         indexQueue:
           type: object
           description: >-
@@ -7140,6 +7153,16 @@ components:
           type: boolean
           description: Whether the vector index is loaded and ready
           example: true
+        statsComputedAt:
+          type: string
+          format: date-time
+          description: (v2.18.5+) When the counts were computed; they come from the shared statistics snapshot (#349)
+        statsAgeSeconds:
+          type: integer
+          description: (v2.18.5+) Age of the counts
+        statsPending:
+          type: boolean
+          description: (v2.18.5+) The first count after a start is still running
         indexProgress:
           type: object
           description: (v2.18.4+) Present while the index loads at startup (#346).

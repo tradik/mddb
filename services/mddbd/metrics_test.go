@@ -213,25 +213,6 @@ func TestMetricsDBStatsCache(t *testing.T) {
 	}
 }
 
-func TestExtractCollection(t *testing.T) {
-	tests := []struct {
-		key      string
-		expected string
-	}{
-		{"doc|blog|post1", "blog"},
-		{"rev|articles|id|ts", "articles"},
-		{"meta|faq|tag|go|doc1", "faq"},
-		{"nopipe", ""},
-		{"single|rest", "rest"},
-	}
-	for _, tt := range tests {
-		got := metricsExtractCollection([]byte(tt.key))
-		if got != tt.expected {
-			t.Errorf("metricsExtractCollection(%q) = %q, want %q", tt.key, got, tt.expected)
-		}
-	}
-}
-
 func BenchmarkMetricsHandler(b *testing.B) {
 	f, err := os.CreateTemp("", "mddb-metrics-bench-*.db")
 	if err != nil {

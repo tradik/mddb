@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"os"
 	"sync"
 	"time"
@@ -82,47 +81,12 @@ func (a *serverMetricsStats) DBStats() metrics.DBStats {
 		ds.SizeBytes = info.Size()
 	}
 
-	_ = a.s.DBViewAll(func(tx *bolt.Tx) error {
-		if b := tx.Bucket([]byte("docs")); b != nil {
-			c := b.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				if coll := metricsExtractCollection(k); coll != "" {
-					cm := ds.Collections[coll]
-					cm.Documents++
-					ds.Collections[coll] = cm
-				}
-			}
-		}
-		if b := tx.Bucket([]byte("rev")); b != nil {
-			c := b.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				if coll := metricsExtractCollection(k); coll != "" {
-					cm := ds.Collections[coll]
-					cm.Revisions++
-					ds.Collections[coll] = cm
-				}
-			}
-		}
-		if b := tx.Bucket([]byte("idxmeta")); b != nil {
-			c := b.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				if coll := metricsExtractCollection(k); coll != "" {
-					cm := ds.Collections[coll]
-					cm.MetaIndex++
-					ds.Collections[coll] = cm
-				}
-			}
-		}
-		return nil
-	})
-
-	if a.s.VectorStore != nil {
-		if counts, err := a.s.VectorStore.CountByCollection(); err == nil {
-			for coll, n := range counts {
-				cm := ds.Collections[coll]
-				cm.Embeddings = n
-				ds.Collections[coll] = cm
-			}
+	// #349: the shared snapshot. A scrape never waits for a walk; until the
+	// first one finishes the per-collection gauges are simply absent.
+	if snap := a.s.dbStats(0); snap != nil {
+		for name, cc := range snap.Collections {
+			ds.Collections[name] = metrics.CollectionStats{Documents: cc.Documents, Revisions: cc.Revisions,
+				MetaIndex: cc.MetaIndices, Embeddings: cc.Embeddings}
 		}
 	}
 	if a.s.WebhookManager != nil {
@@ -155,18 +119,4 @@ func (a *serverMetricsStats) DBWriteTransactions() uint64 {
 		})
 	}
 	return uint64(max(total, 0))
-}
-
-// metricsExtractCollection pulls the collection name from a BoltDB key like "doc|blog|id".
-func metricsExtractCollection(key []byte) string {
-	i := bytes.IndexByte(key, '|')
-	if i < 0 {
-		return ""
-	}
-	rest := key[i+1:]
-	j := bytes.IndexByte(rest, '|')
-	if j < 0 {
-		return string(rest)
-	}
-	return string(rest[:j])
 }
