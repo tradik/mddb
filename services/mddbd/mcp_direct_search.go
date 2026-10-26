@@ -222,23 +222,15 @@ func (c *DirectClient) VectorStats(ctx context.Context) (*MCPVectorStatsResponse
 		resp.Dimensions = s.Embedding.Dimensions()
 	}
 
-	vectorCounts, _ := s.VectorStore.CountByCollection()
-
-	docCounts := make(map[string]int)
-	_ = s.DBViewAll(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs == nil {
-			return nil
-		}
-		cur := bDocs.Cursor()
-		for k, _ := cur.First(); k != nil; k, _ = cur.Next() {
-			parts := vec.SplitKey(k)
-			if len(parts) >= 2 {
-				docCounts[parts[1]]++
+	// #349: counts from the shared snapshot, not a walk per call.
+	docCounts, vectorCounts := map[string]int{}, map[string]int{}
+	if snap := s.dbStats(statsWait()); snap != nil {
+		for name, cc := range snap.Collections {
+			if cc.Documents > 0 || cc.Embeddings > 0 {
+				docCounts[name], vectorCounts[name] = cc.Documents, cc.Embeddings
 			}
 		}
-		return nil
-	})
+	}
 
 	allColls := make(map[string]bool)
 	for col := range docCounts {

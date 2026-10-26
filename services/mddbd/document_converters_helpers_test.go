@@ -364,23 +364,6 @@ func TestDeduplicateChunkResultsCB2(t *testing.T) {
 // metrics.go — pure helper functions
 // ---------------------------------------------------------------------------
 
-func TestExtractCollectionCB2(t *testing.T) {
-	tests := []struct {
-		in   []byte
-		want string
-	}{
-		{[]byte("doc|blog|post1"), "blog"},
-		{[]byte("idx|test|abc"), "test"},
-		{[]byte("nopipe"), ""},
-		{[]byte("one|only"), "only"},
-	}
-	for _, tc := range tests {
-		if got := metricsExtractCollection(tc.in); got != tc.want {
-			t.Errorf("metricsExtractCollection(%q) = %q, want %q", tc.in, got, tc.want)
-		}
-	}
-}
-
 // ---------------------------------------------------------------------------
 // storage_memory.go — key helper
 // ---------------------------------------------------------------------------

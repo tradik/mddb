@@ -31,6 +31,9 @@ type storageBreakdown struct {
 	Buckets     map[string]bucketUsage      `json:"buckets,omitempty"`
 	Collections map[string]*collectionUsage `json:"collections"`
 	ElapsedMs   int64                       `json:"elapsedMs"`
+	// #349: when this breakdown was computed.
+	StatsComputedAt string `json:"statsComputedAt,omitempty"`
+	StatsAgeSeconds int    `json:"statsAgeSeconds"`
 }
 
 // bucketUsage is one top-level bucket as bbolt allocates it.
@@ -84,12 +87,18 @@ func collectionOf(key []byte) (string, bool) {
 	return string(rest[:j]), true
 }
 
+// handleStorage answers from the walk cache (#349): the breakdown reads every
+// page, and on a large database a request waiting for it never returned.
 func (s *Server) handleStorage(w http.ResponseWriter, r *http.Request) {
-	out, err := s.storageUsage(r.URL.Query().Get("collection"))
-	if err != nil {
-		bad(w, err)
+	only := r.URL.Query().Get("collection")
+	val, at, pending := s.cachedWalk("storage:"+only, statsWait(), func() (any, error) { return s.storageUsage(only) })
+	if pending {
+		ok(w, map[string]any{"statsPending": true})
 		return
 	}
+	out := *val.(*storageBreakdown)
+	out.StatsComputedAt = at.UTC().Format(time.RFC3339)
+	out.StatsAgeSeconds = int(time.Since(at).Seconds())
 	ok(w, out)
 }
 

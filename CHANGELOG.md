@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.5] - 2026-10-26
+
+### Fixed
+
+- **`GET /v1/stats` never returned on a large database (#349).** Every call
+  walked the documents, revisions and metadata index (tens of millions of keys
+  on a database of a few million documents) and then read every document
+  again for a checksum. The counts now come from one snapshot shared with
+  gRPC `Stats`, MCP stats and `/metrics`, computed in a single pass that
+  counts and checksums together and stamped with the commit counter: exact
+  and immediate when nothing was written since; recounted before answering
+  when a count takes under a second; otherwise returned at once with
+  `statsComputedAt` and `statsAgeSeconds`, and recounted in the background at
+  most every `MDDB_STATS_TTL` seconds. The first call after a start waits up
+  to `MDDB_STATS_WAIT` seconds and answers `statsPending: true` instead of
+  hanging. The Prometheus scrape no longer walks the database at all.
+- **`GET /v1/vector-stats` and `GET /v1/storage` hung the same way (#349).**
+  vector-stats walked the documents and every stored vector on each call; it
+  now takes its counts from the same snapshot (gRPC and MCP vector stats too).
+  The storage breakdown is kept under the same rules, per query, and both
+  report `statsComputedAt` and `statsAgeSeconds`.
+
 ## [2.18.4] - 2026-10-25
 
 ### Added

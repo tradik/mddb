@@ -571,78 +571,24 @@ func (g *GRPCServer) Stats(ctx context.Context, req *proto.StatsRequest) (*proto
 		Mode:         string(g.server.Mode),
 		Collections:  []*proto.CollectionStats{},
 	}
-
-	// Get database file size
 	if info, err := os.Stat(g.server.Path); err == nil {
 		resp.DatabaseSize = info.Size()
 	}
 
-	// Collect statistics
-	collectionMap := make(map[string]*proto.CollectionStats)
-
-	err := g.server.DBViewAll(func(tx *bolt.Tx) error {
-		// Count documents
-		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-		if bDocs != nil {
-			c := bDocs.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &proto.CollectionStats{Name: coll}
-					}
-					collectionMap[coll].DocumentCount++
-					resp.TotalDocuments++
-				}
-			}
-		}
-
-		// Count revisions
-		bRev := tx.Bucket(g.server.BucketNames.Rev)
-		if bRev != nil {
-			c := bRev.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &proto.CollectionStats{Name: coll}
-					}
-					collectionMap[coll].RevisionCount++
-					resp.TotalRevisions++
-				}
-			}
-		}
-
-		// Count meta indices
-		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
-		if bIdx != nil {
-			c := bIdx.Cursor()
-			for k, _ := c.First(); k != nil; k, _ = c.Next() {
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &proto.CollectionStats{Name: coll}
-					}
-					collectionMap[coll].MetaIndexCount++
-					resp.TotalMetaIndices++
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	// #349: the shared snapshot; it used to walk the database on every call.
+	snap := g.server.dbStats(statsWait())
+	if snap == nil {
+		return nil, status.Error(codes.Unavailable, "database statistics are being computed; retry shortly")
 	}
-
-	// Convert map to slice
-	for _, cs := range collectionMap {
-		resp.Collections = append(resp.Collections, cs)
+	for _, name := range snap.sortedNames() {
+		cc := snap.Collections[name]
+		resp.Collections = append(resp.Collections, &proto.CollectionStats{
+			Name: name, DocumentCount: safeInt32(cc.Documents), RevisionCount: safeInt32(cc.Revisions),
+			MetaIndexCount: safeInt32(cc.MetaIndices),
+		})
+		resp.TotalDocuments += safeInt32(cc.Documents)
+		resp.TotalRevisions += safeInt32(cc.Revisions)
+		resp.TotalMetaIndices += safeInt32(cc.MetaIndices)
 	}
-
 	return resp, nil
 }

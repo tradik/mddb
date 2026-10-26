@@ -39,7 +39,7 @@ import (
 )
 
 // VERSION is the current release version of the MDDB server.
-const VERSION = "2.18.4"
+const VERSION = "2.18.5"
 
 // AccessMode defines the database access mode (read, write, or both).
 type AccessMode string
@@ -142,6 +142,7 @@ type Server struct {
 	collFiles       *collectionFiles          // #336: per-collection files, nil in the single-file layout
 	vectorLoad      vectorLoadRef             // #346: the vector index load in progress
 	reindexJobs     reindexJobs               // #347: background vector reindexes
+	walks           walkCache                 // #349: results of whole-database walks (stats, vector-stats, storage)
 	// GO-021: both MCP transports count their open sessions and nothing ever
 	// asked. A session that a client abandoned without closing stays until it
 	// times out, so the count is how an operator sees leaks accumulating.

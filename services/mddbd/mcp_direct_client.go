@@ -8,7 +8,6 @@ import (
 	"io"
 	"os"
 	"sort"
-	"strings"
 	"time"
 
 	"mddb/internal/sliceutil"
@@ -46,75 +45,23 @@ func (c *DirectClient) Stats(ctx context.Context) (*MCPStats, error) {
 		DatabasePath: c.server.Path,
 		Mode:         string(c.server.Mode),
 	}
-
 	if info, err := os.Stat(c.server.Path); err == nil { // #nosec G703 -- path from server config
 		stats.DatabaseSize = info.Size()
 	}
 
-	collectionMap := make(map[string]*MCPCollectionStats)
-
-	err := c.server.DBViewAll(func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if bDocs != nil {
-			c2 := bDocs.Cursor()
-			for k, _ := c2.First(); k != nil; k, _ = c2.Next() {
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &MCPCollectionStats{Name: coll}
-					}
-					collectionMap[coll].DocumentCount++
-					stats.TotalDocuments++
-				}
-			}
-		}
-
-		bRev := tx.Bucket([]byte("rev"))
-		if bRev != nil {
-			c2 := bRev.Cursor()
-			for k, _ := c2.First(); k != nil; k, _ = c2.Next() {
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &MCPCollectionStats{Name: coll}
-					}
-					collectionMap[coll].RevisionCount++
-					stats.TotalRevisions++
-				}
-			}
-		}
-
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		if bIdx != nil {
-			c2 := bIdx.Cursor()
-			for k, _ := c2.First(); k != nil; k, _ = c2.Next() {
-				parts := strings.Split(string(k), "|")
-				if len(parts) >= 2 {
-					coll := parts[1]
-					if _, ok := collectionMap[coll]; !ok {
-						collectionMap[coll] = &MCPCollectionStats{Name: coll}
-					}
-					collectionMap[coll].MetaIndexCount++
-					stats.TotalMetaIndices++
-				}
-			}
-		}
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
+	// #349: the shared snapshot; it used to walk the database on every call.
+	snap := c.server.dbStats(statsWait())
+	if snap == nil {
+		return nil, errors.New("database statistics are being computed; retry shortly")
 	}
-
-	for _, cs := range collectionMap {
-		stats.Collections = append(stats.Collections, *cs)
+	for _, name := range snap.sortedNames() {
+		cc := snap.Collections[name]
+		stats.Collections = append(stats.Collections, MCPCollectionStats{Name: name, DocumentCount: cc.Documents,
+			RevisionCount: cc.Revisions, MetaIndexCount: cc.MetaIndices})
+		stats.TotalDocuments += cc.Documents
+		stats.TotalRevisions += cc.Revisions
+		stats.TotalMetaIndices += cc.MetaIndices
 	}
-	sort.Slice(stats.Collections, func(i, j int) bool {
-		return stats.Collections[i].Name < stats.Collections[j].Name
-	})
-
 	return stats, nil
 }
 

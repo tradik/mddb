@@ -1558,6 +1558,28 @@ Get server and database statistics.
 - `totalDocuments`: Total documents across all collections
 - `totalRevisions`: Total revisions across all collections
 - `totalMetaIndices`: Total metadata indices across all collections
+- `statsComputedAt`, `statsAgeSeconds` (v2.18.5+): when the counts were computed
+- `statsPending` (v2.18.5+): `true` when the first count after a start is still running
+
+**How fresh the counts are (v2.18.5+).** Counting walks every document,
+revision and metadata-index key, which on a database of millions of documents
+takes minutes; the call used to do that every time and never returned. The
+counts now come from a snapshot shared with gRPC, MCP and `/metrics`:
+
+- nothing written since the snapshot: it is exact and returned at once;
+- written since, on a database whose count takes under a second: counted
+  again before answering, so the numbers are current, as before;
+- written since, on a database whose count is slow: the snapshot is returned
+  at once with its age, and a new count runs in the background at most every
+  `MDDB_STATS_TTL` seconds (300).
+
+The first call after a start waits up to `MDDB_STATS_WAIT` seconds (2) and
+answers `statsPending: true` if the count is not done. `GET /v1/vector-stats`
+takes its document, embedding and chunk counts from the same snapshot, and
+`GET /v1/storage` keeps its breakdowns under the same rules; both report
+`statsComputedAt` and `statsAgeSeconds`. `databaseSize` is
+always current. For one collection's document count without waiting, use
+`POST /v1/aggregate {"collection": "..."}` and read `totalDocs`.
 
 **cURL Example**:
 ```bash
