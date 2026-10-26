@@ -48,6 +48,8 @@ walk does not hold up writes to a small one ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.
 
 1. **Let the server shut down.** SIGTERM, then wait: the shutdown has a 15 s
    budget (`MDDB_SHUTDOWN_TIMEOUT_SEC`) and stores the freelist at the end.
+   Since 2.18.5 the process exits when the budget runs out even if a read is
+   still open, and a second SIGTERM exits at once.
    Docker kills after 10 s by default, so set `stop_grace_period: 20s` (the
    bundled compose files do); Kubernetes waits 30 s by default.
 2. **Keep `MDDB_FREELIST_SYNC` on for large files.** Since 2.18.2 it is on by
@@ -63,6 +65,19 @@ walk does not hold up writes to a small one ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.
    and file locks the guarantees bbolt relies on.
 5. **Do not disable write barriers or fsync** unless the database can be
    rebuilt from its sources.
+
+## Long reads and a growing file
+
+bbolt maps the file into memory. A write that makes the file outgrow the map
+has to remap it, which waits for every open read transaction, and no new read
+can begin while it waits. Until 2.18.5 the whole-database walks
+(`/v1/storage`, `/v1/vector-stats`, the stats count, an fts or vector reindex)
+each ran in one read transaction, so during a bulk ingest into a large file
+every request, `/health` included, stopped until the walk ended (#350). They
+now read in slices of at most 10 000 keys or 50 ms, each its own transaction.
+A file over 1 GiB is also mapped a quarter beyond its size at start (64-bit,
+not Windows), so a bulk ingest remaps rarely; the map is address space, not
+memory or disk.
 
 ## Disks
 

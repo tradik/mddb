@@ -143,6 +143,7 @@ type Server struct {
 	vectorLoad      vectorLoadRef             // #346: the vector index load in progress
 	reindexJobs     reindexJobs               // #347: background vector reindexes
 	walks           walkCache                 // #349: results of whole-database walks (stats, vector-stats, storage)
+	dbProbe         dbProbe                   // #350: the /health transaction in flight
 	// GO-021: both MCP transports count their open sessions and nothing ever
 	// asked. A session that a client abandoned without closing stays until it
 	// times out, so the count is how an operator sees leaks accumulating.
@@ -247,10 +248,10 @@ func getOptimizedBoltOptions() *bolt.Options { return boltOptionsFor("") }
 func boltOptionsFor(path string) *bolt.Options {
 	return &bolt.Options{
 		Timeout:         2 * time.Second,
-		NoFreelistSync:  !freelistSyncFor(path), // see freelistSyncNote
-		FreelistType:    bolt.FreelistMapType,   // Use hashmap for freelist (faster than array)
-		NoGrowSync:      false,                  // Sync after growing mmap (safer)
-		InitialMmapSize: 100 * 1024 * 1024,      // 100MB initial mmap (reduce remapping)
+		NoFreelistSync:  !freelistSyncFor(path),                 // see freelistSyncNote
+		FreelistType:    bolt.FreelistMapType,                   // Use hashmap for freelist (faster than array)
+		NoGrowSync:      false,                                  // Sync after growing mmap (safer)
+		InitialMmapSize: max(100*1024*1024, mmapHeadroom(path)), // 100MB, or room to grow for a large file (#350)
 	}
 }
 
@@ -1282,13 +1283,14 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigCh
 	slog.Info("Received, shutting down...", "sig", sig)
+	go exitOnSecondSignal(sigCh) // #350
 
 	// GO-034: one ordered sequence rather than a handful of ad-hoc Closes.
 	// Seven subsystems had a Stop or Close that nothing called, so their
 	// queues were abandoned rather than drained on the way out.
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout())
 	defer cancel()
-	s.Shutdown(shutdownCtx)
+	s.finishShutdown(shutdownCtx)
 }
 
 // --- helpers / buckets

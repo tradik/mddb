@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"mddb/internal/boltx"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -18,9 +20,10 @@ import (
 // lets one pass attribute each key and value to its bucket and collection.
 //
 // The full breakdown reads the whole database — on a large file that is
-// minutes, and it holds a read transaction that long, during which freed
-// pages cannot be reused. With ?collection=NAME only that collection's keys
-// are read: within each bucket the scan jumps from one tag to the next.
+// minutes. It reads in short transactions (#350): one long one held the mmap
+// lock, and a write growing the file stopped every request until it ended.
+// With ?collection=NAME only that collection's keys are read: within each
+// bucket the scan jumps from one tag to the next.
 
 // storageBreakdown is the response of GET /v1/storage.
 type storageBreakdown struct {
@@ -36,10 +39,11 @@ type storageBreakdown struct {
 	StatsAgeSeconds int    `json:"statsAgeSeconds"`
 }
 
-// bucketUsage is one top-level bucket as bbolt allocates it.
+// bucketUsage is one top-level bucket. The pages bbolt has allocated to it
+// (allocBytes until 2.18.5) are not reported: measuring them means a walk of
+// the bucket in one read transaction (#350).
 type bucketUsage struct {
-	AllocBytes int `json:"allocBytes"` // pages the bucket occupies
-	InUseBytes int `json:"inUseBytes"` // bytes used within them
+	InUseBytes int `json:"inUseBytes"` // key and value bytes
 	Keys       int `json:"keys"`
 }
 
@@ -124,33 +128,44 @@ func (s *Server) storageUsage(only string) (*storageBreakdown, error) {
 		if fi, err := os.Stat(db.Path()); err == nil {
 			out.FileBytes += fi.Size()
 		}
-		return db.View(func(tx *bolt.Tx) error {
+		var buckets [][]byte
+		if err := db.View(func(tx *bolt.Tx) error {
 			out.PageSize = tx.DB().Info().PageSize
 			free := tx.DB().Stats().FreePageN
 			out.FreePages += free
 			out.FreeBytes += int64(free) * int64(out.PageSize)
-			return tx.ForEach(func(name []byte, b *bolt.Bucket) error {
-				bucket := string(name)
-				if only != "" {
-					scanCollectionKeys(b, only, func(n int64) { usage(only).add(bucket, n) })
-					return nil
-				}
-				st := b.Stats()
-				u := out.Buckets[bucket]
-				u.AllocBytes += st.BranchAlloc + st.LeafAlloc
-				u.InUseBytes += st.BranchInuse + st.LeafInuse
-				u.Keys += st.KeyN
-				out.Buckets[bucket] = u
-				return b.ForEach(func(k, v []byte) error {
-					if c, found := keyCollection(bucket, k); found && isCollectionBucket(name) {
-						usage(c).add(bucket, int64(len(k)+len(v)))
-					} else if c, found := collectionOf(k); found {
-						usage(c).add(bucket, int64(len(k)+len(v)))
-					}
-					return nil
-				})
+			return tx.ForEach(func(name []byte, _ *bolt.Bucket) error {
+				buckets = append(buckets, append([]byte(nil), name...))
+				return nil
 			})
-		})
+		}); err != nil {
+			return err
+		}
+		for _, name := range buckets {
+			bucket := string(name)
+			if only != "" {
+				if err := scanCollectionKeys(db, name, only, func(n int64) { usage(only).add(bucket, n) }); err != nil {
+					return err
+				}
+				continue
+			}
+			u := out.Buckets[bucket]
+			err := boltx.Scan(db, name, nil, func(k, v []byte) bool {
+				u.Keys++
+				u.InUseBytes += len(k) + len(v)
+				if c, found := keyCollection(bucket, k); found && isCollectionBucket(name) {
+					usage(c).add(bucket, int64(len(k)+len(v)))
+				} else if c, found := collectionOf(k); found {
+					usage(c).add(bucket, int64(len(k)+len(v)))
+				}
+				return true
+			})
+			out.Buckets[bucket] = u
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 
 	s.restoreMu.RLock()
@@ -185,28 +200,51 @@ func (s *Server) storageUsage(only string) (*storageBreakdown, error) {
 }
 
 // scanCollectionKeys reports the size of every "<tag>|collection|..." key in
-// b, whatever the tag, seeking past the keys of other collections.
-func scanCollectionKeys(b *bolt.Bucket, collection string, add func(int64)) {
-	c := b.Cursor()
-	for k, _ := c.First(); k != nil; {
-		i := bytes.IndexByte(k, '|')
-		if i < 0 {
-			k, _ = c.Next() // not a tagged key; step over it
-			continue
+// bucket, whatever the tag, seeking past the keys of other collections. Each
+// tag is found in a short transaction of its own and its keys read with
+// boltx.Scan (#350).
+func scanCollectionKeys(db *bolt.DB, bucket []byte, collection string, add func(int64)) error {
+	var from []byte // where the next tag search starts; nil is the first key
+	for {
+		var tag []byte
+		err := db.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket(bucket)
+			if b == nil {
+				return nil
+			}
+			c := b.Cursor()
+			k, _ := c.First()
+			if from != nil {
+				k, _ = c.Seek(from)
+			}
+			for ; k != nil; k, _ = c.Next() { // step over untagged keys
+				if i := bytes.IndexByte(k, '|'); i >= 0 {
+					tag = append([]byte(nil), k[:i]...)
+					break
+				}
+			}
+			if tag == nil {
+				return nil
+			}
+			// "<tag>|<collection>" on its own: a per-collection total.
+			exact := append(append(append([]byte(nil), tag...), '|'), collection...)
+			if ek, ev := c.Seek(exact); bytes.Equal(ek, exact) {
+				add(int64(len(ek) + len(ev)))
+			}
+			return nil
+		})
+		if err != nil || tag == nil {
+			return err
 		}
-		tag := append([]byte(nil), k[:i]...)
-		// "<tag>|<collection>" on its own: a per-collection total.
-		exact := append(append(append([]byte(nil), tag...), '|'), collection...)
-		if ek, ev := c.Seek(exact); bytes.Equal(ek, exact) {
-			add(int64(len(ek) + len(ev)))
-		}
-		prefix := append(exact, '|')
-		var v []byte
-		for k, v = c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+		prefix := append(append(append(append([]byte(nil), tag...), '|'), collection...), '|')
+		if err := boltx.Scan(db, bucket, prefix, func(k, v []byte) bool {
 			add(int64(len(k) + len(v)))
+			return true
+		}); err != nil {
+			return err
 		}
 		// Next tag: the first key after every "<tag>|..." key. '}' sorts
 		// right after '|'.
-		k, _ = c.Seek(append(tag, '}'))
+		from = append(tag, '}')
 	}
 }

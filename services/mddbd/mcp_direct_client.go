@@ -32,9 +32,12 @@ func NewDirectClient(s *Server) *DirectClient {
 
 // Health checks if the database is healthy via the direct client.
 func (c *DirectClient) Health(ctx context.Context) (*MCPHealth, error) {
-	err := c.server.DBView(func(tx *bolt.Tx) error { return nil })
+	stalled, err := c.server.probeDB(healthProbeWait) // #350
 	if err != nil {
 		return &MCPHealth{Status: "unhealthy", Mode: string(c.server.Mode)}, err
+	}
+	if stalled > 0 {
+		return &MCPHealth{Status: "busy", Mode: string(c.server.Mode)}, nil
 	}
 	return &MCPHealth{Status: "healthy", Mode: string(c.server.Mode)}, nil
 }

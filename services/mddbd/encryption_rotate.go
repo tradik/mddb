@@ -102,26 +102,21 @@ func (rm *RotationManager) Status() (*RotationStatus, error) {
 	rm.mu.Unlock()
 
 	per := make(map[string]*CollectionStat)
-	err := rm.server.DBViewAll(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("docs"))
-		if b == nil {
-			return nil
+	// In short read transactions (#350).
+	err := rm.server.DBScanAll([]byte("docs"), nil, func(k, v []byte) bool {
+		coll := collectionFromDocKey(k)
+		if coll == "" {
+			return true
 		}
-		return b.ForEach(func(k, v []byte) error {
-			coll := collectionFromDocKey(k)
-			if coll == "" {
-				return nil
-			}
-			cs := per[coll]
-			if cs == nil {
-				cfg, _ := rm.server.CollectionManager.Get(coll)
-				cs = &CollectionStat{Collection: coll, Encrypted: cfg != nil && cfg.Encrypted}
-				per[coll] = cs
-			}
-			cs.Total++
-			classifyEntry(v, rm.encryptor.PrimaryKeyID(), cs)
-			return nil
-		})
+		cs := per[coll]
+		if cs == nil {
+			cfg, _ := rm.server.CollectionManager.Get(coll)
+			cs = &CollectionStat{Collection: coll, Encrypted: cfg != nil && cfg.Encrypted}
+			per[coll] = cs
+		}
+		cs.Total++
+		classifyEntry(v, rm.encryptor.PrimaryKeyID(), cs)
+		return true
 	})
 	if err != nil {
 		return nil, err

@@ -7,6 +7,8 @@ import (
 
 	json "mddb/internal/jsonx"
 
+	"mddb/internal/boltx"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -67,5 +69,43 @@ func TestStorageBreakdown(t *testing.T) {
 	}
 	if _, ok := collectionOf([]byte("tag||x")); ok {
 		t.Error("empty collection")
+	}
+}
+
+// #350: read in slices of one key, the breakdown is the same.
+func TestStorageBreakdownAcrossScanSlices(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	for _, id := range []string{"a", "b", "c"} {
+		addTestDoc(t, s, "big", id, "en", "some content "+id, map[string][]string{"tag": {"x"}})
+	}
+	whole, err := s.storageUsage("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	one, _ := s.storageUsage("big")
+	old := boltx.ScanSlice
+	boltx.ScanSlice.Keys = 1
+	defer func() { boltx.ScanSlice = old }()
+	sliced, err := s.storageUsage("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sliced.Collections["big"].TotalBytes != whole.Collections["big"].TotalBytes || sliced.Buckets["docs"] != whole.Buckets["docs"] {
+		t.Errorf("sliced %+v, whole %+v", sliced.Collections["big"], whole.Collections["big"])
+	}
+	if oneSliced, _ := s.storageUsage("big"); oneSliced.Collections["big"].TotalBytes != one.Collections["big"].TotalBytes {
+		t.Errorf("one collection: %d, want %d", oneSliced.Collections["big"].TotalBytes, one.Collections["big"].TotalBytes)
+	}
+
+	if err := scanCollectionKeys(s.DB, []byte("missing"), "big", func(int64) {}); err != nil {
+		t.Error(err)
+	}
+	_ = s.DB.Close()
+	if _, err := s.storageUsage(""); err == nil {
+		t.Error("closed database, whole")
+	}
+	if err := scanCollectionKeys(s.DB, []byte("docs"), "big", func(int64) {}); err == nil {
+		t.Error("closed database, one collection")
 	}
 }

@@ -40,6 +40,7 @@ Simple health check endpoint that verifies database connectivity.
 |---|---|
 | `persistence` | What the data directory can promise (GO-032): where it is, what filesystem holds it, whether it is writable and whether it survives a container restart. `warnings[]` carries anything that made the answer worse. |
 | `durable` | `writable && !ephemeral`. **`false` means acknowledged writes may not survive a restart** — the process is up and the data is not safe. Worth alerting on separately from `status`. |
+| `databaseWaitSeconds` | Present with `status: "busy"` (v2.18.5+): a read transaction has been waiting this long to begin, typically while a bulk write grows the file. The process is alive and the check answers within 2 s instead of hanging with the database. |
 | `mcpSessions` | Open MCP sessions per transport. **Absent when the MCP server is disabled** — an absent field says "not running" where a zero would say "idle". A count that only grows is how a session leak becomes visible: a client that disconnects without closing leaves its session until it times out. |
 
 A load balancer should read `status` alone. A monitoring system should also
@@ -55,8 +56,8 @@ right up to the restart that loses the data.
 ```
 
 **HTTP Status Codes:**
-- `200 OK` - Service is healthy
-- `503 Service Unavailable` - Service is unhealthy
+- `200 OK` - Service is healthy, or `busy` (the database is slow to answer, see `databaseWaitSeconds`)
+- `503 Service Unavailable` - Service is unhealthy, or `stalled`: the database has not let a read begin for `MDDB_HEALTH_STALL_LIMIT` seconds (300), long enough for an orchestrator to restart it
 
 ### `/v1/health`
 Alias for `/health` endpoint (same functionality).

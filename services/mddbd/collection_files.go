@@ -391,9 +391,10 @@ func openCollectionFile(path string, opts *bolt.Options) (*bolt.DB, error) {
 // collectionFileOptions are a collection file's bbolt options: the main
 // file's, without the 100 MB initial map. With it, bbolt grows a file in
 // 16 MB steps from the first write, so every collection, however small,
-// took 16 MB of disk; without it a file grows by doubling from 32 KB.
+// took 16 MB of disk; without it a file grows by doubling from 32 KB. A file
+// past 1 GB gets room to grow before a remap (#350).
 func collectionFileOptions(path string) *bolt.Options {
 	o := boltOptionsFor(path)
-	o.InitialMmapSize = 0
+	o.InitialMmapSize = mmapHeadroom(path)
 	return o
 }

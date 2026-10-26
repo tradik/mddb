@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"mddb/internal/envconf"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // Database statistics without the wait (#349).
@@ -173,35 +171,33 @@ func (s *Server) walkStats() (*dbStatsSnapshot, error) {
 		}
 		return cc
 	}
-	err := s.DBViewAll(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(s.BucketNames.Docs); b != nil {
-			c := b.Cursor()
-			for k, v := c.First(); k != nil; k, v = c.Next() {
-				if name, ok := statsCollection(k); ok {
-					cc := get(name)
-					cc.Documents++
-					// The checksum the separate pass used to compute: key and
-					// the first 64 bytes of the value, XORed.
-					h := crc32.ChecksumIEEE(k)
-					h ^= crc32.ChecksumIEEE(v[:min(len(v), 64)])
-					cc.checksum ^= h
-				}
-			}
+	// Each bucket in short read transactions (#350).
+	err := s.DBScanAll(s.BucketNames.Docs, nil, func(k, v []byte) bool {
+		if name, ok := statsCollection(k); ok {
+			cc := get(name)
+			cc.Documents++
+			// The checksum the separate pass used to compute: key and the
+			// first 64 bytes of the value, XORed.
+			h := crc32.ChecksumIEEE(k)
+			h ^= crc32.ChecksumIEEE(v[:min(len(v), 64)])
+			cc.checksum ^= h
 		}
-		count := func(bucket []byte, add func(*collectionCounts)) {
-			if b := tx.Bucket(bucket); b != nil {
-				c := b.Cursor()
-				for k, _ := c.First(); k != nil; k, _ = c.Next() {
-					if name, ok := statsCollection(k); ok {
-						add(get(name))
-					}
-				}
-			}
-		}
-		count(s.BucketNames.Rev, func(cc *collectionCounts) { cc.Revisions++ })
-		count(s.BucketNames.IdxMeta, func(cc *collectionCounts) { cc.MetaIndices++ })
-		return nil
+		return true
 	})
+	count := func(bucket []byte, add func(*collectionCounts)) error {
+		return s.DBScanAll(bucket, nil, func(k, _ []byte) bool {
+			if name, ok := statsCollection(k); ok {
+				add(get(name))
+			}
+			return true
+		})
+	}
+	if err == nil {
+		err = count(s.BucketNames.Rev, func(cc *collectionCounts) { cc.Revisions++ })
+	}
+	if err == nil {
+		err = count(s.BucketNames.IdxMeta, func(cc *collectionCounts) { cc.MetaIndices++ })
+	}
 	if err != nil {
 		return nil, err
 	}

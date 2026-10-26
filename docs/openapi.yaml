@@ -170,12 +170,18 @@ paths:
                 properties:
                   status:
                     type: string
-                    enum: [ healthy, degraded ]
+                    enum: [ healthy, degraded, busy ]
                     description: >-
                       degraded (v2.18.2+): reads are served but writes wait
                       for the freelist to be rebuilt after a crash (#333);
-                      see reads, writes, phase and progress.
+                      see reads, writes, phase and progress. busy (v2.18.5+):
+                      a read transaction has been waiting databaseWaitSeconds
+                      to begin (#350); after MDDB_HEALTH_STALL_LIMIT the
+                      answer is 503 with status stalled.
                     example: healthy
+                  databaseWaitSeconds:
+                    type: integer
+                    description: (v2.18.5+) Present when busy or stalled.
                   reads:
                     type: boolean
                     description: (v2.18.2+) Present when degraded.
@@ -314,7 +320,7 @@ paths:
                     additionalProperties:
                       type: object
                       properties:
-                        allocBytes: {type: integer}
+                        allocBytes: {type: integer, deprecated: true, description: "No longer reported since 2.18.5 (#350)"}
                         inUseBytes: {type: integer}
                         keys: {type: integer}
                   collections:

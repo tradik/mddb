@@ -28,6 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now takes its counts from the same snapshot (gRPC and MCP vector stats too).
   The storage breakdown is kept under the same rules, per query, and both
   report `statsComputedAt` and `statsAgeSeconds`.
+- **A bulk ingest stopped the whole server, `/health` included, and SIGTERM
+  did not end it (#350).** A bbolt read transaction holds the memory map; a
+  write that grows the file must remap, waits for every open read, and no new
+  read can begin meanwhile. The whole-database walks (`/v1/storage`, vector
+  counts, the stats count, the encryption status, fts and vector reindex)
+  each held one read transaction for minutes on a large file, so one of them
+  during an ingest froze every request. They now read in slices of at most
+  10 000 keys or 50 ms, each its own transaction. A file over 1 GiB is mapped
+  a quarter beyond its size at start (64-bit, not Windows), so an ingest
+  remaps rarely. `/health` no longer waits for the database: after 2 s it
+  answers `200` with `status: "busy"` and `databaseWaitSeconds`, and `503`
+  `stalled` only after `MDDB_HEALTH_STALL_LIMIT` seconds (300). Closing the
+  database files is now a shutdown step under `MDDB_SHUTDOWN_TIMEOUT_SEC`: the
+  process exits when the budget runs out, and a second SIGTERM or Ctrl-C exits
+  at once.
+
+### Changed
+
+- **`/v1/storage` no longer reports a bucket's `allocBytes` (#350).** It took
+  one read transaction over the whole bucket. `inUseBytes` is now the bytes of
+  the bucket's keys and values. The Go client keeps the field; it reads 0.
 
 ## [2.18.4] - 2026-10-25
 

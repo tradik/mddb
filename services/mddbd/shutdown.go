@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
 	"time"
 
 	"mddb/internal/envconf"
@@ -86,12 +87,23 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	add("lockfree-cache", s.LockFreeCache != nil, func() { s.LockFreeCache.Close() })
 	add("document-cache", s.Cache != nil, func() { s.Cache.Close() })
 
+	// 6. The database files (#350). Closing waits for every open read
+	//    transaction; as a step it is bounded by the deadline like the rest,
+	//    where the deferred Close at the end of main waited forever.
+	add("database", s.DB != nil, func() {
+		s.closeCollectionFiles()
+		if err := s.DB.Close(); err != nil {
+			slog.Error("closing database", "err", err)
+		}
+	})
+
 	return steps
 }
 
-// Shutdown runs this server's sequence with the given deadline.
-func (s *Server) Shutdown(ctx context.Context) {
-	runShutdownSteps(ctx, s.shutdownSteps())
+// Shutdown runs this server's sequence with the given deadline and reports
+// whether every step finished.
+func (s *Server) Shutdown(ctx context.Context) bool {
+	return runShutdownSteps(ctx, s.shutdownSteps())
 }
 
 // runShutdownSteps executes steps in order until they are done or the deadline
@@ -101,12 +113,12 @@ func (s *Server) Shutdown(ctx context.Context) {
 // which one wedged, and it is deliberately not waited on: it keeps running in
 // its own goroutine while the process exits, which is strictly better than
 // holding the process open until the operator's SIGKILL arrives.
-func runShutdownSteps(ctx context.Context, steps []shutdownStep) {
+func runShutdownSteps(ctx context.Context, steps []shutdownStep) bool {
 	for _, step := range steps {
 		if ctx.Err() != nil {
 			slog.Warn("shutdown deadline reached; skipping remaining steps",
 				"skippedFrom", step.name)
-			return
+			return false
 		}
 		start := time.Now()
 		done := make(chan struct{})
@@ -121,8 +133,31 @@ func runShutdownSteps(ctx context.Context, steps []shutdownStep) {
 		case <-ctx.Done():
 			slog.Warn("shutdown step did not finish in time", "step", step.name,
 				"elapsed", time.Since(start))
-			return
+			return false
 		}
 	}
 	slog.Info("shutdown complete")
+	return true
+}
+
+// shutdownExit ends the process when shutdown cannot finish (#350).
+var shutdownExit = os.Exit
+
+// exitOnSecondSignal ends the process at once on another signal from sigCh:
+// an operator who repeats SIGTERM or Ctrl-C wants it gone, not waited for.
+func exitOnSecondSignal(sigCh <-chan os.Signal) {
+	sig := <-sigCh
+	slog.Warn("second signal; exiting without finishing shutdown", "sig", sig)
+	shutdownExit(1)
+}
+
+// finishShutdown runs the sequence and, if a step did not finish in time,
+// exits rather than returning to the deferred closes that would wait for it.
+// Committed data is on disk either way; the next start rebuilds what was not
+// stored, such as the freelist.
+func (s *Server) finishShutdown(ctx context.Context) {
+	if !s.Shutdown(ctx) {
+		slog.Warn("exiting with shutdown unfinished")
+		shutdownExit(1)
+	}
 }
