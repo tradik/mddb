@@ -122,7 +122,7 @@ type StorageBreakdown struct {
 
 // BucketUsage is one top-level database bucket.
 type BucketUsage struct {
-	AllocBytes int `json:"allocBytes"`
+	AllocBytes int `json:"allocBytes"` // 0 from server 2.18.5 on (#350)
 	InUseBytes int `json:"inUseBytes"`
 	Keys       int `json:"keys"`
 }

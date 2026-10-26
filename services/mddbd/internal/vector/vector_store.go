@@ -447,41 +447,31 @@ func (vs *VectorStore) CountByCollection() (map[string]int, error) {
 	counts := make(map[string]int)
 	seen := make(map[string]bool)
 
-	err := boltx.ViewAll(vs.rt(), func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return nil
+	// #350: in short read transactions, so a write that grows the file is
+	// not held up behind a walk of every vector.
+	err := boltx.ScanAll(vs.rt(), vs.bucketName, []byte("vec|"), func(k, _ []byte) bool {
+		// Key format: vec|collection|docID or vec|collection|docID#N
+		rest := string(k[4:]) // "collection|..."
+		pipeIdx := strings.IndexByte(rest, '|')
+		if pipeIdx < 0 {
+			return true
 		}
-		c := b.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			ks := string(k)
-			// Key format: vec|collection|docID or vec|collection|docID#N
-			// Find first | after "vec|"
-			if len(ks) < 5 || ks[:4] != "vec|" {
-				continue
-			}
-			rest := ks[4:] // "collection|..."
-			pipeIdx := strings.IndexByte(rest, '|')
-			if pipeIdx < 0 {
-				continue
-			}
-			coll := rest[:pipeIdx]
-			docIDPart := rest[pipeIdx+1:]
-			// Strip chunk suffix (#N) - keys are always built with buildChunkKey
-			// which appends #chunkIndex. Only strip the very last #N where N >= 0.
-			if hashIdx := strings.LastIndexByte(docIDPart, '#'); hashIdx >= 0 {
-				suffix := docIDPart[hashIdx+1:]
-				if n, err := strconv.Atoi(suffix); err == nil && n >= 0 {
-					docIDPart = docIDPart[:hashIdx]
-				}
-			}
-			dedupKey := coll + "\x00" + docIDPart
-			if !seen[dedupKey] {
-				seen[dedupKey] = true
-				counts[coll]++
+		coll := rest[:pipeIdx]
+		docIDPart := rest[pipeIdx+1:]
+		// Strip chunk suffix (#N) - keys are always built with buildChunkKey
+		// which appends #chunkIndex. Only strip the very last #N where N >= 0.
+		if hashIdx := strings.LastIndexByte(docIDPart, '#'); hashIdx >= 0 {
+			suffix := docIDPart[hashIdx+1:]
+			if n, err := strconv.Atoi(suffix); err == nil && n >= 0 {
+				docIDPart = docIDPart[:hashIdx]
 			}
 		}
-		return nil
+		dedupKey := coll + "\x00" + docIDPart
+		if !seen[dedupKey] {
+			seen[dedupKey] = true
+			counts[coll]++
+		}
+		return true
 	})
 	return counts, err
 }
@@ -489,26 +479,12 @@ func (vs *VectorStore) CountByCollection() (map[string]int, error) {
 // CountChunksByCollection counts total chunk embeddings per collection (including multi-chunk docs).
 func (vs *VectorStore) CountChunksByCollection() (map[string]int, error) {
 	counts := make(map[string]int)
-
-	err := boltx.ViewAll(vs.rt(), func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return nil
+	err := boltx.ScanAll(vs.rt(), vs.bucketName, []byte("vec|"), func(k, _ []byte) bool {
+		rest := k[4:]
+		if i := bytes.IndexByte(rest, '|'); i >= 0 {
+			counts[string(rest[:i])]++
 		}
-		c := b.Cursor()
-		for k, _ := c.First(); k != nil; k, _ = c.Next() {
-			ks := string(k)
-			if len(ks) < 5 || ks[:4] != "vec|" {
-				continue
-			}
-			rest := ks[4:]
-			pipeIdx := strings.IndexByte(rest, '|')
-			if pipeIdx < 0 {
-				continue
-			}
-			counts[rest[:pipeIdx]]++
-		}
-		return nil
+		return true
 	})
 	return counts, err
 }

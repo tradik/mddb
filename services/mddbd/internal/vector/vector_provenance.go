@@ -157,20 +157,14 @@ func (vs *VectorStore) collectionsWithVectors() []string {
 		seen = make(map[string]bool)
 		out  []string
 	)
-	_ = boltx.ViewAll(vs.rt(), func(tx *bolt.Tx) error {
-		b := tx.Bucket(vs.bucketName)
-		if b == nil {
-			return nil
-		}
-		return b.ForEach(func(k, _ []byte) error {
-			parts := SplitKey(k)
-			if len(parts) < 3 || parts[0] != "vec" || seen[parts[1]] {
-				return nil
-			}
+	// In short read transactions (#350).
+	_ = boltx.ScanAll(vs.rt(), vs.bucketName, []byte("vec|"), func(k, _ []byte) bool {
+		parts := SplitKey(k)
+		if len(parts) >= 3 && !seen[parts[1]] {
 			seen[parts[1]] = true
 			out = append(out, parts[1])
-			return nil
-		})
+		}
+		return true
 	})
 	return out
 }

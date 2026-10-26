@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,8 +9,6 @@ import (
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	vec "mddb/internal/vector"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // Re-embedding a collection (#347).
@@ -73,21 +70,11 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 		Mode ChunkMode
 	}
 	var docs []docEntry
-	if err := s.DBViewC(collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(s.BucketNames.Docs)
-		if bDocs == nil {
-			return nil
-		}
-		prefix := []byte("doc|" + collection + "|")
-		c := bDocs.Cursor()
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			d, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
+	if err := s.DBScanC(collection, s.BucketNames.Docs, []byte("doc|"+collection+"|"), func(_, v []byte) bool {
+		if d, err := loadDoc(v); err == nil {
 			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(collection, d)})
 		}
-		return nil
+		return true
 	}); err != nil {
 		return res, err
 	}

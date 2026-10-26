@@ -7,6 +7,8 @@ import (
 	"time"
 
 	pb "mddb/proto"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // #335: a collection with full-text indexing off gets no postings, and an
@@ -106,5 +108,25 @@ func TestFTSSettingTravelsEveryTransport(t *testing.T) {
 	g, err := gs.FTSReindex(context.Background(), &pb.FTSReindexRequest{Collection: "g"})
 	if err != nil || g.GetStatus() != "removed" {
 		t.Errorf("gRPC reindex: %v %v", g, err)
+	}
+}
+
+// Undecodable and empty documents are skipped; a closed database is an error.
+func TestReindexFTSSkipsAndFails(t *testing.T) {
+	t.Setenv("MDDB_STORAGE_LAYOUT", "single") // writes and closes the main file directly
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	addTestDoc(t, s, "c", "a", "en", "wombat burrow", nil)
+	addTestDoc(t, s, "c", "empty", "en", "", nil)
+	_ = s.DB.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(s.BucketNames.Docs).Put([]byte("doc|c|broken"), []byte("not a document"))
+	})
+	res, err := s.reindexCollectionFTS("c")
+	if err != nil || res.Reindexed != 1 || res.Skipped != 2 {
+		t.Errorf("reindex: %+v %v", res, err)
+	}
+	_ = s.DB.Close()
+	if _, err := s.reindexCollectionFTS("c"); err == nil {
+		t.Error("closed database")
 	}
 }

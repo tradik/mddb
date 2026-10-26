@@ -493,11 +493,8 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if database is accessible
-	err := s.DBView(func(tx *bolt.Tx) error {
-		return nil
-	})
-
+	// Check if database is accessible, without hanging with it (#350).
+	stalled, err := s.probeDB(healthProbeWait)
 	if err != nil {
 		w.WriteHeader(503)
 		_, _ = fmt.Fprintf(w, `{"status":"unhealthy","error":%q}`, err.Error())
@@ -530,9 +527,17 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			body["vectorIndex"] = map[string]any{"ready": false, "progress": p}
 		}
 	}
+	code := 200
+	if stalled > 0 { // #350: a read transaction has been waiting this long
+		body["status"] = "busy"
+		body["databaseWaitSeconds"] = int(stalled.Seconds())
+		if stalled >= healthStallLimit() {
+			body["status"], code = "stalled", 503
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
+	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(body); err != nil {
 		slog.Debug("writing the health response failed", "err", err)
 	}

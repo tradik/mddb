@@ -94,6 +94,13 @@ func (s *Server) DBViewC(collection string, fn func(*bolt.Tx) error) error {
 	return s.collectionDB(collection).View(fn)
 }
 
+// DBScanC is boltx.Scan of bucket in the file holding collection (#350).
+func (s *Server) DBScanC(collection string, bucket, prefix []byte, visit func(k, v []byte) bool) error {
+	s.restoreMu.RLock()
+	defer s.restoreMu.RUnlock()
+	return boltx.Scan(s.collectionDB(collection), bucket, prefix, visit)
+}
+
 // DBUpdateC runs fn in a write transaction on the file holding collection.
 func (s *Server) DBUpdateC(collection string, fn func(*bolt.Tx) error) error {
 	s.restoreMu.RLock()
@@ -113,6 +120,20 @@ func (s *Server) DBViewAll(fn func(*bolt.Tx) error) error {
 	defer s.restoreMu.RUnlock()
 	for _, db := range s.collectionDBs() {
 		if err := db.View(fn); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// DBScanAll is boltx.Scan of bucket over every file holding collection data:
+// a whole-bucket walk in short read transactions, so a write that grows a
+// file is not stalled behind it (#350).
+func (s *Server) DBScanAll(bucket, prefix []byte, visit func(k, v []byte) bool) error {
+	s.restoreMu.RLock()
+	defer s.restoreMu.RUnlock()
+	for _, db := range s.collectionDBs() {
+		if err := boltx.Scan(db, bucket, prefix, visit); err != nil {
 			return err
 		}
 	}

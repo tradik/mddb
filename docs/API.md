@@ -1498,7 +1498,7 @@ curl "$MDDB/v1/storage?collection=src"      # one collection: reads only its key
 ```json
 {
   "fileBytes": 2690252800, "pageSize": 4096, "freePages": 812, "freeBytes": 3325952,
-  "buckets": {"ftsp": {"allocBytes": 1214251008, "inUseBytes": 1003141120, "keys": 9120334}},
+  "buckets": {"ftsp": {"inUseBytes": 1003141120, "keys": 9120334}},
   "collections": {
     "src": {"totalBytes": 2410000000,
             "byCategory": {"content": 98000000, "metadata": 41000000, "fullText": 2190000000, "vectors": 81000000},
@@ -1512,9 +1512,12 @@ In the per-collection layout ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md)) each
 collection also reports `fileBytes`, the size of its own file, and the totals
 cover every file.
 
-The full breakdown reads every page and holds one read transaction while it
-does; on a large file that is minutes, and pages freed meanwhile cannot be
-reused until it ends. `buckets` is present only in the full breakdown. Turn
+The full breakdown reads every key; on a large file that is minutes. Since
+v2.18.5 it reads in short transactions, so writes are not held up behind it,
+and a bucket's `inUseBytes` is the bytes of its keys and values. `allocBytes`,
+the pages bbolt allocated to a bucket, is no longer reported: measuring it
+took one read transaction over the whole bucket. `buckets` is present only in
+the full breakdown. Turn
 full-text indexing off for a collection that does not need it with
 `"fts": {"enabled": false}` in its [collection config](#get-v1collection-config),
 then `POST /v1/fts-reindex` to remove its postings.
@@ -3506,6 +3509,12 @@ Health check endpoint. Also available at `/v1/health`.
 ```
 
 Returns `503` with `"status": "unhealthy"` if the database is not accessible.
+
+The database check waits at most 2 s (v2.18.5+). While the database is busy —
+a write growing the file waits for long reads to end, and no read can begin
+meanwhile — the answer is `200` with `"status": "busy"` and
+`databaseWaitSeconds`; after `MDDB_HEALTH_STALL_LIMIT` seconds (300) it is
+`503` with `"status": "stalled"`. See [HEALTHCHECK.md](HEALTHCHECK.md).
 
 ---
 

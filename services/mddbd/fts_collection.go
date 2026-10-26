@@ -1,12 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"log/slog"
 
 	"mddb/internal/storage"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // Full-text indexing per collection (#335).
@@ -47,28 +44,20 @@ func (s *Server) reindexCollectionFTS(collection string) (ftsReindexResult, erro
 	var all []string
 	res := ftsReindexResult{Status: "ok"}
 	now := currentUnix()
-	// Collected first, indexed outside the read transaction: indexing writes.
-	if err := s.DBViewC(collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(s.BucketNames.Docs)
-		if bDocs == nil {
-			return nil
+	// Collected first, indexed outside the read transactions: indexing writes.
+	if err := s.DBScanC(collection, s.BucketNames.Docs, []byte("doc|"+collection+"|"), func(_, v []byte) bool {
+		doc, err := loadDoc(v)
+		if err != nil {
+			res.Skipped++
+			return true
 		}
-		prefix := []byte("doc|" + collection + "|")
-		c := bDocs.Cursor()
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			doc, err := loadDoc(v)
-			if err != nil {
-				res.Skipped++
-				continue
-			}
-			all = append(all, doc.ID)
-			if doc.ContentMD == "" || (doc.ExpiresAt > 0 && doc.ExpiresAt < now) {
-				res.Skipped++
-				continue
-			}
-			docs = append(docs, doc)
+		all = append(all, doc.ID)
+		if doc.ContentMD == "" || (doc.ExpiresAt > 0 && doc.ExpiresAt < now) {
+			res.Skipped++
+			return true
 		}
-		return nil
+		docs = append(docs, doc)
+		return true
 	}); err != nil {
 		return res, err
 	}
