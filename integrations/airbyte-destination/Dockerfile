@@ -17,8 +17,11 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
-RUN pip install -r requirements.txt
+# requirements.lock pins every package, transitive ones included, with its
+# hashes (pip-compile --generate-hashes from requirements.txt), and only
+# wheels are installed: no setup script runs at build time.
+COPY requirements.lock ./
+RUN pip install --no-cache-dir --only-binary :all: --require-hashes -r requirements.lock
 
 COPY main.py ./
 COPY destination_mddb ./destination_mddb

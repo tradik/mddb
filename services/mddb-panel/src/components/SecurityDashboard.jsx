@@ -53,7 +53,7 @@ export default function SecurityDashboard() {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const openAuditFor = (preset) => {
@@ -141,7 +141,7 @@ export default function SecurityDashboard() {
           </header>
           <div className="p-3 text-xs text-gray-600">
             Rate-limit breaches and other operational counters are exported on the <span className="font-mono">/metrics</span> endpoint
-            (Prometheus format). Subscribe via a webhook for the <span className="font-mono">security.rate_limit_exceeded</span>
+            (Prometheus format). Subscribe via a webhook for the <span className="font-mono">security.rate_limit_exceeded</span>{' '}
             event to receive real-time alerts.
           </div>
         </section>

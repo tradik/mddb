@@ -8,14 +8,29 @@ RUN apk add --no-cache \
     wget \
     curl
 
-# Install Air for hot reload
-RUN go install github.com/air-verse/air@v1.67.1 # NOSONAR -- immutable, explicitly pinned tool version
+# Install Air for hot reload: the release binary, checked against the
+# SHA-256 sums published with v1.67.1 (air_1.67.1_checksums.txt). A
+# `go install …@version` resolved Air's dependencies at build time instead.
+ARG TARGETARCH=amd64
+ARG AIR_VERSION=1.67.1
+RUN set -eu; \
+    case "${TARGETARCH}" in \
+      amd64) sum=b8a4f3016e61bbb2e482fd4e0d460de97daf2ea93f60fc774eac3da11ced6faf ;; \
+      arm64) sum=a9695e7f06b5eb8d871d240127c13e19b58e126406f6dcf9b2a883c890b91181 ;; \
+      *) echo "no Air binary for ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /usr/local/bin/air \
+      "https://github.com/air-verse/air/releases/download/v${AIR_VERSION}/air_${AIR_VERSION}_linux_${TARGETARCH}"; \
+    echo "${sum}  /usr/local/bin/air" | sha256sum -c -; \
+    chmod 0755 /usr/local/bin/air
 
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files from services/mddbd
+# Copy go mod files from services/mddbd, and the vendored bbolt that go.mod
+# replaces go.etcd.io/bbolt with (#333): without it `go mod download` fails.
 COPY services/mddbd/go.mod services/mddbd/go.sum ./
+COPY services/mddbd/third_party/bbolt/ ./third_party/bbolt/
 
 # Download dependencies
 RUN go mod download

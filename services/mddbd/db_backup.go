@@ -1,10 +1,10 @@
 package main
 
 import (
+	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	bolt "go.etcd.io/bbolt"
@@ -30,34 +30,37 @@ import (
 // serving, before a restart finds out. MDDB_BACKUP_VERIFY=false skips the
 // check for databases too large to walk on every backup.
 //
-// dst must be safeBackupPath's output; every caller passes it. CodeQL raises
-// go/path-injection on the CreateTemp and Rename below (alerts #62, #63) for
-// the reason given at copyFile in util.go: it does not model safeBackupPath's
-// symlink-resolved filepath.Rel check as a barrier. Dismissed as false
-// positives, as the copyFile alerts were.
+// dst must be safeBackupPath's output; every caller passes it. The writes
+// below go through an os.Root on dst's directory: the temporary file, the
+// rename and the collection files cannot leave that directory, even through
+// a symlink created in it after safeBackupPath checked the path.
 func (s *Server) backupTo(dst string) error {
-	if err := backupFile(s.DB, &s.restoreMu, dst); err != nil {
+	dir, err := os.OpenRoot(filepath.Dir(dst)) // NOSONAR gosecurity:S2083 -- dst is safeBackupPath's output, confined to the backup directory
+	if err != nil {
+		return err
+	}
+	defer func() { _ = dir.Close() }()
+	name := filepath.Base(dst)
+	if err := backupFile(s.DB, &s.restoreMu, dir, name); err != nil {
 		return err
 	}
 	// #336: with one file per collection, each collection file is copied
 	// into "<dst>.d/" under its own name. Every file is a consistent copy;
 	// the files are copied one after another, not at one instant.
 	if cf := s.collectionStore(); cf != nil {
-		dir := collectionDir(dst)
-		// dst has been through safeBackupPath; the derived directory is
-		// checked again so it cannot climb out of where dst points.
-		if strings.Contains(dir, "..") {
-			return fmt.Errorf("invalid backup path %q", dst)
-		}
-		if err := os.MkdirAll(dir, 0o700); err != nil { // #nosec G703 -- dst is safeBackupPath's output
+		sub := filepath.Base(collectionDir(name))
+		_ = dir.Mkdir(sub, 0o700) // already there is fine; OpenRoot reports anything else
+		subDir, err := dir.OpenRoot(sub)
+		if err != nil {
 			return err
 		}
+		defer func() { _ = subDir.Close() }()
 		for _, c := range cf.names() {
 			db := cf.get(c)
 			if db == nil {
 				continue
 			}
-			if err := backupFile(db, &s.restoreMu, filepath.Join(dir, collectionFileName(c))); err != nil {
+			if err := backupFile(db, &s.restoreMu, subDir, collectionFileName(c)); err != nil {
 				return fmt.Errorf("collection %q: %w", c, err)
 			}
 		}
@@ -65,15 +68,15 @@ func (s *Server) backupTo(dst string) error {
 	return nil
 }
 
-// backupFile writes a consistent copy of db to dst, verified before it
-// replaces dst.
-func backupFile(db *bolt.DB, restoreMu *sync.RWMutex, dst string) error {
-	tmp, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".tmp-*")
+// backupFile writes a consistent copy of db to name in dir, verified before
+// it replaces name.
+func backupFile(db *bolt.DB, restoreMu *sync.RWMutex, dir *os.Root, name string) error {
+	tmpName := name + ".tmp-" + rand.Text()
+	tmp, err := dir.OpenFile(tmpName, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600) // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 	if err != nil {
 		return err
 	}
-	name := tmp.Name()
-	defer func() { _ = os.Remove(name) }() // #nosec G703 -- os.CreateTemp produced name; no-op once renamed
+	defer func() { _ = dir.Remove(tmpName) }() // a no-op once renamed
 
 	restoreMu.RLock()
 	err = db.View(func(tx *bolt.Tx) error {
@@ -92,10 +95,10 @@ func backupFile(db *bolt.DB, restoreMu *sync.RWMutex, dst string) error {
 	}
 
 	if os.Getenv("MDDB_BACKUP_VERIFY") != "false" {
-		if err := verifyDatabase(name); err != nil {
+		if err := verifyDatabase(filepath.Join(dir.Name(), tmpName)); err != nil {
 			return fmt.Errorf("the live database is damaged — a consistent copy of it %w; "+
 				"take no restart until it is repaired (mddbd -repair-db, see docs/BACKUP.md)", err)
 		}
 	}
-	return os.Rename(name, dst) // #nosec G703 -- dst is safeBackupPath's output
+	return dir.Rename(tmpName, name) // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 }

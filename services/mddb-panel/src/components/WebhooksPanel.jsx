@@ -36,7 +36,7 @@ export default function WebhooksPanel() {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, []);
 
   const handleDelete = async (id) => {
@@ -49,7 +49,7 @@ export default function WebhooksPanel() {
     }
   };
 
-  const collectionNames = Object.keys(collectionConfigs || {}).sort();
+  const collectionNames = Object.keys(collectionConfigs || {}).sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="flex flex-col h-full">
@@ -193,8 +193,9 @@ function WebhookForm({ collectionNames, onClose, onSaved }) {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+              <label htmlFor="webhook-url" className="block text-sm font-medium text-gray-700 mb-1">URL</label>
               <input
+                id="webhook-url"
                 type="url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
@@ -218,8 +219,9 @@ function WebhookForm({ collectionNames, onClose, onSaved }) {
             />
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Collection filter</label>
+              <label htmlFor="webhook-collection" className="block text-sm font-medium text-gray-700 mb-1">Collection filter</label>
               <select
+                id="webhook-collection"
                 value={collection}
                 onChange={(e) => setCollection(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"

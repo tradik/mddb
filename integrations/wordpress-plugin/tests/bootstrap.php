@@ -41,6 +41,9 @@ if ( ! class_exists( 'WP_Post' ) ) {
 if ( ! class_exists( 'WP_Term' ) ) {
 	require_once __DIR__ . '/stubs/class-wp-term.php';
 }
+if ( ! class_exists( 'WP_Query' ) ) {
+	require_once __DIR__ . '/stubs/class-wp-query.php';
+}
 require_once __DIR__ . '/stubs/class-wp-rest-request.php';
 require_once __DIR__ . '/stubs/wp-functions.php';
 

@@ -23,7 +23,7 @@ export function renderMarkdown(text: string): string {
   // content comes from the server/LLM (prompt injection). escapeHtml already
   // ran, so the URL can't break out of the href attribute — only the scheme
   // is the risk — hence an allowlist that drops the link but keeps the text.
-  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label, url) => {
+  html = replaceLinks(html, (label, url) => {
     if (!isSafeUrl(url)) {
       return label;
     }
@@ -34,6 +34,38 @@ export function renderMarkdown(text: string): string {
   html = html.replace(/\n/g, '<br>');
 
   return html;
+}
+
+/// replaceLinks rewrites every [label](url) — the matches of
+/// /\[([^\]]+)\]\(([^)]+)\)/g, leftmost first — in one pass. The regex
+/// backtracks on input such as many "[" with no "](": each position retried
+/// the rest of the text. Here a "[" whose "]" is not followed by "(" skips to
+/// that "]", since every "[" before it would end at the same place, and with
+/// no ")" left nothing further can match.
+export function replaceLinks(html: string, render: (label: string, url: string) => string): string {
+  let out = '';
+  let i = 0;
+  while (i < html.length) {
+    const open = html.indexOf('[', i);
+    if (open < 0) break;
+    const close = html.indexOf(']', open + 1);
+    if (close < 0) break;
+    if (close === open + 1 || html[close + 1] !== '(') {
+      out += html.slice(i, close + 1);
+      i = close + 1;
+      continue;
+    }
+    const end = html.indexOf(')', close + 2);
+    if (end < 0) break;
+    if (end === close + 2) {
+      out += html.slice(i, end + 1);
+      i = end + 1;
+      continue;
+    }
+    out += html.slice(i, open) + render(html.slice(open + 1, close), html.slice(close + 2, end));
+    i = end + 1;
+  }
+  return out + html.slice(i);
 }
 
 const SAFE_SCHEME_RE = /^(https?|mailto):/i;

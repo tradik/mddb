@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Backups are written through `os.Root`.** The backup path was checked by
+  `safeBackupPath` and then written by name, so a symlink created in the
+  backup directory between the check and the write could lead the temporary
+  file, the rename or the collection files out of it. They now go through an
+  `os.Root` on the target directory, and the path check itself reads the
+  filesystem only through an `os.Root` on the backup directory. SonarCloud
+  reported both as blockers (path traversal, filesystem oracle) and failed the
+  quality gate.
+- **A backup could not target a directory, but tried to.** `to` naming the
+  backup directory itself, or a directory in it, passed the check; the
+  backup's temporary file was then created beside the target — for the
+  backup directory, in the directory above it — before the rename failed.
+  Any existing target that is not a regular file is now refused.
+- **The Airbyte destination image installs from a hashed lock file, wheels
+  only.** It installed version ranges from `requirements.txt`, so a build could
+  pick up any new release and run an sdist's setup script; `make lock`
+  regenerates `requirements.lock`.
+
+### Fixed
+
+- **`services/mddbd/Dockerfile.dev` did not build since 2.18.2.** `go.mod`
+  replaces bbolt with `./third_party/bbolt` (#333), which the dev image copied
+  only after `go mod download`. Air is now the release binary checked against
+  its published SHA-256 rather than a `go install` resolving its dependencies
+  at build time. `docs/DOCKER.md` gave the wrong build context for it and named a make target that does not exist (`make dev-build` is the one).
+- **The chat widget's link rendering was a regex that backtracks** on text
+  with many `[` and no `](`; a message could stall the page. A linear scanner
+  replaces it, checked against the regex on 5,000 random inputs.
+- **Chrome extension:** a refresh request from the popup that failed was never
+  answered, so the popup waited on it; it now gets `status: null`.
+- Panel: form labels are tied to their controls (screen readers announced
+  unlabelled fields), number inputs parse with `Number.parseInt(…, 10)`,
+  collection names sort with `localeCompare`; Grafana data source and the
+  Chrome extension's package script likewise. GitHub Action and Chrome
+  extension: trailing slashes are trimmed without a backtracking regex
+  (the action's `dist/` is rebuilt). Proto scripts use `[[ ]]`. The GTM
+  `<iframe>` on the docs site has a title.
+- WordPress plugin tests: the `apply_filters` stub had two parameters where
+  WordPress's takes any number, and `WP_Query` was defined by `eval` in two
+  versions, of which only the first one run existed; it is a stub file now.
+
 ## [2.18.6] - 2026-10-27
 
 ### Added

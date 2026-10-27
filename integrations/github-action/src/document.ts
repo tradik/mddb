@@ -44,9 +44,7 @@ const CODE_FENCE_LANGS: Record<string, string> = {
 };
 
 export function slugifyPath(relativePath: string): string {
-  return relativePath
-    .replace(/\\/g, '/')
-    .replace(/^\/+|\/+$/g, '')
+  return trimSlashes(relativePath.replaceAll('\\', '/'))
     .toLowerCase()
     .replace(/[^a-z0-9._/-]+/g, '-')
     .replace(/-+/g, '-')
@@ -65,7 +63,9 @@ export function deriveKey(strategy: KeyStrategy, relativePath: string, content: 
     case 'filename':
       return basenameKey(relativePath);
     case 'hash':
-      return crypto.createHash('sha1').update(content).digest('hex');
+      // A document key, not a security check; changing the algorithm would
+      // change every key already stored with keyStrategy: hash.
+      return crypto.createHash('sha1').update(content).digest('hex'); // NOSONAR typescript:S4790
   }
 }
 
@@ -74,13 +74,13 @@ export function buildContentMd(relativePath: string, raw: string): string {
   if (MARKDOWN_EXT.has(ext)) return raw;
   if (TEXT_EXT.has(ext)) return raw;
   const lang = CODE_FENCE_LANGS[ext] ?? '';
-  return '```' + lang + '\n' + raw.replace(/```/g, '` ``') + '\n```\n';
+  return '```' + lang + '\n' + raw.replaceAll('```', '` ``') + '\n```\n';
 }
 
 export function buildMeta(opts: BuildDocumentOptions, size: number): Record<string, string[]> {
   const meta: Record<string, string[]> = {
     source: ['github-action'],
-    path: [opts.relativePath.replace(/\\/g, '/')],
+    path: [opts.relativePath.replaceAll('\\', '/')],
     extension: [path.extname(opts.relativePath).toLowerCase() || '(none)'],
     size: [String(size)],
   };
@@ -101,4 +101,13 @@ export async function buildDocument(opts: BuildDocumentOptions): Promise<MddbDoc
     meta: buildMeta(opts, Buffer.byteLength(raw, 'utf8')),
     contentMd: buildContentMd(opts.relativePath, raw),
   };
+}
+
+/** Strips leading and trailing slashes without a regex (`/^\/+|\/+$/` backtracks). */
+function trimSlashes(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s[start] === '/') start++;
+  while (end > start && s[end - 1] === '/') end--;
+  return s.slice(start, end);
 }

@@ -95,7 +95,7 @@ if command -v python3 &> /dev/null; then
 
     # __init__.py is hand-written (it exports MddbClient); only create it if
     # the package is being generated from scratch.
-    [ -f clients/python/mddb_client/__init__.py ] || touch clients/python/mddb_client/__init__.py
+    [[ -f clients/python/mddb_client/__init__.py ]] || touch clients/python/mddb_client/__init__.py
     
     echo "  ✅ Python code generated in clients/python/mddb_client/"
 else

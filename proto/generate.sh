@@ -46,7 +46,7 @@ if command -v buf &> /dev/null; then
     # `import mddb_client` had never worked. Rewrite it to a relative import.
     echo "📎 Making the Python stub's import relative (mddb_pb2_grpc.py)"
     python_grpc="clients/python/mddb_client/mddb_pb2_grpc.py"
-    if [ -f "${python_grpc}" ]; then
+    if [[ -f "${python_grpc}" ]]; then
         sed -i 's/^import mddb_pb2 as mddb__pb2$/from . import mddb_pb2 as mddb__pb2/' "${python_grpc}"
     fi
 

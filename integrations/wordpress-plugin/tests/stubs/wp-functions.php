@@ -174,7 +174,9 @@ if ( ! function_exists( 'get_site_transient' ) ) {
 	function get_site_transient( $name ) { unset( $name ); return false; }
 }
 if ( ! function_exists( 'apply_filters' ) ) {
-	function apply_filters( $hook, $value ) { unset( $hook ); return $value; }
+	// WordPress's is apply_filters( $hook_name, $value, ...$args ): filters
+	// receive extra arguments, as mddb_sync_meta receives the post.
+	function apply_filters( $hook, $value, ...$args ) { unset( $hook, $args ); return $value; }
 }
 if ( ! function_exists( 'apply_filters_ref_array' ) ) {
 	function apply_filters_ref_array( $hook, $args ) {

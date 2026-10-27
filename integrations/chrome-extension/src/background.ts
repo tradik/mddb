@@ -54,7 +54,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return false;
   }
   if (message && message.type === 'mddb:refresh') {
-    refreshStats(badgeDeps).then((status) => sendResponse({ status }));
+    refreshStats(badgeDeps).then(
+      (status) => sendResponse({ status }),
+      () => sendResponse({ status: null }), // the popup shows "unknown" rather than waiting forever
+    );
     return true;
   }
   return false;

@@ -152,3 +152,51 @@ func TestAPathInTheConfiguredSpellingOfTheJailIsInside(t *testing.T) {
 		}
 	}
 }
+
+// A backup aimed at the jail itself, or at a directory in it, is refused.
+// Before 2.18.7 it was accepted, and the backup's temporary file was created
+// beside the target: for the jail, in the directory above it.
+func TestABackupCannotTargetADirectory(t *testing.T) {
+	jail := t.TempDir()
+	t.Setenv("MDDB_BACKUP_DIR", jail)
+	if err := os.Mkdir(filepath.Join(jail, "sub"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{".", "sub", jail} {
+		if _, err := safeBackupPath(name, false); err == nil || !strings.Contains(err.Error(), "not a regular file") {
+			t.Errorf("%q: %v", name, err)
+		}
+	}
+}
+
+// A directory inside the jail that is a symlink out of it is refused at the
+// open, for a file that exists there and for one that does not yet.
+func TestASymlinkedDirectoryOutOfTheJailIsRefused(t *testing.T) {
+	jail, outside := t.TempDir(), t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "x.db"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(jail, "out")); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+	t.Setenv("MDDB_BACKUP_DIR", jail)
+	for _, c := range []struct {
+		name            string
+		requireExisting bool
+	}{{"out/x.db", true}, {"out/x.db", false}, {"out/new.db", false}} {
+		if _, err := safeBackupPath(c.name, c.requireExisting); err == nil {
+			t.Errorf("%s (requireExisting=%v) through a symlink out of the jail was accepted", c.name, c.requireExisting)
+		}
+	}
+	// A missing parent inside the jail is reported as such.
+	if _, err := safeBackupPath("missing-dir/new.db", false); err == nil || !strings.Contains(err.Error(), "parent") {
+		t.Errorf("missing parent: %v", err)
+	}
+	// A parent that is a file, not a directory.
+	if err := os.WriteFile(filepath.Join(jail, "file"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := safeBackupPath("file/new.db", false); err == nil {
+		t.Error("a file as the parent directory was accepted")
+	}
+}

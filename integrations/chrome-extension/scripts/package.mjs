@@ -57,9 +57,9 @@ async function zipDir(srcDir, outPath) {
   let offset = 0;
   const out = createWriteStream(outPath);
 
-  for (const file of files.sort()) {
+  for (const file of files.sort((a, b) => a.localeCompare(b))) {
     const raw = await readFile(file);
-    const name = relative(srcDir, file).split(/\\|\//).join('/');
+    const name = relative(srcDir, file).replaceAll('\\', '/');
     const nameBuf = Buffer.from(name, 'utf8');
     const compressed = await deflate(raw);
     const crc = crc32(raw);

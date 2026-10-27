@@ -86,6 +86,11 @@ make build test spec
 make check URL=https://mddb.tradik.com
 ```
 
+The image installs from `requirements.lock`, which pins every package with
+its hashes and is installed wheels-only (`--only-binary :all:
+--require-hashes`): no package's setup script runs during the build. After
+changing `requirements.txt`, run `make lock` and commit both files.
+
 ## Registering in the Airbyte UI
 
 The connector is "custom" — Airbyte runs it from a Docker image. With a local Airbyte OSS instance:

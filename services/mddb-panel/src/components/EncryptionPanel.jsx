@@ -31,7 +31,7 @@ export default function EncryptionPanel() {
   };
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, []);
 
   const startRotation = async () => {

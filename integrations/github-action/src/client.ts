@@ -42,7 +42,7 @@ export class MddbClient {
   private readonly sleep: (ms: number) => Promise<void>;
 
   constructor(opts: MddbClientOptions) {
-    this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
+    this.baseUrl = trimTrailingSlashes(opts.baseUrl);
     this.apiKey = opts.apiKey;
     this.timeoutMs = Math.max(1, opts.timeoutSeconds) * 1000;
     this.fetchImpl = opts.fetchImpl ?? fetch;
@@ -142,4 +142,11 @@ export class MddbClient {
 /* istanbul ignore next — exercised in production only; tests inject sleepImpl. */
 function defaultSleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Strips trailing slashes without a regex (a `/\/+$/` backtracks). */
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
 }

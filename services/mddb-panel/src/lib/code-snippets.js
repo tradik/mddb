@@ -21,7 +21,7 @@ export function jsonToPHP(obj, indent = 0) {
   // the generated snippet is broken at best, and at worst the rest of the
   // value is read as code. Order matters: escaping the quote first would then
   // double the backslash this step adds.
-  if (typeof obj === 'string') return `'${obj.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  if (typeof obj === 'string') return `'${obj.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
 
   if (Array.isArray(obj)) {
     if (obj.length === 0) return '[]';
@@ -43,7 +43,7 @@ export function jsonToPython(obj, indent) {
   if (typeof obj === 'boolean') return obj ? 'True' : 'False';
   if (typeof obj === 'number') return String(obj);
   // Backslash first, then the quote — same reasoning as jsonToPHP above.
-  if (typeof obj === 'string') return `"${obj.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  if (typeof obj === 'string') return `"${obj.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 
   if (Array.isArray(obj)) {
     if (obj.length === 0) return '[]';
