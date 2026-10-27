@@ -116,7 +116,7 @@ function ftsFrame(refId: string, payload: FtsResponse): DataFrame {
 
 function statsFrame(refId: string, payload: StatsResponse): DataFrame {
   const collections = payload?.collections ?? {};
-  const names = Object.keys(collections).sort();
+  const names = Object.keys(collections).sort((a, b) => a.localeCompare(b));
   return createDataFrame({
     refId,
     name: 'mddb / stats',

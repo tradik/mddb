@@ -35,31 +35,6 @@ final class BulkTest extends TestCase {
 		parent::tearDown();
 	}
 
-	/**
-	 * Tiny stub that drives Bulk through a recorded `posts` array.
-	 *
-	 * @param array<int,WP_Post> $posts
-	 */
-	private function bulkWith( array $posts, int $foundPosts, Sync $sync ): Bulk {
-		Functions\when( 'get_option' )->justReturn( [ 'url' => 'https://mddb', 'postTypes' => [ 'post' ] ] );
-
-		// Brain Monkey can't easily stub `new WP_Query`. Hand-roll a tiny stub
-		// class with the public surface Bulk reads.
-		if ( ! class_exists( '\\WP_Query', false ) ) {
-			eval( 'namespace { class WP_Query { public array $posts = []; public int $found_posts = 0; public function __construct( $args = [] ) {} } }' );
-		}
-		$GLOBALS['__mddb_bulk_test_posts']       = $posts;
-		$GLOBALS['__mddb_bulk_test_found_posts'] = $foundPosts;
-		// Override the stub on each construct so we don't need a static queue.
-		\WP_Query::__set_state ?? null; // no-op anchor
-		$query              = new \WP_Query();
-		$query->posts       = $posts;
-		$query->found_posts = $foundPosts;
-		$_GLOBALS['__last'] = $query;
-
-		return new Bulk( new Settings(), $sync );
-	}
-
 	public function testEmptyPostTypesShortCircuits(): void {
 		Functions\when( 'get_option' )->justReturn( [ 'url' => 'https://mddb', 'postTypes' => [] ] );
 		$sync = $this->createMock( Sync::class );
@@ -74,10 +49,6 @@ final class BulkTest extends TestCase {
 	public function testProcessBatchCountsSuccessFailureSkip(): void {
 		Functions\when( 'get_option' )->justReturn( [ 'url' => 'https://mddb', 'postTypes' => [ 'post' ] ] );
 
-		// Build a stub WP_Query.
-		if ( ! class_exists( '\\WP_Query', false ) ) {
-			eval( 'namespace { class WP_Query { public array $posts = []; public int $found_posts = 0; public function __construct( $args = [] ) { global $__mddb_test_query_state; $this->posts = $__mddb_test_query_state[\'posts\'] ?? []; $this->found_posts = $__mddb_test_query_state[\'found\'] ?? 0; } } }' );
-		}
 		$postA = new WP_Post( [ 'ID' => 1 ] );
 		$postB = new WP_Post( [ 'ID' => 2 ] );
 		$postC = new WP_Post( [ 'ID' => 3 ] );
@@ -106,9 +77,6 @@ final class BulkTest extends TestCase {
 
 	public function testProcessBatchNotDoneWhenMorePagesRemain(): void {
 		Functions\when( 'get_option' )->justReturn( [ 'url' => 'https://mddb', 'postTypes' => [ 'post' ] ] );
-		if ( ! class_exists( '\\WP_Query', false ) ) {
-			eval( 'namespace { class WP_Query { public array $posts = []; public int $found_posts = 0; public function __construct( $args = [] ) { global $__mddb_test_query_state; $this->posts = $__mddb_test_query_state[\'posts\'] ?? []; $this->found_posts = $__mddb_test_query_state[\'found\'] ?? 0; } } }' );
-		}
 		$page = array_map( static fn( int $i ) => new WP_Post( [ 'ID' => $i ] ), range( 1, 25 ) );
 		$GLOBALS['__mddb_test_query_state'] = [ 'posts' => $page, 'found' => 100 ];
 

@@ -187,7 +187,7 @@ export default function HybridSearchPanel() {
                 min={0}
                 max={100}
                 value={Math.round(hybridAlpha * 100)}
-                onChange={(e) => setHybridAlpha(parseInt(e.target.value) / 100)}
+                onChange={(e) => setHybridAlpha(Number.parseInt(e.target.value, 10) / 100)}
                 className="w-full accent-primary-600"
               />
               <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
@@ -207,7 +207,7 @@ export default function HybridSearchPanel() {
                 min={1}
                 max={1000}
                 value={hybridRrfK}
-                onChange={(e) => setHybridRrfK(parseInt(e.target.value) || 60)}
+                onChange={(e) => setHybridRrfK(Number.parseInt(e.target.value, 10) || 60)}
                 className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
@@ -231,7 +231,7 @@ export default function HybridSearchPanel() {
                 max={100}
                 value={Math.round(hybridSignals.diversity * 100)}
                 onChange={(e) =>
-                  setHybridSignals({ ...hybridSignals, diversity: parseInt(e.target.value) / 100 })
+                  setHybridSignals({ ...hybridSignals, diversity: Number.parseInt(e.target.value, 10) / 100 })
                 }
                 className="w-full accent-primary-600"
                 aria-describedby="signal-diversity-help"
@@ -250,7 +250,7 @@ export default function HybridSearchPanel() {
                 max={100}
                 value={Math.round(hybridSignals.proximity * 100)}
                 onChange={(e) =>
-                  setHybridSignals({ ...hybridSignals, proximity: parseInt(e.target.value) / 100 })
+                  setHybridSignals({ ...hybridSignals, proximity: Number.parseInt(e.target.value, 10) / 100 })
                 }
                 className="w-full accent-primary-600"
                 aria-describedby="signal-proximity-help"
@@ -269,7 +269,7 @@ export default function HybridSearchPanel() {
                 max={100}
                 value={Math.round(hybridSignals.freshness * 100)}
                 onChange={(e) =>
-                  setHybridSignals({ ...hybridSignals, freshness: parseInt(e.target.value) / 100 })
+                  setHybridSignals({ ...hybridSignals, freshness: Number.parseInt(e.target.value, 10) / 100 })
                 }
                 className="w-full accent-primary-600"
                 aria-describedby="signal-freshness-help"
@@ -350,7 +350,7 @@ export default function HybridSearchPanel() {
               min={1}
               max={50}
               value={hybridTopK}
-              onChange={(e) => setHybridTopK(parseInt(e.target.value))}
+              onChange={(e) => setHybridTopK(Number.parseInt(e.target.value, 10))}
               className="w-full accent-primary-600"
             />
           </div>
@@ -363,7 +363,7 @@ export default function HybridSearchPanel() {
               min={0}
               max={100}
               value={Math.round(hybridThreshold * 100)}
-              onChange={(e) => setHybridThreshold(parseInt(e.target.value) / 100)}
+              onChange={(e) => setHybridThreshold(Number.parseInt(e.target.value, 10) / 100)}
               className="w-full accent-primary-600"
             />
           </div>
@@ -371,7 +371,7 @@ export default function HybridSearchPanel() {
             <label className="block text-xs font-medium text-gray-600 mb-1">Typo Tolerance</label>
             <select
               value={hybridFuzzy}
-              onChange={(e) => setHybridFuzzy(parseInt(e.target.value))}
+              onChange={(e) => setHybridFuzzy(Number.parseInt(e.target.value, 10))}
               className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value={0}>Off</option>

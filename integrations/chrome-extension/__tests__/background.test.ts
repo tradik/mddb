@@ -81,6 +81,19 @@ describe('background service worker wiring', () => {
     expect(sendResponse).toHaveBeenCalled();
   });
 
+  it('answers a refresh message even when the refresh fails', async () => {
+    jest.doMock('../src/refresh', () => ({
+      refreshStats: () => Promise.reject(new Error('storage unavailable')),
+    }));
+    await import('../src/background');
+    const sendResponse = jest.fn();
+    const sender = { id: chrome.runtime.id };
+    listeners.runtimeMessage[0]({ type: 'mddb:refresh' }, sender, sendResponse);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sendResponse).toHaveBeenCalledWith({ status: null });
+    jest.dontMock('../src/refresh');
+  });
+
   it('returns false for unknown messages', async () => {
     await import('../src/background');
     const sendResponse = jest.fn();

@@ -8,7 +8,7 @@ TAG        := 0.1.1
 URL        ?= https://mddb.tradik.com
 VENV       := .venv
 
-.PHONY: help build push test spec check clean
+.PHONY: help build push test spec check clean lock
 
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
@@ -34,6 +34,13 @@ check: ## Run check command (URL=<mddb base url>)
 	@printf '{"mddbUrl":"%s"}' "$(URL)" | \
 	docker run --rm -i $(IMAGE):$(TAG) check --config /dev/stdin | \
 	python3 -m json.tool
+
+lock: ## Regenerate requirements.lock (hashes) from requirements.txt, in the image's Python
+	docker run --rm -v "$$PWD":/src -w /src python:3.13-slim sh -c '\
+	  pip install -q --root-user-action=ignore pip-tools && \
+	  pip-compile -q --generate-hashes --allow-unsafe --strip-extras --no-header \
+	    --output-file requirements.lock requirements.txt && \
+	  chown $(shell id -u):$(shell id -g) requirements.lock'
 
 clean: ## Remove local venv, caches, coverage
 	rm -rf $(VENV) .pytest_cache .coverage htmlcov destination_mddb/__pycache__ unit_tests/__pycache__

@@ -88,9 +88,10 @@ docker build -t mddb:latest -f services/mddbd/Dockerfile services/mddbd
 
 **Build**:
 ```bash
-make docker-build-dev
+make dev-build    # every dev image, through docker-compose.dev.yml
 # or
-docker build -t mddb:dev -f services/mddbd/Dockerfile.dev services/mddbd
+# From the repository root: the Dockerfile copies services/mddbd/... paths.
+docker build -t mddb:dev -f services/mddbd/Dockerfile.dev .
 ```
 
 ## Production Deployment

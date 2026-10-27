@@ -88,7 +88,7 @@ func DetectLocalProvider(ctx context.Context) *DetectedProvider {
 	url := strings.TrimSuffix(envOr("OLLAMA_HOST", DefaultOllamaURL), "/")
 	// OLLAMA_HOST is conventionally written without a scheme.
 	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		url = "http://" + url
+		url = "http://" + url // NOSONAR go:S5332 -- OLLAMA_HOST is a local Ollama, which serves plain HTTP; a scheme in the variable is kept as given
 	}
 
 	models, err := listOllamaModels(ctx, url)

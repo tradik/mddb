@@ -74,7 +74,7 @@ export function assertKeyPrefix(value: string): string {
 }
 
 export function normaliseUrl(url: string): string {
-  const trimmed = url.trim().replace(/\/+$/, '');
+  const trimmed = trimTrailingSlashes(url.trim());
   if (!/^https?:\/\//i.test(trimmed)) {
     throw new Error(`Invalid mddb-url: "${url}". Must start with http:// or https://.`);
   }
@@ -108,4 +108,11 @@ export function readInputs(getInput: (name: string) => string = core.getInput): 
     dryRun: parseBool(getInput('dry-run') || 'false', false),
     failOnError: parseBool(getInput('fail-on-error') || 'true', true),
   };
+}
+
+/** Strips trailing slashes without a regex (a `/\/+$/` backtracks). */
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
 }

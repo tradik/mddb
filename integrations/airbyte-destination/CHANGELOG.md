@@ -1,5 +1,13 @@
 # Changelog — destination-mddb
 
+## [Unreleased]
+
+### Security
+- The image installs from `requirements.lock`, every package pinned with its
+  hashes, wheels only (`--only-binary :all: --require-hashes`). It installed
+  `requirements.txt` ranges, so a build could pick up any new release, and an
+  sdist's setup script could run during it. `make lock` regenerates the lock.
+
 ## [0.1.1] — 2026-05-17
 
 ### Changed

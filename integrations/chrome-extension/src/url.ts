@@ -18,7 +18,7 @@ export function normalizeServerUrl(input: string): string {
   }
 
   // Strip trailing slash from pathname so we can concatenate paths safely.
-  const path = parsed.pathname.replace(/\/+$/, '');
+  const path = trimTrailingSlashes(parsed.pathname);
   return `${parsed.protocol}//${parsed.host}${path}`;
 }
 
@@ -34,4 +34,11 @@ export function derivePanelUrl(serverUrl: string, override?: string | null): str
 
 export function originOf(url: string): string {
   return new URL(url).origin;
+}
+
+/** Strips trailing slashes without a regex (a `/\/+$/` backtracks). */
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
 }

@@ -60,7 +60,7 @@ func hostExempt(host string) bool {
 // RFC 6890 192.0.0.0/24, RFC 2544 benchmarking 198.18.0.0/15 and the limited
 // broadcast address.
 var extraDenyCIDRs = func() []*net.IPNet {
-	cidrs := []string{"100.64.0.0/10", "192.0.0.0/24", "198.18.0.0/15", "255.255.255.255/32"}
+	cidrs := []string{"100.64.0.0/10", "192.0.0.0/24", "198.18.0.0/15", "255.255.255.255/32"} // NOSONAR go:S1313 -- the ranges outbound requests are refused, not addresses connected to
 	out := make([]*net.IPNet, 0, len(cidrs))
 	for _, c := range cidrs {
 		_, n, err := net.ParseCIDR(c)

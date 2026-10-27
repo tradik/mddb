@@ -104,7 +104,7 @@ export default function VectorSpacePanel() {
 
       <div className="flex flex-wrap gap-3 mb-4">
         <label className="flex flex-col text-xs font-medium text-gray-700">
-          Collection
+          <span>Collection</span>
           <input
             type="text"
             value={collection}
@@ -114,7 +114,7 @@ export default function VectorSpacePanel() {
           />
         </label>
         <label className="flex flex-col text-xs font-medium text-gray-700">
-          Sample (max 2000)
+          <span>Sample (max 2000)</span>
           <input
             type="number"
             min="10"
@@ -125,7 +125,7 @@ export default function VectorSpacePanel() {
           />
         </label>
         <label className="flex flex-col text-xs font-medium text-gray-700 flex-1 min-w-48">
-          Query overlay (optional)
+          <span>Query overlay (optional)</span>
           <input
             type="text"
             value={query}

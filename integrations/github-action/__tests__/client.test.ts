@@ -158,3 +158,14 @@ describe('MddbClient.ping', () => {
     await expect(client.ping()).rejects.toThrow(/Unexpected/);
   });
 });
+
+describe('MddbClient base URL', () => {
+  it('drops trailing slashes from the base URL', async () => {
+    const { fetchImpl, calls } = makeFetch([{ status: 200, body: '{}' }]);
+    const client = new MddbClient(
+      clientOpts({ baseUrl: 'https://mddb.example.com///', fetchImpl }),
+    );
+    await client.addDocument(doc);
+    expect(calls[0][0]).toBe('https://mddb.example.com/v1/add');
+  });
+});

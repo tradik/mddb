@@ -476,7 +476,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Retrieval profile (RAG-001, v2.12.0+) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Retrieval Defaults</label>
+                <span className="block text-sm font-medium text-gray-700 mb-1">Retrieval Defaults</span>
                 <p className="text-xs text-gray-500 mb-2">
                   Search settings stored with the collection instead of repeated by every client.
                   A request that passes its own value always wins; leave a field empty to keep MDDB&apos;s default.
@@ -484,8 +484,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Default search type</label>
+                    <label htmlFor="cc-search-type" className="block text-xs text-gray-500 mb-0.5">Default search type</label>
                     <select
+                      id="cc-search-type"
                       value={retrievalSearchType}
                       onChange={(e) => setRetrievalSearchType(e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -498,8 +499,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Results per search (topK)</label>
+                    <label htmlFor="cc-top-k" className="block text-xs text-gray-500 mb-0.5">Results per search (topK)</label>
                     <input
+                      id="cc-top-k"
                       type="number"
                       min="0"
                       max="1000"
@@ -511,8 +513,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Granularity</label>
+                    <label htmlFor="cc-granularity" className="block text-xs text-gray-500 mb-0.5">Granularity</label>
                     <select
+                      id="cc-granularity"
                       value={retrievalMode}
                       onChange={(e) => setRetrievalMode(e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -528,8 +531,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Hybrid fusion</label>
+                    <label htmlFor="cc-hybrid-fusion" className="block text-xs text-gray-500 mb-0.5">Hybrid fusion</label>
                     <select
+                      id="cc-hybrid-fusion"
                       value={hybridStrategy}
                       onChange={(e) => setHybridStrategy(e.target.value)}
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -561,8 +565,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   )}
 
                   <div>
-                    <label className="block text-xs text-gray-500 mb-0.5">Context budget (tokens)</label>
+                    <label htmlFor="cc-context-budget" className="block text-xs text-gray-500 mb-0.5">Context budget (tokens)</label>
                     <input
+                      id="cc-context-budget"
                       type="number"
                       min="0"
                       value={contextTokenBudget}
@@ -579,7 +584,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* Response prompt (RAG-002, v2.12.0+) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Answer Formatting</label>
+                <label htmlFor="cc-response-prompt" className="block text-sm font-medium text-gray-700 mb-1">Answer Formatting</label>
                 <p className="text-xs text-gray-500 mb-2">
                   How answers drawn from this collection should be shaped — numbered steps for runbooks,
                   code blocks for API docs. Applied automatically by the chat service and handed to MCP agents
@@ -588,6 +593,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   <code className="px-1 bg-gray-100 rounded">{'{{query}}'}</code> as placeholders.
                 </p>
                 <textarea
+                  id="cc-response-prompt"
                   value={responsePrompt}
                   onChange={(e) => setResponsePrompt(e.target.value.slice(0, 4096))}
                   rows={4}
@@ -602,7 +608,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* At-Rest Encryption (ISO 27001 A.8.24 / SOC 2 CC6.7) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">At-Rest Encryption</label>
+                <span className="block text-sm font-medium text-gray-700 mb-1">At-Rest Encryption</span>
                 <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                   <input
                     type="checkbox"
@@ -610,7 +616,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                     onChange={(e) => setEncrypted(e.target.checked)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                  Encrypt this collection (AES-256-GCM)
+                  <span>Encrypt this collection (AES-256-GCM)</span>
                 </label>
                 <p className="text-xs text-gray-400 mt-1">
                   Requires <span className="font-mono">MDDB_ENCRYPTION_KEY</span> to be set on the server. Legacy plaintext documents remain readable after enabling.

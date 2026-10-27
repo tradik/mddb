@@ -20,6 +20,11 @@ describe('slugifyPath', () => {
     expect(slugifyPath('---hello---')).toBe('hello');
   });
 
+  it('trims leading and trailing slashes', () => {
+    expect(slugifyPath('//docs/guide.md//')).toBe('docs/guide.md');
+    expect(slugifyPath('///')).toBe('');
+  });
+
   it('normalises Windows separators', () => {
     expect(slugifyPath('docs\\guide.md')).toBe('docs/guide.md');
   });

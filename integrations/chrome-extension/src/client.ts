@@ -39,8 +39,15 @@ export class MddbApiError extends Error {
 
 const DEFAULT_TIMEOUT_MS = 8000;
 
+/** Strips trailing slashes without a regex (a `/\/+$/` backtracks). */
+function trimTrailingSlashes(s: string): string {
+  let end = s.length;
+  while (end > 0 && s[end - 1] === '/') end--;
+  return s.slice(0, end);
+}
+
 function joinUrl(base: string, path: string): string {
-  const stripped = base.replace(/\/+$/, '');
+  const stripped = trimTrailingSlashes(base);
   const prefixed = path.startsWith('/') ? path : `/${path}`;
   return `${stripped}${prefixed}`;
 }

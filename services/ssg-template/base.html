@@ -33,7 +33,7 @@
 {{define "email_on"}}{{ "<!--/email_off-->" | safeHTML }}{{end}}
 
 {{define "gtm_noscript"}}
-<noscript><iframe src='https://www.googletagmanager.com/ns.html?id={{template "gtm_id" .}}' height="0" width="0"
+<noscript><iframe title="Google Tag Manager" src='https://www.googletagmanager.com/ns.html?id={{template "gtm_id" .}}' height="0" width="0"
         style="display:none;visibility:hidden"></iframe></noscript>
 {{end}}
 

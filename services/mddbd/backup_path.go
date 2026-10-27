@@ -1,7 +1,10 @@
 package main
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -88,36 +91,44 @@ func confineToDir(dir, name string, requireExisting bool, label string) (string,
 		return "", fmt.Errorf("%s path escapes its directory", label)
 	}
 
-	// Resolve symlinks for the existing portion of the path; for non-existent
-	// targets fall back to the parent directory's resolved form.
-	resolved := candidate
-	// #nosec G703 -- candidate passed withinDir above: this stat cannot reach
-	// outside the jail, which TestAnEscapingPathRevealsNothingAboutWhatItNames
-	// proves rather than asserts. gosec does not trace a sanitizer through a
-	// helper function.
-	if info, statErr := os.Lstat(candidate); statErr == nil {
-		if requireExisting && !info.Mode().IsRegular() {
-			return "", fmt.Errorf("%s path is not a regular file", label)
-		}
-		if r, rerr := filepath.EvalSymlinks(candidate); rerr == nil {
-			resolved = r
-		}
-	} else if requireExisting {
-		return "", fmt.Errorf("%s not found: %w", label, statErr)
-	} else {
-		parent := filepath.Dir(candidate)
-		pr, perr := filepath.EvalSymlinks(parent)
-		if perr != nil {
-			return "", fmt.Errorf("resolve %s parent: %w", label, perr)
-		}
-		resolved = filepath.Join(pr, filepath.Base(candidate))
+	// Everything from here goes through an os.Root on the jail. A path, or a
+	// symlink on it, that leads out of the directory is refused by the open
+	// itself, so nothing outside the jail is ever looked at — the check is
+	// the system's, not a comparison of strings made before the look.
+	jail, err := openJail(rootResolved)
+	if err != nil {
+		return "", fmt.Errorf("resolve %s dir: %w", label, err)
+	}
+	defer func() { _ = jail.Close() }()
+	rel, err := filepath.Rel(rootResolved, candidate)
+	if err != nil || !withinDir(rootResolved, candidate) {
+		rel, _ = filepath.Rel(root, candidate) // the configured spelling
 	}
 
-	if !withinDir(rootResolved, resolved) {
+	info, statErr := jail.Stat(rel) // NOSONAR gosecurity:S6549 -- rel passed withinDir, and os.Root refuses a path out of the jail
+	switch {
+	case statErr == nil:
+		// Not only on restore: a backup written to the jail itself, or to a
+		// directory in it, put its temporary file beside that directory —
+		// for the jail, outside it.
+		if !info.Mode().IsRegular() {
+			return "", fmt.Errorf("%s path is not a regular file", label)
+		}
+	case !errors.Is(statErr, fs.ErrNotExist):
 		return "", fmt.Errorf("%s path escapes its directory", label)
+	case requireExisting:
+		return "", fmt.Errorf("%s not found: %w", label, statErr)
+	default:
+		parent, perr := jail.Stat(filepath.Dir(rel)) // NOSONAR gosecurity:S6549 -- as above
+		if perr != nil || !parent.IsDir() {
+			return "", fmt.Errorf("resolve %s parent: %w", label, cmp.Or(perr, errors.New("not a directory")))
+		}
 	}
-	return resolved, nil
+	return filepath.Join(rootResolved, rel), nil
 }
+
+// openJail is os.OpenRoot; a test replaces it to reach the error path.
+var openJail = os.OpenRoot
 
 // withinDir reports whether p lies inside root, lexically. Both must already be
 // cleaned; symlinks are the caller's business.
