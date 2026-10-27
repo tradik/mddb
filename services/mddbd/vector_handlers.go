@@ -469,10 +469,13 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// A tenant user sees only the collections of its namespace, as in
+	// /v1/stats (MULTI_TENANCY.md, "Scoped listings").
+	tenant := TenantFromContext(r.Context())
 	collections := make(map[string]interface{})
 	allColls := make(map[string]bool)
 	for c, n := range docCounts {
-		if n > 0 || vectorCounts[c] > 0 {
+		if (n > 0 || vectorCounts[c] > 0) && CollectionInTenant(tenant, c) {
 			allColls[c] = true
 		}
 	}

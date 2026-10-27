@@ -163,7 +163,7 @@ func TestExtractionIsCapped(t *testing.T) {
 // A wrong edge is worse than a missing one, so an unknown language yields
 // nothing rather than a guess.
 func TestUnknownLanguageYieldsNothing(t *testing.T) {
-	for _, lang := range []string{"", "markdown", "csv", "python", "unknown"} {
+	for _, lang := range []string{"", "markdown", "csv", "shell", "sql", "unknown"} {
 		if s := extract(lang, ".a { color: red }\nfunction f() {}"); !s.Empty() {
 			t.Errorf("language %q produced symbols: %+v", lang, s)
 		}

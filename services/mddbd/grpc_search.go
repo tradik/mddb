@@ -190,12 +190,13 @@ func (g *GRPCServer) VectorStats(ctx context.Context, req *proto.VectorStatsRequ
 		}
 	}
 
+	// A tenant user sees only its namespace, as in Stats.
+	tenant := TenantFromContext(ctx)
 	allColls := make(map[string]bool)
 	for c := range docCounts {
-		allColls[c] = true
-	}
-	for c := range vectorCounts {
-		allColls[c] = true
+		if CollectionInTenant(tenant, c) {
+			allColls[c] = true
+		}
 	}
 
 	for coll := range allColls {

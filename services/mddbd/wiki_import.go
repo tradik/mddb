@@ -121,6 +121,11 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reading and indexing a dump takes as long as it takes, and the deadline
+	// does not stop it; only the answer was lost (#315). Lifted before the
+	// upload is read, which is itself the slow part of a large dump.
+	liftWriteDeadline(w, r)
+
 	start := time.Now()
 	req, reader, filename, err := s.parseWikiImportRequest(r)
 	if err != nil {

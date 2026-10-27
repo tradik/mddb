@@ -34,6 +34,9 @@ func (s *Server) handleImportURL(w http.ResponseWriter, r *http.Request) {
 		bad(w, errors.New("missing required fields: collection, url, lang"))
 		return
 	}
+	// Fetching and indexing a remote document can outlast the write timeout
+	// and is not cancelled by it; only the answer was lost (#315).
+	liftWriteDeadline(w, r)
 
 	// Derive key from URL if not provided
 	if req.Key == "" {

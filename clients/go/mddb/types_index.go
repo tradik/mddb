@@ -92,7 +92,7 @@ type CodeGraphNode struct {
 }
 
 // CodeGraphEdge is one connection and the symbol behind it. Kind is
-// "uses-selector", "imports" or "calls".
+// "uses-selector", "imports", "calls" or "references" (server 2.18.6+).
 type CodeGraphEdge struct {
 	From      string          `json:"from"`
 	To        string          `json:"to"`

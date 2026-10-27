@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -175,5 +176,95 @@ func TestStorageAnswersFromTheWalkCache(t *testing.T) {
 	s.handleStorage(rec, httptest.NewRequest(http.MethodGet, "/v1/storage?collection=slow", nil))
 	if !strings.Contains(rec.Body.String(), "statsPending") {
 		t.Errorf("pending storage: %s", rec.Body.String())
+	}
+}
+
+// After a restore the statistics describe the restored database, not the
+// one before it. The expensive path served the old snapshot for up to the
+// TTL, with its age, as if nothing had happened.
+func TestStatsForgetTheOldDatabaseAfterARestore(t *testing.T) {
+	t.Setenv("MDDB_STORAGE_LAYOUT", "single")
+	s, cleanup := newTestServerForCollectionConfig(t)
+	defer cleanup()
+	defer func() { _ = s.DB.Close() }() // the restore opens a handle cleanup does not know
+
+	backup := filepath.Join(t.TempDir(), "b.db")
+	if err := s.backupTo(backup); err != nil {
+		t.Fatal(err)
+	}
+	addTestDoc(t, s, "later", "a", "en", "written after the backup", nil)
+	if snap := s.dbStats(time.Second); snap == nil || snap.Collections["later"] == nil {
+		t.Fatal("no snapshot of the current database")
+	}
+	s.walks.entries["stats"].took = 2 * cheapWalk // pretend walks are expensive
+
+	if err := s.restoreFromBackup(backup); err != nil {
+		t.Fatal(err)
+	}
+	snap := s.dbStats(2 * time.Second)
+	if snap == nil {
+		t.Fatal("no snapshot after the restore")
+	}
+	if snap.Collections["later"] != nil {
+		t.Error("the snapshot still describes the database before the restore")
+	}
+}
+
+// A tenant user sees only its namespace in vector-stats and storage, as in
+// stats (MULTI_TENANCY.md). They listed every collection, with its counts
+// and bytes.
+func TestVectorStatsAndStorageAreScopedToTheTenant(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	addTestDoc(t, s, "acme/docs", "a", "en", "tenant text", nil)
+	addTestDoc(t, s, "other/docs", "a", "en", "another tenant", nil)
+	addTestDoc(t, s, "global", "a", "en", "no tenant", nil)
+
+	asTenant := func(method, target string) *http.Request {
+		r := httptest.NewRequest(method, target, nil)
+		return r.WithContext(context.WithValue(r.Context(), authContextKey, &JWTClaims{Username: "u", Tenant: "acme"}))
+	}
+	keysOf := func(body []byte, field string) map[string]bool {
+		var out map[string]json.RawMessage
+		_ = json.Unmarshal(body, &out)
+		var m map[string]json.RawMessage
+		_ = json.Unmarshal(out[field], &m)
+		seen := map[string]bool{}
+		for k := range m {
+			seen[k] = true
+		}
+		return seen
+	}
+
+	w := httptest.NewRecorder()
+	s.handleVectorStats(w, asTenant(http.MethodGet, "/v1/vector-stats"))
+	if got := keysOf(w.Body.Bytes(), "collections"); !got["acme/docs"] || got["other/docs"] || got["global"] {
+		t.Errorf("vector-stats as a tenant: %v", got)
+	}
+	w = httptest.NewRecorder()
+	s.handleVectorStats(w, httptest.NewRequest(http.MethodGet, "/v1/vector-stats", nil))
+	if got := keysOf(w.Body.Bytes(), "collections"); !got["acme/docs"] || !got["other/docs"] || !got["global"] {
+		t.Errorf("vector-stats without a tenant: %v", got)
+	}
+	if resp, err := (&GRPCServer{server: s}).VectorStats(
+		context.WithValue(context.Background(), authContextKey, &JWTClaims{Username: "u", Tenant: "acme"}), nil); err != nil ||
+		resp.Collections["acme/docs"] == nil || resp.Collections["other/docs"] != nil {
+		t.Errorf("gRPC vector stats as a tenant: %v %v", resp.GetCollections(), err)
+	}
+
+	w = httptest.NewRecorder()
+	s.handleStorage(w, asTenant(http.MethodGet, "/v1/storage"))
+	if got := keysOf(w.Body.Bytes(), "collections"); w.Code != 200 || !got["acme/docs"] || got["other/docs"] || got["global"] {
+		t.Errorf("storage as a tenant: %d %v", w.Code, got)
+	}
+	w = httptest.NewRecorder()
+	s.handleStorage(w, asTenant(http.MethodGet, "/v1/storage?collection=other/docs"))
+	if w.Code != http.StatusForbidden {
+		t.Errorf("another tenant's collection: %d", w.Code)
+	}
+	w = httptest.NewRecorder()
+	s.handleStorage(w, httptest.NewRequest(http.MethodGet, "/v1/storage", nil))
+	if got := keysOf(w.Body.Bytes(), "collections"); !got["other/docs"] || !got["global"] {
+		t.Errorf("storage without a tenant: %v", got)
 	}
 }

@@ -236,7 +236,8 @@ func (r *edgeResolver) resolveTarget(target string) *codeDocRef {
 
 // importExtensions is the order in which an extension-less specifier is tried.
 // Sorted and fixed, so two servers resolve an ambiguous specifier the same way.
-var importExtensions = []string{".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".css", ".scss", ".less"}
+var importExtensions = []string{".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".css", ".scss", ".less",
+	".py", ".rb", ".php", ".java", ".rs"}
 
 // importForms lists the stored `imports` values that would point at this key.
 func importForms(key string) []string {

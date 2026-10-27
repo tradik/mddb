@@ -67,7 +67,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_HTTP_PORT` | — | string | — | Plain port number (converted to `":PORT"`) |
 | `MDDB_ADDR` | `":11023"` | string | — | Legacy alias for `MDDB_HTTP_ADDR` |
 | `MDDB_HTTP_READ_TIMEOUT` | `30s` | duration | — | Time allowed to read a whole request, body included. `0` = no limit. Applies to the HTTP API and the MCP HTTP listener |
-| `MDDB_HTTP_WRITE_TIMEOUT` | `30s` | duration | — | Time allowed from reading the request to writing the response. `0` = no limit. A response that misses it is dropped by the connection, so it is logged as `response not delivered`. `add-batch`, `delete-batch`, `backup` and `restore` lift it for their own response |
+| `MDDB_HTTP_WRITE_TIMEOUT` | `30s` | duration | — | Time allowed from reading the request to writing the response. `0` = no limit. A response that misses it is dropped by the connection, so it is logged as `response not delivered`. `add-batch`, `delete-batch`, `backup`, `restore`, `vector-reindex` and, since v2.18.6, `fts-reindex`, `import-url` and `import-wiki` lift it for their own response |
 
 ---
 

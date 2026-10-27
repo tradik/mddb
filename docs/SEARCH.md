@@ -41,7 +41,7 @@ curl -X POST http://localhost:11023/v1/fts \
   -d '{"collection":"articles","query":"programowanie wydajne","lang":"pl","algorithm":"bm25"}'
 ```
 
-Configure default language: `MDDB_FTS_DEFAULT_LANG=en` (default). Query supported languages: `GET /v1/fts-languages`. Reindex existing documents: `POST /v1/fts-reindex?collection=X`.
+Configure default language: `MDDB_FTS_DEFAULT_LANG=en` (default). Query supported languages: `GET /v1/fts-languages`. Reindex existing documents: `POST /v1/fts-reindex` with `{"collection":"X"}`.
 
 **Protocol parity:** The `lang` parameter, FTS reindex, and FTS languages endpoints are available across all protocols: REST API, gRPC (`FTS`, `FTSReindex`, `FTSLanguages` RPCs), and MCP tools (`full_text_search` with `lang`, `fts_reindex`, `fts_languages`).
 

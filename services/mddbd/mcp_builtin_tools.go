@@ -462,7 +462,8 @@ func mcpBuiltinToolsCore() []MCPTool {
 			Name: "code_graph",
 			Description: "Code connection graph. Answers what a document depends on and what depends on it: " +
 				"which stylesheet declares a selector a template applies, which pages load a script, " +
-				"what breaks if this file changes. Edges are derived from the defines/uses/imports " +
+				"which file defines a function this one calls, which manifest declares the ConfigMap a " +
+				"Deployment refers to, what breaks if this file changes. Edges are derived from the defines/uses/imports " +
 				"metadata of code documents, resolved within one collection.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
