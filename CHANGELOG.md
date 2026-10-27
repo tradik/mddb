@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **"Used by" on the site and in the README.** daemonports.org, whose search
+  over 110,000–120,000 pages runs on mddb, is listed under a "Powers" strip on mddb.tradik.com with a
+  link to its live memory and disk figures. The strip labels now meet the
+  WCAG 2.2 4.5:1 contrast ratio (they were 3.9:1).
+
 ## [2.18.5] - 2026-10-26
 
 ### Fixed
