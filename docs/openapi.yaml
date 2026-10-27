@@ -68,7 +68,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.18.5"
+  version: "2.18.6"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -6044,7 +6044,7 @@ components:
                 type: string
               kind:
                 type: string
-                enum: [ uses-selector, calls, imports ]
+                enum: [ uses-selector, calls, references, imports ]
               symbol:
                 type: string
                 description: >

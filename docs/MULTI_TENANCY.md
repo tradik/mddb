@@ -64,6 +64,9 @@ and gRPC clients authenticated with such a key are confined the same way.
 Listing endpoints return only the caller's namespace:
 
 - `POST /v1/stats` — collection stats and totals are filtered to the tenant.
+- `GET /v1/vector-stats` (HTTP and gRPC) and `GET /v1/storage` — only tenant
+  collections; `?collection=` naming another tenant's collection answers
+  `403` (v2.18.6+; until then they listed every collection).
 - `POST /v1/collection-config/list` — only tenant collections.
 - Curation rule listing, schema listing (gRPC) — filtered likewise.
 

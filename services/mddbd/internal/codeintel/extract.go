@@ -95,6 +95,22 @@ func ExtractWithLimit(language, content string, max int) Symbols {
 		s = extractC(content)
 	case "asm":
 		s = extractAsm(content)
+	case "go":
+		s = extractGo(content)
+	case "rust":
+		s = extractRust(content)
+	case "java":
+		s = extractJava(content)
+	case "python":
+		s = extractPython(content)
+	case "ruby":
+		s = extractRuby(content)
+	case "php":
+		s = extractPHP(content)
+	case "terraform":
+		s = extractTerraform(content)
+	case "yaml":
+		s = extractYAML(content)
 	default:
 		return Symbols{}
 	}

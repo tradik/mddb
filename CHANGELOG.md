@@ -7,7 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.6] - 2026-10-27
+
+### Added
+
+- **Code symbols and graph edges for Go, Rust, Java, Python, Ruby and PHP.**
+  These files were tokenised as code but got no `defines`, `uses` or
+  `imports`, so `meta.defines=` found nothing in them and the code graph had
+  no edges. They now get the same treatment as C: functions, methods and
+  types they define; functions they call that they do not define (calls
+  through a value, such as `obj.f()` or `$this->f()`, are left out); and their
+  imports. `calls` edges connect a caller to the file that defines the
+  function. `imports` edges follow Python `from .x import`, Ruby
+  `require_relative`, PHP `require __DIR__ . '/x.php'`, Rust `mod x;` and Java
+  `import a.b.C` (as `a/b/C.java`). An import without an extension is matched
+  against `.py`, `.rb`, `.php`, `.java` and `.rs`. Package imports (Go paths,
+  `use` paths, `require "json"`) are recorded as written. Documents stored
+  before this version get symbols when they are written again.
+- **Terraform, Kubernetes, OpenShift, Kustomize and Ansible files in the code
+  graph.** `.tf` and `.tfvars` are now code. Terraform defines and refers to
+  things the way its code does (`aws_instance.web`, `var.region`,
+  `module.vpc`, `local.tags`), so `meta.defines=var.region` finds the
+  declaration. YAML is read by its shape:
+  - a Kubernetes object (OpenShift Routes and DeploymentConfigs included)
+    defines `Kind/name` and refers to the ConfigMaps, Secrets, claims, service
+    accounts and Services it names;
+  - a Kustomization imports its resources;
+  - an Ansible file defines its task and handler names, and its `notify`
+    reaches the handler file.
+
+  Other YAML, and Helm templates, which do not parse, get no symbols. A new
+  edge kind, `references`, connects these files to the file that declares
+  what they name.
+
+### Fixed
+
+- **`POST /v1/fts-reindex`, `/v1/import-url` and `/v1/import-wiki` lost their
+  response after `MDDB_HTTP_WRITE_TIMEOUT` (30 s).** The three ran to the
+  end, but net/http dropped the answer written after the deadline and the
+  client saw `EOF`, with `response not delivered` in the log. `add-batch`,
+  `delete-batch`, `backup`, `restore` (#315) and `vector-reindex` (#347) had
+  already been given their own deadline; these three now lift it too. An
+  fts-reindex of a collection of a hundred thousand documents takes minutes
+  and used to fail this way every time.
+- **After a restore, `/v1/stats`, `/v1/vector-stats` and `/v1/storage` kept
+  describing the database before it.** The shared statistics snapshot (#349,
+  2.18.5) survived a restore and a replication snapshot. On a database whose
+  count is slow it was served, with its age, for up to `MDDB_STATS_TTL`
+  seconds (300); if the restored file happened to have the same commit
+  counter, indefinitely. The snapshot is now dropped with the rest of the
+  in-memory state.
+- **A tenant user saw every collection in `/v1/vector-stats` and
+  `/v1/storage`.** MULTI_TENANCY.md promises that listings return only the
+  caller's namespace, and `/v1/stats` does; these two (and gRPC `VectorStats`)
+  listed every collection with its document counts and bytes. They are now
+  filtered like `/v1/stats`, and `/v1/storage?collection=` naming another
+  tenant's collection answers `403`.
+
 ### Documentation
+
+- `POST /v1/fts-reindex` in API.md described query parameters and a response
+  the server never had; it now shows the JSON body and the `status`,
+  `reindexed` and `skipped` fields.
+
+- **A table of the languages mddb reads** in [API.md](docs/API.md#symbols-which-file-declares-this):
+  extensions, code search, symbols and graph edges per language.
 
 - **"Used by" on the site and in the README.** daemonports.org, whose search
   over 110,000–120,000 pages runs on mddb, is listed under a "Powers" strip on mddb.tradik.com with a

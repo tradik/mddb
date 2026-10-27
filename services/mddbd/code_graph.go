@@ -32,8 +32,13 @@ const (
 	// EdgeImports connects a document to one it pulls in by path — a
 	// `<script src>`, a `<link href>`, an `@import`, an ES import.
 	EdgeImports EdgeKind = "imports"
-	// EdgeCalls connects a C, C++ or assembly document calling a function or
-	// macro to the document defining it (#319).
+	// EdgeReferences connects a configuration file naming an object to the
+	// file declaring it: a Deployment to its ConfigMap, a Terraform output to
+	// the resource, an Ansible notify to the handler (2.18.6).
+	EdgeReferences EdgeKind = "references"
+	// EdgeCalls connects a document calling a function or macro to the
+	// document defining it: C, C++ and assembly (#319); Go, Rust, Java,
+	// Python, Ruby and PHP since 2.18.6.
 	EdgeCalls EdgeKind = "calls"
 )
 
@@ -41,8 +46,10 @@ const (
 // doing the using: a C file calls, a template applies a selector.
 func usesEdgeKind(language string) EdgeKind {
 	switch language {
-	case "c", "cpp", "asm":
+	case "c", "cpp", "asm", "go", "rust", "java", "python", "ruby", "php":
 		return EdgeCalls
+	case "yaml", "terraform":
+		return EdgeReferences
 	}
 	return EdgeUsesSelector
 }

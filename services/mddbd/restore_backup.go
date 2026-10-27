@@ -143,6 +143,9 @@ func (s *Server) swapDatabase(source string, install func(dst string) error) err
 // Server.WebhookManager / SchemaManager / Cache never see a swapped field
 // (GO-004). Shared by the replication snapshot path and manual restore.
 func (s *Server) rebuildInMemoryState() {
+	// Statistics of the old database (#349) must not outlive it.
+	s.walks.reset()
+
 	// Reload vector index. The store wraps the new DB; the in-memory index is
 	// rebuilt asynchronously (loadVectorIndex acquires the restore read lock
 	// via DBView, so it waits until this restore releases the write lock).

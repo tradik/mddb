@@ -43,6 +43,7 @@ var codeExtensions = map[string]string{
 	".cc": "cpp", ".cpp": "cpp", ".cxx": "cpp", ".hpp": "cpp", ".hh": "cpp", ".hxx": "cpp",
 	".s": "asm", ".asm": "asm",
 	".m4": "m4",
+	".tf": "terraform", ".tfvars": "terraform",
 }
 
 // InferCodeLanguage returns the language for a document key or path, or "" when
@@ -265,7 +266,10 @@ func (s *Server) codeIncludePaths(collection string) []string {
 // in this collection, and rewriting it to `theme/lodash` would invent an edge.
 func isModuleLanguage(language string) bool {
 	switch language {
-	case "javascript", "typescript", "jsx", "tsx":
+	case "javascript", "typescript", "jsx", "tsx",
+		// A bare import in these names a package or a module on the load
+		// path; one relative to the file is written "./x" by the extractor.
+		"go", "rust", "java", "python", "ruby", "php", "terraform":
 		return true
 	default:
 		return false

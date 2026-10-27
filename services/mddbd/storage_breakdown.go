@@ -95,12 +95,27 @@ func collectionOf(key []byte) (string, bool) {
 // page, and on a large database a request waiting for it never returned.
 func (s *Server) handleStorage(w http.ResponseWriter, r *http.Request) {
 	only := r.URL.Query().Get("collection")
+	// A tenant user sees only the collections of its namespace, as in
+	// /v1/stats (MULTI_TENANCY.md, "Scoped listings").
+	tenant := TenantFromContext(r.Context())
+	if only != "" && !CollectionInTenant(tenant, only) {
+		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+		return
+	}
 	val, at, pending := s.cachedWalk("storage:"+only, statsWait(), func() (any, error) { return s.storageUsage(only) })
 	if pending {
 		ok(w, map[string]any{"statsPending": true})
 		return
 	}
 	out := *val.(*storageBreakdown)
+	if tenant != "" { // the cached value is shared: filter a copy
+		out.Collections = map[string]*collectionUsage{}
+		for c, u := range val.(*storageBreakdown).Collections {
+			if CollectionInTenant(tenant, c) {
+				out.Collections[c] = u
+			}
+		}
+	}
 	out.StatsComputedAt = at.UTC().Format(time.RFC3339)
 	out.StatsAgeSeconds = int(time.Since(at).Seconds())
 	ok(w, out)

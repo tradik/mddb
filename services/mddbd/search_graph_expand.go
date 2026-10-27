@@ -97,7 +97,7 @@ type GraphExpansion struct {
 	FromKey string `json:"fromKey"`
 	// Symbol is the selector, identifier or path that justifies the edge.
 	Symbol string `json:"symbol"`
-	// Kind is the edge type — "uses-selector", "calls" or "imports".
+	// Kind is the edge type — "uses-selector", "calls", "references" or "imports".
 	Kind string `json:"kind"`
 	// Depth is how many hops from the matching result.
 	Depth int `json:"depth"`

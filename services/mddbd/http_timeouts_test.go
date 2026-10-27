@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log/slog"
 	"net"
@@ -119,4 +120,40 @@ func TestNoWarningWhenTheDeadlineWasLiftedOrMet(t *testing.T) {
 func TestLiftWriteDeadlineWithoutTheMiddleware(t *testing.T) {
 	rec := httptest.NewRecorder()
 	liftWriteDeadline(rec, httptest.NewRequest(http.MethodPost, "/", nil))
+}
+
+// The handlers whose work outlasts the write timeout lift it, so a client
+// that waits gets the answer (#315). fts-reindex, import-url and import-wiki
+// did not until 2.18.6: an fts-reindex of a large collection finished and
+// the client got EOF.
+func TestLongWriteHandlersLiftTheDeadline(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	addTestDoc(t, s, "c", "a", "en", "some text", nil)
+
+	for name, run := range map[string]func(w http.ResponseWriter, r *http.Request){
+		"fts-reindex": func(w http.ResponseWriter, r *http.Request) {
+			s.handleFTSReindex(w, withBody(r, `{"collection":"c"}`))
+		},
+		"import-url": func(w http.ResponseWriter, r *http.Request) {
+			s.handleImportURL(w, withBody(r, `{"collection":"c","url":"http://127.0.0.1:1/x.md","lang":"en"}`))
+		},
+		"import-wiki": func(w http.ResponseWriter, r *http.Request) {
+			r.Header.Set("Content-Type", "multipart/form-data; boundary=x")
+			s.handleWikiImport(w, withBody(r, "not a form"))
+		},
+	} {
+		st := &deadlineState{}
+		req := httptest.NewRequest(http.MethodPost, "/v1/"+name, nil)
+		req = req.WithContext(context.WithValue(req.Context(), deadlineStateKey{}, st))
+		run(httptest.NewRecorder(), req)
+		if !st.lifted.Load() {
+			t.Errorf("%s did not lift the write deadline", name)
+		}
+	}
+}
+
+func withBody(r *http.Request, body string) *http.Request {
+	r.Body = io.NopCloser(strings.NewReader(body))
+	return r
 }

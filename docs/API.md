@@ -1148,23 +1148,33 @@ When `highlight: true`, each result gains a `highlights` array:
 
 ### POST /v1/fts-reindex
 
-Reindex all documents in a collection using their stored `lang` field for language-aware FTS processing.
+Reindex all documents in a collection using their stored `lang` field for language-aware FTS processing. A collection with `fts: {enabled: false}` has its postings removed instead (v2.18.2+).
 
-**Query Parameters**:
-- `collection` (required): Collection name to reindex
+**Request Body**:
+```json
+{ "collection": "articles" }
+```
 
 **cURL Example**:
 ```bash
-curl -X POST "http://localhost:11023/v1/fts-reindex?collection=articles"
+curl -X POST http://localhost:11023/v1/fts-reindex \
+  -H 'Content-Type: application/json' -d '{"collection":"articles"}'
 ```
 
 **Response**:
 ```json
 {
+  "status": "ok",
   "reindexed": 150,
-  "collection": "articles"
+  "skipped": 2
 }
 ```
+
+`status` is `ok`, `partial` when some documents failed to index (they count
+in `skipped`), or `removed` for a collection with full-text indexing off.
+A reindex of a large collection takes minutes; since v2.18.6 the call lifts
+the HTTP write deadline for its own response, as `add-batch` does, so the
+answer arrives however long it takes, as long as the client waits.
 
 ---
 
@@ -3280,13 +3290,15 @@ Import a markdown document from a URL. Automatically extracts YAML frontmatter.
 | `meta` | object | Metadata (merged with frontmatter) |
 | `ttl` | integer | Time-to-live in seconds |
 
-**Response**: Saved document object.
+**Response**: Saved document object. The call lifts the HTTP write deadline
+for its own response (v2.18.6+): a slow remote server no longer costs the
+client the answer.
 
 ---
 
 ### POST /v1/import-wiki
 
-Import Wikipedia (MediaWiki) XML dumps. Supports `.xml` and `.xml.bz2` compressed files. Streams the XML — does not load the entire file into memory.
+Import Wikipedia (MediaWiki) XML dumps. Supports `.xml` and `.xml.bz2` compressed files. Streams the XML — does not load the entire file into memory. The call lifts the HTTP write deadline for its own response (v2.18.6+); an import that outlasted `MDDB_HTTP_WRITE_TIMEOUT` used to finish with the client seeing `EOF`.
 
 **Multipart Form Upload:**
 ```bash
@@ -3874,6 +3886,43 @@ curl -s "$MDDB/v1/fts?collection=theme&q=hero-banner&meta.defines=.hero-banner"
 curl -s "$MDDB/v1/fts?collection=theme&q=*&meta.uses=.hero-banner"
 ```
 
+Which languages get what. A document is code when its key has one of these
+extensions (or `meta.language` says so). Every code document is tokenised
+for full-text search as code; the languages with symbols also get the three
+keys above and edges in the [connection graph](#the-connection-graph).
+
+| Language | Extensions | Code search | Symbols | Graph edges |
+|---|---|---|---|---|
+| C | `.c` `.h` | ✅ | ✅ (v2.18.0) | `calls`, `imports` |
+| C++ | `.cc` `.cpp` `.cxx` `.hpp` `.hh` `.hxx` | ✅ | ✅ (v2.18.0) | `calls`, `imports` |
+| Assembly | `.s` `.S` `.asm` | ✅ | ✅ (v2.18.0) | `calls`, `imports` |
+| Go | `.go` | ✅ | ✅ (v2.18.6) | `calls` |
+| Rust | `.rs` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
+| Java | `.java` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
+| Python | `.py` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
+| Ruby | `.rb` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
+| PHP | `.php` | ✅ | ✅ (v2.18.6) | `calls`, `imports` |
+| JavaScript | `.js` `.mjs` `.cjs` `.jsx` | ✅ | ✅ | `imports` |
+| TypeScript | `.ts` `.tsx` | ✅ | ✅ | `imports` |
+| HTML | `.html` `.htm` | ✅ | ✅ | `uses-selector`, `imports` |
+| CSS / SCSS / Sass / Less | `.css` `.scss` `.sass` `.less` | ✅ | ✅ | `uses-selector`, `imports` |
+| Terraform | `.tf` `.tfvars` | ✅ (v2.18.6) | ✅ (v2.18.6) | `references` |
+| Kubernetes / OpenShift manifests, Kustomize | `.yaml` `.yml` | ✅ | ✅ (v2.18.6) | `references`, `imports` |
+| Ansible playbooks, task and handler files | `.yaml` `.yml` | ✅ | ✅ (v2.18.6) | `references`, `imports` |
+| Shell | `.sh` `.bash` | ✅ | — | — |
+| SQL | `.sql` | ✅ | — | — |
+| M4 | `.m4` | ✅ | — | — |
+| Other YAML, JSON, TOML, XML, SVG | `.yaml` `.yml` `.json` `.toml` `.xml` `.svg` | ✅ | — (data, not code) | — |
+
+A YAML file is read by its shape, not its name: a document with `apiVersion`
+and `kind` is a Kubernetes object (an OpenShift Route or DeploymentConfig is
+one too), a document that is a list is Ansible, and anything else — a CI
+workflow, a compose file — gets no symbols. A Helm template does not parse
+as YAML and gets none either.
+
+Go imports name packages, which are directories rather than documents, so
+they are recorded in `imports` and can be filtered on, but produce no edge.
+
 What each language contributes:
 
 | Language | `defines` | `uses` | `imports` |
@@ -3883,6 +3932,19 @@ What each language contributes:
 | HTML | `id` attributes | `class` names, `on*` handler names | Local `src` / `href` targets |
 | C / C++ (`.c .h .cc .cpp .hpp …`, v2.18.0) | Function definitions, `static` prototypes, `struct`/`union`/`enum` tags, `typedef` names, `#define` macros, file-scope variables | Functions and macros called in function bodies that the file does not define | `#include` targets |
 | Assembly (`.S .s .asm`, v2.18.0) | `ENTRY(x)` and similar macros, `.globl` symbols | `call` / `bl` / `jal` targets | `#include` targets |
+| Go (v2.18.6) | Functions, methods, `type` names | Functions called that the file does not define | Import paths (`fmt`, `net/http`) |
+| Rust (v2.18.6) | `fn`, `struct`, `enum`, `trait`, `type`, `union`, `macro_rules!` | Functions and macros called that the file does not define | `use` paths as written, `extern crate`, `mod x;` as the file beside it |
+| Java (v2.18.6) | Classes, interfaces, enums, records, methods | Methods called and classes created with `new` | `import a.b.C` as `a/b/C` |
+| Python (v2.18.6) | `def` and `class` | Functions and classes called that the file does not define | `import a.b` as `a/b`; `from .x import y` as `./x` |
+| Ruby (v2.18.6) | `def`, `class`, `module` | Methods called and `Name.new` | `require` as written, `require_relative` from the file |
+| PHP (v2.18.6) | Functions, classes, interfaces, traits, enums | Functions called, classes created with `new`, `Class::method()` | `require`/`include` from the file (`__DIR__ . '/x.php'` too), `use` namespaces as written |
+| Terraform (v2.18.6) | `aws_instance.web`, `data.aws_ami.ubuntu`, `module.vpc`, `var.region`, `output.ip`, `local.tags` — the way code refers to them | `var.`, `local.`, `module.`, `data.` and resource references the file does not declare, inside `"${...}"` too | Module `source` (`./modules/vpc` from the file, registry addresses as written) |
+| Kubernetes / OpenShift (v2.18.6) | `Kind/name` of each object (`Deployment/web`) | `ConfigMap/…`, `Secret/…`, `PersistentVolumeClaim/…`, `ServiceAccount/…` and Ingress `Service/…` it refers to, and any `{kind, name}` pair: a Route's `to`, `roleRef`, `subjects`, `scaleTargetRef` | A Kustomization's `resources`, `bases`, `components` and patches |
+| Ansible (v2.18.6) | Task and handler names, `listen` topics | `notify` | `include_tasks`, `import_tasks`, `import_playbook`, `include_vars`, `vars_files` from the file; roles as `roles/NAME` |
+
+**Calls through a value are left out** in every language — `obj.f()`,
+`$this->f()`, `pkg.F()`, `Type::f()` — because the text alone cannot say
+which file defines them. A method and a package function look the same.
 
 **C details.** A non-static prototype is a declaration of something defined
 elsewhere, so it is not a define — otherwise every header would claim every
@@ -4001,11 +4063,13 @@ Three kinds of edge:
 | Kind | Meaning | Derived from |
 |---|---|---|
 | `uses-selector` | A template applies a class or id a stylesheet declares | `uses` ↔ `defines` |
-| `calls` | A C, C++ or assembly file calls a function or macro another file defines (v2.18.0) | `uses` ↔ `defines` |
+| `calls` | A file calls a function or macro another file defines: C, C++ and assembly (v2.18.0); Go, Rust, Java, Python, Ruby and PHP (v2.18.6) | `uses` ↔ `defines` |
+| `references` | A configuration file names what another declares: a Deployment its ConfigMap, a Terraform output its resource, an Ansible `notify` its handler (v2.18.6) | `uses` ↔ `defines` |
 | `imports` | A document pulls another in by path or `#include` | `imports` ↔ document key |
 
 The `uses` ↔ `defines` kind is named by the language of the document doing the
-using, so a C file calling into assembly is a `calls` edge.
+using, so a C file calling into assembly is a `calls` edge and a YAML or
+Terraform file naming an object is a `references` edge.
 
 Import paths are resolved against the referring document when it is stored, so
 `href="style.css"` inside `theme/index.html` is recorded as `theme/style.css`
@@ -4013,7 +4077,11 @@ and matches a key directly. One language-specific rule: in HTML and CSS a bare
 path is relative to the document — which is what makes `<link>` and `@import`
 produce edges at all — while in JavaScript a bare `import "lodash"` names a
 package, and rewriting it to `theme/lodash` would invent an edge to a document
-that will never exist.
+that will never exist. Go, Rust, Java, Python, Ruby and PHP follow the
+JavaScript rule: a bare name is a package or a module on the load path, and
+an import relative to the file is written `./x`. An import without an
+extension is matched against the code extensions (`./models` finds
+`models.py`).
 
 Three limits, and one of them is reported back:
 

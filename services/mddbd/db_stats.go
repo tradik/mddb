@@ -83,6 +83,15 @@ type walkEntry struct {
 	running    chan struct{} // closed when the walk in progress ends
 }
 
+// reset forgets every result: after a restore or a replication snapshot the
+// database is another one, and a snapshot of the old one described it for
+// up to the TTL. A walk in progress finishes into its orphaned entry.
+func (c *walkCache) reset() {
+	c.mu.Lock()
+	c.entries = nil
+	c.mu.Unlock()
+}
+
 func statsTTL() time.Duration {
 	return time.Duration(envconf.Int("MDDB_STATS_TTL", 300)) * time.Second
 }

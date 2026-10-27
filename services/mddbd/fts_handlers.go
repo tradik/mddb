@@ -494,6 +494,9 @@ func (s *Server) handleFTSReindex(w http.ResponseWriter, r *http.Request) {
 		bad(w, fmt.Errorf("full-text search not initialized"))
 		return
 	}
+	// Reindexing a large collection outlasts the write timeout and is not
+	// cancelled by it; only the answer was lost (#315, as for add-batch).
+	liftWriteDeadline(w, r)
 
 	res, err := s.reindexCollectionFTS(req.Collection)
 	if err != nil {
