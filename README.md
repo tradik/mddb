@@ -674,6 +674,17 @@ is in **[Issues](https://github.com/tradik/mddb/issues)** and
 **[Discussions](https://github.com/tradik/mddb/discussions/categories/ideas)**.
 Both are current by construction, which a hand-written roadmap was not.
 
+## 🏁 Used by
+
+- **[daemonports.org](https://daemonports.org/)** — search over 110,000–120,000
+  pages from the ports trees of five BSD systems runs on mddb, refreshed every
+  30 minutes. Its
+  [stats page](https://daemonports.org/stats/) shows mddb's live memory and
+  disk use.
+
+Running mddb in something public? Open an issue or a PR to be listed here and
+on [mddb.tradik.com](https://mddb.tradik.com/).
+
 ## 🤝 Contributing
 
 Contributions welcome! See **[CONTRIBUTING.md](CONTRIBUTING.md)** for guidelines.
