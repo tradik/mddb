@@ -40,6 +40,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_CONFIG` | `""` | string | Path to YAML config file (also `-config` / `-c` CLI flag) |
 | `MDDB_PATH` | `"mddb.db"` | string | Path to the BoltDB database file (also `--db` CLI flag, `database.path` in YAML) |
 | `MDDB_MODE` | `"wr"` | string | Access mode: `"read"`, `"write"`, or `"wr"` (read+write) (also `--mode` CLI flag, `database.mode` in YAML) |
+| `MDDB_DISK_MIN_FREE` | `104857600` (100 MB) | int (bytes) | Free space under which the persistence check reports `low_disk_space`; `0` disables the check ([DEPLOYMENT.md](DEPLOYMENT.md#persistence-guarantees)) |
 | `MDDB_PANEL_MODE` | `"internal"` | string | Panel mode: `"internal"` (CORS enabled) or `"external"` (reverse proxy) |
 | `MDDB_CORS_ORIGINS` | `"*"` | string | CORS allowlist (SEC-008): comma-separated exact origins, e.g. `https://app.example.com,https://admin.example.com`. Only a matching request `Origin` is echoed (with `Vary: Origin`); others get no `Access-Control-Allow-Origin`. `*` = wildcard (read-only, no credentials). Takes precedence over `MDDB_CORS_ORIGIN`. |
 | `MDDB_CORS_ORIGIN` | `"*"` | string | Legacy single-origin form of `MDDB_CORS_ORIGINS` (kept for compatibility). Prefer `MDDB_CORS_ORIGINS`. |
@@ -54,6 +55,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_SEARCH_QUEUE_TIMEOUT_MS` | `2000` | int | How long a query waits for a slot before the `503` |
 | `MDDB_SEARCH_CACHE_SIZE` | `500` | int | Maximum cached search responses; `0` disables the cache regardless of what a request asks for. Caching is opt-in per request via `cacheTtl` — see [SEARCH.md](SEARCH.md#result-caching) |
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
+| `MDDB_METRICS_PUBLIC` | `"false"` | bool | With `MDDB_AUTH_ENABLED=true`, serve `/metrics` without credentials (SEC-009). No effect when auth is off ([TELEMETRY.md](TELEMETRY.md)) |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |
 
 ---
@@ -64,6 +66,7 @@ Complete reference for all MDDB configuration parameters.
 |---------|---------|------|----------|-------------|
 | `MDDB_HTTP_ENABLED` | `true` | bool | `--http-enabled` | Enable/disable the HTTP API server |
 | `MDDB_HTTP_ADDR` | `":11023"` | string | `--http-addr` | HTTP API listen address |
+| `MDDB_API_MODE` | inherits `MDDB_MODE` | string | — | Access mode for HTTP/JSON REST and GraphQL: `read`, `write` or `wr` |
 | `MDDB_HTTP_PORT` | — | string | — | Plain port number (converted to `":PORT"`) |
 | `MDDB_ADDR` | `":11023"` | string | — | Legacy alias for `MDDB_HTTP_ADDR` |
 | `MDDB_HTTP_READ_TIMEOUT` | `30s` | duration | — | Time allowed to read a whole request, body included. `0` = no limit. Applies to the HTTP API and the MCP HTTP listener |
@@ -77,6 +80,7 @@ Complete reference for all MDDB configuration parameters.
 |---------|---------|------|----------|-------------|
 | `MDDB_GRPC_ENABLED` | `true` | bool | `--grpc-enabled` | Enable/disable the gRPC server |
 | `MDDB_GRPC_ADDR` | `":11024"` | string | `--grpc-addr` | gRPC listen address |
+| `MDDB_GRPC_MODE` | inherits `MDDB_MODE` | string | — | Access mode for gRPC: `read`, `write` or `wr` |
 | `MDDB_GRPC_PORT` | — | string | — | Plain port number (converted to `":PORT"`) |
 
 ---
@@ -147,6 +151,7 @@ always exposed under `mddb_operations_total`. Details: [MCP.md](MCP.md#request-l
 |---------|---------|------|----------|-------------|
 | `MDDB_HTTP3_ENABLED` | `false` | bool | `--http3-enabled` | Enable HTTP/3 (QUIC) server |
 | `MDDB_HTTP3_ADDR` | `":11443"` | string | `--http3-addr` | HTTP/3 listen address |
+| `MDDB_HTTP3_MODE` | inherits `MDDB_MODE` | string | — | Access mode for HTTP/3: `read`, `write` or `wr` |
 | `MDDB_HTTP3_PORT` | — | string | — | Plain port number (converted to `":PORT"`) |
 | `MDDB_EXTREME` | — | bool | — | Legacy alias for `MDDB_HTTP3_ENABLED` |
 
@@ -543,6 +548,7 @@ Access log lines take their level from the status: 5xx is `error`, 4xx is
 | `MDDB_FTS_STEMMING` | `true` | bool | Enable Porter stemming for FTS indexing and queries |
 | `MDDB_FTS_SYNONYMS` | `true` | bool | Enable synonym expansion in FTS queries |
 | `MDDB_FTS_DEFAULT_LANG` | `"en"` | string | Default language for stemming and stop words |
+| `MDDB_CODE_MAX_SYMBOLS` | `512` | int | Most `defines`, `uses` and `imports` entries kept per code document ([API.md](API.md#symbols-which-file-declares-this)) |
 
 ---
 
@@ -585,6 +591,7 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 | `MDDB_REPLICATION_LEADER_ADDR` | `""` | string | Leader address for follower nodes |
 | `MDDB_BINLOG_ENABLED` | `false` | bool | Enable binary log (auto-enabled for leaders) |
 | `MDDB_BINLOG_PATH` | `""` | string | Custom binlog file path |
+| `MDDB_REPLICATION_SECRET` | `""` | string | Shared secret for the snapshot and binlog streams; the same value on the leader and every follower. Without it, auth or mTLS, a leader refuses them ([REPLICATION.md](REPLICATION.md#securing-replication)) |
 | `MDDB_FREELIST_SYNC` | auto | bool | Write bbolt's freelist on every commit so opening the database reads one page instead of the whole file. On a 908 MB database: 7 ms and 37 MB RSS instead of ~400 ms and 938 MB; minutes from a cold disk on large files ([DEPLOYMENT.md](DEPLOYMENT.md#large-databases-startup-time-and-memory)). Since v2.18.2 a clean shutdown stores the freelist anyway; this setting is what protects a start after a crash. Unset (or `auto`, v2.18.2+): on for a file of `MDDB_FREELIST_SYNC_THRESHOLD` or more, decided at start; `true`/`false` force it |
 | `MDDB_FREELIST_SYNC_THRESHOLD` | `4294967296` | int | File size in bytes from which `MDDB_FREELIST_SYNC` defaults to on (v2.18.2+) |
 | `MDDB_STATS_TTL` | `300` | int | Seconds between background recounts for `/v1/stats` on a database whose count is slow (v2.18.5+) |

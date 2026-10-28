@@ -3435,8 +3435,8 @@ curl http://localhost:11023/v1/system/info
   "os": "linux",
   "arch": "amd64",
   "numCPU": 4,
-  "goVersion": "go1.27.0",
-  "version": "2.11.4",
+  "goVersion": "go1.27.3",
+  "version": "2.18.6",
   "uptimeSeconds": 3600,
   "memoryTotal": 134217728,
   "memoryUsed": 67108864,
@@ -3459,7 +3459,7 @@ curl http://localhost:11023/v1/config
 **Response**:
 ```json
 {
-  "version": "2.11.4",
+  "version": "2.18.6",
   "databasePath": "mddb.db",
   "mode": "wr",
   "protocols": {
@@ -4058,7 +4058,7 @@ knows what to look at. Add `&lines=true` to get the first line the symbol
 appears on for both sides — off by default, because it is the only part of a
 traversal that reads document content.
 
-Three kinds of edge:
+Four kinds of edge:
 
 | Kind | Meaning | Derived from |
 |---|---|---|

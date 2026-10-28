@@ -8,12 +8,12 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	"mddb-test/internal/benchenv"
 )
 
 const (
-	postgresDSN = "host=localhost port=15432 user=mddb password=benchmark123 dbname=mddb_test sslmode=disable"
-	totalDocs   = 3000
-	batchSize   = 100
+	totalDocs = 3000
+	batchSize = 100
 )
 
 type Stats struct {
@@ -34,7 +34,7 @@ func main() {
 
 	// Connect to PostgreSQL
 	fmt.Print("Connecting to PostgreSQL... ")
-	db, err := sql.Open("postgres", postgresDSN)
+	db, err := sql.Open("postgres", "host=localhost port=15432 user=mddb dbname=mddb_test sslmode=disable password="+benchenv.MustPassword())
 	if err != nil {
 		fmt.Printf("✗ Failed: %v\n", err)
 		os.Exit(1)

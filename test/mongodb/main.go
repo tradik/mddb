@@ -10,10 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"mddb-test/internal/benchenv"
 )
 
 const (
-	mongoURI   = "mongodb://mddb:benchmark123@localhost:27017"
 	totalDocs  = 3000
 	batchSize  = 100
 	dbName     = "mddb_test"
@@ -39,7 +39,7 @@ func main() {
 	// Connect to MongoDB
 	fmt.Print("Connecting to MongoDB... ")
 	ctx := context.Background()
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017").SetAuth(options.Credential{Username: "mddb", Password: benchenv.MustPassword()}))
 	if err != nil {
 		fmt.Printf("✗ Failed: %v\n", err)
 		os.Exit(1)

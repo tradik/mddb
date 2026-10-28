@@ -6,7 +6,7 @@ services:
       MYSQL_ROOT_PASSWORD: root123
       MYSQL_DATABASE: mddb_test
       MYSQL_USER: mddb
-      MYSQL_PASSWORD: benchmark123
+      MYSQL_PASSWORD: ${MDDB_BENCH_PASSWORD:-benchmark123}
     ports:
       - "13306:3306"
     volumes:
@@ -23,7 +23,7 @@ services:
     environment:
       POSTGRES_DB: mddb_test
       POSTGRES_USER: mddb
-      POSTGRES_PASSWORD: benchmark123
+      POSTGRES_PASSWORD: ${MDDB_BENCH_PASSWORD:-benchmark123}
     ports:
       - "15432:5432"
     volumes:
@@ -39,7 +39,7 @@ services:
     container_name: mddb-benchmark-mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: mddb
-      MONGO_INITDB_ROOT_PASSWORD: benchmark123
+      MONGO_INITDB_ROOT_PASSWORD: ${MDDB_BENCH_PASSWORD:-benchmark123}
       MONGO_INITDB_DATABASE: mddb_test
     ports:
       - "27017:27017"
@@ -56,7 +56,7 @@ services:
     container_name: mddb-benchmark-couchdb
     environment:
       COUCHDB_USER: mddb
-      COUCHDB_PASSWORD: benchmark123
+      COUCHDB_PASSWORD: ${MDDB_BENCH_PASSWORD:-benchmark123}
     ports:
       - "5984:5984"
     volumes:

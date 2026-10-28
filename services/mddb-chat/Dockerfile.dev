@@ -13,8 +13,8 @@ COPY services/mddb-chat/ .
 # Update proto path for Docker context
 RUN sed -i 's|../../proto/|/proto/|g' build.rs
 
-RUN cargo build
+RUN cargo build --locked
 
 EXPOSE 11030
 
-CMD ["cargo", "run"]
+CMD ["cargo", "run", "--locked"]

@@ -27,6 +27,18 @@ that still use them.
 
 All transports run on the MCP port (default: 9000, configurable via `MDDB_MCP_ADDR`).
 
+The MCP port also answers plain JSON requests, for scripts and for checking a
+deployment without an MCP client. They take the same credentials as the MCP
+transports:
+
+| Endpoint | What it does |
+|---|---|
+| `GET /tools` | The tool catalog, built-in and custom tools, as `{"tools": [...]}` |
+| `POST /tools/call` | Run one tool: `{"name": "...", "arguments": {...}}`. Answers 403 when the HTTP mode is `read`, and 503 while writes wait for the freelist after a crash, whatever the tool |
+| `GET /resources` | The resource catalog and resource templates |
+| `POST /resources/read` | Read one resource: `{"uri": "mddb://..."}` |
+| `GET /events` | The server-sent document change events, as `GET /v1/events` on the HTTP port |
+
 ## Protocol Revisions
 
 MDDB serves two revisions at once, and **each request declares its own**: one
@@ -311,7 +323,7 @@ Two records exist, both behind the same switch.
 ```
 
 **Tool-call record** (2.16.0) — one line per `tools/call`, on every transport
-(Streamable HTTP, SSE, `/mcp/tools/call`, stdio). Every tool call is a
+(Streamable HTTP, SSE, `/tools/call`, stdio). Every tool call is a
 `POST /mcp` with status 200, so the request record cannot tell a lookup that
 found something from one that did not. This record can:
 
@@ -535,7 +547,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `restore_backup` | Restore the MDDB database from a backup file. |
 | `update_document` | Partially update a document. |
 | `get_document_meta` | Get document metadata without content. |
-| `code_graph` | Code connection graph: what a document depends on and what depends on it (which stylesheet declares a selector, which pages load a script). |
+| `code_graph` | Code connection graph: what a document depends on and what depends on it: which stylesheet declares a selector, which pages load a script, which file defines a function this one calls (C, C++, assembly, Go, Rust, Java, Python, Ruby, PHP), which manifest declares the ConfigMap a Deployment refers to (Kubernetes, OpenShift, Kustomize, Terraform, Ansible). Edge kinds: `uses-selector`, `calls`, `references`, `imports`. |
 | `delete_collection` | Delete an entire collection and all its documents, revisions, and metadata indices. |
 | `get_collection_config` | Get configuration attributes for a collection (type, description, icon, color, custom metadata). |
 | `set_collection_config` | Set or update configuration attributes for a collection. Only the arguments sent change (v2.18.0; before, an update erased the icon, colour, custom meta and revision cap it did not mention). `code.include_paths` sets where C `#include <...>` resolves (#319). `embedding.chunk_size` / `embedding.chunk_mode` set the collection's chunking for embeddings (v2.18.1, #325). `fts.enabled: false` stops full-text postings for the collection; `fts_reindex` then removes existing ones (v2.18.2, #335). |

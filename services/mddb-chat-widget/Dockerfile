@@ -3,9 +3,9 @@ FROM node:26.12-alpine3.24 AS builder
 
 WORKDIR /app
 
-COPY services/mddb-chat-widget/package.json services/mddb-chat-widget/package-lock.json* ./
+COPY services/mddb-chat-widget/package.json services/mddb-chat-widget/package-lock.json ./
 
-RUN npm install
+RUN npm ci --ignore-scripts
 
 COPY services/mddb-chat-widget/ .
 

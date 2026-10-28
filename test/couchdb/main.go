@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"sort"
 	"time"
+
+	"mddb-test/internal/benchenv"
 )
 
 // drainClose discards and closes a response body so the keep-alive connection
@@ -19,11 +22,13 @@ func drainClose(body io.ReadCloser) {
 }
 
 const (
-	couchURL  = "http://mddb:benchmark123@localhost:5984"
 	totalDocs = 3000
 	batchSize = 100
 	dbName    = "mddb_test"
 )
+
+// couchURL is set in main, with the password from the environment.
+var couchURL string
 
 type Stats struct {
 	Times      []time.Duration
@@ -55,6 +60,7 @@ func checkConnection() {
 }
 
 func main() {
+	couchURL = (&url.URL{Scheme: "http", User: url.UserPassword("mddb", benchenv.MustPassword()), Host: "localhost:5984"}).String()
 	fmt.Println("════════════════════════════════════════════════")
 	fmt.Println("  CouchDB Performance Test")
 	fmt.Println("════════════════════════════════════════════════")

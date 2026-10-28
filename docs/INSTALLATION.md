@@ -542,7 +542,7 @@ ready, and its answer is cached in `GET /health`:
 
 ```json
 { "status": "healthy",
-  "update": { "current": "2.11.4", "latest": "v2.12.0", "available": true } }
+  "update": { "current": "2.18.5", "latest": "v2.18.6", "available": true } }
 ```
 
 An **absent** `update` field means the check is disabled or has not finished,

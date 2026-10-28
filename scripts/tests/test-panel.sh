@@ -89,7 +89,7 @@ cd ../..
 if [ ! -d "services/mddb-panel/node_modules" ]; then
     print_header "Installing Panel Dependencies"
     cd services/mddb-panel
-    npm install
+    npm ci --ignore-scripts
     cd ../..
 fi
 
