@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.7] - 2026-10-28
+
 ### Security
 
 - **Backups are written through `os.Root`.** The backup path was checked by
