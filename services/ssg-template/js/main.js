@@ -59,14 +59,26 @@
         }
     });
 
-    // Smooth scroll for on-page anchor links
+    // Section links on the headings of a document, before the smooth scroll
+    // below binds to every on-page link.
+    const docBody = document.querySelector('.doc-body');
+    if (docBody) {
+        addHeadingAnchors(docBody, document);
+    }
+
+    // Smooth scroll for on-page anchor links. The target is looked up by id,
+    // not with querySelector: a heading id may start with a digit
+    // ("1-deterministic-ids"), which is not a valid selector. The URL keeps
+    // the fragment, so a section link can be copied from the address bar.
     document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
         anchor.addEventListener('click', function (e) {
-            const target = document.querySelector(this.getAttribute('href'));
+            const hash = this.getAttribute('href');
+            const target = document.getElementById(decodeURIComponent(hash.slice(1)));
             if (target) {
                 e.preventDefault();
                 const top = target.getBoundingClientRect().top + window.scrollY - 80;
                 window.scrollTo({ top: top, behavior: 'smooth' });
+                history.pushState(null, '', hash);
             }
         });
     });
@@ -93,3 +105,23 @@
         pre.appendChild(btn);
     });
 })();
+
+/**
+ * Adds a "#" link to every h1, h2 and h3 in root that has an id, so a
+ * section's address can be followed or copied. The ids come from the site
+ * generator; a heading without one is left alone, and running it twice adds
+ * nothing.
+ */
+function addHeadingAnchors(root, doc) {
+    root.querySelectorAll('h1[id], h2[id], h3[id]').forEach(function (heading) {
+        if (heading.querySelector('.heading-anchor')) {
+            return;
+        }
+        const link = doc.createElement('a');
+        link.className = 'heading-anchor';
+        link.href = '#' + heading.id;
+        link.setAttribute('aria-label', 'Link to the section ' + heading.textContent.trim());
+        link.textContent = '#';
+        heading.appendChild(link);
+    });
+}

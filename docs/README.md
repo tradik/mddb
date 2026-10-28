@@ -26,8 +26,8 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
 - **[API Documentation](API.md)** - Complete HTTP/JSON API reference
-- **[OpenAPI/Swagger Specification](/docs/api/swagger/)** - Machine-readable API spec (OpenAPI 3.0)
-- **[Swagger UI](/docs/api/swagger/)** - Interactive API documentation
+- **[OpenAPI specification](/docs/api/openapi.yaml)** - Machine-readable API spec (OpenAPI 3.0)
+- **[REST API reference](/docs/api/reference/)** - every endpoint and schema, with a Try it console
 - **[Health Check Guide](HEALTHCHECK.md)** - Health checks for Docker, Kubernetes, and load balancers
 - **[gRPC Documentation](GRPC.md)** - High-performance gRPC API guide
 - **[Usage Examples](EXAMPLES.md)** - Code examples and integration patterns
