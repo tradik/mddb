@@ -86,7 +86,7 @@
 .doc-body h2 { font-size: 1.5rem; margin: 2rem 0 .75rem; border-bottom: 1px solid var(--border); padding-bottom: .5rem; }
 .doc-body h3 { font-size: 1.2rem; margin: 1.5rem 0 .5rem; }
 .doc-body h4 { font-size: 1.05rem; margin: 1.25rem 0 .5rem; }
-/* Section links (js/main.js addHeadingAnchors): shown on hover and on focus,
+/* Section links (SSG heading_anchors): shown on hover and on focus,
    always on touch screens; scroll-margin keeps a linked heading clear of the
    fixed navbar. */
 .doc-body :is(h1, h2, h3, h4)[id] { scroll-margin-top: calc(var(--navbar-h) + 16px); }

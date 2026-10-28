@@ -52,7 +52,7 @@ jobs:
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 
       - name: Generate site with SSG
-        uses: spagu/ssg@464c732acc19648269f43d174c0534361af74919 # v1.8.80
+        uses: spagu/ssg@d7de465bcd41f403924d7e8239e09559245bd496 # v1.8.82
         with:
           # Pinned: the build depends on output validation from 1.8.18
           # (check_links/images/meta/orphans), static_sources from 1.8.19,
@@ -64,7 +64,8 @@ jobs:
           # the API reference at /docs/api/swagger/ can enter sitemap.xml, and,
           # from 1.8.66, the `listen:` button on blog posts (1.8.67 rebuilds
           # fully after an ssg upgrade, so it appears without a content
-          # change). The
+          # change), and from 1.8.82 `heading_anchors:`, the section
+          # links on headings. The
           # pin is also what made the last mismatch obvious rather than
           # intermittent.
           #
@@ -78,7 +79,7 @@ jobs:
           # not landed fails this job with a 404 on ssg-linux-amd64.tar.gz. The
           # check is one command:
           #   gh release view v1.8.58 --repo spagu/ssg --json assets
-          version: 'v1.8.80'
+          version: 'v1.8.82'
           source: '.'
           template: 'ssg-template'
           domain: 'mddb.tradik.com'

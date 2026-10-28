@@ -26,8 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   link to its own address (on hover, on focus, and always on touch screens),
   and a linked heading is no longer hidden under the navbar. Following an
   on-page link to a heading whose id starts with a digit threw instead of
-  scrolling, and the address bar now keeps the section's fragment
-  (spagu/ssg#364 asks the generator to render these links).
+  scrolling, and the address bar now keeps the section's fragment. The
+  links are written into the HTML by SSG 1.8.82 (`heading_anchors`,
+  spagu/ssg#364), so they work without JavaScript; the docs deploy moves from
+  SSG 1.8.80 to 1.8.82.
 
 ## [2.18.7] - 2026-10-28
 

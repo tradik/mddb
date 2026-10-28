@@ -121,6 +121,11 @@ api_docs:
     url: /docs/api/reference/
 check_api: warn
 
+# A "#" self-link on every h1–h3 with an id, written at build time (SSG 1.8.82),
+# so section links work without JavaScript. Styled by .heading-anchor in
+# css/docs.css.
+heading_anchors: true
+
 static_sources:
   - path: docs/openapi.yaml
     dest: docs/api/openapi.yaml
