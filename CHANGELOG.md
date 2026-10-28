@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   WordPress's takes any number, and `WP_Query` was defined by `eval` in two
   versions, of which only the first one run existed; it is a stub file now.
 
+### Documentation
+
+- Blog: [Why Put Your Code in a Database](blog/2026-10-28-why-put-your-code-in-a-database.md),
+  what semantic search, exact-name search and `code_graph` over a repository
+  are good for, and where they fall short.
+
 ## [2.18.6] - 2026-10-27
 
 ### Added
