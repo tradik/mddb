@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# The throwaway databases' password, shared with docker-compose.benchmark.yml
+# and the Go clients (test/internal/benchenv).
+export MDDB_BENCH_PASSWORD="${MDDB_BENCH_PASSWORD:-benchmark123}"
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -62,7 +66,7 @@ done
 # Check CouchDB health
 echo -n "Checking CouchDB... "
 for i in {1..30}; do
-    if curl -s http://mddb:benchmark123@localhost:5984/_up | grep -q "ok" >/dev/null 2>&1; then
+    if curl -s -u "mddb:${MDDB_BENCH_PASSWORD}" http://localhost:5984/_up | grep -q "ok" >/dev/null 2>&1; then
         echo -e "${GREEN}✓ Ready${NC}"
         break
     fi

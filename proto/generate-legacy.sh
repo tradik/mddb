@@ -77,7 +77,7 @@ if command -v python3 &> /dev/null; then
     # Check if grpcio-tools is installed
     if ! python3 -c "import grpc_tools" 2>/dev/null; then
         echo "  Installing grpcio-tools..."
-        pip3 install grpcio-tools 2>/dev/null || echo "  ⚠️  Install manually: pip3 install grpcio-tools"
+        pip3 install --only-binary :all: grpcio-tools 2>/dev/null || echo "  ⚠️  Install manually: pip3 install --only-binary :all: grpcio-tools"
     fi
     
     mkdir -p clients/python/mddb_client

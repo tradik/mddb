@@ -81,6 +81,10 @@ go run ./grpc-perf
 # gRPC batch test
 go run ./grpc-batch
 
+# The database clients read the containers' password from MDDB_BENCH_PASSWORD
+# (docker-compose.benchmark.yml defaults it to benchmark123)
+export MDDB_BENCH_PASSWORD=benchmark123
+
 # MySQL test (requires Docker containers)
 docker-compose -f docker-compose.benchmark.yml up -d
 go run ./mysql

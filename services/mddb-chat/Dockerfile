@@ -14,7 +14,7 @@ COPY services/mddb-chat/ .
 # Update proto path for Docker context
 RUN sed -i 's|../../proto/|/proto/|g' build.rs
 
-RUN cargo build --release
+RUN cargo build --release --locked
 
 # Runtime stage
 FROM debian:bookworm-slim

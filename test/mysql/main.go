@@ -8,10 +8,10 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"mddb-test/internal/benchenv"
 )
 
 const (
-	mysqlDSN  = "mddb:benchmark123@tcp(localhost:13306)/mddb_test?charset=utf8mb4&parseTime=True"
 	totalDocs = 3000
 	batchSize = 100
 )
@@ -34,7 +34,7 @@ func main() {
 
 	// Connect to MySQL
 	fmt.Print("Connecting to MySQL... ")
-	db, err := sql.Open("mysql", mysqlDSN)
+	db, err := sql.Open("mysql", "mddb:"+benchenv.MustPassword()+"@tcp(localhost:13306)/mddb_test?charset=utf8mb4&parseTime=True")
 	if err != nil {
 		fmt.Printf("✗ Failed: %v\n", err)
 		os.Exit(1)

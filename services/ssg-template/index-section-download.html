@@ -82,35 +82,35 @@ docker pull tradik/mddb:{{$.Vars.mddbVersion}}</code></pre>
             </div>
         </div>
         <div class="release-notes">
-            <!-- Content mirrors CHANGELOG.md [2.11.4]. TODO: replace with the
+            <!-- Content mirrors CHANGELOG.md [2.18.0]–[2.18.6]. TODO: replace with the
                  native SSG changelog data source when spagu/ssg#69 ships. -->
             <h3>What's New in v{{$.Vars.mddbVersion}}</h3>
             <ul>
-                <li><strong>Native multi-tenancy</strong> — tenant namespace isolation for
-                    collections, enforced centrally so HTTP, gRPC, GraphQL and MCP all
-                    inherit it; tenant users can never hold the global admin role and
-                    single-tenant deployments need zero changes.
+                <li><strong>Code as a graph</strong>: store a repository one file per document
+                    and <code>code_graph</code> answers what calls a function, what includes a
+                    header and which manifest uses a Secret. Go, Rust, Java, Python, Ruby, PHP,
+                    C, C++, assembly, Terraform, Kubernetes, OpenShift, Kustomize and Ansible.
                 </li>
-                <li><strong>Retrieval modes for vector search</strong> — <code>retrievalMode:
-                    parent | chunk | window</code> returns whole documents, the exact matching
-                    passage (<code>chunkIndex</code> + <code>chunkText</code>), or the passage
-                    with surrounding context — precise prompts for RAG.
+                <li><strong>Chunking per collection</strong>: <code>embedding: {chunkSize,
+                    chunkMode}</code>, with code split where brackets balance so an embedded
+                    chunk is a whole function.
                 </li>
-                <li><strong>MMR result diversification</strong> — <code>mmr: true</code> reranks
-                    with Maximal Marginal Relevance so near-duplicate documents stop crowding
-                    out distinct ones; <code>mmrLambda</code> balances relevance vs diversity.
+                <li><strong>Restarts in milliseconds</strong>: a clean shutdown records the
+                    free pages, so a planned restart no longer walks the database, and after a
+                    crash reads start at once while the freelist rebuilds in the background.
                 </li>
-                <li><strong>Disk-only vectors (low-memory mode)</strong> —
-                    <code>diskOnlyVectors: true</code> keeps only quantized vectors in RAM
-                    (~4× less with int8, ~8× with int4) while full-precision vectors stay on
-                    disk for exact two-phase rescoring.
+                <li><strong>One storage file per collection</strong>:
+                    <code>MDDB_STORAGE_LAYOUT=per-collection</code>, full-text indexing that a
+                    collection can switch off, and <code>/v1/storage</code> to see where the
+                    bytes go.
                 </li>
-                <li><strong>Vector space explorer</strong> — <code>/v1/vector-projection</code>
-                    computes a server-side 2D PCA projection of a collection's embeddings and
-                    the panel visualizes clusters, outliers and query placement.
+                <li><strong>A large database stays responsive</strong>: stats and long scans
+                    read in short transactions, <code>/health</code> answers while the database
+                    is busy, and vector reindexing runs as a job with progress.
                 </li>
-                <li><strong>arm64 SIMD restored</strong> — NEON/SME hardware acceleration for
-                    vector math builds and links again on Apple Silicon and ARM servers.
+                <li><strong>OAuth 2.1 for MCP</strong>: claude.ai custom connectors sign in to
+                    the MCP listener, which also gains custom prompts and more actions for
+                    custom tools.
                 </li>
             </ul>
             <a href="https://github.com/tradik/mddb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">View

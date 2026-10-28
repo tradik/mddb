@@ -93,6 +93,12 @@ Complete list of MDDB features organized by category.
 - **API Endpoint** - `POST /v1/hybrid-search` with gRPC `HybridSearch` RPC and `hybrid_search` MCP tool
 - **Distance Sort** (v2.9.13+) - With a `geo` filter attached, `sort: "distance"` re-orders post-merge results by proximity ascending instead of fused score
 
+#### Code Search & Code Graph
+- **Code is indexed as code** - Identifiers are kept whole and split into parts (`parse_request`, `request`), nothing is stemmed, keywords stay searchable. A document is code by its extension or `meta.language`
+- **Chunking on brackets** - `embedding.chunkMode: code` (v2.18.1+) splits code for embedding where brackets balance, so a chunk is a whole function
+- **Symbols** - `defines`, `uses` and `imports` extracted on save for CSS, JavaScript/TypeScript, HTML (v2.12+), C, C++, assembly (v2.18.0+), Go, Rust, Java, Python, Ruby, PHP, Terraform, Kubernetes/OpenShift manifests, Kustomize and Ansible (v2.18.6+); filter on them with `meta.defines=` / `meta.uses=`
+- **Connection graph** - `GET /v1/code-graph` and the `code_graph` MCP tool return what a file depends on and what depends on it, with `uses-selector`, `calls`, `references` and `imports` edges and the symbol behind each. See [API.md](API.md#the-connection-graph)
+
 #### Geospatial Search
 - **R-tree Index** - Radius and bounding-box queries over lat/lng points
 - **Geohash Index** - Alternative geohash-prefix index with same API

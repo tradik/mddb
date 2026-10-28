@@ -29,6 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **mddb-chat: pulldown-cmark 0.13.4 → 0.13.5** (RUSTSEC-2026-0414,
   exponential event growth with wiki links). It is a build dependency of
   `prost-build`, not linked into the binary, but `cargo audit` fails on it.
+- **Builds install what the lock files say, without install scripts.** The
+  mddb-chat images build with `cargo build --locked`, the chat widget image
+  with `npm ci --ignore-scripts`, `scripts/tests/test-panel.sh` the same,
+  and `proto/generate-legacy.sh` installs grpcio-tools from wheels only.
+- **The benchmark clients read the database password from
+  `MDDB_BENCH_PASSWORD`** instead of carrying it in four files.
+  `docker-compose.benchmark.yml` and `compare-all-databases.sh` default it to
+  the old value, so running the comparison is unchanged; a client started by
+  hand says which variable to set.
 
 ### Fixed
 
@@ -58,6 +67,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **The site's "What's New" listed 2.11.4** under the 2.18.6 heading; it now
+  covers the 2.18 series. Code search and the code graph are on the landing
+  page, in [FEATURES.md](docs/FEATURES.md) and in the docs index, which named
+  neither.
+- **openapi.yaml:** `POST /v1/fts-reindex` takes a JSON body, not a query
+  parameter; `/v1/storage` reads in short transactions since 2.18.5, and it
+  and `/v1/vector-stats` are scoped to the tenant (403 for another tenant's
+  collection); `/health` 503 bodies (`warming_up`, `stalled`, `unhealthy`)
+  are described; `code-graph` names calls and references.
+- [MCP.md](docs/MCP.md): `code_graph` as the server describes it, and the
+  MCP port's plain JSON endpoints (`/tools`, `/tools/call`, `/resources`,
+  `/resources/read`, `/events`); the tool-call log named `/mcp/tools/call`.
+- [config.md](docs/config.md) lists `MDDB_API_MODE`, `MDDB_GRPC_MODE`,
+  `MDDB_HTTP3_MODE`, `MDDB_CODE_MAX_SYMBOLS`, `MDDB_DISK_MIN_FREE`,
+  `MDDB_METRICS_PUBLIC` and `MDDB_REPLICATION_SECRET`, read by the server and
+  documented only elsewhere.
+- API.md counted three edge kinds over a table of four; tool count, binary
+  size and version numbers in examples brought up to date; tag and category
+  pages have `og:description`.
 - Blog: [Why Put Your Code in a Database](blog/2026-10-28-why-put-your-code-in-a-database.md),
   what semantic search, exact-name search and `code_graph` over a repository
   are good for, and where they fall short.
