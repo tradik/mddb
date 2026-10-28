@@ -9,7 +9,7 @@ which is not how Cloudflare Pages serves it.
 
 Pages rewrites two shapes before answering, with a 308 each time:
 
-  * `/docs/api/swagger/index.html` → `/docs/api/swagger/`  (`.html` stripped)
+  * `/docs/api/reference/index.html` → `/docs/api/reference/`  (`.html` stripped)
   * `/docs/config`                 → `/docs/config/`       (slash appended)
 
 Both work for a visitor, so nothing is broken — they simply cost a round trip

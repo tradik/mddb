@@ -41,7 +41,7 @@ graph TB
 
 Routes requests to handlers, applies middleware (JSON, CORS, auth, rate limit, logging), enforces access modes.
 
-For the **full endpoint catalogue** see [API.md](API.md) (HTTP/REST), [GRPC.md](GRPC.md) (gRPC), [GRAPHQL.md](GRAPHQL.md) (GraphQL schema), [MCP.md](MCP.md) (MCP tools), and the live Swagger UI at `/docs/api/swagger/`. The endpoint list lives in [services/mddbd/endpoints_handlers.go](https://github.com/tradik/mddb/blob/main/services/mddbd/endpoints_handlers.go) and is queryable at `GET /v1/endpoints`.
+For the **full endpoint catalogue** see [API.md](API.md) (HTTP/REST), [GRPC.md](GRPC.md) (gRPC), [GRAPHQL.md](GRAPHQL.md) (GraphQL schema), [MCP.md](MCP.md) (MCP tools), and the [REST API reference](/docs/api/reference/) generated from `openapi.yaml`. The endpoint list lives in [services/mddbd/endpoints_handlers.go](https://github.com/tradik/mddb/blob/main/services/mddbd/endpoints_handlers.go) and is queryable at `GET /v1/endpoints`.
 
 ### 2. Storage Layer (BoltDB)
 

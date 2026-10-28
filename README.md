@@ -599,7 +599,7 @@ mddb-cli stats
 - **[gRPC API](docs/GRPC.md)** - High-performance protocol guide
 - **[GraphQL API](docs/GRAPHQL.md)** - Flexible query language
 - **[OpenAPI/Swagger](docs/openapi.yaml)** - Machine-readable spec
-- **[Swagger UI](https://mddb.tradik.com/docs/api/swagger/)** - Interactive API docs
+- **[REST API reference](https://mddb.tradik.com/docs/api/reference/)** - every endpoint and schema from the OpenAPI spec, with a Try it console
 
 ### Features & Guides
 - **[Vector Search](docs/EMBEDDING_PROVIDERS.md)** - Semantic search setup (OpenAI, Cohere, Voyage, Ollama)

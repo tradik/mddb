@@ -67,7 +67,7 @@ two shapes before answering, with a 308 each time:
 
 | link in the HTML | what Pages does |
 |---|---|
-| `/docs/api/swagger/index.html` | 308 → `/docs/api/swagger/` (strips `.html`) |
+| `/docs/api/reference/index.html` | 308 → `/docs/api/reference/` (strips `.html`) |
 | `/docs/config` | 308 → `/docs/config/` (appends the slash) |
 
 Both work for a visitor, so nothing is broken — they cost a round trip and a

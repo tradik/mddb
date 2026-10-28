@@ -110,15 +110,18 @@ engine: "go"
 # see them — while they were staged by a Makefile step afterwards, every page
 # linking /docs/api/swagger was reported as a dead link.
 # `dest` for a file is its full destination path, not a directory to drop it in.
+# The REST reference is generated from docs/openapi.yaml (SSG api_docs): one
+# page for the API, one per tag, one for the schemas, in the site's theme and
+# search, with a Try it console. It replaced a Swagger UI page that was a
+# copied file outside the theme, loaded the spec from a relative URL that
+# 404ed, and showed nothing without JavaScript.
+api_docs:
+  - openapi: docs/openapi.yaml
+    name: MDDB REST API
+    url: /docs/api/reference/
+check_api: warn
+
 static_sources:
-  # A directory page, not swagger.html: Cloudflare Pages strips the extension
-  # and 308s, so a .html URL and the file on disk can never both be right.
-  - path: services/ssg-template/swagger.html
-    dest: docs/api/swagger/index.html
-    # A copied file never becomes a page, so nothing in the sitemap could reach
-    # it: the API reference was linked from the footer of every page and absent
-    # from the file the site uses to state its own structure (SSG 1.8.57).
-    sitemap: true
   - path: docs/openapi.yaml
     dest: docs/api/openapi.yaml
   - path: services/ssg-template/404.html
@@ -170,6 +173,10 @@ feeds:
 redirects:
   - from: /index/
     to: /
+    status: 301
+  # The Swagger UI page (until 2.18.7) is now the generated REST reference.
+  - from: /docs/api/swagger/
+    to: /docs/api/reference/
     status: 301
   # Retired tags (2026-09): the vocabulary carried 23 terms across 11 posts, so
   # 13 archives listed a single article each — thin pages a crawler reports and

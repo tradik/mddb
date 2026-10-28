@@ -82,6 +82,14 @@ servers:
   - url: http://localhost:11023/v1
     description: Local development server (with version prefix)
 
+# Authentication is off unless MDDB_AUTH_ENABLED=true, so each operation
+# accepts a JWT, an API key, or nothing; with auth on, only /health and the
+# login endpoints answer without credentials.
+security:
+  - BearerAuth: []
+  - APIKeyAuth: []
+  - {}
+
 tags:
   - name: Health
     description: Health check and monitoring endpoints
@@ -4607,7 +4615,7 @@ paths:
         `MDDB_AUDIT_ENABLED` is not set. Events are returned newest-first.
       operationId: auditQuery
       security:
-        - bearerAuth: []
+        - BearerAuth: []
       parameters:
         - name: from
           in: query
@@ -4707,8 +4715,8 @@ paths:
         Returns a snapshot of every configured audit-log exporter (webhook,
         syslog) with delivered / failed / dropped counts and the last error.
       security:
-        - bearerAuth: []
-        - apiKeyAuth: []
+        - BearerAuth: []
+        - APIKeyAuth: []
       responses:
         "200":
           description: Exporter status
@@ -4759,8 +4767,8 @@ paths:
         Primary keyID, configured previous keyIDs, and per-collection counts
         of how each document is sealed (primary / legacy / plaintext / unknown).
       security:
-        - bearerAuth: []
-        - apiKeyAuth: []
+        - BearerAuth: []
+        - APIKeyAuth: []
       responses:
         "200":
           description: Encryption status
@@ -4818,8 +4826,8 @@ paths:
         already under the primary keyID are skipped. Single-flight: calling
         rotate while a job is running returns the existing job's ID.
       security:
-        - bearerAuth: []
-        - apiKeyAuth: []
+        - BearerAuth: []
+        - APIKeyAuth: []
       requestBody:
         required: false
         content:
@@ -4849,8 +4857,8 @@ paths:
         - Encryption
       summary: List rotation jobs (2.9.16+)
       security:
-        - bearerAuth: []
-        - apiKeyAuth: []
+        - BearerAuth: []
+        - APIKeyAuth: []
       responses:
         "200":
           description: Jobs list (newest first)
@@ -6667,14 +6675,6 @@ components:
           default: false
         profile:
           type: string
-        sanitized:
-          type: integer
-          description: >-
-            How many documents had undecodable bytes dropped because their text
-            was not valid UTF-8 (GO-036). A bulk import sanitises rather than
-            failing, so one page in Windows-1250 cannot abort the other twenty
-            thousand — but the count says how many were changed. Single-document
-            writes refuse instead, with an error naming the encoding.
           enum: [ default, fast ]
           default: default
           description: >
@@ -6686,19 +6686,6 @@ components:
             explicitly overrides the preset, so `fast` plus `saveRevision: true`
             keeps revisions. An unknown name is rejected with 400 rather than
             falling back silently.
-        keyCollisions:
-          type: array
-          items:
-            type: string
-          description: |
-            (v2.12.0+) Input keys that differ only in letter case and therefore
-            name one document — `README.md` and `readme.md` are the same
-            document, and the last write wins.
-
-            The write still happens; refusing a large import over a spelling
-            would be worse. Absent when there are no collisions.
-          example:
-            - '"README.md" and "readme.md" name one document (keys are case-insensitive); the last write wins'
         textOnly:
           type: boolean
           default: false
@@ -6747,6 +6734,27 @@ components:
             (v2.12.0+) Which ingest profile actually applied, so a corpus
             loaded months ago can be explained without guessing which flags the
             caller sent.
+        sanitized:
+          type: integer
+          description: >-
+            How many documents had undecodable bytes dropped because their text
+            was not valid UTF-8 (GO-036). A bulk import sanitises rather than
+            failing, so one page in Windows-1250 cannot abort the other twenty
+            thousand — but the count says how many were changed. Single-document
+            writes refuse instead, with an error naming the encoding.
+        keyCollisions:
+          type: array
+          items:
+            type: string
+          description: |
+            (v2.12.0+) Input keys that differ only in letter case and therefore
+            name one document — `README.md` and `readme.md` are the same
+            document, and the last write wins.
+
+            The write still happens; refusing a large import over a spelling
+            would be worse. Absent when there are no collisions.
+          example:
+            - '"README.md" and "readme.md" name one document (keys are case-insensitive); the last write wins'
 
     GetRequest:
       type: object
