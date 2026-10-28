@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extension: trailing slashes are trimmed without a backtracking regex
   (the action's `dist/` is rebuilt). Proto scripts use `[[ ]]`. The GTM
   `<iframe>` on the docs site has a title.
+- `docs/config.md` said documents under `MDDB_COMPRESSION_SMALL_THRESHOLD`
+  (1 KB) are Snappy-compressed; they are stored uncompressed, Snappy covers
+  1–10 KB and Zstd everything above.
 - WordPress plugin tests: the `apply_filters` stub had two parameters where
   WordPress's takes any number, and `WP_Query` was defined by `eval` in two
   versions, of which only the first one run existed; it is a stub file now.

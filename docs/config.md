@@ -570,9 +570,9 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_COMPRESSION_ENABLED` | `true` | bool | Enable adaptive document compression |
-| `MDDB_COMPRESSION_SMALL_THRESHOLD` | `1024` | int (bytes) | Below this: Snappy compression |
-| `MDDB_COMPRESSION_MEDIUM_THRESHOLD` | `10240` | int (bytes) | Above this: Zstd compression |
+| `MDDB_COMPRESSION_ENABLED` | `true` | bool | Enable adaptive compression of stored documents and revisions (not indexes, vectors or API traffic) |
+| `MDDB_COMPRESSION_SMALL_THRESHOLD` | `1024` | int (bytes) | Below this: stored uncompressed. From here up to the medium threshold: Snappy |
+| `MDDB_COMPRESSION_MEDIUM_THRESHOLD` | `10240` | int (bytes) | From this size: Zstd (default level). Either codec is kept only when the result is smaller |
 
 ---
 
