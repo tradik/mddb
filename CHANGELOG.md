@@ -26,6 +26,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   only.** It installed version ranges from `requirements.txt`, so a build could
   pick up any new release and run an sdist's setup script; `make lock`
   regenerates `requirements.lock`.
+- **mddb-chat: pulldown-cmark 0.13.4 → 0.13.5** (RUSTSEC-2026-0414,
+  exponential event growth with wiki links). It is a build dependency of
+  `prost-build`, not linked into the binary, but `cargo audit` fails on it.
 
 ### Fixed
 
@@ -33,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replaces bbolt with `./third_party/bbolt` (#333), which the dev image copied
   only after `go mod download`. Air is now the release binary checked against
   its published SHA-256 rather than a `go install` resolving its dependencies
-  at build time. `docs/DOCKER.md` gave the wrong build context for it and named a make target that does not exist (`make dev-build` is the one).
+  at build time, downloaded over HTTPS only (redirects included). `docs/DOCKER.md` gave the wrong build context for it and named a make target that does not exist (`make dev-build` is the one).
 - **The chat widget's link rendering was a regex that backtracks** on text
   with many `[` and no `](`; a message could stall the page. A linear scanner
   replaces it, checked against the regex on 5,000 random inputs.
