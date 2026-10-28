@@ -19,7 +19,7 @@ RUN set -eu; \
       arm64) sum=a9695e7f06b5eb8d871d240127c13e19b58e126406f6dcf9b2a883c890b91181 ;; \
       *) echo "no Air binary for ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
-    curl -fsSL -o /usr/local/bin/air \
+    curl --proto '=https' --tlsv1.2 -fsSL -o /usr/local/bin/air \
       "https://github.com/air-verse/air/releases/download/v${AIR_VERSION}/air_${AIR_VERSION}_linux_${TARGETARCH}"; \
     echo "${sum}  /usr/local/bin/air" | sha256sum -c -; \
     chmod 0755 /usr/local/bin/air
