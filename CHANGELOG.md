@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The S3 and memory storage backends key their index as bbolt does
+  (#360).** The key and language are stored with ASCII letters in lower
+  case, and the collection as written. So `README.md` is found as
+  `readme.md`, and two spellings of one key leave a single entry.
+  - **No bucket is rewritten, because there is nothing to migrate.** MDDB
+    keeps the key index of every collection in its local database, which
+    DOC-017 already migrates. It moves only document bodies to a backend,
+    so no release has written key-index objects to S3.
+
 - **SonarCloud quality gate failed on main after 2.18.8.** It reported
   `gosecurity:S2083`, path traversal, on the collection directory of a
   backup (`db_backup.go`). This is a false positive: the call goes through
