@@ -104,6 +104,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **OpenTelemetry trace export (OPS-024).** With `MDDB_OTEL_ENDPOINT` set,
+  MDDB sends spans over OTLP/HTTP (JSON) to any OpenTelemetry collector.
+  - **Spans.** `search.fts`, `search.embed_query`, `search.vector`,
+    `search.fuse`, `search.load_content`, `ingest.convert`, `ingest.index`
+    and `ingest.embed`, each under a server span per request.
+  - **Joining the caller's trace.** A W3C `traceparent` from a REST or
+    MCP-over-HTTP header, or from gRPC metadata, puts the spans into the
+    caller's own trace. Requests without one start a new trace, sampled at
+    `MDDB_OTEL_SAMPLE_RATIO`. Every MCP stdio request is its own trace.
+  - **Delivery.** Export is batched and asynchronous through a bounded
+    queue, so a slow or missing collector never delays a request. Dropped
+    spans and failed exports are counted in `mddb_operations_total`. Queued
+    spans are flushed on shutdown.
+  - **No SDK dependency.** The exporter is built in. It adds 45 KB to the
+    binary, where the OpenTelemetry SDK would add 1.5 MB.
+  - **Free when off.** With no endpoint set, hybrid search keeps the same
+    time and allocations per request as before.
+  - **Settings.** `MDDB_OTEL_HEADERS`, `MDDB_OTEL_SERVICE_NAME` and
+    `MDDB_OTEL_QUEUE_SIZE`; see docs/TELEMETRY.md.
 - **Document summaries as a second representation (RAG-009).** A document
   can carry a summary, written by its client, in the metadata key
   `summary`. MDDB never generates one and has no LLM in the server.

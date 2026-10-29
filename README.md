@@ -652,7 +652,7 @@ mddb-cli stats
 - **[Deployment](docs/DEPLOYMENT.md)** - Production setup
 - **[Storage Tuning](docs/STORAGE-TUNING.md)** - Disks, filesystems, WSL2, macOS, FreeBSD, ZFS; fast restarts of large databases
 - **[Storage Layout](docs/STORAGE-LAYOUT.md)** - One file, or one file per collection (`MDDB_STORAGE_LAYOUT`)
-- **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana
+- **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana, OpenTelemetry traces over OTLP (`MDDB_OTEL_ENDPOINT`)
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes
 - **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured
 - **[Architecture](docs/ARCHITECTURE.md)** - System design
