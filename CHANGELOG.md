@@ -144,8 +144,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     chunks too.
 - **The server chooses the vector index: `algorithm: "auto"` (SRCH-013).**
   - **Where.** `algorithm` on `/v1/vector-search` and `/v1/cross-search`,
-    `vectorAlgorithm` on `/v1/hybrid-search`, the same on the MCP tools and
-    gRPC, and `retrieval.vectorAlgorithm` in the collection profile.
+    `vectorAlgorithm` on `/v1/hybrid-search`, the same on the MCP tools,
+    gRPC and GraphQL `vectorSearch` (`algorithm`, `explain`,
+    `latencyTargetMs`, and `plan` in the response), and
+    `retrieval.vectorAlgorithm` in the collection profile.
   - **What the planner looks at.** A query planner picks the index per
     query. It goes by:
     - collection size: flat under 10k vectors, hnsw up to 1M, ivf above;
@@ -164,7 +166,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Default unchanged.** Without `algorithm`, search is flat exactly as
     before.
 - **Relevance feedback (SRCH-015).** Vector, hybrid and cross search, the
-  `semantic_search`, `hybrid_search` and `cross_search` tools, and gRPC take
+  `semantic_search`, `hybrid_search` and `cross_search` tools, gRPC and
+  GraphQL `vectorSearch` (`FeedbackExampleInput {key}` or `{vector}`) take
   `positive` and `negative` examples, as document keys or vectors.
   - **Modes.** `feedbackMode: "query"` (the default) moves the query vector
     with Rocchio (1 / 0.75 / 0.25, overridable with `rocchio`). `"rescore"`
