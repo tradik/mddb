@@ -16,6 +16,16 @@ make build-cli
 make install-all
 ```
 
+### Docker
+
+The image is built from the repository root, because the CLI uses the Go
+client from `clients/go/mddb`:
+
+```bash
+docker build -f services/mddb-cli/Dockerfile -t mddb-cli .
+docker run --rm -e MDDB_SERVER=http://host.docker.internal:11023 mddb-cli stats
+```
+
 ### Manual Installation
 
 ```bash

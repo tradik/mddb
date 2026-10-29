@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 )
 
@@ -18,9 +20,21 @@ var (
 // defaultServerURL is where the CLI looks for a server when told nothing else.
 const defaultServerURL = "http://localhost:11023"
 
+// serverEnv overrides defaultServerURL; --server overrides both. The README
+// documented it for years before the CLI read it (fixed in 2.18.9).
+const serverEnv = "MDDB_SERVER"
+
+// defaultServer is MDDB_SERVER when set, defaultServerURL otherwise.
+func defaultServer() string {
+	if u := os.Getenv(serverEnv); u != "" {
+		return u
+	}
+	return defaultServerURL
+}
+
 // newRootCmd builds the whole command tree.
 func newRootCmd() *cobra.Command {
-	serverURL, outputJSON, verbose, apiKey, token = defaultServerURL, false, false, "", ""
+	serverURL, outputJSON, verbose, apiKey, token = defaultServer(), false, false, "", ""
 
 	rootCmd := &cobra.Command{
 		Use:   "mddb-cli",
@@ -32,7 +46,7 @@ It provides an interface similar to mysql-client for managing markdown documents
 		Version: CurrentVersion(),
 	}
 
-	rootCmd.PersistentFlags().StringVarP(&serverURL, "server", "s", defaultServerURL, "MDDB server URL")
+	rootCmd.PersistentFlags().StringVarP(&serverURL, "server", "s", defaultServer(), "MDDB server URL (env "+serverEnv+")")
 	rootCmd.PersistentFlags().BoolVarP(&outputJSON, "json", "j", false, "Output raw JSON")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	rootCmd.PersistentFlags().StringVar(&apiKey, "api-key", "", "API key for authentication")
