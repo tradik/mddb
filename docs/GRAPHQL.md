@@ -215,6 +215,19 @@ query {
 }
 ```
 
+`filter` (v2.18.8+) takes the operator filter from
+[Filter Operators](SEARCH.md#filter-operators-v2188) as a JSON object, on
+`search` and `vectorSearch`, ANDed with `filterMeta`:
+
+```graphql
+query {
+  search(input: {
+    collection: "repo"
+    filter: { path: { prefix: "internal/" }, kind: { not: ["test"] } }
+  }) { edges { node { key } } }
+}
+```
+
 ### Vector Search (Semantic Search)
 
 ```graphql

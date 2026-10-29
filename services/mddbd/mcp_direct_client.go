@@ -10,7 +10,6 @@ import (
 	"sort"
 	"time"
 
-	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	proto "mddb/proto"
 
@@ -209,12 +208,12 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 	type row struct{ Doc storage.Doc }
 	var rows []row
 
+	filter := mergeFilters(req.FilterMeta, req.Filter)
 	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
 		seen := make(map[string]bool)
 
-		if len(req.FilterMeta) == 0 {
+		if len(filter) == 0 {
 			c2 := bDocs.Cursor()
 			prefix := []byte("doc|" + req.Collection + "|")
 			for k, v := c2.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c2.Next() {
@@ -231,21 +230,7 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 				rows = append(rows, row{*d})
 			}
 		} else {
-			var sets [][]string
-			for mk, mvals := range req.FilterMeta {
-				var ids []string
-				for _, mv := range mvals {
-					prefix := storage.MetaKeyPrefix(req.Collection, mk, mv)
-					c2 := bIdx.Cursor()
-					for k, _ := c2.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c2.Next() {
-						id := string(k[len(prefix):])
-						ids = append(ids, id)
-					}
-				}
-				ids = sliceutil.Unique(ids)
-				sets = append(sets, ids)
-			}
-			ids := intersect(sets...)
+			ids := sortedIDs(metaFilterIDs(tx, req.Collection, filter))
 			for _, id := range ids {
 				if seen[id] {
 					continue
@@ -346,11 +331,11 @@ func (c *DirectClient) DeleteCollection(ctx context.Context, req *MCPDeleteColle
 func (c *DirectClient) collectExportDocs(req *MCPExportRequest) ([]storage.Doc, error) {
 	var docs []storage.Doc
 
+	filter := filterMetaAsFilter(req.FilterMeta)
 	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
 
-		if len(req.FilterMeta) == 0 {
+		if len(filter) == 0 {
 			cur := bDocs.Cursor()
 			prefix := []byte("doc|" + req.Collection + "|")
 			for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
@@ -361,21 +346,7 @@ func (c *DirectClient) collectExportDocs(req *MCPExportRequest) ([]storage.Doc, 
 				docs = append(docs, *d)
 			}
 		} else {
-			var sets [][]string
-			for mk, mvals := range req.FilterMeta {
-				var ids []string
-				for _, mv := range mvals {
-					prefix := storage.MetaKeyPrefix(req.Collection, mk, mv)
-					cur := bIdx.Cursor()
-					for k, _ := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = cur.Next() {
-						id := string(k[len(prefix):])
-						ids = append(ids, id)
-					}
-				}
-				ids = sliceutil.Unique(ids)
-				sets = append(sets, ids)
-			}
-			for _, id := range intersect(sets...) {
+			for _, id := range sortedIDs(metaFilterIDs(tx, req.Collection, filter)) {
 				v := bDocs.Get(storage.DocKey(req.Collection, id))
 				if v == nil {
 					continue

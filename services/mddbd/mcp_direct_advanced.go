@@ -446,8 +446,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 
 	for _, coll := range req.TargetCollections {
 		var results []vec.VectorResult
-		if len(req.FilterMeta) > 0 {
-			allowedIDs := s.getDocIDsByMeta(coll, req.FilterMeta)
+		if allowedIDs, active := s.allowedDocIDs(coll, req.FilterMeta, req.Filter); active {
 			if len(allowedIDs) == 0 {
 				continue
 			}

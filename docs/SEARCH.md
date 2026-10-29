@@ -383,6 +383,53 @@ curl -X POST http://localhost:11023/v1/fts \
 
 **Filter logic:** AND between different metadata keys, OR between values of the same key (same as metadata search).
 
+### Filter Operators (v2.18.8+)
+
+`filterMeta` asks one question: is the value one of these? `filter` asks the
+rest — "path starts with `internal/`", "modified after September", "smaller
+than 10 kB", "not a test", "has a summary". It is accepted by `/v1/fts`,
+`/v1/vector-search`, `/v1/hybrid-search`, `/v1/cross-search`, `/v1/search`
+and `/v1/aggregate`, by the matching MCP tools (`filter` argument) and by the
+GraphQL `search` and `vectorSearch` inputs.
+
+```bash
+curl -X POST http://localhost:11023/v1/fts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection": "code",
+    "query": "hnsw",
+    "filter": {
+      "path":     {"prefix": "internal/"},
+      "modified": {"gte": "2026-09-01"},
+      "size":     {"lt": 10000},
+      "kind":     {"not": ["test"]},
+      "summary":  {"exists": true},
+      "title":    {"contains": "hnsw"}
+    }
+  }'
+```
+
+| Operator | Matches when | Notes |
+|---|---|---|
+| `in` | a value equals one of the list | one string or an array; same as `filterMeta` |
+| `prefix` | a value starts with the string | exact case; seeks the index, no scan |
+| `contains` | a value contains the substring | case-insensitive |
+| `gt` `gte` `lt` `lte` | a value is beyond the bound | numbers compare as numbers, dates as dates (a bound may be a date or a unix timestamp), anything else lexically |
+| `not` | the document has none of the values | documents without the key match |
+| `exists` | the document has (`true`) or lacks (`false`) the key | |
+
+- Keys are ANDed. Inside one key the value operators must hold for the
+  **same** value; a document with several values matches when any one does.
+- `filter` and `filterMeta` together are ANDed.
+- Every operator is answered from the metadata index. No document body is
+  read to evaluate a filter.
+- An unknown operator is rejected with `400` and its name, so a typo does not
+  turn into a filter that matches everything.
+- `rangeMeta` on `/v1/fts` (v2.7) still works. Since v2.18.8 a range on a
+  metadata key is folded into `filter` and answered from the index; ranges on
+  `addedAt` / `updatedAt` are still checked on the document. A multi-valued
+  key now matches when any value is in range, not only the first.
+
 ### Per-Query Boost/Demote (v2.9.12+)
 
 Reshape ranking without reindexing by attaching a `boost` map to the request. Keys are in `"metaKey:metaValue"` form; values multiply the score of matching documents.

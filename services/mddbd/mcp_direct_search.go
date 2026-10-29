@@ -65,8 +65,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	}
 
 	var results []vec.VectorResult
-	if len(req.FilterMeta) > 0 {
-		allowedIDs := s.getDocIDsByMeta(req.Collection, req.FilterMeta)
+	if allowedIDs, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
 		if len(allowedIDs) == 0 {
 			resp := &MCPVectorSearchResponse{
 				Results:        []MCPVectorSearchResult{},
@@ -354,6 +353,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		MaxHighlights:     req.MaxHighlights,
 		FragmentSize:      req.FragmentSize,
 		FilterMeta:        req.FilterMeta,
+		Filter:            req.Filter,
 		DisableStem:       req.DisableStem,
 		DisableSynonyms:   req.DisableSynonyms,
 		Mode:              req.Mode,
@@ -456,6 +456,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		Threshold:       req.Threshold,
 		DistanceMetric:  req.DistanceMetric,
 		FilterMeta:      req.FilterMeta,
+		Filter:          req.Filter,
 		Boost:           req.Boost,
 		Sort:            req.Sort,
 		Oversample:      req.Oversample,

@@ -38,6 +38,11 @@ func (s *MCPToolServer) toolSearchDocuments(ctx context.Context, args map[string
 		Offset:         mcpGetInt(args, "offset"),
 		IncludeContent: includeContent,
 	}
+	filter, filterErr := mcpGetFilter(args)
+	if filterErr != nil {
+		return "", filterErr
+	}
+	req.Filter = filter
 	if asc, ok := args["asc"].(bool); ok {
 		req.Asc = asc
 	}
@@ -214,6 +219,11 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		WindowSize:     mcpGetInt(args, "window_size"),
 		Oversample:     mcpGetFloat(args, "oversample"),
 	}
+	filter, filterErr := mcpGetFilter(args)
+	if filterErr != nil {
+		return "", filterErr
+	}
+	req.Filter = filter
 	if mmr, ok := args["mmr"].(bool); ok {
 		req.MMR = mmr
 	}
@@ -332,6 +342,11 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		FacetBy:         mcpGetStringSlice(args, "facet_by"),
 		FacetMaxValues:  mcpGetInt(args, "facet_max_values"),
 	}
+	filter, filterErr := mcpGetFilter(args)
+	if filterErr != nil {
+		return "", filterErr
+	}
+	req.Filter = filter
 
 	resp, err := s.client.FTSSearch(ctx, req)
 	if err != nil {
@@ -384,6 +399,11 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		Boost:           mcpGetFloat64Map(args, "boost"),
 		Sort:            mcpGetString(args, "sort"),
 	}
+	filter, filterErr := mcpGetFilter(args)
+	if filterErr != nil {
+		return "", filterErr
+	}
+	req.Filter = filter
 	if alpha, ok := args["alpha"].(float64); ok {
 		req.Alpha = alpha
 	}

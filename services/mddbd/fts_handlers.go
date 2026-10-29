@@ -26,6 +26,7 @@ type FTSSearchRequest struct {
 	DisableSynonyms bool                `json:"disableSynonyms"`        // temporarily disable synonyms for this query
 	FieldWeights    map[string]float64  `json:"fieldWeights,omitempty"` // BM25F field weights
 	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`   // metadata pre-filter (in-graph filtering)
+	Filter          MetaFilter          `json:"filter,omitempty"`       // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	// Advanced search modes
 	Mode          string             `json:"mode,omitempty"`          // "simple" (default), "boolean", "phrase", "wildcard", "proximity", "auto"
 	Distance      int                `json:"distance,omitempty"`      // proximity distance (words) for mode=proximity
@@ -223,8 +224,11 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 
 	// Pre-filter by metadata (in-graph filtering)
 	var allowed map[string]bool
-	if len(req.FilterMeta) > 0 {
-		allowed = s.getDocIDsByMeta(req.Collection, req.FilterMeta)
+	// rangeMeta on metadata keys joins the index filter (SRCH-017); only
+	// timestamp ranges still need the documents.
+	filter, docRanges := rangeMetaAsFilter(req.Filter, req.RangeMeta)
+	if ids, active := s.allowedDocIDs(req.Collection, req.FilterMeta, filter); active {
+		allowed = ids
 		if len(allowed) == 0 {
 			return &FTSSearchResponse{
 				Results:   []FTSResultWithDoc{},
@@ -244,7 +248,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	// matches that happened to rank there (#311). The search functions score
 	// every match either way — the limit only truncates their sorted output.
 	searchLimit := req.Limit
-	if allowed != nil || len(req.RangeMeta) > 0 || len(req.Boost) > 0 || req.FacetScope == facetScopeAll {
+	if allowed != nil || len(docRanges) > 0 || len(req.Boost) > 0 || req.FacetScope == facetScopeAll {
 		searchLimit = 0
 	}
 
@@ -347,8 +351,8 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	}
 
 	// Apply range filters
-	if len(req.RangeMeta) > 0 && len(results) > 0 {
-		results, err = s.FilterByRange(req.Collection, results, req.RangeMeta)
+	if len(docRanges) > 0 && len(results) > 0 {
+		results, err = s.FilterByRange(req.Collection, results, docRanges)
 		if err != nil {
 			return nil, err
 		}

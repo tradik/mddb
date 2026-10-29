@@ -26,6 +26,7 @@ type CrossSearchRequest struct {
 	Algorithm         string              `json:"algorithm"`
 	DistanceMetric    string              `json:"distanceMetric"`
 	FilterMeta        map[string][]string `json:"filterMeta"`
+	Filter            MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	IncludeContent    bool                `json:"includeContent"`
 	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
 	// the index per requested result, before deduplication, merging or
@@ -160,8 +161,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 
 	for _, coll := range req.TargetCollections {
 		var results []vector.VectorResult
-		if len(req.FilterMeta) > 0 {
-			allowedIDs := s.getDocIDsByMeta(coll, req.FilterMeta)
+		if allowedIDs, active := s.allowedDocIDs(coll, req.FilterMeta, req.Filter); active {
 			if len(allowedIDs) == 0 {
 				continue
 			}

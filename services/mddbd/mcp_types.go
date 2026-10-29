@@ -67,6 +67,7 @@ type MCPGetRequest struct {
 type MCPSearchRequest struct {
 	Collection string              `json:"collection"`
 	FilterMeta map[string][]string `json:"filter_meta,omitempty"`
+	Filter     MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	Sort       string              `json:"sort,omitempty"`
 	Asc        bool                `json:"asc,omitempty"`
 	Limit      int                 `json:"limit,omitempty"`
@@ -213,6 +214,7 @@ type MCPVectorSearchRequest struct {
 	TopK           int                 `json:"topK,omitempty"`
 	Threshold      float64             `json:"threshold,omitempty"`
 	FilterMeta     map[string][]string `json:"filterMeta,omitempty"`
+	Filter         MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	IncludeContent bool                `json:"includeContent,omitempty"`
 	Algorithm      string              `json:"algorithm,omitempty"`
 	DistanceMetric string              `json:"distanceMetric,omitempty"`
@@ -327,6 +329,7 @@ type MCPFTSSearchRequest struct {
 	// The rest of what POST /v1/fts accepts (#328): for code, stemming has to
 	// be off and the search scoped by metadata on every call.
 	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`
+	Filter          MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	DisableStem     bool                `json:"disableStem,omitempty"`
 	DisableSynonyms bool                `json:"disableSynonyms,omitempty"`
 	Mode            string              `json:"mode,omitempty"`
@@ -401,6 +404,7 @@ type MCPHybridSearchRequest struct {
 	Threshold       float64             `json:"threshold,omitempty"`
 	DistanceMetric  string              `json:"distanceMetric,omitempty"`
 	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`
+	Filter          MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	Boost           map[string]float64  `json:"boost,omitempty"`
 	Sort            string              `json:"sort,omitempty"` // "combined" (default) or "distance"
 	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
@@ -697,6 +701,7 @@ type MCPCrossSearchRequest struct {
 	Algorithm         string              `json:"algorithm"`
 	DistanceMetric    string              `json:"distanceMetric"`
 	FilterMeta        map[string][]string `json:"filterMeta"`
+	Filter            MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	IncludeContent    bool                `json:"includeContent"`
 	// Oversample is the recall/latency knob (SRCH-005).
 	Oversample float64 `json:"oversample,omitempty"`

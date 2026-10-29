@@ -201,6 +201,12 @@ input UpdateDocumentInput {
 input SearchInput {
   collection: String!
   filterMeta: [MetaInput!]
+  """
+  Operator metadata filter (SRCH-017), ANDed with filterMeta. One condition
+  per key: in, prefix, contains, gt, gte, lt, lte, not, exists — e.g.
+  {"path": {"prefix": "internal/"}, "kind": {"not": ["test"]}}.
+  """
+  filter: JSONObject
   sort: String
   asc: Boolean
   limit: Int
@@ -214,6 +220,12 @@ input VectorSearchInput {
   topK: Int
   threshold: Float
   filterMeta: [MetaInput!]
+  """
+  Operator metadata filter (SRCH-017), ANDed with filterMeta. One condition
+  per key: in, prefix, contains, gt, gte, lt, lte, not, exists — e.g.
+  {"path": {"prefix": "internal/"}, "kind": {"not": ["test"]}}.
+  """
+  filter: JSONObject
   includeContent: Boolean
   """
   Recall/latency knob (SRCH-005): candidates fetched per requested result

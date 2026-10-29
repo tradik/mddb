@@ -91,6 +91,56 @@ func (s *Server) SearchRange(collection string, ranges []RangeFilter, limit int)
 	return results, nil
 }
 
+// rangeMetaAsFilter folds rangeMeta into the operator filter (SRCH-017), so
+// a range on a metadata key is answered from the meta index instead of by
+// loading every matching document. Ranges on addedAt/updatedAt live on the
+// document, not in the index, and are returned for FilterByRange; so is a
+// range whose operator the filter already sets for that key.
+func rangeMetaAsFilter(f MetaFilter, ranges []RangeFilter) (MetaFilter, []RangeFilter) {
+	if len(ranges) == 0 {
+		return f, nil
+	}
+	out := make(MetaFilter, len(f)+len(ranges))
+	for k, c := range f {
+		out[k] = c
+	}
+	var rest []RangeFilter
+	for _, rf := range ranges {
+		switch strings.ToLower(rf.Field) {
+		case "addedat", "updatedat":
+			rest = append(rest, rf)
+			continue
+		}
+		c := out[rf.Field]
+		if !foldRange(&c, rf) {
+			rest = append(rest, rf)
+			continue
+		}
+		out[rf.Field] = c
+	}
+	return out, rest
+}
+
+// foldRange copies rf's bounds into c unless c already sets one of them.
+func foldRange(c *MetaCondition, rf RangeFilter) bool {
+	pairs := []struct {
+		bound string
+		dst   **string
+	}{{rf.Gt, &c.Gt}, {rf.Gte, &c.Gte}, {rf.Lt, &c.Lt}, {rf.Lte, &c.Lte}}
+	for _, p := range pairs {
+		if p.bound != "" && *p.dst != nil {
+			return false
+		}
+	}
+	for _, p := range pairs {
+		if p.bound != "" {
+			v := p.bound
+			*p.dst = &v
+		}
+	}
+	return true
+}
+
 // FilterByRange applies range filters to an existing result set.
 func (s *Server) FilterByRange(collection string, results []fts.FTSResult, ranges []RangeFilter) ([]fts.FTSResult, error) {
 	if len(ranges) == 0 {

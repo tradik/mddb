@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"mddb/internal/binlog"
 	json "mddb/internal/jsonx"
-	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	"mddb/internal/temporal"
 	"net/http"
@@ -141,13 +140,14 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	type row struct{ Doc storage.Doc }
 	var rows []row
 
+	filter := mergeFilters(req.FilterMeta, req.Filter)
 	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
 		seen := make(map[string]bool)
 
-		// Jeśli brak filtra meta → pełny scan kolekcji (dla prostoty; można dodać bucket per collection)
-		if len(req.FilterMeta) == 0 {
+		// No filter: walk the whole collection. Otherwise resolve the filter
+		// on the meta index and load only the matching documents.
+		if len(filter) == 0 {
 			c := bDocs.Cursor()
 			prefix := []byte("doc|" + req.Collection + "|")
 			for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
@@ -161,22 +161,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 				rows = append(rows, row{*d})
 			}
 		} else {
-			// Intersect po meta kluczach
-			var sets [][]string
-			for mk, mvals := range req.FilterMeta {
-				var ids []string
-				for _, mv := range mvals {
-					prefix := storage.MetaKeyPrefix(req.Collection, mk, mv)
-					c := bIdx.Cursor()
-					for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-						id := string(k[len(prefix):])
-						ids = append(ids, id)
-					}
-				}
-				ids = sliceutil.Unique(ids)
-				sets = append(sets, ids)
-			}
-			ids := intersect(sets...)
+			ids := sortedIDs(metaFilterIDs(tx, req.Collection, filter))
 			for _, id := range ids {
 				if seen[id] {
 					continue

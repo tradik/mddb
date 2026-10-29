@@ -6054,6 +6054,51 @@ paths:
 
 components:
   schemas:
+    MetaFilter:
+      type: object
+      description: |
+        Operator metadata filter (SRCH-017, v2.18.8), ANDed with `filterMeta`.
+        One condition per metadata key; keys are ANDed. Inside a condition the
+        value operators (`in`, `prefix`, `contains`, `gt`, `gte`, `lt`, `lte`)
+        must all hold for the same value, and a document with several values
+        matches when any one does. `not` and `exists` judge the whole document,
+        so `not` keeps documents that lack the key. Every operator is answered
+        from the metadata index without reading document bodies. Bounds compare
+        numerically when both sides are numbers, by time when the value is a
+        date and the bound a date or unix timestamp, lexically otherwise.
+        An unknown operator is a 400 that names it.
+      additionalProperties:
+        $ref: '#/components/schemas/MetaCondition'
+      example:
+        path: { prefix: internal/ }
+        modified: { gte: '2026-09-01' }
+        size: { lt: 10000 }
+        kind: { not: [ test ] }
+        summary: { exists: true }
+        title: { contains: hnsw }
+    MetaCondition:
+      type: object
+      additionalProperties: false
+      properties:
+        in:
+          description: Exact values; one string or an array.
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        prefix: { type: string, description: 'Value starts with (exact case; seeks the index).' }
+        contains: { type: string, description: Value contains the substring (case-insensitive). }
+        gt: { oneOf: [ { type: string }, { type: number } ] }
+        gte: { oneOf: [ { type: string }, { type: number } ] }
+        lt: { oneOf: [ { type: string }, { type: number } ] }
+        lte: { oneOf: [ { type: string }, { type: number } ] }
+        not:
+          description: The document has none of these values (documents without the key match).
+          oneOf:
+            - type: string
+            - type: array
+              items: { type: string }
+        exists: { type: boolean, description: The document has (true) or lacks (false) the key. }
     CodeGraphResponse:
       type: object
       description: >
@@ -6803,6 +6848,8 @@ components:
           example:
             category: [ blog, tutorial ]
             status: [ published ]
+        filter:
+          $ref: '#/components/schemas/MetaFilter'
         sort:
           type: string
           enum: [ addedAt, updatedAt, key ]
@@ -7025,6 +7072,8 @@ components:
           description: Metadata filters to narrow results before ranking
           example:
             category: [ devops, tutorial ]
+        filter:
+          $ref: '#/components/schemas/MetaFilter'
         includeContent:
           type: boolean
           description: Whether to include document content in results (default false)
@@ -7355,6 +7404,8 @@ components:
             keys, OR between values)
           example:
             category: [ tutorial ]
+        filter:
+          $ref: '#/components/schemas/MetaFilter'
         fieldWeights:
           type: object
           additionalProperties:
@@ -8005,6 +8056,8 @@ components:
           description: Metadata filters applied to both FTS and vector results
           example:
             category: [ tutorial ]
+        filter:
+          $ref: '#/components/schemas/MetaFilter'
         geo:
           type: object
           description: |
@@ -9666,6 +9719,8 @@ components:
             items:
               type: string
           description: Optional metadata pre-filter (AND over keys, OR over values)
+        filter:
+          $ref: '#/components/schemas/MetaFilter'
         facets:
           type: array
           items:
@@ -9814,6 +9869,8 @@ components:
             items:
               type: string
           description: Metadata filters applied to target documents
+        filter:
+          $ref: '#/components/schemas/MetaFilter'
         includeContent:
           type: boolean
           description: Include document content in results

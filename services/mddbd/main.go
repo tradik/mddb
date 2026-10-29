@@ -199,8 +199,9 @@ type GetRequest struct {
 // SearchRequest is the HTTP request body for searching documents.
 type SearchRequest struct {
 	Collection string              `json:"collection"`
-	FilterMeta map[string][]string `json:"filterMeta"` // AND over keys, OR over values
-	Sort       string              `json:"sort"`       // addedAt|updatedAt|key
+	FilterMeta map[string][]string `json:"filterMeta"`       // AND over keys, OR over values
+	Filter     MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
+	Sort       string              `json:"sort"`             // addedAt|updatedAt|key
 	Asc        bool                `json:"asc"`
 	Limit      int                 `json:"limit"`
 	Offset     int                 `json:"offset"`

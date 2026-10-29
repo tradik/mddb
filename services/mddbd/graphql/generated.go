@@ -9450,7 +9450,7 @@ func (ec *executionContext) unmarshalInputSearchInput(ctx context.Context, obj a
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "filterMeta", "sort", "asc", "limit", "offset"}
+	fieldsInOrder := [...]string{"collection", "filterMeta", "filter", "sort", "asc", "limit", "offset"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9471,6 +9471,13 @@ func (ec *executionContext) unmarshalInputSearchInput(ctx context.Context, obj a
 				return it, err
 			}
 			it.FilterMeta = data
+		case "filter":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+			data, err := ec.unmarshalOJSONObject2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Filter = data
 		case "sort":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("sort"))
 			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
@@ -9786,7 +9793,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "includeContent", "oversample"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9835,6 +9842,13 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.FilterMeta = data
+		case "filter":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("filter"))
+			data, err := ec.unmarshalOJSONObject2map(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Filter = data
 		case "includeContent":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeContent"))
 			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)

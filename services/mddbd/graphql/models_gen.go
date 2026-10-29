@@ -228,10 +228,14 @@ type Schema struct {
 type SearchInput struct {
 	Collection string       `json:"collection"`
 	FilterMeta []*MetaInput `json:"filterMeta,omitempty"`
-	Sort       *string      `json:"sort,omitempty"`
-	Asc        *bool        `json:"asc,omitempty"`
-	Limit      *int         `json:"limit,omitempty"`
-	Offset     *int         `json:"offset,omitempty"`
+	// Operator metadata filter (SRCH-017), ANDed with filterMeta. One condition
+	// per key: in, prefix, contains, gt, gte, lt, lte, not, exists — e.g.
+	// {"path": {"prefix": "internal/"}, "kind": {"not": ["test"]}}.
+	Filter map[string]any `json:"filter,omitempty"`
+	Sort   *string        `json:"sort,omitempty"`
+	Asc    *bool          `json:"asc,omitempty"`
+	Limit  *int           `json:"limit,omitempty"`
+	Offset *int           `json:"offset,omitempty"`
 }
 
 type SetGroupPermissionInput struct {
@@ -302,13 +306,17 @@ type VectorCollectionStats struct {
 }
 
 type VectorSearchInput struct {
-	Collection     string       `json:"collection"`
-	Query          *string      `json:"query,omitempty"`
-	QueryVector    []float64    `json:"queryVector,omitempty"`
-	TopK           *int         `json:"topK,omitempty"`
-	Threshold      *float64     `json:"threshold,omitempty"`
-	FilterMeta     []*MetaInput `json:"filterMeta,omitempty"`
-	IncludeContent *bool        `json:"includeContent,omitempty"`
+	Collection  string       `json:"collection"`
+	Query       *string      `json:"query,omitempty"`
+	QueryVector []float64    `json:"queryVector,omitempty"`
+	TopK        *int         `json:"topK,omitempty"`
+	Threshold   *float64     `json:"threshold,omitempty"`
+	FilterMeta  []*MetaInput `json:"filterMeta,omitempty"`
+	// Operator metadata filter (SRCH-017), ANDed with filterMeta. One condition
+	// per key: in, prefix, contains, gt, gte, lt, lte, not, exists — e.g.
+	// {"path": {"prefix": "internal/"}, "kind": {"not": ["test"]}}.
+	Filter         map[string]any `json:"filter,omitempty"`
+	IncludeContent *bool          `json:"includeContent,omitempty"`
 	// Recall/latency knob (SRCH-005): candidates fetched per requested result
 	// before deduplication trims them. 1.0-10.0; omit to use the collection's
 	// retrieval profile, then MDDB's default of 3.0.

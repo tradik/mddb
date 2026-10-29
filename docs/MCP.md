@@ -396,6 +396,24 @@ leave a caller with neither the text nor its location.
 Lower `fragment_size` for source. The default of 150 is a byte budget tuned for
 prose; code lines are short, so it covers about fifteen lines of CSS.
 
+## Narrowing a Search (v2.18.8+)
+
+`search_documents`, `semantic_search`, `full_text_search`, `hybrid_search`,
+`cross_search` and `aggregate` take `filter` next to `filter_meta`. One
+condition per metadata key, with the operators `in`, `prefix`, `contains`,
+`gt`, `gte`, `lt`, `lte`, `not` and `exists`:
+
+```json
+{"name": "full_text_search", "arguments": {
+  "collection": "repo", "query": "retry",
+  "filter": {"path": {"prefix": "internal/"}, "kind": {"not": ["test"]}}
+}}
+```
+
+The filter is evaluated on the metadata index before scoring, so narrowing to
+one directory costs nothing extra. An unknown operator is an error naming it.
+Full semantics: [Filter Operators](SEARCH.md#filter-operators-v2188).
+
 ## Built-in Tool Catalog
 
 All 81 built-in tools, grouped by area. Tool inputs are self-describing via
@@ -426,7 +444,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
 | `semantic_search` | Search documents by meaning using semantic similarity. |
-| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). |
+| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter`, the operator filter described below. |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
 | `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. |

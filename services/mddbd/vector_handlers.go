@@ -1,14 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"log/slog"
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	json "mddb/internal/jsonx"
-	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	"net/http"
@@ -26,6 +24,7 @@ type VectorSearchRequest struct {
 	TopK           int                 `json:"topK"`
 	Threshold      float64             `json:"threshold"`
 	FilterMeta     map[string][]string `json:"filterMeta"`
+	Filter         MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	IncludeContent bool                `json:"includeContent"`
 	Algorithm      string              `json:"algorithm"`      // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	DistanceMetric string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
@@ -252,8 +251,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Search: with or without metadata filter
 	var results []vec.VectorResult
-	if len(req.FilterMeta) > 0 {
-		allowedIDs := s.getDocIDsByMeta(req.Collection, req.FilterMeta)
+	if allowedIDs, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
 		if len(allowedIDs) == 0 {
 			ok(w, VectorSearchResponseHTTP{
 				Results:        []VectorSearchResultItem{},
@@ -534,36 +532,13 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 	ok(w, resp)
 }
 
-// getDocIDsByMeta returns a set of doc IDs matching metadata filters.
+// getDocIDsByMeta returns the IDs of documents matching an equality filter.
+// It is the filterMeta-only form of allowedDocIDs, kept for the surfaces that
+// take nothing else (geo, gRPC).
 func (s *Server) getDocIDsByMeta(collection string, filterMeta map[string][]string) map[string]bool {
-	result := make(map[string]bool)
-
-	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		if bIdx == nil {
-			return nil
-		}
-
-		var sets [][]string
-		for mk, mvals := range filterMeta {
-			var ids []string
-			for _, mv := range mvals {
-				prefix := storage.MetaKeyPrefix(collection, mk, mv)
-				c := bIdx.Cursor()
-				for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-					id := string(k[len(prefix):])
-					ids = append(ids, id)
-				}
-			}
-			ids = sliceutil.Unique(ids)
-			sets = append(sets, ids)
-		}
-
-		for _, id := range intersect(sets...) {
-			result[id] = true
-		}
-		return nil
-	})
-
-	return result
+	ids, active := s.allowedDocIDs(collection, filterMeta, nil)
+	if !active {
+		return map[string]bool{}
+	}
+	return ids
 }

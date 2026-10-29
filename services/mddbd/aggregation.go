@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"errors"
-	"mddb/internal/storage"
 	"net/http"
 	"sort"
 	"strings"
@@ -20,6 +19,7 @@ import (
 type AggregateRequest struct {
 	Collection   string              `json:"collection"`
 	FilterMeta   map[string][]string `json:"filterMeta,omitempty"`   // optional pre-filter (same as search)
+	Filter       MetaFilter          `json:"filter,omitempty"`       // operator pre-filter (SRCH-017), ANDed with filterMeta
 	Facets       []FacetRequest      `json:"facets,omitempty"`       // metadata facet aggregations
 	Histograms   []HistogramRequest  `json:"histograms,omitempty"`   // date/numeric histograms
 	MaxFacetSize int                 `json:"maxFacetSize,omitempty"` // max values per facet (default 50)
@@ -92,52 +92,6 @@ func (s *Server) handleAggregate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ok(w, resp)
-}
-
-// resolveMetaFilter returns the set of document IDs matching the metadata filter.
-func (s *Server) resolveMetaFilter(tx *bolt.Tx, collection string, filterMeta map[string][]string) map[string]bool {
-	bIdx := tx.Bucket([]byte("idxmeta"))
-	if bIdx == nil {
-		return nil
-	}
-
-	var sets [][]string
-	for mk, mvals := range filterMeta {
-		var ids []string
-		seen := make(map[string]bool)
-		for _, mv := range mvals {
-			prefix := storage.MetaKeyPrefix(collection, mk, mv)
-			c := bIdx.Cursor()
-			for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-				id := string(k[len(prefix):])
-				if !seen[id] {
-					seen[id] = true
-					ids = append(ids, id)
-				}
-			}
-		}
-		sets = append(sets, ids)
-	}
-
-	if len(sets) == 0 {
-		return nil
-	}
-
-	// Intersect
-	result := make(map[string]bool)
-	for _, id := range sets[0] {
-		result[id] = true
-	}
-	for _, set := range sets[1:] {
-		next := make(map[string]bool)
-		for _, id := range set {
-			if result[id] {
-				next[id] = true
-			}
-		}
-		result = next
-	}
-	return result
 }
 
 // computeFacet scans the idxmeta bucket and counts distinct values for a metadata key.
@@ -377,8 +331,8 @@ func (s *Server) aggregate(req *AggregateRequest) (*AggregateResponse, error) {
 			return nil
 		}
 
-		if len(req.FilterMeta) > 0 {
-			allowedIDs = s.resolveMetaFilter(tx, req.Collection, req.FilterMeta)
+		if f := mergeFilters(req.FilterMeta, req.Filter); len(f) > 0 {
+			allowedIDs = metaFilterIDs(tx, req.Collection, f)
 		}
 
 		docPrefix := []byte("doc|" + req.Collection + "|")

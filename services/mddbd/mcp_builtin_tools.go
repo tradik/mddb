@@ -42,6 +42,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 				"properties": map[string]interface{}{
 					"collection":      map[string]interface{}{"type": "string"},
 					"filter_meta":     map[string]interface{}{"type": "object"},
+					"filter":          mcpFilterSchema,
 					"sort":            map[string]interface{}{"type": "string"},
 					"limit":           map[string]interface{}{"type": "integer"},
 					"offset":          map[string]interface{}{"type": "integer"},
@@ -79,6 +80,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 				"properties": map[string]interface{}{
 					"collection":  map[string]interface{}{"type": "string", "description": "Collection to aggregate over"},
 					"filter_meta": map[string]interface{}{"type": "object", "description": "Optional metadata filter applied before aggregation"},
+					"filter":      mcpFilterSchema,
 					"facets": map[string]interface{}{
 						"type":        "array",
 						"description": "Fields to compute value-count facets on. Each item may be a string (field name) or an object {field, order_by}",
@@ -105,6 +107,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"top_k":           map[string]interface{}{"type": "integer", "description": "Number of results to return (default: 5)"},
 					"threshold":       map[string]interface{}{"type": "number", "description": "Minimum similarity score 0-1 (default: 0.0)"},
 					"filter_meta":     map[string]interface{}{"type": "object", "description": "Optional metadata filter to combine with semantic search"},
+					"filter":          mcpFilterSchema,
 					"algorithm":       map[string]interface{}{"type": "string", "description": "Vector search algorithm: flat (exact, default), hnsw (approximate), ivf (clustered), pq (compressed)"},
 					"distance_metric": map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"retrieval_mode":  map[string]interface{}{"type": "string", "description": "Result granularity: parent (default, one result per document), chunk (matching passage with chunkIndex/chunkText), window (passage plus neighboring chunks)"},
@@ -189,6 +192,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"max_highlights":   map[string]interface{}{"type": "integer", "description": "(v2.12.0+) Fragments per result; default 3."},
 					"fragment_size":    map[string]interface{}{"type": "integer", "description": "(v2.12.0+) Approximate characters per fragment; default 150. Lower it for source, whose lines are short — 150 bytes covers roughly fifteen lines of CSS."},
 					"filter_meta":      map[string]interface{}{"type": "object", "description": "(v2.18.1) Metadata pre-filter, e.g. {\"language\":[\"c\"],\"module\":[\"net\"]}: only matching documents are searched."},
+					"filter":           mcpFilterSchema,
 					"disable_stem":     map[string]interface{}{"type": "boolean", "description": "(v2.18.1) Turn stemming off for this query. For source code and exact identifiers."},
 					"disable_synonyms": map[string]interface{}{"type": "boolean", "description": "(v2.18.1) Turn synonym expansion off for this query."},
 					"mode":             map[string]interface{}{"type": "string", "description": "(v2.18.1) simple (default), boolean, phrase, wildcard, proximity or auto. Phrase mode finds an identifier such as \"mem_page_alloc\" in code."},
@@ -598,6 +602,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"threshold":        map[string]interface{}{"type": "number", "description": "Min vector similarity 0-1"},
 					"distance_metric":  map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"filter_meta":      map[string]interface{}{"type": "object", "description": "Metadata filter"},
+					"filter":           mcpFilterSchema,
 					"boost":            map[string]interface{}{"type": "object", "description": "Per-query score multiplier keyed by \"metaKey:metaValue\" (e.g. {\"tag:featured\":5.0,\"status:archived\":-2.0}). Positive boosts, negative demotes; combined multiplicatively."},
 					"sort":             map[string]interface{}{"type": "string", "description": "Result ordering: \"combined\" (default, by fused score) or \"distance\" (by proximity ascending — requires a geo filter on the HTTP path)"},
 					"facet_by":         map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "(v2.9.14+) Metadata keys to aggregate into response.facets."},
@@ -978,6 +983,8 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"distance_metric":    map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"include_content":    map[string]interface{}{"type": "boolean", "description": "Include document content in results"},
 					"oversample":         map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication or merging (1.0-10.0, default 3.0). Higher finds more, costs more."},
+					"filter_meta":        map[string]interface{}{"type": "object", "description": "Metadata equality filter applied in every target collection"},
+					"filter":             mcpFilterSchema,
 				},
 				"required": []string{"target_collections"},
 			},
@@ -1228,4 +1235,15 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 			},
 		},
 	}
+}
+
+// mcpFilterSchema describes the operator filter (SRCH-017) once for every
+// search tool that accepts it.
+var mcpFilterSchema = map[string]interface{}{
+	"type": "object",
+	"description": "Operator metadata filter, ANDed with filter_meta. One condition per key, e.g. " +
+		`{"path":{"prefix":"internal/"},"modified":{"gte":"2026-09-01"},"size":{"lt":10000},` +
+		`"kind":{"not":["test"]},"summary":{"exists":true},"title":{"contains":"hnsw"}}. ` +
+		"Operators: in, prefix, contains (case-insensitive), gt, gte, lt, lte (numeric when both sides are numbers, else lexical — ISO dates sort correctly), not, exists.",
+	"additionalProperties": map[string]interface{}{"type": "object"},
 }

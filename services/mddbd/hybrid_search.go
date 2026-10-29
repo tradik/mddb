@@ -43,7 +43,8 @@ type HybridSearchRequest struct {
 	Threshold       float64             `json:"threshold"`      // min vector similarity 0-1
 	DistanceMetric  string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
 	FilterMeta      map[string][]string `json:"filterMeta"`
-	Geo             *HybridGeoFilter    `json:"geo,omitempty"` // optional spatial pre-filter
+	Filter          MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
+	Geo             *HybridGeoFilter    `json:"geo,omitempty"`    // optional spatial pre-filter
 	IncludeContent  bool                `json:"includeContent"`
 	FieldWeights    map[string]float64  `json:"fieldWeights,omitempty"`
 	DisableStem     bool                `json:"disableStem"`
@@ -385,8 +386,8 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 
 	// Pre-filter by metadata if provided
 	var allowed map[string]bool
-	if len(req.FilterMeta) > 0 {
-		allowed = s.getDocIDsByMeta(req.Collection, req.FilterMeta)
+	if ids, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
+		allowed = ids
 		if len(allowed) == 0 {
 			return nil, nil
 		}
@@ -483,8 +484,7 @@ func (s *Server) runVectorSearch(ctx context.Context, req HybridSearchRequest) (
 	metric := vector.ResolveSimilarity(req.DistanceMetric)
 
 	var results []vector.VectorResult
-	if len(req.FilterMeta) > 0 {
-		allowedIDs := s.getDocIDsByMeta(req.Collection, req.FilterMeta)
+	if allowedIDs, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
 		if len(allowedIDs) == 0 {
 			return nil, nil
 		}

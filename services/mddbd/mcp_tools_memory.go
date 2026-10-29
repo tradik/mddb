@@ -453,26 +453,5 @@ func (s *MCPToolServer) toolMemorySessionHistory(ctx context.Context, args map[s
 
 // matchesMeta checks if a document's meta matches all filter criteria.
 func matchesMeta(docMeta, filterMeta map[string][]string) bool {
-	for key, filterVals := range filterMeta {
-		docVals, exists := docMeta[key]
-		if !exists {
-			return false
-		}
-		matched := false
-		for _, fv := range filterVals {
-			for _, dv := range docVals {
-				if dv == fv {
-					matched = true
-					break
-				}
-			}
-			if matched {
-				break
-			}
-		}
-		if !matched {
-			return false
-		}
-	}
-	return true
+	return filterMetaAsFilter(filterMeta).Matches(docMeta)
 }

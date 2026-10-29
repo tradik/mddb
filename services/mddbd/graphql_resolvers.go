@@ -31,9 +31,14 @@ func (a *GraphQLAdapter) SearchDocuments(ctx context.Context, input gql.SearchIn
 	if err := a.CheckPermission(ctx, input.Collection, int(PermRead)); err != nil {
 		return nil, err
 	}
+	filter, err := mcpGetFilter(map[string]interface{}{"filter": input.Filter})
+	if err != nil {
+		return nil, err
+	}
 	req := &MCPSearchRequest{
 		Collection:     input.Collection,
 		FilterMeta:     gql.MapMetaInputToInternal(input.FilterMeta),
+		Filter:         filter,
 		Sort:           derefString(input.Sort),
 		Asc:            derefBool(input.Asc, true),
 		Limit:          derefInt(input.Limit, 100),
@@ -305,9 +310,14 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		return nil, err
 	}
 
+	filter, err := mcpGetFilter(map[string]interface{}{"filter": input.Filter})
+	if err != nil {
+		return nil, err
+	}
 	req := &MCPVectorSearchRequest{
 		Collection:     input.Collection,
 		FilterMeta:     gql.MapMetaInputToInternal(input.FilterMeta),
+		Filter:         filter,
 		TopK:           derefInt(input.TopK, 5),
 		Threshold:      derefFloat64(input.Threshold, 0),
 		IncludeContent: derefBool(input.IncludeContent, false),

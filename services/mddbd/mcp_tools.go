@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	json "mddb/internal/jsonx"
 	"strings"
 )
 
@@ -339,6 +340,25 @@ func mcpGetMetaMap(m map[string]interface{}, key string) map[string][]string {
 		}
 	}
 	return result
+}
+
+// mcpGetFilter reads the operator filter (SRCH-017) from a tool argument.
+// It goes through the same decoder as the REST body, so an unknown operator
+// is the same error on both surfaces.
+func mcpGetFilter(m map[string]interface{}) (MetaFilter, error) {
+	raw, ok := m["filter"]
+	if !ok || raw == nil {
+		return nil, nil
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("filter: %w", err)
+	}
+	var f MetaFilter
+	if err := json.Unmarshal(data, &f); err != nil {
+		return nil, err
+	}
+	return f, nil
 }
 
 // mcpGetFloat64Map reads a JSON object of numeric values into a float64 map.

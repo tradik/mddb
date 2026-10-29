@@ -99,6 +99,11 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		Oversample:       mcpGetFloat(args, "oversample"),
 		FilterMeta:       mcpGetMetaMap(args, "filter_meta"),
 	}
+	filter, filterErr := mcpGetFilter(args)
+	if filterErr != nil {
+		return "", filterErr
+	}
+	req.Filter = filter
 	if ic, ok := args["include_content"].(bool); ok {
 		req.IncludeContent = ic
 	}
@@ -127,6 +132,11 @@ func (s *MCPToolServer) toolAggregate(ctx context.Context, args map[string]inter
 		FilterMeta:   mcpGetMetaMap(args, "filter_meta"),
 		MaxFacetSize: mcpGetInt(args, "max_facet_size"),
 	}
+	filter, filterErr := mcpGetFilter(args)
+	if filterErr != nil {
+		return "", filterErr
+	}
+	req.Filter = filter
 	// Parse facets array
 	if facetsRaw, ok := args["facets"].([]interface{}); ok {
 		for _, f := range facetsRaw {
