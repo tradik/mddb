@@ -369,6 +369,8 @@ type MCPFTSSearchRequest struct {
 	FacetBy         []string            `json:"facetBy,omitempty"`
 	FacetMaxValues  int                 `json:"facetMaxValues,omitempty"`
 	GroupBy         *GroupBy            `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	BM25K1          *float64            `json:"bm25K1,omitempty"`  // SRCH-018; nil = profile, then 1.2
+	BM25B           *float64            `json:"bm25B,omitempty"`   // SRCH-018; nil = profile, then 0.75
 	PassageOptions                      // format, passageLines (AGT-002)
 }
 
@@ -451,6 +453,8 @@ type MCPHybridSearchRequest struct {
 	// FieldWeights and Lang tune the full-text half, as on REST and gRPC.
 	FieldWeights map[string]float64 `json:"fieldWeights,omitempty"`
 	Lang         string             `json:"lang,omitempty"`
+	BM25K1       *float64           `json:"bm25K1,omitempty"` // SRCH-018
+	BM25B        *float64           `json:"bm25B,omitempty"`
 	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
 	// the index per requested result, before deduplication, merging or
 	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then

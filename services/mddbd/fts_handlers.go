@@ -25,6 +25,11 @@ type FTSSearchRequest struct {
 	DisableStem     bool                `json:"disableStem"`            // temporarily disable stemming for this query
 	DisableSynonyms bool                `json:"disableSynonyms"`        // temporarily disable synonyms for this query
 	FieldWeights    map[string]float64  `json:"fieldWeights,omitempty"` // BM25F field weights
+	// BM25K1 and BM25B override the BM25 constants for this query (SRCH-018);
+	// nil = the collection profile's, then 1.2 / 0.75. bm25 and bm25f only.
+	BM25K1 *float64 `json:"bm25K1,omitempty"`
+	BM25B  *float64 `json:"bm25B,omitempty"`
+	bm25            fts.BM25Params      // resolved by normalizeFTSRequest
 	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`   // metadata pre-filter (in-graph filtering)
 	Filter          MetaFilter          `json:"filter,omitempty"`       // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	// Advanced search modes
@@ -169,6 +174,10 @@ func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
 	}
 	if s.FTSIndex == nil {
 		return fmt.Errorf("full-text search not initialized")
+	}
+	var err error
+	if req.bm25, err = s.ResolveBM25(req.Collection, req.BM25K1, req.BM25B); err != nil {
+		return err
 	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
 	return req.ValidatePassageOptions()
@@ -323,15 +332,15 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 		switch algo {
 		case "bm25f":
 			if fuzzy > 0 {
-				results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, searchLimit, fuzzy, req.FieldWeights)
+				results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, searchLimit, fuzzy, req.FieldWeights, req.bm25)
 			} else {
-				results, err = idx.SearchBM25F(req.Collection, tokens, searchLimit, req.FieldWeights)
+				results, err = idx.SearchBM25F(req.Collection, tokens, searchLimit, req.FieldWeights, req.bm25)
 			}
 		case "bm25":
 			if fuzzy > 0 {
-				results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, fuzzy)
+				results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, searchLimit, fuzzy, req.bm25)
 			} else {
-				results, err = idx.SearchBM25(req.Collection, req.Query, searchLimit)
+				results, err = idx.SearchBM25(req.Collection, req.Query, searchLimit, req.bm25)
 			}
 		case "tfidf":
 			if fuzzy > 0 {

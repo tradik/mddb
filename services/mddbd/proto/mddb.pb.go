@@ -2512,6 +2512,8 @@ type FTSRequest struct {
 	GroupBy        *GroupBy                  `protobuf:"bytes,12,opt,name=group_by,json=groupBy,proto3" json:"group_by,omitempty"`                                                                                   // (v2.18.8) at most per_group results per metadata value or document
 	Format         string                    `protobuf:"bytes,13,opt,name=format,proto3" json:"format,omitempty"`                                                                                                    // (v2.18.8) "passages" returns passages instead of documents
 	PassageLines   int32                     `protobuf:"varint,14,opt,name=passage_lines,json=passageLines,proto3" json:"passage_lines,omitempty"`                                                                   // (v2.18.8) context lines around a passage's hit
+	Bm25K1         *float64                  `protobuf:"fixed64,15,opt,name=bm25_k1,json=bm25K1,proto3,oneof" json:"bm25_k1,omitempty"`                                                                              // (v2.18.8, SRCH-018) BM25 k1 for this query; unset = collection profile, then 1.2
+	Bm25B          *float64                  `protobuf:"fixed64,16,opt,name=bm25_b,json=bm25B,proto3,oneof" json:"bm25_b,omitempty"`                                                                                 // (v2.18.8, SRCH-018) BM25 b for this query; unset = collection profile, then 0.75
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2640,6 +2642,20 @@ func (x *FTSRequest) GetFormat() string {
 func (x *FTSRequest) GetPassageLines() int32 {
 	if x != nil {
 		return x.PassageLines
+	}
+	return 0
+}
+
+func (x *FTSRequest) GetBm25K1() float64 {
+	if x != nil && x.Bm25K1 != nil {
+		return *x.Bm25K1
+	}
+	return 0
+}
+
+func (x *FTSRequest) GetBm25B() float64 {
+	if x != nil && x.Bm25B != nil {
+		return *x.Bm25B
 	}
 	return 0
 }
@@ -3198,6 +3214,8 @@ type HybridSearchRequest struct {
 	WaitForIndexMs  int32                     `protobuf:"varint,23,opt,name=wait_for_index_ms,json=waitForIndexMs,proto3" json:"wait_for_index_ms,omitempty"`                                // (v2.18.8) wait up to this long (max 30000) for queued embeddings
 	WaitForKeys     []string                  `protobuf:"bytes,24,rep,name=wait_for_keys,json=waitForKeys,proto3" json:"wait_for_keys,omitempty"`                                            // (v2.18.8) wait only for these keys
 	ReadLevel       string                    `protobuf:"bytes,25,opt,name=read_level,json=readLevel,proto3" json:"read_level,omitempty"`                                                    // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
+	Bm25K1          *float64                  `protobuf:"fixed64,26,opt,name=bm25_k1,json=bm25K1,proto3,oneof" json:"bm25_k1,omitempty"`                                                     // (v2.18.8, SRCH-018) BM25 k1 of the full-text half
+	Bm25B           *float64                  `protobuf:"fixed64,27,opt,name=bm25_b,json=bm25B,proto3,oneof" json:"bm25_b,omitempty"`                                                        // (v2.18.8, SRCH-018) BM25 b of the full-text half
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -3405,6 +3423,20 @@ func (x *HybridSearchRequest) GetReadLevel() string {
 		return x.ReadLevel
 	}
 	return ""
+}
+
+func (x *HybridSearchRequest) GetBm25K1() float64 {
+	if x != nil && x.Bm25K1 != nil {
+		return *x.Bm25K1
+	}
+	return 0
+}
+
+func (x *HybridSearchRequest) GetBm25B() float64 {
+	if x != nil && x.Bm25B != nil {
+		return *x.Bm25B
+	}
+	return 0
 }
 
 type HybridSearchResult struct {
@@ -7070,12 +7102,14 @@ type RetrievalProfileProto struct {
 	HybridAlpha       float64                `protobuf:"fixed64,5,opt,name=hybrid_alpha,json=hybridAlpha,proto3" json:"hybrid_alpha,omitempty"`        // 0.0-1.0; see hybrid_alpha_set
 	// hybrid_alpha 0.0 is a meaningful weight (pure keyword), so it cannot
 	// double as "unset" — this says whether the value above was configured.
-	HybridAlphaSet     bool    `protobuf:"varint,6,opt,name=hybrid_alpha_set,json=hybridAlphaSet,proto3" json:"hybrid_alpha_set,omitempty"`
-	ContextTokenBudget int32   `protobuf:"varint,7,opt,name=context_token_budget,json=contextTokenBudget,proto3" json:"context_token_budget,omitempty"` // cap on total returned context, in tokens
-	Oversample         float64 `protobuf:"fixed64,8,opt,name=oversample,proto3" json:"oversample,omitempty"`                                            // (SRCH-005) candidates per result before dedup/merge/rescore; 1.0-10.0
-	GroupByKey         string  `protobuf:"bytes,9,opt,name=group_by_key,json=groupByKey,proto3" json:"group_by_key,omitempty"`                          // (SRCH-016) default groupBy key: a metadata key, "document" or "collection"; empty = none
-	GroupByPerGroup    int32   `protobuf:"varint,10,opt,name=group_by_per_group,json=groupByPerGroup,proto3" json:"group_by_per_group,omitempty"`       // (SRCH-016) results kept per group; 0 = 1
-	Format             string  `protobuf:"bytes,11,opt,name=format,proto3" json:"format,omitempty"`                                                     // (AGT-002) default result format: "results" or "passages"; empty = results
+	HybridAlphaSet     bool     `protobuf:"varint,6,opt,name=hybrid_alpha_set,json=hybridAlphaSet,proto3" json:"hybrid_alpha_set,omitempty"`
+	ContextTokenBudget int32    `protobuf:"varint,7,opt,name=context_token_budget,json=contextTokenBudget,proto3" json:"context_token_budget,omitempty"` // cap on total returned context, in tokens
+	Oversample         float64  `protobuf:"fixed64,8,opt,name=oversample,proto3" json:"oversample,omitempty"`                                            // (SRCH-005) candidates per result before dedup/merge/rescore; 1.0-10.0
+	GroupByKey         string   `protobuf:"bytes,9,opt,name=group_by_key,json=groupByKey,proto3" json:"group_by_key,omitempty"`                          // (SRCH-016) default groupBy key: a metadata key, "document" or "collection"; empty = none
+	GroupByPerGroup    int32    `protobuf:"varint,10,opt,name=group_by_per_group,json=groupByPerGroup,proto3" json:"group_by_per_group,omitempty"`       // (SRCH-016) results kept per group; 0 = 1
+	Format             string   `protobuf:"bytes,11,opt,name=format,proto3" json:"format,omitempty"`                                                     // (AGT-002) default result format: "results" or "passages"; empty = results
+	Bm25K1             *float64 `protobuf:"fixed64,12,opt,name=bm25_k1,json=bm25K1,proto3,oneof" json:"bm25_k1,omitempty"`                               // (SRCH-018) BM25 term-frequency saturation, 0-3; unset = 1.2
+	Bm25B              *float64 `protobuf:"fixed64,13,opt,name=bm25_b,json=bm25B,proto3,oneof" json:"bm25_b,omitempty"`                                  // (SRCH-018) BM25 length normalisation, 0-1; unset = 0.75
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -7185,6 +7219,20 @@ func (x *RetrievalProfileProto) GetFormat() string {
 		return x.Format
 	}
 	return ""
+}
+
+func (x *RetrievalProfileProto) GetBm25K1() float64 {
+	if x != nil && x.Bm25K1 != nil {
+		return *x.Bm25K1
+	}
+	return 0
+}
+
+func (x *RetrievalProfileProto) GetBm25B() float64 {
+	if x != nil && x.Bm25B != nil {
+		return *x.Bm25B
+	}
+	return 0
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.
@@ -14581,7 +14629,7 @@ const file_mddb_proto_rawDesc = "" +
 	"collection\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
 	"\x04lang\x18\x03 \x01(\tR\x04lang\x12\x10\n" +
-	"\x03ttl\x18\x04 \x01(\x03R\x03ttl\"\xd3\x05\n" +
+	"\x03ttl\x18\x04 \x01(\x03R\x03ttl\"\xa4\x06\n" +
 	"\n" +
 	"FTSRequest\x12\x1e\n" +
 	"\n" +
@@ -14601,7 +14649,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06filter\x18\v \x03(\v2\x1c.mddb.FTSRequest.FilterEntryR\x06filter\x12(\n" +
 	"\bgroup_by\x18\f \x01(\v2\r.mddb.GroupByR\agroupBy\x12\x16\n" +
 	"\x06format\x18\r \x01(\tR\x06format\x12#\n" +
-	"\rpassage_lines\x18\x0e \x01(\x05R\fpassageLines\x1aO\n" +
+	"\rpassage_lines\x18\x0e \x01(\x05R\fpassageLines\x12\x1c\n" +
+	"\abm25_k1\x18\x0f \x01(\x01H\x00R\x06bm25K1\x88\x01\x01\x12\x1a\n" +
+	"\x06bm25_b\x18\x10 \x01(\x01H\x01R\x05bm25B\x88\x01\x01\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1a8\n" +
@@ -14611,7 +14661,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\x1aN\n" +
 	"\vFilterEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
-	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"\xbf\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01B\n" +
+	"\n" +
+	"\b_bm25_k1B\t\n" +
+	"\a_bm25_b\"\xbf\x01\n" +
 	"\tFTSResult\x12*\n" +
 	"\bdocument\x18\x01 \x01(\v2\x0e.mddb.DocumentR\bdocument\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x01R\x05score\x12#\n" +
@@ -14651,7 +14704,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"n\n" +
 	"\x14FTSLanguagesResponse\x123\n" +
 	"\tlanguages\x18\x01 \x03(\v2\x15.mddb.FTSLanguageInfoR\tlanguages\x12!\n" +
-	"\fdefault_lang\x18\x02 \x01(\tR\vdefaultLang\"\xc4\t\n" +
+	"\fdefault_lang\x18\x02 \x01(\tR\vdefaultLang\"\x95\n" +
+	"\n" +
 	"\x13HybridSearchRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -14682,7 +14736,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\x11wait_for_index_ms\x18\x17 \x01(\x05R\x0ewaitForIndexMs\x12\"\n" +
 	"\rwait_for_keys\x18\x18 \x03(\tR\vwaitForKeys\x12\x1d\n" +
 	"\n" +
-	"read_level\x18\x19 \x01(\tR\treadLevel\x1aO\n" +
+	"read_level\x18\x19 \x01(\tR\treadLevel\x12\x1c\n" +
+	"\abm25_k1\x18\x1a \x01(\x01H\x00R\x06bm25K1\x88\x01\x01\x12\x1a\n" +
+	"\x06bm25_b\x18\x1b \x01(\x01H\x01R\x05bm25B\x88\x01\x01\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1a?\n" +
@@ -14695,7 +14751,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\x1aN\n" +
 	"\vFilterEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
-	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"\xda\x02\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01B\n" +
+	"\n" +
+	"\b_bm25_k1B\t\n" +
+	"\a_bm25_b\"\xda\x02\n" +
 	"\x12HybridSearchResult\x12*\n" +
 	"\bdocument\x18\x01 \x01(\v2\x0e.mddb.DocumentR\bdocument\x12%\n" +
 	"\x0ecombined_score\x18\x02 \x01(\x01R\rcombinedScore\x12\x1b\n" +
@@ -15037,7 +15096,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1f\n" +
 	"\vnext_cursor\x18\x03 \x01(\tR\n" +
 	"nextCursor\x12\x19\n" +
-	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\xb2\x03\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\x83\x04\n" +
 	"\x15RetrievalProfileProto\x12.\n" +
 	"\x13default_search_type\x18\x01 \x01(\tR\x11defaultSearchType\x12\x13\n" +
 	"\x05top_k\x18\x02 \x01(\x05R\x04topK\x12%\n" +
@@ -15053,7 +15112,12 @@ const file_mddb_proto_rawDesc = "" +
 	"groupByKey\x12+\n" +
 	"\x12group_by_per_group\x18\n" +
 	" \x01(\x05R\x0fgroupByPerGroup\x12\x16\n" +
-	"\x06format\x18\v \x01(\tR\x06format\"\xf5\x01\n" +
+	"\x06format\x18\v \x01(\tR\x06format\x12\x1c\n" +
+	"\abm25_k1\x18\f \x01(\x01H\x00R\x06bm25K1\x88\x01\x01\x12\x1a\n" +
+	"\x06bm25_b\x18\r \x01(\x01H\x01R\x05bm25B\x88\x01\x01B\n" +
+	"\n" +
+	"\b_bm25_k1B\t\n" +
+	"\a_bm25_b\"\xf5\x01\n" +
 	"\x12StorageConfigProto\x12\x1a\n" +
 	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x16\n" +
@@ -16476,6 +16540,9 @@ func file_mddb_proto_init() {
 	if File_mddb_proto != nil {
 		return
 	}
+	file_mddb_proto_msgTypes[36].OneofWrappers = []any{}
+	file_mddb_proto_msgTypes[46].OneofWrappers = []any{}
+	file_mddb_proto_msgTypes[107].OneofWrappers = []any{}
 	file_mddb_proto_msgTypes[111].OneofWrappers = []any{}
 	file_mddb_proto_msgTypes[116].OneofWrappers = []any{}
 	file_mddb_proto_msgTypes[184].OneofWrappers = []any{}

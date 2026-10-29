@@ -1,6 +1,7 @@
 package main
 
 import (
+	"mddb/internal/fts"
 	"errors"
 	"fmt"
 
@@ -83,6 +84,11 @@ type RetrievalProfileDef struct {
 	// "passages" for a code collection, where an agent wants places rather
 	// than documents. Empty = "results".
 	Format string `json:"format,omitempty"`
+	// BM25K1 and BM25B replace the BM25 constants for this collection's
+	// full-text searches (SRCH-018); nil keeps 1.2 / 0.75. Pointers, because
+	// 0 is a meaningful b (no length normalisation).
+	BM25K1 *float64 `json:"bm25K1,omitempty"`
+	BM25B  *float64 `json:"bm25B,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -127,6 +133,9 @@ func (p *RetrievalProfileDef) Validate() error {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if err := (PassageOptions{Format: p.Format}).ValidatePassageOptions(); err != nil {
+		return fmt.Errorf("invalid retrieval.%w", err)
+	}
+	if err := (fts.BM25Params{K1: floatOr(p.BM25K1, fts.DefaultBM25.K1), B: floatOr(p.BM25B, fts.DefaultBM25.B)}).Validate(); err != nil {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if p.ContextTokenBudget < 0 || p.ContextTokenBudget > maxProfileContextTokenBudget {
@@ -222,6 +231,25 @@ func (s *Server) ResolveGroupBy(collection string, requested *GroupBy) *GroupBy 
 	return nil
 }
 
+// ResolveBM25 applies request > collection profile > default to each BM25
+// parameter separately (SRCH-018).
+func (s *Server) ResolveBM25(collection string, k1, b *float64) (fts.BM25Params, error) {
+	p := fts.DefaultBM25
+	if prof := s.RetrievalProfile(collection); prof != nil {
+		p.K1, p.B = floatOr(prof.BM25K1, p.K1), floatOr(prof.BM25B, p.B)
+	}
+	p.K1, p.B = floatOr(k1, p.K1), floatOr(b, p.B)
+	return p, p.Validate()
+}
+
+// floatOr is *v, or fallback when v is nil.
+func floatOr(v *float64, fallback float64) float64 {
+	if v == nil {
+		return fallback
+	}
+	return *v
+}
+
 // --- proto conversion (RAG-001) ---
 
 // retrievalProfileFromProto converts a gRPC retrieval block into the stored
@@ -241,6 +269,8 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		ContextTokenBudget: int(p.ContextTokenBudget),
 		GroupBy:            groupByFromProto(p.GroupByKey, p.GroupByPerGroup),
 		Format:             p.Format,
+		BM25K1:             p.Bm25K1,
+		BM25B:              p.Bm25B,
 	}
 }
 
@@ -270,6 +300,8 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		GroupByKey:         groupByKey(p.GroupBy),
 		GroupByPerGroup:    groupByPerGroup(p.GroupBy),
 		Format:             p.Format,
+		Bm25K1:             p.BM25K1,
+		Bm25B:              p.BM25B,
 	}
 }
 

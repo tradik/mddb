@@ -265,6 +265,15 @@ func mcpGetInt(m map[string]interface{}, key string) int {
 	return 0
 }
 
+// mcpGetFloatPtr is the number at key, or nil when it is absent: for
+// parameters where 0 means something (SRCH-018 bm25_b).
+func mcpGetFloatPtr(m map[string]interface{}, key string) *float64 {
+	if v, ok := m[key].(float64); ok {
+		return &v
+	}
+	return nil
+}
+
 func mcpGetFloat(m map[string]interface{}, key string) float64 {
 	if v, ok := m[key].(float64); ok {
 		return v

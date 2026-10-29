@@ -29,13 +29,13 @@ type fieldStats struct {
 
 // SearchBM25F performs field-weighted BM25F search.
 // tokens is the pre-tokenized query. fieldWeights overrides defaults if non-empty.
-func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit int, fieldWeights map[string]float64) ([]FTSResult, error) {
+func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit int, fieldWeights map[string]float64, p BM25Params) ([]FTSResult, error) {
 	if len(tokens) == 0 {
 		return nil, nil
 	}
 	scores := make(map[string]*bm25fDocScore)
 	err := f.view(collection, func(tx *bolt.Tx) error {
-		scorer, ok := newBM25FScorer(tx, collection, bm25fWeights(fieldWeights))
+		scorer, ok := newBM25FScorer(tx, collection, bm25fWeights(fieldWeights), p)
 		if !ok {
 			return nil
 		}
@@ -53,13 +53,13 @@ func (f *FTSIndex) SearchBM25F(collection string, tokens map[string]int, limit i
 }
 
 // SearchBM25FFuzzy performs BM25F search with fuzzy term matching.
-func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, limit, maxDist int, fieldWeights map[string]float64) ([]FTSResult, error) {
+func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, limit, maxDist int, fieldWeights map[string]float64, p BM25Params) ([]FTSResult, error) {
 	if len(tokens) == 0 {
 		return nil, nil
 	}
 	scores := make(map[string]*bm25fDocScore)
 	err := f.view(collection, func(tx *bolt.Tx) error {
-		scorer, ok := newBM25FScorer(tx, collection, bm25fWeights(fieldWeights))
+		scorer, ok := newBM25FScorer(tx, collection, bm25fWeights(fieldWeights), p)
 		if !ok {
 			return nil
 		}
@@ -93,12 +93,13 @@ type bm25fScorer struct {
 	fstats    map[string]fieldStats
 	weights   map[string]float64
 	totalDocs float64 // N: the most documents any field holds
+	params    BM25Params
 }
 
 // newBM25FScorer is false when the collection has no field statistics.
-func newBM25FScorer(tx *bolt.Tx, collection string, weights map[string]float64) (*bm25fScorer, bool) {
+func newBM25FScorer(tx *bolt.Tx, collection string, weights map[string]float64, p BM25Params) (*bm25fScorer, bool) {
 	sources := fieldSources(tx, collection, weights)
-	s := &bm25fScorer{sources: sources, fstats: loadFieldStats(sources), weights: weights}
+	s := &bm25fScorer{sources: sources, fstats: loadFieldStats(sources), weights: weights, params: p}
 	for _, fs := range s.fstats {
 		s.totalDocs = max(s.totalDocs, fs.TotalDocs)
 	}
@@ -133,7 +134,7 @@ func (s *bm25fScorer) termScores(term string) map[string]float64 {
 
 	out := make(map[string]float64, len(tfTilde))
 	for docID, t := range tfTilde {
-		out[docID] = idf * t / (bm25K1 + t)
+		out[docID] = idf * t / (s.params.K1 + t)
 	}
 	return out
 }
@@ -159,7 +160,7 @@ func (s *bm25fScorer) addFieldTF(tfTilde map[string]float64, src fieldSource, fs
 		if meta := src.lengths.Get(src.lenKey(docID)); len(meta) >= 4 {
 			dl = float64(binary.LittleEndian.Uint32(meta))
 		}
-		tfTilde[docID] += w * tf / (1.0 - bm25B + bm25B*dl/avgdl)
+		tfTilde[docID] += w * tf / s.params.norm(dl, avgdl)
 	}
 }
 

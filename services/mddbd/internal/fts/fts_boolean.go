@@ -259,7 +259,7 @@ func (f *FTSIndex) searchSingleTerm(collection, term string) ([]FTSResult, error
 					dl = float64(binary.LittleEndian.Uint32(meta))
 				}
 
-				bm25Score := idf * (tf * (bm25K1 + 1)) / (tf + bm25K1*(1-bm25B+bm25B*dl/avgdl))
+				bm25Score := DefaultBM25.termScore(idf, tf, dl, avgdl)
 
 				d, ok := scores[docID]
 				if !ok {

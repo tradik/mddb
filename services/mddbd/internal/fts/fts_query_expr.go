@@ -501,7 +501,7 @@ func (f *FTSIndex) evalExpr(collection string, expr QueryExpr) (map[string]*expr
 	case *TermExpr:
 		return f.evalTermNode(collection, e.Term)
 	case *FuzzyExpr:
-		res, err := f.SearchBM25Fuzzy(collection, e.Term, 0, e.Distance)
+		res, err := f.SearchBM25Fuzzy(collection, e.Term, 0, e.Distance, DefaultBM25)
 		if err != nil {
 			return nil, err
 		}
@@ -564,7 +564,7 @@ func (f *FTSIndex) evalExpr(collection string, expr QueryExpr) (map[string]*expr
 // We pass the raw term as the "query" and limit 0 so the scorer doesn't
 // truncate — the caller applies limit after AST evaluation.
 func (f *FTSIndex) evalTermNode(collection, term string) (map[string]*exprScore, error) {
-	res, err := f.SearchBM25(collection, term, 0)
+	res, err := f.SearchBM25(collection, term, 0, DefaultBM25)
 	if err != nil {
 		return nil, err
 	}

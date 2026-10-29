@@ -145,7 +145,7 @@ func TestEval_HybridAndAdvisor(t *testing.T) {
 	}
 	// Without an embedder only keyword configurations are measured.
 	s.Embedding = nil
-	if rec, _ = s.RecommendSearch("kb"); rec.SearchType != SearchTypeFTS || len(rec.Measured.Results) != 2 {
+	if rec, _ = s.RecommendSearch("kb"); rec.SearchType != SearchTypeFTS || len(rec.Measured.Results) != 4 || rec.RetrievalProfile.BM25B != nil {
 		t.Fatalf("advisor fts: %+v", rec)
 	}
 	// A set that cannot run is a warning, not a failure.

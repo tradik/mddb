@@ -407,6 +407,8 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		FacetBy:           req.FacetBy,
 		FacetMaxValues:    req.FacetMaxValues,
 		PassageOptions:    req.PassageOptions,
+		BM25K1:            req.BM25K1,
+		BM25B:             req.BM25B,
 		skipContextBudget: true,
 	}, time.Now())
 	if err != nil {
@@ -530,6 +532,8 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		Oversample:      req.Oversample,
 		FieldWeights:    req.FieldWeights,
 		Lang:            req.Lang,
+		BM25K1:          req.BM25K1,
+		BM25B:           req.BM25B,
 		IncludeContent:  true,
 	}
 

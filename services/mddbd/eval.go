@@ -56,6 +56,9 @@ type EvalConfig struct {
 	Alpha           *float64 `json:"alpha,omitempty"`
 	Strategy        string   `json:"strategy,omitempty"`
 	RetrievalMode   string   `json:"retrievalMode,omitempty"`
+	// BM25K1 and BM25B try BM25 parameters on fts and hybrid (SRCH-018).
+	BM25K1 *float64 `json:"bm25K1,omitempty"`
+	BM25B  *float64 `json:"bm25B,omitempty"`
 }
 
 func (c EvalConfig) label() string {
@@ -68,6 +71,12 @@ func (c EvalConfig) label() string {
 	}
 	if c.Alpha != nil {
 		l += fmt.Sprintf(" alpha=%.2f", *c.Alpha)
+	}
+	if c.BM25K1 != nil {
+		l += fmt.Sprintf(" k1=%g", *c.BM25K1)
+	}
+	if c.BM25B != nil {
+		l += fmt.Sprintf(" b=%g", *c.BM25B)
 	}
 	return l
 }
@@ -191,7 +200,7 @@ func (s *Server) evalSearch(ctx context.Context, collection string, k int, c Eva
 	switch c.SearchType {
 	case SearchTypeFTS:
 		resp, err := s.searchFTS(FTSSearchRequest{Collection: collection, Query: query, Limit: k, Algorithm: c.Algorithm,
-			skipContextBudget: true}, time.Now())
+			BM25K1: c.BM25K1, BM25B: c.BM25B, skipContextBudget: true}, time.Now())
 		if err != nil {
 			return nil, 0, err
 		}
@@ -209,7 +218,8 @@ func (s *Server) evalSearch(ctx context.Context, collection string, k int, c Eva
 		}
 	case SearchTypeHybrid:
 		items, _, err := s.hybridItems(ctx, HybridSearchRequest{Collection: collection, Query: query, TopK: k,
-			Algorithm: c.Algorithm, VectorAlgorithm: c.VectorAlgorithm, Alpha: c.Alpha, Strategy: c.Strategy, IncludeContent: true})
+			Algorithm: c.Algorithm, VectorAlgorithm: c.VectorAlgorithm, Alpha: c.Alpha, Strategy: c.Strategy, IncludeContent: true,
+			BM25K1: c.BM25K1, BM25B: c.BM25B})
 		if err != nil {
 			return nil, 0, err
 		}

@@ -26,7 +26,7 @@ func TestBM25IndexAndSearch(t *testing.T) {
 	}
 
 	// Test single-term query
-	results, err := idx.SearchBM25("blog", "golang", 10)
+	results, err := idx.SearchBM25("blog", "golang", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestBM25MultiTermQuery(t *testing.T) {
 	}
 
 	// Multi-term query: "golang tutorial"
-	results, err := idx.SearchBM25("docs", "golang tutorial", 10)
+	results, err := idx.SearchBM25("docs", "golang tutorial", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestBM25EmptyCollection(t *testing.T) {
 	idx, cleanup := newTestFTSIndex(t)
 	defer cleanup()
 
-	results, err := idx.SearchBM25("empty", "query", 10)
+	results, err := idx.SearchBM25("empty", "query", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -115,7 +115,7 @@ func TestBM25EmptyQuery(t *testing.T) {
 		t.Fatalf("Index: %v", err)
 	}
 
-	results, err := idx.SearchBM25("blog", "", 10)
+	results, err := idx.SearchBM25("blog", "", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestBM25StopWordsQuery(t *testing.T) {
 	}
 
 	// Query with only stop words should return nil
-	results, err := idx.SearchBM25("blog", "the and or", 10)
+	results, err := idx.SearchBM25("blog", "the and or", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestBM25Limit(t *testing.T) {
 	}
 
 	// Request only 5 results
-	results, err := idx.SearchBM25("col", "common", 5)
+	results, err := idx.SearchBM25("col", "common", 5, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -182,7 +182,7 @@ func TestBM25SortedByScore(t *testing.T) {
 		t.Fatalf("Index d3: %v", err)
 	}
 
-	results, err := idx.SearchBM25("col", "golang", 10)
+	results, err := idx.SearchBM25("col", "golang", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestBM25DocumentLengthNormalization(t *testing.T) {
 		t.Fatalf("Index long: %v", err)
 	}
 
-	results, err := idx.SearchBM25("test", "golang", 10)
+	results, err := idx.SearchBM25("test", "golang", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -277,7 +277,7 @@ func TestBM25MetaUpdate(t *testing.T) {
 	}
 
 	// Search should reflect the updated metadata
-	results, err := idx.SearchBM25("test", "python", 10)
+	results, err := idx.SearchBM25("test", "python", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}
@@ -348,7 +348,7 @@ func TestBM25DifferentCollections(t *testing.T) {
 	}
 
 	// Search in blog collection only
-	results, err := idx.SearchBM25("blog", "golang", 10)
+	results, err := idx.SearchBM25("blog", "golang", 10, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestBM25DifferentCollections(t *testing.T) {
 	}
 
 	// Search in docs collection only
-	results, err = idx.SearchBM25("docs", "golang", 10)
+	results, err = idx.SearchBM25("docs", "golang", 10, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,7 +375,7 @@ func TestBM25NoMatch(t *testing.T) {
 	}
 
 	// Query for non-existent term
-	results, err := idx.SearchBM25("blog", "javascript", 10)
+	results, err := idx.SearchBM25("blog", "javascript", 10, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25 failed: %v", err)
 	}

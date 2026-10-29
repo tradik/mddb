@@ -47,6 +47,10 @@ type HybridSearchRequest struct {
 	Geo             *HybridGeoFilter    `json:"geo,omitempty"`    // optional spatial pre-filter
 	IncludeContent  bool                `json:"includeContent"`
 	FieldWeights    map[string]float64  `json:"fieldWeights,omitempty"`
+	// BM25K1 and BM25B override the BM25 constants for this query (SRCH-018);
+	// nil = the collection profile's, then 1.2 / 0.75. bm25 and bm25f only.
+	BM25K1 *float64 `json:"bm25K1,omitempty"`
+	BM25B  *float64 `json:"bm25B,omitempty"`
 	DisableStem     bool                `json:"disableStem"`
 	DisableSynonyms bool                `json:"disableSynonyms"`
 	Lang            string              `json:"lang,omitempty"`
@@ -420,6 +424,10 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 	if s.FTSIndex == nil {
 		return nil, nil
 	}
+	bm25, err := s.ResolveBM25(req.Collection, req.BM25K1, req.BM25B)
+	if err != nil {
+		return nil, err
+	}
 
 	// Per-query stemming/synonym control on a view of the index, never on
 	// the shared one (see FTSIndex.QueryView).
@@ -458,20 +466,19 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 	tokens := idx.TokenizeQueryLang(req.Collection, req.Query, req.Lang)
 
 	var results []fts.FTSResult
-	var err error
 
 	switch req.Algorithm {
 	case "bm25f":
 		if req.Fuzzy > 0 {
-			results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, candidates, req.Fuzzy, req.FieldWeights)
+			results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, candidates, req.Fuzzy, req.FieldWeights, bm25)
 		} else {
-			results, err = idx.SearchBM25F(req.Collection, tokens, candidates, req.FieldWeights)
+			results, err = idx.SearchBM25F(req.Collection, tokens, candidates, req.FieldWeights, bm25)
 		}
 	case "bm25":
 		if req.Fuzzy > 0 {
-			results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
+			results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy, bm25)
 		} else {
-			results, err = idx.SearchBM25(req.Collection, req.Query, candidates)
+			results, err = idx.SearchBM25(req.Collection, req.Query, candidates, bm25)
 		}
 	case "pmisparse":
 		if req.Fuzzy > 0 {
@@ -481,9 +488,9 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 		}
 	default:
 		if req.Fuzzy > 0 {
-			results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy)
+			results, err = idx.SearchBM25Fuzzy(req.Collection, req.Query, candidates, req.Fuzzy, bm25)
 		} else {
-			results, err = idx.SearchBM25(req.Collection, req.Query, candidates)
+			results, err = idx.SearchBM25(req.Collection, req.Query, candidates, bm25)
 		}
 	}
 

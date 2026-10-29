@@ -161,7 +161,7 @@ func TestIndexDocsIndexesFieldsWithoutContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	res, err := idx.SearchBM25F("c", idx.TokenizeLang("kubernetes", "en"), 10,
-		map[string]float64{"meta.tags": 1.0})
+		map[string]float64{"meta.tags": 1.0}, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +284,7 @@ func TestIndexDocsStoresTheBodyOnce(t *testing.T) {
 			t.Fatalf("the body was stored in the per-field index: %q", k)
 		}
 	}
-	res, err := idx.SearchBM25F("c", idx.Tokenize("fox"), 10, map[string]float64{"content": 1})
+	res, err := idx.SearchBM25F("c", idx.Tokenize("fox"), 10, map[string]float64{"content": 1}, DefaultBM25)
 	if err != nil || len(res) != 5 {
 		t.Errorf("BM25F over content found %d of 5 (err %v)", len(res), err)
 	}

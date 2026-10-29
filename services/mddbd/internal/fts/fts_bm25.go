@@ -11,12 +11,6 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-// BM25 default parameters (Okapi BM25)
-const (
-	bm25K1 = 1.2  // term frequency saturation
-	bm25B  = 0.75 // document length normalization
-)
-
 // ftsMetaKey builds the key for storing document length metadata.
 func ftsMetaKey(collection, docID string) []byte {
 	return []byte(fmt.Sprintf("ftsmeta|%s|%s", collection, docID))
@@ -129,7 +123,7 @@ func (f *FTSIndex) RemoveBM25Meta(tx *bolt.Tx, collection, docID string) error {
 }
 
 // SearchBM25 performs full-text search using Okapi BM25 scoring.
-func (f *FTSIndex) SearchBM25(collection, query string, limit int) ([]FTSResult, error) {
+func (f *FTSIndex) SearchBM25(collection, query string, limit int, p BM25Params) ([]FTSResult, error) {
 	queryTerms := f.TokenizeQuery(collection, query)
 	if len(queryTerms) == 0 {
 		return nil, nil
@@ -203,7 +197,7 @@ func (f *FTSIndex) SearchBM25(collection, query string, limit int) ([]FTSResult,
 				}
 
 				// BM25 score: IDF * (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * dl/avgdl))
-				bm25Score := idf * (tf * (bm25K1 + 1)) / (tf + bm25K1*(1-bm25B+bm25B*dl/avgdl))
+				bm25Score := p.termScore(idf, tf, dl, avgdl)
 
 				ds, ok := scores[docID]
 				if !ok {

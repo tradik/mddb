@@ -24,7 +24,7 @@ func TestBM25FBasicSearch(t *testing.T) {
 	}
 
 	tokens := idx.Tokenize("golang")
-	results, err := idx.SearchBM25F("blog", tokens, 10, nil)
+	results, err := idx.SearchBM25F("blog", tokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25F: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestBM25FDefaultWeights(t *testing.T) {
 	}
 
 	tokens := idx.Tokenize("database")
-	results, err := idx.SearchBM25F("col", tokens, 10, nil)
+	results, err := idx.SearchBM25F("col", tokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25F: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestBM25FCustomWeights(t *testing.T) {
 		"meta.tags": 10.0,
 		"content":   1.0,
 	}
-	results, err := idx.SearchBM25F("col", tokens, 10, customWeights)
+	results, err := idx.SearchBM25F("col", tokens, 10, customWeights, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25F custom: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestBM25FCustomWeights(t *testing.T) {
 		"meta.tags": 1.0,
 		"content":   10.0,
 	}
-	results2, err := idx.SearchBM25F("col", tokens, 10, flippedWeights)
+	results2, err := idx.SearchBM25F("col", tokens, 10, flippedWeights, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25F flipped: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestBM25FContentWithoutFieldData(t *testing.T) {
 	}
 
 	tokens := idx.Tokenize("golang")
-	results, err := idx.SearchBM25F("blog", tokens, 10, nil)
+	results, err := idx.SearchBM25F("blog", tokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25F: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestBM25FMultipleTerms(t *testing.T) {
 	}
 
 	tokens := idx.Tokenize("golang database")
-	results, err := idx.SearchBM25F("col", tokens, 10, nil)
+	results, err := idx.SearchBM25F("col", tokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25F: %v", err)
 	}
@@ -193,7 +193,7 @@ func TestBM25FFuzzy(t *testing.T) {
 
 	// Typo: "golanq" instead of "golang"
 	tokens := idx.Tokenize("golanq")
-	results, err := idx.SearchBM25FFuzzy("col", tokens, 10, 1, nil)
+	results, err := idx.SearchBM25FFuzzy("col", tokens, 10, 1, nil, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25FFuzzy: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestBM25FEmptyCollection(t *testing.T) {
 	defer cleanup()
 
 	tokens := idx.Tokenize("anything")
-	results, err := idx.SearchBM25F("nonexistent", tokens, 10, nil)
+	results, err := idx.SearchBM25F("nonexistent", tokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatalf("SearchBM25F: %v", err)
 	}
@@ -237,7 +237,7 @@ func TestBM25FFieldWeightZero(t *testing.T) {
 	both, err := idx.SearchBM25F("col", tokens, 10, map[string]float64{
 		"meta.title": 3.0,
 		"content":    1.0,
-	})
+	}, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +246,7 @@ func TestBM25FFieldWeightZero(t *testing.T) {
 	contentOnly, err := idx.SearchBM25F("col", tokens, 10, map[string]float64{
 		"meta.title": 0,
 		"content":    1.0,
-	})
+	}, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestBM25FRemoveCleanup(t *testing.T) {
 	}
 
 	tokens := idx.Tokenize("golang")
-	results, err := idx.SearchBM25F("col", tokens, 10, nil)
+	results, err := idx.SearchBM25F("col", tokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestBM25FRemoveCleanup(t *testing.T) {
 		t.Fatalf("Remove: %v", err)
 	}
 
-	results, err = idx.SearchBM25F("col", tokens, 10, nil)
+	results, err = idx.SearchBM25F("col", tokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestBM25FReindex(t *testing.T) {
 
 	// Old term should not match
 	goTokens := idx.Tokenize("golang")
-	results, err := idx.SearchBM25F("col", goTokens, 10, nil)
+	results, err := idx.SearchBM25F("col", goTokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +328,7 @@ func TestBM25FReindex(t *testing.T) {
 
 	// New term should match
 	pyTokens := idx.Tokenize("python")
-	results, err = idx.SearchBM25F("col", pyTokens, 10, nil)
+	results, err = idx.SearchBM25F("col", pyTokens, 10, nil, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -550,6 +550,8 @@ message FTSRequest {
   GroupBy group_by = 12;                         // (v2.18.8) at most per_group results per metadata value or document
   string format = 13;                            // (v2.18.8) "passages" returns passages instead of documents
   int32 passage_lines = 14;                      // (v2.18.8) context lines around a passage's hit
+  optional double bm25_k1 = 15;                  // (v2.18.8, SRCH-018) BM25 k1 for this query; unset = collection profile, then 1.2
+  optional double bm25_b = 16;                   // (v2.18.8, SRCH-018) BM25 b for this query; unset = collection profile, then 0.75
 }
 
 message FTSResult {
@@ -638,6 +640,8 @@ message HybridSearchRequest {
   int32 wait_for_index_ms = 23;                  // (v2.18.8) wait up to this long (max 30000) for queued embeddings
   repeated string wait_for_keys = 24;             // (v2.18.8) wait only for these keys
   string read_level = 25;                         // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
+  optional double bm25_k1 = 26;                  // (v2.18.8, SRCH-018) BM25 k1 of the full-text half
+  optional double bm25_b = 27;                   // (v2.18.8, SRCH-018) BM25 b of the full-text half
 }
 
 message HybridSearchResult {
@@ -1055,6 +1059,8 @@ message RetrievalProfileProto {
   string group_by_key = 9;          // (SRCH-016) default groupBy key: a metadata key, "document" or "collection"; empty = none
   int32 group_by_per_group = 10;    // (SRCH-016) results kept per group; 0 = 1
   string format = 11;               // (AGT-002) default result format: "results" or "passages"; empty = results
+  optional double bm25_k1 = 12;     // (SRCH-018) BM25 term-frequency saturation, 0-3; unset = 1.2
+  optional double bm25_b = 13;      // (SRCH-018) BM25 length normalisation, 0-1; unset = 0.75
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.

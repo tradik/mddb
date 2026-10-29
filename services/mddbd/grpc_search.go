@@ -343,7 +343,8 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 	fr := FTSSearchRequest{Collection: req.Collection, Query: req.Query, Limit: int(req.Limit), Algorithm: req.Algorithm,
 		Fuzzy: int(req.Fuzzy), FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
 		Lang: req.Lang, Boost: req.Boost, FacetBy: req.FacetBy, FacetMaxValues: int(req.FacetMaxValues),
-		GroupBy: groupByOf(req.GroupBy), PassageOptions: passageOptions(req.Format, req.PassageLines)}
+		GroupBy: groupByOf(req.GroupBy), PassageOptions: passageOptions(req.Format, req.PassageLines),
+		BM25K1: req.Bm25K1, BM25B: req.Bm25B}
 	if err := g.server.normalizeFTSRequest(&fr); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -451,6 +452,7 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		VectorAlgorithm: req.VectorAlgorithm, Alpha: req.Alpha, Strategy: req.Strategy, RRFK: int(req.RrfK),
 		Fuzzy: int(req.Fuzzy), Threshold: req.Threshold, FilterMeta: metaValuesFromProto(req.FilterMeta),
 		Filter: metaFilterFromProto(req.Filter), Boost: req.Boost, FieldWeights: req.FieldWeights, Lang: req.Lang,
+		BM25K1: req.Bm25K1, BM25B: req.Bm25B,
 		GroupBy:        groupByOf(req.GroupBy),
 		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
 		PassageOptions: passageOptions(req.Format, req.PassageLines),

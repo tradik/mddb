@@ -341,6 +341,8 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		Fuzzy:          mcpGetInt(args, "fuzzy"),
 		Lang:           mcpGetString(args, "lang"),
 		Boost:          mcpGetFloat64Map(args, "boost"),
+		BM25K1:         mcpGetFloatPtr(args, "bm25_k1"),
+		BM25B:          mcpGetFloatPtr(args, "bm25_b"),
 		IncludeContent: includeContent,
 		// CODE-002: highlights carry the line range, which is what lets an
 		// agent edit a place instead of reading a file.
@@ -423,6 +425,8 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		FilterMeta:      mcpGetMetaMap(args, "filter_meta"),
 		Boost:           mcpGetFloat64Map(args, "boost"),
 		Sort:            mcpGetString(args, "sort"),
+		BM25K1:          mcpGetFloatPtr(args, "bm25_k1"),
+		BM25B:           mcpGetFloatPtr(args, "bm25_b"),
 	}
 	filter, filterErr := mcpGetFilter(args)
 	if filterErr != nil {

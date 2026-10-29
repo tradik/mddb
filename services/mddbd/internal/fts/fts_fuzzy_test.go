@@ -182,7 +182,7 @@ func TestSearchBM25Fuzzy(t *testing.T) {
 	_ = fts.Index("docs", "doc1", "javascript programming tutorial")
 	_ = fts.Index("docs", "doc2", "python programming guide")
 
-	results, err := fts.SearchBM25Fuzzy("docs", "javascrip", 10, 1)
+	results, err := fts.SearchBM25Fuzzy("docs", "javascrip", 10, 1, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestSearchBM25Fuzzy_EmptyQuery(t *testing.T) {
 	fts, cleanup := newTestFTSForFuzzy(t)
 	defer cleanup()
 
-	results, err := fts.SearchBM25Fuzzy("docs", "", 10, 1)
+	results, err := fts.SearchBM25Fuzzy("docs", "", 10, 1, DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}

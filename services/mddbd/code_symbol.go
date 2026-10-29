@@ -8,6 +8,7 @@ import (
 
 	bolt "go.etcd.io/bbolt"
 
+	"mddb/internal/fts"
 	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 )
@@ -113,7 +114,7 @@ func (s *Server) LookupSymbol(req SymbolRequest) (*SymbolResult, error) {
 	// holds every identifier; occurrenceLines then keeps only whole-word uses.
 	var textIDs []string
 	if wantUsers && s.FTSIndex != nil {
-		if hits, err := s.FTSIndex.SearchBM25(req.Collection, req.Name, symbolScanDocs); err == nil {
+		if hits, err := s.FTSIndex.SearchBM25(req.Collection, req.Name, symbolScanDocs, fts.DefaultBM25); err == nil {
 			for _, h := range hits {
 				textIDs = append(textIDs, h.DocID)
 			}

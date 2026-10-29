@@ -204,7 +204,7 @@ func (f *FTSIndex) SearchFuzzy(collection, query string, limit, maxDist int) ([]
 }
 
 // SearchBM25Fuzzy performs BM25 search with fuzzy term matching.
-func (f *FTSIndex) SearchBM25Fuzzy(collection, query string, limit, maxDist int) ([]FTSResult, error) {
+func (f *FTSIndex) SearchBM25Fuzzy(collection, query string, limit, maxDist int, p BM25Params) ([]FTSResult, error) {
 	queryTerms := f.TokenizeQuery(collection, query)
 	if len(queryTerms) == 0 {
 		return nil, nil
@@ -280,7 +280,7 @@ func (f *FTSIndex) SearchBM25Fuzzy(collection, query string, limit, maxDist int)
 					dl = float64(binary.LittleEndian.Uint32(meta))
 				}
 
-				bm25Score := idf * (tf * (bm25K1 + 1)) / (tf + bm25K1*(1-bm25B+bm25B*dl/avgdl))
+				bm25Score := p.termScore(idf, tf, dl, avgdl)
 				if !isExact {
 					bm25Score *= fuzzyPenalty
 				}

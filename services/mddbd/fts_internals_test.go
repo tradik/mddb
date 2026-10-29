@@ -1291,7 +1291,7 @@ func TestFTSSearchBM25FFuzzy(t *testing.T) {
 	_ = idx.IndexFields("col", "d2", fields2)
 
 	tokens := map[string]int{"programing": 1}
-	results, err := idx.SearchBM25FFuzzy("col", tokens, 10, 1, nil)
+	results, err := idx.SearchBM25FFuzzy("col", tokens, 10, 1, nil, fts.DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1308,7 +1308,7 @@ func TestFTSSearchBM25Fuzzy(t *testing.T) {
 	_ = idx.Index("col", "d1", "algorithm optimization performance")
 	_ = idx.Index("col", "d2", "database indexing storage")
 
-	results, err := idx.SearchBM25Fuzzy("col", "algorithmm", 10, 1)
+	results, err := idx.SearchBM25Fuzzy("col", "algorithmm", 10, 1, fts.DefaultBM25)
 	if err != nil {
 		t.Fatal(err)
 	}
