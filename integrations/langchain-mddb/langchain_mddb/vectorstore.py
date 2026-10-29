@@ -28,7 +28,7 @@ Two things worth knowing before using it:
 
 from __future__ import annotations
 
-from typing import Any, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
@@ -67,19 +67,7 @@ class MddbVectorStore(VectorStore):
                 ``Document.page_content``.
         """
         if client is None:
-            try:
-                from mddb_client import MddbClient
-            except ImportError as exc:  # pragma: no cover - import-time guard
-                raise ImportError(
-                    "langchain-mddb needs mddb-client, which is not on PyPI and "
-                    "cannot be installed from git: its protobuf stubs are "
-                    "generated at build time and are not committed. Build it "
-                    "from a checkout:\n"
-                    "  git clone https://github.com/tradik/mddb.git\n"
-                    "  cd mddb && ./proto/generate.sh\n"
-                    "  pip install ./clients/python"
-                ) from exc
-            client = MddbClient(address, **client_kwargs)
+            client = _open_client(address, **client_kwargs)
             self._owns_client = True
         else:
             self._owns_client = False
@@ -293,6 +281,27 @@ class MddbVectorStore(VectorStore):
 
 
 # -- conversions ------------------------------------------------------------
+
+
+def _open_client(address: str, **client_kwargs: Any) -> Any:
+    """Opens an ``MddbClient`` to ``address``; shared by every adapter here.
+
+    The import is the guard: mddb-client is not on PyPI, so a missing package
+    gets instructions rather than a bare ModuleNotFoundError.
+    """
+    try:
+        from mddb_client import MddbClient
+    except ImportError as exc:  # pragma: no cover - import-time guard
+        raise ImportError(
+            "langchain-mddb needs mddb-client, which is not on PyPI and "
+            "cannot be installed from git: its protobuf stubs are "
+            "generated at build time and are not committed. Build it "
+            "from a checkout:\n"
+            "  git clone https://github.com/tradik/mddb.git\n"
+            "  cd mddb && ./proto/generate.sh\n"
+            "  pip install ./clients/python"
+        ) from exc
+    return MddbClient(address, **client_kwargs)
 
 
 def _to_document(doc: Any, text_key: str) -> Document:

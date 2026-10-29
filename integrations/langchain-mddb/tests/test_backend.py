@@ -19,27 +19,7 @@ import pytest
 
 pytest.importorskip("deepagents")
 
-
-class _Msg:
-    def __init__(self, **kwargs: Any) -> None:
-        self.__dict__.update(kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        return ""
-
-
-class _MetaValues:
-    def __init__(self, values: List[str]) -> None:
-        self.values = list(values)
-
-
-class _RpcError(grpc.RpcError):
-    def __init__(self, code: grpc.StatusCode) -> None:
-        super().__init__()
-        self._code = code
-
-    def code(self) -> grpc.StatusCode:
-        return self._code
+from _fakes import _Msg, _MetaValues, _RpcError  # noqa: E402
 
 
 def _pb2() -> types.ModuleType:

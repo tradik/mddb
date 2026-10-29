@@ -1503,7 +1503,7 @@ graph TB
 
 **[← Back to README](../README.md)** · **[LLM Connections →](LLM_CONNECTIONS.md)** · **[RAG Pipeline →](RAG-PIPELINE.md)**
 
-## 12. LangChain ⇄ MDDB (VectorStore + Retriever)
+## 12. LangChain ⇄ MDDB (VectorStore, Retriever, Store)
 
 A developer choosing a retrieval backend inside LangChain picks from the list
 that has an adapter. `langchain-mddb` puts MDDB on that list.
@@ -1568,6 +1568,90 @@ retries. Files are documents keyed by path, with `path`, `dir` and
 `dirPrefix` metadata, so a listing is one indexed query and the same files
 are searchable with `full_text_search` and `semantic_search`. Install with
 `pip install "langchain-mddb[client,deepagents]"` (Python 3.11+).
+
+### LangGraph Store: long-term agent memory (v2.18.9)
+
+`MddbStore` implements LangGraph's `BaseStore` — the interface behind a
+graph's long-term memory, Deep Agents' `StoreBackend` and LangMem — on one
+MDDB collection (default `langgraph_store`). Sync and async: `put`, `get`,
+`delete`, `search`, `list_namespaces`, `batch`.
+
+```python
+from langchain_mddb import MddbStore
+
+store = MddbStore(collection="agent-memory", address="localhost:11024",
+                  ttl={"default_ttl": 60 * 24 * 30, "refresh_on_read": True})
+
+store.put(("users", "u1", "semantic"), "tea", {"content": "Prefers green tea", "kind": "preference"})
+store.search(("users", "u1"), query="what does the user drink?", limit=5)   # hybrid, with score
+store.search(("users", "u1"), filter={"kind": "preference"})               # newest first
+store.list_namespaces(prefix=("users",), max_depth=2)
+```
+
+| LangGraph | MDDB |
+|---|---|
+| store | one collection |
+| `namespace` + `key` | document key `users/u1/semantic/tea` (labels and key escaped: `%`, `/`, `\|`) |
+| `value` | `content_md` = the value as JSON (what the server embeds and full-text indexes) |
+| namespace prefix | `meta.nsPrefix` = every prefix of `meta.ns` — one indexed equality filter |
+| `filter={"kind": "x"}` | `meta.value.kind` = `"x"` (JSON-encoded, so `3` ≠ `"3"`); `$eq` too; `$gt`, `$ne`, nested or list values raise `NotImplementedError` |
+| `search(query=...)` | `HybridSearch`, `score` = combined score; items put with `index=False` are left out |
+| `search()` without query | `Search` sorted by `updatedAt` descending |
+| `list_namespaces` | the distinct `meta.ns` values (`GetMetaKeys`), with prefix/suffix (`*` wildcard), `max_depth`, `limit`, `offset` |
+| TTL (minutes) | `SetTTL` in seconds; `refresh_on_read` sets it again on `get`/`search` |
+
+MDDB embeds server-side with the collection's provider, and it embeds the
+stored value whole: `index={"embed", "dims"}` is accepted so a configuration
+ports from another store, and `fields` other than `["$"]` warn rather than
+pretend to narrow it. Expiry is best-effort, as LangGraph describes it.
+
+**Memory types are namespaces, not API.** The convention from LangMem:
+
+| Memory | Namespace | Holds |
+|---|---|---|
+| semantic | `("users", user_id, "semantic")` | facts and preferences |
+| episodic | `("users", user_id, "episodic")` | summaries of past interactions |
+| procedural | `("agents", agent_id, "procedural")` | the agent's own instructions; a collection's `responsePrompt` (RAG-002) is the server-side counterpart |
+
+`store.search(("users", user_id))` then reads all of one user's memory, and
+`list_namespaces(prefix=("users",), max_depth=2)` lists the users.
+
+Deep Agents keeps an agent's files in the store with `StoreBackend` — one
+namespace per user, so files persist across threads and never cross users:
+
+```python
+from dataclasses import dataclass
+
+from deepagents import create_deep_agent
+from deepagents.backends import StoreBackend
+from langchain_mddb import MddbStore
+
+
+@dataclass
+class Context:
+    user_id: str
+
+
+store = MddbStore(collection="agent-files")
+agent = create_deep_agent(
+    model=llm,  # any tool-calling chat model
+    backend=StoreBackend(store=store, namespace=lambda rt: ("users", rt.context.user_id, "files")),
+    store=store,
+    context_schema=Context,
+)
+agent.invoke({"messages": [("user", "remember that I drink green tea")]},
+             {"configurable": {"thread_id": "t1"}}, context=Context(user_id="alice"))
+# Another thread, same user: the files written in t1 are there.
+agent.invoke({"messages": [("user", "what do I drink?")]},
+             {"configurable": {"thread_id": "t2"}}, context=Context(user_id="alice"))
+```
+
+Run locally against a live server (with a scripted model), the second thread
+reads the file the first one wrote, and another user's namespace does not see
+it. On LangGraph Platform the user comes from `rt.server_info.user.identity`
+instead of the context.
+
+Install with `pip install "langchain-mddb[client,store]"`.
 
 **[→ Full README](../integrations/langchain-mddb/README.md)**
 

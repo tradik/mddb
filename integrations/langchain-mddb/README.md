@@ -1,7 +1,7 @@
 # langchain-mddb
 
-LangChain `VectorStore` and `Retriever` backed by
-[MDDB](https://github.com/tradik/mddb).
+LangChain `VectorStore` and `Retriever`, LangGraph `Store` (agent memory) and
+a Deep Agents filesystem backend, backed by [MDDB](https://github.com/tradik/mddb).
 
 ## Install
 
@@ -126,10 +126,100 @@ backend = CompositeBackend(
 Paths must be absolute; a path with `..` is refused in the result's `error`,
 never sent to the server.
 
+## LangGraph Store (agent memory)
+
+`MddbStore` (extra `store`) implements LangGraph's `BaseStore` — long-term
+memory for graphs, Deep Agents' `StoreBackend`, LangMem — on one collection
+(default `langgraph_store`). Every method has its async twin (`aput`, `aget`,
+`asearch`, `adelete`, `alist_namespaces`); they run the same calls on a worker
+thread, because the gRPC client blocks.
+
+```python
+from langchain_mddb import MddbStore
+
+store = MddbStore(collection="agent-memory", address="localhost:11024",
+                  ttl={"default_ttl": 60 * 24 * 30, "refresh_on_read": True})
+
+ns = ("users", "u1", "semantic")
+store.put(ns, "tea", {"content": "Prefers green tea", "kind": "preference"})
+store.get(ns, "tea").value                       # {'content': 'Prefers green tea', 'kind': 'preference'}
+store.search(("users", "u1"), query="drink")     # hybrid search, each item has .score
+store.search(("users",), filter={"kind": "preference"}, limit=20)   # newest first
+store.list_namespaces(prefix=("users",), max_depth=2)              # [('users', 'u1')]
+store.put(ns, "raw", {"blob": "..."}, index=False)  # stored, filterable, not in query search
+store.delete(ns, "tea")
+```
+
+How an item is stored:
+
+| LangGraph | MDDB |
+|---|---|
+| `namespace` + `key` | document key `users/u1/semantic/tea`; `%`, `/` and `\|` in labels and keys are escaped, so `("a/b",)` and `("a", "b")` never collide |
+| `value` | `content_md`, the value as JSON — nested dicts, lists and Unicode round-trip exactly |
+| namespace | `meta.ns` = `users/u1/semantic`, `meta.nsPrefix` = every prefix of it |
+| top-level scalars of `value` | `meta.value.<field>`, JSON-encoded, for `filter` |
+| `index=False` | `meta.indexed` = `false` |
+| `ttl` (minutes) | `SetTTL` (seconds), recorded in `meta.ttlSeconds` so reads can refresh it |
+
+**Why the value is in the body and not in metadata.** Every metadata value is
+also a key in MDDB's metadata index: that caps its length (a Deep Agents file
+can be megabytes) and would make `list_namespaces` read every value back. The
+body has neither problem, and it is what the server embeds and indexes.
+
+**Search.** With `query`, `HybridSearch` restricted to the namespace prefix;
+`score` is the combined keyword/vector score. Without `query`, items come
+newest first (`updatedAt` descending), paged by `limit` and `offset`.
+
+**Filters.** Equality on a top-level scalar — `{"kind": "preference"}` or
+`{"kind": {"$eq": "preference"}}` — is answered by the metadata index; `3`
+and `"3"` are different values. `$gt`, `$gte`, `$lt`, `$lte`, `$ne`, nested
+objects, lists and strings over 256 characters raise `NotImplementedError`:
+dropping a condition would silently widen the search.
+
+**Embeddings.** MDDB embeds server-side with the collection's provider, and
+embeds the stored value whole. `index={"dims": ..., "embed": ...}` is accepted
+so a configuration ports over unchanged; `fields` other than `["$"]` emits a
+warning, because it cannot narrow what the server embeds.
+
+**Memory types are namespaces.** Semantic memory (facts) in
+`("users", id, "semantic")`, episodic (interaction summaries) in
+`("users", id, "episodic")`, procedural (the agent's instructions) in
+`("agents", id, "procedural")`. `search(("users", id))` reads one user's
+memory across all three.
+
+### Deep Agents: files that outlive the thread
+
+```python
+from dataclasses import dataclass
+
+from deepagents import create_deep_agent
+from deepagents.backends import StoreBackend
+from langchain_mddb import MddbStore
+
+
+@dataclass
+class Context:
+    user_id: str
+
+
+store = MddbStore(collection="agent-files")
+agent = create_deep_agent(
+    model=llm,  # any tool-calling chat model
+    backend=StoreBackend(store=store, namespace=lambda rt: ("users", rt.context.user_id, "files")),
+    store=store,
+    context_schema=Context,
+)
+agent.invoke({"messages": [("user", "remember that I drink green tea")]},
+             {"configurable": {"thread_id": "t1"}}, context=Context(user_id="alice"))
+```
+
+A later thread for the same user reads the files this one wrote; another
+user's namespace does not see them.
+
 ## Development
 
 ```bash
-pip install -e ".[test,client]"
+pip install -e ".[test,client]"   # test pulls in langgraph and, on 3.11+, deepagents
 pytest
 ```
 

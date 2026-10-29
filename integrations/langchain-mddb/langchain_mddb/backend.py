@@ -47,6 +47,7 @@ from deepagents.backends.protocol import (
 )
 
 from ._paths import InvalidPath, dir_of, file_meta, glob_match, key_for, normalize
+from .vectorstore import _open_client
 
 #: Matches returned by one grep at most, as the built-in backends cap theirs.
 MAX_GREP_MATCHES = 1000
@@ -67,9 +68,7 @@ class MddbBackend(BackendProtocol):
             lang: language recorded on every file document.
         """
         if client is None:  # pragma: no cover - needs a live server
-            from mddb_client import MddbClient
-
-            client = MddbClient(address, **client_kwargs)
+            client = _open_client(address, **client_kwargs)
         self._client = client
         self.collection = collection
         self.lang = lang
