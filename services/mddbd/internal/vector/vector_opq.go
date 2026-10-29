@@ -94,7 +94,7 @@ func (o *OPQIndex) Add(collection, docID string, vector []float32) error {
 	delete(c.codes, docID) // the replaced vector's code, if any
 	if c.trained && len(c.codebooks) > 0 && len(vector) == c.dim {
 		rotated := matVecMul(c.rotation, vector, c.dim)
-		c.codes[docID] = encodeOPQ(c, rotated, o.nSubspaces)
+		c.codes[docID] = encodeOPQ(c, rotated)
 	}
 	return nil
 }
@@ -425,9 +425,12 @@ func encodePQVec(vec []float32, codebooks [][]float32Slice, nSub, dim int) []uin
 	return code
 }
 
-// encodeOPQ encodes a single rotated vector using collection codebooks.
-func encodeOPQ(c *opqCollection, rotated []float32, nSub int) []uint8 {
-	return encodePQVec(rotated, c.codebooks, nSub, c.dim)
+// encodeOPQ encodes a rotated vector with the collection's trained codebooks.
+// Their count is the subspace count Train settled on, which is the configured
+// one clamped to the dimension; encoding with the configured count ran past
+// the codebooks and panicked for vectors under 8 dimensions.
+func encodeOPQ(c *opqCollection, rotated []float32) []uint8 {
+	return encodePQVec(rotated, c.codebooks, len(c.codebooks), c.dim)
 }
 
 // learnRotation computes the optimal orthogonal rotation aligning X to Y

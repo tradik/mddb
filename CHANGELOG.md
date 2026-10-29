@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **OPQ panicked on vectors under 8 dimensions (#364).** Training clamps the
+  subspace count to the dimension. A vector added after training was then
+  encoded with the configured count, past the trained codebooks. Encoding now
+  uses the count training produced.
+- **A per-collection restore that had to undo its file swap overflowed the
+  stack.** The undo closure called itself. It is now a separate function,
+  with a test.
+
 - **HNSW recall, the cost of the exact prefilter, and the `auto` thresholds
   (SRCH-013).** The planner benchmark at 2k, 200k and 2M vectors found all
   three.
@@ -167,6 +175,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Images in retrieval (RAG-010).**
+  - **Extraction.** Turn it on with `extractImages`. It is available on
+    upload, `/v1/ingest`, gRPC, MCP `upload_file` and `ingest_documents`, and
+    `mddb-cli autoindex --images`, and it is the default in a collection of
+    type `images`.
+  - **What is extracted.** A Markdown file's image links, and a PDF's JPEG
+    and 8-bit RGB/gray pictures.
+  - **Image documents.** Each image becomes a document under `KEY/images/`,
+    with `meta.kind: image`, `parent`, `altText`, `caption` and `page`.
+    - Its alt text and caption are searchable.
+    - Its bytes are kept in the collection's `images` bucket and served by
+      `GET /v1/image`.
+    - Remote links are fetched only with `fetchRemoteImages`, through the
+      SSRF guard.
+  - **Images on search results.** `includeImages: true` on full-text, vector,
+    hybrid and cross-collection search returns each hit's images. It works
+    over REST, MCP, gRPC and GraphQL, in results and in passages. Without it,
+    responses are byte-for-byte unchanged.
+  - **Searching by picture.** This needs a provider that embeds images:
+    Voyage `voyage-multimodal-3.5` (`MDDB_EMBEDDING_IMAGE_MODEL`), or Cohere
+    Embed v3 and later.
+    - The worker embeds pictures within the collection's embedding budget.
+    - Vector and hybrid search return `imageHits`, matched by what the
+      picture shows.
+    - Vector search takes `queryImage` to search with an image.
+    - Other providers skip pictures, and `indexing-status` says why.
 - **New converters and a conversion confidence score (GO-046).**
   - **New formats.**
     - XLSX and ODS: one table per sheet, dates in ISO 8601.
