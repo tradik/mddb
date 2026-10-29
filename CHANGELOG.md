@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A document key finds its document under any spelling (DOC-017).** The
+  identifier has always been case-insensitive, but the key index stored the
+  key as written. So `README.md` was not found as `readme.md`, and writing
+  both spellings left two index entries.
+  - **The new rule.** The index now stores the key and language with ASCII
+    letters in lower case, as the identifier does. Collections stay
+    case-sensitive.
+  - **Schema version.** Every database file now records its on-disk schema
+    version (`schema_version`/`version`).
+  - **Migration.** On first open, 2.18.9 migrates older files before
+    serving any read or write: at startup, as each per-collection file
+    opens, and when a restore or a replication snapshot installs a file.
+    The rewrite is chunked and crash-safe. It merges duplicate spellings and
+    keeps the entry that points at an existing document.
+  - **Replication.** A follower applying entries from an older leader
+    stores them in the new form. Upgrade followers before the leader.
+  - **Downgrade.** Restore a backup taken before the upgrade: 2.18.8 finds
+    keys written with upper-case letters only by their lower-case spelling.
+- **Five-field cron schedules never ran.** The scheduler accepted only
+  six-field schedules, so a rule such as `0 9 * * *` (the documented form)
+  was stored and silently never fired. Both forms run now, and a schedule
+  that does not parse is refused when the rule is created or updated.
+- **The extreme-mode batch processor crashed on a cancelled request.** It
+  left empty slots that the commit then read; every document now gets an
+  answer.
 - **Setting a TTL stored an encrypted collection's document unencrypted.**
   REST, MCP and gRPC each had their own set-TTL. None of them encrypted the
   rewritten document, and only REST wrote it to the binlog. gRPC also left
@@ -22,6 +47,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Per-collection quotas, disk reserve and embedding budget (GO-043).** A
+  collection's config can carry `quota: {maxDocuments, maxBytes,
+  maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`.
+  - **Storage limits.** Writes that would pass a storage limit are refused
+    with `507 Insufficient Storage`. One check inside the write transaction
+    does this, so REST, gRPC (`RESOURCE_EXHAUSTED`), MCP (tool error with
+    `structuredContent`), GraphQL (error `extensions`), batch and ingest
+    behave the same. A batch over a limit is refused whole and nothing is
+    written.
+  - **Embedding budget.** A spent daily budget never refuses a document:
+    its embedding waits as pending until midnight UTC, or until the quota
+    is raised. `vector-reindex` answers `429` with `Retry-After`.
+  - **Server limits.** `MDDB_DISK_RESERVE_BYTES` refuses document writes
+    while free disk is below the reserve; reads and backups keep working.
+    `MDDB_VECTOR_RAM_LIMIT_BYTES` refuses writes that would add vectors to
+    RAM past the limit; disk-only collections are exempt.
+  - **Reporting.** New metrics `mddb_collection_fullness{collection,resource}`
+    and `mddb_embedding_budget_used{collection}`, and a new webhook event
+    `quota.exceeded`.
+  - **Who can change a quota.** With auth on, only a global admin. Omitting
+    `quota` keeps the stored one, and `{}` removes it. Collections without a
+    quota behave as before.
+- **Scheduled backups with retention and an S3 target (OPS-023).** A cron
+  automation can now take a backup instead of firing a webhook:
+  `"backup": {"target": "local"|"s3", "path", "bucket", "prefix", "keep": N,
+  "collections": ["*"]}`.
+  - **The backup.** Each run uses the same code as `GET /v1/backup`: a
+    consistent copy, opened as a restore would open it. It writes a
+    `<name>.sha256` file in `sha256sum` format.
+  - **Where it goes.** A directory inside `MDDB_BACKUP_DIR`, or any
+    S3-compatible bucket (AWS S3, MinIO, R2, GCS or Azure through S3),
+    configured with the same `storageConfig` block as S3-backed
+    collections. Uploaded objects are read back and their sha256 checked.
+  - **Retention.** Only after a successful run are the oldest backups
+    deleted down to `keep`, so a failing schedule never eats into existing
+    backups.
+  - **Reporting.** Runs appear in the automation log (`action: "backup"`,
+    `target`, `removed`) and as jobs on the SSE stream. They set
+    `mddb_backup_last_success_timestamp{rule}`, and a failure fires the new
+    `backup.failed` webhook event.
+  - **The S3 secret key** is masked on every read of a rule.
+  - **New CLI:** `mddb-cli backup schedule add|list|remove`.
+  - **With replication**, enable crons on one node only (docs/BACKUP.md).
 - **MCP: destructive tools can ask the user first (MCP-004).** New
   `MDDB_MCP_CONFIRM_DESTRUCTIVE=off|elicit|require`; the default `off`
   changes nothing.

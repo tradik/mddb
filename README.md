@@ -392,6 +392,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Confirm Destructive MCP Tools** - `MDDB_MCP_CONFIRM_DESTRUCTIVE=elicit|require` makes deletes, truncation and restore ask the human through MCP elicitation first ([guide](docs/MCP.md))
 - ✅ **User Management** - Multi-user with admin roles
 - ✅ **[Native Multi-Tenancy](docs/MULTI_TENANCY.md)** - Namespace isolation per tenant, enforced centrally across HTTP/gRPC/GraphQL/MCP; zero config for single-tenant deployments
+- ✅ **[Per-Collection Quotas](docs/MULTI_TENANCY.md)** - `maxDocuments`, `maxBytes`, `maxVectors` and a daily embedding budget per collection (507/429 on every protocol), plus `MDDB_DISK_RESERVE_BYTES` and `MDDB_VECTOR_RAM_LIMIT_BYTES`
 - ✅ **Group Permissions** - Organize users into groups
 - ✅ **[TLS / HTTPS](docs/TLS.md)** - `MDDB_TLS_ENABLED=true`, `MDDB_TLS_CERT`, `MDDB_TLS_KEY`, taking a user-supplied PEM cert and key, TLS 1.2 minimum
 - ✅ **[Mutual TLS (mTLS)](docs/TLS.md#quick-start-mtls--clients-must-present-certificates)** - `MDDB_TLS_CLIENT_CA` points to a PEM bundle of trusted client CAs; `MDDB_TLS_CLIENT_AUTH=require` (default) or `request`. Rejects unauthenticated clients when `require`
@@ -646,7 +647,7 @@ mddb-cli stats
 
 ### Operations
 - **[Docker Guide](docs/DOCKER.md)** - Container deployment
-- **[Backup, Restore & Repair](docs/BACKUP.md)** - Consistent verified backups, safe restores, `mddbd -verify-db` / `-repair-db` for a damaged database file
+- **[Backup, Restore & Repair](docs/BACKUP.md)** - Consistent verified backups, safe restores, `mddbd -verify-db` / `-repair-db` for a damaged database file; scheduled backups with retention to a local directory or S3
 - **[Deployment](docs/DEPLOYMENT.md)** - Production setup
 - **[Storage Tuning](docs/STORAGE-TUNING.md)** - Disks, filesystems, WSL2, macOS, FreeBSD, ZFS; fast restarts of large databases
 - **[Storage Layout](docs/STORAGE-LAYOUT.md)** - One file, or one file per collection (`MDDB_STORAGE_LAYOUT`)
