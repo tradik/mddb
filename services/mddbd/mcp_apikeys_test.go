@@ -145,13 +145,13 @@ func TestMCPAPIKeyMiddlewareWithStore(t *testing.T) {
 	}
 
 	// Static key should fail
-	_, ok := m.validateKey("sk-nonexistent")
+	_, _, ok := m.validateKey("sk-nonexistent")
 	if ok {
 		t.Error("nonexistent key should fail")
 	}
 
 	// Dynamic key should succeed
-	name, ok := m.validateKey(fullKey)
+	name, _, ok := m.validateKey(fullKey)
 	if !ok {
 		t.Error("dynamic key should succeed")
 	}

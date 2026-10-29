@@ -39,6 +39,9 @@ type MCPAPIKey struct {
 	CreatedAt int64  `json:"createdAt"`
 	ExpiresAt int64  `json:"expiresAt,omitempty"` // 0 = never
 	Disabled  bool   `json:"disabled,omitempty"`
+	// Toolsets limits the key to these MCP toolsets (MCP-003); empty = all
+	// the server exposes. A key for a coding agent might carry ["search","code"].
+	Toolsets []string `json:"toolsets,omitempty"`
 }
 
 // mcpAPIKeyStore provides CRUD for MCP API keys in BoltDB.
@@ -60,9 +63,13 @@ func newMCPAPIKeyStore(db *bolt.DB) *mcpAPIKeyStore {
 }
 
 // Create generates a new API key and stores it.
-func (s *mcpAPIKeyStore) Create(name string, expiresAt int64) (*MCPAPIKey, string, error) {
+// toolsets, when given, limit what the key can list and call (MCP-003).
+func (s *mcpAPIKeyStore) Create(name string, expiresAt int64, toolsets ...string) (*MCPAPIKey, string, error) {
 	if name == "" {
 		return nil, "", fmt.Errorf("name is required")
+	}
+	if _, err := parseToolsets(toolsets); err != nil {
+		return nil, "", err
 	}
 
 	// Generate key: mcp_ + 32 random hex chars
@@ -77,6 +84,7 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64) (*MCPAPIKey, strin
 		Name:      name,
 		CreatedAt: time.Now().Unix(),
 		ExpiresAt: expiresAt,
+		Toolsets:  toolsets,
 	}
 
 	data, err := json.Marshal(apiKey)
@@ -148,6 +156,7 @@ func (s *mcpAPIKeyStore) List() ([]MCPAPIKeySummary, error) {
 				CreatedAt:   ak.CreatedAt,
 				ExpiresAt:   ak.ExpiresAt,
 				Disabled:    ak.Disabled,
+				Toolsets:    ak.Toolsets,
 			})
 			return nil
 		})
@@ -220,6 +229,8 @@ type MCPAPIKeySummary struct {
 	CreatedAt   int64  `json:"createdAt"`
 	ExpiresAt   int64  `json:"expiresAt,omitempty"`
 	Disabled    bool   `json:"disabled,omitempty"`
+	// Toolsets the key is limited to (MCP-003); absent = all.
+	Toolsets []string `json:"toolsets,omitempty"`
 }
 
 // ---- HTTP Handlers (mounted on main HTTP port, requires admin auth) ----
@@ -251,17 +262,20 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name      string `json:"name"`
-		ExpiresAt int64  `json:"expiresAt,omitempty"`
+		Name      string   `json:"name"`
+		ExpiresAt int64    `json:"expiresAt,omitempty"`
+		Toolsets  []string `json:"toolsets,omitempty"` // MCP-003
 	}
 	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&req); err != nil {
 		http.Error(w, `{"error":"invalid request"}`, http.StatusBadRequest)
 		return
 	}
 
-	apiKey, fullKey, err := s.mcpKeyStore.Create(req.Name, req.ExpiresAt)
+	apiKey, fullKey, err := s.mcpKeyStore.Create(req.Name, req.ExpiresAt, req.Toolsets...)
 	if err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -276,6 +290,7 @@ func (s *Server) handleMCPAPIKeyCreate(w http.ResponseWriter, r *http.Request) {
 		"name":      apiKey.Name,
 		"createdAt": apiKey.CreatedAt,
 		"expiresAt": apiKey.ExpiresAt,
+		"toolsets":  apiKey.Toolsets,
 	})
 }
 
@@ -381,30 +396,36 @@ func (m *MCPAPIKeyMiddleware) InvalidateCache() {
 }
 
 // validateFromStore checks a key against the BoltDB store.
-func (m *MCPAPIKeyMiddleware) validateFromStore(provided string) (string, bool) {
+func (m *MCPAPIKeyMiddleware) validateFromStore(provided string) (string, map[string]bool, bool) {
 	if m.keyStore == nil {
-		return "", false
+		return "", nil, false
 	}
 
 	// Check cache
 	m.cacheMu.RLock()
 	if entry, ok := m.cache[provided]; ok && time.Now().Before(entry.expires) {
 		m.cacheMu.RUnlock()
-		return entry.name, entry.valid
+		return entry.name, entry.toolsets, entry.valid
 	}
 	m.cacheMu.RUnlock()
 
 	ak, err := m.keyStore.Get(provided)
 	valid := err == nil && ak != nil
 	name := ""
+	var toolsets map[string]bool
 	if valid {
 		name = ak.Name
+		// Stored toolsets were validated on create; a name a later version
+		// removed would fail here, and fails closed: the key gets nothing.
+		if toolsets, err = parseToolsets(ak.Toolsets); err != nil {
+			toolsets = map[string]bool{}
+		}
 	}
 
 	// Cache result
 	m.cacheMu.Lock()
-	m.cache[provided] = &apiKeyCacheEntry{name: name, valid: valid, expires: time.Now().Add(m.cacheTTL)}
+	m.cache[provided] = &apiKeyCacheEntry{name: name, toolsets: toolsets, valid: valid, expires: time.Now().Add(m.cacheTTL)}
 	m.cacheMu.Unlock()
 
-	return name, valid
+	return name, toolsets, valid
 }

@@ -98,7 +98,7 @@ func (h *MCPHandler) dispatchModern(ctx context.Context, method string,
 	case "resources/read":
 		result = h.handleResourcesRead(ctx, req)
 	case "tools/list":
-		result = h.handleToolsList(req)
+		result = h.handleToolsList(ctx, req)
 	case "tools/call":
 		result = h.handleToolsCall(ctx, req)
 	case "prompts/list":

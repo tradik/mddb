@@ -200,7 +200,7 @@ func (o *mcpOAuth) Wrap(next http.Handler) http.Handler {
 		case strings.HasPrefix(bearer, oauthAccessPrefix):
 			t, err := o.open(oauthAccessPrefix, "access", bearer)
 			if err == nil {
-				if _, valid := o.keys.validateKey(t.APIKey); !valid {
+				if _, _, valid := o.keys.validateKey(t.APIKey); !valid {
 					err = errOAuthToken // its key was deleted: 401, so the client re-authorizes
 				}
 			}

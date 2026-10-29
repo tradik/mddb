@@ -167,7 +167,7 @@ In read-only mode, MCP tools with `readOnlyHint=false` (write, delete, destructi
 
 ### Disabling Built-in Tools
 
-Set `MDDB_MCP_BUILTIN_TOOLS=false` to hide all 54 built-in tools, exposing only custom YAML tools:
+Set `MDDB_MCP_BUILTIN_TOOLS=false` to hide all built-in tools, exposing only custom YAML tools (to keep some groups, use `MDDB_MCP_TOOLSETS=search,code` — see [MCP.md](MCP.md#toolsets-v2188)):
 
 ```bash
 docker run -d \

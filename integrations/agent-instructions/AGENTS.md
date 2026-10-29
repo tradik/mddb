@@ -50,6 +50,14 @@ to read.
 | `filter: {"path": {"prefix": "src/"}}` | searching everything and discarding | narrows on the metadata index before scoring; also `contains`, `gte`/`lt`, `not`, `exists` |
 | `group_by: {"key": "path", "per_group": 1}` | five hits from the same file | one result per file (or author, or collection), so the page covers more ground |
 
+## Fewer tools, better choices
+
+If the server or your key lists many tools you never use, ask the operator for
+a key limited to the toolsets your work needs — `search,code` for reading code,
+`search` for answering from documents, `search,memory,documents` for an
+assistant that keeps notes. Fewer schemas in context means a cheaper turn and
+a clearer choice.
+
 ## Anti-patterns
 
 **Do not fetch a document to edit part of it.** Search with

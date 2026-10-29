@@ -45,6 +45,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   by text. Such results are marked `pendingEmbedding`. `POST /v1/add` and
   `add_document` report `indexing.embeddingQueued`, and the SSE event
   `collection.indexed` fires when a collection's queue drains.
+- **MCP toolsets (MCP-003).** `MDDB_MCP_BUILTIN_TOOLS=false` hid every
+  built-in tool or none. Each built-in tool now belongs to one of eleven
+  toolsets (`search`, `code`, `documents`, `ingest`, `memory`, `schema`,
+  `admin`, `geo`, `automation`, `webhooks`, `wordpress`).
+  `MDDB_MCP_TOOLSETS=search,code` exposes only those groups, and an MCP API
+  key can carry its own `toolsets` (`POST /v1/mcp/keys`, or
+  `key:name:search|code` in `MDDB_MCP_API_KEYS`). A tool outside the caller's
+  toolsets is not listed and calling it returns `-32601`. With `search,code`
+  the `tools/list` schemas shrink from about 17 200 tokens to about 6 600.
 
 ### Changed
 

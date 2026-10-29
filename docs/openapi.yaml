@@ -38,7 +38,8 @@ info:
     ## Per-Protocol Access Modes
     Each protocol can have its own read/write mode: `MDDB_API_MODE`, `MDDB_GRPC_MODE`, `MDDB_MCP_MODE`, `MDDB_HTTP3_MODE`.
     Values: `read`, `write`, `wr`. Default: inherits from `MDDB_MODE`.
-    Set `MDDB_MCP_BUILTIN_TOOLS=false` to hide built-in MCP tools.
+    Set `MDDB_MCP_BUILTIN_TOOLS=false` to hide built-in MCP tools, or
+    `MDDB_MCP_TOOLSETS=search,code` to expose only some groups of them.
 
     ## Authentication
     MDDB supports JWT tokens and API keys for authentication with collection-level RBAC authorization.
@@ -1153,6 +1154,16 @@ paths:
                   format: int64
                   description: Unix timestamp; omit or 0 for a key that never expires.
                   example: 0
+                toolsets:
+                  type: array
+                  items:
+                    type: string
+                    enum: [ search, code, documents, ingest, memory, schema, admin, geo, automation, webhooks, wordpress, all ]
+                  description: |
+                    MCP toolsets the key may list and call (MCP-003, v2.18.8);
+                    omit for every toolset the server exposes. A call outside
+                    them is answered with JSON-RPC -32601. An unknown name is a 400.
+                  example: [ search, code ]
       responses:
         "200":
           description: Key created (plaintext returned once)
@@ -1174,8 +1185,11 @@ paths:
                   expiresAt:
                     type: integer
                     format: int64
+                  toolsets:
+                    type: array
+                    items: { type: string }
         "400":
-          description: Invalid request body or key name
+          description: Invalid request body, key name or toolset
         "403":
           description: Admin permission required
         "503":
@@ -6293,6 +6307,10 @@ components:
         is four bytes of SHA-256 over the key, and `keyPrefix` holds only the
         scheme marker every key starts with.
       properties:
+        toolsets:
+          type: array
+          items: { type: string }
+          description: Toolsets the key is limited to (MCP-003); absent means all.
         keyPrefix:
           type: string
           description: Scheme marker only — never a slice of the key.

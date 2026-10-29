@@ -96,6 +96,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_MCP_DOMAIN` | `""` | string | — | MCP server domain |
 | `MDDB_MCP_CONFIG` | `""` | string | — | Path to YAML with custom MCP tool definitions |
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | bool | — | Set to `false` to expose only custom YAML tools |
+| `MDDB_MCP_TOOLSETS` | `all` | list | `search`, `code`, `documents`, `ingest`, `memory`, `schema`, `admin`, `geo`, `automation`, `webhooks`, `wordpress`, `all` | Built-in tool groups to expose (v2.18.8, MCP-003); tools outside them are neither listed nor callable |
 | `MDDB_MCP_MODE` | `"wr"` | string | — | MCP access mode: `"read"`, `"write"`, or `"wr"` |
 | `MDDB_MCP_PROTOCOL_VERSION` | `""` | string | — | Pin the MCP spec revision, disabling negotiation. Empty means negotiate and default to the newest revision this build implements. An unknown value stops the server at startup. |
 

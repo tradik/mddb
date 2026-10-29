@@ -102,7 +102,7 @@ func (h *MCPHandler) HandleContext(ctx context.Context, req map[string]interface
 
 	// Tools
 	case "tools/list":
-		result = h.handleToolsList(req)
+		result = h.handleToolsList(ctx, req)
 	case "tools/call":
 		result = h.handleToolsCall(ctx, req)
 
@@ -253,8 +253,8 @@ func (h *MCPHandler) handleResourcesRead(ctx context.Context, req map[string]int
 
 // ---- Tools with cursor pagination ----
 
-func (h *MCPHandler) handleToolsList(req map[string]interface{}) map[string]interface{} {
-	tools := mcpAllTools(h.customTools)
+func (h *MCPHandler) handleToolsList(ctx context.Context, req map[string]interface{}) map[string]interface{} {
+	tools := mcpToolsFor(ctx, h.customTools)
 
 	// Cursor-based pagination
 	params, _ := req["params"].(map[string]interface{})
@@ -282,6 +282,11 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 	params, _ := req["params"].(map[string]interface{})
 	name, _ := params["name"].(string)
 	args, _ := params["arguments"].(map[string]interface{})
+
+	// MCP-003: a tool hidden from tools/list is not callable either.
+	if _, builtin := mcpToolGroup[name]; builtin && !builtinToolAllowed(ctx, name) {
+		return map[string]interface{}{"error": errToolNotInToolset(name)}
+	}
 
 	// GO-021: a tool long enough to be worth reporting on can now find a
 	// progress sender in its context. Nil for callers that did not ask.

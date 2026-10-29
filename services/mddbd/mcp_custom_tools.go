@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 )
 
 // MCPCustomToolConfig defines a single custom YAML tool.
@@ -102,12 +101,21 @@ func mcpCustomToolToMCPTool(ct MCPCustomToolConfig) MCPTool {
 	}
 }
 
-// mcpAllTools returns built-in tools plus custom tools from config, with annotations and output schemas.
-// Set MDDB_MCP_BUILTIN_TOOLS=false to expose only custom tools (no built-in tools).
+// mcpAllTools returns the tools the server exposes: built-in tools in its
+// toolsets (MDDB_MCP_TOOLSETS; MDDB_MCP_BUILTIN_TOOLS=false exposes none) plus
+// custom tools, with annotations and output schemas.
 func mcpAllTools(customDefs []MCPCustomToolConfig) []MCPTool {
+	return mcpToolsFor(context.Background(), customDefs)
+}
+
+// mcpToolsFor is mcpAllTools as one request sees it: also narrowed to the
+// toolsets of the MCP API key that authenticated it (MCP-003).
+func mcpToolsFor(ctx context.Context, customDefs []MCPCustomToolConfig) []MCPTool {
 	var tools []MCPTool
-	if os.Getenv("MDDB_MCP_BUILTIN_TOOLS") != "false" {
-		tools = mcpBuiltinTools()
+	for _, t := range mcpBuiltinTools() {
+		if builtinToolAllowed(ctx, t.Name) {
+			tools = append(tools, t)
+		}
 	}
 	for _, ct := range customDefs {
 		tools = append(tools, mcpCustomToolToMCPTool(ct))

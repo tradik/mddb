@@ -366,7 +366,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Authentication** - JWT tokens and API keys; OAuth 2.1 on the MCP listener for claude.ai connectors ([MCP.md](docs/MCP.md#oauth-21-for-claudeai-connectors-v2181))
 - ✅ **Authorization** - Collection-level RBAC (Read/Write/Admin)
 - ✅ **Per-Protocol Access Modes** - `MDDB_MCP_MODE=read` (MCP read-only), `MDDB_API_MODE`, `MDDB_GRPC_MODE`, `MDDB_HTTP3_MODE`
-- ✅ **MCP Tool Control** - `MDDB_MCP_BUILTIN_TOOLS=false` to expose only custom YAML tools
+- ✅ **MCP Tool Control** - `MDDB_MCP_BUILTIN_TOOLS=false` to expose only custom YAML tools; `MDDB_MCP_TOOLSETS=search,code` (or per API key) to expose only some groups
 - ✅ **User Management** - Multi-user with admin roles
 - ✅ **[Native Multi-Tenancy](docs/MULTI_TENANCY.md)** - Namespace isolation per tenant, enforced centrally across HTTP/gRPC/GraphQL/MCP; zero config for single-tenant deployments
 - ✅ **Group Permissions** - Organize users into groups

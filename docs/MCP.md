@@ -179,6 +179,7 @@ curl -X POST http://localhost:9000/mcp \
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 82 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 
 ### API Key Authentication
 
@@ -427,6 +428,43 @@ key — one passage per file instead of five from the same one:
 
 Each result reports its `group` and `groupRank`. See
 [Grouping Results](SEARCH.md#grouping-results-v2188).
+
+## Toolsets (v2.18.8+)
+
+Every tool's schema sits in the model's context on every turn, and a long menu
+makes the choice worse as well as more expensive. Each built-in tool belongs
+to one toolset, and a server or a key can expose only the toolsets it needs:
+
+| Toolset | Tools |
+|---|---|
+| `search` | `search_documents`, `aggregate`, `semantic_search`, `full_text_search`, `hybrid_search`, `cross_search`, `autocomplete`, `fts_languages`, `search_advisor`, `get_indexing_status`, `find_duplicates`, `classify_document`, `get_meta_keys` |
+| `code` | `code_graph` |
+| `documents` | `add_document`, `update_document`, `delete_document`, `get_document_meta`, `set_ttl`, `add_documents_batch`, `delete_documents_batch`, `export_documents`, `list_revisions`, `restore_revision` |
+| `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*` |
+| `memory` | `memory_*` |
+| `schema` | `set_schema`, `get_schema`, `delete_schema`, `list_schemas`, `validate_document` |
+| `admin` | stats, reindexing, backups, collection deletion and configs, synonyms, stopwords, curation rules |
+| `geo`, `automation`, `webhooks`, `wordpress` | the tools of that area |
+
+- **Server:** `MDDB_MCP_TOOLSETS=search,code` (default `all`).
+  `MDDB_MCP_BUILTIN_TOOLS=false` still hides every built-in tool.
+- **Per key:** `POST /v1/mcp/keys` with `"toolsets": ["search", "code"]`, or a
+  third field in a static key: `MDDB_MCP_API_KEYS=key:name:search|code`. A key
+  sees the intersection of its toolsets and the server's.
+- A tool outside the caller's toolsets is not listed, and calling it anyway is
+  answered with JSON-RPC `-32601` — the list is not the authorisation.
+- Custom tools are never filtered: they are the operator's explicit choice.
+
+Measured on this build, the `tools/list` schemas of all 82 tools take about
+69 KB (≈17 200 tokens) per turn; `search,code` takes about 26 KB (≈6 600).
+
+| Agent | Toolsets |
+|---|---|
+| Reads and reviews code | `search,code` |
+| Answers from a knowledge base | `search` |
+| Keeps notes across sessions | `search,memory,documents` |
+| Imports content | `ingest,documents,search` |
+| Operates the server | `admin` (with a key of its own) |
 
 ## Searching What You Just Wrote (v2.18.8+)
 

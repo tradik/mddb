@@ -150,7 +150,7 @@ func (o *mcpOAuth) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := r.Form.Get("api_key")
-	if _, valid := o.keys.validateKey(key); key == "" || !valid {
+	if _, _, valid := o.keys.validateKey(key); key == "" || !valid {
 		renderOAuthConsent(w, http.StatusUnauthorized, a, "That is not a valid MCP API key.")
 		return
 	}
@@ -249,7 +249,7 @@ func (o *mcpOAuth) handleToken(w http.ResponseWriter, r *http.Request) {
 	}
 	// The key is checked again on every grant, so a deleted key stops
 	// yielding tokens at the next refresh, not when its last token expires.
-	if _, valid := o.keys.validateKey(apiKey); apiKey == "" || !valid {
+	if _, _, valid := o.keys.validateKey(apiKey); apiKey == "" || !valid {
 		oauthError(w, http.StatusBadRequest, "invalid_grant", "the code or refresh token is invalid, expired, or its API key was revoked")
 		return
 	}

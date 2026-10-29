@@ -72,7 +72,7 @@ func (m *MCPHTTPServer) handleResourceRead(w http.ResponseWriter, r *http.Reques
 func (m *MCPHTTPServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"tools": mcpAllTools(m.customTools),
+		"tools": mcpToolsFor(r.Context(), m.customTools),
 	}); err != nil {
 		slog.Error("encoding tools response", "err", err)
 	}
@@ -83,6 +83,13 @@ func (m *MCPHTTPServer) handleToolCall(w http.ResponseWriter, r *http.Request) {
 	var req MCPToolCallRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, fmt.Sprintf("invalid request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	if _, builtin := mcpToolGroup[req.Name]; builtin && !builtinToolAllowed(r.Context(), req.Name) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"error": errToolNotInToolset(req.Name)})
 		return
 	}
 

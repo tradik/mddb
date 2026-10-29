@@ -22,26 +22,31 @@ import (
 //
 // Enable with MDDB_MCP_API_KEY_ENABLED=true.
 type MCPAPIKeyMiddleware struct {
-	enabled  bool
-	keys     map[string]string // static: key → name
-	keyStore *mcpAPIKeyStore   // dynamic: BoltDB-backed store
-	cacheTTL time.Duration
-	cacheMu  sync.RWMutex
-	cache    map[string]*apiKeyCacheEntry
+	enabled bool
+	keys    map[string]string // static: key → name
+	// keyToolsets: static key → toolsets, from an optional third field in
+	// MDDB_MCP_API_KEYS ("key:name:search|code"). MCP-003.
+	keyToolsets map[string]map[string]bool
+	keyStore    *mcpAPIKeyStore // dynamic: BoltDB-backed store
+	cacheTTL    time.Duration
+	cacheMu     sync.RWMutex
+	cache       map[string]*apiKeyCacheEntry
 }
 
 type apiKeyCacheEntry struct {
-	name    string
-	valid   bool
-	expires time.Time
+	name     string
+	toolsets map[string]bool
+	valid    bool
+	expires  time.Time
 }
 
 // NewMCPAPIKeyMiddleware creates API key middleware from environment variables.
 func NewMCPAPIKeyMiddleware() *MCPAPIKeyMiddleware {
 	m := &MCPAPIKeyMiddleware{
-		enabled: os.Getenv("MDDB_MCP_API_KEY_ENABLED") == "true",
-		keys:    make(map[string]string),
-		cache:   make(map[string]*apiKeyCacheEntry),
+		enabled:     os.Getenv("MDDB_MCP_API_KEY_ENABLED") == "true",
+		keys:        make(map[string]string),
+		keyToolsets: make(map[string]map[string]bool),
+		cache:       make(map[string]*apiKeyCacheEntry),
 	}
 	if !m.enabled {
 		return m
@@ -54,16 +59,27 @@ func NewMCPAPIKeyMiddleware() *MCPAPIKeyMiddleware {
 		if entry == "" {
 			continue
 		}
-		parts := strings.SplitN(entry, ":", 2)
+		parts := strings.SplitN(entry, ":", 3)
 		key := parts[0]
 		name := key
 		if len(name) > 8 {
 			name = name[:8] + "..."
 		}
-		if len(parts) == 2 && parts[1] != "" {
+		if len(parts) >= 2 && parts[1] != "" {
 			name = parts[1]
 		}
 		m.keys[key] = name
+		if len(parts) == 3 {
+			sets, err := parseToolsets(strings.Split(parts[2], "|"))
+			if err != nil {
+				// Fail closed: a key whose limits cannot be read gets no tools.
+				slog.Warn("MDDB_MCP_API_KEYS: invalid toolsets; the key is limited to none", "name", name, "err", err)
+				sets = map[string]bool{}
+			}
+			if sets != nil {
+				m.keyToolsets[key] = sets
+			}
+		}
 	}
 
 	ttl, err := time.ParseDuration(os.Getenv("MDDB_MCP_API_KEY_CACHE_TTL"))
@@ -100,7 +116,7 @@ func (m *MCPAPIKeyMiddleware) Wrap(next http.Handler) http.Handler {
 			return
 		}
 
-		name, ok := m.validateKey(key)
+		name, toolsets, ok := m.validateKey(key)
 		if !ok {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
@@ -110,21 +126,23 @@ func (m *MCPAPIKeyMiddleware) Wrap(next http.Handler) http.Handler {
 
 		// Store key name in header for downstream logging
 		r.Header.Set("X-MCP-Key-Name", name)
-		next.ServeHTTP(w, r)
+		// MCP-003: the key's toolsets travel in the context, where a client
+		// header cannot reach them.
+		next.ServeHTTP(w, r.WithContext(withKeyToolsets(r.Context(), toolsets)))
 	})
 }
 
-func (m *MCPAPIKeyMiddleware) validateKey(provided string) (string, bool) {
+func (m *MCPAPIKeyMiddleware) validateKey(provided string) (string, map[string]bool, bool) {
 	// 1. Check static keys (constant-time comparison)
 	for key, name := range m.keys {
 		if subtle.ConstantTimeCompare([]byte(provided), []byte(key)) == 1 {
-			return name, true
+			return name, m.keyToolsets[key], true
 		}
 	}
 
 	// 2. Check dynamic keys from BoltDB store
 	if m.keyStore == nil {
-		return "", false
+		return "", nil, false
 	}
 	return m.validateFromStore(provided)
 }
