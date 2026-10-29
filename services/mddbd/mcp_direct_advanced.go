@@ -523,13 +523,14 @@ func (c *DirectClient) Ingest(ctx context.Context, req *MCPIngestRequest) (*MCPI
 	}
 
 	return &MCPIngestResponse{
-		Added:      resp.Added,
-		Updated:    resp.Updated,
-		Skipped:    resp.Skipped,
-		Failed:     resp.Failed,
-		Errors:     resp.Errors,
-		Collection: resp.Collection,
-		DurationMs: resp.DurationMs,
+		Added:       resp.Added,
+		Updated:     resp.Updated,
+		Skipped:     resp.Skipped,
+		Failed:      resp.Failed,
+		Errors:      resp.Errors,
+		Collection:  resp.Collection,
+		DurationMs:  resp.DurationMs,
+		Conversions: resp.Conversions,
 	}, nil
 }
 

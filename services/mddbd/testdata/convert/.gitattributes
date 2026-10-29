@@ -1,0 +1,3 @@
+# Conversion fixtures are compared byte for byte: mail keeps its CRLF line
+# ends, binaries their bytes. No line-end normalisation here.
+* -text

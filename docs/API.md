@@ -228,7 +228,7 @@ Add multiple documents to a collection in a single request. Uses the optimized b
   - `key` (required): Document key
   - `lang` (required): Language code
   - `contentMd` (required unless `contentBase64` is given): Markdown content
-  - `format` (optional, v2.18.9+): convert the document from this format (`html`, `pdf`, `docx`, `odt`, `rtf`, `tex`, `yaml`, `log`, ... — see the format table under `/v1/upload`). Empty means the key's extension. Without `contentBase64`, `contentMd` is the file's text (HTML sent as a string)
+  - `format` (optional, v2.18.9+): convert the document from this format (`html`, `pdf`, `docx`, `odt`, `rtf`, `xlsx`, `ods`, `csv`, `tsv`, `pptx`, `odp`, `epub`, `eml`, `mbox`, `tex`, `yaml`, `log`, ... — see the format table under `/v1/upload`). Empty means the key's extension. Without `contentBase64`, `contentMd` is the file's text (HTML sent as a string)
   - `contentBase64` (optional, v2.18.9+): the file to convert, base64-encoded. It goes through the same converters as `/v1/upload`; the stored document is the Markdown, with `meta.sourceFormat` set. With `skipDuplicates` the converted Markdown is compared, so an unchanged file is skipped. A format with no converter fails that document (`unsupported format: bin`), not the batch
   - `meta` (optional): Metadata key-value pairs
   - `saveRevision` (optional): Whether to save a revision for this document
@@ -358,6 +358,12 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
 }
 ```
 
+Since v2.18.9 the response also lists `conversions`: every document converted
+from a file sent with `contentBase64`, with its `key`, the `format` it came
+from, `conversionConfidence` and `conversionWarnings` (see *Conversion
+confidence* below). An email's attachments and a mailbox's messages are
+stored as documents of their own and listed there too.
+
 #### The `fast` ingest profile (v2.12.0+)
 
 MDDB could always ingest faster by skipping steps — the flags existed — but only
@@ -436,7 +442,7 @@ Upload files via multipart/form-data. Files are auto-converted to Markdown and s
 **Content-Type**: `multipart/form-data`
 
 **Form Fields**:
-- `file` or `files[]` (required): One or more files to upload. Supported formats: `.md`, `.txt`, `.html`, `.htm`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.yaml`, `.yml`, `.log`, `.lex`, `.tex`, `.latex`
+- `file` or `files[]` (required): One or more files to upload. Supported formats: `.md`, `.txt`, `.html`, `.htm`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.xlsx`, `.ods`, `.csv`, `.tsv`, `.pptx`, `.odp`, `.epub`, `.eml`, `.mbox`, `.yaml`, `.yml`, `.log`, `.lex`, `.tex`, `.latex` (see the table below)
 - `collection` (required): Target collection name
 - `lang` (required): Document language code (e.g. `en_US`, `pl_PL`)
 - `key` (optional): Document key — if empty, derived from filename (lowercase, spaces→hyphens, extension stripped). **Keys resolve case-insensitively** — see below
@@ -483,20 +489,60 @@ migrated when v2.18.9 first opens it (see
 |--------|-----------|------------|
 | Markdown | `.md` | Stored as-is, frontmatter extracted |
 | Plain text | `.txt` | Stored as-is, frontmatter extracted |
-| HTML | `.html`, `.htm` | Converted to Markdown (headings, links, lists, bold/italic preserved) |
-| PDF | `.pdf` | Text extracted (text-based PDFs only; scanned/image PDFs not supported — use Docling) |
+| HTML | `.html`, `.htm` | Converted to Markdown (headings, links, lists, bold/italic preserved); head, scripts and styles dropped, all entities decoded |
+| PDF | `.pdf` | Text of the content streams, FlateDecode inflated. A scan without a text layer is stored with `conversionConfidence` 0 and a warning naming the pages without text — the server does no OCR |
 | DOCX | `.docx` | Text extracted with headings and list structure preserved |
 | ODT | `.odt` | OpenDocument text extracted with headings preserved |
 | RTF | `.rtf` | Rich Text Format — text extracted, formatting stripped |
+| XLSX (v2.18.9+) | `.xlsx` | Every sheet a `## Sheet` section holding a table; dates (by the cell's number format) as ISO 8601, not serial numbers; shared and inline strings, booleans; formulas give their cached value |
+| ODS (v2.18.9+) | `.ods` | As XLSX: every table a section; date and time cells as ISO 8601; repeated rows and columns expanded up to 1000 |
+| CSV, TSV (v2.18.9+) | `.csv`, `.tsv` | One table; the CSV separator (`,` `;` tab `\|`) detected from the first lines, a UTF-8 BOM dropped |
+| PPTX (v2.18.9+) | `.pptx` | One `## Slide N: Title` section per slide in presentation order, body paragraphs, then `**Notes:**` with the speaker notes; slide numbers, dates and footers left out |
+| ODP (v2.18.9+) | `.odp` | As PPTX: one section per page, title frame as the title, `presentation:notes` as notes |
+| EPUB (v2.18.9+) | `.epub` | Chapters in spine order (the book's reading order), each through the HTML converter; the book title as the heading |
+| EML (v2.18.9+) | `.eml` | Headers to meta (`from`, `to`, `date` as RFC 3339, `subject`, `messageId`, `attachments`); the plain-text body, or the HTML body through the HTML converter (nothing executed); every attachment the server can convert stored as its own document `KEY/attachments/NAME` with `meta.parent` = KEY |
+| MBOX (v2.18.9+) | `.mbox` | The mailbox document lists its messages; each message is stored as `KEY/message-N` (as EML, with its own attachments below it) |
 | LaTeX | `.tex`, `.latex` | Converted to Markdown (sections, formatting, environments, math preserved) |
 | YAML | `.yaml`, `.yml` | Wrapped in code block for structured data |
 | Log | `.log` | Wrapped in code block |
 | LEX | `.lex` | Wrapped in code block |
 
+The format is decided by content where it has a signature — `%PDF`, `{\rtf`, a
+zip holding `word/document.xml`, `xl/workbook.xml` or `ppt/presentation.xml`,
+or an OpenDocument/EPUB `mimetype` — and by extension otherwise, so a PDF named
+`.txt` is converted as a PDF. Binary content that no converter recognises is
+refused (`binary content that is no format the server converts`) rather than
+stored as text. Every converter is pure Go; none adds a dependency.
+
+**Conversion confidence** (v2.18.9+, GO-046): every converted document carries
+`meta.conversionConfidence`, a number from `0.00` to `1.00`, and
+`meta.conversionWarnings` saying what lowered it. It is a heuristic, computed
+from the converted text and the file — no model, no OCR:
+
+| Signal | Effect |
+|---|---|
+| No letter or digit extracted from a non-empty file | 0 |
+| PDF pages without text | × pages with text / pages (a scan scores 0) |
+| Replacement (U+FFFD) and non-printable characters | × (1 − 4 × their share); warned above 1% |
+| Text under 0.5% of the file size (zip and PDF formats) | × between 0.5 and 1 — pictures hold the rest |
+| Empty sheets | × (1 − 0.5 × empty sheets / sheets) |
+
+Find the documents worth a second look with the metadata filter —
+`"filter": {"conversionConfidence": {"lt": 0.5}}` compares numerically — and
+the search advisor (`/v1/search-advisor`) reports `lowConfidenceDocuments` and
+`lowConfidenceRatio` with a warning when there are any. Markdown and text are
+not converted and carry no score.
+
 **Auto-injected Metadata**:
 - `upload_format`: Original file format (e.g. `pdf`, `html`, `docx`)
 - `upload_filename`: Original filename
 - `upload_converted`: `"true"` if file was converted from non-markdown format
+- `conversionConfidence`, `conversionWarnings` (v2.18.9+): see *Conversion confidence* above
+- `from`, `to`, `date`, `subject`, `messageId`, `attachments` (v2.18.9+, email); `parent` and `filename` on an attachment's document
+
+A converted file's response also carries `conversionConfidence` and
+`conversionWarnings`, and `parts`: the further documents it held (a mailbox's
+messages, an email's attachments), each an upload result of its own.
 
 **Single File Response**:
 ```json

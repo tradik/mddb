@@ -96,6 +96,18 @@ type IngestResponseHTTP struct {
 	// collisions are named — importing a repository holding both `README.md`
 	// and `readme.md` should not be something you find out about later.
 	KeyCollisions []string `json:"keyCollisions,omitempty"`
+	// Conversions reports each document converted from a file (GO-046):
+	// its key, the format it was converted from, and how well it converted,
+	// so a scanned PDF is named in the response instead of found later.
+	Conversions []IngestConversion `json:"conversions,omitempty"`
+}
+
+// IngestConversion is one converted document of an ingest response.
+type IngestConversion struct {
+	Key        string   `json:"key"`
+	Format     string   `json:"format"`
+	Confidence float64  `json:"conversionConfidence"`
+	Warnings   []string `json:"conversionWarnings,omitempty"`
 }
 
 // handleIngest handles POST /v1/ingest
@@ -158,28 +170,30 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 		}
 	}
 
-	// Phase 1: Pre-process documents (key derivation, frontmatter, meta injection)
+	// Phase 1: Pre-process documents (key derivation, conversion,
+	// frontmatter, meta injection)
 	convert := s.Tracer.Stage(ctx, spanIngestConvert) // OPS-024
-	protoDocs, ttls, skipped, errs, sanitized := s.preProcessIngest(collection, docs, opts)
+	plan := s.preProcessIngest(collection, docs, opts)
 	convert.SetString("mddb.collection", collection)
-	convert.SetInt("mddb.documents", len(protoDocs))
+	convert.SetInt("mddb.documents", len(plan.docs))
 	convert.End()
 
 	resp := &IngestResponseHTTP{
 		Collection: collection,
-		Skipped:    skipped,
-		Failed:     len(errs),
-		Errors:     errs,
+		Skipped:    plan.skipped,
+		Failed:     len(plan.errs),
+		Errors:     plan.errs,
 		Profile:    profile.Name,
 		// Set here rather than on the way out, so it is reported on every
 		// path — the first version assigned it only in the early return
 		// below, and every successful import reported zero.
-		Sanitized: sanitized,
+		Sanitized: plan.sanitized,
 		// DOC-016: reported on every path, including the empty one below.
 		KeyCollisions: describeKeyCollisions(docs),
+		Conversions:   plan.conversions,
 	}
 
-	if len(protoDocs) == 0 {
+	if len(plan.docs) == 0 {
 		resp.DurationMs = time.Since(start).Milliseconds()
 		return resp, nil
 	}
@@ -189,8 +203,8 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	index := s.Tracer.Stage(ctx, spanIngestIndex)
 	defer index.End()
 	index.SetString("mddb.collection", collection)
-	index.SetInt("mddb.documents", len(protoDocs))
-	batchResp, processed, err := s.processBatchWithDocs(ctx, collection, protoDocs)
+	index.SetInt("mddb.documents", len(plan.docs))
+	batchResp, processed, err := s.processBatchWithDocs(ctx, collection, plan.docs)
 	if err != nil {
 		index.SetError(err)
 		return nil, err
@@ -202,7 +216,7 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	resp.Errors = append(resp.Errors, batchResp.Errors...)
 
 	// Phase 3: Apply the TTLs the documents asked for
-	s.applyIngestTTLs(collection, ttls, processed)
+	s.applyIngestTTLs(collection, plan.ttls, processed)
 
 	// Phase 4: Post-commit hooks
 	s.firePostBatchHooks(collection, processed, postBatchOptions{
@@ -219,17 +233,23 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	return resp, nil
 }
 
+// ingestPlan is what pre-processing decided: the documents to write, the
+// TTL each asks for (by document ID), and what to report.
+type ingestPlan struct {
+	docs        []*proto.BatchDocument
+	ttls        map[string]int64
+	skipped     int
+	errs        []string
+	sanitized   int
+	conversions []IngestConversion
+}
+
 // preProcessIngest transforms IngestDocumentHTTP into proto.BatchDocument,
 // applying URL key derivation, file conversion, frontmatter extraction,
-// metadata injection, and optional deduplication. It returns the documents to
-// write, the TTL each written document asks for (by document ID), how many
-// were skipped as unchanged, the per-document errors, and how many had text
-// sanitised.
-func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ([]*proto.BatchDocument, map[string]int64, int, []string, int) {
-	var protoDocs []*proto.BatchDocument
-	var errs []string
-	var sanitized int
-	ttls := make(map[string]int64)
+// metadata injection, and optional deduplication. A converted file may yield
+// several documents (an email and its attachments, GO-046).
+func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ingestPlan {
+	plan := ingestPlan{ttls: make(map[string]int64)}
 
 	for i, d := range docs {
 		// Derive key from URL if not provided
@@ -238,15 +258,14 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 			key = deriveKeyFromURL(d.URL)
 		}
 		if key == "" {
-			errs = append(errs, fmt.Sprintf("doc[%d]: cannot derive key (provide key or url)", i))
+			plan.errs = append(plan.errs, fmt.Sprintf("doc[%d]: cannot derive key (provide key or url)", i))
 			continue
 		}
 		if d.Lang == "" {
-			errs = append(errs, fmt.Sprintf("doc[%d] (%s): missing lang", i, key))
+			plan.errs = append(plan.errs, fmt.Sprintf("doc[%d] (%s): missing lang", i, key))
 			continue
 		}
 
-		content := d.ContentMD
 		meta := d.Meta
 		if meta == nil {
 			meta = make(map[string][]string)
@@ -255,78 +274,83 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 		// AGT-001: a file goes through the converters /v1/upload uses, so
 		// a PDF sent by `mddb-cli autoindex` is stored as its text, not
 		// refused as binary or indexed as bytes.
-		converted := false
+		out := []convertedDoc{{Key: key, Markdown: d.ContentMD, Meta: meta}}
 		if len(d.Content) > 0 || d.Format != "" {
-			conv, format, err := convertIngestFile(d, key, opts.TextOnly)
+			conv, err := convertIngestFile(d, key, opts.TextOnly)
 			if err != nil {
-				errs = append(errs, fmt.Sprintf("doc[%d] (%s): %s", i, key, err.Error()))
+				plan.errs = append(plan.errs, fmt.Sprintf("doc[%d] (%s): %s", i, key, err.Error()))
 				continue
 			}
-			content, converted = conv.Markdown, conv.Converted
-			if converted {
-				meta["sourceFormat"] = []string{format}
+			out = convertedDocs(conv, key, meta)
+		}
+
+		for j, cd := range out {
+			content, docMeta := cd.Markdown, cd.Meta
+
+			// GO-036: drop bytes protobuf cannot store, and count it.
+			// Sanitising here rather than refusing, because one badly encoded
+			// page must not abort an import of the other twenty thousand —
+			// but the response says how many were changed.
+			if sanitizedContent, sanitizedMeta, changed := SanitizeDocumentText(content, docMeta); changed {
+				content = sanitizedContent
+				docMeta = sanitizedMeta
+				plan.sanitized++
 			}
-		}
 
-		// GO-036: drop bytes protobuf cannot store, and count it. Sanitising
-		// here rather than refusing, because one badly encoded page must not
-		// abort an import of the other twenty thousand — but the response says
-		// how many were changed, which it previously did not.
-		if sanitizedContent, sanitizedMeta, changed := SanitizeDocumentText(content, meta); changed {
-			content = sanitizedContent
-			meta = sanitizedMeta
-			sanitized++
-		}
-
-		// Extract frontmatter; a converted file has none of its own.
-		if d.ExtractFrontmatter && !converted && content != "" {
-			fmMeta, body := parseFrontmatter(content)
-			if fmMeta != nil {
-				// Frontmatter as base, request meta overrides
-				merged := fmMeta
-				for k, v := range meta {
-					merged[k] = v
+			// Extract frontmatter; a converted file has none of its own.
+			if j == 0 && d.ExtractFrontmatter && !cd.Converted && content != "" {
+				fmMeta, body := parseFrontmatter(content)
+				if fmMeta != nil {
+					// Frontmatter as base, request meta overrides
+					merged := fmMeta
+					for k, v := range docMeta {
+						merged[k] = v
+					}
+					docMeta = merged
 				}
-				meta = merged
+				content = body
 			}
-			content = body
-		}
 
-		// Auto-inject scraping metadata
-		if d.URL != "" {
-			meta["source_url"] = []string{d.URL}
-		}
-		if d.ScrapedAt > 0 {
-			meta["scraped_at"] = []string{strconv.FormatInt(d.ScrapedAt, 10)}
-		}
-		if d.Scraper != "" {
-			meta["scraper"] = []string{d.Scraper}
-		}
+			// Auto-inject scraping metadata
+			if d.URL != "" {
+				docMeta["source_url"] = []string{d.URL}
+			}
+			if d.ScrapedAt > 0 {
+				docMeta["scraped_at"] = []string{strconv.FormatInt(d.ScrapedAt, 10)}
+			}
+			if d.Scraper != "" {
+				docMeta["scraper"] = []string{d.Scraper}
+			}
+			if cd.Converted {
+				docMeta["sourceFormat"] = []string{cd.Format}
+				plan.conversions = append(plan.conversions, IngestConversion{Key: cd.Key, Format: cd.Format,
+					Confidence: cd.Confidence, Warnings: cd.Warnings})
+			}
 
-		if d.TTL > 0 {
-			ttls[genID(collection, key, d.Lang)] = d.TTL
+			if d.TTL > 0 {
+				plan.ttls[genID(collection, cd.Key, d.Lang)] = d.TTL
+			}
+			plan.docs = append(plan.docs, &proto.BatchDocument{
+				Key:          cd.Key,
+				Lang:         d.Lang,
+				Meta:         toProtoMeta(docMeta),
+				ContentMd:    content,
+				SaveRevision: opts.SaveRevision,
+			})
 		}
-		protoDocs = append(protoDocs, &proto.BatchDocument{
-			Key:          key,
-			Lang:         d.Lang,
-			Meta:         toProtoMeta(meta),
-			ContentMd:    content,
-			SaveRevision: opts.SaveRevision,
-		})
 	}
 
-	skipped := 0
 	if opts.SkipDuplicates {
-		protoDocs, skipped = s.dropUnchanged(collection, protoDocs)
+		plan.docs, plan.skipped = s.dropUnchanged(collection, plan.docs)
 	}
-	return protoDocs, ttls, skipped, errs, sanitized
+	return plan
 }
 
 // convertIngestFile converts an ingest document that carries a file. The
 // format comes from the document, or from its key's extension; the bytes are
 // Content, or ContentMD when a caller sent text with a format to convert it
 // from (HTML as a string, say).
-func convertIngestFile(d IngestDocumentHTTP, key string, textOnly bool) (conversion, string, error) {
+func convertIngestFile(d IngestDocumentHTTP, key string, textOnly bool) (conversion, error) {
 	format := normalizeFormat(d.Format)
 	if format == "" {
 		format = formatFromFilename(key)
@@ -335,8 +359,7 @@ func convertIngestFile(d IngestDocumentHTTP, key string, textOnly bool) (convers
 	if len(data) == 0 {
 		data = []byte(d.ContentMD)
 	}
-	conv, err := convertToMarkdown(format, data, textOnly)
-	return conv, format, err
+	return convertToMarkdown(format, data, textOnly)
 }
 
 // dropUnchanged removes the documents whose stored content is the same as
@@ -446,13 +469,19 @@ func protoFromIngestResponse(resp *IngestResponseHTTP) *proto.IngestResponse {
 	if resp.Errors != nil {
 		errs = resp.Errors
 	}
+	conversions := make([]*proto.IngestConversion, 0, len(resp.Conversions))
+	for _, c := range resp.Conversions {
+		conversions = append(conversions, &proto.IngestConversion{Key: c.Key, Format: c.Format,
+			ConversionConfidence: c.Confidence, ConversionWarnings: c.Warnings})
+	}
 	return &proto.IngestResponse{
-		Added:      safeInt32(resp.Added),
-		Updated:    safeInt32(resp.Updated),
-		Skipped:    safeInt32(resp.Skipped),
-		Failed:     safeInt32(resp.Failed),
-		Errors:     errs,
-		Collection: resp.Collection,
-		DurationMs: resp.DurationMs,
+		Added:       safeInt32(resp.Added),
+		Updated:     safeInt32(resp.Updated),
+		Skipped:     safeInt32(resp.Skipped),
+		Failed:      safeInt32(resp.Failed),
+		Errors:      errs,
+		Collection:  resp.Collection,
+		DurationMs:  resp.DurationMs,
+		Conversions: conversions,
 	}
 }

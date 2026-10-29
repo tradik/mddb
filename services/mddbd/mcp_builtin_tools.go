@@ -1125,7 +1125,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 		// --- File Upload ---
 		{
 			Name:        "upload_file",
-			Description: "Upload a file and convert it to markdown. Supports md, txt, html, pdf, docx, odt, rtf, tex, yaml and log formats. Plain text and markdown files are stored as-is; other formats are auto-converted to markdown. File content is passed as base64-encoded string.",
+			Description: "Upload a file and convert it to markdown. Supports md, txt, html, pdf, docx, odt, rtf, xlsx, ods, csv, tsv, pptx, odp, epub, eml, mbox, tex, yaml and log formats. Plain text and markdown files are stored as-is; other formats are auto-converted to markdown, scored with conversionConfidence (0-1), and an email's attachments or a mailbox's messages are stored as further documents (parts) with meta.parent. File content is passed as base64-encoded string.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{

@@ -1,0 +1,20 @@
+From alice@example.org Mon Oct 26 08:00:00 2026
+From: Alice <alice@example.org>
+To: team@example.org
+Subject: Standup moved
+Date: Mon, 26 Oct 2026 08:00:00 +0000
+Message-ID: <standup@example.org>
+Content-Type: text/plain; charset=iso-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+Standup moves to 10:00 in the caf=E9.
+>From now on, bring coffee.
+
+From bob@example.org Mon Oct 26 09:30:00 2026
+From: Bob <bob@example.org>
+To: team@example.org
+Subject: Release notes
+Date: Mon, 26 Oct 2026 09:30:00 +0000
+Content-Type: text/html
+
+<h2>Release 4.2</h2><script>alert('x')</script><ul><li>Faster sync</li><li>Dark mode</li></ul>

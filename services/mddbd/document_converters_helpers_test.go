@@ -241,17 +241,18 @@ func TestOdtXMLToMarkdown(t *testing.T) {
 }
 
 func TestPdfToMarkdownInvalid(t *testing.T) {
-	_, err := pdfToMarkdown([]byte("not a pdf"))
+	_, _, err := pdfToMarkdown([]byte("not a pdf"))
 	if err == nil {
 		t.Error("expected error for invalid PDF")
 	}
 }
 
 func TestPdfToMarkdownNoText(t *testing.T) {
-	// Valid PDF header but no extractable text
-	_, err := pdfToMarkdown([]byte("%PDF-1.4\n%%EOF"))
-	if err == nil {
-		t.Error("expected error for empty PDF")
+	// A valid PDF with no text is not an error any more (GO-046): it is a
+	// page without text, which the confidence score reports.
+	md, sig, err := pdfToMarkdown([]byte("%PDF-1.4\n%%EOF"))
+	if err != nil || md != "" || sig.Pages != 1 || sig.PagesWithoutText != 1 {
+		t.Errorf("empty PDF: %q %+v %v", md, sig, err)
 	}
 }
 

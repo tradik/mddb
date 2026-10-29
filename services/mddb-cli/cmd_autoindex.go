@@ -61,10 +61,14 @@ type autoindexReport struct {
 	Errors    []string        `json:"errors,omitempty"`
 }
 
-// autoConverted is a file sent for conversion, and its format.
+// autoConverted is a document the server converted from a file: its key
+// (the file's path, or a path below it for a mailbox's messages and an
+// email's attachments), the format, and how well it converted.
 type autoConverted struct {
-	Rel    string `json:"path"`
-	Format string `json:"format"`
+	Rel        string   `json:"path"`
+	Format     string   `json:"format"`
+	Confidence *float64 `json:"conversionConfidence,omitempty"`
+	Warnings   []string `json:"conversionWarnings,omitempty"`
 }
 
 func newAutoindexCmd() *cobra.Command {
@@ -76,8 +80,9 @@ func newAutoindexCmd() *cobra.Command {
 
 In a git repository the files are the ones git tracks or would track; elsewhere
 everything except node_modules, target, dist, build, vendor and similar. Binary
-files are skipped by content, except PDF, DOCX, ODT and RTF, which the server
-converts to Markdown, as it does HTML and TeX. Each document gets meta path, extension, kind,
+files are skipped by content, except the documents the server converts to
+Markdown: PDF, DOCX, ODT, RTF, XLSX, ODS, PPTX, ODP and EPUB by content, and
+HTML, TeX, CSV, TSV, EML and MBOX by extension. Each document gets meta path, extension, kind,
 language, size and modified (and gitCommit, gitBranch in a repository); the
 server extracts symbols. A second run only rewrites files whose content changed.`,
 		Args: cobra.MaximumNArgs(1),
@@ -218,6 +223,7 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 			rep.Added, rep.Updated, rep.Unchanged = rep.Added+resp.Added, rep.Updated+resp.Updated, rep.Unchanged+resp.Skipped
 			rep.Failed += resp.Failed
 			rep.Errors = append(rep.Errors, resp.Errors...)
+			rep.noteConversions(resp.Conversions)
 		}
 		batch, size = nil, 0
 	}
@@ -239,7 +245,7 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 		if f.Format != "" {
 			// The server converts it, with the converters /v1/upload uses.
 			doc.Format, doc.Content = f.Format, content
-			rep.Converted = append(rep.Converted, autoConverted{f.Rel, f.Format})
+			rep.Converted = append(rep.Converted, autoConverted{Rel: f.Rel, Format: f.Format})
 		} else {
 			doc.ContentMD = string(content)
 		}
@@ -247,6 +253,37 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 		size += wireSize(f, content)
 	}
 	flush()
+}
+
+// noteConversions records how well the server converted each document:
+// the file's own, and the messages and attachments it held.
+func (rep *autoindexReport) noteConversions(convs []mddb.IngestConversion) {
+	for _, c := range convs {
+		confidence := c.Confidence
+		entry := autoConverted{Rel: c.Key, Format: c.Format, Confidence: &confidence, Warnings: c.Warnings}
+		found := false
+		for i := range rep.Converted {
+			if rep.Converted[i].Rel == c.Key {
+				rep.Converted[i], found = entry, true
+			}
+		}
+		if !found {
+			rep.Converted = append(rep.Converted, entry)
+		}
+	}
+}
+
+// quality is the report's note on a conversion: its confidence, and the
+// first warning when there is one.
+func (c autoConverted) quality() string {
+	if c.Confidence == nil {
+		return ""
+	}
+	q := fmt.Sprintf(" (confidence %.2f", *c.Confidence)
+	if len(c.Warnings) > 0 {
+		q += ": " + c.Warnings[0]
+	}
+	return q + ")"
 }
 
 // wireSize is what a file adds to a batch: its bytes, or their base64 when
@@ -284,7 +321,7 @@ func printAutoindex(rep *autoindexReport, start time.Time) error {
 		rep.Collection, rep.Files, float64(rep.Bytes)/1e6, rep.Added, rep.Updated, rep.Unchanged, rep.Failed,
 		rep.Pruned, len(rep.Skipped), rep.DurationMs)
 	for _, c := range rep.Converted {
-		fmt.Printf("  ~ %s: converted from %s\n", c.Rel, c.Format)
+		fmt.Printf("  ~ %s: converted from %s%s\n", c.Rel, c.Format, c.quality())
 	}
 	for _, e := range rep.Errors {
 		fmt.Println("  !", e)

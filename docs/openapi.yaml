@@ -652,10 +652,22 @@ paths:
         Upload files via multipart/form-data. Files are auto-converted
         to Markdown and stored as documents. Supports single and batch upload.
 
-        Supported formats: `.md`, `.txt`, `.html`, `.htm`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.yaml`, `.yml`, `.log`, `.lex`, `.tex`, `.latex`.
+        Supported formats: `.md`, `.txt`, `.html`, `.htm`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.xlsx`, `.ods`, `.csv`, `.tsv`, `.pptx`, `.odp`, `.epub`, `.eml`, `.mbox`, `.yaml`, `.yml`, `.log`, `.lex`, `.tex`, `.latex`.
         Default (md/txt) is stored as-is with frontmatter extraction; others are converted.
         ODT and DOCX are ZIP-based with XML extraction. RTF is parsed to plain text.
         LaTeX/TeX is converted (sections, formatting, environments). YAML/LOG/LEX are wrapped in code blocks.
+
+        (v2.18.9+, GO-046) XLSX and ODS become one section per sheet with a
+        table, dates as ISO 8601; CSV/TSV a table (separator detected).
+        PPTX and ODP become one section per slide, speaker notes included.
+        EPUB is read in spine order. EML and MBOX put from, to, date, subject
+        and messageId into meta, and each convertible attachment (and each
+        message of a mailbox) becomes a document of its own with
+        `meta.parent`, listed under `parts`. The format is taken from the
+        content where it has a signature (`%PDF`, a zip's main part, `{\rtf`),
+        so a PDF named `.txt` is converted as a PDF; binary content no
+        converter recognises is refused. Every converted document carries
+        `meta.conversionConfidence` (0-1) and `meta.conversionWarnings`.
       operationId: uploadFile
       requestBody:
         required: true
@@ -695,6 +707,13 @@ paths:
                 maxSize:
                   type: integer
                   description: Per-file size limit in bytes (default 10MB, max 100MB)
+                profile:
+                  type: string
+                  description: Ingest profile, as for /v1/ingest (`default`, `fast`)
+                textOnly:
+                  type: string
+                  enum: ["true", "false"]
+                  description: Extract plain text from html, docx, odt and epub instead of rebuilding Markdown structure
       responses:
         "200":
           description: File(s) uploaded and stored
@@ -7435,7 +7454,9 @@ components:
           type: string
           description: >
             (v2.18.9+) Convert the document from this format: html, pdf, docx,
-            odt, rtf, tex, yaml, log. Empty means the key's extension. Without
+            odt, rtf, xlsx, ods, csv, tsv, pptx, odp, epub, eml, mbox, tex,
+            yaml, log. Empty means the key's extension; a signature in the
+            content (`%PDF`, a zip's main part) wins over both. Without
             `contentBase64`, `contentMd` is taken as the file's text (HTML sent
             as a string, say).
           example: pdf
@@ -7556,6 +7577,36 @@ components:
             would be worse. Absent when there are no collisions.
           example:
             - '"README.md" and "readme.md" name one document (keys are case-insensitive); the last write wins'
+        conversions:
+          type: array
+          description: >-
+            (v2.18.9+, GO-046) Every document converted from a file sent with
+            `contentBase64`/`format` — including an email's attachments and a
+            mailbox's messages — with how well it converted. A scan without a
+            text layer is named here, not found later.
+          items:
+            $ref: "#/components/schemas/IngestConversion"
+
+    IngestConversion:
+      type: object
+      properties:
+        key:
+          type: string
+          example: reports/scan.pdf
+        format:
+          type: string
+          description: The format the document was converted from
+          example: pdf
+        conversionConfidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          example: 0
+        conversionWarnings:
+          type: array
+          items:
+            type: string
 
     GetRequest:
       type: object
@@ -9668,6 +9719,18 @@ components:
         summaryRatio:
           type: number
           description: (v2.18.9+, RAG-009) Their share of the sample, 0-1.
+        convertedDocuments:
+          type: integer
+          description: (v2.18.9+, GO-046) Sampled documents converted from a file, carrying meta.conversionConfidence.
+        lowConfidenceDocuments:
+          type: integer
+          description: >-
+            (v2.18.9+, GO-046) Sampled documents whose conversionConfidence is
+            below 0.5. When there are any, the advisor warns and names the
+            filter that lists them.
+        lowConfidenceRatio:
+          type: number
+          description: (v2.18.9+, GO-046) Their share of the sample, 0-1.
 
     FusionSignals:
       type: object
@@ -9799,13 +9862,41 @@ components:
           description: Document key
         format:
           type: string
-          description: Detected file format (md, txt, html, pdf, docx, odt, rtf, yaml,
-            tex, log, lex)
+          description: Detected file format (md, txt, html, pdf, docx, odt, rtf, xlsx,
+            ods, csv, tsv, pptx, odp, epub, eml, mbox, yaml, tex, log, lex)
         converted:
           type: boolean
           description: Whether the file was converted to markdown
         document:
           $ref: "#/components/schemas/Document"
+        conversionConfidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: >-
+            (v2.18.9+, GO-046) How well the file converted, by heuristics:
+            the share of replacement and non-printable characters, PDF pages
+            without text, the ratio of text to file size, empty sheets. A scan
+            without a text layer scores 0. Absent for Markdown and text, which
+            are not converted. Also stored as `meta.conversionConfidence`.
+          example: 0.98
+        conversionWarnings:
+          type: array
+          items:
+            type: string
+          description: (v2.18.9+) What lowered the confidence. Also stored as `meta.conversionWarnings`.
+          example:
+            - 3 of 3 pages have no extractable text (scanned, or a font encoding the converter cannot read; the server does no OCR)
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/UploadResponse"
+          description: >-
+            (v2.18.9+) Further documents the file held: each message of a
+            mailbox, each convertible attachment of an email. Keyed below the
+            file's key (`inbox/message-1`, `mail/attachments/q3.csv`), with
+            `meta.parent` naming the document that held them.
 
     UploadBatchResponse:
       type: object

@@ -918,6 +918,8 @@ type MCPIngestResponse struct {
 	Errors     []string `json:"errors,omitempty"`
 	Collection string   `json:"collection"`
 	DurationMs int64    `json:"duration_ms"`
+	// Conversions: each document converted from a file, scored (GO-046).
+	Conversions []IngestConversion `json:"conversions,omitempty"`
 }
 
 // --- MCP Client Interface ---

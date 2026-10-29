@@ -55,6 +55,18 @@ type IngestResponse struct {
 	Profile       string   `json:"profile,omitempty"`       // profile that applied
 	Sanitized     int      `json:"sanitized,omitempty"`     // documents with invalid UTF-8 dropped
 	KeyCollisions []string `json:"keyCollisions,omitempty"` // keys differing only in case
+	// Conversions lists each document converted from a file, with how well
+	// it converted (v2.18.9+).
+	Conversions []IngestConversion `json:"conversions,omitempty"`
+}
+
+// IngestConversion is one document converted from a file: the format it came
+// from, a heuristic confidence from 0 to 1, and what lowered it.
+type IngestConversion struct {
+	Key        string   `json:"key"`
+	Format     string   `json:"format"`
+	Confidence float64  `json:"conversionConfidence"`
+	Warnings   []string `json:"conversionWarnings,omitempty"`
 }
 
 // DocumentRef names one document of a collection.

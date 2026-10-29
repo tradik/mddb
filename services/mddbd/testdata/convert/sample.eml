@@ -1,0 +1,36 @@
+From: =?UTF-8?Q?Zo=C3=AB_Kowalska?= <zoe@example.org>
+To: ops@example.org
+Subject: =?UTF-8?B?UXVhcnRlcmx5IGZpZ3VyZXMg4oCUIFEz?=
+Date: Tue, 27 Oct 2026 09:15:00 +0100
+Message-ID: <q3-figures@example.org>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/alternative; boundary="inner"
+
+--inner
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+Hi all,
+
+the Q3 figures are attached. Revenue grew 12 =E2=80=94 see the sheet.
+--inner
+Content-Type: text/html; charset=utf-8
+
+<p>Hi all,</p><script>steal()</script><p>the Q3 figures are attached.</p>
+--inner--
+--outer
+Content-Type: text/csv; name="q3.csv"
+Content-Disposition: attachment; filename="q3.csv"
+Content-Transfer-Encoding: base64
+
+cmVnaW9uO3JldmVudWUKTm9ydGg7MTIwMApTb3V0aDs5ODAK
+--outer
+Content-Type: image/png; name="chart.png"
+Content-Disposition: attachment; filename="chart.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==
+--outer--

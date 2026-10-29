@@ -323,8 +323,7 @@ func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]inte
 
 	// One conversion path for every surface (AGT-001); text_only is the
 	// RAG-004 option upload and ingest already had.
-	format := formatFromFilename(filename)
-	conv, err := convertToMarkdown(format, data, mcpGetBool(args, "text_only"))
+	conv, err := convertToMarkdown(formatFromFilename(filename), data, mcpGetBool(args, "text_only"))
 	if err != nil {
 		return "", err
 	}
@@ -353,30 +352,39 @@ func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]inte
 	}
 
 	// Add upload metadata
-	meta["upload_format"] = []string{format}
+	meta["upload_format"] = []string{conv.Format}
 	meta["upload_filename"] = []string{filename}
 	if converted {
 		meta["upload_converted"] = []string{"true"}
 	}
-
-	// Store via MCPClient.Add
-	doc, err := s.client.Add(ctx, &MCPAddRequest{
-		Collection: collection,
-		Key:        key,
-		Lang:       lang,
-		ContentMD:  contentMD,
-		Meta:       meta,
-	})
 	_ = ttl // TTL is set via /v1/set-ttl or SetTTL MCP tool separately
-	if err != nil {
-		return "", err
-	}
 
-	result := map[string]interface{}{
-		"key":       key,
-		"format":    format,
-		"converted": converted,
-		"document":  doc,
+	// The file's own document first, then what it held (GO-046).
+	conv.Markdown = contentMD
+	var result map[string]interface{}
+	var parts []string
+	for _, d := range convertedDocs(conv, key, meta) {
+		doc, err := s.client.Add(ctx, &MCPAddRequest{Collection: collection, Key: d.Key, Lang: lang, ContentMD: d.Markdown, Meta: d.Meta})
+		if err != nil {
+			return "", err
+		}
+		if result != nil {
+			parts = append(parts, d.Key)
+			continue
+		}
+		result = map[string]interface{}{
+			"key":       d.Key,
+			"format":    d.Format,
+			"converted": d.Converted,
+			"document":  doc,
+		}
+		if d.Converted {
+			result["conversionConfidence"] = d.Confidence
+			result["conversionWarnings"] = d.Warnings
+		}
+	}
+	if len(parts) > 0 {
+		result["parts"] = parts
 	}
 	out, _ := json.MarshalIndent(result, "", "  ")
 	return string(out), nil

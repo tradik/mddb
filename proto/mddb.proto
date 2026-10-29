@@ -1426,6 +1426,15 @@ message IngestResponse {
   repeated string errors = 5;
   string collection = 6;
   int64 duration_ms = 7;
+  repeated IngestConversion conversions = 8; // Documents converted from files, scored (GO-046)
+}
+
+// IngestConversion says how well one document converted from its file.
+message IngestConversion {
+  string key = 1;
+  string format = 2;                      // The format it was converted from
+  double conversion_confidence = 3;       // 0-1, heuristic: 0 for a scan without a text layer
+  repeated string conversion_warnings = 4;
 }
 
 // --- Revisions ---

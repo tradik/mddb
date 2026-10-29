@@ -124,9 +124,11 @@ mddb-cli autoindex [path] [-c collection] [--lang en] [--include glob]... [--exc
 Walks the directory (git-aware), skips binary and oversized files, sends the
 rest in batches with path, kind, language, size, modified and git metadata,
 and stores a retrieval profile from the search advisor. A second run rewrites
-only changed files. PDF, DOCX, ODT and RTF (recognised by content) and HTML
-and TeX (by extension) are sent as files, which the server converts to
-Markdown (v2.18.9+); the report lists them as `~ path: converted from pdf`.
+only changed files. PDF, DOCX, ODT, RTF, XLSX, ODS, PPTX, ODP and EPUB
+(recognised by content) and HTML, TeX, CSV, TSV, EML and MBOX (by extension)
+are sent as files, which the server converts to Markdown (v2.18.9+); the
+report lists each with its format and conversion confidence, e.g.
+`~ scan.pdf: converted from pdf (confidence 0.00: 3 of 3 pages have no extractable text ...)`.
 See [docs/BULK-IMPORT.md](../../docs/BULK-IMPORT.md).
 
 #### add - Add or update a document

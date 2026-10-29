@@ -15,24 +15,31 @@ import (
 // hand over as files rather than as text. It decides by content where the
 // format has a signature — a PDF named .txt is still a PDF, and a .docx that
 // is not a zip is not a Word file — and by extension for markup formats that
-// are text (HTML, TeX), where sending them raw would index their tags.
+// are text (HTML, TeX, CSV, mail), where sending them raw would index their
+// markup.
 
 // markupExtensions are text formats the server converts: sent as they are,
-// their markup would land in the index as words.
+// their markup would land in the index as words, a table as a run of
+// separators, and a mailbox as one document with every header in it.
 var markupExtensions = map[string]string{
 	".html": "html", ".htm": "html", ".xhtml": "html",
 	".tex": "tex", ".latex": "tex",
+	".csv": "csv", ".tsv": "tsv",
+	".eml": "eml", ".mbox": "mbox",
 }
 
 // odfMimeTypes maps the first entry of an OpenDocument or EPUB zip to the
 // format the server converts it from.
 var odfMimeTypes = map[string]string{
-	"application/vnd.oasis.opendocument.text": "odt",
+	"application/vnd.oasis.opendocument.text":         "odt",
+	"application/vnd.oasis.opendocument.spreadsheet":  "ods",
+	"application/vnd.oasis.opendocument.presentation": "odp",
+	"application/epub+zip":                            "epub",
 }
 
 // ooxmlParts maps the main part of an Office Open XML zip to its format.
 var ooxmlParts = map[string]string{
-	"word/document.xml": "docx",
+	"word/document.xml": "docx", "xl/workbook.xml": "xlsx", "ppt/presentation.xml": "pptx",
 }
 
 // sniffFile reads the start of a file and says what it is: the format the

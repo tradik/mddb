@@ -84,6 +84,13 @@ type CollectionProfile struct {
 	SummaryDocuments int     `json:"summaryDocuments"`
 	SummaryRatio     float64 `json:"summaryRatio"`
 
+	// ConvertedDocuments is how many sampled documents were converted from
+	// a file and scored (GO-046); LowConfidenceDocuments how many of those
+	// scored below 0.5, and LowConfidenceRatio their share of the sample.
+	ConvertedDocuments     int     `json:"convertedDocuments,omitempty"`
+	LowConfidenceDocuments int     `json:"lowConfidenceDocuments,omitempty"`
+	LowConfidenceRatio     float64 `json:"lowConfidenceRatio,omitempty"`
+
 	// EstimatedVectorBytes is what the vectors occupy at float32 — the number
 	// that decides whether a quantized index is worth the recall it costs.
 	EstimatedVectorBytes int64 `json:"estimatedVectorBytes,omitempty"`
@@ -230,6 +237,7 @@ func (s *Server) profileCollection(collection string) (*CollectionProfile, error
 			if documentSummary(doc) != "" {
 				p.SummaryDocuments++
 			}
+			p.countConversion(doc.Meta)
 		}
 		return nil
 	})
@@ -257,6 +265,7 @@ func (s *Server) profileCollection(collection string) (*CollectionProfile, error
 	if p.Sampled > 0 {
 		p.TermsPerDocument = float64(len(terms)) / float64(p.Sampled)
 		p.SummaryRatio = float64(p.SummaryDocuments) / float64(p.Sampled)
+		p.LowConfidenceRatio = float64(p.LowConfidenceDocuments) / float64(p.Sampled)
 	}
 
 	s.profileVectors(collection, p)
@@ -428,6 +437,7 @@ func buildRecommendation(p *CollectionProfile, embeddingConfigured bool) *Search
 	// --- summaries (RAG-009) ---
 
 	adviseSummaries(r, p)
+	adviseConversions(r, p)
 
 	// --- signals ---
 

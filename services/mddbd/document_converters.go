@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"strconv"
 	"strings"
@@ -15,7 +16,10 @@ import (
 func htmlToMarkdown(data []byte) string {
 	s := string(data)
 
-	// Remove <script> and <style> blocks
+	// Remove <script> and <style> blocks, and the head: its <title> is not
+	// part of the body, and glued to the first heading it read as
+	// "Opening hours# Opening hours" (GO-046).
+	s = stripTagBlock(s, "head")
 	s = stripTagBlock(s, "script")
 	s = stripTagBlock(s, "style")
 
@@ -53,13 +57,10 @@ func htmlToMarkdown(data []byte) string {
 	// Strip remaining HTML tags
 	s = stripAllTags(s)
 
-	// Decode common HTML entities
-	s = strings.ReplaceAll(s, "&amp;", "&")
-	s = strings.ReplaceAll(s, "&lt;", "<")
-	s = strings.ReplaceAll(s, "&gt;", ">")
-	s = strings.ReplaceAll(s, "&quot;", "\"")
-	s = strings.ReplaceAll(s, "&#39;", "'")
-	s = strings.ReplaceAll(s, "&nbsp;", " ")
+	// Decode entities: all of them, once. The six replacements this used to
+	// do left "&ndash;" and "&#8217;" in the text and decoded "&amp;lt;"
+	// twice, into "<" (GO-046).
+	s = strings.ReplaceAll(html.UnescapeString(s), "\u00a0", " ")
 
 	// Clean up excessive whitespace
 	for strings.Contains(s, "\n\n\n") {
@@ -67,105 +68,6 @@ func htmlToMarkdown(data []byte) string {
 	}
 
 	return strings.TrimSpace(s)
-}
-
-// pdfToMarkdown extracts text from a PDF. Lightweight: reads text between stream/endstream
-// and extracts parenthesized text operators (Tj, TJ, '). This is best-effort for simple PDFs.
-func pdfToMarkdown(data []byte) (string, error) {
-	if len(data) < 5 || string(data[:5]) != "%PDF-" {
-		return "", errors.New("not a valid PDF file")
-	}
-
-	s := string(data)
-	var result strings.Builder
-
-	// Extract text from content streams: look for text between ( ) in Tj/TJ operators
-	idx := 0
-	for {
-		streamStart := indexFold(s[idx:], "stream\n")
-		if streamStart < 0 {
-			streamStart = indexFold(s[idx:], "stream\r\n")
-		}
-		if streamStart < 0 {
-			break
-		}
-		streamStart += idx
-
-		// Find "stream" keyword end
-		contentStart := streamStart + 7 // len("stream\n")
-		if s[streamStart+6] == '\r' {
-			contentStart = streamStart + 8
-		}
-
-		endStream := strings.Index(s[contentStart:], "endstream")
-		if endStream < 0 {
-			break
-		}
-
-		content := s[contentStart : contentStart+endStream]
-		extractPDFText(content, &result)
-
-		idx = contentStart + endStream + 9
-	}
-
-	text := result.String()
-	if strings.TrimSpace(text) == "" {
-		return "", errors.New("could not extract text from PDF (scanned/image-based PDFs are not supported; use Docling for advanced parsing)")
-	}
-
-	return strings.TrimSpace(text), nil
-}
-
-// extractPDFText extracts text from a PDF content stream (between parentheses in text operators).
-func extractPDFText(content string, result *strings.Builder) {
-	i := 0
-	for i < len(content) {
-		if content[i] == '(' {
-			// Find matching closing paren (handle escaped parens)
-			depth := 1
-			start := i + 1
-			j := start
-			for j < len(content) && depth > 0 {
-				if content[j] == '\\' {
-					j += 2
-					continue
-				}
-				switch content[j] {
-				case '(':
-					depth++
-				case ')':
-					depth--
-				}
-				if depth > 0 {
-					j++
-				}
-			}
-			if depth == 0 {
-				text := content[start:j]
-				// Unescape
-				text = strings.ReplaceAll(text, "\\(", "(")
-				text = strings.ReplaceAll(text, "\\)", ")")
-				text = strings.ReplaceAll(text, "\\\\", "\\")
-				text = strings.ReplaceAll(text, "\\n", "\n")
-				text = strings.ReplaceAll(text, "\\r", "\r")
-				text = strings.ReplaceAll(text, "\\t", "\t")
-				if strings.TrimSpace(text) != "" {
-					result.WriteString(text)
-				}
-				i = j + 1
-				continue
-			}
-		}
-
-		// Check for Td/TD (text positioning — likely a new line)
-		if i+2 < len(content) && (content[i] == 'T' && (content[i+1] == 'd' || content[i+1] == 'D')) {
-			if i+2 >= len(content) || content[i+2] == ' ' || content[i+2] == '\n' || content[i+2] == '\r' {
-				result.WriteByte('\n')
-			}
-		}
-
-		i++
-	}
 }
 
 // docxToMarkdown extracts text from a DOCX file (which is a ZIP containing XML).

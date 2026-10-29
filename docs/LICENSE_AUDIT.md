@@ -14,6 +14,15 @@ status: publish
 **Amended:** 2026-08-24 — `github.com/google/renameio` removed from
 `services/mddbd` (WIN-003); see the footnote on `github.com/coder/hnsw`. This is
 a targeted correction, not a re-scan: every other row is still as of the scan date.
+**Amended:** 2026-10-29 — the XLSX, ODS, CSV, PPTX, ODP, EPUB, EML and MBOX
+converters (GO-046, v2.18.9) add **no dependency**. They are written on the
+standard library (`archive/zip`, `encoding/xml`, `encoding/csv`, `net/mail`,
+`mime/multipart`) plus `golang.org/x/text` (BSD-3-Clause, already listed under
+`services/mddbd`, now a direct rather than an indirect requirement) for mail
+charsets. `github.com/xuri/excelize/v2` (BSD-3-Clause) was considered for XLSX
+and not taken: reading cell values needs a few hundred lines, while excelize
+brings six further modules (mscfb, msoleps, go-deepcopy, efp, nfp, x/image) for
+writing, styling and encrypted workbooks the server never uses.
 
 ---
 

@@ -30,6 +30,13 @@ type UploadResponse struct {
 	Format    string      `json:"format"`
 	Converted bool        `json:"converted"`
 	Doc       storage.Doc `json:"document"`
+	// ConversionConfidence (0–1) and ConversionWarnings say how well a
+	// converted file converted (GO-046); absent for Markdown and text.
+	ConversionConfidence *float64 `json:"conversionConfidence,omitempty"`
+	ConversionWarnings   []string `json:"conversionWarnings,omitempty"`
+	// Parts are the further documents the file held: a mailbox's messages,
+	// an email's convertible attachments, each with meta.parent.
+	Parts []UploadResponse `json:"parts,omitempty"`
 }
 
 // UploadBatchResponse is the JSON response for multi-file upload.
@@ -53,7 +60,7 @@ type UploadBatchResponse struct {
 //	ttl             – TTL in seconds (optional)
 //	maxSize         – per-file size limit in bytes (optional, default 10 MB, max 100 MB)
 //
-// Supported file types: .md .txt .html .htm .pdf .docx .odt .rtf .yaml .yml .log .lex .tex .latex
+// Supported file types: see supportedFormatsHint (document_convert.go).
 // Default (md/txt) is stored as-is; others are converted to markdown.
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -200,8 +207,7 @@ func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang,
 		return nil, fmt.Errorf("file %q exceeds max size (%d bytes)", fh.Filename, maxSize)
 	}
 
-	format := formatFromFilename(fh.Filename)
-	conv, err := convertToMarkdown(format, data, textOnly)
+	conv, err := convertToMarkdown(formatFromFilename(fh.Filename), data, textOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -239,29 +245,35 @@ func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang,
 	for k, v := range baseMeta {
 		docMeta[k] = v
 	}
-	docMeta["upload_format"] = []string{format}
+	docMeta["upload_format"] = []string{conv.Format}
 	docMeta["upload_filename"] = []string{fh.Filename}
 	if converted {
 		docMeta["upload_converted"] = []string{"true"}
 	}
 
-	// Validate schema
-	if err := s.SchemaManager.Validate(collection, docMeta); err != nil {
-		return nil, err
+	// The file's own document first, then what it held (GO-046).
+	conv.Markdown = contentMD
+	var res *UploadResponse
+	for _, d := range convertedDocs(conv, key, docMeta) {
+		if err := s.SchemaManager.Validate(collection, d.Meta); err != nil {
+			return res, fmt.Errorf("%s: %w", d.Key, err)
+		}
+		saved, _, err := s.addDocument(collection, d.Key, lang, d.Meta, d.Markdown, ttl, true)
+		if err != nil {
+			return res, fmt.Errorf("%s: %w", d.Key, err)
+		}
+		r := UploadResponse{Key: d.Key, Format: d.Format, Converted: d.Converted, Doc: saved}
+		if d.Converted {
+			confidence := d.Confidence
+			r.ConversionConfidence, r.ConversionWarnings = &confidence, d.Warnings
+		}
+		if res == nil {
+			res = &r
+		} else {
+			res.Parts = append(res.Parts, r)
+		}
 	}
-
-	// Store
-	saved, _, err := s.addDocument(collection, key, lang, docMeta, contentMD, ttl, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return &UploadResponse{
-		Key:       key,
-		Format:    format,
-		Converted: converted,
-		Doc:       saved,
-	}, nil
+	return res, nil
 }
 
 // deriveKeyFromFilename strips the extension and returns a URL-safe key.
