@@ -26,7 +26,7 @@ func covHRevisionKeyOverflow(collection, lang string) string {
 func covHDocCount(t *testing.T, s *Server, collection string) int {
 	t.Helper()
 	n := 0
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).ForEach(func(k, _ []byte) error {
 			if strings.HasPrefix(string(k), "doc|"+collection+"|") {
 				n++
@@ -42,7 +42,7 @@ func covHRevCount(t *testing.T, s *Server, collection, docID string) int {
 	t.Helper()
 	n := 0
 	prefix := string(storage.RevPrefix(collection, docID))
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("rev")).ForEach(func(k, _ []byte) error {
 			if strings.HasPrefix(string(k), prefix) {
 				n++
@@ -64,7 +64,7 @@ func TestCovHAddDocumentRefusals(t *testing.T) {
 	defer cleanup()
 
 	// A stored document that no longer decodes cannot be overwritten blind.
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("c", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(storage.DocKey("c", genID("c", "bad", "en")), []byte{0x01})
 	})
 	if _, _, err := s.addDocument("c", "bad", "en", nil, "x", 0, true); err == nil {
@@ -128,7 +128,7 @@ func TestCovHAddDocumentMetaReindexAndRetention(t *testing.T) {
 		t.Fatalf("revisions kept: %d, want 2", n)
 	}
 	// Only the current tag is indexed; the earlier ones were removed.
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("c", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("idxmeta"))
 		if b.Get(append(storage.MetaKeyPrefix("c", "tag", "t3"), doc.ID...)) == nil {
 			t.Error("current tag not indexed")
@@ -313,7 +313,7 @@ func TestCovHDeleteDocumentRefusals(t *testing.T) {
 	if err := s.deleteDocumentInternal("c", "missing", "en"); err == nil {
 		t.Fatal("deleting a missing document must fail")
 	}
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("c", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(storage.DocKey("c", genID("c", "bad", "en")), []byte{0x01})
 	})
 	if err := s.deleteDocumentInternal("c", "bad", "en"); err == nil {

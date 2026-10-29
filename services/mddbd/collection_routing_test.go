@@ -23,6 +23,28 @@ func perCollectionServer(t *testing.T) *Server {
 	return s
 }
 
+// closeStorage closes every file that holds data, so each storage call that
+// follows fails in either layout: the main file and, in the per-collection
+// layout, every open collection file. The named collections get their file
+// first, so a write to a collection that has none yet cannot open a fresh
+// one and succeed.
+func closeStorage(t *testing.T, s *Server, collections ...string) {
+	t.Helper()
+	for _, c := range collections {
+		if _, err := s.collectionDBForWrite(c); err != nil {
+			t.Fatalf("opening the file of %s: %v", c, err)
+		}
+	}
+	for _, db := range s.collectionFileDBs() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("closing a collection file: %v", err)
+		}
+	}
+	if err := s.DB.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+}
+
 func TestPerCollectionWritesLandInTheirOwnFiles(t *testing.T) {
 	s := perCollectionServer(t)
 	addTestDoc(t, s, "blog", "a", "en", "zebra crossing", nil)

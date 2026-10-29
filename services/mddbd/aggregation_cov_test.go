@@ -27,17 +27,17 @@ func covGAggDocs(t *testing.T, s *Server) {
 		covGPutDoc(t, s, "agg", &d)
 		for k, vals := range d.Meta {
 			for _, v := range vals {
-				covGPutIdx(t, s, append(storage.MetaKeyPrefix("agg", k, v), []byte(d.ID)...))
+				covGPutIdx(t, s, "agg", append(storage.MetaKeyPrefix("agg", k, v), []byte(d.ID)...))
 			}
 		}
 	}
 	covGPutRaw(t, s, "agg", "4", []byte{0xff, 0xfe})
-	covGPutIdx(t, s, []byte("meta|agg|tag|novalue"))
+	covGPutIdx(t, s, "agg", []byte("meta|agg|tag|novalue"))
 }
 
-func covGPutIdx(t *testing.T, s *Server, key []byte) {
+func covGPutIdx(t *testing.T, s *Server, collection string, key []byte) {
 	t.Helper()
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("idxmeta")).Put(key, []byte("1")) }); err != nil {
+	if err := s.DBUpdateC(collection, func(tx *bolt.Tx) error { return tx.Bucket([]byte("idxmeta")).Put(key, []byte("1")) }); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -106,7 +106,7 @@ func TestCovGAggregateHistogramsAndFacets(t *testing.T) {
 func TestCovGAggregateWithoutIndexBucket(t *testing.T) {
 	s := covGServer(t)
 	covGAggDocs(t, s)
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("idxmeta")) }); err != nil {
+	if err := s.DBUpdateC("agg", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("idxmeta")) }); err != nil {
 		t.Fatal(err)
 	}
 	resp := covGAggregate(t, s, map[string]any{"collection": "agg", "facets": []map[string]any{{"field": "tag"}}})

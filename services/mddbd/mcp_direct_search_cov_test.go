@@ -301,7 +301,7 @@ func TestCovCFTSMaintenanceTools(t *testing.T) {
 		}
 	}
 
-	closed, _ := covCClosedClient(t)
+	closed, _ := covCClosedClient(t, "f")
 	if _, err := closed.FTSReindex(ctx, &MCPFTSReindexRequest{Collection: "f"}); err == nil {
 		t.Error("FTSReindex on a closed database succeeded")
 	}

@@ -71,7 +71,7 @@ func TestCovGDocMetaEdgeCases(t *testing.T) {
 	covGWantCode(t, get(), http.StatusBadRequest)
 
 	// The by-key entry outlived its document.
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Delete(storage.DocKey("blog", d.ID))
 	}); err != nil {
 		t.Fatal(err)
@@ -83,7 +83,7 @@ func TestCovGMetaKeysSkipsMalformedEntriesAndMissingBucket(t *testing.T) {
 	s := covGServer(t)
 	addTestDoc(t, s, "blog", "a", "en", "x", map[string][]string{"tag": {"go", "db"}})
 	addTestDoc(t, s, "blog", "b", "en", "x", map[string][]string{"tag": {"go"}})
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("idxmeta")).Put([]byte("meta|blog|keyonly"), []byte("1"))
 	}); err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestCovGMetaKeysSkipsMalformedEntriesAndMissingBucket(t *testing.T) {
 		t.Errorf("meta keys = %+v; the malformed key must be skipped and values deduplicated", out.Meta)
 	}
 
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("idxmeta")) }); err != nil {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("idxmeta")) }); err != nil {
 		t.Fatal(err)
 	}
 	rec = covGRaw(s.handleMetaKeys, http.MethodGet, "/?collection=blog", "")

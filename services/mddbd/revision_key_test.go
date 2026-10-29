@@ -18,7 +18,7 @@ func TestRevisions_SameSecondWritesAreAllKept(t *testing.T) {
 	count := func(key string) int {
 		n := 0
 		prefix := storage.RevPrefix("c", genID("c", key, "en"))
-		_ = s.DB.View(func(tx *bolt.Tx) error {
+		_ = s.DBViewC("c", func(tx *bolt.Tx) error {
 			c := tx.Bucket([]byte("rev")).Cursor()
 			for k, _ := c.Seek(prefix); k != nil && strings.HasPrefix(string(k), string(prefix)); k, _ = c.Next() {
 				n++

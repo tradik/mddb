@@ -86,7 +86,7 @@ func TestCovGVectorSearchSkipsMissingCorruptAndNoBucket(t *testing.T) {
 	s := covGVectorServer(t)
 	gone := covGEmbedded(t, s, "blog", "gone", "x", nil)
 	bad := covGEmbedded(t, s, "blog", "bad", "y", nil)
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Delete(storage.DocKey("blog", gone.ID))
 	}); err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func TestCovGVectorSearchSkipsMissingCorruptAndNoBucket(t *testing.T) {
 		t.Errorf("neither a missing nor a corrupt document can be returned: %+v", resp.Results)
 	}
 
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
 		t.Fatal(err)
 	}
 	resp, _ = covGVector(t, s, map[string]any{"collection": "blog", "query": "x"})

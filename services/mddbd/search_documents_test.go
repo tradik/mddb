@@ -21,7 +21,7 @@ func TestSearchDocuments_OneImplementation(t *testing.T) {
 	old := addTestDoc(t, s, "col", "old", "en", "o", map[string][]string{"tag": {"x"}})
 	old.ExpiresAt = 1
 	buf, _ := marshalDoc(&old)
-	_ = s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("col", old.ID), buf) })
+	_ = s.DBUpdateC("col", func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("col", old.ID), buf) })
 
 	for _, f := range []MetaFilter{nil, {"tag": {In: []string{"x"}, hasIn: true}}} {
 		page, total, err := s.searchDocuments("col", f, "key", true, 1, 1)
@@ -38,7 +38,7 @@ func TestSearchDocuments_OneImplementation(t *testing.T) {
 		t.Fatalf("grpc: %v %+v", err, resp)
 	}
 	// A record that does not decode is an error, not a silent gap.
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("col", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(storage.DocKey("col", "zz"), []byte("{"))
 	})
 	if _, _, err := s.searchDocuments("col", nil, "", false, 0, 10); err == nil {

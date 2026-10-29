@@ -263,7 +263,7 @@ func TestUpdate_RefusalsAndRetention(t *testing.T) {
 	doc := addTestDoc(t, s, "fs", "old.md", "en", "x", map[string][]string{"author": {"ann"}})
 	doc.ExpiresAt = 1
 	buf, _ := json.Marshal(doc)
-	_ = s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("fs", doc.ID), buf) })
+	_ = s.DBUpdateC("fs", func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("fs", doc.ID), buf) })
 	c := "y"
 	if _, err := s.updateDocument("fs", "old.md", "en", DocPatch{Content: &c}); !errors.Is(err, errDocNotFound) {
 		t.Fatalf("expired: %v", err)
@@ -279,7 +279,7 @@ func TestUpdate_RefusalsAndRetention(t *testing.T) {
 		t.Fatal("rolled back")
 	}
 	// A document that no longer decodes is not found either.
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("fs", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(storage.DocKey("fs", doc.ID), []byte("{"))
 	})
 	if _, err := s.updateDocument("fs", "old.md", "en", DocPatch{Content: &c}); !errors.Is(err, errDocNotFound) {

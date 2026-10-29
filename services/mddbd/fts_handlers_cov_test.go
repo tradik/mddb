@@ -70,7 +70,7 @@ func covGEnableAuth(t *testing.T, s *Server) {
 // write path — used for corrupt and expired documents.
 func covGPutRaw(t *testing.T, s *Server, collection, id string, data []byte) {
 	t.Helper()
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(storage.DocKey(collection, id), data)
 	}); err != nil {
 		t.Fatal(err)
@@ -450,7 +450,7 @@ func TestCovGFTSReindex(t *testing.T) {
 	s.FTSIndex = idx
 
 	// The store failing underneath is a 500 with the cause.
-	_ = s.DB.Close()
+	closeStorage(t, s, "blog")
 	rec = doRequest(t, s.handleFTSReindex, map[string]any{"collection": "blog"})
 	covGWantCode(t, rec, http.StatusInternalServerError)
 	if !strings.Contains(rec.Body.String(), "error") {
@@ -486,7 +486,7 @@ func TestCovGFTSLanguages(t *testing.T) {
 func TestCovGFTSStoreFailureIsAnError(t *testing.T) {
 	s := covGServer(t)
 	covGFTSDocs(t, s)
-	_ = s.DB.Close()
+	closeStorage(t, s, "blog")
 	_, rec := covGFTS(t, s, map[string]any{"collection": "blog", "query": "lazy"})
 	covGWantCode(t, rec, http.StatusBadRequest)
 	if !strings.Contains(rec.Body.String(), "database not open") {

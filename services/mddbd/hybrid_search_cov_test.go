@@ -311,7 +311,7 @@ func TestCovGLoadHybridDocsSkipsBadEntries(t *testing.T) {
 
 	// Without a docs bucket there is nothing to load.
 	s.BucketNames.Docs = []byte("docs")
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
 		t.Fatal(err)
 	}
 	if out := s.loadHybridDocs("blog", items, true); len(out) != 0 {
@@ -322,7 +322,7 @@ func TestCovGLoadHybridDocsSkipsBadEntries(t *testing.T) {
 func TestCovGHybridStoreFailureIsAnError(t *testing.T) {
 	s := covGServer(t)
 	addTestDoc(t, s, "blog", "a", "en", "golang", nil)
-	_ = s.DB.Close()
+	closeStorage(t, s, "blog")
 	_, rec := covGHybrid(t, s, map[string]any{"collection": "blog", "query": "golang"})
 	covGWantCode(t, rec, http.StatusBadRequest)
 	if !strings.Contains(rec.Body.String(), "FTS search failed") {

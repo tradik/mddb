@@ -17,7 +17,7 @@ func TestCovJSetTTLOnUndecodableDocument(t *testing.T) {
 	defer cleanup()
 
 	dk := storage.DocKey("c", genID("c", "k", "en"))
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("c", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(dk, []byte("{broken"))
 	}); err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func TestCovJSetTTLOnUndecodableDocument(t *testing.T) {
 		t.Errorf("a corrupt document was reported as missing: %s", rec.Body.String())
 	}
 	var raw string
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("c", func(tx *bolt.Tx) error {
 		raw = string(tx.Bucket([]byte("docs")).Get(dk))
 		return nil
 	})

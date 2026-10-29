@@ -140,7 +140,7 @@ func TestWhere_SkipsAndDocumentsWithoutMeta(t *testing.T) {
 	addTestDoc(t, s, "c", "keep", "en", "x", map[string][]string{"kind": {"log"}})
 	gone := addTestDoc(t, s, "c", "gone", "en", "x", map[string][]string{"kind": {"log"}})
 	// The meta index still names a document whose record is gone.
-	_ = s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Delete(storage.DocKey("c", gone.ID)) })
+	_ = s.DBUpdateC("c", func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Delete(storage.DocKey("c", gone.ID)) })
 	res, err := s.RunWhere(WhereUpdate, WhereRequest{Collection: "c", FilterMeta: map[string][]string{"kind": {"log"}},
 		Meta: map[string][]string{"a": {"1"}}})
 	if err != nil || res.Matched != 2 || res.Affected != 1 {

@@ -119,7 +119,7 @@ func TestCovJRevisionsListNewestFirstAndSkipsMalformedKeys(t *testing.T) {
 	// ending in the separator, a non-numeric suffix and a value that is not a
 	// document.
 	prefix := storage.RevPrefix("c", genID("c", "k", "en"))
-	err := s.DB.Update(func(tx *bolt.Tx) error {
+	err := s.DBUpdateC("c", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("rev"))
 		for k, v := range map[string][]byte{
 			string(prefix):                          []byte("x"),
@@ -161,7 +161,7 @@ func TestCovJRevisionsListWithoutRevisionBucket(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
 	addTestDoc(t, s, "c", "k", "en", "v1", nil)
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("rev")) }); err != nil {
+	if err := s.DBUpdateC("c", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("rev")) }); err != nil {
 		t.Fatal(err)
 	}
 

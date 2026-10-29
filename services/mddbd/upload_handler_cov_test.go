@@ -76,7 +76,7 @@ func covJFileHeader(t *testing.T, name string, content []byte, maxMemory int64) 
 func covJDocExists(t *testing.T, s *Server, coll, key, lang string) bool {
 	t.Helper()
 	found := false
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC(coll, func(tx *bolt.Tx) error {
 		found = tx.Bucket([]byte("bykey")).Get(storage.ByKeyKey(coll, key, lang)) != nil
 		return nil
 	})

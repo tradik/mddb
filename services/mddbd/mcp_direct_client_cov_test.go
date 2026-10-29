@@ -27,14 +27,13 @@ func covCServer(t *testing.T) (*DirectClient, *Server) {
 	return NewDirectClient(s), s
 }
 
-// covCClosedClient is a client whose database is closed, so every transaction
-// it opens fails.
-func covCClosedClient(t *testing.T) (*DirectClient, *Server) {
+// covCClosedClient is a client whose database — and, in the per-collection
+// layout, the files of the named collections — is closed, so every
+// transaction it opens fails.
+func covCClosedClient(t *testing.T, collections ...string) (*DirectClient, *Server) {
 	t.Helper()
 	c, s := covCServer(t)
-	if err := s.DB.Close(); err != nil {
-		t.Fatal(err)
-	}
+	closeStorage(t, s, collections...)
 	return c, s
 }
 
@@ -50,10 +49,20 @@ func covCBareClient(t *testing.T) *DirectClient {
 	return NewDirectClient(&Server{DB: db, Path: path, Mode: ModeRW})
 }
 
+// covCKeyCollection is the collection whose file holds key of bucket.
+func covCKeyCollection(t *testing.T, bucket string, key []byte) string {
+	t.Helper()
+	c, ok := keyCollection(bucket, key)
+	if !ok {
+		t.Fatalf("no collection in %s key %q", bucket, key)
+	}
+	return c
+}
+
 // covCPut writes raw bytes under key in bucket, bypassing every write path.
 func covCPut(t *testing.T, s *Server, bucket string, key, val []byte) {
 	t.Helper()
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte(bucket)).Put(key, val) }); err != nil {
+	if err := s.DBUpdateC(covCKeyCollection(t, bucket, key), func(tx *bolt.Tx) error { return tx.Bucket([]byte(bucket)).Put(key, val) }); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -61,7 +70,7 @@ func covCPut(t *testing.T, s *Server, bucket string, key, val []byte) {
 // covCDel removes key from bucket, leaving every index that points at it.
 func covCDel(t *testing.T, s *Server, bucket string, key []byte) {
 	t.Helper()
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte(bucket)).Delete(key) }); err != nil {
+	if err := s.DBUpdateC(covCKeyCollection(t, bucket, key), func(tx *bolt.Tx) error { return tx.Bucket([]byte(bucket)).Delete(key) }); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -201,7 +210,7 @@ func TestCovCSearchFailsOnADamagedDocument(t *testing.T) {
 }
 
 func TestCovCClosedDatabaseFailsEveryOperation(t *testing.T) {
-	c, _ := covCClosedClient(t)
+	c, _ := covCClosedClient(t, "x")
 	ctx := context.Background()
 	if _, err := c.DeleteCollection(ctx, &MCPDeleteCollectionRequest{Collection: "x"}); err == nil {
 		t.Error("DeleteCollection succeeded on a closed database")

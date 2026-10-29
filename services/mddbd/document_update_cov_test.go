@@ -18,7 +18,7 @@ func covHStoreWithID(t *testing.T, s *Server, collection, key, id string) {
 		t.Fatal(err)
 	}
 	docID := genID(collection, key, "en")
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		if err := tx.Bucket([]byte("docs")).Put(storage.DocKey(collection, docID), buf); err != nil {
 			return err
 		}

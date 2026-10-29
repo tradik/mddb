@@ -67,7 +67,7 @@ func TestCovGHTTPGetSkipsDanglingAndCorruptDocs(t *testing.T) {
 	d := addTestDoc(t, s, "blog", "a", "en", "hello", nil)
 
 	// The by-key index points at a document that is gone.
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Delete(storage.DocKey("blog", d.ID))
 	}); err != nil {
 		t.Fatal(err)
@@ -124,7 +124,7 @@ func TestCovGHTTPSearchFilterSkipsBadEntries(t *testing.T) {
 	s := covGServer(t)
 	good := addTestDoc(t, s, "blog", "good", "en", "x", map[string][]string{"tag": {"go"}})
 	// A meta-index entry whose document is gone is skipped.
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("idxmeta")).Put(append(storage.MetaKeyPrefix("blog", "tag", "go"), []byte("ghost")...), []byte("1"))
 	}); err != nil {
 		t.Fatal(err)
@@ -157,7 +157,7 @@ func TestCovGHTTPExport(t *testing.T) {
 	}
 
 	// The store failing is reported before anything is streamed.
-	_ = s.DB.Close()
+	closeStorage(t, s, "blog")
 	for _, format := range []string{"ndjson", "zip"} {
 		rec := doRequest(t, s.handleExport, map[string]any{"collection": "blog", "format": format})
 		covGWantCode(t, rec, http.StatusBadRequest)
@@ -273,7 +273,7 @@ func TestCovGHTTPChecksum(t *testing.T) {
 	}
 
 	// Without a docs bucket there is nothing to count.
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
+	if err := s.DBUpdateC("blog", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
 		t.Fatal(err)
 	}
 	if sum, n := s.collectionChecksum("blog"); n != 0 || sum != "00000000" {

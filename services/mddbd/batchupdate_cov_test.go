@@ -33,7 +33,7 @@ func TestCovHBatchUpdateFailures(t *testing.T) {
 	if _, _, err := s.addDocument("c", revKey, "en", nil, "old", 0, false); err != nil {
 		t.Fatal(err)
 	}
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("c", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(storage.DocKey("c", genID("c", "corrupt", "en")), []byte{0x01})
 	})
 
@@ -102,7 +102,7 @@ func TestCovHBatchUpdateClosedDatabase(t *testing.T) {
 	addTestDoc(t, s, "c", "a", "en", "x", nil)
 	bu := NewBatchUpdater(s, 1)
 	updated := bu.parallelProcess(context.Background(), "c", []*proto.UpdateDocument{covHUpdateDoc("a", "y", nil, false)}, 1)
-	_ = s.DB.Close()
+	closeStorage(t, s, "c")
 
 	resp := bu.commitUpdate("c", updated, 1)
 	if resp.Updated != 0 || resp.Failed != 1 || !covHErrorsMention(resp.Errors, "transaction error") {

@@ -219,7 +219,7 @@ func TestCovFStorageFailuresReachTheCaller(t *testing.T) {
 func TestCovFSearchReportsACorruptDocument(t *testing.T) {
 	a, s := covFAdapter(t)
 	addTestDoc(t, s, "docs", "good", "en", "fine", nil)
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC("docs", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put([]byte("doc|docs|corrupt"), []byte("not a document"))
 	}); err != nil {
 		t.Fatal(err)

@@ -37,7 +37,7 @@ func TestCovGSearchRange(t *testing.T) {
 		t.Errorf("SearchRange = %+v", res)
 	}
 
-	_ = s.DB.Close()
+	closeStorage(t, s, "r")
 	if _, err := s.SearchRange("r", low, 0); err == nil {
 		t.Error("a store failure must be returned")
 	}

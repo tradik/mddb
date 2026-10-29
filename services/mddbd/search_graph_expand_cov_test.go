@@ -77,7 +77,7 @@ func TestCovGAppendGraphNeighbours(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.DB.Update(func(tx *bolt.Tx) error {
+	if err := srv.DBUpdateC("theme", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Delete(storage.DocKey("theme", gone.DocID))
 	}); err != nil {
 		t.Fatal(err)

@@ -58,12 +58,12 @@ func covEWant(t *testing.T, name string, err error, want codes.Code, part string
 	}
 }
 
-// covECloseDB closes the database so every storage call fails.
+// covECloseDB closes the database, and in the per-collection layout the
+// files of collection "c" and every other open collection, so every storage
+// call fails.
 func covECloseDB(t *testing.T, s *Server) {
 	t.Helper()
-	if err := s.DB.Close(); err != nil {
-		t.Fatalf("close: %v", err)
-	}
+	closeStorage(t, s, "c")
 }
 
 // covERPC is one RPC call reduced to its error.

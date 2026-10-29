@@ -13,7 +13,7 @@ import (
 // covGPutManyDocs writes n documents in one transaction.
 func covGPutManyDocs(t *testing.T, s *Server, collection string, n int, content string) {
 	t.Helper()
-	if err := s.DB.Update(func(tx *bolt.Tx) error {
+	if err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("docs"))
 		for i := 0; i < n; i++ {
 			id := fmt.Sprintf("d%05d", i)
@@ -90,7 +90,7 @@ func TestCovGProfileVectors(t *testing.T) {
 
 func TestCovGRecommendSearchStoreFailures(t *testing.T) {
 	s := covGServer(t)
-	if err := s.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
+	if err := s.DBUpdateC("x", func(tx *bolt.Tx) error { return tx.DeleteBucket([]byte("docs")) }); err != nil {
 		t.Fatal(err)
 	}
 	rec, err := s.RecommendSearch("x")
@@ -98,7 +98,7 @@ func TestCovGRecommendSearchStoreFailures(t *testing.T) {
 		t.Errorf("no docs bucket reads as empty: %+v %v", rec, err)
 	}
 
-	_ = s.DB.Close()
+	closeStorage(t, s, "x")
 	if _, err := s.RecommendSearch("x"); err == nil || !strings.Contains(err.Error(), "reading x") {
 		t.Errorf("a store failure must be returned with context, got %v", err)
 	}

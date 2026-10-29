@@ -196,7 +196,7 @@ func TestCovCRevisionsWithoutTheirBucketOrDatabase(t *testing.T) {
 	if _, err := bare.RestoreRevision(ctx, "c", "k", "en", 1); err == nil || !errors.Is(err, errNotFound) {
 		t.Errorf("RestoreRevision on a bare database: %v", err)
 	}
-	closed, _ := covCClosedClient(t)
+	closed, _ := covCClosedClient(t, "c")
 	if _, err := closed.ListRevisions(ctx, "c", "k", "en"); err == nil {
 		t.Error("ListRevisions on a closed database succeeded")
 	}
@@ -339,7 +339,7 @@ func TestCovCFindDuplicatesAndIngest(t *testing.T) {
 		t.Fatalf("FindDuplicates = %+v, %v", dups, err)
 	}
 
-	_ = s.DB.Close()
+	closeStorage(t, s, "dup")
 	if _, err := c.Ingest(ctx, &MCPIngestRequest{Collection: "dup", Documents: []MCPIngestDocument{
 		{Key: "three", Lang: "en", ContentMD: "more"},
 	}}); err == nil {

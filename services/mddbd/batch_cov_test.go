@@ -64,7 +64,7 @@ func TestCovHBatchPerDocumentFailures(t *testing.T) {
 	if err := s.SchemaManager.Set("c", `{"required":["author"]}`); err != nil {
 		t.Fatal(err)
 	}
-	_ = s.DB.Update(func(tx *bolt.Tx) error {
+	_ = s.DBUpdateC("c", func(tx *bolt.Tx) error {
 		return tx.Bucket([]byte("docs")).Put(storage.DocKey("c", genID("c", "corrupt", "en")), []byte{0x01})
 	})
 	author := map[string]string{"author": "ann"}
@@ -132,7 +132,7 @@ func TestCovHBatchRevisionRetention(t *testing.T) {
 	if n := covHRevCount(t, s, "c", id); n != 2 {
 		t.Fatalf("revisions kept: %d, want 2", n)
 	}
-	_ = s.DB.View(func(tx *bolt.Tx) error {
+	_ = s.DBViewC("c", func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte("idxmeta"))
 		if b.Get(append(storage.MetaKeyPrefix("c", "tag", "t3"), id...)) == nil || b.Get(append(storage.MetaKeyPrefix("c", "tag", "t2"), id...)) != nil {
 			t.Error("the batch did not replace the metadata index")
@@ -146,7 +146,7 @@ func TestCovHBatchClosedDatabase(t *testing.T) {
 	defer cleanup()
 	bp := NewBatchProcessor(s, 1)
 	processed := bp.parallelProcess(context.Background(), "c", []*proto.BatchDocument{covHBatchDoc("a", "x", nil, false)}, 1)
-	_ = s.DB.Close()
+	closeStorage(t, s, "c")
 
 	resp, committed := bp.commitBatch("c", processed, 1)
 	if committed != nil || resp.Failed != 1 || !covHErrorsMention(resp.Errors, "transaction error") {
