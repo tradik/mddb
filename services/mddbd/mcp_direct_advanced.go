@@ -387,6 +387,9 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	if err := req.ValidateIndexWait(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidatePassageOptions(); err != nil {
+		return nil, err
+	}
 
 	// Select algorithm
 	algo := req.Algorithm
@@ -448,9 +451,13 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
-		IncludeContent: req.IncludeContent,
+		IncludeContent: req.IncludeContent || req.wantsPassages(),
 	})
 
+	if req.wantsPassages() {
+		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
+		return &MCPCrossSearchResponse{Passages: &p}, nil
+	}
 	return &MCPCrossSearchResponse{
 		Results:           items,
 		Total:             len(items),

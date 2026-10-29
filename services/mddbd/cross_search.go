@@ -34,7 +34,8 @@ type CrossSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
+	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions // format, passageLines (AGT-002)
 }
 
 // CrossSearchResultItem represents a single cross-collection search result.
@@ -86,6 +87,10 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.ValidateIndexWait(); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	if err := req.ValidatePassageOptions(); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -173,12 +178,16 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
-		IncludeContent: req.IncludeContent,
+		IncludeContent: req.IncludeContent || req.wantsPassages(),
 	})
 
 	// Track operation
 	if s.Metrics != nil {
 		s.Metrics.IncOp("cross_search", algo)
+	}
+	if req.wantsPassages() {
+		ok(w, s.crossPassages(req.Query, items, req.PassageOptions, waited))
+		return
 	}
 
 	resp := CrossSearchResponse{

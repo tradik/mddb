@@ -64,6 +64,7 @@ to read.
 | `limit: 5` then refine | `limit: 50` | a first page usually answers it; ask again if it did not |
 | `highlight: true` | reading the document to find the match | returns the matching fragments directly |
 | `cacheTtl: 60` | repeating an identical query | serves a repeat from memory; writes invalidate it immediately |
+| `format: "passages"` | documents, then reading them for the place | path + line range + enclosing definition + those lines, per hit — the default to reach for in code |
 | `filter: {"path": {"prefix": "src/"}}` | searching everything and discarding | narrows on the metadata index before scoring; also `contains`, `gte`/`lt`, `not`, `exists` |
 | `group_by: {"key": "path", "per_group": 1}` | five hits from the same file | one result per file (or author, or collection), so the page covers more ground |
 

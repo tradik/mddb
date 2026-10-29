@@ -120,6 +120,8 @@ type VectorSearchResponse {
   total: Int!
   model: String
   dimensions: Int
+  "Set instead of results when the input asked for format passages (AGT-002)."
+  passages: [Passage!]
 }
 
 # Full-text search result
@@ -132,6 +134,8 @@ type FTSResult {
 type FTSResponse {
   results: [FTSResult!]!
   total: Int!
+  "Set instead of results when the input asked for format passages (AGT-002)."
+  passages: [Passage!]
 }
 
 # Stats and metrics
@@ -295,6 +299,9 @@ input VectorSearchInput {
   oversample: Float
   "Keep at most perGroup results per value of key (SRCH-016)."
   groupBy: GroupByInput
+  "results (default) or passages: path, lines, symbol and text per hit (AGT-002)."
+  format: String
+  passageLines: Int
 }
 
 """
@@ -310,6 +317,9 @@ input FTSInput {
   collection: String!
   query: String!
   limit: Int
+  "results (default) or passages: path, lines, symbol and text per hit (AGT-002)."
+  format: String
+  passageLines: Int
 }
 
 input RegisterWebhookInput {

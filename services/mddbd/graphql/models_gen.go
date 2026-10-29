@@ -158,11 +158,16 @@ type FTSInput struct {
 	Collection string `json:"collection"`
 	Query      string `json:"query"`
 	Limit      *int   `json:"limit,omitempty"`
+	// results (default) or passages: path, lines, symbol and text per hit (AGT-002).
+	Format       *string `json:"format,omitempty"`
+	PassageLines *int    `json:"passageLines,omitempty"`
 }
 
 type FTSResponse struct {
 	Results []*FTSResult `json:"results"`
 	Total   int          `json:"total"`
+	// Set instead of results when the input asked for format passages (AGT-002).
+	Passages []*Passage `json:"passages,omitempty"`
 }
 
 type FTSResult struct {
@@ -386,6 +391,9 @@ type VectorSearchInput struct {
 	Oversample *float64 `json:"oversample,omitempty"`
 	// Keep at most perGroup results per value of key (SRCH-016).
 	GroupBy *GroupByInput `json:"groupBy,omitempty"`
+	// results (default) or passages: path, lines, symbol and text per hit (AGT-002).
+	Format       *string `json:"format,omitempty"`
+	PassageLines *int    `json:"passageLines,omitempty"`
 }
 
 type VectorSearchResponse struct {
@@ -393,6 +401,8 @@ type VectorSearchResponse struct {
 	Total      int                   `json:"total"`
 	Model      *string               `json:"model,omitempty"`
 	Dimensions *int                  `json:"dimensions,omitempty"`
+	// Set instead of results when the input asked for format passages (AGT-002).
+	Passages []*Passage `json:"passages,omitempty"`
 }
 
 type VectorSearchResult struct {

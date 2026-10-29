@@ -205,6 +205,15 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 	if req.Limit <= 0 {
 		req.Limit = 50
 	}
+	req.PassageOptions = c.server.ResolveFormat(req.Collection, req.PassageOptions)
+	if err := req.ValidatePassageOptions(); err != nil {
+		return nil, err
+	}
+	// A listing has no hits; its passages are the start of each document,
+	// so the bodies are needed to cut them (AGT-002).
+	if req.wantsPassages() {
+		req.IncludeContent = true
+	}
 
 	type row struct{ Doc storage.Doc }
 	var rows []row
@@ -294,6 +303,15 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 	end := start + req.Limit
 	if end > total {
 		end = total
+	}
+
+	if req.wantsPassages() {
+		hits := make([]passageSource, 0, end-start)
+		for _, r := range rows[start:end] {
+			hits = append(hits, passageSource{doc: r.Doc, bestChunk: -1})
+		}
+		p := c.server.finishPassages(req.Collection, c.server.buildPassages(req.Collection, hits, req.PassageOptions, "search"), nil)
+		return &MCPSearchResponse{Passages: &p, Total: total}, nil
 	}
 
 	docs := make([]MCPDocument, 0, end-start)

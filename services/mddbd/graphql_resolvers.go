@@ -319,6 +319,7 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		FilterMeta:     gql.MapMetaInputToInternal(input.FilterMeta),
 		Filter:         filter,
 		GroupBy:        groupByFromGQL(input.GroupBy),
+		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines),
 		TopK:           derefInt(input.TopK, 5),
 		Threshold:      derefFloat64(input.Threshold, 0),
 		IncludeContent: derefBool(input.IncludeContent, false),
@@ -336,6 +337,10 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 	resp, err := a.mcp.VectorSearch(ctx, req)
 	if err != nil {
 		return nil, err
+	}
+	if resp.Passages != nil {
+		return &gql.VectorSearchResponse{Results: []*gql.VectorSearchResult{}, Total: resp.Passages.Total,
+			Passages: passagesToGQL(resp.Passages.Passages)}, nil
 	}
 	results := make([]*gql.VectorSearchResult, 0, len(resp.Results))
 	for i := range resp.Results {
@@ -404,9 +409,13 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 		Query:          input.Query,
 		Limit:          derefInt(input.Limit, 50),
 		IncludeContent: true,
+		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines),
 	})
 	if err != nil {
 		return nil, err
+	}
+	if resp.Passages != nil {
+		return &gql.FTSResponse{Results: []*gql.FTSResult{}, Total: resp.Passages.Total, Passages: passagesToGQL(resp.Passages.Passages)}, nil
 	}
 	out := make([]*gql.FTSResult, 0, len(resp.Results))
 	for i := range resp.Results {
@@ -473,4 +482,9 @@ func clampUint(n uint64) int {
 		return maxInt
 	}
 	return int(n)
+}
+
+// passageOptionsFromGQL converts the GraphQL format inputs (AGT-002).
+func passageOptionsFromGQL(format *string, lines *int) PassageOptions {
+	return PassageOptions{Format: derefString(format), PassageLines: derefInt(lines, 0)}
 }

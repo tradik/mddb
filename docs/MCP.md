@@ -429,6 +429,22 @@ key — one passage per file instead of five from the same one:
 Each result reports its `group` and `groupRank`. See
 [Grouping Results](SEARCH.md#grouping-results-v2188).
 
+## Passages for Code (v2.18.8+)
+
+`search_documents`, `full_text_search`, `semantic_search`, `hybrid_search` and
+`cross_search` take `format: "passages"` (and `passage_lines`). Each hit then
+comes back as a path, a line range, the definition holding it and those lines,
+instead of the document:
+
+```json
+{"name": "full_text_search", "arguments": {
+  "collection": "theme", "query": "background", "limit": 1, "format": "passages"
+}}
+```
+
+For code this replaces "search, then read the file" with one call; see
+[Passages — What an Agent Gets](SEARCH.md#passages--what-an-agent-gets-v2188).
+
 ## Toolsets (v2.18.8+)
 
 Every tool's schema sits in the model's context on every turn, and a long menu

@@ -6736,6 +6736,7 @@ type RetrievalProfileProto struct {
 	Oversample         float64 `protobuf:"fixed64,8,opt,name=oversample,proto3" json:"oversample,omitempty"`                                            // (SRCH-005) candidates per result before dedup/merge/rescore; 1.0-10.0
 	GroupByKey         string  `protobuf:"bytes,9,opt,name=group_by_key,json=groupByKey,proto3" json:"group_by_key,omitempty"`                          // (SRCH-016) default groupBy key: a metadata key, "document" or "collection"; empty = none
 	GroupByPerGroup    int32   `protobuf:"varint,10,opt,name=group_by_per_group,json=groupByPerGroup,proto3" json:"group_by_per_group,omitempty"`       // (SRCH-016) results kept per group; 0 = 1
+	Format             string  `protobuf:"bytes,11,opt,name=format,proto3" json:"format,omitempty"`                                                     // (AGT-002) default result format: "results" or "passages"; empty = results
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -6838,6 +6839,13 @@ func (x *RetrievalProfileProto) GetGroupByPerGroup() int32 {
 		return x.GroupByPerGroup
 	}
 	return 0
+}
+
+func (x *RetrievalProfileProto) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.
@@ -12949,7 +12957,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1f\n" +
 	"\vnext_cursor\x18\x03 \x01(\tR\n" +
 	"nextCursor\x12\x19\n" +
-	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\x9a\x03\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\xb2\x03\n" +
 	"\x15RetrievalProfileProto\x12.\n" +
 	"\x13default_search_type\x18\x01 \x01(\tR\x11defaultSearchType\x12\x13\n" +
 	"\x05top_k\x18\x02 \x01(\x05R\x04topK\x12%\n" +
@@ -12964,7 +12972,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\fgroup_by_key\x18\t \x01(\tR\n" +
 	"groupByKey\x12+\n" +
 	"\x12group_by_per_group\x18\n" +
-	" \x01(\x05R\x0fgroupByPerGroup\"\xf5\x01\n" +
+	" \x01(\x05R\x0fgroupByPerGroup\x12\x16\n" +
+	"\x06format\x18\v \x01(\tR\x06format\"\xf5\x01\n" +
 	"\x12StorageConfigProto\x12\x1a\n" +
 	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x16\n" +

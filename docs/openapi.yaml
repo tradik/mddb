@@ -6185,6 +6185,14 @@ paths:
 
 components:
   schemas:
+    PassagesResponse:
+      type: object
+      description: What a search returns with format "passages" (AGT-002).
+      properties:
+        passages: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        total: { type: integer }
+        contextTruncated: { type: boolean }
+        indexing: { $ref: '#/components/schemas/IndexWaitResult' }
     Passage:
       type: object
       description: |
@@ -7272,6 +7280,15 @@ components:
       required:
         - collection
       properties:
+        format:
+          type: string
+          enum: [ results, passages ]
+          description: '`passages` returns path + lines + enclosing definition + text per hit instead of documents (AGT-002, v2.18.8); the response is a PassagesResponse.'
+        passageLines:
+          type: integer
+          minimum: 0
+          maximum: 200
+          description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
         graphExpand:
           $ref: '#/components/schemas/GraphExpandOptions'
         readLevel:
@@ -7638,6 +7655,15 @@ components:
         - collection
         - query
       properties:
+        format:
+          type: string
+          enum: [ results, passages ]
+          description: '`passages` returns path + lines + enclosing definition + text per hit instead of documents (AGT-002, v2.18.8); the response is a PassagesResponse.'
+        passageLines:
+          type: integer
+          minimum: 0
+          maximum: 200
+          description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
         groupBy:
           $ref: '#/components/schemas/GroupBy'
         collection:
@@ -8251,6 +8277,15 @@ components:
         - collection
         - query
       properties:
+        format:
+          type: string
+          enum: [ results, passages ]
+          description: '`passages` returns path + lines + enclosing definition + text per hit instead of documents (AGT-002, v2.18.8); the response is a PassagesResponse.'
+        passageLines:
+          type: integer
+          minimum: 0
+          maximum: 200
+          description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
         readLevel:
           type: string
           enum: [ indexed, indexedPlusPending ]
@@ -9743,6 +9778,10 @@ components:
         default for that endpoint — so a collection without a profile behaves
         exactly as it did before this existed.
       properties:
+        format:
+          type: string
+          enum: [ results, passages ]
+          description: '`passages` returns path + lines + enclosing definition + text per hit instead of documents (AGT-002, v2.18.8); the response is a PassagesResponse.'
         groupBy:
           $ref: '#/components/schemas/GroupBy'
         defaultSearchType:
@@ -10124,6 +10163,15 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        format:
+          type: string
+          enum: [ results, passages ]
+          description: '`passages` returns path + lines + enclosing definition + text per hit instead of documents (AGT-002, v2.18.8); the response is a PassagesResponse.'
+        passageLines:
+          type: integer
+          minimum: 0
+          maximum: 200
+          description: Lines of context on each side of a hit (default 10); a hit inside a shorter definition returns the definition.
         waitForIndex:
           type: integer
           minimum: 0

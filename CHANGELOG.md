@@ -65,6 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   extractor cannot see, such as `x.Method()`, are found through the
   full-text index. Graph retrieval takes `graphKinds` (`callers`, `callees`,
   `tests`, `siblings`) to expand by those relations.
+- **Passages instead of documents (AGT-002).** Lines came back only in
+  chunk modes, the path sat in `meta.path`, and nothing said which definition
+  a hit was in, so an agent assembled a location from three places and then
+  read the file anyway. `format: "passages"` on `/v1/fts`,
+  `/v1/vector-search`, `/v1/hybrid-search`, `/v1/cross-search`, the five MCP
+  search tools and GraphQL `fts`/`vectorSearch` returns, per hit, the path,
+  a line range, the enclosing definition, the text and its token estimate.
+  Finding a CSS declaration in a 4 KB stylesheet takes one call and 292
+  bytes. A collection profile may make it the default, and the search
+  advisor recommends it for code. Without `format` nothing changes.
 
 ### Changed
 

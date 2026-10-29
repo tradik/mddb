@@ -52,8 +52,9 @@ type FTSSearchRequest struct {
 	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
 	// caller that says nothing keeps today's behaviour and today's freshness.
 	// Capped at searchCacheMaxTTL.
-	CacheTTL int      `json:"cacheTtl,omitempty"`
-	GroupBy  *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	CacheTTL       int      `json:"cacheTtl,omitempty"`
+	GroupBy        *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	PassageOptions          // format, passageLines (AGT-002)
 }
 
 // FTSSearchResponse is the HTTP response for full-text search.
@@ -78,6 +79,9 @@ type FTSSearchResponse struct {
 	// dropped results from the tail (RAG-001). Without it, a caller cannot
 	// tell a short result list from a capped one.
 	ContextTruncated bool `json:"contextTruncated,omitempty"`
+	// passages is set for format "passages" and is what the caller gets
+	// instead of this response (AGT-002).
+	passages *PassagesResponse
 }
 
 // FTSResultWithDoc includes the full document in the result.
@@ -132,8 +136,12 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var out any = resp
+	if resp.passages != nil {
+		out = resp.passages
+	}
 	if cacheKey != "" {
-		if body, err := json.Marshal(resp); err == nil {
+		if body, err := json.Marshal(out); err == nil {
 			s.SearchCache.Set(cacheKey, body, int64(cacheTTL))
 			w.Header().Set("Content-Type", "application/json")
 			if _, err := w.Write(body); err != nil {
@@ -142,7 +150,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	ok(w, resp)
+	ok(w, out)
 }
 
 // normalizeFTSRequest validates a full-text request and resolves its limit.
@@ -161,7 +169,8 @@ func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
 	if s.FTSIndex == nil {
 		return fmt.Errorf("full-text search not initialized")
 	}
-	return nil
+	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
+	return req.ValidatePassageOptions()
 }
 
 // searchFTS runs a full-text search: spell correction, mode, filters, ranges,
@@ -452,7 +461,8 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	// RAG-001: cap the total context this collection hands back. Applied
 	// before Total and facets so both describe what the caller actually
 	// receives — a count that includes dropped results is worse than no count.
-	if !req.skipContextBudget {
+	// With passages the budget counts the passages, which is what is sent.
+	if !req.skipContextBudget && !req.wantsPassages() {
 		var contextTruncated bool
 		resp.Results, contextTruncated = applyContextBudget(s, req.Collection, resp.Results,
 			func(r FTSResultWithDoc) int { return approxTokens(r.Document.ContentMD) })
@@ -486,6 +496,16 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	}
 
 	resp.SpellCorrected = spellCorrected
+
+	if req.wantsPassages() {
+		hits := make([]passageSource, 0, len(resp.Results))
+		for _, r := range resp.Results {
+			hits = append(hits, passageSource{doc: r.Document, score: r.Score, bestChunk: -1,
+				highlights: r.Highlights, terms: r.MatchedTerms})
+		}
+		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "fts"), nil)
+		resp.passages = &p
+	}
 
 	return &resp, nil
 }

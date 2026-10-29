@@ -139,12 +139,26 @@ type vectorShaping struct {
 	MMRLambda  float64
 	TopK       int
 	DiskVecs   map[string][]float32
+	// BestChunk, when non-nil, receives each document's best chunk index in
+	// parent mode.
+	BestChunk map[string]int
 }
 
 // shapeVectorResults dedupes (parent mode), groups, diversifies and cuts the
-// candidates, and returns the group tag of each kept result by its ID.
+// candidates, and returns the group tag of each kept result by its ID. In
+// parent mode it also records each document's best chunk, which is where a
+// passage (AGT-002) for that document is cut.
 func (s *Server) shapeVectorResults(sh vectorShaping, results []vec.VectorResult) ([]vec.VectorResult, map[string]groupTag) {
 	if !sh.ChunkMode {
+		if sh.BestChunk != nil {
+			best := map[string]float32{}
+			for _, r := range results {
+				base, idx := splitChunkKey(r.DocID)
+				if score, seen := best[base]; !seen || r.Score > score {
+					best[base], sh.BestChunk[base] = r.Score, idx
+				}
+			}
+		}
 		results = vec.DeduplicateChunkResults(results)
 	}
 	var tags map[string]groupTag

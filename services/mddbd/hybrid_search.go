@@ -59,8 +59,9 @@ type HybridSearchRequest struct {
 	// the index per requested result, before deduplication, merging or
 	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
 	// the default.
-	Oversample float64  `json:"oversample,omitempty"`
-	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	Oversample     float64  `json:"oversample,omitempty"`
+	GroupBy        *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	PassageOptions          // format, passageLines (AGT-002)
 	IndexWait
 
 	// onlyIDs restricts the full-text half to these documents. Internal:
@@ -147,6 +148,11 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.ValidateIndexWait(); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
+	if err := req.ValidatePassageOptions(); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -320,7 +326,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ---- Step 4: Load full documents ----
-	items := s.loadHybridDocs(req.Collection, merged, req.IncludeContent)
+	items := s.loadHybridDocs(req.Collection, merged, req.IncludeContent || req.wantsPassages())
 	// loadHybridDocs copies merged items but may drop DistanceMeters; re-attach.
 	if geoAllowed != nil {
 		for i := range items {
@@ -339,6 +345,11 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.TopK > 0 && len(items) > req.TopK {
 		items = items[:req.TopK]
+	}
+
+	if req.wantsPassages() {
+		ok(w, s.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited))
+		return
 	}
 
 	// RAG-001: cap the total context this collection hands back, after topK

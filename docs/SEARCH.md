@@ -942,6 +942,47 @@ curl -X POST http://localhost:11023/v1/vector-search \
   applies across chunks, in `parent` mode across documents.
 - Also available on the `semantic_search` MCP tool (`mmr`, `mmr_lambda`).
 
+## Passages — What an Agent Gets (v2.18.8+)
+
+A document answers "which file"; an agent editing code needs "which lines,
+inside which definition, and what they say". `format: "passages"` returns that
+from `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search` and
+`/v1/cross-search` (and the matching MCP tools and GraphQL queries) instead of
+documents:
+
+```bash
+curl -X POST http://localhost:11023/v1/fts -H "Content-Type: application/json" \
+  -d '{"collection": "theme", "query": "background", "limit": 1, "format": "passages"}'
+```
+
+```json
+{"passages": [{
+  "collection": "theme", "key": "css/style.css", "path": "css/style.css",
+  "lines": {"start": 152, "end": 155}, "symbol": ".hero-banner",
+  "content": ".hero-banner {\n  background: url(hero.png);\n  padding: 2rem;\n}",
+  "score": 0.91, "source": "fts", "tokens": 16
+}], "total": 1}
+```
+
+That is the whole answer to "where is the hero background set" in 292 bytes,
+against 4 KB for the stylesheet it came from.
+
+| Search | Where the passage is cut |
+|---|---|
+| `retrievalMode` `chunk` / `window` | the chunk or window, as those modes already cut it |
+| vector, `parent` mode | the document's best-scoring chunk |
+| everything else | around the first line the query's terms match, `passageLines` (default 10) on each side; a hit inside a definition no longer than that window returns the definition |
+
+- `symbol` is the innermost definition holding the hit (code documents; see
+  [Code Documents](API.md#one-symbol-everywhere-it-matters-v2188) for the
+  languages).
+- `tokens` uses the same estimate as the context budget, and the budget counts
+  passages in this format, not the documents they came from.
+- The document body is never included. Without `format`, or with
+  `"results"`, responses are exactly as before.
+- A collection's retrieval profile may set `format: "passages"` as its
+  default; the search advisor recommends it for code collections.
+
 ## Searching What You Just Wrote (v2.18.8+)
 
 A write returns once the document, its full text and its metadata are

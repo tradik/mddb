@@ -22,6 +22,11 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if err := req.ValidateIndexWait(); err != nil {
 		return nil, err
 	}
+	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
+	if err := req.ValidatePassageOptions(); err != nil {
+		return nil, err
+	}
+	includeContent := req.IncludeContent || req.wantsPassages()
 	waited := s.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	if req.Collection == "" {
@@ -116,9 +121,13 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	}
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
+	var bestChunk map[string]int
+	if req.wantsPassages() {
+		bestChunk = map[string]int{}
+	}
 	results, groupTags := s.shapeVectorResults(vectorShaping{
 		Collection: req.Collection, ChunkMode: chunkMode, GroupBy: req.GroupBy,
-		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: topK, DiskVecs: diskVecs,
+		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: topK, DiskVecs: diskVecs, BestChunk: bestChunk,
 	}, results)
 	windowSize := 0
 	if mode == RetrievalModeWindow {
@@ -159,7 +168,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 					chunkPassageWithLinesSize(doc.ContentMD, chunkIndex, windowSize,
 						c.server.chunkModeFor(req.Collection, &doc), c.server.chunkSizeFor(req.Collection))
 			}
-			if !req.IncludeContent {
+			if !includeContent {
 				doc.ContentMD = ""
 			}
 			item.Document = docToMCPDocument(doc)
@@ -171,11 +180,26 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if req.ReadLevel == ReadLevelIndexedPlusPending {
 		for _, doc := range pendingDocsFor(s, req.Collection, req.Query, req.FilterMeta, req.Filter, topK, items,
 			func(it MCPVectorSearchResult) string { return it.Document.ID }) {
-			if !req.IncludeContent {
+			if !includeContent {
 				doc.ContentMD = ""
 			}
 			items = append(items, MCPVectorSearchResult{Document: docToMCPDocument(doc), Rank: len(items) + 1, PendingEmbedding: true})
 		}
+	}
+
+	if req.wantsPassages() {
+		hits := make([]passageSource, 0, len(items))
+		terms := queryTerms(req.Query)
+		for _, it := range items {
+			best, ok := bestChunk[it.Document.ID]
+			if !ok || it.PendingEmbedding {
+				best = -1
+			}
+			hits = append(hits, passageSource{doc: mcpDocumentToDoc(it.Document), score: float64(it.Score),
+				chunkText: it.ChunkText, startLine: it.StartLine, endLine: it.EndLine, bestChunk: best, terms: terms})
+		}
+		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited)
+		return &MCPVectorSearchResponse{Passages: &p, Algorithm: algo}, nil
 	}
 
 	resp := &MCPVectorSearchResponse{
@@ -373,10 +397,15 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		Distance:          req.Distance,
 		FacetBy:           req.FacetBy,
 		FacetMaxValues:    req.FacetMaxValues,
+		PassageOptions:    req.PassageOptions,
 		skipContextBudget: true,
 	}, time.Now())
 	if err != nil {
 		return nil, err
+	}
+
+	if full.passages != nil {
+		return &MCPFTSSearchResponse{Passages: full.passages, Algorithm: full.Algorithm}, nil
 	}
 
 	resp := &MCPFTSSearchResponse{
@@ -464,6 +493,10 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if err := req.ValidateIndexWait(); err != nil {
 		return nil, err
 	}
+	req.PassageOptions = c.server.ResolveFormat(req.Collection, req.PassageOptions)
+	if err := req.ValidatePassageOptions(); err != nil {
+		return nil, err
+	}
 	waited := c.server.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	httpReq := HybridSearchRequest{
@@ -535,6 +568,10 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 
 	items := c.server.loadHybridDocs(req.Collection, merged, true)
 	items = groupHybridItems(req.Collection, items, req.GroupBy, httpReq.TopK)
+	if req.wantsPassages() {
+		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited)
+		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy}, nil
+	}
 
 	distMetric := httpReq.DistanceMetric
 	if distMetric == "" {

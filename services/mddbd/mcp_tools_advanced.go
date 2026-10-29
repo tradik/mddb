@@ -124,9 +124,13 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 	if len(req.TargetCollections) == 0 {
 		return "", fmt.Errorf("target_collections is required")
 	}
+	req.PassageOptions = mcpGetPassageOptions(args)
 	resp, err := s.client.CrossSearch(ctx, req)
 	if err != nil {
 		return "", err
+	}
+	if resp.Passages != nil {
+		return mcpPassagesJSON(resp.Passages), nil
 	}
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil

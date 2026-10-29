@@ -210,6 +210,12 @@ query {
 }
 ```
 
+### Passages
+
+`fts` and `vectorSearch` take `format: "passages"` and `passageLines`
+(v2.18.8); the response then fills `passages` (path, `lines`, `symbol`,
+`content`) and leaves `results` empty.
+
 ### Search Documents
 
 ```graphql

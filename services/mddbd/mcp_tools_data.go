@@ -47,9 +47,13 @@ func (s *MCPToolServer) toolSearchDocuments(ctx context.Context, args map[string
 		req.Asc = asc
 	}
 
+	req.PassageOptions = mcpGetPassageOptions(args)
 	resp, err := s.client.Search(ctx, req)
 	if err != nil {
 		return "", err
+	}
+	if resp.Passages != nil {
+		return mcpPassagesJSON(resp.Passages), nil
 	}
 
 	if mcpProjectionActive(fields, includeContent) {
@@ -241,9 +245,13 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		req.Threshold = threshold
 	}
 
+	req.PassageOptions = mcpGetPassageOptions(args)
 	resp, err := s.client.VectorSearch(ctx, req)
 	if err != nil {
 		return "", err
+	}
+	if resp.Passages != nil {
+		return mcpPassagesJSON(resp.Passages), nil
 	}
 
 	if mcpProjectionActive(fields, includeContent) {
@@ -359,9 +367,13 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 	}
 	req.GroupBy = groupBy
 
+	req.PassageOptions = mcpGetPassageOptions(args)
 	resp, err := s.client.FTSSearch(ctx, req)
 	if err != nil {
 		return "", err
+	}
+	if resp.Passages != nil {
+		return mcpPassagesJSON(resp.Passages), nil
 	}
 
 	if mcpProjectionActive(fields, includeContent) {
@@ -428,9 +440,13 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		req.Threshold = threshold
 	}
 
+	req.PassageOptions = mcpGetPassageOptions(args)
 	resp, err := s.client.HybridSearch(ctx, req)
 	if err != nil {
 		return "", err
+	}
+	if resp.Passages != nil {
+		return mcpPassagesJSON(resp.Passages), nil
 	}
 
 	data, _ := json.MarshalIndent(resp, "", "  ")

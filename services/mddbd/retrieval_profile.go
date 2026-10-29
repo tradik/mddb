@@ -79,6 +79,10 @@ type RetrievalProfileDef struct {
 	// when a request does not send its own — e.g. one passage per file for
 	// a code collection.
 	GroupBy *GroupBy `json:"groupBy,omitempty"`
+	// Format is the collection's default result format (AGT-002):
+	// "passages" for a code collection, where an agent wants places rather
+	// than documents. Empty = "results".
+	Format string `json:"format,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -120,6 +124,9 @@ func (p *RetrievalProfileDef) Validate() error {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if err := p.GroupBy.Validate(); err != nil {
+		return fmt.Errorf("invalid retrieval.%w", err)
+	}
+	if err := (PassageOptions{Format: p.Format}).ValidatePassageOptions(); err != nil {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if p.ContextTokenBudget < 0 || p.ContextTokenBudget > maxProfileContextTokenBudget {
@@ -233,6 +240,7 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		HybridAlphaSet:     p.HybridAlphaSet,
 		ContextTokenBudget: int(p.ContextTokenBudget),
 		GroupBy:            groupByFromProto(p.GroupByKey, p.GroupByPerGroup),
+		Format:             p.Format,
 	}
 }
 
@@ -261,6 +269,7 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		ContextTokenBudget: safeInt32(p.ContextTokenBudget),
 		GroupByKey:         groupByKey(p.GroupBy),
 		GroupByPerGroup:    groupByPerGroup(p.GroupBy),
+		Format:             p.Format,
 	}
 }
 

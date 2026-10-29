@@ -43,6 +43,8 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"collection":      map[string]interface{}{"type": "string"},
 					"filter_meta":     map[string]interface{}{"type": "object"},
 					"filter":          mcpFilterSchema,
+					"format":          mcpFormatSchema,
+					"passage_lines":   mcpPassageLinesSchema,
 					"sort":            map[string]interface{}{"type": "string"},
 					"limit":           map[string]interface{}{"type": "integer"},
 					"offset":          map[string]interface{}{"type": "integer"},
@@ -108,6 +110,8 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"threshold":       map[string]interface{}{"type": "number", "description": "Minimum similarity score 0-1 (default: 0.0)"},
 					"filter_meta":     map[string]interface{}{"type": "object", "description": "Optional metadata filter to combine with semantic search"},
 					"filter":          mcpFilterSchema,
+					"format":          mcpFormatSchema,
+					"passage_lines":   mcpPassageLinesSchema,
 					"group_by":        mcpGroupBySchema,
 					"read_level":      mcpReadLevelSchema,
 					"wait_for_index":  mcpWaitForIndexSchema,
@@ -197,6 +201,8 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"fragment_size":    map[string]interface{}{"type": "integer", "description": "(v2.12.0+) Approximate characters per fragment; default 150. Lower it for source, whose lines are short — 150 bytes covers roughly fifteen lines of CSS."},
 					"filter_meta":      map[string]interface{}{"type": "object", "description": "(v2.18.1) Metadata pre-filter, e.g. {\"language\":[\"c\"],\"module\":[\"net\"]}: only matching documents are searched."},
 					"filter":           mcpFilterSchema,
+					"format":           mcpFormatSchema,
+					"passage_lines":    mcpPassageLinesSchema,
 					"group_by":         mcpGroupBySchema,
 					"disable_stem":     map[string]interface{}{"type": "boolean", "description": "(v2.18.1) Turn stemming off for this query. For source code and exact identifiers."},
 					"disable_synonyms": map[string]interface{}{"type": "boolean", "description": "(v2.18.1) Turn synonym expansion off for this query."},
@@ -642,6 +648,8 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"distance_metric":  map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"filter_meta":      map[string]interface{}{"type": "object", "description": "Metadata filter"},
 					"filter":           mcpFilterSchema,
+					"format":           mcpFormatSchema,
+					"passage_lines":    mcpPassageLinesSchema,
 					"group_by":         mcpGroupBySchema,
 					"read_level":       mcpReadLevelSchema,
 					"wait_for_index":   mcpWaitForIndexSchema,
@@ -1028,6 +1036,8 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"oversample":         map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication or merging (1.0-10.0, default 3.0). Higher finds more, costs more."},
 					"filter_meta":        map[string]interface{}{"type": "object", "description": "Metadata equality filter applied in every target collection"},
 					"filter":             mcpFilterSchema,
+					"format":             mcpFormatSchema,
+					"passage_lines":      mcpPassageLinesSchema,
 					"group_by":           mcpGroupBySchema,
 					"read_level":         mcpReadLevelSchema,
 					"wait_for_index":     mcpWaitForIndexSchema,
@@ -1322,5 +1332,18 @@ var (
 	mcpWaitForKeysSchema = map[string]interface{}{
 		"type": "array", "items": map[string]interface{}{"type": "string"},
 		"description": "With wait_for_index: wait only for these document keys, e.g. the one just added",
+	}
+)
+
+// Passage-format arguments of the search tools (AGT-002).
+var (
+	mcpFormatSchema = map[string]interface{}{
+		"type": "string", "enum": []string{FormatResults, FormatPassages},
+		"description": "passages returns path + lines + symbol + content per hit instead of documents — " +
+			"for code, one call answers where to edit at a fraction of the tokens",
+	}
+	mcpPassageLinesSchema = map[string]interface{}{
+		"type": "integer", "minimum": 0, "maximum": maxPassageLines,
+		"description": "Lines of context on each side of a hit in a passage (default 10); a hit inside a shorter definition returns the definition",
 	}
 )

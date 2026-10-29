@@ -101,6 +101,8 @@ type SearchRecommendation struct {
 	HybridAlpha    float64 `json:"hybridAlpha,omitempty"`
 	// RetrievalMode is the shape of a result.
 	RetrievalMode string `json:"retrievalMode,omitempty"`
+	// Format is "passages" for code, where an agent wants places (AGT-002).
+	Format string `json:"format,omitempty"`
 	// Signals suggests fusion weights when the collection warrants them.
 	Signals *FusionSignals `json:"signals,omitempty"`
 	// TopK is a starting point, not a rule.
@@ -369,6 +371,9 @@ func buildRecommendation(p *CollectionProfile, embeddingConfigured bool) *Search
 		r.RetrievalMode = "graph"
 		r.Reasons = append(r.Reasons,
 			"retrievalMode graph: this is code, so the connection graph reaches the stylesheet a matching script touches — a document no score would have found.")
+		r.Format = FormatPassages
+		r.Reasons = append(r.Reasons,
+			"format passages: for code, a path, a line range and the definition holding it answer where to edit; the whole file does not.")
 	case p.LongDocumentRatio > 0.3:
 		r.RetrievalMode = "chunk"
 		r.Reasons = append(r.Reasons, fmt.Sprintf(
@@ -412,6 +417,7 @@ func (r *SearchRecommendation) toProfile() *RetrievalProfileDef {
 		DefaultSearchType: r.SearchType,
 		TopK:              r.TopK,
 		RetrievalMode:     r.RetrievalMode,
+		Format:            r.Format,
 	}
 	if r.SearchType == "hybrid" {
 		p.HybridStrategy = r.HybridStrategy

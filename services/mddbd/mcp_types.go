@@ -79,12 +79,16 @@ type MCPSearchRequest struct {
 	// projection doesn't pay for content it discards (GO-022). Callers that
 	// want bodies must set it explicitly (the tool layer defaults to true).
 	IncludeContent bool `json:"includeContent,omitempty"`
+	PassageOptions      // format, passageLines (AGT-002)
 }
 
 // MCPSearchResponse represents search result.
 type MCPSearchResponse struct {
 	Documents []MCPDocument `json:"documents"`
 	Total     int           `json:"total"`
+	// Passages is set when the request asked for format "passages"; the tool
+	// returns it instead of the results (AGT-002).
+	Passages *PassagesResponse `json:"-"`
 }
 
 // MCPDeleteRequest represents request to delete a document.
@@ -232,7 +236,8 @@ type MCPVectorSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
+	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions // format, passageLines (AGT-002)
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -274,6 +279,9 @@ type MCPVectorSearchResponse struct {
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Passages is set when the request asked for format "passages"; the tool
+	// returns it instead of the results (AGT-002).
+	Passages *PassagesResponse `json:"-"`
 }
 
 // MCPVectorReindexRequest represents a reindex request.
@@ -352,6 +360,7 @@ type MCPFTSSearchRequest struct {
 	FacetBy         []string            `json:"facetBy,omitempty"`
 	FacetMaxValues  int                 `json:"facetMaxValues,omitempty"`
 	GroupBy         *GroupBy            `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	PassageOptions                      // format, passageLines (AGT-002)
 }
 
 // MCPFTSResult represents a single FTS result.
@@ -384,6 +393,9 @@ type MCPFTSSearchResponse struct {
 	// present only when one is configured. Returned with the results so an
 	// agent gets it in the same round trip that fetched what to say.
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
+	// Passages is set when the request asked for format "passages"; the tool
+	// returns it instead of the results (AGT-002).
+	Passages *PassagesResponse `json:"-"`
 }
 
 // MCPFTSReindexRequest represents a request to reindex FTS for a collection.
@@ -434,7 +446,8 @@ type MCPHybridSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
+	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions // format, passageLines (AGT-002)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -472,6 +485,9 @@ type MCPHybridSearchResponse struct {
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Passages is set when the request asked for format "passages"; the tool
+	// returns it instead of the results (AGT-002).
+	Passages *PassagesResponse `json:"-"`
 }
 
 // MCPGeoSearchRequest represents a geo radius search.
@@ -739,7 +755,8 @@ type MCPCrossSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
+	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions // format, passageLines (AGT-002)
 }
 
 // MCPCrossSearchResponse is the response for cross_search.
@@ -753,6 +770,9 @@ type MCPCrossSearchResponse struct {
 	DistanceMetric    string                  `json:"distanceMetric"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Passages is set when the request asked for format "passages"; the tool
+	// returns it instead of the results (AGT-002).
+	Passages *PassagesResponse `json:"-"`
 }
 
 // --- Find Duplicates MCP Types ---

@@ -41,7 +41,8 @@ type VectorSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
+	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions // format, passageLines (AGT-002)
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -213,6 +214,14 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
+	if err := req.ValidatePassageOptions(); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	// Passages are cut from the document, so it is loaded whole and the body
+	// dropped afterwards, when the passages are built (AGT-002).
+	includeContent := req.IncludeContent || req.wantsPassages()
 	// GO-042: wait for this collection's queued embeddings before searching.
 	waited := s.waitForIndex(r.Context(), req.Collection, req.IndexWait)
 	// RAG-008: request, then collection profile, then default — the same
@@ -304,10 +313,14 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
+	var bestChunk map[string]int
+	if req.wantsPassages() {
+		bestChunk = map[string]int{}
+	}
 	// Dedupe (parent mode), groupBy, MMR over the oversampled set, then topK.
 	results, groupTags := s.shapeVectorResults(vectorShaping{
 		Collection: req.Collection, ChunkMode: chunkMode, GroupBy: req.GroupBy,
-		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: topK, DiskVecs: diskVecs,
+		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: topK, DiskVecs: diskVecs, BestChunk: bestChunk,
 	}, results)
 
 	windowSize := 0
@@ -355,7 +368,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 					chunkPassageWithLinesSize(doc.ContentMD, chunkIndex, windowSize,
 						s.chunkModeFor(req.Collection, &doc), s.chunkSizeFor(req.Collection))
 			}
-			if !req.IncludeContent {
+			if !includeContent {
 				doc.ContentMD = ""
 			}
 			item.Document = doc
@@ -367,7 +380,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// GO-042: documents still waiting for their embedding, found by text.
 	if req.ReadLevel == ReadLevelIndexedPlusPending {
 		for _, doc := range pendingDocsFor(s, req.Collection, req.Query, req.FilterMeta, req.Filter, topK, items, func(it VectorSearchResultItem) string { return it.Document.ID }) {
-			if !req.IncludeContent {
+			if !includeContent {
 				doc.ContentMD = ""
 			}
 			items = append(items, VectorSearchResultItem{Document: doc, Rank: len(items) + 1, PendingEmbedding: true})
@@ -378,13 +391,17 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// window modes the passage is what the caller receives, so that is what
 	// counts against the budget — charging the whole parent document would
 	// make the cap meaningless for exactly the modes RAG uses.
-	items, contextTruncated := applyContextBudget(s, req.Collection, items,
-		func(it VectorSearchResultItem) int {
-			if it.ChunkText != "" {
-				return approxTokens(it.ChunkText)
-			}
-			return approxTokens(it.Document.ContentMD)
-		})
+	// With passages the budget counts the passages, below.
+	var contextTruncated bool
+	if !req.wantsPassages() {
+		items, contextTruncated = applyContextBudget(s, req.Collection, items,
+			func(it VectorSearchResultItem) int {
+				if it.ChunkText != "" {
+					return approxTokens(it.ChunkText)
+				}
+				return approxTokens(it.Document.ContentMD)
+			})
+	}
 
 	// SRCH-006: reach documents the query matches on no term, by following the
 	// edges the matching documents already have. Applied after the budget so
@@ -392,7 +409,22 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// and before the response so its documents arrive with the rest.
 	var expansions []GraphExpansion
 	if mode == RetrievalModeGraph {
-		expansions, items = s.appendGraphNeighbours(req.Collection, items, req.GraphExpand, req.IncludeContent)
+		expansions, items = s.appendGraphNeighbours(req.Collection, items, req.GraphExpand, includeContent)
+	}
+
+	if req.wantsPassages() {
+		hits := make([]passageSource, 0, len(items))
+		terms := queryTerms(req.Query)
+		for _, it := range items {
+			best, ok := bestChunk[it.Document.ID]
+			if !ok || it.PendingEmbedding {
+				best = -1
+			}
+			hits = append(hits, passageSource{doc: it.Document, score: float64(it.Score), chunkText: it.ChunkText,
+				startLine: it.StartLine, endLine: it.EndLine, bestChunk: best, terms: terms})
+		}
+		ok(w, s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited))
+		return
 	}
 
 	resp := VectorSearchResponseHTTP{

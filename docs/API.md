@@ -4198,6 +4198,14 @@ Spans by language:
 Interfaces and traits ("implementations") are left out on purpose: telling an
 implementation from a namesake needs type information a scanner does not have.
 
+### Passages instead of documents (v2.18.8+)
+
+`/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search` and `/v1/cross-search`
+take `"format": "passages"` and `"passageLines"`. The response is then
+`{"passages": [Passage], "total", "contextTruncated"}` — each passage a path,
+a line range, the definition holding it and its text — instead of documents.
+See [SEARCH.md — Passages](SEARCH.md#passages--what-an-agent-gets-v2188).
+
 ### Why the tokeniser differs
 
 The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,

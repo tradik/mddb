@@ -127,8 +127,9 @@ type ComplexityRoot struct {
 	}
 
 	FTSResponse struct {
-		Results func(childComplexity int) int
-		Total   func(childComplexity int) int
+		Passages func(childComplexity int) int
+		Results  func(childComplexity int) int
+		Total    func(childComplexity int) int
 	}
 
 	FTSResult struct {
@@ -290,6 +291,7 @@ type ComplexityRoot struct {
 	VectorSearchResponse struct {
 		Dimensions func(childComplexity int) int
 		Model      func(childComplexity int) int
+		Passages   func(childComplexity int) int
 		Results    func(childComplexity int) int
 		Total      func(childComplexity int) int
 	}
@@ -727,6 +729,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DocumentEdge.Node(childComplexity), true
 
+	case "FTSResponse.passages":
+		if e.ComplexityRoot.FTSResponse.Passages == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FTSResponse.Passages(childComplexity), true
 	case "FTSResponse.results":
 		if e.ComplexityRoot.FTSResponse.Results == nil {
 			break
@@ -1582,6 +1590,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.VectorSearchResponse.Model(childComplexity), true
+	case "VectorSearchResponse.passages":
+		if e.ComplexityRoot.VectorSearchResponse.Passages == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResponse.Passages(childComplexity), true
 	case "VectorSearchResponse.results":
 		if e.ComplexityRoot.VectorSearchResponse.Results == nil {
 			break
@@ -1998,6 +2012,8 @@ func (ec *executionContext) childFields_FTSResponse(ctx context.Context, field g
 		return ec.fieldContext_FTSResponse_results(ctx, field)
 	case "total":
 		return ec.fieldContext_FTSResponse_total(ctx, field)
+	case "passages":
+		return ec.fieldContext_FTSResponse_passages(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type FTSResponse", field.Name)
 }
@@ -2234,6 +2250,8 @@ func (ec *executionContext) childFields_VectorSearchResponse(ctx context.Context
 		return ec.fieldContext_VectorSearchResponse_model(ctx, field)
 	case "dimensions":
 		return ec.fieldContext_VectorSearchResponse_dimensions(ctx, field)
+	case "passages":
+		return ec.fieldContext_VectorSearchResponse_passages(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type VectorSearchResponse", field.Name)
 }
@@ -4547,6 +4565,38 @@ func (ec *executionContext) _FTSResponse_total(ctx context.Context, field graphq
 }
 func (ec *executionContext) fieldContext_FTSResponse_total(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("FTSResponse", field, false, false, "Int")
+}
+
+func (ec *executionContext) _FTSResponse_passages(ctx context.Context, field graphql.CollectedField, obj *FTSResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FTSResponse_passages(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Passages, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalOPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FTSResponse_passages(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FTSResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _FTSResult_document(ctx context.Context, field graphql.CollectedField, obj *FTSResult) (ret graphql.Marshaler) {
@@ -8658,6 +8708,38 @@ func (ec *executionContext) fieldContext_VectorSearchResponse_dimensions(_ conte
 	return graphql.NewScalarFieldContext("VectorSearchResponse", field, false, false, "Int")
 }
 
+func (ec *executionContext) _VectorSearchResponse_passages(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResponse_passages(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Passages, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalOPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResponse_passages(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VectorSearchResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _VectorSearchResult_document(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10513,7 +10595,7 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "limit"}
+	fieldsInOrder := [...]string{"collection", "query", "limit", "format", "passageLines"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -10541,6 +10623,20 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 				return it, err
 			}
 			it.Limit = data
+		case "format":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("format"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Format = data
+		case "passageLines":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("passageLines"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PassageLines = data
 		}
 	}
 	return it, nil
@@ -11241,7 +11337,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11318,6 +11414,20 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.GroupBy = data
+		case "format":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("format"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Format = data
+		case "passageLines":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("passageLines"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PassageLines = data
 		}
 	}
 	return it, nil
@@ -11945,6 +12055,11 @@ func (ec *executionContext) _FTSResponse(ctx context.Context, sel ast.SelectionS
 		case "total":
 			out.Values[i] = ec._FTSResponse_total(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "passages":
+			out.Values[i] = ec._FTSResponse_passages(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:
@@ -13071,6 +13186,11 @@ func (ec *executionContext) _VectorSearchResponse(ctx context.Context, sel ast.S
 			}
 		case "dimensions":
 			out.Values[i] = ec._VectorSearchResponse_dimensions(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "passages":
+			out.Values[i] = ec._VectorSearchResponse_passages(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -14613,6 +14733,25 @@ func (ec *executionContext) unmarshalOMetaInput2ᚕᚖmddbᚋgraphqlᚐMetaInput
 		}
 	}
 	return res, nil
+}
+
+func (ec *executionContext) marshalOPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx context.Context, sel ast.SelectionSet, v []*Passage) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNPassage2ᚖmddbᚋgraphqlᚐPassage(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOSchema2ᚖmddbᚋgraphqlᚐSchema(ctx context.Context, sel ast.SelectionSet, v *Schema) graphql.Marshaler {
