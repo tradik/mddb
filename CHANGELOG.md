@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Data race between router wiring and the vector index reload after a
+  restore (#359).** In the per-collection layout, the first use of the
+  collection files after a restore, or at startup, sets every component's
+  router again: full-text index, vectors, geo points, TTL, temporal events
+  and document storage.
+  - **The race.** The vector index reload and request handlers read those
+    routers at the same time. Each router was a plain field, so
+    `go test -race` failed now and then.
+  - **The fix.** Routers are now held in `boltx.RouterSlot`, an atomic
+    pointer. A full-text index shares its slot with its per-request query
+    views.
+- **`-verify-db` reported a stack trace instead of the reason when bbolt's
+  check read past the file.** That read is a fatal runtime fault, not a
+  panic, so only panics were recognised. The report now gives
+  `fatal error: fault (unexpected fault address …)`.
+
 - **The S3 and memory storage backends key their index as bbolt does
   (#360).** The key and language are stored with ASCII letters in lower
   case, and the collection as written. So `README.md` is found as

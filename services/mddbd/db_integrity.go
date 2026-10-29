@@ -121,10 +121,22 @@ func openBolt(path string, opts *bolt.Options) (db *bolt.DB, err error) {
 
 // failureReason picks bbolt's own words out of a child's output: the panic
 // message if it crashed, its report otherwise — not a stack trace.
+//
+// A read past the mapped file is not a panic but a fatal runtime error
+// ("unexpected fault address 0x…" then "fatal error: fault"), which no
+// recover catches; it is reported in those two lines, not as the stack's tail.
 func failureReason(out string) string {
-	for _, line := range strings.Split(out, "\n") {
-		if i := strings.Index(line, "panic: "); i >= 0 {
-			return strings.TrimSpace(line[i+len("panic: "):])
+	lines := strings.Split(out, "\n")
+	for i, line := range lines {
+		if j := strings.Index(line, "panic: "); j >= 0 {
+			return strings.TrimSpace(line[j+len("panic: "):])
+		}
+		if j := strings.Index(line, "fatal error: "); j >= 0 {
+			reason := strings.TrimSpace(line[j:])
+			if i > 0 && strings.HasPrefix(lines[i-1], "unexpected fault address") {
+				reason += " (" + strings.TrimSpace(lines[i-1]) + ")"
+			}
+			return reason
 		}
 	}
 	return lastLines(out, 6)

@@ -102,12 +102,18 @@ func TestADamagedDatabaseFailsTheCheckWithBboltsReason(t *testing.T) {
 	if err == nil {
 		t.Fatal("a database whose tree references one page twice passed the check")
 	}
-	// Which of bbolt's two failures wins is a race — its walker goroutine
+	// Which of bbolt's failures wins is a race — its walker goroutine
 	// can fault on the rolled-back transaction before the reported panic
 	// (seen on Windows CI) — and the reason the check is a child process.
 	// Either is reported, not a stack trace.
-	if msg := err.Error(); !strings.Contains(msg, "multiple references") && !strings.Contains(msg, "nil pointer") {
+	// Under load the walker can also read past the mapping, a fatal fault
+	// rather than a panic.
+	msg := err.Error()
+	if !strings.Contains(msg, "multiple references") && !strings.Contains(msg, "nil pointer") && !strings.Contains(msg, "fatal error: fault") {
 		t.Errorf("the error should carry bbolt's description, got: %v", err)
+	}
+	if strings.Contains(msg, "goroutine ") {
+		t.Errorf("the error is a stack trace: %v", err)
 	}
 }
 
@@ -285,6 +291,14 @@ func TestFailureReasonPrefersBboltsWords(t *testing.T) {
 	}
 	if got := failureReason("a\nb\nc\nd\ne\nf\ng\nh"); got != "c | d | e | f | g | h" {
 		t.Errorf("plain output: %q", got)
+	}
+	// A read past the mapping is a fatal runtime error, not a panic.
+	fault := "unexpected fault address 0x7f00deadbeef\nfatal error: fault\n[signal SIGSEGV: segmentation violation]\n\ngoroutine 7 [running]:\nruntime.throw()"
+	if got := failureReason(fault); got != "fatal error: fault (unexpected fault address 0x7f00deadbeef)" {
+		t.Errorf("fault output: %q", got)
+	}
+	if got := failureReason("fatal error: all goroutines are asleep - deadlock!\n\ngoroutine 1"); got != "fatal error: all goroutines are asleep - deadlock!" {
+		t.Errorf("fatal output: %q", got)
 	}
 }
 
