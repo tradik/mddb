@@ -244,6 +244,11 @@ func (w *EmbeddingWorker) Pending() *pending.Tracker { return w.pending }
 // processJob embeds one document. It reports false when the document was left
 // without the vectors it should have: the provider failed or storing failed.
 // Nothing to do — unchanged content, no chunks, a deleted document — is true.
+// embeddingRetryDelay is the backoff unit between embedding attempts: the
+// worker waits one unit after the first failure, two after the second. A
+// variable only so tests of the failure path need not wait six seconds.
+var embeddingRetryDelay = time.Second
+
 func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 	contentHash := vec.ContentHash(job.ContentMD)
 
@@ -303,7 +308,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 				break
 			}
 			slog.Warn("embedding attempt failed", "attempt", attempt+1, "collection", job.Collection, "docID", job.DocID, "i", i, "err", embedErr)
-			time.Sleep(time.Duration(attempt+1) * time.Second)
+			time.Sleep(time.Duration(attempt+1) * embeddingRetryDelay)
 		}
 
 		if embedErr != nil {

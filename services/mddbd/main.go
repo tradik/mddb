@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"mddb/internal/audit"
@@ -266,11 +267,70 @@ func boltOptionsFor(path string) *bolt.Options {
 	}
 }
 
+// Startup seams (TEST-002). main() was one 1,040-line function that nothing
+// could call, so the whole startup sat at 0.5% coverage. It is now a sequence
+// of steps a test can run against a temporary database; these variables are
+// the only places a test substitutes anything, and each holds the production
+// behaviour by default.
+var (
+	// fatal logs and ends the process. A test swaps in a function that
+	// records the message and stops only the calling goroutine, so it can
+	// assert which startup step refused to continue.
+	fatal = logging.Fatal
+	// loadConfig reads CLI flags, environment and config file. Flags are
+	// process-global and parse once, so a test hands serve its own config.
+	loadConfig = loadServerConfig
+	// shutdownSignals returns the channel serve waits on before shutting down.
+	shutdownSignals = notifyShutdownSignals
+)
+
+// notifyShutdownSignals subscribes to SIGINT and SIGTERM.
+func notifyShutdownSignals() chan os.Signal {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	return sigCh
+}
+
+// fatalOnErr ends the process with msg, the key/value pairs kv and the error
+// when err is not nil.
+func fatalOnErr(err error, msg string, kv ...any) {
+	if err != nil {
+		fatal(msg, append(kv, "err", err)...)
+	}
+}
+
+// mustStep ends the process when the named startup step failed.
+func mustStep(step string, err error) {
+	fatalOnErr(err, "startup step failed", "step", step)
+}
+
+// ignoreServerClosed drops the error every listener returns on a deliberate
+// close, which is not a failure.
+func ignoreServerClosed(err error) error {
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
+
+// clientAuthMode is the mTLS client-auth policy as the startup log names it.
+func clientAuthMode(cfg TLSConfig) string {
+	if cfg.ClientAuth == "" {
+		return "require"
+	}
+	return cfg.ClientAuth
+}
+
 func main() {
+	os.Exit(run())
+}
+
+// run is the whole process: it returns the exit code main hands to os.Exit.
+func run() int {
 	// A child started by verifyDatabase: check one file and exit, before
 	// anything else about this process is set up.
 	if p := os.Getenv(verifyChildEnv); p != "" {
-		os.Exit(runVerifyChild(p))
+		return runVerifyChild(p)
 	}
 
 	// Install the structured logger before anything can log (GO-028).
@@ -279,10 +339,13 @@ func main() {
 	logging.Setup()
 
 	// Load server configuration (CLI flags > env vars > config file > defaults)
-	srvCfg := loadServerConfig()
+	return runServer(loadConfig())
+}
 
+// runServer starts the server described by srvCfg, blocks until a shutdown signal
+// arrives, shuts down in order and returns the exit code.
+func runServer(srvCfg ServerConfig) int {
 	dbPath := srvCfg.Database.Path
-	mode := srvCfg.Database.Mode
 
 	// GO-032: say plainly what durability this data directory can offer before
 	// accepting a single write. bbolt fsyncs every commit, but that promise is
@@ -299,30 +362,141 @@ func main() {
 		earlyServer = clock.startEarlyHealth(srvCfg.HTTP.Addr)
 	}
 	clock.begin("opening database")
-	openStart := time.Now()
-	db, walked, freelistLoad, err := openDatabase(clock, dbPath, boltOptionsFor(dbPath)) // #333, #334
-	if d := time.Since(openStart); walked && d > 30*time.Second {
-		slog.Warn("opening the database walked every page to rebuild the freelist",
-			"elapsed", d.Round(time.Second),
-			"remedy", "a clean shutdown (SIGTERM) stores the freelist for the next start; MDDB_FREELIST_SYNC=true stores it on every commit, so a crash does not cost a walk either (docs/STORAGE-TUNING.md)")
-	}
-	if err != nil {
-		logging.Fatal("startup step failed", "step", "bolt.Open", "err", err,
-			"remedy", "if the file is damaged: mddbd -verify-db FILE, then mddbd -repair-db FILE -repair-to NEWFILE (docs/BACKUP.md)")
-	}
+	db, freelistLoad := openServerDatabase(clock, dbPath)
 	defer func() {
 		if err := db.Close(); err != nil {
 			slog.Error("closing database", "err", err)
 		}
 	}()
 
-	// Extreme mode = HTTP/3 enabled (legacy MDDB_EXTREME mapped in config)
-	useExtreme := srvCfg.HTTP3.Enabled
+	s := newServer(srvCfg, db, persistence, freelistLoad)
+	s.checkCollectionLayout()
+	defer s.closeCollectionFiles()
 
+	clock.srv.Store(s)
+	clock.begin("initialising indexes and managers")
+	authEnabled := s.initSubsystems(clock)
+
+	// Enforce ISO 27001 / SOC 2 guardrails when MDDB_PRODUCTION=true,
+	// or log a one-shot warning otherwise.
+	EnforceProductionGuards(slog.Warn, fatal)
+
+	// MCP stdio mode — replaces normal HTTP/gRPC operation
+	if srvCfg.MCP.Stdio {
+		s.runMCPStdio()
+		return 0
+	}
+
+	s.logProtocolConfig()
+
+	mux := http.NewServeMux()
+	s.registerRoutes(mux, authEnabled)
+	s.registerGraphQL(mux, authEnabled)
+
+	// Panel mode: internal (default) = CORS enabled, external = CORS disabled (panel proxies)
+	panelMode := env("MDDB_PANEL_MODE", "internal")
+	handler, httpReadTimeout, httpWriteTimeout := s.wrapHTTPHandler(mux, authEnabled, panelMode)
+
+	// Shut down early health server before starting the main one
+	clock.begin("starting listeners")
+	if earlyServer != nil {
+		_ = earlyServer.Close()
+		time.Sleep(50 * time.Millisecond) // brief pause to release port
+	}
+
+	// Start async bulk ingest manager — recovers orphan jobs from previous run
+	// and spins up the single worker that drains the in-memory queue.
+	s.BulkIngest = NewBulkIngestManager(s, 64)
+	s.BulkIngest.Start()
+
+	// Mark server as ready — health check will now return "healthy" instead of "warming_up"
+	s.Ready = true
+	clock.done()
+	slog.Info("Server initialization complete — ready to serve")
+
+	// OPS-019: after ready, and in the background. Someone running a release
+	// with a security fix in it should not have to go looking to find that out,
+	// and a GitHub request must never delay a data server's startup.
+	_ = s.startUpdateCheck()
+
+	s.startHTTPListener(handler, httpReadTimeout, httpWriteTimeout)
+	s.startMCPListener(panelMode, httpReadTimeout, httpWriteTimeout)
+	s.startHTTP3Listener(handler)
+
+	// Start replication client (follower mode); stopped on the way out.
+	defer s.startReplicationClient()()
+
+	if s.ReplicationRole == "leader" {
+		slog.Info("replication leader started", "nodeID", s.NodeID, "currentLSN", s.Binlog.CurrentLSN())
+	}
+
+	// Close binlog on shutdown
+	if s.Binlog != nil {
+		defer func() { _ = s.Binlog.Close() }()
+	}
+
+	// Stop automation log cleanup on shutdown
+	if s.AutomationLogStore != nil {
+		defer s.AutomationLogStore.Stop()
+	}
+
+	// Flush pending audit events on shutdown
+	if s.AuditManager != nil {
+		defer s.AuditManager.Stop()
+	}
+
+	// Stop the disk-usage monitor; LagMonitor is stopped together with the
+	// replication client above.
+	if s.DiskMonitor != nil {
+		defer s.DiskMonitor.Stop()
+	}
+
+	s.startGRPCListener(authEnabled)
+
+	// Block until signal
+	sigCh := shutdownSignals()
+	sig := <-sigCh
+	slog.Info("Received, shutting down...", "sig", sig)
+	go exitOnSecondSignal(sigCh) // #350
+
+	// GO-034: one ordered sequence rather than a handful of ad-hoc Closes.
+	// Seven subsystems had a Stop or Close that nothing called, so their
+	// queues were abandoned rather than drained on the way out.
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout())
+	defer cancel()
+	s.finishShutdown(shutdownCtx)
+	return 0
+}
+
+// openServerDatabase opens the main database file, ending the process when it
+// cannot be opened (#333, #334).
+func openServerDatabase(clock *startupClock, dbPath string) (*bolt.DB, *backgroundFreelist) {
+	openStart := time.Now()
+	db, walked, freelistLoad, err := openDatabase(clock, dbPath, boltOptionsFor(dbPath))
+	warnSlowOpen(walked, time.Since(openStart))
+	if err != nil {
+		fatal("startup step failed", "step", "bolt.Open", "err", err,
+			"remedy", "if the file is damaged: mddbd -verify-db FILE, then mddbd -repair-db FILE -repair-to NEWFILE (docs/BACKUP.md)")
+	}
+	return db, freelistLoad
+}
+
+// warnSlowOpen explains an open that spent d walking the file for its freelist.
+func warnSlowOpen(walked bool, d time.Duration) {
+	if walked && d > 30*time.Second {
+		slog.Warn("opening the database walked every page to rebuild the freelist",
+			"elapsed", d.Round(time.Second),
+			"remedy", "a clean shutdown (SIGTERM) stores the freelist for the next start; MDDB_FREELIST_SYNC=true stores it on every commit, so a crash does not cost a walk either (docs/STORAGE-TUNING.md)")
+	}
+}
+
+// newServer builds the server around an open database, with the caches and
+// performance helpers every configuration has.
+func newServer(srvCfg ServerConfig, db *bolt.DB, persistence PersistenceStatus, freelistLoad *backgroundFreelist) *Server {
 	s := &Server{
 		DB:           db,
-		Path:         dbPath,
-		Mode:         mode,
+		Path:         srvCfg.Database.Path,
+		Mode:         srvCfg.Database.Mode,
 		freelistLoad: freelistLoad,
 		Config:       srvCfg,
 		BucketNames: BucketNames{
@@ -344,69 +518,136 @@ func main() {
 		ZeroCopy:      NewZeroCopyManager(),               // Zero-copy I/O
 		SIMD:          vector.NewSIMDProcessor(),          // Vectorized operations
 		ShardCluster:  NewShardCluster(4, 2),              // 4 shards, 2x replication
-		UseExtreme:    useExtreme,
+		// Extreme mode = HTTP/3 enabled (legacy MDDB_EXTREME mapped in config)
+		UseExtreme: srvCfg.HTTP3.Enabled,
 	}
 	s.IndexQueue.SetStore(serverIndexStore{s: s}) // wire persistence (server now ready)
 	freelistLoad.start()                          // #333: writes wait for it, reads do not
+	return s
+}
 
-	// #336: in the per-collection layout the main file must hold no
-	// collection data, and every collection file opens now, in parallel.
-	if perCollectionLayout() {
-		if held, err := mainFileHoldsCollections(db); err != nil || held {
-			logging.Fatal("startup step failed", "step", "per-collection layout",
-				"err", fmt.Errorf("the main file still holds collection data (%v)", err),
-				"remedy", "stop the server and run mddbd -split-collections "+dbPath+" (docs/STORAGE-LAYOUT.md)")
-		}
-		if s.collectionStore() == nil {
-			logging.Fatal("startup step failed", "step", "opening per-collection files", "dir", collectionDir(dbPath))
-		}
+// checkCollectionLayout enforces the per-collection layout (#336): the main
+// file must hold no collection data, and every collection file opens now, in
+// parallel.
+func (s *Server) checkCollectionLayout() {
+	if !perCollectionLayout() {
+		return
 	}
-	defer s.closeCollectionFiles()
+	if held, err := mainFileHoldsCollections(s.DB); err != nil || held {
+		fatal("startup step failed", "step", "per-collection layout",
+			"err", fmt.Errorf("the main file still holds collection data (%v)", err),
+			"remedy", "stop the server and run mddbd -split-collections "+s.Path+" (docs/STORAGE-LAYOUT.md)")
+	}
+	if s.collectionStore() == nil {
+		fatal("startup step failed", "step", "opening per-collection files", "dir", collectionDir(s.Path))
+	}
+}
 
-	clock.srv.Store(s)
-	clock.begin("initialising indexes and managers")
+// initSubsystems builds every index and manager in dependency order and
+// reports whether authentication is enabled.
+func (s *Server) initSubsystems(clock *startupClock) (authEnabled bool) {
+	s.initExtreme()
+	s.initSearchIndexes()
+	s.initEmbedding()
 
-	// Initialize extreme performance features
-	if useExtreme {
-		slog.Info("Extreme Performance Mode ENABLED")
-
-		// Initialize WAL
-		wal, err := NewWAL(dbPath, SyncPeriodic)
-		if err != nil {
-			logging.Fatal("Failed to initialize WAL", "err", err)
-		}
-		s.WAL = wal
-		// Honest wording: this WAL is allocated but nothing writes to it, and
-		// bbolt already fsyncs every commit, so durability comes from bbolt —
-		// not from here. Saying "WAL initialized" implied a guarantee this
-		// subsystem does not provide (GO-032).
-		slog.Info("WAL file allocated (not in the write path; durability comes from bbolt's per-commit fsync)")
-
-		// Initialize MVCC
-		s.MVCC = NewMVCC()
-		slog.Info("MVCC initialized")
-
-		slog.Info("Lock-Free Cache enabled")
-		slog.Info("Bloom Filters enabled")
-		slog.Info("Delta Encoding enabled")
-		slog.Info("Adaptive Compression enabled (Snappy + Zstd)")
-		slog.Info("Adaptive Indexing enabled")
-		slog.Info("Async I/O enabled")
-		slog.Info("Zero-Copy I/O enabled")
-		slog.Info("Vectorized Operations (SIMD) enabled")
-		slog.Info("Distributed Sharding enabled (4 shards, 2x replication)")
+	// RAG-007: say so when the stored vectors were produced differently from
+	// how the configured provider produces them now. Reindexing is the
+	// operator's call, so this names the collections and stops there.
+	if msg := reportStaleEmbeddings(s.VectorStore, s.Embedding); msg != "" {
+		slog.Warn("embedding provenance changed", "detail", msg)
 	}
 
-	if err := s.ensureBuckets(); err != nil {
-		logging.Fatal("startup step failed", "step", "ensureBuckets", "err", err)
+	// Load vectors into memory asynchronously
+	go s.loadVectorIndex() // in the background; logs "vector index loaded" with its duration
+	clock.begin("loading geo indexes")
+	go s.loadGeoIndexes()
+
+	s.initAudit()
+	s.initTTL(clock)
+
+	// AGT-004: what retrieval saved its callers, counted per day.
+	s.Gain = NewGainRecorder(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
+	s.Gain.Start()
+
+	// Configure compression
+	srvCfg := s.Config
+	compression.ConfigureCompression(srvCfg.Compression.Enabled, srvCfg.Compression.SmallThreshold, srvCfg.Compression.MediumThreshold)
+	if !srvCfg.Compression.Enabled {
+		slog.Info("Document compression disabled")
 	}
+
+	s.initFTS()
+	s.initWebhooks()
+	automationsEnabled := s.initAutomation()
+	s.initSchema()
+	s.initCollections(clock)
+	s.initEncryption()
+	s.initCuration()
+	s.initTemporal()
+	s.initSpell()
+	s.initEventsAndMetrics()
+	s.initReplication()
+
+	// Initialize cron scheduler (if enabled)
+	if automationsEnabled && env("MDDB_CRONS", "false") == "true" {
+		s.CronScheduler = NewCronScheduler(s)
+		s.CronScheduler.Start()
+		s.CronScheduler.Reload()
+		slog.Info("Cron scheduler started")
+	}
+
+	authEnabled = s.initAuth(clock)
+
+	// Initialize the shared HTTP+gRPC rate limiter (opt-in via
+	// MDDB_RATE_LIMIT_ENABLED). Both transports consume the same
+	// per-client budget. Wire the webhook publisher so rejections
+	// surface as security.rate_limit_exceeded events.
+	s.RateLimiter = NewRateLimiter()
+	s.RateLimiter.SetWebhookManager(s.WebhookManager)
+	return authEnabled
+}
+
+// initExtreme starts the extreme performance features (HTTP/3 mode).
+func (s *Server) initExtreme() {
+	if !s.UseExtreme {
+		return
+	}
+	slog.Info("Extreme Performance Mode ENABLED")
+
+	// Initialize WAL
+	wal, err := NewWAL(s.Path, SyncPeriodic)
+	fatalOnErr(err, "Failed to initialize WAL")
+	s.WAL = wal
+	// Honest wording: this WAL is allocated but nothing writes to it, and
+	// bbolt already fsyncs every commit, so durability comes from bbolt —
+	// not from here. Saying "WAL initialized" implied a guarantee this
+	// subsystem does not provide (GO-032).
+	slog.Info("WAL file allocated (not in the write path; durability comes from bbolt's per-commit fsync)")
+
+	// Initialize MVCC
+	s.MVCC = NewMVCC()
+	slog.Info("MVCC initialized")
+
+	slog.Info("Lock-Free Cache enabled")
+	slog.Info("Bloom Filters enabled")
+	slog.Info("Delta Encoding enabled")
+	slog.Info("Adaptive Compression enabled (Snappy + Zstd)")
+	slog.Info("Adaptive Indexing enabled")
+	slog.Info("Async I/O enabled")
+	slog.Info("Zero-Copy I/O enabled")
+	slog.Info("Vectorized Operations (SIMD) enabled")
+	slog.Info("Distributed Sharding enabled (4 shards, 2x replication)")
+}
+
+// initSearchIndexes creates the document buckets and the vector and geo
+// stores and indexes.
+func (s *Server) initSearchIndexes() {
+	mustStep("ensureBuckets", s.ensureBuckets())
 
 	// Initialize vector search
-	s.VectorStore = vector.NewVectorStore(db)
+	s.VectorStore = vector.NewVectorStore(s.DB)
 	s.VectorStore.SetRouter(s.router()) // #336
-	if err := s.VectorStore.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "VectorStore.EnsureBucket", "err", err)
-	}
+	mustStep("VectorStore.EnsureBucket", s.VectorStore.EnsureBucket())
 	s.VectorIndex = vector.NewVectorIndex()
 
 	// Initialize geo search. Startup rebuild from BoltDB happens asynchronously
@@ -414,14 +655,12 @@ func main() {
 	// Both indexes share the same "geo" bucket in BoltDB — they're two views
 	// of the same underlying data, picked by the /v1/geo-search?algorithm=...
 	// parameter at query time.
-	s.GeoStore = geo.NewGeoStore(db)
+	s.GeoStore = geo.NewGeoStore(s.DB)
 	s.GeoStore.SetRouter(s.router()) // #336
-	if err := s.GeoStore.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "GeoStore.EnsureBucket", "err", err)
-	}
+	mustStep("GeoStore.EnsureBucket", s.GeoStore.EnsureBucket())
 	s.GeoIndex = geo.NewGeoIndex()
 	s.GeoHashIndex = geo.NewGeoHashIndex()
-	bqRerank := srvCfg.Vector.BQRerankFactor
+	bqRerank := s.Config.Vector.BQRerankFactor
 	if bqRerank <= 0 {
 		bqRerank = 10
 	}
@@ -436,7 +675,11 @@ func main() {
 		return vector.ParseQuantization(cfg.Quantization)
 	})
 	s.VectorSearchers = newVectorSearchers(s.VectorIndex, s.QuantizedVecIndex, bqRerank)
+}
 
+// initEmbedding picks the embedding provider: stored config first, then the
+// environment, then a model already running on this machine.
+func (s *Server) initEmbedding() {
 	// Try to load embedding config from database first
 	defaultConfig, err := s.GetDefaultEmbeddingConfig()
 	if err == nil && defaultConfig != nil {
@@ -444,65 +687,57 @@ func main() {
 		s.InitializeEmbeddingFromConfig(defaultConfig)
 		slog.Info("vector search enabled", "source", "stored config",
 			"provider", defaultConfig.Provider, "model", defaultConfig.Model, "dimensions", defaultConfig.Dimensions)
+		return
+	}
+	// Fall back to environment variables
+	s.Embedding = embedding.NewProvider()
+	if s.Embedding != nil {
+		s.startEmbeddingWorker(s.Embedding)
+		slog.Info("vector search enabled", "source", "environment",
+			"provider", s.Embedding.Model(), "model", s.Embedding.Model(), "dimensions", s.Embedding.Dimensions())
+	} else if detected := embedding.DetectLocalProvider(context.Background()); detected != nil {
+		// SRCH-001: nothing configured, but this machine is already
+		// running a model. Most installs with no semantic search have one
+		// sitting there — MDDB simply never looked.
+		s.Embedding = detected.Provider
+		s.DetectedEmbedding = detected
+		s.startEmbeddingWorker(s.Embedding)
+		slog.Info("vector search enabled", "source", "autodetected",
+			"provider", detected.Name, "model", detected.Model,
+			"dimensions", detected.Dimensions, "url", detected.APIURL,
+			"note", "set MDDB_EMBEDDING_AUTODETECT=0 to disable this probe")
 	} else {
-		// Fall back to environment variables
-		s.Embedding = embedding.NewProvider()
-		if s.Embedding != nil {
-			s.startEmbeddingWorker(s.Embedding)
-			slog.Info("vector search enabled", "source", "environment",
-				"provider", s.Embedding.Model(), "model", s.Embedding.Model(), "dimensions", s.Embedding.Dimensions())
-		} else if detected := embedding.DetectLocalProvider(context.Background()); detected != nil {
-			// SRCH-001: nothing configured, but this machine is already
-			// running a model. Most installs with no semantic search have one
-			// sitting there — MDDB simply never looked.
-			s.Embedding = detected.Provider
-			s.DetectedEmbedding = detected
-			s.startEmbeddingWorker(s.Embedding)
-			slog.Info("vector search enabled", "source", "autodetected",
-				"provider", detected.Name, "model", detected.Model,
-				"dimensions", detected.Dimensions, "url", detected.APIURL,
-				"note", "set MDDB_EMBEDDING_AUTODETECT=0 to disable this probe")
-		} else {
-			slog.Info("Vector search embedding provider not configured (set MDDB_EMBEDDING_PROVIDER or configure in panel)")
-		}
+		slog.Info("Vector search embedding provider not configured (set MDDB_EMBEDDING_PROVIDER or configure in panel)")
 	}
+}
 
-	// RAG-007: say so when the stored vectors were produced differently from
-	// how the configured provider produces them now. Reindexing is the
-	// operator's call, so this names the collections and stops there.
-	if msg := reportStaleEmbeddings(s.VectorStore, s.Embedding); msg != "" {
-		slog.Warn("embedding provenance changed", "detail", msg)
+// loadGeoIndexes loads the geo indexes from BoltDB. Both R-tree and geohash
+// are populated from the same "geo" bucket so the /v1/geo-search algorithm
+// switch is a pure runtime decision — no per-algorithm persistence layers.
+// Handlers reject requests with 503 while !IsReady, matching the vector-index
+// startup contract.
+func (s *Server) loadGeoIndexes() {
+	start := time.Now()
+	n, err := s.GeoStore.Rebuild(s.GeoIndex, "")
+	if err != nil {
+		slog.Warn("Geo index rebuild failed", "err", err)
 	}
+	s.GeoIndex.SetReady()
+	slog.Info("geo R-tree loaded",
+		"points", n, "collections", len(s.GeoIndex.Collections()), "elapsed", time.Since(start))
 
-	// Load vectors into memory asynchronously
-	go s.loadVectorIndex() // in the background; logs "vector index loaded" with its duration
-	clock.begin("loading geo indexes")
+	start = time.Now()
+	nh, err := s.GeoStore.RebuildHash(s.GeoHashIndex, "")
+	if err != nil {
+		slog.Warn("Geohash index rebuild failed", "err", err)
+	}
+	s.GeoHashIndex.SetReady()
+	slog.Info("geohash index loaded", "points", nh, "elapsed", time.Since(start))
+}
 
-	// Load geo indexes from BoltDB asynchronously. Both R-tree and geohash
-	// are populated from the same "geo" bucket so the /v1/geo-search
-	// algorithm switch is a pure runtime decision — no per-algorithm
-	// persistence layers. Handlers reject requests with 503 while !IsReady,
-	// matching the vector-index startup contract.
-	go func() {
-		start := time.Now()
-		n, err := s.GeoStore.Rebuild(s.GeoIndex, "")
-		if err != nil {
-			slog.Warn("Geo index rebuild failed", "err", err)
-		}
-		s.GeoIndex.SetReady()
-		slog.Info("geo R-tree loaded",
-			"points", n, "collections", len(s.GeoIndex.Collections()), "elapsed", time.Since(start))
-
-		start = time.Now()
-		nh, err := s.GeoStore.RebuildHash(s.GeoHashIndex, "")
-		if err != nil {
-			slog.Warn("Geohash index rebuild failed", "err", err)
-		}
-		s.GeoHashIndex.SetReady()
-		slog.Info("geohash index loaded", "points", nh, "elapsed", time.Since(start))
-	}()
-
-	// Initialize audit log (ISO 27001 A.8.15 / SOC 2 CC7.2)
+// initAudit starts the audit log (ISO 27001 A.8.15 / SOC 2 CC7.2) and its
+// optional external sinks.
+func (s *Server) initAudit() {
 	auditEnabled := env("MDDB_AUDIT_ENABLED", "false") == "true"
 	auditRetention := 90
 	if v := env("MDDB_AUDIT_RETENTION_DAYS", ""); v != "" {
@@ -510,73 +745,64 @@ func main() {
 			auditRetention = n
 		}
 	}
-	s.AuditManager = audit.NewAuditManager(db, auditEnabled, auditRetention)
+	s.AuditManager = audit.NewAuditManager(s.DB, auditEnabled, auditRetention)
 	s.AuditManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
-	if err := s.AuditManager.EnsureBuckets(); err != nil {
-		logging.Fatal("startup step failed", "step", "AuditManager.EnsureBuckets", "err", err)
-	}
+	mustStep("AuditManager.EnsureBuckets", s.AuditManager.EnsureBuckets())
 	s.AuditManager.Start()
-	if auditEnabled {
-		slog.Info("Audit log enabled (retention days)", "auditRetention", auditRetention)
+	if !auditEnabled {
+		return
+	}
+	slog.Info("Audit log enabled (retention days)", "auditRetention", auditRetention)
 
-		// Wire optional external sinks (ISO 27001 A.8.15 / SOC 2 CC7.2 —
-		// audit trail must be tamper-evident; pushing to an off-host SIEM
-		// or syslog collector covers the case where the local DB is
-		// compromised).
-		exportBuf := 1024
-		if v := env("MDDB_AUDIT_EXPORT_BUFFER", ""); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n > 0 {
-				exportBuf = n
-			}
-		}
-		if u := env("MDDB_AUDIT_EXPORT_WEBHOOK_URL", ""); u != "" {
-			insecure := env("MDDB_AUDIT_EXPORT_WEBHOOK_INSECURE_TLS", "") == "true"
-			we, err := audit.NewWebhookExporter(u, env("MDDB_AUDIT_EXPORT_WEBHOOK_HEADER", ""), exportBuf, insecure)
-			if err != nil {
-				slog.Warn("audit webhook exporter", "err", err)
-			} else {
-				s.AuditManager.AddExporter(we)
-				slog.Info("Audit webhook exporter active", "u", u)
-			}
-		}
-		if a := env("MDDB_AUDIT_EXPORT_SYSLOG_ADDR", ""); a != "" {
-			fac := env("MDDB_AUDIT_EXPORT_SYSLOG_FACILITY", "local0")
-			se, err := audit.NewSyslogExporter(a, fac, exportBuf)
-			if err != nil {
-				slog.Warn("audit syslog exporter", "err", err)
-			} else {
-				s.AuditManager.AddExporter(se)
-				slog.Info("Audit syslog exporter active (facility)", "a", a, "fac", fac)
-			}
+	// Wire optional external sinks (ISO 27001 A.8.15 / SOC 2 CC7.2 —
+	// audit trail must be tamper-evident; pushing to an off-host SIEM
+	// or syslog collector covers the case where the local DB is
+	// compromised).
+	exportBuf := 1024
+	if v := env("MDDB_AUDIT_EXPORT_BUFFER", ""); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			exportBuf = n
 		}
 	}
+	if u := env("MDDB_AUDIT_EXPORT_WEBHOOK_URL", ""); u != "" {
+		insecure := env("MDDB_AUDIT_EXPORT_WEBHOOK_INSECURE_TLS", "") == "true"
+		we, err := audit.NewWebhookExporter(u, env("MDDB_AUDIT_EXPORT_WEBHOOK_HEADER", ""), exportBuf, insecure)
+		if err != nil {
+			slog.Warn("audit webhook exporter", "err", err)
+		} else {
+			s.AuditManager.AddExporter(we)
+			slog.Info("Audit webhook exporter active", "u", u)
+		}
+	}
+	if a := env("MDDB_AUDIT_EXPORT_SYSLOG_ADDR", ""); a != "" {
+		fac := env("MDDB_AUDIT_EXPORT_SYSLOG_FACILITY", "local0")
+		se, err := audit.NewSyslogExporter(a, fac, exportBuf)
+		if err != nil {
+			slog.Warn("audit syslog exporter", "err", err)
+		} else {
+			s.AuditManager.AddExporter(se)
+			slog.Info("Audit syslog exporter active (facility)", "a", a, "fac", fac)
+		}
+	}
+}
 
-	// Initialize TTL manager
-	s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})
+// initTTL starts the document TTL manager.
+func (s *Server) initTTL(clock *startupClock) {
+	s.TTLManager = ttl.NewTTLManager(s.DB, serverTTLReaper{s: s})
 	s.TTLManager.SetRouter(s.router()) // #336
 	clock.begin("starting managers")
-	if err := s.TTLManager.EnsureBuckets(); err != nil {
-		logging.Fatal("startup step failed", "step", "TTLManager.EnsureBuckets", "err", err)
-	}
+	mustStep("TTLManager.EnsureBuckets", s.TTLManager.EnsureBuckets())
 	s.TTLManager.StartCleanup(30 * time.Second)
 	slog.Info("TTL manager started (cleanup every 30s)")
+}
 
-	// AGT-004: what retrieval saved its callers, counted per day.
-	s.Gain = NewGainRecorder(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
-	s.Gain.Start()
-
-	// Configure compression
-	compression.ConfigureCompression(srvCfg.Compression.Enabled, srvCfg.Compression.SmallThreshold, srvCfg.Compression.MediumThreshold)
-	if !srvCfg.Compression.Enabled {
-		slog.Info("Document compression disabled")
-	}
-
-	// Initialize FTS index
-	s.FTSIndex = fts.NewFTSIndex(db)
+// initFTS builds the full-text index with its languages, synonyms and stop
+// words.
+func (s *Server) initFTS() {
+	srvCfg := s.Config
+	s.FTSIndex = fts.NewFTSIndex(s.DB)
 	s.FTSIndex.SetRouter(s.router()) // #336
-	if err := s.FTSIndex.EnsureBuckets(); err != nil {
-		logging.Fatal("startup step failed", "step", "FTSIndex.EnsureBuckets", "err", err)
-	}
+	mustStep("FTSIndex.EnsureBuckets", s.FTSIndex.EnsureBuckets())
 
 	// Initialize multi-language FTS support
 	langReg := fts.NewLangRegistry(srvCfg.FTS.DefaultLang)
@@ -588,26 +814,18 @@ func main() {
 	}
 
 	// Initialize synonym manager
-	s.SynonymManager = fts.NewSynonymManager(db)
-	if err := s.SynonymManager.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "SynonymManager.EnsureBucket", "err", err)
-	}
-	if err := s.SynonymManager.LoadAll(); err != nil {
-		logging.Fatal("startup step failed", "step", "SynonymManager.LoadAll", "err", err)
-	}
+	s.SynonymManager = fts.NewSynonymManager(s.DB)
+	mustStep("SynonymManager.EnsureBucket", s.SynonymManager.EnsureBucket())
+	mustStep("SynonymManager.LoadAll", s.SynonymManager.LoadAll())
 	if srvCfg.FTS.SynonymsEnabled {
 		s.FTSIndex.SetSynonymManager(s.SynonymManager)
 		slog.Info("FTS synonyms enabled")
 	}
 
 	// Initialize stop word manager
-	s.StopWordManager = fts.NewStopWordManager(db)
-	if err := s.StopWordManager.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "StopWordManager.EnsureBucket", "err", err)
-	}
-	if err := s.StopWordManager.LoadAll(); err != nil {
-		logging.Fatal("startup step failed", "step", "StopWordManager.LoadAll", "err", err)
-	}
+	s.StopWordManager = fts.NewStopWordManager(s.DB)
+	mustStep("StopWordManager.EnsureBucket", s.StopWordManager.EnsureBucket())
+	mustStep("StopWordManager.LoadAll", s.StopWordManager.LoadAll())
 	s.FTSIndex.SetStopWordManager(s.StopWordManager)
 	s.StopWordManager.SetLangRegistry(langReg)
 	slog.Info("Stop word manager initialized")
@@ -616,90 +834,84 @@ func main() {
 	s.FTSIndex.SetPMIData(fts.NewPMIData())
 
 	slog.Info("Full-text search index initialized")
+}
 
-	// Initialize webhook manager
-	s.WebhookManager = webhooks.NewWebhookManager(db)
-	if err := s.WebhookManager.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "WebhookManager.EnsureBucket", "err", err)
-	}
-	if err := s.WebhookManager.LoadAll(); err != nil {
-		logging.Fatal("startup step failed", "step", "WebhookManager.LoadAll", "err", err)
-	}
+// initWebhooks loads the webhook subscriptions and the incident detectors
+// that deliver security.* and ops.* events through them.
+func (s *Server) initWebhooks() {
+	s.WebhookManager = webhooks.NewWebhookManager(s.DB)
+	mustStep("WebhookManager.EnsureBucket", s.WebhookManager.EnsureBucket())
+	mustStep("WebhookManager.LoadAll", s.WebhookManager.LoadAll())
 	slog.Info("webhook manager initialized", "hooks", len(s.WebhookManager.List()))
 
 	// Incident detectors — reuse the WebhookManager to deliver
 	// security.* and ops.* events to whichever hooks subscribed.
 	s.AuthFailureTracker = NewAuthFailureTracker(s.WebhookManager)
-	s.DiskMonitor = NewDiskUsageMonitor(s.WebhookManager, dbPath)
+	s.DiskMonitor = NewDiskUsageMonitor(s.WebhookManager, s.Path)
 	s.DiskMonitor.Start()
+}
 
-	// Initialize automation manager (triggers, crons, webhook targets)
-	automationsEnabled := env("MDDB_AUTOMATIONS", "enable") != "disable"
-	if automationsEnabled {
-		s.AutomationManager = NewAutomationManager(db)
-		s.AutomationManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
-		s.AutomationManager.SetServer(s)
-		if err := s.AutomationManager.EnsureBucket(); err != nil {
-			logging.Fatal("startup step failed", "step", "AutomationManager.EnsureBucket", "err", err)
-		}
-		if err := s.AutomationManager.LoadAll(); err != nil {
-			logging.Fatal("startup step failed", "step", "AutomationManager.LoadAll", "err", err)
-		}
-		slog.Info("automation manager initialized", "rules", len(s.AutomationManager.List("")))
+// initAutomation loads triggers, crons and webhook targets, and their
+// execution log, unless MDDB_AUTOMATIONS=disable. It reports whether
+// automations are enabled.
+func (s *Server) initAutomation() bool {
+	if env("MDDB_AUTOMATIONS", "enable") == "disable" {
+		return false
+	}
+	s.AutomationManager = NewAutomationManager(s.DB)
+	s.AutomationManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
+	s.AutomationManager.SetServer(s)
+	mustStep("AutomationManager.EnsureBucket", s.AutomationManager.EnsureBucket())
+	mustStep("AutomationManager.LoadAll", s.AutomationManager.LoadAll())
+	slog.Info("automation manager initialized", "rules", len(s.AutomationManager.List("")))
 
-		// Initialize automation log store
-		if env("MDDB_AUTOMATION_LOGS", "enable") != "disable" {
-			logTTLStr := env("MDDB_AUTOMATION_LOGS_TTL", "7d")
-			logTTL, err := automationlog.ParseDurationString(logTTLStr)
-			if err != nil {
-				logging.Fatal("Invalid MDDB_AUTOMATION_LOGS_TTL", "err", err)
-			}
-			s.AutomationLogStore = automationlog.NewStore(db, logTTL)
-			s.AutomationLogStore.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
-			if err := s.AutomationLogStore.EnsureBucket(); err != nil {
-				logging.Fatal("startup step failed", "step", "AutomationLogStore.EnsureBucket", "err", err)
-			}
-			s.AutomationLogStore.StartCleanup(5 * time.Minute)
-			s.AutomationManager.SetLogStore(s.AutomationLogStore)
-			slog.Info("Automation logs enabled (TTL)", "logTTLStr", logTTLStr)
-		}
+	// Initialize automation log store
+	if env("MDDB_AUTOMATION_LOGS", "enable") == "disable" {
+		return true
 	}
+	logTTLStr := env("MDDB_AUTOMATION_LOGS_TTL", "7d")
+	logTTL, err := automationlog.ParseDurationString(logTTLStr)
+	fatalOnErr(err, "Invalid MDDB_AUTOMATION_LOGS_TTL")
+	s.AutomationLogStore = automationlog.NewStore(s.DB, logTTL)
+	s.AutomationLogStore.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
+	mustStep("AutomationLogStore.EnsureBucket", s.AutomationLogStore.EnsureBucket())
+	s.AutomationLogStore.StartCleanup(5 * time.Minute)
+	s.AutomationManager.SetLogStore(s.AutomationLogStore)
+	slog.Info("Automation logs enabled (TTL)", "logTTLStr", logTTLStr)
+	return true
+}
 
-	// Initialize schema manager
-	s.SchemaManager = schema.NewSchemaManager(db)
-	if err := s.SchemaManager.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "SchemaManager.EnsureBucket", "err", err)
-	}
-	if err := s.SchemaManager.LoadAll(); err != nil {
-		logging.Fatal("startup step failed", "step", "SchemaManager.LoadAll", "err", err)
-	}
+// initSchema loads the per-collection metadata schemas.
+func (s *Server) initSchema() {
+	s.SchemaManager = schema.NewSchemaManager(s.DB)
+	mustStep("SchemaManager.EnsureBucket", s.SchemaManager.EnsureBucket())
+	mustStep("SchemaManager.LoadAll", s.SchemaManager.LoadAll())
 	slog.Info("Schema manager initialized (schemas loaded)", "listCount", len(s.SchemaManager.List()))
+}
 
-	// Initialize collection config manager
-	s.CollectionManager = NewCollectionManager(db)
+// initCollections loads the collection configs and the storage backends they
+// ask for.
+func (s *Server) initCollections(clock *startupClock) {
+	s.CollectionManager = NewCollectionManager(s.DB)
 	s.CollectionManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
-	if err := s.CollectionManager.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "CollectionManager.EnsureBucket", "err", err)
-	}
+	mustStep("CollectionManager.EnsureBucket", s.CollectionManager.EnsureBucket())
 	clock.begin("loading collection settings and storage backends")
-	if err := s.CollectionManager.LoadAll(); err != nil {
-		logging.Fatal("startup step failed", "step", "CollectionManager.LoadAll", "err", err)
-	}
+	mustStep("CollectionManager.LoadAll", s.CollectionManager.LoadAll())
 
 	// GO-021: build the per-collection storage backends the configs ask for.
 	// Until this ran, `storageBackend: "s3"` was accepted, validated and
 	// ignored — every document went to the local file regardless.
 	s.InitStorageBackends()
 	slog.Info("Collection manager initialized (collections configured)", "listAllCount", len(s.CollectionManager.ListAll()))
+}
 
-	// At-rest encryption (ISO 27001 A.8.24 / SOC 2 CC6.7). The encryptor
-	// is a no-op when MDDB_ENCRYPTION_KEY is unset; a misconfigured key
-	// fatals to avoid silently storing plaintext for a collection that
-	// was explicitly opted in.
+// initEncryption sets up at-rest encryption (ISO 27001 A.8.24 / SOC 2
+// CC6.7). The encryptor is a no-op when MDDB_ENCRYPTION_KEY is unset; a
+// misconfigured key fatals to avoid silently storing plaintext for a
+// collection that was explicitly opted in.
+func (s *Server) initEncryption() {
 	enc, err := encryption.NewEncryptor()
-	if err != nil {
-		logging.Fatal("encryption init", "err", err)
-	}
+	fatalOnErr(err, "encryption init")
 	s.Encryptor = enc
 	SetGlobalEncryptor(enc)
 	s.CollectionManager.SetEncryptor(enc)
@@ -713,51 +925,57 @@ func main() {
 		slog.Info("At-rest encryption enabled (collection(s) opted in)", "encCount", encCount)
 		slog.Info("Encryption primary", "primaryKeyID", enc.PrimaryKeyID(), "previousKeyIDsCount", len(enc.PreviousKeyIDs()))
 		s.RotationManager = NewRotationManager(s, enc)
-	} else {
-		// If any collection is flagged as encrypted but we have no key,
-		// refuse to start — writing plaintext into a supposedly encrypted
-		// collection is a silent compliance failure.
-		for name, cfg := range s.CollectionManager.ListAll() {
-			if cfg != nil && cfg.Encrypted {
-				logging.Fatal("collection has encrypted=true but MDDB_ENCRYPTION_KEY is not set", "name", name)
-			}
+		return
+	}
+	// If any collection is flagged as encrypted but we have no key,
+	// refuse to start — writing plaintext into a supposedly encrypted
+	// collection is a silent compliance failure.
+	for name, cfg := range s.CollectionManager.ListAll() {
+		if cfg != nil && cfg.Encrypted {
+			fatal("collection has encrypted=true but MDDB_ENCRYPTION_KEY is not set", "name", name)
 		}
 	}
+}
 
-	// Curation manager: loads all pinning/hiding rules into memory so the
-	// search hot path never hits disk.
-	s.CurationManager = NewCurationManager(db)
+// initCuration loads all pinning/hiding rules into memory so the search hot
+// path never hits disk.
+func (s *Server) initCuration() {
+	s.CurationManager = NewCurationManager(s.DB)
 	s.CurationManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
-	if err := s.CurationManager.EnsureBucket(); err != nil {
-		logging.Fatal("startup step failed", "step", "CurationManager.EnsureBucket", "err", err)
-	}
-	if err := s.CurationManager.LoadAll(); err != nil {
-		logging.Fatal("startup step failed", "step", "CurationManager.LoadAll", "err", err)
-	}
+	mustStep("CurationManager.EnsureBucket", s.CurationManager.EnsureBucket())
+	mustStep("CurationManager.LoadAll", s.CurationManager.LoadAll())
 	slog.Info("Curation manager initialized (rules loaded)", "listAllCount", len(s.CurationManager.ListAll()))
+}
 
-	// Initialize temporal event tracking (disabled by default; set MDDB_TEMPORAL=true to enable)
-	if env("MDDB_TEMPORAL", "false") == "true" {
-		s.TemporalManager = temporal.NewTemporalManager(db)
-		s.TemporalManager.SetRouter(s.router()) // #336
-		if err := s.TemporalManager.EnsureBuckets(); err != nil {
-			logging.Fatal("startup step failed", "step", "TemporalManager.EnsureBuckets", "err", err)
-		}
-		s.TemporalManager.Start()
-		slog.Info("Temporal event tracking initialized")
+// initTemporal starts temporal event tracking (disabled by default; set
+// MDDB_TEMPORAL=true to enable).
+func (s *Server) initTemporal() {
+	if env("MDDB_TEMPORAL", "false") != "true" {
+		return
 	}
+	s.TemporalManager = temporal.NewTemporalManager(s.DB)
+	s.TemporalManager.SetRouter(s.router()) // #336
+	mustStep("TemporalManager.EnsureBuckets", s.TemporalManager.EnsureBuckets())
+	s.TemporalManager.Start()
+	slog.Info("Temporal event tracking initialized")
+}
 
-	// Initialize spell checker (disabled by default; set MDDB_SPELL=true to enable)
-	if env("MDDB_SPELL", "false") == "true" {
-		s.SpellManager = spell.NewSpellManager(db)
-		s.SpellManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
-		if err := s.SpellManager.EnsureBucket(); err != nil {
-			logging.Fatal("startup step failed", "step", "SpellManager.EnsureBucket", "err", err)
-		}
-		s.SpellManager.LoadAll() // async — sets ready flag when done
-		slog.Info("Spell manager initialized (loading dictionaries in background)")
+// initSpell starts the spell checker (disabled by default; set
+// MDDB_SPELL=true to enable).
+func (s *Server) initSpell() {
+	if env("MDDB_SPELL", "false") != "true" {
+		return
 	}
+	s.SpellManager = spell.NewSpellManager(s.DB)
+	s.SpellManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
+	mustStep("SpellManager.EnsureBucket", s.SpellManager.EnsureBucket())
+	s.SpellManager.LoadAll() // async — sets ready flag when done
+	slog.Info("Spell manager initialized (loading dictionaries in background)")
+}
 
+// initEventsAndMetrics sets up the SSE hub, the MCP profile and key store,
+// and the metrics collector, and wires metrics into the subsystems.
+func (s *Server) initEventsAndMetrics() {
 	// Initialize SSE hub (enabled by default, set MDDB_SSE_ENABLED=false to disable)
 	sseEnabled := env("MDDB_SSE_ENABLED", "true") != "false"
 	sseMaxClients := envconf.Int("MDDB_SSE_MAX_CLIENTS", 1000)
@@ -768,8 +986,8 @@ func main() {
 	}
 
 	// Store MCP server info for handlers
-	s.MCPInfo = srvCfg.MCP.ServerInfo
-	s.MCPInstructions = srvCfg.MCP.Instructions
+	s.MCPInfo = s.Config.MCP.ServerInfo
+	s.MCPInstructions = s.Config.MCP.Instructions
 
 	// Initialize MCP API key store (BoltDB-backed, persists across restarts)
 	s.mcpKeyStore = newMCPAPIKeyStore(s.DB)
@@ -786,11 +1004,12 @@ func main() {
 	if s.EmbeddingWorker != nil {
 		s.EmbeddingWorker.metrics = s.Metrics
 	}
-	if s.WebhookManager != nil {
-		s.WebhookManager.SetMetrics(s.Metrics)
-	}
+	s.WebhookManager.SetMetrics(s.Metrics)
+}
 
-	// Initialize replication
+// initReplication sets the node's replication role, opens the binlog and,
+// on a follower, turns off the background writers.
+func (s *Server) initReplication() {
 	s.ReplicationRole = env("MDDB_REPLICATION_ROLE", "") // "leader", "follower", ""
 	s.NodeID = env("MDDB_NODE_ID", "")
 	if s.NodeID == "" && s.ReplicationRole != "" {
@@ -806,42 +1025,21 @@ func main() {
 	// Initialize binlog (auto-enabled for leader, opt-in for standalone)
 	binlogEnabled := env("MDDB_BINLOG_ENABLED", "false") == "true" || s.ReplicationRole == "leader"
 	if binlogEnabled {
-		bl, err := binlog.NewBinlog(dbPath, binlog.BinlogConfig{
+		bl, err := binlog.NewBinlog(s.Path, binlog.BinlogConfig{
 			Path:    env("MDDB_BINLOG_PATH", ""),
 			MaxSize: 256 * 1024 * 1024, // 256MB
 			MaxAge:  24 * time.Hour,
 		})
-		if err != nil {
-			logging.Fatal("Failed to initialize binlog", "err", err)
-		}
+		fatalOnErr(err, "Failed to initialize binlog")
 		s.Binlog = bl
 		slog.Info("binlog enabled", "currentLSN", bl.CurrentLSN())
-	}
-
-	// Set binlog on all subsystems
-	if s.Binlog != nil {
-		s.VectorStore.SetBinlog(s.Binlog)
-		s.GeoStore.SetBinlog(s.Binlog)
-		s.FTSIndex.SetBinlog(s.Binlog)
-		s.TTLManager.SetBinlog(s.Binlog)
-		s.WebhookManager.SetBinlog(s.Binlog)
-		s.SchemaManager.SetBinlog(s.Binlog)
-		s.SynonymManager.SetBinlog(s.Binlog)
-		s.StopWordManager.SetBinlog(s.Binlog)
-		s.AutomationManager.SetBinlog(s.Binlog)
-		s.CollectionManager.SetBinlog(s.Binlog)
-		if s.TemporalManager != nil {
-			s.TemporalManager.SetBinlog(s.Binlog)
-		}
-		if s.SpellManager != nil {
-			s.SpellManager.SetBinlog(s.Binlog)
-		}
+		s.setBinlogEverywhere()
 	}
 
 	// Follower: disable background writers (data comes from binlog)
 	if s.ReplicationRole == "follower" {
 		s.TTLManager.Stop() // don't run TTL cleanup, leader handles it
-		s.TTLManager = ttl.NewTTLManager(db, serverTTLReaper{s: s})
+		s.TTLManager = ttl.NewTTLManager(s.DB, serverTTLReaper{s: s})
 		s.TTLManager.SetRouter(s.router()) // #336
 		_ = s.TTLManager.EnsureBuckets()
 		// Don't start cleanup — deletes come from binlog
@@ -853,30 +1051,47 @@ func main() {
 		}
 		slog.Info("Replication disabled TTL cleanup and embedding worker on follower")
 	}
+}
 
-	// Initialize cron scheduler (if enabled)
-	if automationsEnabled && env("MDDB_CRONS", "false") == "true" {
-		s.CronScheduler = NewCronScheduler(s)
-		s.CronScheduler.Start()
-		s.CronScheduler.Reload()
-		slog.Info("Cron scheduler started")
+// setBinlogEverywhere points every subsystem that writes at the binlog.
+func (s *Server) setBinlogEverywhere() {
+	s.VectorStore.SetBinlog(s.Binlog)
+	s.GeoStore.SetBinlog(s.Binlog)
+	s.FTSIndex.SetBinlog(s.Binlog)
+	s.TTLManager.SetBinlog(s.Binlog)
+	s.WebhookManager.SetBinlog(s.Binlog)
+	s.SchemaManager.SetBinlog(s.Binlog)
+	s.SynonymManager.SetBinlog(s.Binlog)
+	s.StopWordManager.SetBinlog(s.Binlog)
+	// MDDB_AUTOMATIONS=disable leaves no automation manager; setting the
+	// binlog on it unguarded crashed every such start with a binlog.
+	if s.AutomationManager != nil {
+		s.AutomationManager.SetBinlog(s.Binlog)
 	}
+	s.CollectionManager.SetBinlog(s.Binlog)
+	if s.TemporalManager != nil {
+		s.TemporalManager.SetBinlog(s.Binlog)
+	}
+	if s.SpellManager != nil {
+		s.SpellManager.SetBinlog(s.Binlog)
+	}
+}
 
-	// Initialize authentication (disabled by default)
+// initAuth enables authentication when MDDB_AUTH_ENABLED=true (disabled by
+// default) and reports whether it did.
+func (s *Server) initAuth(clock *startupClock) bool {
 	authEnabled := env("MDDB_AUTH_ENABLED", "false") == "true"
 	if authEnabled {
 		jwtSecret := env("MDDB_AUTH_JWT_SECRET", "")
 		if jwtSecret == "" {
-			logging.Fatal("MDDB_AUTH_ENABLED=true requires MDDB_AUTH_JWT_SECRET to be set")
+			fatal("MDDB_AUTH_ENABLED=true requires MDDB_AUTH_JWT_SECRET to be set")
 		}
 
 		jwtExpiryStr := env("MDDB_AUTH_JWT_EXPIRY", "24h")
 		jwtExpiry, err := time.ParseDuration(jwtExpiryStr)
-		if err != nil {
-			logging.Fatal("Invalid MDDB_AUTH_JWT_EXPIRY", "err", err)
-		}
+		fatalOnErr(err, "Invalid MDDB_AUTH_JWT_EXPIRY")
 
-		s.AuthManager = NewAuthManager(db, AuthConfig{
+		s.AuthManager = NewAuthManager(s.DB, AuthConfig{
 			JWTSecret:     jwtSecret,
 			JWTExpiry:     jwtExpiry,
 			AdminUsername: env("MDDB_AUTH_ADMIN_USERNAME", "admin"),
@@ -884,41 +1099,22 @@ func main() {
 		})
 		s.AuthManager.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 
-		if err := s.AuthManager.EnsureBuckets(); err != nil {
-			logging.Fatal("startup step failed", "step", "AuthManager.EnsureBuckets", "err", err)
-		}
+		mustStep("AuthManager.EnsureBuckets", s.AuthManager.EnsureBuckets())
 		clock.begin("loading users and API keys")
-		if err := s.AuthManager.LoadAll(); err != nil {
-			logging.Fatal("startup step failed", "step", "AuthManager.LoadAll", "err", err)
-		}
-		if err := s.AuthManager.BootstrapAdmin(); err != nil {
-			logging.Fatal("startup step failed", "step", "AuthManager.BootstrapAdmin", "err", err)
-		}
+		mustStep("AuthManager.LoadAll", s.AuthManager.LoadAll())
+		mustStep("AuthManager.BootstrapAdmin", s.AuthManager.BootstrapAdmin())
 
 		slog.Info("Authentication enabled")
 	}
 	if s.AuthManager != nil {
 		s.AuthManager.SetServer(s)
 	}
+	return authEnabled
+}
 
-	// Initialize the shared HTTP+gRPC rate limiter (opt-in via
-	// MDDB_RATE_LIMIT_ENABLED). Both transports consume the same
-	// per-client budget. Wire the webhook publisher so rejections
-	// surface as security.rate_limit_exceeded events.
-	s.RateLimiter = NewRateLimiter()
-	s.RateLimiter.SetWebhookManager(s.WebhookManager)
-
-	// Enforce ISO 27001 / SOC 2 guardrails when MDDB_PRODUCTION=true,
-	// or log a one-shot warning otherwise.
-	EnforceProductionGuards(slog.Warn, logging.Fatal)
-
-	// MCP stdio mode — replaces normal HTTP/gRPC operation
-	if srvCfg.MCP.Stdio {
-		s.runMCPStdio()
-		return
-	}
-
-	// Log protocol configuration
+// logProtocolConfig logs which protocols are on and their mode overrides.
+func (s *Server) logProtocolConfig() {
+	srvCfg := s.Config
 	slog.Info("Protocol config HTTP MCP HTTP3", "enabled", srvCfg.HTTP.Enabled, "enabled2", srvCfg.GRPC.Enabled, "enabled3", srvCfg.MCP.Enabled, "enabled4", srvCfg.HTTP3.Enabled)
 	// Log per-protocol mode overrides
 	if srvCfg.HTTP.Mode != "" {
@@ -933,38 +1129,36 @@ func main() {
 	if srvCfg.HTTP3.Mode != "" {
 		slog.Info("Per-protocol mode HTTP3 (MDDB_HTTP3_MODE)", "mode", srvCfg.HTTP3.Mode)
 	}
+}
 
-	mux := http.NewServeMux()
-	s.registerRoutes(mux, authEnabled)
+// registerGraphQL serves /graphql and the playground unless
+// MDDB_GRAPHQL_ENABLED=false.
+func (s *Server) registerGraphQL(mux *http.ServeMux, authEnabled bool) {
+	if env("MDDB_GRAPHQL_ENABLED", "true") == "false" {
+		return
+	}
+	graphqlHandler := s.newGraphQLHandler()
 
-	// GraphQL endpoint (disabled by default)
-	graphqlEnabled := env("MDDB_GRAPHQL_ENABLED", "true") != "false"
-	if graphqlEnabled {
-		graphqlHandler := s.newGraphQLHandler()
-
-		// Wrap with auth middleware if enabled
-		if authEnabled && s.AuthManager != nil {
-			graphqlHandler = s.GraphQLAuthMiddleware(graphqlHandler)
-		}
-
-		mux.Handle("/graphql", graphqlHandler)
-		slog.Info("GraphQL endpoint enabled at /graphql")
-
-		// GraphQL Playground (development tool)
-		if env("MDDB_GRAPHQL_PLAYGROUND", "true") == "true" {
-			mux.Handle("/playground", newGraphQLPlaygroundHandler("/graphql"))
-			slog.Info("GraphQL Playground enabled at /playground")
-		}
+	// Wrap with auth middleware if enabled
+	if authEnabled && s.AuthManager != nil {
+		graphqlHandler = s.GraphQLAuthMiddleware(graphqlHandler)
 	}
 
-	httpAddr := srvCfg.HTTP.Addr
-	grpcAddr := srvCfg.GRPC.Addr
+	mux.Handle("/graphql", graphqlHandler)
+	slog.Info("GraphQL endpoint enabled at /graphql")
 
-	// Panel mode: internal (default) = CORS enabled, external = CORS disabled (panel proxies)
-	panelMode := env("MDDB_PANEL_MODE", "internal")
+	// GraphQL Playground (development tool)
+	if env("MDDB_GRAPHQL_PLAYGROUND", "true") == "true" {
+		mux.Handle("/playground", newGraphQLPlaygroundHandler("/graphql"))
+		slog.Info("GraphQL Playground enabled at /playground")
+	}
+}
 
-	// Wrap mux: CORS → panic-recover → rate limit → auth → metrics → max-body → JSON → routes
-	handler := withJSON(mux)
+// wrapHTTPHandler wraps the routes in the middleware chain:
+// CORS → panic-recover → rate limit → auth → metrics → max-body → JSON → routes.
+// It returns the handler and the listener's read and write timeouts.
+func (s *Server) wrapHTTPHandler(mux *http.ServeMux, authEnabled bool, panelMode string) (handler http.Handler, readTimeout, writeTimeout time.Duration) {
+	handler = withJSON(mux)
 	// SEC-005: cap request body size globally so a single oversized JSON body
 	// can't OOM the process. Upload/import endpoints legitimately stream large
 	// files and manage their own limits, so they are exempt.
@@ -986,8 +1180,8 @@ func main() {
 	handler = PanicRecoveryMiddleware(s.WebhookManager, handler)
 	// #315: a response that misses the write deadline is dropped by net/http
 	// without a trace; say so.
-	httpReadTimeout, httpWriteTimeout := httpTimeouts()
-	handler = withDeadlineWarning(handler, httpWriteTimeout)
+	readTimeout, writeTimeout = httpTimeouts()
+	handler = withDeadlineWarning(handler, writeTimeout)
 	// GO-028: one line per request, off unless asked for. It wraps outside
 	// panic recovery so a recovered panic still reports its 500.
 	if envconf.String("MDDB_ACCESS_LOG", "false") == "true" {
@@ -1014,298 +1208,254 @@ func main() {
 	if panelMode == "external" {
 		slog.Info("Panel mode external (CORS disabled, panel proxies requests)")
 	}
+	return handler, readTimeout, writeTimeout
+}
 
-	// Shut down early health server before starting the main one
-	clock.begin("starting listeners")
-	if earlyServer != nil {
-		_ = earlyServer.Close()
-		time.Sleep(50 * time.Millisecond) // brief pause to release port
-	}
-
-	// Start async bulk ingest manager — recovers orphan jobs from previous run
-	// and spins up the single worker that drains the in-memory queue.
-	s.BulkIngest = NewBulkIngestManager(s, 64)
-	s.BulkIngest.Start()
-
-	// Mark server as ready — health check will now return "healthy" instead of "warming_up"
-	s.Ready = true
-	clock.done()
-	slog.Info("Server initialization complete — ready to serve")
-
-	// OPS-019: after ready, and in the background. Someone running a release
-	// with a security fix in it should not have to go looking to find that out,
-	// and a GitHub request must never delay a data server's startup.
-	_ = s.startUpdateCheck()
-
-	// Start HTTP server (with optional TLS). httpAddr may be a TCP host:port
-	// or a Unix Domain Socket (unix:/path/to/sock) — see listen_addr.go.
-	if srvCfg.HTTP.Enabled {
-		go func() {
-			server := &http.Server{
-				Addr:              httpAddr,
-				Handler:           handler,
-				ReadHeaderTimeout: 10 * time.Second,
-				ReadTimeout:       httpReadTimeout,
-				WriteTimeout:      httpWriteTimeout,
-				IdleTimeout:       120 * time.Second,
-			}
-			lis, err := openListener(httpAddr)
-			if err != nil {
-				logging.Fatal("startup step failed", "step", "openListener", "err", err)
-			}
-			defer func() { _ = closeListener(lis, httpAddr) }()
-			tlsOn := srvCfg.TLS.Enabled && srvCfg.TLS.CertFile != "" && srvCfg.TLS.KeyFile != ""
-			if tlsOn && isUnixAddr(httpAddr) {
-				slog.Info("mddb TLS ignored on UDS listener (filesystem perms authenticate the peer)", "httpAddr", httpAddr)
-				tlsOn = false
-			}
-			if tlsOn {
-				tlsCfg, terr := buildServerTLSConfig(srvCfg.TLS)
-				if terr != nil {
-					logging.Fatal("TLS config", "terr", terr)
-				}
-				server.TLSConfig = tlsCfg
-				mtls := ""
-				if srvCfg.TLS.ClientCAFile != "" {
-					mode := srvCfg.TLS.ClientAuth
-					if mode == "" {
-						mode = "require"
-					}
-					mtls = fmt.Sprintf(", mtls=on (clientAuth=%s)", mode)
-				}
-				slog.Info("mddb HTTPS listening (,, tls=on)", "httpAddr", httpAddr, "mode", s.Mode, "dbPath", dbPath, "mtls", mtls)
-				if err := server.ServeTLS(lis, "", ""); err != nil && err != http.ErrServerClosed {
-					logging.Fatal("startup step failed", "step", "server.ServeTLS", "err", err)
-				}
-			} else {
-				slog.Info("mddb HTTP listening", "httpAddr", httpAddr, "mode", s.Mode, "dbPath", dbPath)
-				if err := server.Serve(lis); err != nil && err != http.ErrServerClosed {
-					logging.Fatal("startup step failed", "step", "server.Serve", "err", err)
-				}
-			}
-		}()
-	} else {
+// startHTTPListener serves the HTTP API (with optional TLS) in the
+// background. The address may be a TCP host:port or a Unix Domain Socket
+// (unix:/path/to/sock) — see listen_addr.go.
+func (s *Server) startHTTPListener(handler http.Handler, readTimeout, writeTimeout time.Duration) {
+	if !s.Config.HTTP.Enabled {
 		slog.Info("HTTP server disabled")
+		return
 	}
+	go s.serveHTTP(handler, readTimeout, writeTimeout)
+}
 
-	// Start MCP HTTP server on its own port
-	if srvCfg.MCP.Enabled {
-		// A pin naming a revision this build cannot speak is refused here
-		// rather than at the first handshake: the operator set it deliberately,
-		// so silently ignoring it would leave them believing a compatibility
-		// problem was solved.
-		if err := ValidateMCPProtocolVersion(); err != nil {
-			logging.Fatal("startup step failed", "step", "MCP protocol version", "err", err)
-		}
-		if pinned := PinnedMCPVersion(); pinned != "" {
-			slog.Warn("MCP protocol revision is pinned; version negotiation is disabled",
-				"revision", pinned, "supported", SupportedMCPVersions())
-		}
+// serveHTTP runs the HTTP API listener until it fails.
+func (s *Server) serveHTTP(handler http.Handler, readTimeout, writeTimeout time.Duration) {
+	srvCfg := s.Config
+	httpAddr := srvCfg.HTTP.Addr
+	server := &http.Server{
+		Addr:              httpAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       120 * time.Second,
+	}
+	lis, err := openListener(httpAddr)
+	mustStep("openListener", err)
+	defer func() { _ = closeListener(lis, httpAddr) }()
+	tlsOn := srvCfg.TLS.Enabled && srvCfg.TLS.CertFile != "" && srvCfg.TLS.KeyFile != ""
+	if tlsOn && isUnixAddr(httpAddr) {
+		slog.Info("mddb TLS ignored on UDS listener (filesystem perms authenticate the peer)", "httpAddr", httpAddr)
+		tlsOn = false
+	}
+	if !tlsOn {
+		slog.Info("mddb HTTP listening", "httpAddr", httpAddr, "mode", s.Mode, "dbPath", s.Path)
+		mustStep("server.Serve", ignoreServerClosed(server.Serve(lis)))
+		return
+	}
+	tlsCfg, terr := buildServerTLSConfig(srvCfg.TLS)
+	if terr != nil {
+		fatal("TLS config", "terr", terr)
+	}
+	server.TLSConfig = tlsCfg
+	mtls := ""
+	if srvCfg.TLS.ClientCAFile != "" {
+		mtls = fmt.Sprintf(", mtls=on (clientAuth=%s)", clientAuthMode(srvCfg.TLS))
+	}
+	slog.Info("mddb HTTPS listening (,, tls=on)", "httpAddr", httpAddr, "mode", s.Mode, "dbPath", s.Path, "mtls", mtls)
+	mustStep("server.ServeTLS", ignoreServerClosed(server.ServeTLS(lis, "", "")))
+}
 
-		// Built before the goroutine so /health can read their session counts
-		// without racing the listener's startup.
-		mcpSSE := NewMCPSSETransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
-			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode).WithMetrics(s.Metrics))
-		mcpStreamable := NewMCPStreamableTransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
-			srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode).WithMetrics(s.Metrics))
-		s.mcpSSE, s.mcpStreamable = mcpSSE, mcpStreamable
-
-		go func() {
-			mcpMux := http.NewServeMux()
-			mcpSrv := s.newMCPHTTPServer()
-			mcpMux.HandleFunc("/resources", mcpSrv.handleResources)
-			mcpMux.HandleFunc("/resources/read", mcpSrv.handleResourceRead)
-			mcpMux.HandleFunc("/tools", mcpSrv.handleTools)
-			mcpMux.HandleFunc("/tools/call", s.guardWrite(mcpSrv.handleToolCall))
-			mcpMux.HandleFunc("/events", s.handleSSE)
-
-			// MCP-over-SSE transport (legacy, 2024-11-05 spec)
-			mcpMux.HandleFunc("/sse", mcpSSE.HandleSSE)
-			mcpMux.HandleFunc("/message", mcpSSE.HandleMessage)
-			slog.Info("MCP-over-SSE transport enabled at /sse + /message (legacy)")
-
-			// Streamable HTTP transport (2025-11-25 spec)
-			mcpMux.HandleFunc("/mcp", mcpStreamable.Handle)
-			slog.Info("MCP Streamable HTTP transport enabled at /mcp")
-
-			// MCP middleware chain: CORS → OAuth (#322) → API Key Auth → Rate Limit → Request Logging → JSON → Routes
-			var mcpHandler http.Handler = mcpMux
-			mcpHandler = withJSON(mcpHandler)
-
-			mcpLogger := NewMCPRequestLogger()
-			mcpHandler = mcpLogger.Wrap(mcpHandler)
-
-			mcpRateLimiter := NewMCPRateLimiter()
-			mcpHandler = mcpRateLimiter.Wrap(mcpHandler)
-
-			mcpAuth := NewMCPAPIKeyMiddleware()
-			mcpAuth.SetKeyStore(s.mcpKeyStore)
-			s.mcpAuth = mcpAuth
-			mcpHandler = mcpAuth.Wrap(mcpHandler)
-
-			// SEC-002: tie MCP exposure to the main auth config. When
-			// MDDB_AUTH_ENABLED=true and MCP has no key auth of its own, gate
-			// the listener with the main AuthManager so it can't be an
-			// anonymous full-R/W bypass; warn loudly if MCP is unauthenticated
-			// and bound beyond loopback.
-			mcpHandler = s.applyMCPAuth(mcpHandler, srvCfg.MCP.Addr)
-
-			// #322: OAuth 2.1 for clients that cannot send an API key
-			// (claude.ai connectors). Off unless MDDB_MCP_OAUTH_ENABLED=true.
-			mcpHandler = newMCPOAuthFromEnv(mcpAuth).Wrap(mcpHandler)
-
-			if panelMode != "external" {
-				mcpHandler = withCORS(mcpHandler)
-			}
-
-			slog.Info("mddb MCP HTTP listening", "addr", srvCfg.MCP.Addr)
-			server := &http.Server{
-				Addr:              srvCfg.MCP.Addr,
-				Handler:           mcpHandler,
-				ReadHeaderTimeout: 10 * time.Second,
-				ReadTimeout:       httpReadTimeout,
-				WriteTimeout:      httpWriteTimeout,
-				IdleTimeout:       120 * time.Second,
-			}
-			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logging.Fatal("startup step failed", "step", "server.ListenAndServe", "err", err)
-			}
-		}()
-	} else {
+// startMCPListener serves MCP over HTTP on its own port, in the background.
+func (s *Server) startMCPListener(panelMode string, readTimeout, writeTimeout time.Duration) {
+	srvCfg := s.Config
+	if !srvCfg.MCP.Enabled {
 		slog.Info("MCP server disabled")
+		return
+	}
+	// A pin naming a revision this build cannot speak is refused here
+	// rather than at the first handshake: the operator set it deliberately,
+	// so silently ignoring it would leave them believing a compatibility
+	// problem was solved.
+	mustStep("MCP protocol version", ValidateMCPProtocolVersion())
+	if pinned := PinnedMCPVersion(); pinned != "" {
+		slog.Warn("MCP protocol revision is pinned; version negotiation is disabled",
+			"revision", pinned, "supported", SupportedMCPVersions())
 	}
 
-	// Start HTTP/3 server
-	if srvCfg.HTTP3.Enabled {
-		go func() {
-			slog.Info("mddb HTTP/3 listening", "addr", srvCfg.HTTP3.Addr)
-			h3Server, err := NewHTTP3Server(srvCfg.HTTP3.Addr, HTTP3Middleware(handler))
-			if err != nil {
-				slog.Warn("Failed to start HTTP/3 server", "err", err)
-				return
-			}
-			// Kept on the server so shutdown can close the listener; it was
-			// a local until now, which made the UDP socket unclosable (GO-034).
-			s.HTTP3 = h3Server
-			if err := h3Server.Start(); err != nil {
-				slog.Warn("HTTP/3 server error", "err", err)
-			}
-		}()
+	// Built before the goroutine so /health can read their session counts
+	// without racing the listener's startup.
+	mcpSSE := NewMCPSSETransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
+		srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode).WithMetrics(s.Metrics))
+	mcpStreamable := NewMCPStreamableTransport(NewMCPHandlerWithConfig(NewDirectClient(s), loadMCPCustomTools(),
+		srvCfg.MCP.ServerInfo, srvCfg.MCP.Instructions, s.Mode, srvCfg.MCP.Mode).WithMetrics(s.Metrics))
+	s.mcpSSE, s.mcpStreamable = mcpSSE, mcpStreamable
+
+	go s.serveMCP(mcpSSE, mcpStreamable, panelMode, readTimeout, writeTimeout)
+}
+
+// serveMCP runs the MCP HTTP listener until it fails.
+func (s *Server) serveMCP(mcpSSE *MCPSSETransport, mcpStreamable *MCPStreamableTransport, panelMode string, readTimeout, writeTimeout time.Duration) {
+	srvCfg := s.Config
+	mcpMux := http.NewServeMux()
+	mcpSrv := s.newMCPHTTPServer()
+	mcpMux.HandleFunc("/resources", mcpSrv.handleResources)
+	mcpMux.HandleFunc("/resources/read", mcpSrv.handleResourceRead)
+	mcpMux.HandleFunc("/tools", mcpSrv.handleTools)
+	mcpMux.HandleFunc("/tools/call", s.guardWrite(mcpSrv.handleToolCall))
+	mcpMux.HandleFunc("/events", s.handleSSE)
+
+	// MCP-over-SSE transport (legacy, 2024-11-05 spec)
+	mcpMux.HandleFunc("/sse", mcpSSE.HandleSSE)
+	mcpMux.HandleFunc("/message", mcpSSE.HandleMessage)
+	slog.Info("MCP-over-SSE transport enabled at /sse + /message (legacy)")
+
+	// Streamable HTTP transport (2025-11-25 spec)
+	mcpMux.HandleFunc("/mcp", mcpStreamable.Handle)
+	slog.Info("MCP Streamable HTTP transport enabled at /mcp")
+
+	// MCP middleware chain: CORS → OAuth (#322) → API Key Auth → Rate Limit → Request Logging → JSON → Routes
+	var mcpHandler http.Handler = mcpMux
+	mcpHandler = withJSON(mcpHandler)
+
+	mcpLogger := NewMCPRequestLogger()
+	mcpHandler = mcpLogger.Wrap(mcpHandler)
+
+	mcpRateLimiter := NewMCPRateLimiter()
+	mcpHandler = mcpRateLimiter.Wrap(mcpHandler)
+
+	mcpAuth := NewMCPAPIKeyMiddleware()
+	mcpAuth.SetKeyStore(s.mcpKeyStore)
+	s.mcpAuth = mcpAuth
+	mcpHandler = mcpAuth.Wrap(mcpHandler)
+
+	// SEC-002: tie MCP exposure to the main auth config. When
+	// MDDB_AUTH_ENABLED=true and MCP has no key auth of its own, gate
+	// the listener with the main AuthManager so it can't be an
+	// anonymous full-R/W bypass; warn loudly if MCP is unauthenticated
+	// and bound beyond loopback.
+	mcpHandler = s.applyMCPAuth(mcpHandler, srvCfg.MCP.Addr)
+
+	// #322: OAuth 2.1 for clients that cannot send an API key
+	// (claude.ai connectors). Off unless MDDB_MCP_OAUTH_ENABLED=true.
+	mcpHandler = newMCPOAuthFromEnv(mcpAuth).Wrap(mcpHandler)
+
+	if panelMode != "external" {
+		mcpHandler = withCORS(mcpHandler)
 	}
 
-	// Start replication client (follower mode)
-	var replClient *ReplicationClient
-	if s.ReplicationRole == "follower" {
-		leaderAddr := env("MDDB_REPLICATION_LEADER_ADDR", "")
-		if leaderAddr == "" {
-			logging.Fatal("MDDB_REPLICATION_ROLE=follower requires MDDB_REPLICATION_LEADER_ADDR")
+	slog.Info("mddb MCP HTTP listening", "addr", srvCfg.MCP.Addr)
+	server := &http.Server{
+		Addr:              srvCfg.MCP.Addr,
+		Handler:           mcpHandler,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       120 * time.Second,
+	}
+	mustStep("server.ListenAndServe", ignoreServerClosed(server.ListenAndServe()))
+}
+
+// startHTTP3Listener serves the API over HTTP/3 in the background when
+// enabled.
+func (s *Server) startHTTP3Listener(handler http.Handler) {
+	if !s.Config.HTTP3.Enabled {
+		return
+	}
+	slog.Info("mddb HTTP/3 listening", "addr", s.Config.HTTP3.Addr)
+	h3Server, err := NewHTTP3Server(s.Config.HTTP3.Addr, HTTP3Middleware(handler))
+	if err != nil {
+		slog.Warn("Failed to start HTTP/3 server", "err", err)
+		return
+	}
+	// Kept on the server so shutdown can close the listener (GO-034), and
+	// assigned before the listener goroutine starts: assigned inside it, the
+	// shutdown sequence read the field with no synchronisation.
+	s.HTTP3 = h3Server
+	go func() {
+		if err := h3Server.Start(); err != nil {
+			slog.Warn("HTTP/3 server error", "err", err)
 		}
-		replClient = NewReplicationClient(s, ReplicationClientConfig{
-			LeaderAddr: leaderAddr,
-			FollowerID: s.NodeID,
-		})
-		s.replClient = replClient
-		replClient.Start()
-		defer replClient.Stop()
-		slog.Info("Replication client started", "leaderAddr", leaderAddr, "nodeID", s.NodeID)
+	}()
+}
 
-		// Monitor replication lag and fire ops.replication_lag_high
-		// when it crosses the threshold.
-		s.LagMonitor = NewReplicationLagMonitor(s.WebhookManager, replClient)
-		s.LagMonitor.Start()
-		defer s.LagMonitor.Stop()
+// startReplicationClient starts the follower's replication client and lag
+// monitor, returning what stops them. Other roles get a no-op.
+func (s *Server) startReplicationClient() (stop func()) {
+	if s.ReplicationRole != "follower" {
+		return func() {}
 	}
-
-	if s.ReplicationRole == "leader" {
-		slog.Info("replication leader started", "nodeID", s.NodeID, "currentLSN", s.Binlog.CurrentLSN())
+	leaderAddr := env("MDDB_REPLICATION_LEADER_ADDR", "")
+	if leaderAddr == "" {
+		fatal("MDDB_REPLICATION_ROLE=follower requires MDDB_REPLICATION_LEADER_ADDR")
 	}
+	replClient := NewReplicationClient(s, ReplicationClientConfig{
+		LeaderAddr: leaderAddr,
+		FollowerID: s.NodeID,
+	})
+	s.replClient = replClient
+	replClient.Start()
+	slog.Info("Replication client started", "leaderAddr", leaderAddr, "nodeID", s.NodeID)
 
-	// Close binlog on shutdown
-	if s.Binlog != nil {
-		defer func() { _ = s.Binlog.Close() }()
+	// Monitor replication lag and fire ops.replication_lag_high
+	// when it crosses the threshold.
+	s.LagMonitor = NewReplicationLagMonitor(s.WebhookManager, replClient)
+	s.LagMonitor.Start()
+	return func() {
+		s.LagMonitor.Stop()
+		replClient.Stop()
 	}
+}
 
-	// Stop automation log cleanup on shutdown
-	if s.AutomationLogStore != nil {
-		defer s.AutomationLogStore.Stop()
-	}
-
-	// Flush pending audit events on shutdown
-	if s.AuditManager != nil {
-		defer s.AuditManager.Stop()
-	}
-
-	// Stop the disk-usage monitor; LagMonitor is stopped adjacent to
-	// the replication client in the follower branch above.
-	if s.DiskMonitor != nil {
-		defer s.DiskMonitor.Stop()
-	}
-
-	// Start gRPC server
-	if srvCfg.GRPC.Enabled {
-		var grpcOpts []grpc.ServerOption
-		var unaryChain []grpc.UnaryServerInterceptor
-		var streamChain []grpc.StreamServerInterceptor
-		if s.RateLimiter.Enabled() {
-			unaryChain = append(unaryChain, s.RateLimiter.UnaryInterceptor())
-			streamChain = append(streamChain, s.RateLimiter.StreamInterceptor())
-		}
-		if authEnabled && s.AuthManager != nil {
-			unaryChain = append(unaryChain, s.AuthManager.GRPCUnaryInterceptor())
-			// SEC-003: streaming RPCs (Export, replication) must be
-			// authenticated too — and claims injected so stream handlers'
-			// CheckPermission sees them.
-			streamChain = append(streamChain, s.AuthManager.GRPCStreamInterceptor())
-		}
-		if len(unaryChain) > 0 {
-			grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryChain...))
-		}
-		if len(streamChain) > 0 {
-			grpcOpts = append(grpcOpts, grpc.ChainStreamInterceptor(streamChain...))
-		}
-		// TLS / mTLS — same buildServerTLSConfig as the HTTP listener.
-		// Skipped on UDS (filesystem perms authenticate the local peer).
-		grpcTLSLog := ""
-		if !isUnixAddr(grpcAddr) {
-			tlsCfg, terr := buildServerTLSConfig(srvCfg.TLS)
-			if terr != nil {
-				logging.Fatal("gRPC TLS config", "terr", terr)
-			}
-			if tlsCfg != nil {
-				grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(tlsCfg)))
-				grpcTLSLog = ", tls=on"
-				if srvCfg.TLS.ClientCAFile != "" {
-					mode := srvCfg.TLS.ClientAuth
-					if mode == "" {
-						mode = "require"
-					}
-					grpcTLSLog = fmt.Sprintf(", tls=on, mtls=on (clientAuth=%s)", mode)
-				}
-			}
-		}
-		go func() {
-			slog.Info("mddb gRPC listening", "grpcAddr", grpcAddr, "mode", s.Mode, "dbPath", dbPath, "grpcTLSLog", grpcTLSLog)
-			if err := startGRPCServer(s, grpcAddr, grpcOpts...); err != nil {
-				logging.Fatal("startup step failed", "step", "startGRPCServer", "err", err)
-			}
-		}()
-	} else {
+// startGRPCListener serves gRPC in the background when enabled.
+func (s *Server) startGRPCListener(authEnabled bool) {
+	if !s.Config.GRPC.Enabled {
 		slog.Info("gRPC server disabled")
+		return
 	}
+	grpcAddr := s.Config.GRPC.Addr
+	grpcOpts, grpcTLSLog := s.grpcServerOptions(authEnabled)
+	go func() {
+		slog.Info("mddb gRPC listening", "grpcAddr", grpcAddr, "mode", s.Mode, "dbPath", s.Path, "grpcTLSLog", grpcTLSLog)
+		mustStep("startGRPCServer", startGRPCServer(s, grpcAddr, grpcOpts...))
+	}()
+}
 
-	// Block until signal
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	sig := <-sigCh
-	slog.Info("Received, shutting down...", "sig", sig)
-	go exitOnSecondSignal(sigCh) // #350
-
-	// GO-034: one ordered sequence rather than a handful of ad-hoc Closes.
-	// Seven subsystems had a Stop or Close that nothing called, so their
-	// queues were abandoned rather than drained on the way out.
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout())
-	defer cancel()
-	s.finishShutdown(shutdownCtx)
+// grpcServerOptions builds the interceptor chains and TLS credentials for the
+// gRPC listener, and the TLS note for its startup log.
+func (s *Server) grpcServerOptions(authEnabled bool) ([]grpc.ServerOption, string) {
+	var grpcOpts []grpc.ServerOption
+	var unaryChain []grpc.UnaryServerInterceptor
+	var streamChain []grpc.StreamServerInterceptor
+	if s.RateLimiter.Enabled() {
+		unaryChain = append(unaryChain, s.RateLimiter.UnaryInterceptor())
+		streamChain = append(streamChain, s.RateLimiter.StreamInterceptor())
+	}
+	if authEnabled && s.AuthManager != nil {
+		unaryChain = append(unaryChain, s.AuthManager.GRPCUnaryInterceptor())
+		// SEC-003: streaming RPCs (Export, replication) must be
+		// authenticated too — and claims injected so stream handlers'
+		// CheckPermission sees them.
+		streamChain = append(streamChain, s.AuthManager.GRPCStreamInterceptor())
+	}
+	if len(unaryChain) > 0 {
+		grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryChain...))
+	}
+	if len(streamChain) > 0 {
+		grpcOpts = append(grpcOpts, grpc.ChainStreamInterceptor(streamChain...))
+	}
+	// TLS / mTLS — same buildServerTLSConfig as the HTTP listener.
+	// Skipped on UDS (filesystem perms authenticate the local peer).
+	grpcTLSLog := ""
+	if isUnixAddr(s.Config.GRPC.Addr) {
+		return grpcOpts, grpcTLSLog
+	}
+	tlsCfg, terr := buildServerTLSConfig(s.Config.TLS)
+	if terr != nil {
+		fatal("gRPC TLS config", "terr", terr)
+	}
+	if tlsCfg != nil {
+		grpcOpts = append(grpcOpts, grpc.Creds(credentials.NewTLS(tlsCfg)))
+		grpcTLSLog = ", tls=on"
+		if s.Config.TLS.ClientCAFile != "" {
+			grpcTLSLog = fmt.Sprintf(", tls=on, mtls=on (clientAuth=%s)", clientAuthMode(s.Config.TLS))
+		}
+	}
+	return grpcOpts, grpcTLSLog
 }
 
 // --- helpers / buckets
