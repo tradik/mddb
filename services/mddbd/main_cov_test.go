@@ -642,6 +642,9 @@ func TestCovAServeHTTPS(t *testing.T) {
 }
 
 func TestCovAServeHTTPIgnoresTLSOnUnixSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("MDDB refuses unix socket listeners on Windows by design")
+	}
 	logs := covACaptureLogs(t)
 	covATrapFatal(t)
 	sock := filepath.Join(t.TempDir(), "m.sock")
