@@ -43,7 +43,7 @@ const (
 // mcpToolsets lists the tools of each group.
 var mcpToolsets = map[string][]string{
 	ToolsetSearch: {"search_documents", "aggregate", "semantic_search", "full_text_search", "hybrid_search",
-		"cross_search", "autocomplete", "fts_languages", "search_advisor", "get_indexing_status",
+		"cross_search", "autocomplete", "fts_languages", "search_advisor", "get_indexing_status", "run_eval", "add_eval_query",
 		"find_duplicates", "classify_document", "get_meta_keys"},
 	ToolsetCode: {"code_graph", "code_symbol", "reference_search", "reference_symbol", "reference_examples", "reference_dependencies"},
 	ToolsetDocuments: {"add_document", "update_document", "delete_document", "get_document_meta", "set_ttl",

@@ -112,6 +112,56 @@ Shows how many documents each algorithm returns (limit=10) to verify they all fi
 - **fuzzy**: Adds Levenshtein distance computation. Expected ~2-3x slower than exact matching.
 - All benchmarks run on a warm server with FTS indices already built during document insertion.
 
+## Retrieval quality on the MDDB docs (v2.18.8)
+
+The latency tables above say how fast each algorithm is. This section says how
+often it finds the right page. The set is
+[`tools/bench/evalsets/docs.json`](../tools/bench/evalsets/docs.json): 20
+questions about MDDB, each with the documentation page that answers it, graded
+0–3. The questions are phrased the way a user asks, not copied from headings.
+The collection is the 60 pages of `docs/`, keyed by file name.
+
+Measured 2026-10-29 on a default-configured server built from this release.
+Embeddings came from `nomic-embed-text` through Ollama, autodetected.
+
+```bash
+mddb-cli eval docs --queries tools/bench/evalsets/docs.json \
+  --config fts/bm25 --config fts/bm25f --config fts/tfidf --config fts/pmisparse \
+  --config vector --config hybrid
+```
+
+| Configuration | recall@10 | nDCG@10 | MRR | p50 ms | p99 ms |
+|---------------|-----------|---------|-----|--------|--------|
+| fts/bm25 | 0.825 | 0.739 | 0.723 | 0.9 | 1.9 |
+| fts/bm25f | 0.825 | 0.739 | 0.723 | 0.8 | 1.2 |
+| fts/tfidf | 0.800 | 0.496 | 0.405 | 1.0 | 1.1 |
+| fts/pmisparse | 0.800 | 0.574 | 0.535 | 0.9 | 33.6 |
+| vector | 0.875 | 0.763 | 0.750 | 20.1 | 44.2 |
+| hybrid (alpha 0.5) | 0.875 | 0.783 | 0.765 | 10.7 | 17.3 |
+
+- **Hybrid ranks best.** It finds as many pages as vector search and puts the
+  answer higher: its MRR is 0.765, against 0.723 for BM25.
+- **TF-IDF finds the pages but ranks them badly.** Its recall is close to
+  BM25, but its MRR is about half.
+- **BM25F equals BM25 here.** These documents have no separate title field to
+  weight.
+- **Some questions share no words with their answer.** "import a million
+  documents in the background" should find the bulk-import page. Keyword
+  search misses it and vector search finds it. Those questions are where
+  vector search earns its latency.
+- **Two questions defeat every configuration.** These are "call my endpoint
+  when a document changes" (automations) and "which documents are read most
+  often" (temporal tracking). The pages never use the asker's words. That
+  points at the pages, not at the search.
+- **Returned tokens are large because every result is a whole page.** With
+  `format: passages` an agent receives a fraction of that.
+
+The same set runs in CI with keyword search only. The test is
+`TestEval_DocsSetHoldsTheLine` in `services/mddbd/eval_docs_test.go`. It fails
+when recall@10 drops under 0.7 or nDCG@10 under 0.65. The test server there
+scores 0.750 and 0.683, because it does not use a default server's
+configuration.
+
 ---
 
 # Insert Throughput Benchmark

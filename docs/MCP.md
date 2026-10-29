@@ -178,7 +178,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 87 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 89 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 
 ### API Key Authentication
@@ -453,7 +453,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
 
 | Toolset | Tools |
 |---|---|
-| `search` | `search_documents`, `aggregate`, `semantic_search`, `full_text_search`, `hybrid_search`, `cross_search`, `autocomplete`, `fts_languages`, `search_advisor`, `get_indexing_status`, `find_duplicates`, `classify_document`, `get_meta_keys` |
+| `search` | `search_documents`, `aggregate`, `semantic_search`, `full_text_search`, `hybrid_search`, `cross_search`, `autocomplete`, `fts_languages`, `search_advisor`, `get_indexing_status`, `run_eval`, `add_eval_query`, `find_duplicates`, `classify_document`, `get_meta_keys` |
 | `code` | `code_graph`, `code_symbol`, `reference_search`, `reference_symbol`, `reference_examples`, `reference_dependencies` |
 | `documents` | `add_document`, `update_document`, `delete_document`, `get_document_meta`, `set_ttl`, `add_documents_batch`, `delete_documents_batch`, `export_documents`, `list_revisions`, `restore_revision` |
 | `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*` |
@@ -502,7 +502,7 @@ handle the gap, cheapest first:
 
 ## Built-in Tool Catalog
 
-All 87 built-in tools, grouped by area. Tool inputs are self-describing via
+All 89 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -531,6 +531,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
 | `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. |
 | `get_indexing_status` | (v2.18.8) Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
+| `run_eval` | (v2.18.8) Measure search configurations on the collection's evaluation set: recall@k, nDCG@k, MRR, p50/p99 latency and tokens per configuration. Read-only. See [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188). |
+| `add_eval_query` | (v2.18.8) Add a query and the keys of the documents that should answer it, optionally graded 0–3, to the collection's evaluation set. |
 | `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |

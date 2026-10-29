@@ -934,6 +934,9 @@ type MCPClient interface {
 	CodeSymbol(ctx context.Context, req *SymbolRequest) (*SymbolResult, error)
 	// IndexingStatus reports queued embedding and metadata work (GO-042).
 	IndexingStatus(ctx context.Context, collection string) (*IndexingStatus, error)
+	// AddEvalQuery and RunEval keep and run an evaluation set (SRCH-019).
+	AddEvalQuery(ctx context.Context, collection string, q EvalQuery) (EvalQuery, error)
+	RunEval(ctx context.Context, req EvalRequest) (*EvalResult, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)
 	// Synonyms
 	ListSynonyms(ctx context.Context, collection string) (*MCPSynonymListResponse, error)

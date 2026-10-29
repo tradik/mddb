@@ -68,6 +68,10 @@ type CollectionConfig struct {
 	Embedding *EmbeddingChunkingDef `json:"embedding,omitempty"`
 	// FTS turns full-text indexing off for the collection (#335).
 	FTS *CollectionFTSDef `json:"fts,omitempty"`
+	// EvalSet holds the collection's evaluation queries (SRCH-019). Managed
+	// only through /v1/eval-queries; Set keeps the stored set when a config
+	// is rewritten without one. See eval_set.go.
+	EvalSet []EvalQuery `json:"evalSet,omitempty"`
 }
 
 // CodeConfigDef configures how source documents in a collection are read.
@@ -200,8 +204,17 @@ func (cm *CollectionManager) Get(collection string) (*CollectionConfig, bool) {
 	return cfg, ok
 }
 
-// Set stores or updates the config for a collection.
+// Set stores or updates the config for a collection. The evaluation set is
+// not part of a config write: the stored one is kept (SRCH-019).
 func (cm *CollectionManager) Set(collection string, cfg *CollectionConfig) error {
+	if stored, found := cm.Get(collection); found {
+		cfg.EvalSet = stored.EvalSet
+	}
+	return cm.put(collection, cfg)
+}
+
+// put stores a config exactly as given.
+func (cm *CollectionManager) put(collection string, cfg *CollectionConfig) error {
 	if cfg.Type == "" {
 		cfg.Type = "default"
 	}

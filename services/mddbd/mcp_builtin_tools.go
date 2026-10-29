@@ -13,7 +13,8 @@ const (
 func mcpBuiltinTools() []MCPTool {
 	t := mcpBuiltinToolsCore()
 	t = append(t, mcpBuiltinToolsAdvanced()...)
-	return append(t, mcpReferenceTools()...)
+	t = append(t, mcpReferenceTools()...)
+	return append(t, mcpEvalTools()...)
 }
 
 // mcpBuiltinToolsCore lists the core document / search / index / webhook /

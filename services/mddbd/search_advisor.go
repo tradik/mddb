@@ -118,6 +118,9 @@ type SearchRecommendation struct {
 	// Profile is the retrieval profile that would encode this advice, ready to
 	// PUT to /v1/collection-config (RAG-001).
 	RetrievalProfile *RetrievalProfileDef `json:"retrievalProfile,omitempty"`
+	// Measured is the evaluation-set run behind the choice, when the
+	// collection has a set (SRCH-019).
+	Measured *EvalResult `json:"measured,omitempty"`
 }
 
 // advisorSampleLimit is how many documents the profile reads.
@@ -158,7 +161,9 @@ func (s *Server) RecommendSearch(collection string) (*SearchRecommendation, erro
 		}, nil
 	}
 
-	return buildRecommendation(profile, s.Embedding != nil), nil
+	rec := buildRecommendation(profile, s.Embedding != nil)
+	s.applyMeasurement(rec, collection)
+	return rec, nil
 }
 
 // profileCollection reads a sample and measures its shape.

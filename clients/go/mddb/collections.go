@@ -62,3 +62,10 @@ func (c *Client) CodeLanguages(ctx context.Context) (*CodeLanguages, error) {
 func (c *Client) SearchAdvisor(ctx context.Context, collection string, apply bool) (json.RawMessage, error) {
 	return c.Do(ctx, "POST", "/v1/search-advisor", map[string]any{"collection": collection, "apply": apply})
 }
+
+// Eval runs a collection's evaluation set (SRCH-019) under the given search
+// configurations and returns recall@k, nDCG@k, MRR, latency and tokens per
+// configuration, as the server sends them. req is the POST /v1/eval body.
+func (c *Client) Eval(ctx context.Context, req any) (json.RawMessage, error) {
+	return c.Do(ctx, "POST", "/v1/eval", req)
+}

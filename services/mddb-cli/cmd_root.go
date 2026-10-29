@@ -40,7 +40,7 @@ It provides an interface similar to mysql-client for managing markdown documents
 
 	rootCmd.AddCommand(
 		newAddCmd(), newGetCmd(), newImportURLCmd(), newSetTTLCmd(),
-		newSearchCmd(), newFTSCmd(), newVectorSearchCmd(), newAutoindexCmd(), newReferenceCmd(),
+		newSearchCmd(), newFTSCmd(), newVectorSearchCmd(), newAutoindexCmd(), newReferenceCmd(), newEvalCmd(),
 		newVectorReindexCmd(), newVectorStatsCmd(),
 		newExportCmd(), newBackupCmd(), newRestoreCmd(), newTruncateCmd(), newStatsCmd(),
 		newWebhookCmd(), newSchemaCmd(), newValidateCmd(),

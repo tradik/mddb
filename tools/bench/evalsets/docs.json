@@ -1,0 +1,25 @@
+{
+  "description": "Retrieval evaluation set for the MDDB documentation (SRCH-019). Keys are file names under docs/. Grade 3 = the page that answers the question, 1 = a page that also covers it.",
+  "queries": [
+    {"id": "backup-restore", "query": "how do I take a backup of the database and restore it", "expectedKeys": ["BACKUP.md"], "grades": {"BACKUP.md": 3}},
+    {"id": "replication", "query": "set up a read replica that follows the leader", "expectedKeys": ["REPLICATION.md"], "grades": {"REPLICATION.md": 3}},
+    {"id": "tls", "query": "serve the API over HTTPS with my own certificate", "expectedKeys": ["TLS.md"], "grades": {"TLS.md": 3}},
+    {"id": "quantization", "query": "reduce vector memory with int8 quantization", "expectedKeys": ["QUANTIZATION.md"], "grades": {"QUANTIZATION.md": 3}},
+    {"id": "tenants", "query": "isolate customers from each other in one server", "expectedKeys": ["MULTI_TENANCY.md"], "grades": {"MULTI_TENANCY.md": 3}},
+    {"id": "spelling", "query": "correct typos in search queries automatically", "expectedKeys": ["SYMSPELL.md", "SEARCH.md"], "grades": {"SYMSPELL.md": 3, "SEARCH.md": 1}},
+    {"id": "geo", "query": "find documents within a radius of a latitude and longitude", "expectedKeys": ["GEOSEARCH.md"], "grades": {"GEOSEARCH.md": 3}},
+    {"id": "webhooks", "query": "call my endpoint when a document changes", "expectedKeys": ["AUTOMATIONS.md"], "grades": {"AUTOMATIONS.md": 3}},
+    {"id": "jwt-login", "query": "log in and get a JWT token, create API keys", "expectedKeys": ["AUTHENTICATION.md", "AUTH_QUICKSTART.md"], "grades": {"AUTHENTICATION.md": 3, "AUTH_QUICKSTART.md": 2}},
+    {"id": "classify", "query": "classify a document into labels without training", "expectedKeys": ["ZERO-SHOT-CLASSIFICATION.md"], "grades": {"ZERO-SHOT-CLASSIFICATION.md": 3}},
+    {"id": "hot-docs", "query": "which documents are read most often", "expectedKeys": ["TEMPORAL-TRACK.md"], "grades": {"TEMPORAL-TRACK.md": 3}},
+    {"id": "schema", "query": "reject documents whose metadata does not match a JSON schema", "expectedKeys": ["SCHEMA-VALIDATION.md"], "grades": {"SCHEMA-VALIDATION.md": 3}},
+    {"id": "pmisparse", "query": "learned sparse retrieval without a neural model", "expectedKeys": ["PMISPARSE.md"], "grades": {"PMISPARSE.md": 3}},
+    {"id": "db-size", "query": "database file keeps growing after deletes, compact it", "expectedKeys": ["STORAGE-TUNING.md", "BACKUP.md"], "grades": {"STORAGE-TUNING.md": 3, "BACKUP.md": 1}},
+    {"id": "tracing", "query": "export traces and metrics to OpenTelemetry", "expectedKeys": ["TELEMETRY.md"], "grades": {"TELEMETRY.md": 3}},
+    {"id": "health", "query": "liveness and readiness probes for Kubernetes", "expectedKeys": ["HEALTHCHECK.md", "DEPLOYMENT.md"], "grades": {"HEALTHCHECK.md": 3, "DEPLOYMENT.md": 1}},
+    {"id": "bulk", "query": "import a million documents in the background", "expectedKeys": ["BULK-IMPORT.md"], "grades": {"BULK-IMPORT.md": 3}},
+    {"id": "embedding", "query": "use Ollama or OpenAI to compute embeddings", "expectedKeys": ["EMBEDDING_PROVIDERS.md"], "grades": {"EMBEDDING_PROVIDERS.md": 3}},
+    {"id": "events", "query": "stream change events to the browser", "expectedKeys": ["SSE.md"], "grades": {"SSE.md": 3}},
+    {"id": "reference", "query": "learn from another project's source code before implementing", "expectedKeys": ["REFERENCE-CODING.md"], "grades": {"REFERENCE-CODING.md": 3}}
+  ]
+}

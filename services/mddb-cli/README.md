@@ -74,6 +74,19 @@ it), indexes the clone into `ref-<owner>-<repo>` marked `code.role:
 reference`, with the licence and source on every document. See
 [docs/REFERENCE-CODING.md](../../docs/REFERENCE-CODING.md).
 
+#### eval - Measure retrieval quality
+
+```bash
+mddb-cli eval <collection> [--queries file.json] [--config fts/bm25]... [--k 10] [--fail-below recall@10=0.8,ndcg=0.6]
+```
+
+Runs the collection's evaluation set, or the queries in `--queries`, under
+each `--config` (`fts/<algorithm>`, `vector[/<index>]`, `hybrid`). It prints
+recall@k, nDCG@k, MRR, latency and tokens for each. With `--fail-below` it
+exits non-zero when any configuration scores under a threshold, which makes
+it a CI gate. See
+[docs/SEARCH.md](../../docs/SEARCH.md#measuring-instead-of-guessing-v2188).
+
 #### autoindex - Index a directory or repository
 
 ```bash

@@ -107,6 +107,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   editing one document cannot lose an edit. `langchain-mddb` gained
   `MddbBackend`, a Deep Agents filesystem backend (ls, read, write, edit,
   glob, grep, delete, upload, download, history) over one collection.
+- **Retrieval evaluation (SRCH-019).** Choosing a search configuration was
+  guesswork. A collection now keeps an evaluation set: queries, the keys
+  that should answer them, and optional grades. `POST /v1/eval`, the MCP
+  tool `run_eval` and `mddb-cli eval` score up to 8 configurations on it.
+  Each gets recall@k, nDCG@k, MRR, p50/p99 latency and returned tokens.
+  `/v1/eval-queries` and the MCP tool `add_eval_query` manage the set. With a
+  set stored, the search advisor recommends from the measurement.
+  `mddb-cli eval --fail-below recall@10=0.8` gates CI. A 20-question set for
+  the MDDB docs ships in `tools/bench/evalsets/docs.json`, and its results
+  are in `docs/BENCHMARK.md`. A Go test runs that set with BM25 on every
+  build.
 
 ### Fixed
 

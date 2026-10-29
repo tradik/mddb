@@ -58,6 +58,17 @@ ref-OWNER-REPO with code.role reference, recording the repository, commit and
 licence. Only https://, ssh:// and user@host:path addresses are accepted. The
 server never clones. search runs a hybrid search over every reference
 collection and prints path:lines passages.
+.SS eval
+Measure retrieval quality on an evaluation set (v2.18.8).
+.PP
+.B mddb-cli eval
+\fICOLLECTION\fR [\fB\-\-queries\fR \fIFILE\fR] [\fB\-\-config\fR \fISPEC\fR]... [\fB\-\-k\fR \fIN\fR] [\fB\-\-fail\-below\fR \fIMETRIC=VALUE,...\fR]
+.PP
+Runs the collection's stored evaluation set, or the JSON queries in FILE,
+under each configuration: fts/ALGORITHM, vector[/INDEX] or hybrid. It prints
+recall@k, nDCG@k, MRR, p50/p99 latency and returned tokens. With
+\fB\-\-fail\-below\fR (metrics recall, ndcg, mrr; @N sets k) it exits non-zero
+when any configuration scores under a threshold or fails to run.
 .SS autoindex
 Index every text file under a directory into one collection (v2.18.8).
 .PP

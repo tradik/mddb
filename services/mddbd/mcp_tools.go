@@ -143,6 +143,10 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolCodeGraph(ctx, args)
 	case "search_advisor":
 		return s.toolSearchAdvisor(ctx, args)
+	case "add_eval_query":
+		return s.toolAddEvalQuery(ctx, args)
+	case "run_eval":
+		return s.toolRunEval(ctx, args)
 	case "get_indexing_status":
 		return s.toolGetIndexingStatus(ctx, args)
 	case "classify_document":

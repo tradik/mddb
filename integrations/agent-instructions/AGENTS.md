@@ -31,6 +31,10 @@ Do you know words that appear in the text?
   narrow a set, not to find text.
 - **`aggregate`** — counts and groupings. Never fetch documents to count them.
 
+When a search keeps missing what it should find, measure instead of guessing.
+Record the question and the document that answers it with `add_eval_query`,
+then compare configurations with `run_eval`.
+
 ## Before implementing something new
 
 If a project that already solved it is indexed as a reference (`mddb-cli

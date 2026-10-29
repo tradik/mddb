@@ -1567,6 +1567,71 @@ still-queued documents that match by text, marked `pendingEmbedding`. The SSE
 event `collection.indexed` fires when a collection's queue drains, and
 `/v1/stats` includes the server-wide figures under `indexing`.
 
+### POST /v1/eval
+
+Measure retrieval on the collection's own questions (v2.18.8, SRCH-019). An
+evaluation set is a list of queries, each with the keys of the documents that
+should answer it and optional grades (0–3) for nDCG. The endpoint runs the set
+under up to 8 search configurations and returns, per configuration, recall@k,
+nDCG@k, MRR, p50/p99 latency in milliseconds and the estimated tokens returned.
+It only reads, so a read-only server runs it.
+
+```bash
+curl -X POST http://localhost:11023/v1/eval -d '{
+  "collection": "docs",
+  "k": 10,
+  "configs": [
+    {"searchType": "fts", "algorithm": "bm25"},
+    {"searchType": "hybrid", "strategy": "rrf"},
+    {"searchType": "vector"}
+  ]
+}'
+```
+
+```json
+{
+  "collection": "docs", "k": 10, "queries": 20,
+  "results": [
+    {"config": "fts/bm25", "recallAtK": 0.825, "ndcgAtK": 0.739, "mrr": 0.723,
+     "p50Ms": 0.9, "p99Ms": 1.9, "tokens": 1580031},
+    {"config": "hybrid", "recallAtK": 0.875, "ndcgAtK": 0.783, "mrr": 0.765,
+     "p50Ms": 10.7, "p99Ms": 17.3, "tokens": 1790501}
+  ]
+}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `configs[]` | `searchType` (`fts`, `vector`, `hybrid`), `algorithm` (FTS), `vectorAlgorithm`, `alpha`, `strategy`, `retrievalMode`, `name`. Default: fts/bm25, hybrid, vector. |
+| `queries` | Inline queries for this run instead of the stored set — how a set kept in a repository is evaluated. Max 200. |
+| `k` | Cut-off, default 10, max 100. |
+| `details` | Adds `perQuery` with every query's scores and returned keys. |
+
+A configuration that fails (no embedding provider, unknown algorithm) carries
+`error` and does not stop the others.
+
+### GET / POST / DELETE /v1/eval-queries
+
+The stored evaluation set of a collection. It lives in the collection config
+(`evalSet`) but is changed only here: `PUT /v1/collection-config` keeps the
+stored set.
+
+```bash
+# add (an existing id is replaced)
+curl -X POST http://localhost:11023/v1/eval-queries -d '{
+  "collection": "docs", "id": "backup",
+  "query": "how do I back up and restore the database",
+  "expectedKeys": ["BACKUP.md"], "grades": {"BACKUP.md": 3}
+}'
+# list
+curl "http://localhost:11023/v1/eval-queries?collection=docs"
+# remove
+curl -X DELETE "http://localhost:11023/v1/eval-queries?collection=docs&id=backup"
+```
+
+When a collection has a set, `GET /v1/search-advisor` runs it and recommends
+the configuration that scored best, with the run under `measured`.
+
 ### GET /v1/stats
 
 Get server and database statistics.

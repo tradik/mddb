@@ -1287,6 +1287,48 @@ curl -X POST http://localhost:11023/v1/hybrid-search \
 }
 ```
 
+## Measuring Instead of Guessing (v2.18.8+)
+
+Every recommendation in this guide is a starting point. Which configuration
+is best for a collection depends on its documents and on the questions people
+ask, and only those questions can settle it. An **evaluation set** holds them:
+queries with the keys of the documents that should answer them. `POST
+/v1/eval` scores search configurations on the set: recall@k, nDCG@k, MRR,
+latency and returned tokens. No model judges anything. Relevance is what the
+set says it is.
+
+```bash
+mddb-cli eval docs --queries tools/bench/evalsets/docs.json \
+  --config fts/bm25 --config hybrid --config vector
+```
+
+```
+20 queries, k=10
+
+config                   recall     ndcg      mrr    p50 ms    p99 ms   tokens
+fts/bm25                  0.825    0.739    0.723       0.9       1.9  1580031
+vector                    0.875    0.763    0.750      20.1      44.2  1723243
+hybrid                    0.875    0.783    0.765      10.7      17.3  1790501
+```
+
+That is the MDDB documentation measured with its own 20-question set (see
+[BENCHMARK.md](BENCHMARK.md#retrieval-quality-on-the-mddb-docs-v2188)).
+
+- **Store a set** on the collection with `POST /v1/eval-queries` or the MCP
+  tool `add_eval_query`. Each query is
+  `{id, query, expectedKeys, grades}`, where grades run from 0 to 3 and an
+  ungraded expected key counts 1.
+- **The advisor uses it.** With a stored set, `search_advisor` runs it and
+  recommends the configuration that scored best. Its first reason gives the
+  numbers, and `measured` holds the run.
+- **Gate CI on it.** `mddb-cli eval <collection> --fail-below
+  recall@10=0.8,ndcg=0.6` exits non-zero when any configuration scores under
+  a threshold, or fails to run.
+
+Twenty to fifty real questions are enough to tell configurations apart.
+Collect them from what people actually asked, not from document titles.
+Queries written from a title favour keyword search.
+
 ## Which algorithm should I use? (v2.12.0+)
 
 MDDB offers eight vector algorithms, four ranking algorithms, three fusion

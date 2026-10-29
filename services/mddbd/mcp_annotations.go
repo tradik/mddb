@@ -46,6 +46,8 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	// a separate, explicit write through /v1/collection-config.
 	"search_advisor":          readOnly(),
 	"get_indexing_status":     readOnly(),
+	"run_eval":                readOnly(),
+	"add_eval_query":          writeIdempotent(),
 	"code_symbol":             readOnly(),
 	"reference_search":        readOnly(),
 	"reference_symbol":        readOnly(),

@@ -5214,6 +5214,152 @@ paths:
         "405":
           description: Method not allowed
 
+  /v1/eval:
+    post:
+      tags:
+        - Search
+      summary: Measure retrieval on an evaluation set
+      description: |
+        Runs the collection's evaluation set, or the inline `queries`, under
+        up to 8 search configurations. For each configuration it returns
+        recall@k, nDCG@k, MRR, p50/p99 latency and estimated returned tokens
+        (SRCH-019, v2.18.8). Read-only. A configuration that fails carries
+        `error` and does not stop the others. Also the `run_eval` MCP tool.
+      operationId: runEval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvalRequest"
+      responses:
+        "200":
+          description: Scores per configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalResult"
+        "400":
+          description: No evaluation queries, an invalid query, or too many queries or configs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "405":
+          description: Method not allowed
+
+  /v1/eval-queries:
+    get:
+      tags:
+        - Search
+      summary: List a collection's evaluation set
+      operationId: listEvalQueries
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The stored queries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  collection:
+                    type: string
+                  queries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/EvalQuery"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+        - Search
+      summary: Add a query to the evaluation set
+      description: |
+        Stores one query. An existing `id` is replaced, and a missing one is
+        generated. The set lives in the collection config as `evalSet`, but
+        `PUT /v1/collection-config` keeps it, so this is the only way to
+        change it. At most 200 queries. Also the `add_eval_query` MCP tool.
+      operationId: addEvalQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/EvalQuery"
+                - type: object
+                  required: [collection]
+                  properties:
+                    collection:
+                      type: string
+      responses:
+        "200":
+          description: The stored query, with its id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvalQuery"
+        "400":
+          description: Invalid query, or the set is full
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden, or read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - Search
+      summary: Remove a query from the evaluation set
+      operationId: deleteEvalQuery
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Whether a query was removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        "403":
+          description: Forbidden, or read-only mode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /v1/search-advisor:
     get:
       tags:
@@ -8726,6 +8872,127 @@ components:
             type: string
         retrievalProfile:
           $ref: "#/components/schemas/RetrievalProfile"
+        measured:
+          $ref: "#/components/schemas/EvalResult"
+
+    EvalQuery:
+      type: object
+      description: One evaluation query and the documents that should answer it (SRCH-019).
+      required: [query, expectedKeys]
+      properties:
+        id:
+          type: string
+        query:
+          type: string
+        expectedKeys:
+          type: array
+          items:
+            type: string
+        grades:
+          type: object
+          description: Key to relevance 0..3 for nDCG; an ungraded expected key counts 1.
+          additionalProperties:
+            type: integer
+            minimum: 0
+            maximum: 3
+
+    EvalConfig:
+      type: object
+      required: [searchType]
+      properties:
+        name:
+          type: string
+        searchType:
+          type: string
+          enum: [fts, vector, hybrid]
+        algorithm:
+          type: string
+          description: FTS algorithm (tfidf, bm25, bm25f, pmisparse)
+        vectorAlgorithm:
+          type: string
+        alpha:
+          type: number
+        strategy:
+          type: string
+          description: Hybrid fusion, alpha or rrf
+        retrievalMode:
+          type: string
+
+    EvalRequest:
+      type: object
+      required: [collection]
+      properties:
+        collection:
+          type: string
+        k:
+          type: integer
+          default: 10
+          maximum: 100
+        configs:
+          type: array
+          maxItems: 8
+          description: Default fts/bm25, hybrid and vector.
+          items:
+            $ref: "#/components/schemas/EvalConfig"
+        queries:
+          type: array
+          maxItems: 200
+          description: Inline queries used instead of the stored set.
+          items:
+            $ref: "#/components/schemas/EvalQuery"
+        details:
+          type: boolean
+          description: Add per-query results.
+
+    EvalResult:
+      type: object
+      properties:
+        collection:
+          type: string
+        k:
+          type: integer
+        queries:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              config:
+                type: string
+              recallAtK:
+                type: number
+              ndcgAtK:
+                type: number
+              mrr:
+                type: number
+              p50Ms:
+                type: number
+              p99Ms:
+                type: number
+              tokens:
+                type: integer
+              error:
+                type: string
+              perQuery:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    query:
+                      type: string
+                    recall:
+                      type: number
+                    ndcg:
+                      type: number
+                    reciprocalRank:
+                      type: number
+                    returned:
+                      type: array
+                      items:
+                        type: string
 
     CollectionProfile:
       type: object
@@ -10040,6 +10307,12 @@ components:
           $ref: "#/components/schemas/CollectionFTS"
         wordpress:
           $ref: "#/components/schemas/WordPressTargetConfig"
+        evalSet:
+          type: array
+          readOnly: true
+          description: Evaluation queries (SRCH-019). Changed only through /v1/eval-queries; a PUT keeps the stored set.
+          items:
+            $ref: "#/components/schemas/EvalQuery"
 
     WordPressTargetConfig:
       type: object
