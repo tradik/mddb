@@ -72,6 +72,43 @@ func typedCases() []typedCase {
 			},
 		},
 		{
+			name:   "Aliases",
+			call:   func(ctx context.Context, c *Client) (any, error) { return c.Aliases(ctx) },
+			method: "GET", path: "/v1/aliases",
+			respBody: `{"aliases":[{"alias":"docs","collection":"docs-v2"}]}`,
+			check: func(t *testing.T, got any) {
+				if a := got.([]Alias); len(a) != 1 || a[0].Collection != "docs-v2" {
+					t.Errorf("Aliases = %+v", a)
+				}
+			},
+		},
+		{
+			name:   "SetAlias",
+			call:   func(ctx context.Context, c *Client) (any, error) { return nil, c.SetAlias(ctx, "docs/x", "docs-v2") },
+			method: "PUT", path: "/v1/aliases/docs%2Fx",
+			wantBody: `"collection":"docs-v2"`,
+			respBody: `{}`,
+			check:    func(t *testing.T, got any) {},
+		},
+		{
+			name:   "DeleteAlias",
+			call:   func(ctx context.Context, c *Client) (any, error) { return nil, c.DeleteAlias(ctx, "docs") },
+			method: "DELETE", path: "/v1/aliases/docs",
+			respBody: `{}`,
+			check:    func(t *testing.T, got any) {},
+		},
+		{
+			name:   "IndexingStatus",
+			call:   func(ctx context.Context, c *Client) (any, error) { return c.IndexingStatus(ctx, "a b") },
+			method: "GET", path: "/v1/indexing-status?collection=a+b",
+			respBody: `{"collection":"a b","indexed":true,"pendingEmbeddings":0}`,
+			check: func(t *testing.T, got any) {
+				if s := got.(*IndexingStatus); !s.Indexed {
+					t.Errorf("IndexingStatus = %+v", s)
+				}
+			},
+		},
+		{
 			name:   "GainDefault",
 			call:   func(ctx context.Context, c *Client) (any, error) { return c.Gain(ctx, "", false) },
 			method: "GET", path: "/v1/gain",

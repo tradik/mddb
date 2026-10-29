@@ -1568,6 +1568,41 @@ still-queued documents that match by text, marked `pendingEmbedding`. The SSE
 event `collection.indexed` fires when a collection's queue drains, and
 `/v1/stats` includes the server-wide figures under `indexing`.
 
+### Collection aliases: /v1/aliases
+
+An alias is a stable name for a collection (v2.18.8, GO-044). Clients use
+the alias, and moving it to another collection is one atomic step. That is
+how a collection rebuilt with a new embedding model replaces the old one
+without any client changing a name.
+
+```bash
+curl -X PUT http://localhost:11023/v1/aliases/docs -d '{"collection":"docs-v2"}'
+curl http://localhost:11023/v1/aliases
+curl -X DELETE http://localhost:11023/v1/aliases/docs
+```
+
+- **Where an alias works.** REST, gRPC, MCP and GraphQL all accept it
+  wherever they take a collection: in the `collection`, `collections`,
+  `sourceCollection` and `targetCollections` fields, in a `?collection=`
+  query parameter, and in the upload form.
+- **One name per request.** The alias is resolved once, when the request
+  arrives, so one request runs entirely against one collection. A search
+  running during a move sees the old collection or the new one, never both.
+- **Permissions.** An alias carries its collection's permissions, because
+  they are checked on the collection it points at. Creating or moving an
+  alias needs write permission on the new target and on the old one.
+  Listing shows only aliases whose collection the caller may read.
+- **Rules.** An alias cannot take the name of an existing collection, and
+  cannot point at another alias. Deleting an alias leaves its collection.
+  An operation that takes a collection, delete included, acts on the
+  collection the alias points at.
+- **Storage and replication.** Aliases are kept in the main database, so
+  backups carry them and the binlog replicates them.
+
+`mddb-cli reindex-swap <alias> --into <new>` does the whole switch. It
+copies the documents into the new collection, waits until it is indexed,
+then moves the alias. The old collection is kept, so you can roll back.
+
 ### GET /v1/gain
 
 What retrieval saved its callers over a window of days, for the whole

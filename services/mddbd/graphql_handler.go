@@ -40,6 +40,9 @@ func (s *Server) newGraphQLHandler() http.Handler {
 	// Add query complexity limit
 	srv.Use(extension.FixedComplexityLimit(1000))
 
+	// GO-044: aliases become collections before any resolver reads them.
+	srv.AroundFields(s.aliasFieldMiddleware)
+
 	// Recovery handler for panics
 	srv.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
 		slog.Warn("GraphQL panic recovered", "err", err)

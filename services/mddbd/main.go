@@ -118,6 +118,7 @@ type Server struct {
 	SchemaManager      *schema.SchemaManager    // Per-collection metadata schema validation
 	Metrics            *metrics.Metrics         // Prometheus-compatible telemetry
 	Gain               *GainRecorder            // AGT-004: tokens returned and avoided, per day
+	Aliases            *AliasManager            // GO-044: alias → collection
 	AuthManager        *AuthManager             // Authentication and authorization
 	AuditManager       *audit.AuditManager      // Audit log (ISO 27001 A.8.15, SOC 2 CC7.2)
 	RateLimiter        *RateLimiter             // Cross-transport rate limiter (ISO 27001 A.5.30, SOC 2 CC6.6)
@@ -903,6 +904,11 @@ func (s *Server) initCollections(clock *startupClock) {
 	// ignored — every document went to the local file regardless.
 	s.InitStorageBackends()
 	slog.Info("Collection manager initialized (collections configured)", "listAllCount", len(s.CollectionManager.ListAll()))
+
+	// GO-044: aliases, loaded before any request can name one.
+	s.Aliases = NewAliasManager(s.DB)
+	s.Aliases.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
+	mustStep("AliasManager.LoadAll", s.Aliases.LoadAll())
 }
 
 // initEncryption sets up at-rest encryption (ISO 27001 A.8.24 / SOC 2
@@ -1069,6 +1075,7 @@ func (s *Server) setBinlogEverywhere() {
 		s.AutomationManager.SetBinlog(s.Binlog)
 	}
 	s.CollectionManager.SetBinlog(s.Binlog)
+	s.Aliases.SetBinlog(s.Binlog)
 	if s.TemporalManager != nil {
 		s.TemporalManager.SetBinlog(s.Binlog)
 	}
@@ -1159,6 +1166,8 @@ func (s *Server) registerGraphQL(mux *http.ServeMux, authEnabled bool) {
 // It returns the handler and the listener's read and write timeouts.
 func (s *Server) wrapHTTPHandler(mux *http.ServeMux, authEnabled bool, panelMode string) (handler http.Handler, readTimeout, writeTimeout time.Duration) {
 	handler = withJSON(mux)
+	// GO-044: an alias becomes its collection before any handler reads it.
+	handler = s.withAliases(handler)
 	// SEC-005: cap request body size globally so a single oversized JSON body
 	// can't OOM the process. Upload/import endpoints legitimately stream large
 	// files and manage their own limits, so they are exempt.
@@ -1419,8 +1428,10 @@ func (s *Server) startGRPCListener(authEnabled bool) {
 // gRPC listener, and the TLS note for its startup log.
 func (s *Server) grpcServerOptions(authEnabled bool) ([]grpc.ServerOption, string) {
 	var grpcOpts []grpc.ServerOption
-	var unaryChain []grpc.UnaryServerInterceptor
-	var streamChain []grpc.StreamServerInterceptor
+	// GO-044: aliases resolve before auth, so permissions are checked on the
+	// collection an alias points at.
+	unaryChain := []grpc.UnaryServerInterceptor{s.aliasUnaryInterceptor()}
+	streamChain := []grpc.StreamServerInterceptor{s.aliasStreamInterceptor()}
 	if s.RateLimiter.Enabled() {
 		unaryChain = append(unaryChain, s.RateLimiter.UnaryInterceptor())
 		streamChain = append(streamChain, s.RateLimiter.StreamInterceptor())

@@ -31,8 +31,8 @@ temporal events.
 The main file holds the server: users, API keys and permissions,
 collection configurations, schemas, synonyms, stop words, spelling
 dictionaries, automations and their logs, webhooks, the audit log, MCP keys,
-embedding configurations, bulk-ingest jobs and the daily retrieval-gain
-counters (`stats`, one small entry per day).
+embedding configurations, bulk-ingest jobs, collection aliases (`aliases`)
+and the daily retrieval-gain counters (`stats`, one small entry per day).
 
 The keys and buckets are the same in both layouts; only the file differs.
 

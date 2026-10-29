@@ -43,6 +43,11 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 			return "", fmt.Errorf("tool %q is not available in read-only mode", name)
 		}
 	}
+	// GO-044: an alias in the arguments becomes its collection here, once,
+	// before any tool reads it.
+	if dc, ok := s.client.(*DirectClient); ok && args != nil {
+		dc.server.Aliases.resolveAliasArgs(args)
+	}
 	// #333: writes wait while the freelist is rebuilt; reads do not.
 	if dc, ok := s.client.(*DirectClient); ok && !s.isToolReadOnly(name) {
 		if err := dc.server.writeBlocked(); err != nil {

@@ -80,6 +80,26 @@ Reports, for the whole server over the window (default 30d, max 365d), the
 searches by type and algorithm, the estimated tokens returned, and the tokens
 avoided. Tokens avoided are whole documents minus the passages and chunks
 returned instead.
+.SS alias
+Stable names for collections (v2.18.8).
+.PP
+.B mddb-cli alias list
+.br
+.B mddb-cli alias set
+\fIALIAS\fR \fICOLLECTION\fR
+.br
+.B mddb-cli alias delete
+\fIALIAS\fR
+.PP
+An alias is accepted wherever a collection name is, on every surface. Moving
+it is atomic: a request sees the old collection or the new one.
+.SS reindex-swap
+.B mddb-cli reindex-swap
+\fIALIAS\fR \fB\-\-into\fR \fICOLLECTION\fR [\fB\-\-timeout\fR \fIDURATION\fR]
+.PP
+Copies the documents of the collection ALIAS points at into COLLECTION (its
+configuration is copied when it has none), waits until COLLECTION is indexed,
+then moves the alias. The old collection is kept.
 .SS autoindex
 Index every text file under a directory into one collection (v2.18.8).
 .PP

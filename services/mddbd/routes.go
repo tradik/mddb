@@ -107,6 +107,9 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/eval-queries", s.handleEvalQueries)
 	// AGT-004: tokens returned and avoided by retrieval, per day.
 	mux.HandleFunc("/v1/gain", s.handleGain)
+	// GO-044: collection aliases.
+	mux.HandleFunc("/v1/aliases", s.handleAliases)
+	mux.HandleFunc("/v1/aliases/", s.handleAliases)
 	mux.HandleFunc("/v1/collection-configs", s.handleCollectionConfigList)
 	mux.HandleFunc("/v1/curation", s.handleCuration)
 	mux.HandleFunc("/v1/events", s.handleSSE)

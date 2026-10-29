@@ -179,6 +179,7 @@ func (s *Server) rebuildInMemoryState() {
 	// restart.
 	for name, reload := range map[string]func() error{
 		"collection configs": func() error { return reloadIf(s.CollectionManager != nil, s.CollectionManager.LoadAll) },
+		"aliases":            func() error { return reloadIf(s.Aliases != nil, s.Aliases.LoadAll) },
 		"auth":               func() error { return reloadIf(s.AuthManager != nil, s.AuthManager.LoadAll) },
 		"automations":        func() error { return reloadIf(s.AutomationManager != nil, s.AutomationManager.LoadAll) },
 		"curation rules":     func() error { return reloadIf(s.CurationManager != nil, s.CurationManager.LoadAll) },

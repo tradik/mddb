@@ -49,7 +49,12 @@ func newFakeServer(t *testing.T, routes map[string]interface{}) *fakeServer {
 
 		// A path that answers differently per method — /v1/webhooks lists on
 		// GET and registers on POST — is keyed as "METHOD path".
-		route, ok := routes[r.Method+" "+r.URL.Path]
+		// A route may also name the query, for one path that answers
+		// differently per parameter: "GET /v1/x?collection=a".
+		route, ok := routes[r.Method+" "+r.URL.RequestURI()]
+		if !ok {
+			route, ok = routes[r.Method+" "+r.URL.Path]
+		}
 		if !ok {
 			route, ok = routes[r.URL.Path]
 		}

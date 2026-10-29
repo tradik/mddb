@@ -99,6 +99,21 @@ tokens returned, and the tokens saved by passages and chunks compared with
 whole documents. Token counts are estimates. The definitions are in
 [docs/TELEMETRY.md](../../docs/TELEMETRY.md#retrieval-gain-v2188).
 
+#### alias, reindex-swap - Stable names for collections
+
+```bash
+mddb-cli alias set docs docs-v1        # create or move
+mddb-cli alias list
+mddb-cli alias delete docs             # the collection stays
+mddb-cli reindex-swap docs --into docs-v2 [--timeout 30m]
+```
+
+`reindex-swap` copies every document of the collection `docs` points at into
+`docs-v2`. Give `docs-v2` its new configuration first, such as an embedding
+model or chunking; without one, the old configuration is copied. It waits
+until `docs-v2` is indexed, then moves the alias. The old collection is
+kept, so you can roll back with `alias set`.
+
 #### autoindex - Index a directory or repository
 
 ```bash

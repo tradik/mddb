@@ -78,7 +78,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	collection := r.FormValue("collection")
+	collection := s.Aliases.Resolve(r.FormValue("collection")) // GO-044: multipart bodies skip the alias middleware
 	lang := r.FormValue("lang")
 	if collection == "" || lang == "" {
 		bad(w, errors.New("missing required fields: collection, lang"))

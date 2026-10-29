@@ -386,7 +386,7 @@ func (s *Server) parseWikiImportRequest(r *http.Request) (WikiImportRequest, io.
 			return req, nil, "", fmt.Errorf("parse multipart: %w", err)
 		}
 
-		req.Collection = r.FormValue("collection")
+		req.Collection = s.Aliases.Resolve(r.FormValue("collection")) // GO-044
 		req.Lang = r.FormValue("lang")
 		req.SkipRedirects = r.FormValue("skipRedirects") == "true"
 		req.SkipFTS = r.FormValue("skipFts") == "true"

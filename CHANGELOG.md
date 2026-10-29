@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Collection aliases (GO-044).**
+  - **What an alias is.** A stable name for a collection: `PUT`,
+    `GET` and `DELETE /v1/aliases`.
+  - **Where it works.** REST, gRPC, MCP and GraphQL accept it wherever they
+    take a collection.
+  - **How it resolves.** Once per request, before permissions are checked.
+    A move is atomic, so a search never mixes two collections.
+  - **CLI.** `mddb-cli alias` manages aliases. `mddb-cli reindex-swap docs
+    --into docs-v2` copies the documents, waits for indexing and moves the
+    alias. The old collection is kept, which is the rebuild path after an
+    embedding-model change.
+
 - **BM25 `k1` and `b` per query and per collection (SRCH-018).** They were
   constants in the code.
   - **Where to set them.** `bm25K1` and `bm25B` go on `/v1/fts`,

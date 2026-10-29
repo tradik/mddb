@@ -5214,6 +5214,83 @@ paths:
         "405":
           description: Method not allowed
 
+  /v1/aliases:
+    get:
+      tags:
+        - Collection Config
+      summary: List collection aliases
+      description: |
+        Aliases whose collection the caller may read (GO-044, v2.18.8). An
+        alias is accepted wherever a collection name is, on every surface,
+        and resolved once per request.
+      operationId: listAliases
+      responses:
+        "200":
+          description: The aliases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  aliases:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Alias"
+
+  /v1/aliases/{alias}:
+    parameters:
+      - name: alias
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      tags:
+        - Collection Config
+      summary: Create an alias or move it to another collection
+      description: |
+        Atomic: a request sees the old collection or the new one. The name
+        may not be an existing collection, and the target may not be an
+        alias. Needs write permission on the target and on the previous one.
+      operationId: setAlias
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [collection]
+              properties:
+                collection:
+                  type: string
+      responses:
+        "200":
+          description: The alias
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alias"
+        "400":
+          description: Invalid name, target is an alias, or name is a collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden, or read-only mode
+    delete:
+      tags:
+        - Collection Config
+      summary: Remove an alias (the collection stays)
+      operationId: deleteAlias
+      responses:
+        "200":
+          description: Removed
+        "404":
+          description: No such alias
+        "403":
+          description: Forbidden, or read-only mode
+
   /v1/gain:
     get:
       tags:
@@ -8945,6 +9022,14 @@ components:
           $ref: "#/components/schemas/RetrievalProfile"
         measured:
           $ref: "#/components/schemas/EvalResult"
+
+    Alias:
+      type: object
+      properties:
+        alias:
+          type: string
+        collection:
+          type: string
 
     GainCounters:
       type: object
