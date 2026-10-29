@@ -1805,6 +1805,8 @@ message EvalConfigProto {
   optional double alpha = 5;
   string strategy = 6;
   string retrieval_mode = 7;
+  optional double bm25_k1 = 8;                   // (SRCH-018) BM25 parameters to try on fts and hybrid
+  optional double bm25_b = 9;
 }
 
 message RunEvalRequest {

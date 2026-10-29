@@ -7970,6 +7970,16 @@ components:
             type: number
           description: Field weights for BM25F algorithm (keys are "title", "meta",
             "content")
+        bm25K1:
+          type: number
+          minimum: 0
+          maximum: 3
+          description: (v2.18.8, SRCH-018) BM25 term-frequency saturation for this query; default the collection profile, then 1.2. bm25 and bm25f only.
+        bm25B:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: (v2.18.8, SRCH-018) BM25 length normalisation for this query; 0 ignores length. Default the collection profile, then 0.75.
           example:
             title: 3.0
             meta: 2.0
@@ -8685,6 +8695,16 @@ components:
           additionalProperties:
             type: number
           description: Field weights for BM25F (keys are "title", "meta", "content")
+        bm25K1:
+          type: number
+          minimum: 0
+          maximum: 3
+          description: (v2.18.8, SRCH-018) BM25 term-frequency saturation of the full-text half; default the collection profile, then 1.2. bm25 and bm25f only.
+        bm25B:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: (v2.18.8, SRCH-018) BM25 length normalisation of the full-text half; 0 ignores length. Default the collection profile, then 0.75.
           example:
             title: 3.0
             meta: 2.0
@@ -9024,6 +9044,11 @@ components:
           description: Hybrid fusion, alpha or rrf
         retrievalMode:
           type: string
+        bm25K1:
+          type: number
+          description: BM25 parameters to try (SRCH-018)
+        bm25B:
+          type: number
 
     EvalRequest:
       type: object
@@ -10263,6 +10288,16 @@ components:
             no longer says anything reliable. Approximated as bytes/4 rather than
             tokenised: a real tokeniser would tie the budget to one model family.
             Responses set `contextTruncated` when this applied. 0 = no cap.
+        bm25K1:
+          type: number
+          minimum: 0
+          maximum: 3
+          description: (v2.18.8, SRCH-018) The collection's BM25 k1; unset = 1.2.
+        bm25B:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: (v2.18.8, SRCH-018) The collection's BM25 b; unset = 0.75.
       example:
         defaultSearchType: hybrid
         topK: 40

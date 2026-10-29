@@ -81,7 +81,8 @@ mddb-cli eval <collection> [--queries file.json] [--config fts/bm25]... [--k 10]
 ```
 
 Runs the collection's evaluation set, or the queries in `--queries`, under
-each `--config` (`fts/<algorithm>`, `vector[/<index>]`, `hybrid`). It prints
+each `--config` (`fts/<algorithm>`, `vector[/<index>]`, `hybrid`, optionally
+with BM25 parameters: `fts/bm25:k1=2:b=0.75`). It prints
 recall@k, nDCG@k, MRR, latency and tokens for each. With `--fail-below` it
 exits non-zero when any configuration scores under a threshold, which makes
 it a CI gate. See

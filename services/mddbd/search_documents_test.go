@@ -38,7 +38,9 @@ func TestSearchDocuments_OneImplementation(t *testing.T) {
 		t.Fatalf("grpc: %v %+v", err, resp)
 	}
 	// A record that does not decode is an error, not a silent gap.
-	_ = s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("col", "zz"), []byte("{")) })
+	_ = s.DB.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("docs")).Put(storage.DocKey("col", "zz"), []byte("{"))
+	})
 	if _, _, err := s.searchDocuments("col", nil, "", false, 0, 10); err == nil {
 		t.Fatal("corrupt record")
 	}

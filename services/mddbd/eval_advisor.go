@@ -10,11 +10,13 @@ import (
 // runs it and lets the measurement decide the search type.
 
 // bm25Variants are the BM25 parameter changes the advisor tries (SRCH-018):
-// less length normalisation, for collections whose documents are of similar
-// length, and less term-frequency saturation, for very short documents. The
-// advisor adopts one only when it scores better on the evaluation set; there
-// are no thresholds on the collection's shape.
-var bm25Variants = []struct{ k1, b float64 }{{1.2, 0.3}, {0.6, 0.75}}
+// less length normalisation, for documents of similar length; less and more
+// term-frequency saturation, for very short and for long, repetitive
+// documents. The advisor adopts one only when it scores better on the
+// evaluation set; there are no thresholds on the collection's shape. On the
+// MDDB docs set lower b and lower k1 both scored worse and k1=2 slightly
+// better (docs/BENCHMARK.md) — which is why the shape alone cannot decide.
+var bm25Variants = []struct{ k1, b float64 }{{1.2, 0.3}, {0.6, 0.75}, {2.0, 0.75}}
 
 // measuredConfigs are what the advisor compares: keyword search with the
 // default and the varied BM25 parameters always, the vector halves only when

@@ -162,6 +162,36 @@ when recall@10 drops under 0.7 or nDCG@10 under 0.65. The test server there
 scores 0.750 and 0.683, because it does not use a default server's
 configuration.
 
+## BM25 parameters on the MDDB docs (v2.18.8)
+
+Same corpus and the same 20 questions as above, keyword search only. Only
+the BM25 parameters change. Measured 2026-10-29 with:
+
+```bash
+mddb-cli eval docs --queries tools/bench/evalsets/docs.json \
+  --config fts/bm25 --config fts/bm25:k1=1.2:b=0.3 --config fts/bm25:k1=0.6:b=0.75 \
+  --config fts/bm25:k1=2:b=0.75 --config fts/bm25:b=0
+```
+
+| k1 | b | recall@10 | nDCG@10 | MRR |
+|----|---|-----------|---------|-----|
+| 1.2 | 0.75 (default) | 0.825 | 0.739 | 0.723 |
+| 1.2 | 0.3 | 0.825 | 0.685 | 0.660 |
+| 0.6 | 0.75 | 0.825 | 0.676 | 0.644 |
+| 2.0 | 0.75 | 0.825 | 0.749 | 0.731 |
+| 1.2 | 0 | 0.800 | 0.523 | 0.438 |
+
+- **Recall barely moves.** The parameters change the order, not what is found.
+- **Length normalisation matters here.** These pages run from 39 to almost 20,000
+  words, and with `b = 0` the long pages win on repetition alone.
+- **The textbook advice points the wrong way.** It suggests a lower `b` for
+  short questions, but here it made ranking worse. The one gain came from a
+  higher `k1`, a small one.
+- **Why the advisor works only from measurement.** It tries `b = 0.3`,
+  `k1 = 0.6` and `k1 = 2` on a collection's own evaluation set. It
+  recommends a variant only when that variant scores better. There are no
+  thresholds on document length behind it.
+
 ## Finding code: grep and read vs MDDB passages (v2.18.8)
 
 An agent asked to change something first has to find it. This compares the

@@ -13401,6 +13401,8 @@ type EvalConfigProto struct {
 	Alpha           *float64               `protobuf:"fixed64,5,opt,name=alpha,proto3,oneof" json:"alpha,omitempty"`
 	Strategy        string                 `protobuf:"bytes,6,opt,name=strategy,proto3" json:"strategy,omitempty"`
 	RetrievalMode   string                 `protobuf:"bytes,7,opt,name=retrieval_mode,json=retrievalMode,proto3" json:"retrieval_mode,omitempty"`
+	Bm25K1          *float64               `protobuf:"fixed64,8,opt,name=bm25_k1,json=bm25K1,proto3,oneof" json:"bm25_k1,omitempty"` // (SRCH-018) BM25 parameters to try on fts and hybrid
+	Bm25B           *float64               `protobuf:"fixed64,9,opt,name=bm25_b,json=bm25B,proto3,oneof" json:"bm25_b,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -13482,6 +13484,20 @@ func (x *EvalConfigProto) GetRetrievalMode() string {
 		return x.RetrievalMode
 	}
 	return ""
+}
+
+func (x *EvalConfigProto) GetBm25K1() float64 {
+	if x != nil && x.Bm25K1 != nil {
+		return *x.Bm25K1
+	}
+	return 0
+}
+
+func (x *EvalConfigProto) GetBm25B() float64 {
+	if x != nil && x.Bm25B != nil {
+		return *x.Bm25B
+	}
+	return 0
 }
 
 type RunEvalRequest struct {
@@ -15757,7 +15773,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06grades\x18\x04 \x03(\v2 .mddb.EvalQueryProto.GradesEntryR\x06grades\x1a9\n" +
 	"\vGradesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xf7\x01\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xc8\x02\n" +
 	"\x0fEvalConfigProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
 	"\vsearch_type\x18\x02 \x01(\tR\n" +
@@ -15766,8 +15782,13 @@ const file_mddb_proto_rawDesc = "" +
 	"\x10vector_algorithm\x18\x04 \x01(\tR\x0fvectorAlgorithm\x12\x19\n" +
 	"\x05alpha\x18\x05 \x01(\x01H\x00R\x05alpha\x88\x01\x01\x12\x1a\n" +
 	"\bstrategy\x18\x06 \x01(\tR\bstrategy\x12%\n" +
-	"\x0eretrieval_mode\x18\a \x01(\tR\rretrievalModeB\b\n" +
-	"\x06_alpha\"\xb9\x01\n" +
+	"\x0eretrieval_mode\x18\a \x01(\tR\rretrievalMode\x12\x1c\n" +
+	"\abm25_k1\x18\b \x01(\x01H\x01R\x06bm25K1\x88\x01\x01\x12\x1a\n" +
+	"\x06bm25_b\x18\t \x01(\x01H\x02R\x05bm25B\x88\x01\x01B\b\n" +
+	"\x06_alphaB\n" +
+	"\n" +
+	"\b_bm25_k1B\t\n" +
+	"\a_bm25_b\"\xb9\x01\n" +
 	"\x0eRunEvalRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +

@@ -38,7 +38,8 @@ func newEvalCmd() *cobra.Command {
 one or more search configurations and prints recall@k, nDCG@k, MRR, latency
 and returned tokens for each.
 
-A configuration is type[/algorithm]: fts/bm25, fts/bm25f, hybrid, vector/hnsw.
+A configuration is type[/algorithm][:k1=N][:b=N]: fts/bm25, fts/bm25f, hybrid,
+vector/hnsw, fts/bm25:k1=0.9:b=0.4 (BM25 parameters).
 Without --config, fts/bm25, hybrid and vector are compared.
 
 --fail-below recall@10=0.8,ndcg=0.6 exits non-zero when any configuration
@@ -69,7 +70,11 @@ func runEval(cmd *cobra.Command, args []string) error {
 	body := map[string]any{"collection": args[0], "k": k}
 	specs, _ := cmd.Flags().GetStringSlice("config")
 	if len(specs) > 0 {
-		body["configs"] = parseEvalConfigs(specs)
+		configs, err := parseEvalConfigs(specs)
+		if err != nil {
+			return err
+		}
+		body["configs"] = configs
 	}
 	if path, _ := cmd.Flags().GetString("queries"); path != "" {
 		queries, err := readEvalQueries(path)
@@ -95,12 +100,14 @@ func runEval(cmd *cobra.Command, args []string) error {
 }
 
 // parseEvalConfigs turns "fts/bm25" into {searchType, algorithm}; the
-// algorithm of a vector config names the vector index.
-func parseEvalConfigs(specs []string) []map[string]string {
-	out := make([]map[string]string, 0, len(specs))
+// algorithm of a vector config names the vector index. ":k1=0.9:b=0.4"
+// after it tries BM25 parameters (SRCH-018).
+func parseEvalConfigs(specs []string) ([]map[string]any, error) {
+	out := make([]map[string]any, 0, len(specs))
 	for _, spec := range specs {
-		typ, alg, _ := strings.Cut(spec, "/")
-		c := map[string]string{"searchType": typ}
+		head, opts, _ := strings.Cut(spec, ":")
+		typ, alg, _ := strings.Cut(head, "/")
+		c := map[string]any{"searchType": typ}
 		switch {
 		case alg == "":
 		case typ == "vector":
@@ -108,9 +115,21 @@ func parseEvalConfigs(specs []string) []map[string]string {
 		default:
 			c["algorithm"] = alg
 		}
+		for _, opt := range strings.Split(opts, ":") {
+			if opt == "" {
+				continue
+			}
+			name, val, _ := strings.Cut(opt, "=")
+			v, err := strconv.ParseFloat(val, 64)
+			field := map[string]string{"k1": "bm25K1", "b": "bm25B"}[name]
+			if err != nil || field == "" {
+				return nil, fmt.Errorf("--config %q: options are k1=<number> and b=<number>", spec)
+			}
+			c[field] = v
+		}
 		out = append(out, c)
 	}
-	return out
+	return out, nil
 }
 
 // readEvalQueries accepts a bare array or an object with "queries".

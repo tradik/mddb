@@ -11,6 +11,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **BM25 `k1` and `b` per query and per collection (SRCH-018).** They were
+  constants in the code.
+  - **Where to set them.** `bm25K1` and `bm25B` go on `/v1/fts`,
+    `/v1/hybrid-search`, MCP `full_text_search` and `hybrid_search`, and gRPC
+    `FTS` and `HybridSearch`. A collection's default goes in its retrieval
+    profile.
+  - **Precedence.** The request wins over the profile, and the profile over
+    1.2 / 0.75. There is no reindex.
+  - **Evaluation.** An evaluation configuration takes them too, for example
+    `mddb-cli eval --config fts/bm25:k1=2:b=0.75`.
+  - **The advisor.** It tries three variants on a stored evaluation set and
+    recommends one only when it scores better.
+  - **Measured on the MDDB docs.** The defaults stay. `k1 = 2` scored nDCG
+    0.749 against 0.739, and a lower `b` or `k1` scored worse.
+
 - **`mddbd -version`** prints `mddbd version X.Y.Z` and exits. The release
   workflow and the snap build run it on the built binary and fail when the
   version does not match the tag (OPS-022).

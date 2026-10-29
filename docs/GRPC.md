@@ -200,6 +200,7 @@ the code that REST and MCP use. They take the same options:
 | `format`, `passage_lines` | the same four | `"passages"` returns `repeated Passage passages`: a path, lines, the enclosing symbol and the text (AGT-002) |
 | `wait_for_index_ms`, `wait_for_keys`, `read_level` | `VectorSearch`, `HybridSearch`, `CrossSearch` | Wait for queued embeddings; the response carries `indexing` (GO-042) |
 | `retrieval_mode`, `window_size` | `VectorSearch` | `chunk` and `window` modes; results carry `chunk_text`, `start_line`, `end_line` |
+| `bm25_k1`, `bm25_b` | `FTS`, `HybridSearch`, `EvalConfigProto`, `RetrievalProfileProto` | BM25 parameters (SRCH-018); unset = the collection profile, then 1.2 / 0.75 |
 | `search_type` | `CrossSearch` | `vector` (default), `fts` or `hybrid`; targets may be `role:reference` (AGT-003) |
 
 `any_of` and `none_of` are named for the REST `in` and `not`, which are

@@ -83,3 +83,25 @@ func TestEval_Failures(t *testing.T) {
 		t.Fatalf("array: %v", err)
 	}
 }
+
+func TestEval_BM25ConfigOptions(t *testing.T) {
+	configs, err := parseEvalConfigs([]string{"fts/bm25:k1=0.9:b=0", "hybrid:b=0.3"})
+	if err != nil || configs[0]["bm25K1"] != 0.9 || configs[0]["bm25B"] != 0.0 || configs[1]["bm25B"] != 0.3 || configs[1]["algorithm"] != nil {
+		t.Fatalf("options: %v %+v", err, configs)
+	}
+	for _, bad := range []string{"fts/bm25:k1", "fts/bm25:c=1", "fts/bm25:b=x"} {
+		if _, err := parseEvalConfigs([]string{bad}); err == nil {
+			t.Fatalf("%q accepted", bad)
+		}
+	}
+	srv := newFakeServer(t, map[string]interface{}{"/v1/eval": evalAnswer})
+	if _, err := runCLI(t, srv.URL, "eval", "kb", "--config", "fts/bm25:q=1"); err == nil {
+		t.Fatal("a bad option fails the command")
+	}
+	if _, err := runCLI(t, srv.URL, "eval", "kb", "--config", "fts/bm25:k1=1.5"); err != nil {
+		t.Fatal(err)
+	}
+	if c := srv.lastCall(t).Body["configs"].([]interface{})[0].(map[string]interface{}); c["bm25K1"] != 1.5 {
+		t.Fatalf("sent: %+v", c)
+	}
+}

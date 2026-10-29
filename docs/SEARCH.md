@@ -283,6 +283,29 @@ where:
 
 **When to use:** When documents vary significantly in length (e.g., mix of short FAQs and long guides). BM25 prevents long documents from dominating results.
 
+#### Tuning k1 and b (v2.18.8+)
+
+`k1` and `b` are parameters of the scoring, not of the index, so changing them
+needs no reindex.
+
+- **Where to set them.** Pass `bm25K1` and `bm25B` on `POST /v1/fts` and
+  `POST /v1/hybrid-search`. Over MCP and gRPC they are `bm25_k1` and
+  `bm25_b`. To make them a collection's default, store them in its retrieval
+  profile as `retrieval.bm25K1` and `retrieval.bm25B`.
+- **Precedence.** The request wins over the profile, and the profile over
+  1.2 / 0.75, separately for each parameter.
+- **Range.** `k1` is 0–3 and `b` is 0–1. `b = 0` ignores document length.
+  `k1 = 0` counts a word once however often it occurs.
+- **Where they apply.** `bm25` and `bm25f`, their fuzzy variants, and the
+  full-text half of hybrid search.
+
+Don't change them by feel. On the MDDB docs, lowering either one made
+ranking worse and raising `k1` to 2 helped slightly. The numbers are in
+[BENCHMARK.md](BENCHMARK.md#bm25-parameters-on-the-mddb-docs-v2188). Try
+values on your own questions with `mddb-cli eval --config fts/bm25:k1=2:b=0.75`.
+With an evaluation set stored, the search advisor tries three variants and
+recommends one only when it scores better.
+
 ### BM25F (Field-Weighted)
 
 BM25F extends BM25 by scoring term matches in different document fields with different weights. A match in the title can be worth more than a match in the body text.

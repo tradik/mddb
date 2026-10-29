@@ -1025,6 +1025,7 @@ Perform full-text search across document content. Supports multiple search modes
 - `disableStem` (optional): Disable stemming for this query (default: false)
 - `disableSynonyms` (optional): Disable synonym expansion for this query (default: false)
 - `fieldWeights` (optional, BM25F only): Map of field name to weight. Defaults: content=1.0, meta.title=3.0, meta.tags=2.0, meta.category=2.0, meta.description=1.5
+- `bm25K1`, `bm25B` (optional, v2.18.8, bm25 and bm25f only): BM25 parameters for this query, k1 0–3 and b 0–1. Default: the collection profile's `retrieval.bm25K1`/`bm25B`, then 1.2 / 0.75. See [SEARCH.md](SEARCH.md#tuning-k1-and-b-v2188).
 - `filterMeta` (optional): Metadata pre-filter — `{"key": ["value1", "value2"]}`
 - `rangeMeta` (optional): Array of range filters on metadata or timestamps
 - `boost` (optional): Per-query score multipliers keyed by `"metaKey:metaValue"`. Positive values boost (`5.0` → 5×), negative values demote (`-2.0` → ½×). Multiple matching entries combine multiplicatively; floor is `0.001`. No reindex required.
@@ -2372,6 +2373,7 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
 | `disableStem` | boolean | `false` | Disable stemming |
 | `disableSynonyms` | boolean | `false` | Disable synonym expansion |
 | `boost` | object | | Per-query score multiplier keyed by `"metaKey:metaValue"` |
+| `bm25K1`, `bm25B` | number | profile, then 1.2 / 0.75 | BM25 parameters of the full-text half (v2.18.8+, [SEARCH.md](SEARCH.md#tuning-k1-and-b-v2188)) |
 | `geo` | object | | Spatial pre-filter: `{lat, lng, radiusMeters}` |
 | `sort` | string | `"combined"` | Result ordering: `combined` (default, by fused score) or `distance` (by `distanceMeters` ascending — requires `geo`) |
 | `facetBy` | array | | (v2.9.14+) Metadata keys to aggregate into `facets` map on the response |
