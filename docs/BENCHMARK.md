@@ -116,7 +116,7 @@ Shows how many documents each algorithm returns (limit=10) to verify they all fi
 
 The latency tables above say how fast each algorithm is. This section says how
 often it finds the right page. The set is
-[`tools/bench/evalsets/docs.json`](../tools/bench/evalsets/docs.json): 20
+[`tools/bench/evalsets/docs.json`](https://github.com/tradik/mddb/blob/main/tools/bench/evalsets/docs.json): 20
 questions about MDDB, each with the documentation page that answers it, graded
 0–3. The questions are phrased the way a user asks, not copied from headings.
 The collection is the 60 pages of `docs/`, keyed by file name.
@@ -169,7 +169,7 @@ two ways it can, on the MDDB repository itself. The comparison counts tokens
 and tool calls. It does not measure answer quality.
 
 The 15 tasks are in
-[`tools/bench/evalsets/agent-tasks.json`](../tools/bench/evalsets/agent-tasks.json).
+[`tools/bench/evalsets/agent-tasks.json`](https://github.com/tradik/mddb/blob/main/tools/bench/evalsets/agent-tasks.json).
 Each has a question, the term an agent would grep for first, and the file
 that holds the code.
 

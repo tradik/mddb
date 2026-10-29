@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.8] - 2026-10-29
+
 ### Added
 
 - **Filter operators: `prefix`, `contains`, ranges, `not`, `exists`

@@ -1,6 +1,6 @@
 {
   "name": "mddb-panel",
-  "version": "2.18.7",
+  "version": "2.18.8",
   "description": "Web admin panel for MDDB - Markdown Database",
   "license": "BSD-3-Clause",
   "type": "module",

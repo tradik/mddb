@@ -279,7 +279,9 @@ func TestUpdate_RefusalsAndRetention(t *testing.T) {
 		t.Fatal("rolled back")
 	}
 	// A document that no longer decodes is not found either.
-	_ = s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("fs", doc.ID), []byte("{")) })
+	_ = s.DB.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket([]byte("docs")).Put(storage.DocKey("fs", doc.ID), []byte("{"))
+	})
 	if _, err := s.updateDocument("fs", "old.md", "en", DocPatch{Content: &c}); !errors.Is(err, errDocNotFound) {
 		t.Fatalf("corrupt: %v", err)
 	}
