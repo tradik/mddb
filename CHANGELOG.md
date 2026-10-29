@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **HNSW recall, the cost of the exact prefilter, and the `auto` thresholds
+  (SRCH-013).** The planner benchmark at 2k, 200k and 2M vectors found all
+  three.
+  - **HNSW recall@10 was 0.74–0.88 and changed between loads.**
+    - `coder/hnsw` kept each node's M closest candidates as neighbours. Documents
+      stored topic by topic therefore linked only inside their own topic, and a
+      search that entered the wrong topic could not leave it.
+    - It also ignored `efConstruction` and drew levels from the clock.
+    - MDDB now has its own graph with the paper's neighbour-selection
+      heuristic, 2M links on layer 0, `efConstruction` 200 (honoured),
+      `efSearch` 64 and a fixed seed.
+    - Recall@10 is now 1.000 at 20k and 200k vectors. Queries are 3–5× faster
+      (0.46 ms against 2.18 ms at 200k), and loading 200k vectors takes 53 s
+      instead of 322 s.
+    - `coder/hnsw` and our Windows fork of it (WIN-003) are no longer
+      dependencies.
+  - **The exact prefilter scanned the whole collection.** It now looks up
+    only the documents the filter admits. At 200k vectors with a 2% filter,
+    p50 dropped from 5.5 to 1.1 ms and p99 from 31 to 1.8 ms. Exact scans
+    also keep their top k in a heap instead of sorting every score, so flat
+    search at 200k takes 5 ms instead of 20.
+  - **`auto` thresholds.**
+    - A filter admitting between 5% and a third of the collection leaves HNSW
+      short of results. `auto` now sends it to a trained IVF, or else the
+      prefilter: 2.5 ms against 36 ms at 10%.
+    - `auto` also falls back to a trained IVF before flat.
+- **The `mddb-cli` Docker image could not be built.** It copied only `main.go`
+  of the CLI's 28 source files, and its build context did not include the Go
+  client that `go.mod` points to. It now builds from the repository root:
+  `docker build -f services/mddb-cli/Dockerfile .`.
+- **`mddb-cli` ignored `MDDB_SERVER`.** The README and the man page
+  documented it, but the CLI never read it. It now sets the default server,
+  and `--server` still overrides it.
+- **Two binaries were committed to the repository.** One was the 44 MB
+  server binary at the root, added with #358 in 2.18.8. The other was
+  `bin/deadcode`, added with GO-021. Both are removed, root binaries and
+  `bin/` are ignored, and the Docker build context excludes binaries built
+  in place.
+
 - **`mddb-cli autoindex` converts documents instead of skipping them or
   indexing them raw (#363, AGT-001).**
   - **The bug.** PDF, DOCX and ODT files were skipped as "binary". HTML,
