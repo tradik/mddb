@@ -16,8 +16,9 @@ import (
 // Questions like "what is this document about" match the language of a
 // summary, not of any one chunk. The collection's summaryMode decides what a
 // summary does on a search, and every vector-backed path — vector search over
-// REST, MCP, gRPC and GraphQL, and the vector half of hybrid — applies it here,
-// on the chunk-level hits, before they are deduplicated, grouped or cut:
+// REST, MCP, gRPC and GraphQL, the vector half of hybrid, and cross-collection
+// vector search, each target by its own profile — applies it here, on the
+// chunk-level hits, before they are deduplicated, grouped or cut:
 //
 //   - off (the default): nothing; results are byte-for-byte today's.
 //   - blend: a document scores the better of its best chunk and its summary.

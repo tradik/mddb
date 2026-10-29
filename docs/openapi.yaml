@@ -10861,7 +10861,8 @@ components:
           description: >-
             (v2.18.9+, RAG-009) What the documents' client-written summaries
             (metadata key `summary`; MDDB never writes one) do on vector and
-            hybrid search. `off` (default) ignores them; results are what they
+            hybrid search, and on cross-collection search, where each target
+            applies its own. `off` (default) ignores them; results are what they
             were before. `blend` scores a document by the better of its best
             chunk and its summary. `expand` blends and adds a summary hit's best
             chunks (up to 3, fewer under contextTokenBudget), one passage each

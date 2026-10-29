@@ -130,13 +130,14 @@ func (s *Server) oneCollectionText(ctx context.Context, coll string, p crossText
 		}
 		return out
 	}
-	items, _, err := s.hybridItems(ctx, HybridSearchRequest{Collection: coll, Query: p.Query, TopK: p.TopK,
+	items, ran, err := s.hybridItems(ctx, HybridSearchRequest{Collection: coll, Query: p.Query, TopK: p.TopK,
 		FilterMeta: p.FilterMeta, Filter: p.Filter, IncludeContent: true})
 	if err != nil {
 		return nil
 	}
 	for _, it := range items {
-		out = append(out, CrossSearchResultItem{Collection: coll, Document: it.Document})
+		out = append(out, CrossSearchResultItem{Collection: coll, Document: it.Document,
+			chunks: ran.plan.expandedChunks(it.Document.ID)}) // RAG-009: expand's chunks
 	}
 	return out
 }

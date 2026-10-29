@@ -53,6 +53,7 @@ func (s *Server) crossSearcher(source, requested string, searchTopK int) (vec.Ve
 type crossCandidate struct {
 	collection string
 	result     vec.VectorResult
+	chunks     []int // summaryMode expand's chunks for the document (RAG-009)
 }
 
 // crossSearchItems searches every target collection, merges the hits by
@@ -76,8 +77,9 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 		}
 		results := s.runPlanned(ps, coll, p.QueryVector, p.SearchTopK, p.Threshold, allowedIDs, active, p.Metric)
 		results = s.rescoreFeedback(p.Feedback, coll, results, p.Metric)
+		results, summaryPlan := s.crossSummaries(p, coll, ps.Plan, results, allowedIDs, active)
 		for _, vr := range vec.DeduplicateChunkResults(results) {
-			cands = append(cands, crossCandidate{collection: coll, result: vr})
+			cands = append(cands, crossCandidate{collection: coll, result: vr, chunks: summaryPlan.expandedChunks(vr.DocID)})
 		}
 	}
 	sort.SliceStable(cands, func(i, j int) bool { return cands[i].result.Score > cands[j].result.Score })
@@ -97,7 +99,7 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 		if !p.IncludeContent {
 			doc.ContentMD = ""
 		}
-		items = append(items, CrossSearchResultItem{Collection: c.collection, Document: doc, Score: c.result.Score})
+		items = append(items, CrossSearchResultItem{Collection: c.collection, Document: doc, Score: c.result.Score, chunks: c.chunks})
 	}
 	if p.GroupBy != nil {
 		items = groupTop(items, p.GroupBy,
@@ -114,4 +116,32 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 		items[i].Rank = i + 1
 	}
 	return items
+}
+
+// crossSummaries applies one target's summaryMode (RAG-009) to that target's
+// hits, through the same applySummaries single-collection vector search uses:
+// each target's own profile decides, so a target with summaries off adds
+// nothing. The plan it returns holds expand's chunks — the target's own plan
+// under "auto", else one of its own — and is nil when the mode is off. Under
+// the one plan of a named algorithm the explain line is copied there,
+// prefixed by the target, since every target shares that plan.
+func (s *Server) crossSummaries(p crossSearchParams, coll string, own *SearchPlan, results []vec.VectorResult,
+	allowed map[string]bool, filtered bool) ([]vec.VectorResult, *SearchPlan) {
+	mode := s.ResolveSummaryMode(coll, "")
+	if mode == "" {
+		return results, nil
+	}
+	plan := own
+	if plan == nil {
+		plan = &SearchPlan{}
+	}
+	results = s.applySummaries(summarySearch{Collection: coll, Mode: mode, Query: p.QueryVector,
+		SearchTopK: p.SearchTopK, TopK: p.TopK, Threshold: p.Threshold, Allowed: allowed,
+		Filtered: filtered, Metric: p.Metric}, results, plan)
+	if own == nil && p.Plan != nil {
+		for _, r := range plan.Reasons {
+			p.Plan.reason("%s: %s", coll, r)
+		}
+	}
+	return results, plan
 }

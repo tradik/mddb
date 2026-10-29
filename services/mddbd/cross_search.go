@@ -53,6 +53,9 @@ type CrossSearchResultItem struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// chunks are summaryMode expand's chunks for the document, chosen by its
+	// own collection's profile (RAG-009): one passage each with passages.
+	chunks []int
 }
 
 // CrossSearchResponse represents the response from cross-collection search.

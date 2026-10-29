@@ -284,7 +284,7 @@ func (s *Server) crossPassages(query string, items []CrossSearchResultItem, opts
 	terms := queryTerms(query)
 	out := make([]Passage, 0, len(items))
 	for _, it := range items {
-		out = append(out, s.buildPassages(it.Collection, []passageSource{{doc: it.Document, score: float64(it.Score), bestChunk: -1, terms: terms}}, opts, "cross")...)
+		out = append(out, s.buildPassages(it.Collection, []passageSource{{doc: it.Document, score: float64(it.Score), bestChunk: -1, terms: terms, chunks: it.chunks}}, opts, "cross")...)
 	}
 	return s.finishPassages("", out, indexing)
 }

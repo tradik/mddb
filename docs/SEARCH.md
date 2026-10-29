@@ -1094,9 +1094,21 @@ curl -X PUT http://localhost:11023/v1/collection-config \
 | `expand` | Like `blend`, and a summary hit also brings the document's best *n* chunks, ranked against the query, at the summary's score. With `format: "passages"` each chunk is a passage, and in `chunk` mode each chunk is a result. *n* is 3, or fewer when `contextTokenBudget` cannot hold *n* chunks for each of `topK` results (never fewer than 1). |
 
 - **Every vector surface does the same thing.** Vector search (REST, MCP
-  `semantic_search`, gRPC `VectorSearch`, GraphQL) and the vector half of
-  hybrid search share one implementation. With `explain: true`, the plan
-  says how many documents their summaries matched.
+  `semantic_search`, gRPC `VectorSearch`, GraphQL), the vector half of
+  hybrid search and cross-collection search (`/v1/cross-search`, MCP
+  `cross_search`, gRPC `CrossSearch`; vector and hybrid) share one
+  implementation. With `explain: true`, the plan says how many documents
+  their summaries matched.
+- **Cross-collection search, per target.** Each target collection applies its
+  own `summaryMode` and `summaryWeight` to its own hits. A target with
+  summaries `off` contributes exactly what it did before, so a search over
+  targets that are all `off` returns the same bytes as before v2.18.9. Under
+  `blend`, a document only its summary matched joins the merged results.
+  Under `expand`, with `format: "passages"`, its summary hit brings that
+  document's best chunks, one passage each. With `explain: true` and a named
+  algorithm, the one plan gets the summary line prefixed by the target
+  (`"kb: summaryMode blend: …"`); with `algorithm: "auto"`, the line is in
+  that target's plan under `collections`.
 - **The keyword side.** While `summaryMode` is not `off`, BM25F (`bm25f`, in
   full-text and hybrid search) adds `meta.summary` with `summaryWeight`
   (default 2.0, range 0–10) to the field weights. A request that names
