@@ -85,12 +85,14 @@ func (bp *BatchProcessor) parallelProcess(ctx context.Context, collection string
 			defer wg.Done()
 
 			for idx := range jobs {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					processed[idx] = bp.processDocument(collection, batchDocs[idx], now)
+				// A cancelled request still gets an answer for every
+				// document. Returning here used to leave nil slots that
+				// commitBatch dereferenced.
+				if err := ctx.Err(); err != nil {
+					processed[idx] = &ProcessedDoc{Doc: storage.Doc{Key: batchDocs[idx].Key}, Error: err}
+					continue
 				}
+				processed[idx] = bp.processDocument(collection, batchDocs[idx], now)
 			}
 		}()
 	}
@@ -109,7 +111,8 @@ func (bp *BatchProcessor) parallelProcess(ctx context.Context, collection string
 
 // processDocument processes a single document (validation, conversion, marshaling)
 func (bp *BatchProcessor) processDocument(collection string, batchDoc *proto.BatchDocument, now int64) *ProcessedDoc {
-	result := &ProcessedDoc{}
+	// The key is set first so an error reported for this document names it.
+	result := &ProcessedDoc{Doc: storage.Doc{Key: batchDoc.Key}}
 
 	// Validate
 	if batchDoc.Key == "" || batchDoc.Lang == "" {
@@ -200,88 +203,15 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 	var bo binlog.BinlogOps
 	// Single transaction for all documents
 	err := bp.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(bp.server.BucketNames.Docs)
-		bIdx := tx.Bucket(bp.server.BucketNames.IdxMeta)
-		bRev := tx.Bucket(bp.server.BucketNames.Rev)
-		bByK := tx.Bucket(bp.server.BucketNames.ByKey)
-
 		for _, p := range processed {
-			// Skip failed documents
+			if p.Error == nil {
+				p.Error = bp.server.writeBatchDoc(tx, &bo, collection, p, now)
+			}
 			if p.Error != nil {
 				resp.Failed++
 				resp.Errors = append(resp.Errors, fmt.Sprintf("%s: %v", p.Doc.Key, p.Error))
 				continue
 			}
-
-			// Store document
-			docKey := storage.DocKey(collection, p.DocID)
-			if err := bDocs.Put(docKey, p.Buf); err != nil {
-				resp.Failed++
-				resp.Errors = append(resp.Errors, fmt.Sprintf("%s: put error: %v", p.Doc.Key, err))
-				continue
-			}
-			bo.Put("docs", docKey, p.Buf)
-
-			// Store key index
-			byKeyK := storage.ByKeyKey(collection, p.Doc.Key, p.Doc.Lang)
-			if err := bByK.Put(byKeyK, []byte(p.DocID)); err != nil {
-				resp.Failed++
-				resp.Errors = append(resp.Errors, fmt.Sprintf("%s: bykey error: %v", p.Doc.Key, err))
-				continue
-			}
-			bo.Put("bykey", byKeyK, []byte(p.DocID))
-
-			// Only reindex metadata if changed
-			if metadataChanged(p.Existing.Meta, p.Doc.Meta) {
-				// Delete old indices
-				if p.Existing.ID != "" && p.Existing.Meta != nil {
-					for mk, vals := range p.Existing.Meta {
-						for _, mv := range vals {
-							prefix := append(storage.MetaKeyPrefix(collection, mk, mv), []byte(p.Existing.ID)...)
-							_ = bIdx.Delete(prefix)
-							bo.Delete("idxmeta", prefix)
-						}
-					}
-				}
-
-				// Add new indices
-				for mk, vals := range p.Doc.Meta {
-					for _, mv := range vals {
-						key := append(storage.MetaKeyPrefix(collection, mk, mv), []byte(p.Doc.ID)...)
-						if err := bIdx.Put(key, []byte("1")); err != nil {
-							resp.Failed++
-							resp.Errors = append(resp.Errors, fmt.Sprintf("%s: index error: %v", p.Doc.Key, err))
-							continue
-						}
-						bo.Put("idxmeta", key, []byte("1"))
-					}
-				}
-			}
-
-			// Revision (optional - only if requested)
-			if p.SaveRevision {
-				rkey := nextRevisionKey(bRev, collection, p.Doc.ID, now)
-				if err := bRev.Put(rkey, p.Buf); err != nil {
-					resp.Failed++
-					resp.Errors = append(resp.Errors, fmt.Sprintf("%s: revision error: %v", p.Doc.Key, err))
-					continue
-				}
-				bo.Put("rev", rkey, p.Buf)
-
-				// Enforce per-collection MaxRevisions so batch writes trim
-				// history just like the single-doc path (GO-001).
-				if bp.server.CollectionManager != nil {
-					if cfg, found := bp.server.CollectionManager.Get(collection); found && cfg.MaxRevisions > 0 {
-						if err := trimRevisions(tx, &bo, collection, p.Doc.ID, cfg.MaxRevisions); err != nil {
-							resp.Failed++
-							resp.Errors = append(resp.Errors, fmt.Sprintf("%s: revision trim error: %v", p.Doc.Key, err))
-							continue
-						}
-					}
-				}
-			}
-
-			// Count success
 			if p.IsUpdate {
 				resp.Updated++
 			} else {
@@ -289,7 +219,6 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 			}
 			committed = append(committed, p)
 		}
-
 		return nil
 	})
 
@@ -302,4 +231,31 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 	bo.FlushTo(bp.server.Binlog)
 
 	return resp, committed
+}
+
+// writeBatchDoc stores one prepared document inside the batch transaction: the
+// document, its key index, its metadata index and — when asked — a revision
+// trimmed to the collection's MaxRevisions. The steps are the single-document
+// path's (addDocument), so a batch indexes and keeps history the same way.
+//
+// A failure is reported for this document only and the batch goes on, so
+// writes made before the failing step stay in the transaction: a document
+// whose revision could not be written is stored but counted as failed.
+func (s *Server) writeBatchDoc(tx *bolt.Tx, bo *binlog.BinlogOps, collection string, p *ProcessedDoc, now int64) error {
+	if err := putLogged(bo,
+		boltWrite{tx.Bucket(s.BucketNames.Docs), "docs", storage.DocKey(collection, p.DocID), p.Buf},
+		boltWrite{tx.Bucket(s.BucketNames.ByKey), "bykey", storage.ByKeyKey(collection, p.Doc.Key, p.Doc.Lang), []byte(p.DocID)}); err != nil {
+		return fmt.Errorf("put error: %w", err)
+	}
+	if metadataChanged(p.Existing.Meta, p.Doc.Meta) {
+		if err := reindexMeta(tx.Bucket(s.BucketNames.IdxMeta), bo, collection, p.Doc.ID, p.Existing.Meta, p.Doc.Meta); err != nil {
+			return fmt.Errorf("index error: %w", err)
+		}
+	}
+	if p.SaveRevision {
+		if err := s.writeRevision(tx, bo, collection, p.Doc.ID, now, p.Buf); err != nil {
+			return fmt.Errorf("revision error: %w", err)
+		}
+	}
+	return nil
 }

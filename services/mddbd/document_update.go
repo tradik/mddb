@@ -192,6 +192,27 @@ func reindexMeta(bIdx *bolt.Bucket, bo *binlog.BinlogOps, collection, docID stri
 	return nil
 }
 
+// boltWrite is one key/value bound for a bucket; name is the bucket's name as
+// the binlog records it.
+type boltWrite struct {
+	bucket     *bolt.Bucket
+	name       string
+	key, value []byte
+}
+
+// putLogged stores each write in order and records it for replication. The
+// first failure stops it; the caller's transaction then rolls back, so the
+// writes already made never reach the database or the binlog.
+func putLogged(bo *binlog.BinlogOps, writes ...boltWrite) error {
+	for _, w := range writes {
+		if err := w.bucket.Put(w.key, w.value); err != nil {
+			return err
+		}
+		bo.Put(w.name, w.key, w.value)
+	}
+	return nil
+}
+
 // writeRevision records a version in the history and keeps the history
 // within the collection's MaxRevisions.
 func (s *Server) writeRevision(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string, now int64, buf []byte) error {

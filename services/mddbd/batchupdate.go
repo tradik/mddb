@@ -206,28 +206,31 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 	err := bu.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(bu.server.BucketNames.Docs)
 		bRev := tx.Bucket(bu.server.BucketNames.Rev)
+		failed := func(u *UpdatedDoc, err error) {
+			resp.Failed++
+			resp.Errors = append(resp.Errors, fmt.Sprintf("%s/%s: %v", u.Key, u.Lang, err))
+		}
 
 		for _, u := range updated {
 			if u.Error != nil {
 				if u.Error.Error() == "document not found" {
 					resp.NotFound++
 				} else {
-					resp.Failed++
-					resp.Errors = append(resp.Errors, fmt.Sprintf("%s/%s: %v", u.Key, u.Lang, u.Error))
+					failed(u, u.Error)
 				}
 				continue
 			}
 
-			// Update document
-			docKey := storage.DocKey(collection, u.DocID)
-			if err := bDocs.Put(docKey, u.Buf); err != nil {
-				resp.Failed++
-				resp.Errors = append(resp.Errors, fmt.Sprintf("%s/%s: update error: %v", u.Key, u.Lang, err))
+			// Update document. Its key was read a moment ago, so only a
+			// database-level fault can refuse it.
+			if err := putLogged(&bo, boltWrite{bDocs, "docs", storage.DocKey(collection, u.DocID), u.Buf}); err != nil {
+				failed(u, fmt.Errorf("update error: %w", err))
 				continue
 			}
-			bo.Put("docs", docKey, u.Buf)
 
 			// Collect metadata reindex job; enqueued after the tx commits.
+			// Queued once the document is written, whatever happens to its
+			// revision, so the index matches what is stored.
 			if metadataChanged(u.Existing.Meta, u.Doc.Meta) {
 				indexJobs = append(indexJobs, &indexqueue.IndexJob{
 					Collection: collection,
@@ -240,12 +243,10 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 			// Revision (optional)
 			if u.SaveRevision {
 				rkey := nextRevisionKey(bRev, collection, u.Doc.ID, now)
-				if err := bRev.Put(rkey, u.Buf); err != nil {
-					resp.Failed++
-					resp.Errors = append(resp.Errors, fmt.Sprintf("%s/%s: revision error: %v", u.Key, u.Lang, err))
+				if err := putLogged(&bo, boltWrite{bRev, "rev", rkey, u.Buf}); err != nil {
+					failed(u, fmt.Errorf("revision error: %w", err))
 					continue
 				}
-				bo.Put("rev", rkey, u.Buf)
 			}
 
 			// Update cache

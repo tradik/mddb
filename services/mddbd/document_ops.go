@@ -67,7 +67,6 @@ func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]s
 	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		bIdx := tx.Bucket([]byte("idxmeta"))
-		bRev := tx.Bucket([]byte("rev"))
 		bByK := tx.Bucket([]byte("bykey"))
 
 		existing := storage.Doc{}
@@ -115,53 +114,25 @@ func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]s
 			return err
 		}
 
-		if err := bDocs.Put(docKey, buf); err != nil {
+		// The document and its key index go in together; a key too long for
+		// bbolt fails the first write and the transaction rolls back.
+		if err := putLogged(&bo,
+			boltWrite{bDocs, "docs", docKey, buf},
+			boltWrite{bByK, "bykey", storage.ByKeyKey(collection, key, lang), []byte(docID)}); err != nil {
 			return err
 		}
-		bo.Put("docs", docKey, buf)
-
-		byKeyK := storage.ByKeyKey(collection, key, lang)
-		if err := bByK.Put(byKeyK, []byte(docID)); err != nil {
-			return err
-		}
-		bo.Put("bykey", byKeyK, []byte(docID))
 
 		if metadataChanged(existing.Meta, doc.Meta) {
-			if existing.ID != "" && existing.Meta != nil {
-				for mk, vals := range existing.Meta {
-					for _, mv := range vals {
-						prefix := append(storage.MetaKeyPrefix(collection, mk, mv), []byte(existing.ID)...)
-						_ = bIdx.Delete(prefix)
-						bo.Delete("idxmeta", prefix)
-					}
-				}
-			}
-			for mk, vals := range doc.Meta {
-				for _, mv := range vals {
-					mkey := append(storage.MetaKeyPrefix(collection, mk, mv), []byte(doc.ID)...)
-					if err := bIdx.Put(mkey, []byte("1")); err != nil {
-						return err
-					}
-					bo.Put("idxmeta", mkey, []byte("1"))
-				}
+			if err := reindexMeta(bIdx, &bo, collection, doc.ID, existing.Meta, doc.Meta); err != nil {
+				return err
 			}
 		}
 
+		// The revision write and MaxRevisions trimming are shared with
+		// updateDocument, so history is capped the same way on both paths.
 		if saveRevision {
-			rkey := nextRevisionKey(bRev, collection, doc.ID, now)
-			if err := bRev.Put(rkey, buf); err != nil {
+			if err := s.writeRevision(tx, &bo, collection, doc.ID, now, buf); err != nil {
 				return err
-			}
-			bo.Put("rev", rkey, buf)
-
-			// Enforce per-collection MaxRevisions: drop oldest revs over the cap so
-			// history never grows unbounded on high-churn collections.
-			if s.CollectionManager != nil {
-				if cfg, found := s.CollectionManager.Get(collection); found && cfg.MaxRevisions > 0 {
-					if err := trimRevisions(tx, &bo, collection, doc.ID, cfg.MaxRevisions); err != nil {
-						return err
-					}
-				}
 			}
 		}
 
