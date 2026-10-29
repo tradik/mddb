@@ -127,9 +127,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `summary_weight`, `EvalConfigProto.summary_mode`,
     `CollectionProfile.summary_documents` and `summary_ratio`,
     `SearchAdvisorResponse.summary_mode`.
-  - **Not covered.** Cross-collection vector search does not apply
-    `summaryMode`, because cross search has no single collection profile.
-    Cross-collection hybrid search does apply it.
+  - **Cross-collection search.** `/v1/cross-search`, MCP `cross_search` and
+    gRPC `CrossSearch` apply each target collection's own `summaryMode` and
+    `summaryWeight`. A target with summaries `off` returns exactly what it
+    did before. With `explain`, the summary line is in that target's plan
+    under `algorithm: "auto"`; with a named algorithm it is in the shared
+    plan, prefixed by the target. Cross hybrid passages carry `expand`'s
+    chunks too.
 - **The server chooses the vector index: `algorithm: "auto"` (SRCH-013).**
   - **Where.** `algorithm` on `/v1/vector-search` and `/v1/cross-search`,
     `vectorAlgorithm` on `/v1/hybrid-search`, the same on the MCP tools and
