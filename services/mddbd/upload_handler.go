@@ -19,6 +19,11 @@ const (
 	maxUploadSizeLimit   = 100 << 20 // 100 MB hard cap
 )
 
+// uploadBodyLimit caps a whole /v1/upload request body: the per-file hard cap
+// times ten, for multi-file uploads and multipart overhead. A variable only so
+// a test can lower it.
+var uploadBodyLimit int64 = maxUploadSizeLimit * 10
+
 // UploadResponse is the JSON response for a single uploaded file.
 type UploadResponse struct {
 	Key       string      `json:"key"`
@@ -56,6 +61,12 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Cap the body before anything reads it. The FormValue("maxSize") below
+	// parses the whole multipart body, so a cap applied after it (as this
+	// handler used to) wrapped a body that had already been read to the end:
+	// an upload of any size reached the multipart temp files on disk.
+	r.Body = http.MaxBytesReader(w, r.Body, uploadBodyLimit)
+
 	// Determine max upload size
 	maxSize := int64(defaultMaxUploadSize)
 	if v := r.FormValue("maxSize"); v != "" {
@@ -66,7 +77,6 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	if maxSize > maxUploadSizeLimit {
 		maxSize = maxUploadSizeLimit
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, maxSize*10) // account for multipart overhead
 
 	if err := r.ParseMultipartForm(maxSize); err != nil { // #nosec G120 -- bounded by http.MaxBytesReader above
 		bad(w, fmt.Errorf("parse multipart: %w", err))
@@ -113,14 +123,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 	// RAG-004: the ingest profile, as a multipart field. A typo must not fall
 	// back silently — a caller who asked for "fast" and got the default would
-	// see a slow upload and no reason why.
-	profile := r.FormValue("profile")
-	if err := ValidateIngestProfile(profile); err != nil {
-		bad(w, err)
-		return
-	}
+	// see a slow upload and no reason why. ResolveIngestProfile validates the
+	// name and returns that error.
 	resolved, err := ResolveIngestProfile(&IngestOptionsHTTP{
-		Profile:  profile,
+		Profile:  r.FormValue("profile"),
 		TextOnly: r.FormValue("textOnly") == "true",
 	})
 	if err != nil {

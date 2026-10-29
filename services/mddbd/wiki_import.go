@@ -213,18 +213,22 @@ func (s *Server) handleWikiImport(w http.ResponseWriter, r *http.Request) {
 		if len(batch) == 0 {
 			return
 		}
-		_, processed, err := s.processBatchWithDocs(r.Context(), req.Collection, batch)
+		batchResp, processed, err := s.processBatchWithDocs(r.Context(), req.Collection, batch)
 		if err != nil {
 			resp.Failed += len(batch)
 			if len(resp.Errors) < 100 {
 				resp.Errors = append(resp.Errors, err.Error())
 			}
 		} else {
-			for _, p := range processed {
-				if p != nil {
-					resp.Imported++
-				} else {
-					resp.Failed++
+			// processed holds only the committed documents; the pages that
+			// failed inside a partly successful batch are counted by the batch
+			// response. Counting processed alone reported them as neither
+			// imported nor failed.
+			resp.Imported += len(processed)
+			resp.Failed += int(batchResp.Failed)
+			for _, e := range batchResp.Errors {
+				if len(resp.Errors) < 100 {
+					resp.Errors = append(resp.Errors, e)
 				}
 			}
 			s.firePostBatchHooks(req.Collection, processed, postBatchOptions{
