@@ -150,7 +150,7 @@ func isWritable(dir string) bool {
 	}
 	name := f.Name()
 	_ = f.Close()
-	_ = os.Remove(name)
+	_ = os.Remove(name) // #nosec G703 -- the temp file CreateTemp just made, not input
 	return true
 }
 

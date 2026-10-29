@@ -51,9 +51,9 @@ func TestAlias_APIAndValidation(t *testing.T) {
 		t.Fatalf("put: %d %s", rec.Code, rec.Body.String())
 	}
 	for body, why := range map[string]string{
-		`{"collection":""}`:        "no collection",
-		`{"collection":"docs"}`:    "alias to an alias",
-		`{`:                        "bad json",
+		`{"collection":""}`:     "no collection",
+		`{"collection":"docs"}`: "alias to an alias",
+		`{`:                     "bad json",
 	} {
 		if rec := aliasREST(s, http.MethodPut, "/v1/aliases/other", body); rec.Code != 400 {
 			t.Fatalf("%s: %d", why, rec.Code)
