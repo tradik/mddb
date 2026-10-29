@@ -93,7 +93,14 @@ func (s *mcpAPIKeyStore) Create(name string, expiresAt int64, toolsets ...string
 	}
 
 	err = s.handle().Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte(mcpAPIKeyBucket))
+		// The bucket is created at startup, but a restore or replication
+		// snapshot can install a database that never had it; the other
+		// methods treat that as "no keys", so Create recreates it rather than
+		// writing into a nil bucket.
+		b, err := tx.CreateBucketIfNotExists([]byte(mcpAPIKeyBucket))
+		if err != nil {
+			return err
+		}
 		return b.Put([]byte(key), data)
 	})
 	if err != nil {

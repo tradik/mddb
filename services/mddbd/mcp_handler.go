@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"log/slog"
 	"os"
@@ -426,26 +427,24 @@ func (h *MCPHandler) HandleJSONWithNotifier(reqJSON []byte, notify func(map[stri
 // runMCPStdio runs the MCP stdio loop on the Server.
 func (s *Server) runMCPStdio() {
 	log.SetOutput(os.Stderr) // MCP uses stdout for protocol
+	s.serveMCPStdio(os.Stdin, os.Stdout)
+}
 
+// serveMCPStdio is the stdio loop on an arbitrary reader and writer: one
+// JSON-RPC message per line in, one response per line out. runMCPStdio binds
+// it to the process's stdin and stdout; tests drive it with buffers.
+func (s *Server) serveMCPStdio(in io.Reader, out io.Writer) {
 	customTools := loadMCPCustomTools()
 	client := NewDirectClient(s)
 	handler := NewMCPHandlerWithConfig(client, customTools, s.MCPInfo, s.MCPInstructions, s.Mode, s.Config.MCP.Mode).WithMetrics(s.Metrics)
 
-	scanner := bufio.NewScanner(os.Stdin)
+	scanner := bufio.NewScanner(in)
 	scanner.Buffer(make([]byte, 0, 4*1024*1024), 4*1024*1024) // 4MB buffer
 
 	// GO-021: stdio can deliver notifications mid-request because the loop
 	// handles one request at a time on one goroutine — anything written during
 	// Handle is already ordered before the response that follows it.
-	notify := func(n map[string]interface{}) {
-		data, err := json.Marshal(n)
-		if err != nil {
-			slog.Warn("MCP notification could not be encoded", "err", err)
-			return
-		}
-		_, _ = os.Stdout.Write(data)
-		_, _ = os.Stdout.Write([]byte("\n"))
-	}
+	notify := mcpStdioNotifier(out)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -464,11 +463,26 @@ func (s *Server) runMCPStdio() {
 			continue
 		}
 
-		_, _ = os.Stdout.Write(resp)
-		_, _ = os.Stdout.Write([]byte("\n"))
+		_, _ = out.Write(resp)
+		_, _ = out.Write([]byte("\n"))
 	}
 
 	if err := scanner.Err(); err != nil {
 		slog.Warn("MCP stdio scanner error", "err", err)
+	}
+}
+
+// mcpStdioNotifier returns the notify callback for the stdio transport: each
+// notification is written to out as one line of JSON. A notification that
+// cannot be encoded is logged and dropped rather than breaking the stream.
+func mcpStdioNotifier(out io.Writer) func(map[string]interface{}) {
+	return func(n map[string]interface{}) {
+		data, err := json.Marshal(n)
+		if err != nil {
+			slog.Warn("MCP notification could not be encoded", "err", err)
+			return
+		}
+		_, _ = out.Write(data)
+		_, _ = out.Write([]byte("\n"))
 	}
 }

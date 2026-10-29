@@ -122,13 +122,23 @@ func newMCPOAuthFromEnv(keys *MCPAPIKeyMiddleware) *mcpOAuth {
 	return o
 }
 
-func newMCPOAuth(issuer, secret string, keys *MCPAPIKeyMiddleware) (*mcpOAuth, error) {
-	k := sha256.Sum256([]byte(secret))
-	block, err := aes.NewCipher(k[:])
+// mcpOAuthNewAEAD builds the cipher that seals OAuth codes and tokens. It is a
+// variable so a test can stand in a failing one: with the SHA-256-derived
+// 32-byte key the real constructor cannot fail.
+var mcpOAuthNewAEAD = newOAuthAEAD
+
+// newOAuthAEAD returns AES-GCM keyed with key (16, 24 or 32 bytes).
+func newOAuthAEAD(key []byte) (cipher.AEAD, error) {
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-	aead, err := cipher.NewGCM(block)
+	return cipher.NewGCM(block)
+}
+
+func newMCPOAuth(issuer, secret string, keys *MCPAPIKeyMiddleware) (*mcpOAuth, error) {
+	k := sha256.Sum256([]byte(secret))
+	aead, err := mcpOAuthNewAEAD(k[:])
 	if err != nil {
 		return nil, err
 	}
