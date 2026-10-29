@@ -140,24 +140,18 @@ func combineResults(parsed *ParsedQuery, positive []map[string]*boolDocScore) ma
 		}
 	}
 
-	// Apply subsequent clauses
-	clauseIdx := 1
-	for i := 1; i < len(parsed.Clauses); i++ {
-		clause := parsed.Clauses[i]
-		if clause.IsNegated {
-			continue // negated clauses handled separately
-		}
-		if clauseIdx >= len(positive) {
-			break
-		}
-
-		op := clause.Operator
+	// Apply subsequent clauses. positive[j] holds the results of the j-th
+	// non-negated clause, so it is joined by that clause's operator — not by
+	// the operator at index j of all clauses: with a leading NOT those differ,
+	// and "NOT a b OR c" used to intersect b and c instead of uniting them.
+	ops := positiveOperators(parsed)
+	for j := 1; j < len(positive) && j < len(ops); j++ {
+		op := ops[j]
 		if op == "" {
 			op = parsed.DefaultOp
 		}
 
-		clauseResult := positive[clauseIdx]
-		clauseIdx++
+		clauseResult := positive[j]
 
 		switch op {
 		case "OR":
@@ -191,6 +185,18 @@ func combineResults(parsed *ParsedQuery, positive []map[string]*boolDocScore) ma
 	}
 
 	return combined
+}
+
+// positiveOperators lists the operator of every non-negated clause, in the
+// order SearchBoolean collects their results.
+func positiveOperators(parsed *ParsedQuery) []string {
+	ops := make([]string, 0, len(parsed.Clauses))
+	for _, c := range parsed.Clauses {
+		if !c.IsNegated {
+			ops = append(ops, c.Operator)
+		}
+	}
+	return ops
 }
 
 // searchSingleTerm performs BM25 search for a single term (used by boolean search).
