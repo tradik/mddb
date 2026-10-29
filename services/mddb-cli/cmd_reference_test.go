@@ -280,10 +280,11 @@ func TestReference_MoreFailures(t *testing.T) {
 }
 
 func TestReference_EdgeBranches(t *testing.T) {
-	// No cache directory: HOME and XDG_CACHE_HOME unset.
+	// No cache directory: HOME, XDG_CACHE_HOME and (Windows) LocalAppData unset.
 	t.Setenv("MDDB_REFERENCES_DIR", "")
 	t.Setenv("HOME", "")
 	t.Setenv("XDG_CACHE_HOME", "")
+	t.Setenv("LocalAppData", "")
 	if _, err := referencesRoot(); err == nil {
 		t.Fatal("no cache directory")
 	}
