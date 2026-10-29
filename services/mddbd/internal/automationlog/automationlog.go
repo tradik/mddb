@@ -30,6 +30,13 @@ type Entry struct {
 	DurationMs int64  `json:"durationMs"`
 	Error      string `json:"error,omitempty"`
 	Attempt    int    `json:"attempt"` // 1-based retry attempt
+	// Action is "backup" for a scheduled backup (OPS-023); empty for a
+	// webhook delivery.
+	Action string `json:"action,omitempty"`
+	// Target is where a backup went: a local path or s3://bucket/key.
+	Target string `json:"target,omitempty"`
+	// Removed lists the backups retention deleted after this one.
+	Removed []string `json:"removed,omitempty"`
 }
 
 // Store persists and queries automation execution logs in BoltDB.

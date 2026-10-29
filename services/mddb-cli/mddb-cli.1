@@ -529,6 +529,79 @@ mddb-cli backup
 mddb-cli backup my-backup.db
 .fi
 .RE
+.SS backup schedule add|list|remove
+Scheduled backups (v2.18.9+): cron automations whose action is a backup,
+taken by the server and kept to the newest
+.B --keep
+on a directory inside
+.B MDDB_BACKUP_DIR
+or in an S3-compatible bucket. The server runs them when
+.B MDDB_CRONS=true
+is set.
+.PP
+.B mddb-cli backup schedule add
+\fB\-\-name\fR \fINAME\fR \fB\-\-cron\fR \fIEXPR\fR [\fIOPTIONS\fR]
+.PP
+.B mddb-cli backup schedule list
+.PP
+.B mddb-cli backup schedule remove
+\fIID\fR
+.PP
+Options for add:
+.TP
+.BI \-\-name " NAME"
+Schedule name (required).
+.TP
+.BI \-\-cron " EXPR"
+Cron expression, five fields or six with seconds first (required).
+.TP
+.BI \-\-target " local|s3"
+Where backups go (default local).
+.TP
+.BI \-\-path " DIR"
+local: directory inside MDDB_BACKUP_DIR.
+.TP
+.BI \-\-bucket " NAME"
+s3: bucket.
+.TP
+.BI \-\-prefix " PREFIX"
+Start of every backup's name or key (default mddb-).
+.TP
+.BI \-\-keep " N"
+Backups kept on the target; the oldest are deleted only after a new one is
+stored. 0 keeps all.
+.TP
+.BI \-\-collections " A,B"
+Collections to back up (per-collection layout only; default all).
+.TP
+.BI \-\-endpoint " HOST[:PORT]" ", \-\-region " REGION ", \-\-access\-key " KEY
+s3: connection.
+.TP
+.BI \-\-secret\-key " KEY"
+s3: secret key (default
+.BR $MDDB_BACKUP_SECRET_KEY ).
+.TP
+.B \-\-tls
+s3: connect over HTTPS.
+.TP
+.B \-\-disabled
+Create the schedule disabled.
+.PP
+.B remove
+refuses an ID that is not a backup schedule; the backups already taken stay.
+.PP
+Examples:
+.RS
+.nf
+mddb-cli backup schedule add --name nightly --cron "0 3 * * *" --path nightly --keep 7
+MDDB_BACKUP_SECRET_KEY=... mddb-cli backup schedule add --name offsite \\
+  --cron "0 4 * * *" --target s3 --endpoint s3.eu-west-1.amazonaws.com --tls \\
+  --bucket mddb-backups --prefix prod-eu/ --access-key AKIA... --keep 30
+mddb-cli backup schedule list
+mddb-cli backup schedule remove 3f9c2a1b7d4e5f60
+.fi
+.RE
+
 .SS restore
 Restore the database from a backup file.
 .PP

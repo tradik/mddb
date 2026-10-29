@@ -247,8 +247,10 @@ in the webhook payload as `sentimentScore`.
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `schedule` | string | (required) | Cron expression (e.g., `"0 9 * * *"`) |
+| `schedule` | string | (required) | Cron expression (e.g., `"0 9 * * *"`), checked on create and update |
 | `triggerId` | string | (required) | ID of the trigger to execute |
+| `webhookId` | string | | The webhook to fire; required unless `backup` is set |
+| `backup` | object | | Take a backup instead of firing a webhook — see [Scheduled Backups](#scheduled-backups) |
 | `lastRun` | int64 | `0` | Unix timestamp of last execution |
 | `nextRun` | int64 | `0` | Unix timestamp of next scheduled execution |
 
@@ -623,6 +625,10 @@ MDDB uses the standard cron expression format with optional seconds support:
 0 0 */2 * * *      # Every 2 hours
 ```
 
+Before 2.18.9 the scheduler accepted only the six-field form: a five-field
+schedule was stored, then silently never ran. Both forms run now, and a
+schedule that does not parse is refused when the rule is created or updated.
+
 ### Common Schedules
 
 | Expression | Description |
@@ -682,6 +688,56 @@ curl -X POST http://localhost:11023/v1/automation \
     "enabled": true
   }'
 ```
+
+### Scheduled Backups
+
+Since 2.18.9 a cron rule can take a backup instead of firing a webhook: give
+it a `backup` object and no `webhookId` (a rule with both is refused). The
+same scheduler runs it, the same automation log records it, and each run is
+a job on the SSE stream. `mddb-cli backup schedule add|list|remove` manages
+these rules.
+
+```bash
+curl -X POST http://localhost:11023/v1/automation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "cron",
+    "name": "offsite nightly",
+    "schedule": "0 3 * * *",
+    "enabled": true,
+    "backup": {
+      "target": "s3",
+      "bucket": "mddb-backups",
+      "prefix": "prod-eu/",
+      "keep": 7,
+      "storageConfig": {"endpoint": "s3.eu-west-1.amazonaws.com", "region": "eu-west-1",
+                        "accessKey": "AKIA...", "secretKey": "...", "useTLS": true}
+    }
+  }'
+```
+
+| `backup` field | Default | Description |
+|---|---|---|
+| `target` | `local` | `local` (a directory inside `MDDB_BACKUP_DIR`) or `s3` (any S3-compatible store) |
+| `path` | | `local`: the directory, relative to `MDDB_BACKUP_DIR` |
+| `bucket` | `storageConfig.bucket` | `s3`: the bucket |
+| `prefix` | `storageConfig.prefix`, then `mddb-` | start of every backup's name or key |
+| `keep` | `0` | backups kept on the target; the oldest are deleted only after a new one is stored. `0` keeps all |
+| `collections` | `["*"]` | a subset needs `MDDB_STORAGE_LAYOUT=per-collection` |
+| `storageConfig` | | `s3`: `endpoint`, `region`, `accessKey`, `secretKey`, `useTLS` |
+
+Reads (`GET`, list, and the rule returned by create and update) blank
+`storageConfig.secretKey` and set `secretKeySet: true`; an update that sends
+no `secretKey` keeps the stored one. An update that names neither a
+`webhookId` nor a `backup` — the gRPC rule message has no backup field —
+keeps the rule's backup.
+
+A backup run's log entry has `action: "backup"`, `target` (where the backup
+is) and `removed` (what retention deleted). A failed run fires the
+`backup.failed` webhook event, and `/metrics` carries
+`mddb_backup_last_success_timestamp{rule="<id>"}`. The whole procedure —
+verification, checksums, restoring from S3 — is in
+[BACKUP.md](BACKUP.md#scheduled-backups).
 
 ---
 

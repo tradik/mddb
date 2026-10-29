@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 
 	bolt "go.etcd.io/bbolt"
@@ -34,7 +35,12 @@ import (
 // below go through an os.Root on dst's directory: the temporary file, the
 // rename and the collection files cannot leave that directory, even through
 // a symlink created in it after safeBackupPath checked the path.
-func (s *Server) backupTo(dst string) error {
+func (s *Server) backupTo(dst string) error { return s.backupCollections(dst, nil) }
+
+// backupCollections is backupTo with, in the per-collection layout, only the
+// files of the collections in only copied — every collection when only is
+// nil. A scheduled backup of a few collections (OPS-023) is this.
+func (s *Server) backupCollections(dst string, only []string) error {
 	dir, err := os.OpenRoot(filepath.Dir(dst)) // NOSONAR gosecurity:S2083 -- dst is safeBackupPath's output, confined to the backup directory
 	if err != nil {
 		return err
@@ -57,7 +63,7 @@ func (s *Server) backupTo(dst string) error {
 		defer func() { _ = subDir.Close() }()
 		for _, c := range cf.names() {
 			db := cf.get(c)
-			if db == nil {
+			if db == nil || (only != nil && !slices.Contains(only, c)) {
 				continue
 			}
 			if err := backupFile(db, &s.restoreMu, subDir, collectionFileName(c)); err != nil {

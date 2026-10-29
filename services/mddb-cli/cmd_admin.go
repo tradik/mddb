@@ -89,6 +89,7 @@ func newBackupCmd() *cobra.Command {
 			return nil
 		},
 	}
+	backupCmd.AddCommand(newBackupScheduleCmd())
 	return backupCmd
 }
 

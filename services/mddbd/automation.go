@@ -50,6 +50,10 @@ type AutomationRule struct {
 	TriggerID string `json:"triggerId,omitempty"`
 	LastRun   int64  `json:"lastRun,omitempty"`
 	NextRun   int64  `json:"nextRun,omitempty"`
+
+	// Backup is a cron rule's other action (OPS-023): a backup instead of a
+	// webhook. See automation_backup.go.
+	Backup *BackupAction `json:"backup,omitempty"`
 }
 
 // AutomationManager manages automation rules (webhooks, triggers, crons).
@@ -159,7 +163,8 @@ func (am *AutomationManager) Create(rule AutomationRule) (*AutomationRule, error
 	am.rules = append(am.rules, rule)
 	am.mu.Unlock()
 
-	return &rule, nil
+	out := rule.redacted()
+	return &out, nil
 }
 
 // Update modifies an existing automation rule.
@@ -184,8 +189,10 @@ func (am *AutomationManager) Update(id string, update AutomationRule) (*Automati
 	update.CreatedAt = existing.CreatedAt
 	update.UpdatedAt = time.Now().Unix()
 
-	// Preserve lastRun/nextRun for crons
+	// Preserve lastRun/nextRun for crons, and what a client of the backup
+	// action could not send back.
 	if update.Type == "cron" {
+		carryOverBackup(&update, existing)
 		if update.LastRun == 0 {
 			update.LastRun = existing.LastRun
 		}
@@ -228,7 +235,8 @@ func (am *AutomationManager) Update(id string, update AutomationRule) (*Automati
 	}
 	am.mu.Unlock()
 
-	return &update, nil
+	out := update.redacted()
+	return &out, nil
 }
 
 // Delete removes an automation rule by ID.
@@ -256,8 +264,19 @@ func (am *AutomationManager) Delete(id string) error {
 	return nil
 }
 
-// Get returns a single rule by ID.
+// Get returns a single rule by ID, its secrets blanked (see redacted).
 func (am *AutomationManager) Get(id string) *AutomationRule {
+	rule := am.stored(id)
+	if rule == nil {
+		return nil
+	}
+	out := rule.redacted()
+	return &out
+}
+
+// stored returns a copy of a rule as stored, secrets included — for the
+// server's own use (running a scheduled backup), never for a client.
+func (am *AutomationManager) stored(id string) *AutomationRule {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
 	for i := range am.rules {
@@ -277,7 +296,7 @@ func (am *AutomationManager) List(filterType string) []AutomationRule {
 	result := make([]AutomationRule, 0, len(am.rules))
 	for _, r := range am.rules {
 		if filterType == "" || r.Type == filterType {
-			result = append(result, r)
+			result = append(result, r.redacted())
 		}
 	}
 	return result
@@ -363,6 +382,10 @@ func (am *AutomationManager) validateRule(rule *AutomationRule) error {
 		return fmt.Errorf("name is required")
 	}
 
+	if rule.Backup != nil && rule.Type != "cron" {
+		return fmt.Errorf("backup is an action of a cron rule, not of a %s", rule.Type)
+	}
+
 	switch rule.Type {
 	case "webhook":
 		rule.URL = strings.TrimSpace(rule.URL)
@@ -430,13 +453,10 @@ func (am *AutomationManager) validateRule(rule *AutomationRule) error {
 		if rule.Schedule == "" {
 			return fmt.Errorf("schedule is required for cron")
 		}
-		if rule.WebhookID == "" {
-			return fmt.Errorf("webhookId is required for cron")
+		if _, err := cronParser.Parse(rule.Schedule); err != nil {
+			return fmt.Errorf("invalid schedule %q: %w", rule.Schedule, err)
 		}
-		// Verify webhook exists
-		if am.GetWebhook(rule.WebhookID) == nil {
-			return fmt.Errorf("webhook not found: %s", rule.WebhookID)
-		}
+		return am.validateCronAction(rule)
 	default:
 		return fmt.Errorf("invalid type: %s (valid: webhook, trigger, cron)", rule.Type)
 	}

@@ -123,6 +123,18 @@ Miss ratio per tool: `sum by (label) (rate(mddb_operations_total{operation="mcp_
 The names behind the misses are in the log, not the metric — see
 [MCP.md](MCP.md#request-logging).
 
+### Scheduled backups (v2.18.9+)
+
+Set by the scheduled backups of [BACKUP.md](BACKUP.md#scheduled-backups);
+absent until a backup rule has stored a backup.
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `mddb_backup_last_success_timestamp` | gauge | `rule` (automation rule ID) | Unix time of the last backup the rule stored and verified |
+| `mddb_operations_total{operation="backup_failed"}` | counter | `label` (rule ID) | Scheduled backup runs that failed |
+
+Alert when a nightly backup is late: `time() - mddb_backup_last_success_timestamp > 26 * 3600`.
+
 ### Database
 
 | Metric | Type | Labels | Description |

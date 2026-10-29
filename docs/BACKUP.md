@@ -47,6 +47,96 @@ file was still being written.
 | `MDDB_BACKUP_VERIFY` | `true` | `false` skips the check after a backup. Restores are always checked. |
 | `MDDB_VERIFY_TIMEOUT` | `1h` | Longest a check may run. Walking a multi-gigabyte file on a cold spinning disk has been reported at over 40 minutes. |
 
+## Scheduled backups
+
+Since 2.18.9 the server takes backups on a schedule itself: a cron
+automation ([AUTOMATIONS.md](AUTOMATIONS.md#scheduled-backups)) with a
+`backup` action instead of a webhook. It needs `MDDB_CRONS=true`.
+
+```bash
+mddb-cli backup schedule add --name nightly --cron "0 3 * * *" --path nightly --keep 7
+mddb-cli backup schedule list
+mddb-cli backup schedule remove <id>      # the backups it took stay
+```
+
+or, through the API:
+
+```bash
+curl -X POST http://localhost:11023/v1/automation -H 'Content-Type: application/json' -d '{
+  "type": "cron", "name": "nightly", "schedule": "0 3 * * *", "enabled": true,
+  "backup": {"target": "local", "path": "nightly", "keep": 7}
+}'
+```
+
+Each run:
+
+1. writes the backup with the same code as `GET /v1/backup`: a consistent
+   copy, checked by opening it as a restore would (unless
+   `MDDB_BACKUP_VERIFY=false`);
+2. writes `<name>.sha256`, the sha256 of every file of the backup in
+   `sha256sum` format (`sha256sum -c` checks a copy anywhere);
+3. stores it on the target. For S3 every object is read back and its sha256
+   compared with the file's;
+4. only then deletes the oldest backups until `keep` remain. A failed run
+   deletes nothing, so a schedule that keeps failing never eats into the
+   backups it already has.
+
+Backups are named `<prefix><UTC time>.db`, for example
+`mddb-20261030T030000Z.db`. Retention only ever looks at names of that
+form under the rule's prefix. Two rules writing to one place should have
+different prefixes. Automations replicate, and every node with
+`MDDB_CRONS=true` runs them: in a replicated setup enable crons on one node,
+or the nodes write — and prune — the same names.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `target` | `local` | `local` or `s3` |
+| `path` | | `local`: directory inside `MDDB_BACKUP_DIR`, so `POST /v1/restore` finds the backups there |
+| `bucket` | `storageConfig.bucket` | `s3`: the bucket, created if missing |
+| `prefix` | `storageConfig.prefix`, then `mddb-` | the start of every name (local) or key (S3; `/` allowed, e.g. `prod-eu/`) |
+| `keep` | `0` | how many backups the target keeps; `0` keeps all |
+| `collections` | `["*"]` | in the per-collection layout, the collections whose files go into the backup. A restore puts back exactly what the backup holds, so a collection left out is not in the restored database. In the single-file layout only `["*"]` is accepted. |
+| `storageConfig` | | `s3`: `endpoint`, `region`, `accessKey`, `secretKey`, `useTLS` — the block an S3-backed collection uses ([config.md](config.md)). Reads blank `secretKey` and set `secretKeySet`; an update without `secretKey` keeps the stored one. |
+
+**S3-compatible targets.** Anything that speaks the S3 API works through the
+same client as S3-backed collections: AWS S3, MinIO, Cloudflare R2, Google
+Cloud Storage and Azure through their S3 interfaces. The objects mirror the
+local files: `<prefix><time>.db`, `<prefix><time>.db.sha256` and, in the
+per-collection layout, `<prefix><time>.db.d/<collection>.db`. A run is
+written to `MDDB_BACKUP_DIR/.scheduled-staging/` first and the staging copy
+is removed afterwards, so the backup directory needs room for one backup.
+
+**Restoring from S3.** Fetch the backup's objects into `MDDB_BACKUP_DIR`
+with any S3 tool, check them, and restore as usual:
+
+```bash
+cd "$MDDB_BACKUP_DIR"
+aws s3 cp --recursive s3://mddb-backups/prod-eu/ fetched/ \
+  --exclude '*' --include 'mddb-20261030T030000Z.db*'
+(cd fetched && sha256sum -c mddb-20261030T030000Z.db.sha256)
+curl -X POST http://localhost:11023/v1/restore \
+  -H 'Content-Type: application/json' -d '{"from": "fetched/mddb-20261030T030000Z.db"}'
+```
+
+**Watching it.**
+
+- Every run is in the automation log (`GET /v1/automation-logs?ruleId=<id>`)
+  with `action: "backup"`, `target` (the path or `s3://bucket/key`),
+  `status`, `error` and `removed` (what retention deleted).
+- `mddb_backup_last_success_timestamp{rule="<id>"}` on `/metrics` is the time
+  of the last stored backup. Alert on it, e.g.
+  `time() - mddb_backup_last_success_timestamp > 26 * 3600`.
+- A failed run fires the `backup.failed` webhook event, with
+  `{ruleId, ruleName, target, backup, error}` in `detail`.
+- Each run is a job on the SSE stream (`GET /v1/events`): `job.started`,
+  `job.progress` for each step (written, hashed, stored, pruned; `total` 4),
+  then `job.completed` or `job.failed`. Its `collection` is `*`, so a client
+  needs read permission on every collection to see it.
+
+A run still going when its next one is due makes that one skip (logged as
+`skipped`). A run that stored its backup but could not prune reports an
+error and still sets the metric: the backup is there.
+
 ## Restoring
 
 ```bash

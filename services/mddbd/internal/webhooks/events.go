@@ -8,4 +8,6 @@ const (
 	EventReplicationLagHigh = "ops.replication_lag_high"
 	EventPanicRecovered     = "ops.panic_recovered"
 	EventDiskUsageHigh      = "ops.disk_usage_high"
+	// EventBackupFailed: a scheduled backup (OPS-023) did not complete.
+	EventBackupFailed = "backup.failed"
 )

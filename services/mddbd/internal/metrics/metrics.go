@@ -28,6 +28,7 @@ type Metrics struct {
 	reqCount   map[string]int64      // "method|path|status" -> count
 	histograms map[string]*histogram // "method|path" -> histogram
 	opsCount   map[string]int64      // operation counters (e.g. "fts_search|bm25" -> count)
+	gauges     map[string]*gauge     // event-set gauges by name (gauges.go)
 }
 
 // StatsProvider supplies the server/runtime gauges that the /metrics endpoint
@@ -307,6 +308,9 @@ func (m *Metrics) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 		buf.WriteString("\n")
 	}
+
+	// --- Gauges set by events (gauges.go) ---
+	m.writeGauges(&buf)
 
 	// --- Database metrics (cached) ---
 	ds := m.stats.DBStats()

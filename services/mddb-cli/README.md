@@ -215,6 +215,33 @@ mddb-cli backup
 mddb-cli backup my-backup.db
 ```
 
+#### backup schedule - Scheduled backups (v2.18.9+)
+
+The server takes these itself, on a cron schedule, and keeps the newest
+`--keep` on a directory inside `MDDB_BACKUP_DIR` or in an S3-compatible
+bucket. They are cron automations with a backup action and run when the
+server has `MDDB_CRONS=true` (see `docs/BACKUP.md#scheduled-backups`).
+
+```bash
+# Nightly at 03:00, seven kept in MDDB_BACKUP_DIR/nightly
+mddb-cli backup schedule add --name nightly --cron "0 3 * * *" --path nightly --keep 7
+
+# Offsite to S3 (or MinIO, R2...); the secret comes from MDDB_BACKUP_SECRET_KEY
+export MDDB_BACKUP_SECRET_KEY=...
+mddb-cli backup schedule add --name offsite --cron "0 4 * * *" --target s3 \
+  --endpoint s3.eu-west-1.amazonaws.com --region eu-west-1 --tls \
+  --bucket mddb-backups --prefix prod-eu/ --access-key AKIA... --keep 30
+
+mddb-cli backup schedule list
+mddb-cli backup schedule remove <id>     # the backups already taken stay
+```
+
+`add` flags: `--name`, `--cron` (both required; 5 fields, or 6 with seconds
+first), `--target local|s3`, `--path`, `--bucket`, `--prefix`, `--keep`,
+`--collections a,b` (per-collection layout only), `--endpoint`, `--region`,
+`--access-key`, `--secret-key` (default `$MDDB_BACKUP_SECRET_KEY`), `--tls`,
+`--disabled`. `remove` refuses an ID that is not a backup schedule.
+
 #### restore - Restore from backup
 
 ```bash

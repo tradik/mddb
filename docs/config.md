@@ -182,6 +182,7 @@ Security and operational incidents are delivered through the existing `/v1/webho
 | `ops.replication_lag_high` | Follower lag exceeds threshold on poll | `{lagMs, thresholdMs}` |
 | `ops.panic_recovered` | An HTTP handler panicked and was recovered by the middleware | `{method, path, panic, ip}` |
 | `ops.disk_usage_high` | DB filesystem used-% ≥ threshold | `{path, usedBytes, totalBytes, usedPct, thresholdPct}` |
+| `backup.failed` | A scheduled backup failed (2.18.9, [BACKUP.md](BACKUP.md#scheduled-backups)) | `{ruleId, ruleName, target, backup, error}` |
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|

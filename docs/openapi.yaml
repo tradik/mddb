@@ -4725,6 +4725,11 @@ paths:
         `job.progress` is throttled to one event per second per job; terminal
         events are not throttled.
 
+        A scheduled backup (2.18.9) is a job too: its id is
+        `backup-<ruleId>-<UTC time>`, its collection `*` (read permission on
+        every collection is needed to see it), `total` 4 and one
+        `job.progress` per step (written, hashed, stored, pruned).
+
         Default enabled (MDDB_SSE_ENABLED=false to disable).
       operationId: sseEvents
       parameters:
@@ -8491,8 +8496,12 @@ components:
           type: array
           items:
             type: string
-            enum: [ doc.added, doc.updated, doc.deleted ]
-          description: Event types to listen for
+            enum: [ doc.added, doc.updated, doc.deleted,
+              security.auth_failure_burst, security.rate_limit_exceeded,
+              ops.replication_lag_high, ops.panic_recovered,
+              ops.disk_usage_high, backup.failed ]
+          description: Event types to listen for. `backup.failed` (2.18.9)
+            fires when a scheduled backup fails.
           example: [ doc.added, doc.updated ]
         collection:
           type: string
@@ -8519,8 +8528,12 @@ components:
           type: array
           items:
             type: string
-            enum: [ doc.added, doc.updated, doc.deleted ]
-          description: Event types to listen for
+            enum: [ doc.added, doc.updated, doc.deleted,
+              security.auth_failure_burst, security.rate_limit_exceeded,
+              ops.replication_lag_high, ops.panic_recovered,
+              ops.disk_usage_high, backup.failed ]
+          description: Event types to listen for. `backup.failed` (2.18.9)
+            fires when a scheduled backup fails.
           example: [ doc.added, doc.updated ]
         collection:
           type: string
@@ -10338,7 +10351,8 @@ components:
           description: Minimum score threshold 0-100 (type=trigger)
         webhookId:
           type: string
-          description: Target webhook ID (type=trigger, type=cron)
+          description: Target webhook ID (type=trigger; type=cron unless
+            `backup` is set)
         searchParams:
           type: object
           description: Extra search parameters (type=trigger)
@@ -10369,7 +10383,9 @@ components:
           description: How to combine search + sentiment conditions (type=trigger)
         schedule:
           type: string
-          description: Cron expression e.g. "0 9 * * *" (type=cron)
+          description: Cron expression, five fields or six with seconds
+            first, e.g. "0 3 * * *" (type=cron). Refused if it does not
+            parse.
         triggerId:
           type: string
           description: Target trigger ID (type=cron)
@@ -10381,6 +10397,46 @@ components:
           type: integer
           readOnly: true
           description: Next scheduled execution (type=cron)
+        backup:
+          $ref: "#/components/schemas/BackupAction"
+
+    BackupAction:
+      type: object
+      description: |
+        A cron rule's backup action (2.18.9), instead of `webhookId`. Each run
+        writes a verified backup, its `.sha256` checksum file, stores it on
+        the target and then deletes the oldest until `keep` remain. See
+        docs/BACKUP.md#scheduled-backups.
+      properties:
+        target:
+          type: string
+          enum: [ local, s3 ]
+          default: local
+        path:
+          type: string
+          description: local — directory inside MDDB_BACKUP_DIR
+        bucket:
+          type: string
+          description: s3 — bucket (default storageConfig.bucket)
+        prefix:
+          type: string
+          default: mddb-
+          description: Start of every backup's name or key; letters, digits,
+            '.', '_', '-' and (s3 only) '/'
+        keep:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Backups kept on the target; 0 keeps all
+        collections:
+          type: array
+          items:
+            type: string
+          default: [ "*" ]
+          description: '["*"] or the collections to back up (per-collection
+            layout only)'
+        storageConfig:
+          $ref: "#/components/schemas/StorageConfigDef"
 
     TriggerMatch:
       type: object
@@ -10421,6 +10477,18 @@ components:
           type: string
         attempt:
           type: integer
+        action:
+          type: string
+          enum: [ backup ]
+          description: Set for a scheduled backup run (2.18.9)
+        target:
+          type: string
+          description: Where the backup went — a path or s3://bucket/key
+        removed:
+          type: array
+          items:
+            type: string
+          description: Backups retention deleted after this one
 
     SearchStats:
       type: object
