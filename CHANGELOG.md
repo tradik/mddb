@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **LangGraph Store on MDDB: `MddbStore` (INT-020).** `langchain-mddb`
+  implements LangGraph's `BaseStore`, sync and async (`put`, `get`, `delete`,
+  `search`, `list_namespaces`, `batch`), on one MDDB collection. This gives
+  long-term graph memory, Deep Agents' `StoreBackend` and LangMem an MDDB
+  backend.
+  - **Storage.** Each item is one document. The key is the escaped namespace
+    plus the item key. The value is stored as JSON, so nested dicts and
+    Unicode round-trip exactly.
+  - **Search.** `meta.nsPrefix` makes a namespace-prefix search one indexed
+    filter. `search(query=...)` is hybrid search with a `score`. Without a
+    query, items come back newest first.
+  - **Filters.** `filter` is equality on top-level scalars. Comparison
+    operators raise `NotImplementedError` instead of being dropped.
+  - **TTL.** It takes `default_ttl` and refreshes on read.
+  - **Packaging.** A new extra `[store]` brings `langgraph>=1.2.18`. The
+    `langchain-core` minimum rises to `>=1.7`.
+
 ### Changed
 
 - **SonarCloud can run through the sonar-scanner (OPS-021).** Automatic
