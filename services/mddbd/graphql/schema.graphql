@@ -124,6 +124,40 @@ type VectorSearchResponse {
   dimensions: Int
   "Set instead of results when the input asked for format passages (AGT-002)."
   passages: [Passage!]
+  "How the search ran and why (SRCH-013); null unless the input set explain."
+  plan: SearchPlan
+}
+
+"How a vector search ran and why (SRCH-013): the index chosen and the reasons."
+type SearchPlan {
+  algorithm: String!
+  "The filter was applied first and the admitted documents scanned exactly."
+  prefilter: Boolean!
+  "Hits the index was asked for: topK × oversample."
+  candidates: Int!
+  "A filtered index search came back short and the scan continued further."
+  iterativeScan: Boolean!
+  reasons: [String!]!
+  "The correction relevance feedback made (SRCH-015); null without examples."
+  feedback: FeedbackApplied
+}
+
+"""
+What relevance feedback did (SRCH-015). alpha, beta, gamma and queryShift
+are set in query mode; weight and rescored in rescore mode; the rest are 0.
+"""
+type FeedbackApplied {
+  mode: String!
+  positive: Int!
+  negative: Int!
+  alpha: Float!
+  beta: Float!
+  gamma: Float!
+  "1 − cosine(query, corrected query): how far the examples moved it."
+  queryShift: Float!
+  weight: Float!
+  "Candidates that had a vector to rescore."
+  rescored: Int!
 }
 
 # Full-text search result
@@ -306,6 +340,38 @@ input VectorSearchInput {
   "results (default) or passages: path, lines, symbol and text per hit (AGT-002)."
   format: String
   passageLines: Int
+  """
+  flat (default, or the collection profile's), auto (SRCH-013: the planner
+  picks), hnsw, ivf, pq, opq, sq, sq4 or bq.
+  """
+  algorithm: String
+  "Return the plan — the index chosen and why (SRCH-013)."
+  explain: Boolean
+  "Optional goal for algorithm auto, 0-60000 ms; a tight one favours a quantized index."
+  latencyTargetMs: Int
+  "Relevance feedback (SRCH-015): documents or vectors like the ones wanted, at most 50."
+  positive: [FeedbackExampleInput!]
+  "Documents or vectors unlike the ones wanted, at most 50."
+  negative: [FeedbackExampleInput!]
+  "query (default: move the query, Rocchio) or rescore (re-rank the candidates)."
+  feedbackMode: String
+  "How far rescore mode shifts a score, 0-10; omit for 0.5."
+  feedbackWeight: Float
+  "Rocchio weights for query mode; omitted ones keep 1, 0.75, 0.25."
+  rocchio: RocchioInput
+}
+
+"A relevance-feedback example (SRCH-015): a document key or ID, or a vector — one, not both."
+input FeedbackExampleInput {
+  key: String
+  vector: [Float!]
+}
+
+"Rocchio coefficients (SRCH-015): query, positive centroid, negative centroid."
+input RocchioInput {
+  alpha: Float
+  beta: Float
+  gamma: Float
 }
 
 """

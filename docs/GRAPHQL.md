@@ -309,6 +309,43 @@ query {
 }
 ```
 
+**Query planner and relevance feedback (v2.18.9+):** `vectorSearch` takes
+the same fields as `POST /v1/vector-search`, and runs the same code.
+`algorithm: "auto"` lets the planner pick the index
+([auto](SEARCH.md#auto-the-server-chooses-v2189)); `explain: true` returns
+`plan`, which is `null` otherwise. `positive` and `negative` take examples
+from earlier results, each `{key}` (a document key or ID) or `{vector}`, not
+both ([Relevance Feedback](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189)):
+
+```graphql
+query {
+  vectorSearch(input: {
+    collection: "kb"
+    query: "rotate the signing key"
+    topK: 10
+    algorithm: "auto"
+    latencyTargetMs: 20
+    explain: true
+    positive: [{ key: "key-rotation" }]
+    negative: [{ key: "tls-certificates" }]
+    feedbackMode: "query"            # or "rescore", with feedbackWeight
+    rocchio: { beta: 1.0 }
+  }) {
+    results { document { key } score }
+    plan {
+      algorithm prefilter candidates iterativeScan reasons
+      feedback { mode positive negative alpha beta gamma queryShift weight rescored }
+    }
+  }
+}
+```
+
+A refused input (an unknown `feedbackMode`, an example with both or neither
+of `key` and `vector`, a key with no embedding, `latencyTargetMs` out of
+range) is a GraphQL error carrying the message REST returns with its 422.
+In `plan.feedback`, the fields the mode does not use are `0`. GraphQL has no
+hybrid search; use REST, MCP or gRPC for `vectorAlgorithm` there.
+
 ### Full-Text Search
 
 ```graphql

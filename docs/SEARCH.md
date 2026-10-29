@@ -888,6 +888,12 @@ target on its own: the response has `"algorithm": "auto"` and one plan per
 target under `plan.collections`. Without `explain` the response has no
 `plan`. Agents should send `auto` rather than guess an index.
 
+- **Surfaces.** `algorithm`, `explain` and `latencyTargetMs` work on REST
+  (`/v1/vector-search`, `/v1/hybrid-search` as `vectorAlgorithm`,
+  `/v1/cross-search`), MCP (`semantic_search`, `hybrid_search`,
+  `cross_search`), gRPC and GraphQL `vectorSearch`, where `plan` is a
+  `SearchPlan` ([GRAPHQL.md](GRAPHQL.md#vector-search-semantic-search)).
+
 ### API Examples
 
 ```bash
@@ -1057,6 +1063,11 @@ curl -X POST http://localhost:11023/v1/vector-search \
   mode, the example counts, and either the Rocchio weights and `queryShift`
   (1 − cosine between the query and the corrected query) or the rescore
   `weight` and how many candidates were rescored.
+- **Surfaces.** Vector, hybrid and cross search on REST, MCP and gRPC, and
+  GraphQL `vectorSearch`, where an example is `{key: "..."}` or
+  `{vector: [...]}` and `rocchio` is an input object
+  ([GRAPHQL.md](GRAPHQL.md#vector-search-semantic-search)). All of them go
+  through one implementation and refuse the same inputs with the same message.
 
 Measured in [BENCHMARK.md](BENCHMARK.md#relevance-feedback-v2189): one round
 of feedback raises recall@10 from 0.31 to 0.49–0.50 on a corpus built so

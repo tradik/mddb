@@ -134,7 +134,13 @@ func TestStatsWalkEdges(t *testing.T) {
 	if val != nil || !pending {
 		t.Errorf("a walk still running: %v %v", val, pending)
 	}
+	// Wait for the walk to end: it reads slowWalk, which the deferred reset
+	// above writes when the test returns.
+	fresh.walks.mu.Lock()
+	running := fresh.walks.entries["slow"].running
+	fresh.walks.mu.Unlock()
 	close(block)
+	<-running
 
 	// A failed walk keeps what there was; with nothing before, nothing.
 	// (Single-file layout: with per-collection files the walk reads only

@@ -139,6 +139,18 @@ type ComplexityRoot struct {
 		Score        func(childComplexity int) int
 	}
 
+	FeedbackApplied struct {
+		Alpha      func(childComplexity int) int
+		Beta       func(childComplexity int) int
+		Gamma      func(childComplexity int) int
+		Mode       func(childComplexity int) int
+		Negative   func(childComplexity int) int
+		Positive   func(childComplexity int) int
+		QueryShift func(childComplexity int) int
+		Rescored   func(childComplexity int) int
+		Weight     func(childComplexity int) int
+	}
+
 	Group struct {
 		CreatedAt   func(childComplexity int) int
 		Description func(childComplexity int) int
@@ -253,6 +265,15 @@ type ComplexityRoot struct {
 		Schema     func(childComplexity int) int
 	}
 
+	SearchPlan struct {
+		Algorithm     func(childComplexity int) int
+		Candidates    func(childComplexity int) int
+		Feedback      func(childComplexity int) int
+		IterativeScan func(childComplexity int) int
+		Prefilter     func(childComplexity int) int
+		Reasons       func(childComplexity int) int
+	}
+
 	Stats struct {
 		Collections      func(childComplexity int) int
 		DatabasePath     func(childComplexity int) int
@@ -293,6 +314,7 @@ type ComplexityRoot struct {
 		Dimensions func(childComplexity int) int
 		Model      func(childComplexity int) int
 		Passages   func(childComplexity int) int
+		Plan       func(childComplexity int) int
 		Results    func(childComplexity int) int
 		Total      func(childComplexity int) int
 	}
@@ -773,6 +795,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FTSResult.Score(childComplexity), true
+
+	case "FeedbackApplied.alpha":
+		if e.ComplexityRoot.FeedbackApplied.Alpha == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Alpha(childComplexity), true
+	case "FeedbackApplied.beta":
+		if e.ComplexityRoot.FeedbackApplied.Beta == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Beta(childComplexity), true
+	case "FeedbackApplied.gamma":
+		if e.ComplexityRoot.FeedbackApplied.Gamma == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Gamma(childComplexity), true
+	case "FeedbackApplied.mode":
+		if e.ComplexityRoot.FeedbackApplied.Mode == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Mode(childComplexity), true
+	case "FeedbackApplied.negative":
+		if e.ComplexityRoot.FeedbackApplied.Negative == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Negative(childComplexity), true
+	case "FeedbackApplied.positive":
+		if e.ComplexityRoot.FeedbackApplied.Positive == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Positive(childComplexity), true
+	case "FeedbackApplied.queryShift":
+		if e.ComplexityRoot.FeedbackApplied.QueryShift == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.QueryShift(childComplexity), true
+	case "FeedbackApplied.rescored":
+		if e.ComplexityRoot.FeedbackApplied.Rescored == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Rescored(childComplexity), true
+	case "FeedbackApplied.weight":
+		if e.ComplexityRoot.FeedbackApplied.Weight == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FeedbackApplied.Weight(childComplexity), true
 
 	case "Group.createdAt":
 		if e.ComplexityRoot.Group.CreatedAt == nil {
@@ -1454,6 +1531,43 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Schema.Schema(childComplexity), true
 
+	case "SearchPlan.algorithm":
+		if e.ComplexityRoot.SearchPlan.Algorithm == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.Algorithm(childComplexity), true
+	case "SearchPlan.candidates":
+		if e.ComplexityRoot.SearchPlan.Candidates == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.Candidates(childComplexity), true
+	case "SearchPlan.feedback":
+		if e.ComplexityRoot.SearchPlan.Feedback == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.Feedback(childComplexity), true
+	case "SearchPlan.iterativeScan":
+		if e.ComplexityRoot.SearchPlan.IterativeScan == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.IterativeScan(childComplexity), true
+	case "SearchPlan.prefilter":
+		if e.ComplexityRoot.SearchPlan.Prefilter == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.Prefilter(childComplexity), true
+	case "SearchPlan.reasons":
+		if e.ComplexityRoot.SearchPlan.Reasons == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.Reasons(childComplexity), true
+
 	case "Stats.collections":
 		if e.ComplexityRoot.Stats.Collections == nil {
 			break
@@ -1603,6 +1717,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.VectorSearchResponse.Passages(childComplexity), true
+	case "VectorSearchResponse.plan":
+		if e.ComplexityRoot.VectorSearchResponse.Plan == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResponse.Plan(childComplexity), true
 	case "VectorSearchResponse.results":
 		if e.ComplexityRoot.VectorSearchResponse.Results == nil {
 			break
@@ -1731,11 +1851,13 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateAPIKeyInput", ec.unmarshalInputCreateAPIKeyInput),
 			graphql.NewInputUnmarshaler("CreateGroupInput", ec.unmarshalInputCreateGroupInput),
 			graphql.NewInputUnmarshaler("FTSInput", ec.unmarshalInputFTSInput),
+			graphql.NewInputUnmarshaler("FeedbackExampleInput", ec.unmarshalInputFeedbackExampleInput),
 			graphql.NewInputUnmarshaler("GroupByInput", ec.unmarshalInputGroupByInput),
 			graphql.NewInputUnmarshaler("IngestDocumentInput", ec.unmarshalInputIngestDocumentInput),
 			graphql.NewInputUnmarshaler("IngestOptionsInput", ec.unmarshalInputIngestOptionsInput),
 			graphql.NewInputUnmarshaler("MetaInput", ec.unmarshalInputMetaInput),
 			graphql.NewInputUnmarshaler("RegisterWebhookInput", ec.unmarshalInputRegisterWebhookInput),
+			graphql.NewInputUnmarshaler("RocchioInput", ec.unmarshalInputRocchioInput),
 			graphql.NewInputUnmarshaler("SearchInput", ec.unmarshalInputSearchInput),
 			graphql.NewInputUnmarshaler("SetGroupPermissionInput", ec.unmarshalInputSetGroupPermissionInput),
 			graphql.NewInputUnmarshaler("SetPermissionInput", ec.unmarshalInputSetPermissionInput),
@@ -2039,6 +2161,30 @@ func (ec *executionContext) childFields_FTSResult(ctx context.Context, field gra
 	return nil, fmt.Errorf("no field named %q was found under type FTSResult", field.Name)
 }
 
+func (ec *executionContext) childFields_FeedbackApplied(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "mode":
+		return ec.fieldContext_FeedbackApplied_mode(ctx, field)
+	case "positive":
+		return ec.fieldContext_FeedbackApplied_positive(ctx, field)
+	case "negative":
+		return ec.fieldContext_FeedbackApplied_negative(ctx, field)
+	case "alpha":
+		return ec.fieldContext_FeedbackApplied_alpha(ctx, field)
+	case "beta":
+		return ec.fieldContext_FeedbackApplied_beta(ctx, field)
+	case "gamma":
+		return ec.fieldContext_FeedbackApplied_gamma(ctx, field)
+	case "queryShift":
+		return ec.fieldContext_FeedbackApplied_queryShift(ctx, field)
+	case "weight":
+		return ec.fieldContext_FeedbackApplied_weight(ctx, field)
+	case "rescored":
+		return ec.fieldContext_FeedbackApplied_rescored(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type FeedbackApplied", field.Name)
+}
+
 func (ec *executionContext) childFields_Group(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "name":
@@ -2177,6 +2323,24 @@ func (ec *executionContext) childFields_Schema(ctx context.Context, field graphq
 	return nil, fmt.Errorf("no field named %q was found under type Schema", field.Name)
 }
 
+func (ec *executionContext) childFields_SearchPlan(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "algorithm":
+		return ec.fieldContext_SearchPlan_algorithm(ctx, field)
+	case "prefilter":
+		return ec.fieldContext_SearchPlan_prefilter(ctx, field)
+	case "candidates":
+		return ec.fieldContext_SearchPlan_candidates(ctx, field)
+	case "iterativeScan":
+		return ec.fieldContext_SearchPlan_iterativeScan(ctx, field)
+	case "reasons":
+		return ec.fieldContext_SearchPlan_reasons(ctx, field)
+	case "feedback":
+		return ec.fieldContext_SearchPlan_feedback(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type SearchPlan", field.Name)
+}
+
 func (ec *executionContext) childFields_Stats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "databasePath":
@@ -2261,6 +2425,8 @@ func (ec *executionContext) childFields_VectorSearchResponse(ctx context.Context
 		return ec.fieldContext_VectorSearchResponse_dimensions(ctx, field)
 	case "passages":
 		return ec.fieldContext_VectorSearchResponse_passages(ctx, field)
+	case "plan":
+		return ec.fieldContext_VectorSearchResponse_plan(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type VectorSearchResponse", field.Name)
 }
@@ -4707,6 +4873,213 @@ func (ec *executionContext) _FTSResult_matchedTerms(ctx context.Context, field g
 }
 func (ec *executionContext) fieldContext_FTSResult_matchedTerms(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("FTSResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _FeedbackApplied_mode(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_mode(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Mode, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_mode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "String")
+}
+
+func (ec *executionContext) _FeedbackApplied_positive(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_positive(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Positive, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_positive(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Int")
+}
+
+func (ec *executionContext) _FeedbackApplied_negative(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_negative(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Negative, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_negative(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Int")
+}
+
+func (ec *executionContext) _FeedbackApplied_alpha(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_alpha(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Alpha, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_alpha(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Float")
+}
+
+func (ec *executionContext) _FeedbackApplied_beta(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_beta(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Beta, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_beta(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Float")
+}
+
+func (ec *executionContext) _FeedbackApplied_gamma(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_gamma(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Gamma, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_gamma(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Float")
+}
+
+func (ec *executionContext) _FeedbackApplied_queryShift(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_queryShift(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.QueryShift, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_queryShift(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Float")
+}
+
+func (ec *executionContext) _FeedbackApplied_weight(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_weight(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Weight, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_weight(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Float")
+}
+
+func (ec *executionContext) _FeedbackApplied_rescored(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FeedbackApplied_rescored(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Rescored, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_FeedbackApplied_rescored(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FeedbackApplied", field, false, false, "Int")
 }
 
 func (ec *executionContext) _Group_name(ctx context.Context, field graphql.CollectedField, obj *Group) (ret graphql.Marshaler) {
@@ -8147,6 +8520,153 @@ func (ec *executionContext) fieldContext_Schema_enabled(_ context.Context, field
 	return graphql.NewScalarFieldContext("Schema", field, false, false, "Boolean")
 }
 
+func (ec *executionContext) _SearchPlan_algorithm(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_algorithm(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Algorithm, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_algorithm(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SearchPlan", field, false, false, "String")
+}
+
+func (ec *executionContext) _SearchPlan_prefilter(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_prefilter(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Prefilter, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_prefilter(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SearchPlan", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _SearchPlan_candidates(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_candidates(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Candidates, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_candidates(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SearchPlan", field, false, false, "Int")
+}
+
+func (ec *executionContext) _SearchPlan_iterativeScan(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_iterativeScan(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.IterativeScan, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_iterativeScan(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SearchPlan", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _SearchPlan_reasons(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_reasons(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Reasons, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_reasons(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SearchPlan", field, false, false, "String")
+}
+
+func (ec *executionContext) _SearchPlan_feedback(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_feedback(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Feedback, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *FeedbackApplied) graphql.Marshaler {
+			return ec.marshalOFeedbackApplied2ᚖmddbᚋgraphqlᚐFeedbackApplied(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_feedback(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SearchPlan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_FeedbackApplied(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Stats_databasePath(ctx context.Context, field graphql.CollectedField, obj *Stats) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -8767,6 +9287,38 @@ func (ec *executionContext) fieldContext_VectorSearchResponse_passages(_ context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _VectorSearchResponse_plan(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResponse_plan(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Plan, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *SearchPlan) graphql.Marshaler {
+			return ec.marshalOSearchPlan2ᚖmddbᚋgraphqlᚐSearchPlan(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResponse_plan(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VectorSearchResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_SearchPlan(ctx, field)
 		},
 	}
 	return fc, nil
@@ -10686,6 +11238,55 @@ func UnmarshalFTSInput(ctx context.Context, raw any) (FTSInput, error) {
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputFeedbackExampleInput(ctx context.Context, obj any) (FeedbackExampleInput, error) {
+	var it FeedbackExampleInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"key", "vector"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "key":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("key"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Key = data
+		case "vector":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("vector"))
+			data, err := ec.unmarshalOFloat2ᚕfloat64ᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Vector = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalFeedbackExampleInput unmarshals raw into the FeedbackExampleInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalFeedbackExampleInput(ctx context.Context, raw any) (FeedbackExampleInput, error) {
+	var out FeedbackExampleInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "FeedbackExampleInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputGroupByInput(ctx context.Context, obj any) (GroupByInput, error) {
 	var it GroupByInput
 	if obj == nil {
@@ -11012,6 +11613,62 @@ func (ec *executionContext) unmarshalInputRegisterWebhookInput(ctx context.Conte
 func UnmarshalRegisterWebhookInput(ctx context.Context, raw any) (RegisterWebhookInput, error) {
 	var out RegisterWebhookInput
 	err := graphql.UnmarshalNamedInputFromContext(ctx, "RegisterWebhookInput", raw, &out)
+	return out, err
+}
+
+func (ec *executionContext) unmarshalInputRocchioInput(ctx context.Context, obj any) (RocchioInput, error) {
+	var it RocchioInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"alpha", "beta", "gamma"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "alpha":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("alpha"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Alpha = data
+		case "beta":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("beta"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Beta = data
+		case "gamma":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("gamma"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Gamma = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalRocchioInput unmarshals raw into the RocchioInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalRocchioInput(ctx context.Context, raw any) (RocchioInput, error) {
+	var out RocchioInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "RocchioInput", raw, &out)
 	return out, err
 }
 
@@ -11376,7 +12033,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11467,6 +12124,62 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.PassageLines = data
+		case "algorithm":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("algorithm"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Algorithm = data
+		case "explain":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("explain"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Explain = data
+		case "latencyTargetMs":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("latencyTargetMs"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.LatencyTargetMs = data
+		case "positive":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("positive"))
+			data, err := ec.unmarshalOFeedbackExampleInput2ᚕᚖmddbᚋgraphqlᚐFeedbackExampleInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Positive = data
+		case "negative":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("negative"))
+			data, err := ec.unmarshalOFeedbackExampleInput2ᚕᚖmddbᚋgraphqlᚐFeedbackExampleInputᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Negative = data
+		case "feedbackMode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feedbackMode"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FeedbackMode = data
+		case "feedbackWeight":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("feedbackWeight"))
+			data, err := ec.unmarshalOFloat2ᚖfloat64(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FeedbackWeight = data
+		case "rocchio":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("rocchio"))
+			data, err := ec.unmarshalORocchioInput2ᚖmddbᚋgraphqlᚐRocchioInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Rocchio = data
 		}
 	}
 	return it, nil
@@ -12146,6 +12859,79 @@ func (ec *executionContext) _FTSResult(ctx context.Context, sel ast.SelectionSet
 			}
 		case "matchedTerms":
 			out.Values[i] = ec._FTSResult_matchedTerms(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var feedbackAppliedImplementors = []string{"FeedbackApplied"}
+
+func (ec *executionContext) _FeedbackApplied(ctx context.Context, sel ast.SelectionSet, obj *FeedbackApplied) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, feedbackAppliedImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FeedbackApplied")
+		case "mode":
+			out.Values[i] = ec._FeedbackApplied_mode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "positive":
+			out.Values[i] = ec._FeedbackApplied_positive(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "negative":
+			out.Values[i] = ec._FeedbackApplied_negative(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "alpha":
+			out.Values[i] = ec._FeedbackApplied_alpha(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "beta":
+			out.Values[i] = ec._FeedbackApplied_beta(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "gamma":
+			out.Values[i] = ec._FeedbackApplied_gamma(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "queryShift":
+			out.Values[i] = ec._FeedbackApplied_queryShift(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "weight":
+			out.Values[i] = ec._FeedbackApplied_weight(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "rescored":
+			out.Values[i] = ec._FeedbackApplied_rescored(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -12957,6 +13743,64 @@ func (ec *executionContext) _Schema(ctx context.Context, sel ast.SelectionSet, o
 	return out
 }
 
+var searchPlanImplementors = []string{"SearchPlan"}
+
+func (ec *executionContext) _SearchPlan(ctx context.Context, sel ast.SelectionSet, obj *SearchPlan) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, searchPlanImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SearchPlan")
+		case "algorithm":
+			out.Values[i] = ec._SearchPlan_algorithm(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "prefilter":
+			out.Values[i] = ec._SearchPlan_prefilter(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "candidates":
+			out.Values[i] = ec._SearchPlan_candidates(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "iterativeScan":
+			out.Values[i] = ec._SearchPlan_iterativeScan(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "reasons":
+			out.Values[i] = ec._SearchPlan_reasons(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "feedback":
+			out.Values[i] = ec._SearchPlan_feedback(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var statsImplementors = []string{"Stats"}
 
 func (ec *executionContext) _Stats(ctx context.Context, sel ast.SelectionSet, obj *Stats) graphql.Marshaler {
@@ -13235,6 +14079,11 @@ func (ec *executionContext) _VectorSearchResponse(ctx context.Context, sel ast.S
 			}
 		case "passages":
 			out.Values[i] = ec._VectorSearchResponse_passages(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "plan":
+			out.Values[i] = ec._VectorSearchResponse_plan(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -13996,6 +14845,11 @@ func (ec *executionContext) marshalNFTSResult2ᚖmddbᚋgraphqlᚐFTSResult(ctx 
 	return ec._FTSResult(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNFeedbackExampleInput2ᚖmddbᚋgraphqlᚐFeedbackExampleInput(ctx context.Context, v any) (*FeedbackExampleInput, error) {
+	res, err := ec.unmarshalInputFeedbackExampleInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v any) (float64, error) {
 	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -14651,6 +15505,30 @@ func (ec *executionContext) marshalOFTSResponse2ᚖmddbᚋgraphqlᚐFTSResponse(
 	return ec._FTSResponse(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalOFeedbackApplied2ᚖmddbᚋgraphqlᚐFeedbackApplied(ctx context.Context, sel ast.SelectionSet, v *FeedbackApplied) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._FeedbackApplied(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalOFeedbackExampleInput2ᚕᚖmddbᚋgraphqlᚐFeedbackExampleInputᚄ(ctx context.Context, v any) ([]*FeedbackExampleInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	vSlice := graphql.CoerceList(v)
+	var err error
+	res := make([]*FeedbackExampleInput, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNFeedbackExampleInput2ᚖmddbᚋgraphqlᚐFeedbackExampleInput(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
 func (ec *executionContext) unmarshalOFloat2ᚕfloat64ᚄ(ctx context.Context, v any) ([]float64, error) {
 	if v == nil {
 		return nil, nil
@@ -14798,11 +15676,26 @@ func (ec *executionContext) marshalOPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ct
 	return ret
 }
 
+func (ec *executionContext) unmarshalORocchioInput2ᚖmddbᚋgraphqlᚐRocchioInput(ctx context.Context, v any) (*RocchioInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputRocchioInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalOSchema2ᚖmddbᚋgraphqlᚐSchema(ctx context.Context, sel ast.SelectionSet, v *Schema) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Schema(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOSearchPlan2ᚖmddbᚋgraphqlᚐSearchPlan(ctx context.Context, sel ast.SelectionSet, v *SearchPlan) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SearchPlan(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOStats2ᚖmddbᚋgraphqlᚐStats(ctx context.Context, sel ast.SelectionSet, v *Stats) graphql.Marshaler {

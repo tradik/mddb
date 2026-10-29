@@ -178,6 +178,28 @@ type FTSResult struct {
 	MatchedTerms []string  `json:"matchedTerms"`
 }
 
+// What relevance feedback did (SRCH-015). alpha, beta, gamma and queryShift
+// are set in query mode; weight and rescored in rescore mode; the rest are 0.
+type FeedbackApplied struct {
+	Mode     string  `json:"mode"`
+	Positive int     `json:"positive"`
+	Negative int     `json:"negative"`
+	Alpha    float64 `json:"alpha"`
+	Beta     float64 `json:"beta"`
+	Gamma    float64 `json:"gamma"`
+	// 1 − cosine(query, corrected query): how far the examples moved it.
+	QueryShift float64 `json:"queryShift"`
+	Weight     float64 `json:"weight"`
+	// Candidates that had a vector to rescore.
+	Rescored int `json:"rescored"`
+}
+
+// A relevance-feedback example (SRCH-015): a document key or ID, or a vector — one, not both.
+type FeedbackExampleInput struct {
+	Key    *string   `json:"key,omitempty"`
+	Vector []float64 `json:"vector,omitempty"`
+}
+
 type Group struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
@@ -289,6 +311,13 @@ type RegisterWebhookInput struct {
 	Collection string   `json:"collection"`
 }
 
+// Rocchio coefficients (SRCH-015): query, positive centroid, negative centroid.
+type RocchioInput struct {
+	Alpha *float64 `json:"alpha,omitempty"`
+	Beta  *float64 `json:"beta,omitempty"`
+	Gamma *float64 `json:"gamma,omitempty"`
+}
+
 type Schema struct {
 	Collection string `json:"collection"`
 	Schema     string `json:"schema"`
@@ -306,6 +335,20 @@ type SearchInput struct {
 	Asc    *bool          `json:"asc,omitempty"`
 	Limit  *int           `json:"limit,omitempty"`
 	Offset *int           `json:"offset,omitempty"`
+}
+
+// How a vector search ran and why (SRCH-013): the index chosen and the reasons.
+type SearchPlan struct {
+	Algorithm string `json:"algorithm"`
+	// The filter was applied first and the admitted documents scanned exactly.
+	Prefilter bool `json:"prefilter"`
+	// Hits the index was asked for: topK × oversample.
+	Candidates int `json:"candidates"`
+	// A filtered index search came back short and the scan continued further.
+	IterativeScan bool     `json:"iterativeScan"`
+	Reasons       []string `json:"reasons"`
+	// The correction relevance feedback made (SRCH-015); null without examples.
+	Feedback *FeedbackApplied `json:"feedback,omitempty"`
 }
 
 type SetGroupPermissionInput struct {
@@ -398,6 +441,23 @@ type VectorSearchInput struct {
 	// results (default) or passages: path, lines, symbol and text per hit (AGT-002).
 	Format       *string `json:"format,omitempty"`
 	PassageLines *int    `json:"passageLines,omitempty"`
+	// flat (default, or the collection profile's), auto (SRCH-013: the planner
+	// picks), hnsw, ivf, pq, opq, sq, sq4 or bq.
+	Algorithm *string `json:"algorithm,omitempty"`
+	// Return the plan — the index chosen and why (SRCH-013).
+	Explain *bool `json:"explain,omitempty"`
+	// Optional goal for algorithm auto, 0-60000 ms; a tight one favours a quantized index.
+	LatencyTargetMs *int `json:"latencyTargetMs,omitempty"`
+	// Relevance feedback (SRCH-015): documents or vectors like the ones wanted, at most 50.
+	Positive []*FeedbackExampleInput `json:"positive,omitempty"`
+	// Documents or vectors unlike the ones wanted, at most 50.
+	Negative []*FeedbackExampleInput `json:"negative,omitempty"`
+	// query (default: move the query, Rocchio) or rescore (re-rank the candidates).
+	FeedbackMode *string `json:"feedbackMode,omitempty"`
+	// How far rescore mode shifts a score, 0-10; omit for 0.5.
+	FeedbackWeight *float64 `json:"feedbackWeight,omitempty"`
+	// Rocchio weights for query mode; omitted ones keep 1, 0.75, 0.25.
+	Rocchio *RocchioInput `json:"rocchio,omitempty"`
 }
 
 type VectorSearchResponse struct {
@@ -407,6 +467,8 @@ type VectorSearchResponse struct {
 	Dimensions *int                  `json:"dimensions,omitempty"`
 	// Set instead of results when the input asked for format passages (AGT-002).
 	Passages []*Passage `json:"passages,omitempty"`
+	// How the search ran and why (SRCH-013); null unless the input set explain.
+	Plan *SearchPlan `json:"plan,omitempty"`
 }
 
 type VectorSearchResult struct {

@@ -325,15 +325,12 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		Threshold:      derefFloat64(input.Threshold, 0),
 		IncludeContent: derefBool(input.IncludeContent, false),
 		Oversample:     oversample,
-	}
-	if input.Query != nil {
-		req.Query = *input.Query
-	}
-	if len(input.QueryVector) > 0 {
-		req.QueryVector = make([]float32, len(input.QueryVector))
-		for i, v := range input.QueryVector {
-			req.QueryVector[i] = float32(v)
-		}
+		Query:          derefString(input.Query),
+		QueryVector:    float32sFromGQL(input.QueryVector),
+		// SRCH-013/015: validated and applied by the shared path.
+		Algorithm:       derefString(input.Algorithm),
+		PlanOptions:     planOptionsFromGQL(input),
+		FeedbackOptions: feedbackFromGQL(input),
 	}
 	resp, err := a.mcp.VectorSearch(ctx, req)
 	if err != nil {
@@ -364,6 +361,7 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		Total:      resp.Total,
 		Model:      &model,
 		Dimensions: &dims,
+		Plan:       searchPlanToGQL(resp.Plan),
 	}, nil
 }
 
