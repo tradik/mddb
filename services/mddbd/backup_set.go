@@ -45,6 +45,12 @@ func hashBackupSet(dir, name string) (*backupSet, error) {
 
 	rels := []string{name}
 	sub := name + ".d"
+	// A file where the collection directory belongs is a damaged set. Asked
+	// to list it, Linux says "not a directory" but Windows says "not found",
+	// which would pass for a set without collection files; so it is checked.
+	if info, err := root.Stat(sub); err == nil && !info.IsDir() { // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
+		return nil, fmt.Errorf("%s is not a directory", sub)
+	}
 	entries, err := fs.ReadDir(root.FS(), sub) // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err

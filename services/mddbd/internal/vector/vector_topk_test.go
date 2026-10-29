@@ -44,3 +44,19 @@ func TestTopKWithoutALimitKeepsEverything(t *testing.T) {
 		t.Fatalf("kept %d of 3", len(best.results()))
 	}
 }
+
+// A huge topK from a request reserves at most topKPrealloc up front, and past
+// that the heap still keeps exactly k results.
+func TestTopKBoundsItsPreallocation(t *testing.T) {
+	if got := cap(newTopK(1_000_000_000).items); got != topKPrealloc {
+		t.Fatalf("capacity for k=1e9 = %d, want %d", got, topKPrealloc)
+	}
+	k := topKPrealloc + 500
+	best := newTopK(k)
+	for i := 0; i < k+700; i++ {
+		best.add(VectorResult{DocID: fmt.Sprintf("d%05d", i), Score: float32(i)})
+	}
+	if n := len(best.results()); n != k {
+		t.Fatalf("kept %d results, want %d", n, k)
+	}
+}

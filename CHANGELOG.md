@@ -265,6 +265,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CI runs the server's tests in shards.** The root package of
+  `services/mddbd` holds over 3,000 tests. It now runs in three shards per
+  storage layout on Linux and in three on Windows, where one job had passed
+  Go's 10-minute package limit. A failure names its shard (`Core tests
+  (per-collection, 2/3)`), and `make test-shard SHARD=2` runs the same shard
+  locally.
+  - **How tests are assigned.** `scripts/go-test-shard.py` picks tests by
+    name prefix and keeps the shards even as tests are added. The patterns
+    stay under 300 bytes, far below Windows' command-line limit.
+  - **Coverage.** `scripts/merge-coverprofiles.sh` joins the shards' profiles
+    so each block counts once, for the coverage floors and Codecov.
 - **Late-interaction scoring measured and not adopted (SRCH-004).** A new
   tool, `tools/bench/maxsim`, compared today's best-chunk scoring with
   MaxSim over the existing chunks. It used `nomic-embed-text`, the 60 pages
@@ -289,6 +300,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A failed per-collection restore left no collection files on
+  Windows.** The undo moved the previous files back before it closed the
+  databases opened from the new ones. Windows refuses to delete or rename a
+  directory with open files, so the undo failed. They are now closed first.
+- **`topK` from a request sized a buffer up front.** A request with
+  `topK: 1000000000` asked for gigabytes before a single vector was scored.
+  Exact scans now reserve at most 1,024 results and grow only as far as there
+  are results to keep.
+- **A backup set with a file where its collection directory belongs passed
+  the checksum step on Windows.** It is now refused on every platform.
 - **SonarCloud blockers on main.**
   - **Panel endpoint suites.** Two of them declared their tests through a
     helper in another file, so the analysis saw files with no tests. Each

@@ -343,15 +343,19 @@ func (s *Server) swapCollectionFiles(srcDir string) (undo func(), err error) {
 	// putBack is a local, not the named result: a returned closure calling
 	// the result would call itself once the result is set, and the first
 	// restore that had to undo a swap overflowed the stack (RAG-010).
+	// The files opened from the swapped-in directory are closed before it is
+	// removed: Windows refuses to delete or rename a directory with open
+	// files, so closing them afterwards left a failed restore with no
+	// collection files at all there.
 	putBack := func() {
-		_ = os.RemoveAll(live)
-		_ = os.Rename(aside, live)
 		s.collMu.Lock()
 		if s.collFiles != nil {
 			s.collFiles.closeAll()
 		}
 		s.collFiles = nil
 		s.collMu.Unlock()
+		_ = os.RemoveAll(live)
+		_ = os.Rename(aside, live)
 	}
 	if err := collMkdirAll(live, 0o700); err != nil {
 		putBack()

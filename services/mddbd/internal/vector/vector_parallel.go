@@ -43,10 +43,12 @@ func parallelSettings(getenv func(string) string) (workers, minSize int) {
 		envInt(getenv("MDDB_VECTOR_PARALLEL_MIN_SIZE"), 2048, 1<<30)
 }
 
-// envInt is v as a number in 1..limit, or def.
+// envInt is v as a number in 1..limit, or def. It is parsed as a 32-bit
+// number: the values are stored in atomic.Int32s, and parsing to that size
+// makes the bound visible where the conversion happens, not only via limit.
 func envInt(v string, def, limit int) int {
-	if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= limit {
-		return n
+	if n, err := strconv.ParseInt(v, 10, 32); err == nil && n > 0 && n <= int64(limit) {
+		return int(n)
 	}
 	return def
 }

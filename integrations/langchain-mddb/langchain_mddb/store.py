@@ -94,7 +94,8 @@ class MddbStore(BaseStore):
             elif isinstance(op, SearchOp):
                 results.append(self._search(op))
             elif isinstance(op, PutOp):
-                results.append(self._put(op))
+                self._put(op)
+                results.append(None)  # BaseStore: a put has no result
             elif isinstance(op, ListNamespacesOp):
                 results.append(self._list_namespaces(op))
             else:

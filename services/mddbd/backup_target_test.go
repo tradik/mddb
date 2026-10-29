@@ -209,8 +209,8 @@ func TestBackupSetFailures(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "y.db.d"), []byte("y"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := hashBackupSet(dir, "y.db"); err == nil {
-		t.Error("hashing with a file for the collection directory succeeded")
+	if _, err := hashBackupSet(dir, "y.db"); err == nil || !strings.Contains(err.Error(), "not a directory") {
+		t.Errorf("hashing with a file for the collection directory: %v", err)
 	}
 	// A part that cannot be removed: the main file's name is a non-empty
 	// directory.
@@ -253,5 +253,26 @@ func TestBackupJobRereadsTheRule(t *testing.T) {
 	job()
 	if got := backupsIn(t, backupDir()); len(got) != 0 {
 		t.Errorf("a disabled or deleted rule took backups: %v", got)
+	}
+}
+
+// A collection directory that cannot be listed fails the hash rather than
+// passing for a set without collection files.
+func TestBackupSetUnreadableCollectionDirectory(t *testing.T) {
+	covKSkipAsRoot(t)
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "u.db"), []byte("u"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sub := filepath.Join(dir, "u.db.d")
+	if err := os.Mkdir(sub, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(sub, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(sub, 0o700) }) // #nosec G302 -- a directory needs x to be removed by t.TempDir
+	if _, err := hashBackupSet(dir, "u.db"); err == nil {
+		t.Error("hashing with an unreadable collection directory succeeded")
 	}
 }

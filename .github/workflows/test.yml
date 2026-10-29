@@ -21,6 +21,8 @@ on:
       - 'scripts/check-go-version.sh'
       - 'scripts/check-proto-plugins.sh'
       - 'scripts/check-coverage-areas.sh'
+      - 'scripts/go-test-shard.py'
+      - 'scripts/merge-coverprofiles.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
       # These jobs exist in this workflow and were unreachable: the filter
@@ -51,6 +53,8 @@ on:
       - 'scripts/check-go-version.sh'
       - 'scripts/check-proto-plugins.sh'
       - 'scripts/check-coverage-areas.sh'
+      - 'scripts/go-test-shard.py'
+      - 'scripts/merge-coverprofiles.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
       # These jobs exist in this workflow and were unreachable: the filter
@@ -98,17 +102,26 @@ jobs:
           go mod verify
           go mod tidy
 
-      - name: Run tests
+      # The root package holds most of the suite (over 3,000 tests) and runs
+      # in the test-core shards below. Here: every other package.
+      - name: Run tests (packages other than the root)
         working-directory: services/mddbd
-        run: go test -v -race -coverprofile=coverage.out ./...
+        run: go test -v -race -coverprofile=coverage-packages.out $(go list ./... | grep -vx mddb)
 
-      # #336: the whole suite again with one file per collection, so the two
-      # storage layouts cannot drift apart.
-      - name: Run tests (per-collection storage layout)
+      # #336: again with one file per collection, so the two storage layouts
+      # cannot drift apart.
+      - name: Run tests (packages other than the root, per-collection storage layout)
         working-directory: services/mddbd
         env:
           MDDB_STORAGE_LAYOUT: per-collection
-        run: go test -race ./...
+        run: go test -race $(go list ./... | grep -vx mddb)
+
+      - name: Keep the package coverage for the merge
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: coverage-packages
+          path: services/mddbd/coverage-packages.out
+          retention-days: 1
 
       # GO-015: the shared Go client SDK (used by mddb-cli) and the CLI itself
       # build/test standalone under GOWORK=off, catching API drift against the
@@ -167,15 +180,12 @@ jobs:
           go test -run='^$' -fuzz='^FuzzLoadDoc$'                  -fuzztime=20s ./
           go test -run='^$' -fuzz='^FuzzPersistenceRoundTrip$'   -fuzztime=20s ./
 
-      # TEST-002: one number for a package of 150 files looked healthy while
-      # the surfaces handling uploads, 80 MCP tools and automation triggers sat
-      # at 22% between them. The floors are ratchets — raise one when you
-      # improve an area, never lower one to make a build pass.
-      - name: Per-area coverage floors
-        run: bash scripts/check-coverage-areas.sh
-
+      # The floors themselves run in the coverage job, on the merged profile.
       - name: Run coverage-floor guard test suite
         run: bash scripts/tests/test-coverage-areas.sh
+
+      - name: Run test-shard and coverage-merge guard test suite
+        run: bash scripts/tests/test-test-shards.sh
 
       # OPS-018: a tag is a mutable pointer. tj-actions/changed-files had every
       # one of its tags repointed at a secret-dumping commit in March 2025, and
@@ -211,6 +221,81 @@ jobs:
       - name: Run source-encoding guard test suite
         run: bash scripts/tests/test-source-encoding.sh
 
+
+  # The root package of services/mddbd, split three ways and run in both
+  # storage layouts. One job took 8 minutes on Linux and over 10 on Windows;
+  # a failure now names its shard, and re-running that shard alone takes a
+  # third of the time. scripts/go-test-shard.py picks the tests by name prefix
+  # and keeps the shards even as tests are added.
+  test-core:
+    name: Core tests (${{ matrix.layout }}, ${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+        layout: [single, per-collection]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/mddbd/go.sum
+
+      - name: Run shard
+        working-directory: services/mddbd
+        env:
+          MDDB_STORAGE_LAYOUT: ${{ matrix.layout }}
+        run: |
+          cov=()
+          if [[ "${{ matrix.layout }}" == single ]]; then
+            cov=(-coverprofile="coverage-core-${{ matrix.shard }}.out")
+          fi
+          # The same flags for -list and the run, so the test binary is built once.
+          pattern="$(go test -race "${cov[@]}" -list '.*' . | python3 ../../scripts/go-test-shard.py 3 ${{ matrix.shard }})"
+          go test -v -race -timeout 25m "${cov[@]}" -run "${pattern}" .
+
+      - name: Keep the shard's coverage for the merge
+        if: matrix.layout == 'single'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: coverage-core-${{ matrix.shard }}
+          path: services/mddbd/coverage-core-${{ matrix.shard }}.out
+          retention-days: 1
+
+  # One profile from the shards and the other packages, then the per-area
+  # floors and the upload: both need the whole suite's coverage.
+  coverage:
+    name: Coverage floors
+    runs-on: ubuntu-latest
+    needs: [test, test-core]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Fetch the profiles
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: coverage-*
+          path: profiles
+          merge-multiple: true
+
+      - name: Merge
+        run: bash scripts/merge-coverprofiles.sh services/mddbd/coverage.out profiles/*.out
+
+      # TEST-002: one number for a package of 150 files looked healthy while
+      # the surfaces handling uploads, 80 MCP tools and automation triggers sat
+      # at 22% between them. The floors are ratchets — raise one when you
+      # improve an area, never lower one to make a build pass.
+      - name: Per-area coverage floors
+        run: bash scripts/check-coverage-areas.sh
+
       - name: Upload coverage
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
@@ -231,9 +316,13 @@ jobs:
   #
   # amd64 only; windows/arm64 is not a target.
   test-windows:
-    name: Run Tests (windows)
+    name: Run Tests (windows, ${{ matrix.shard }}/3)
     runs-on: windows-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
 
     steps:
       - name: Checkout code
@@ -261,15 +350,30 @@ jobs:
       # system. What this job is for is the platform behaviour underneath:
       # file replacement semantics, the syscalls behind diskSpace and
       # processCPUTime, and path handling.
-      - name: Run tests
+      #
+      # The root package runs in three shards (scripts/go-test-shard.py): as
+      # one job it passed Go's 10-minute package limit in 2.18.9. The other
+      # packages, the client and the CLI run with the first shard.
+      - name: Run tests (root package, shard ${{ matrix.shard }}/3)
         working-directory: services/mddbd
-        run: go test ./...
+        shell: bash
+        run: |
+          pattern="$(go test -list '.*' . | python3 ../../scripts/go-test-shard.py 3 ${{ matrix.shard }})"
+          go test -timeout 25m -run "${pattern}" .
+
+      - name: Run tests (packages other than the root)
+        if: matrix.shard == 1
+        working-directory: services/mddbd
+        shell: bash
+        run: go test $(go list ./... | grep -vx mddb)
 
       - name: Test shared Go client
+        if: matrix.shard == 1
         working-directory: clients/go/mddb
         run: go test ./...
 
       - name: Test mddb-cli
+        if: matrix.shard == 1
         working-directory: services/mddb-cli
         run: go test ./...
 

@@ -14,12 +14,22 @@ type topK struct {
 	items []VectorResult // a min-heap: the worst kept result on top
 }
 
+// topKPrealloc caps the capacity reserved up front. k is the caller's topK, a
+// request value: reserving all of it let topK=1e9 ask for gigabytes before a
+// single vector was scored. The heap still holds k results; past the cap it
+// grows by append, as far as there are results to keep.
+const topKPrealloc = 1024
+
 // newTopK collects the k best results; k <= 0 keeps every result.
 func newTopK(k int) *topK {
 	if k <= 0 {
 		return &topK{}
 	}
-	return &topK{k: k, items: make([]VectorResult, 0, k)}
+	capacity := k
+	if capacity > topKPrealloc {
+		capacity = topKPrealloc
+	}
+	return &topK{k: k, items: make([]VectorResult, 0, capacity)}
 }
 
 // worse orders results the way rankings do not want them: lower score first,

@@ -1,0 +1,3 @@
+# Image fixtures and their extraction goldens are compared byte for byte:
+# no line-end normalisation on checkout (Windows would turn LF into CRLF).
+* -text

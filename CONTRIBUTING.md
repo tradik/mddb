@@ -42,6 +42,18 @@ make test
 make lint
 ```
 
+### Re-running a failed CI shard
+
+CI splits the server's root package, which holds over 3,000 tests, into three
+shards per storage layout (`Core tests (single, 2/3)` and so on), plus three
+on Windows. The shards are chosen by `scripts/go-test-shard.py` from test name
+prefixes. To run the shard that failed:
+
+```bash
+make test-shard SHARD=2                                       # single-file layout
+MDDB_STORAGE_LAYOUT=per-collection make test-shard SHARD=2    # per-collection layout
+```
+
 ## Development Workflow
 
 1. **Fork** the repository

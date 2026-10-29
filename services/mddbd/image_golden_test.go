@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -153,8 +154,72 @@ func TestImages_GoldenWithoutImages(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v (regenerate with -update-image-golden)", name, err)
 		}
-		if body+"\n" != string(want) {
+		if !sameJSON(t, body, string(want)) {
 			t.Errorf("%s differs from the golden:\ngot  %s\nwant %s", name, body, want)
 		}
+	}
+}
+
+// sameJSON compares two JSON bodies exactly — shape, order, text, integers —
+// except that fractional numbers may differ by one part in 100,000. Scores
+// come from float32 maths whose last bits depend on the build: the SIMD cosine
+// (the default) and the scalar one (-tags noasm) differ in the seventh digit,
+// and rounding both to a fixed precision still splits them at a boundary.
+func sameJSON(t *testing.T, got, want string) bool {
+	t.Helper()
+	return sameValue(decodeNumbers(t, got), decodeNumbers(t, want))
+}
+
+func decodeNumbers(t *testing.T, body string) any {
+	t.Helper()
+	dec := json.NewDecoder(strings.NewReader(body))
+	dec.UseNumber()
+	var v any
+	if err := dec.Decode(&v); err != nil {
+		t.Fatalf("golden body is not JSON: %v", err)
+	}
+	return v
+}
+
+func sameValue(a, b any) bool {
+	switch x := a.(type) {
+	case map[string]any:
+		y, ok := b.(map[string]any)
+		if !ok || len(x) != len(y) {
+			return false
+		}
+		for k, v := range x {
+			if w, ok := y[k]; !ok || !sameValue(v, w) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		y, ok := b.([]any)
+		if !ok || len(x) != len(y) {
+			return false
+		}
+		for i := range x {
+			if !sameValue(x[i], y[i]) {
+				return false
+			}
+		}
+		return true
+	case json.Number:
+		y, ok := b.(json.Number)
+		if !ok {
+			return false
+		}
+		if x == y {
+			return true
+		}
+		if !strings.ContainsAny(x.String()+y.String(), ".eE") {
+			return false // integers compare exactly
+		}
+		f, err1 := x.Float64()
+		g, err2 := y.Float64()
+		return err1 == nil && err2 == nil && math.Abs(f-g) <= 1e-5*math.Max(1, math.Abs(g))
+	default:
+		return a == b
 	}
 }
