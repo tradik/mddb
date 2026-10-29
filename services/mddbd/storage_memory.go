@@ -2,6 +2,8 @@ package main
 
 import (
 	"sync"
+
+	"mddb/internal/storage"
 )
 
 // MemoryBackend stores documents entirely in memory. Data is lost on restart.
@@ -9,7 +11,7 @@ import (
 type MemoryBackend struct {
 	mu    sync.RWMutex
 	docs  map[string]map[string][]byte // collection → docID → data
-	byKey map[string]string            // "collection|key|lang" → docID
+	byKey map[string]string            // storage.ByKeyKey(collection, key, lang) → docID
 }
 
 // NewMemoryBackend creates a new in-memory storage backend.
@@ -20,8 +22,11 @@ func NewMemoryBackend() *MemoryBackend {
 	}
 }
 
+// memKeyIndex is the map key of a key-index entry: bbolt's key
+// (storage.ByKeyKey), so the key and language are normalised the same way
+// and the collection keeps its case (#360).
 func memKeyIndex(collection, key, lang string) string {
-	return collection + "|" + key + "|" + lang
+	return string(storage.ByKeyKey(collection, key, lang))
 }
 
 // Name implements the StorageBackend interface.

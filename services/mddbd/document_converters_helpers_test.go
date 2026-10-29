@@ -369,8 +369,10 @@ func TestDeduplicateChunkResultsCB2(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestMemKeyIndex(t *testing.T) {
-	got := memKeyIndex("col", "key1", "en")
-	if got != "col|key1|en" {
+	// bbolt's key-index key: the key and language normalised, the
+	// collection as written (#360).
+	got := memKeyIndex("Col", "Key1", "EN")
+	if got != "bykey|Col|key1|en" {
 		t.Errorf("got %q", got)
 	}
 }

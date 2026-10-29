@@ -10,6 +10,8 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+
+	"mddb/internal/storage"
 )
 
 // S3Backend stores documents in an S3-compatible object store (AWS S3, MinIO, Cloudflare R2, etc.).
@@ -66,8 +68,15 @@ func (s *S3Backend) docKey(collection, docID string) string {
 	return s.prefix + "docs/" + collection + "/" + docID
 }
 
+// byKeyKey is the object path of a key-index entry. The key and language are
+// normalised as in bbolt (storage.NormalizeKey), so "README.md" and
+// "readme.md" name one object; the collection keeps its case (#360).
+//
+// No release has written these objects: the server keeps the key index of
+// every collection in bbolt and moves only document bodies to a backend
+// (GO-021), so there is nothing in a bucket to migrate.
 func (s *S3Backend) byKeyKey(collection, key, lang string) string {
-	return s.prefix + "bykey/" + collection + "/" + key + "/" + lang
+	return s.prefix + "bykey/" + collection + "/" + storage.NormalizeKey(key) + "/" + storage.NormalizeKey(lang)
 }
 
 // PutDoc implements the StorageBackend interface.

@@ -144,6 +144,15 @@ new form. Upgrade the followers before the leader: a follower on an older
 release receiving the leader's new entries finds those documents only by
 their lower-case spelling.
 
+**Collections on S3 or in memory** (`storageBackend`, see
+[API.md](API.md#put-v1collection-config)). Only document bodies move to the
+backend; the key index of every collection stays in bbolt and is migrated
+like any other. The backends' own key-index interface (the S3 objects
+`bykey/<collection>/<key>/<lang>`, the memory backend's map) uses the same
+rule since 2.18.9: the key and language with ASCII letters in lower case, the
+collection as written (#360). No release has written key-index objects to a
+bucket, so a bucket has nothing to migrate and is never rewritten.
+
 ## Limits
 
 - **Replication snapshots** stream one file, so a leader in this layout

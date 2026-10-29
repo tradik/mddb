@@ -2839,6 +2839,11 @@ limitation to be lifted later: those are written inside a single transaction
 alongside each other, and a remote object store cannot join it. Splitting them
 would trade a correctness guarantee for a storage location.
 
+The key index — which document a key and language name — is among what stays,
+so on every backend a key is found by any spelling of its ASCII letter case
+(`README.md` as `readme.md`), as on `boltdb` since 2.18.9; the S3 bucket holds
+no key index to migrate ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version)).
+
 So an `s3` collection still needs its local database, and that database still
 needs to survive — it holds everything needed to find a document, just not the
 document.
