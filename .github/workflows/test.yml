@@ -180,10 +180,6 @@ jobs:
           go test -run='^$' -fuzz='^FuzzLoadDoc$'                  -fuzztime=20s ./
           go test -run='^$' -fuzz='^FuzzPersistenceRoundTrip$'   -fuzztime=20s ./
 
-      # The floors themselves run in the coverage job, on the merged profile.
-      - name: Run coverage-floor guard test suite
-        run: bash scripts/tests/test-coverage-areas.sh
-
       - name: Run test-shard and coverage-merge guard test suite
         run: bash scripts/tests/test-test-shards.sh
 
@@ -295,6 +291,11 @@ jobs:
       # improve an area, never lower one to make a build pass.
       - name: Per-area coverage floors
         run: bash scripts/check-coverage-areas.sh
+
+      # Here, not in the test job: its --print case reads the real profile,
+      # which exists only after the merge above.
+      - name: Run coverage-floor guard test suite
+        run: bash scripts/tests/test-coverage-areas.sh
 
       - name: Upload coverage
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7

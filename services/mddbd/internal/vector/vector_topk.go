@@ -25,11 +25,12 @@ func newTopK(k int) *topK {
 	if k <= 0 {
 		return &topK{}
 	}
-	capacity := k
-	if capacity > topKPrealloc {
-		capacity = topKPrealloc
+	// Two allocations rather than a clamped copy of k: the bound has to sit on
+	// k itself for CodeQL's go/uncontrolled-allocation-size to see it.
+	if k > topKPrealloc {
+		return &topK{k: k, items: make([]VectorResult, 0, topKPrealloc)}
 	}
-	return &topK{k: k, items: make([]VectorResult, 0, capacity)}
+	return &topK{k: k, items: make([]VectorResult, 0, k)}
 }
 
 // worse orders results the way rankings do not want them: lower score first,
