@@ -110,7 +110,7 @@ func passagesToProto(ps []Passage) []*proto.Passage {
 	for i, p := range ps {
 		out[i] = &proto.Passage{Collection: p.Collection, Key: p.Key, Lang: p.Lang, Path: p.Path,
 			StartLine: safeInt32(p.Lines.Start), EndLine: safeInt32(p.Lines.End), Symbol: p.Symbol, Kind: p.Kind,
-			Content: p.Content, Score: p.Score, Source: p.Source, Tokens: safeInt32(p.Tokens)}
+			Content: p.Content, Score: p.Score, Source: p.Source, Tokens: safeInt32(p.Tokens), Images: imageRefsToProto(p.Images)}
 	}
 	return out
 }
@@ -154,7 +154,7 @@ func searchStatus(err error) error {
 	switch {
 	case errors.As(err, &loading):
 		return status.Error(codes.Unavailable, err.Error())
-	case errors.Is(err, errNoEmbeddingProvider):
+	case errors.Is(err, errNoEmbeddingProvider), errors.Is(err, errNoImageProvider):
 		return status.Error(codes.FailedPrecondition, err.Error())
 	case errors.Is(err, errSourceNoEmbedding):
 		return status.Error(codes.NotFound, err.Error())
@@ -162,4 +162,25 @@ func searchStatus(err error) error {
 		return status.Error(codes.Internal, err.Error())
 	}
 	return status.Error(codes.InvalidArgument, err.Error())
+}
+
+// imageRefsToProto converts image references (RAG-010).
+func imageRefsToProto(refs []ImageRef) []*proto.ImageRef {
+	if len(refs) == 0 {
+		return nil
+	}
+	out := make([]*proto.ImageRef, len(refs))
+	for i, r := range refs {
+		out[i] = &proto.ImageRef{Key: r.Key, Lang: r.Lang, AltText: r.AltText, Caption: r.Caption, Page: safeInt32(r.Page),
+			MimeType: r.MimeType, Width: safeInt32(r.Width), Height: safeInt32(r.Height), Parent: r.Parent, Score: r.Score, Url: r.URL}
+	}
+	return out
+}
+
+// imageStatusToProto converts the images part of indexing-status (RAG-010).
+func imageStatusToProto(st *ImageIndexingStatus) *proto.ImageIndexingStatus {
+	if st == nil {
+		return nil
+	}
+	return &proto.ImageIndexingStatus{Documents: safeInt32(st.Documents), Embedded: safeInt32(st.Embedded), Model: st.Model, Note: st.Note}
 }

@@ -64,6 +64,7 @@ type FTSSearchRequest struct {
 	CacheTTL       int      `json:"cacheTtl,omitempty"`
 	GroupBy        *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 	PassageOptions          // format, passageLines (AGT-002)
+	ImageOptions            // includeImages (RAG-010)
 }
 
 // FTSSearchResponse is the HTTP response for full-text search.
@@ -104,6 +105,8 @@ type FTSResultWithDoc struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 }
 
 // --- HTTP handler ---
@@ -525,7 +528,14 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 				highlights: r.Highlights, terms: r.MatchedTerms})
 		}
 		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "fts"), nil)
+		if req.IncludeImages {
+			s.attachPassageImages(&p) // RAG-010
+		}
 		resp.passages = &p
+	} else if req.IncludeImages {
+		// RAG-010: each hit's images, by alt text and caption found or not.
+		attachImages(s, resp.Results, func(it *FTSResultWithDoc) imageOwner { return docImages(req.Collection, &it.Document) },
+			func(it *FTSResultWithDoc, refs []ImageRef) { it.Images = refs })
 	}
 
 	return &resp, nil

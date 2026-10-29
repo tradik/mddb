@@ -51,6 +51,7 @@ var collectionBuckets = [][]byte{
 	[]byte("vectors"), []byte("vector_provenance"),
 	[]byte("geo"), []byte("ttl"), []byte("ttlrev"),
 	[]byte("temporal"), []byte("temporal_hot"),
+	bucketImages, // RAG-010: image bytes, img|collection|docID
 }
 
 // keyCollection returns the collection a key of a collection bucket belongs
@@ -71,6 +72,15 @@ func keyCollection(bucket string, key []byte) (string, bool) {
 	_, rest, ok := strings.Cut(string(key), "|")
 	return rest, ok && rest != ""
 }
+
+// The file operations of opening and restoring collection files, variables
+// only so a test can make each of them fail.
+var (
+	collReadDir  = os.ReadDir
+	collRename   = os.Rename
+	collMkdirAll = os.MkdirAll
+	collCopyFile = copyFile
+)
 
 func isCollectionBucket(name []byte) bool {
 	for _, b := range collectionBuckets {
@@ -147,7 +157,7 @@ func openCollectionFiles(dir string, opts func(string) *bolt.Options) (*collecti
 	if err := os.MkdirAll(dir, 0o700); err != nil { // #nosec G703 -- derived from the operator's database path
 		return nil, err
 	}
-	entries, err := os.ReadDir(dir)
+	entries, err := collReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
@@ -327,10 +337,13 @@ func (s *Server) swapCollectionFiles(srcDir string) (undo func(), err error) {
 	live := collectionDir(s.Path)
 	aside := live + ".pre-restore"
 	_ = os.RemoveAll(aside)
-	if err := os.Rename(live, aside); err != nil && !os.IsNotExist(err) {
+	if err := collRename(live, aside); err != nil && !os.IsNotExist(err) {
 		return noop, fmt.Errorf("moving the collection files aside: %w", err)
 	}
-	undo = func() {
+	// putBack is a local, not the named result: a returned closure calling
+	// the result would call itself once the result is set, and the first
+	// restore that had to undo a swap overflowed the stack (RAG-010).
+	putBack := func() {
 		_ = os.RemoveAll(live)
 		_ = os.Rename(aside, live)
 		s.collMu.Lock()
@@ -340,20 +353,20 @@ func (s *Server) swapCollectionFiles(srcDir string) (undo func(), err error) {
 		s.collFiles = nil
 		s.collMu.Unlock()
 	}
-	if err := os.MkdirAll(live, 0o700); err != nil {
-		undo()
+	if err := collMkdirAll(live, 0o700); err != nil {
+		putBack()
 		return noop, err
 	}
 	for _, e := range entries {
 		if _, ok := collectionFromFileName(e.Name()); !ok {
 			continue
 		}
-		if err := copyFile(filepath.Join(srcDir, e.Name()), filepath.Join(live, e.Name())); err != nil {
-			undo()
+		if err := collCopyFile(filepath.Join(srcDir, e.Name()), filepath.Join(live, e.Name())); err != nil {
+			putBack()
 			return noop, fmt.Errorf("copying %s: %w", e.Name(), err)
 		}
 	}
-	return func() { undo() }, nil
+	return putBack, nil
 }
 
 // errSnapshotPerCollection is why replication snapshots are refused in the

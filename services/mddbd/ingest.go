@@ -44,6 +44,16 @@ type IngestDocumentHTTP struct {
 	// document with neither stores ContentMD as before.
 	Format  string `json:"format,omitempty"`
 	Content []byte `json:"contentBase64,omitempty"`
+	// Images are the files a Markdown document's image links name by
+	// relative path (RAG-010), read only with options.extractImages.
+	Images []IngestImage `json:"images,omitempty"`
+}
+
+// IngestImage is a file a document's image link names: its path as the link
+// writes it, and its bytes (base64 in JSON).
+type IngestImage struct {
+	Path    string `json:"path"`
+	Content []byte `json:"contentBase64"`
 }
 
 // IngestOptionsHTTP controls optional behavior during ingestion.
@@ -63,6 +73,13 @@ type IngestOptionsHTTP struct {
 	// build no structure to begin with, so they are unaffected. Implied by
 	// profile "fast".
 	TextOnly bool `json:"textOnly,omitempty"`
+	// ExtractImages stores the images of Markdown documents and PDFs as
+	// image documents under them (RAG-010); on by default in a collection
+	// of type images.
+	ExtractImages bool `json:"extractImages,omitempty"`
+	// FetchRemoteImages fetches a Markdown image link to an http(s) URL,
+	// through the SSRF guard. Off by default.
+	FetchRemoteImages bool `json:"fetchRemoteImages,omitempty"`
 }
 
 // IngestResponseHTTP is the HTTP response body for a bulk ingest operation.
@@ -173,7 +190,7 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	// Phase 1: Pre-process documents (key derivation, conversion,
 	// frontmatter, meta injection)
 	convert := s.Tracer.Stage(ctx, spanIngestConvert) // OPS-024
-	plan := s.preProcessIngest(collection, docs, opts)
+	plan := s.preProcessIngest(ctx, collection, docs, opts)
 	convert.SetString("mddb.collection", collection)
 	convert.SetInt("mddb.documents", len(plan.docs))
 	convert.End()
@@ -215,8 +232,11 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	resp.Failed += int(batchResp.Failed)
 	resp.Errors = append(resp.Errors, batchResp.Errors...)
 
-	// Phase 3: Apply the TTLs the documents asked for
+	// Phase 3: Apply the TTLs the documents asked for, and store the bytes
+	// of the image documents written, before the embedding jobs that read
+	// them are queued (RAG-010).
 	s.applyIngestTTLs(collection, plan.ttls, processed)
+	s.storeIngestImages(collection, plan.images, processed)
 
 	// Phase 4: Post-commit hooks
 	s.firePostBatchHooks(collection, processed, postBatchOptions{
@@ -242,14 +262,16 @@ type ingestPlan struct {
 	errs        []string
 	sanitized   int
 	conversions []IngestConversion
+	// images are the image documents' bytes by document ID (RAG-010).
+	images map[string][]byte
 }
 
 // preProcessIngest transforms IngestDocumentHTTP into proto.BatchDocument,
 // applying URL key derivation, file conversion, frontmatter extraction,
 // metadata injection, and optional deduplication. A converted file may yield
 // several documents (an email and its attachments, GO-046).
-func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ingestPlan {
-	plan := ingestPlan{ttls: make(map[string]int64)}
+func (s *Server) preProcessIngest(ctx context.Context, collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ingestPlan {
+	plan := ingestPlan{ttls: make(map[string]int64), images: map[string][]byte{}}
 
 	for i, d := range docs {
 		// Derive key from URL if not provided
@@ -275,13 +297,16 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 		// a PDF sent by `mddb-cli autoindex` is stored as its text, not
 		// refused as binary or indexed as bytes.
 		out := []convertedDoc{{Key: key, Markdown: d.ContentMD, Meta: meta}}
+		images := s.imageOptionsFor(collection, opts.ExtractImages, opts.FetchRemoteImages, ingestImageFiles(d.Images))
 		if len(d.Content) > 0 || d.Format != "" {
-			conv, err := convertIngestFile(d, key, opts.TextOnly)
+			conv, err := s.convertIngestFile(ctx, collection, d, key, opts.TextOnly, images)
 			if err != nil {
 				plan.errs = append(plan.errs, fmt.Sprintf("doc[%d] (%s): %s", i, key, err.Error()))
 				continue
 			}
 			out = convertedDocs(conv, key, meta)
+		} else if images.Extract {
+			out = markdownImageDocs(ctx, key, d.ContentMD, meta, images) // RAG-010
 		}
 
 		for j, cd := range out {
@@ -330,6 +355,9 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 			if d.TTL > 0 {
 				plan.ttls[genID(collection, cd.Key, d.Lang)] = d.TTL
 			}
+			if cd.Image != nil {
+				plan.images[genID(collection, cd.Key, d.Lang)] = cd.Image.Data
+			}
 			plan.docs = append(plan.docs, &proto.BatchDocument{
 				Key:          cd.Key,
 				Lang:         d.Lang,
@@ -341,7 +369,7 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 	}
 
 	if opts.SkipDuplicates {
-		plan.docs, plan.skipped = s.dropUnchanged(collection, plan.docs)
+		plan.docs, plan.skipped = s.dropUnchanged(collection, plan.docs, s.changedImages(collection, plan.images))
 	}
 	return plan
 }
@@ -350,7 +378,7 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 // format comes from the document, or from its key's extension; the bytes are
 // Content, or ContentMD when a caller sent text with a format to convert it
 // from (HTML as a string, say).
-func convertIngestFile(d IngestDocumentHTTP, key string, textOnly bool) (conversion, error) {
+func (s *Server) convertIngestFile(ctx context.Context, collection string, d IngestDocumentHTTP, key string, textOnly bool, images imageOptions) (conversion, error) {
 	format := normalizeFormat(d.Format)
 	if format == "" {
 		format = formatFromFilename(key)
@@ -359,22 +387,24 @@ func convertIngestFile(d IngestDocumentHTTP, key string, textOnly bool) (convers
 	if len(data) == 0 {
 		data = []byte(d.ContentMD)
 	}
-	return convertToMarkdown(format, data, textOnly)
+	return s.convertFile(ctx, collection, format, data, textOnly, images)
 }
 
 // dropUnchanged removes the documents whose stored content is the same as
-// the new content, and returns how many it removed.
+// the new content, and returns how many it removed. A document in keep is
+// kept whatever its content: an image document whose bytes changed (RAG-010).
 //
 // The comparison runs after conversion, on the Markdown that would be stored,
 // so an unchanged file converts to the same text and is skipped: the
 // converters are deterministic, which is what keeps a second autoindex run
 // cheap.
-func (s *Server) dropUnchanged(collection string, protoDocs []*proto.BatchDocument) ([]*proto.BatchDocument, int) {
+func (s *Server) dropUnchanged(collection string, protoDocs []*proto.BatchDocument, keep map[string]bool) ([]*proto.BatchDocument, int) {
 	existing := s.buildContentHashMap(collection, protoDocs)
 	kept := protoDocs[:0]
 	skipped := 0
 	for _, d := range protoDocs {
-		if h, found := existing[genID(collection, d.Key, d.Lang)]; found && h == crc32.ChecksumIEEE([]byte(d.ContentMd)) {
+		id := genID(collection, d.Key, d.Lang)
+		if h, found := existing[id]; found && !keep[id] && h == crc32.ChecksumIEEE([]byte(d.ContentMd)) {
 			skipped++
 			continue
 		}
@@ -445,6 +475,7 @@ func (s *Server) ingestDocumentsFromProto(ctx context.Context, req *proto.Ingest
 			TTL:                d.Ttl,
 			Format:             d.Format,
 			Content:            d.Content,
+			Images:             ingestImagesFromProto(d.Images),
 		}
 	}
 
@@ -457,6 +488,8 @@ func (s *Server) ingestDocumentsFromProto(ctx context.Context, req *proto.Ingest
 			SkipWebhooks:            req.Options.SkipWebhooks,
 			AutoConfigureCollection: req.Options.AutoConfigureCollection,
 			SaveRevision:            req.Options.SaveRevision,
+			ExtractImages:           req.Options.ExtractImages,
+			FetchRemoteImages:       req.Options.FetchRemoteImages,
 		}
 	}
 

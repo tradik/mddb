@@ -92,6 +92,10 @@ func (s *Server) deleteCollection(collection string) (int, error) {
 			docs = append(docs, deletedDocRef{f.doc.ID, f.doc.Key, f.doc.Lang})
 		}
 
+		// RAG-010: the bytes of its image documents.
+		if err := deleteCollectionImageBytes(tx, collection, &bo); err != nil {
+			return err
+		}
 		// DOC-016: every key-index entry for this collection, cleared by
 		// prefix, so a document stored under two spellings of its key leaves
 		// neither behind.
@@ -165,5 +169,6 @@ func (s *Server) dropCollectionVectors(collection string) {
 	if s.VectorIndex != nil {
 		s.VectorIndex.DropCollection(collection)
 	}
-	s.summaries().drop(collection) // RAG-009; DeleteCollection removed the stored ones
+	s.summaries().drop(collection)  // RAG-009; DeleteCollection removed the stored ones
+	s.imageIndex().drop(collection) // RAG-010; likewise
 }

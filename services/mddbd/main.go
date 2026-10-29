@@ -157,6 +157,8 @@ type Server struct {
 	vectorLoad      vectorLoadRef             // #346: the vector index load in progress
 	summaryOnce     sync.Once                 // RAG-009: builds summaryIdx on first use
 	summaryIdx      *summaryIndex             // RAG-009: the summary vectors, apart from every chunk index
+	imageOnce       sync.Once                 // RAG-010: builds imageIdx on first use
+	imageIdx        *summaryIndex             // RAG-010: the image vectors, apart from every chunk index
 	reindexJobs     reindexJobs               // #347: background vector reindexes
 	walks           walkCache                 // #349: results of whole-database walks (stats, vector-stats, storage)
 	dbProbe         dbProbe                   // #350: the /health transaction in flight
@@ -1500,5 +1502,6 @@ func (s *Server) ensureBuckets() error {
 		s.BucketNames.ByKey,         // bykey|collection|key|lang -> docID
 		[]byte("embedding_configs"), // embedding model configurations
 		bucketBulkJobs,              // bulk ingest job tracking
+		bucketImages,                // img|collection|docID -> image bytes (RAG-010)
 	)
 }

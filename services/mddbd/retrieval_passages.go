@@ -71,6 +71,9 @@ type PassagesResponse struct {
 	Total            int              `json:"total"`
 	ContextTruncated bool             `json:"contextTruncated,omitempty"`
 	Indexing         *IndexWaitResult `json:"indexing,omitempty"`
+	// ImageHits are the images the query matched by their picture, with
+	// includeImages and a provider that embeds images (RAG-010).
+	ImageHits []ImageRef `json:"imageHits,omitempty"`
 }
 
 // ResolveFormat applies the precedence rule to the result format: the

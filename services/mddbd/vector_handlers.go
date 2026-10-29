@@ -45,6 +45,11 @@ type VectorSearchRequest struct {
 	PassageOptions  // format, passageLines (AGT-002)
 	PlanOptions     // explain, latencyTargetMs (SRCH-013)
 	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
+	ImageOptions    // includeImages (RAG-010)
+	// QueryImage searches by an image (RAG-010): base64, a data URI or an
+	// http(s) URL fetched through the SSRF guard. Needs a provider that
+	// embeds images; the results are image documents.
+	QueryImage string `json:"queryImage,omitempty"`
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -68,6 +73,8 @@ type VectorSearchResultItem struct {
 	// PendingEmbedding is true for a document whose embedding is still queued:
 	// found by its text, not yet by its meaning (GO-042).
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 }
 
 // VectorSearchResponseHTTP represents the response from vector search.
@@ -91,6 +98,9 @@ type VectorSearchResponseHTTP struct {
 	// Plan is how the search ran and why, when the request set explain
 	// (SRCH-013).
 	Plan *SearchPlan `json:"plan,omitempty"`
+	// ImageHits are the images the query matched by their picture, with
+	// includeImages and a provider that embeds images (RAG-010).
+	ImageHits []ImageRef `json:"imageHits,omitempty"`
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -121,7 +131,8 @@ func (s *Server) loadVectorIndex() {
 	defer load.finish()
 
 	totalLoaded := 0
-	s.summaries().reset() // RAG-009: reloaded per collection below
+	s.summaries().reset()  // RAG-009: reloaded per collection below
+	s.imageIndex().reset() // RAG-010: likewise
 	for _, collection := range load.order() {
 		count := counts[collection]
 		load.begin(collection)
@@ -166,6 +177,7 @@ func (s *Server) loadVectorIndex() {
 			collVecs = nil // nothing to train float32 indexes with
 		}
 		s.loadSummaryVectors(collection, diskOnly) // RAG-009
+		s.loadImageVectors(collection, diskOnly)   // RAG-010
 
 		// Trigger training for trainable indexes (IVF, PQ)
 		for _, searcher := range s.VectorSearchers {
@@ -200,7 +212,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, errors.New("missing collection"))
 		return
 	}
-	if req.Query == "" && len(req.QueryVector) == 0 {
+	if req.Query == "" && len(req.QueryVector) == 0 && req.QueryImage == "" {
 		bad(w, errors.New("either query or queryVector is required"))
 		return
 	}
@@ -259,6 +271,10 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// the fixed `topK * 3` here and in four other places.
 	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 	allowedIDs, filtered := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
+	if req.QueryImage != "" { // RAG-010: search the image vectors with an image
+		s.respondImageQuery(w, r, req, topK, allowedIDs, filtered, includeContent, waited)
+		return
+	}
 
 	// SRCH-013: the named algorithm, the profile's, flat — or the planner's
 	// choice for "auto". A quantized collection is searched in its own index
@@ -437,6 +453,14 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		expansions, items = s.appendGraphNeighbours(req.Collection, items, req.GraphExpand, includeContent)
 	}
 
+	// RAG-010: each hit's images, and the images the query matches.
+	var imageHits []ImageRef
+	if req.IncludeImages {
+		imageHits = s.imageHitsFor(r.Context(), req.Collection, req.Query, topK, req.Threshold, allowedIDs, filtered, ps.Plan)
+		attachImages(s, items, func(it *VectorSearchResultItem) imageOwner { return docImages(req.Collection, &it.Document) },
+			func(it *VectorSearchResultItem, refs []ImageRef) { it.Images = refs })
+	}
+
 	if req.wantsPassages() {
 		hits := make([]passageSource, 0, len(items))
 		terms := queryTerms(req.Query)
@@ -449,7 +473,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 				startLine: it.StartLine, endLine: it.EndLine, bestChunk: best, terms: terms,
 				chunks: ps.Plan.expandedChunks(it.Document.ID)})
 		}
-		ok(w, s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited))
+		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited)
+		s.passageImages(&p, req.IncludeImages, imageHits)
+		ok(w, p)
 		return
 	}
 
@@ -462,6 +488,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		GraphExpansions:  expansions,
 		Indexing:         waited,
 		Plan:             req.explained(ps.Plan),
+		ImageHits:        imageHits,
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()

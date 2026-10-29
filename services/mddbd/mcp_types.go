@@ -250,6 +250,9 @@ type MCPVectorSearchRequest struct {
 	PassageOptions  // format, passageLines (AGT-002)
 	PlanOptions     // explain, latencyTargetMs (SRCH-013)
 	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
+	ImageOptions    // includeImages (RAG-010)
+	// QueryImage searches by an image (RAG-010); see VectorSearchRequest.
+	QueryImage string `json:"queryImage,omitempty"`
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -271,6 +274,8 @@ type MCPVectorSearchResult struct {
 	// PendingEmbedding is true for a document whose embedding is still queued:
 	// found by its text, not yet by its meaning (GO-042).
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 	// docTokens is the whole document's size in chunk modes (AGT-004).
 	docTokens int
 }
@@ -296,6 +301,9 @@ type MCPVectorSearchResponse struct {
 	// Plan is how the vector search ran and why, when the request set explain
 	// (SRCH-013).
 	Plan *SearchPlan `json:"plan,omitempty"`
+	// ImageHits are the images the query matched by their picture, with
+	// includeImages and a provider that embeds images (RAG-010).
+	ImageHits []ImageRef `json:"imageHits,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
 	Passages *PassagesResponse `json:"-"`
@@ -380,6 +388,7 @@ type MCPFTSSearchRequest struct {
 	BM25K1          *float64            `json:"bm25K1,omitempty"`  // SRCH-018; nil = profile, then 1.2
 	BM25B           *float64            `json:"bm25B,omitempty"`   // SRCH-018; nil = profile, then 0.75
 	PassageOptions                      // format, passageLines (AGT-002)
+	ImageOptions                        // includeImages (RAG-010)
 }
 
 // MCPFTSResult represents a single FTS result.
@@ -394,6 +403,8 @@ type MCPFTSResult struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 }
 
 // MCPFTSSearchResponse represents full-text search results.
@@ -474,6 +485,7 @@ type MCPHybridSearchRequest struct {
 	PassageOptions  // format, passageLines (AGT-002)
 	PlanOptions     // explain, latencyTargetMs (SRCH-013)
 	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
+	ImageOptions    // includeImages (RAG-010)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -493,6 +505,8 @@ type MCPHybridSearchResult struct {
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
 	// Pinned is set on a result a curation rule placed.
 	Pinned bool `json:"pinned,omitempty"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 }
 
 // MCPHybridSearchResponse represents hybrid search results.
@@ -516,6 +530,9 @@ type MCPHybridSearchResponse struct {
 	// Plan is how the vector search ran and why, when the request set explain
 	// (SRCH-013).
 	Plan *SearchPlan `json:"plan,omitempty"`
+	// ImageHits are the images the query matched by their picture, with
+	// includeImages and a provider that embeds images (RAG-010).
+	ImageHits []ImageRef `json:"imageHits,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
 	Passages *PassagesResponse `json:"-"`
@@ -798,7 +815,8 @@ type MCPCrossSearchRequest struct {
 	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
 	// include "role:reference" for every reference collection.
-	SearchType string `json:"searchType,omitempty"`
+	SearchType   string `json:"searchType,omitempty"`
+	ImageOptions        // includeImages (RAG-010)
 }
 
 // MCPCrossSearchResponse is the response for cross_search.
@@ -889,6 +907,8 @@ type MCPIngestDocument struct {
 	// (AGT-001); see IngestDocumentHTTP.
 	Format  string `json:"format,omitempty"`
 	Content []byte `json:"content_base64,omitempty"`
+	// Images are the files the document's image links name (RAG-010).
+	Images []IngestImage `json:"images,omitempty"`
 }
 
 // MCPIngestOptions represents options for ingest operation.
@@ -899,7 +919,9 @@ type MCPIngestOptions struct {
 	SkipWebhooks            bool `json:"skip_webhooks,omitempty"`
 	AutoConfigureCollection bool `json:"auto_configure_collection,omitempty"`
 	SaveRevision            bool `json:"save_revision,omitempty"`
-	TextOnly                bool `json:"text_only,omitempty"` // RAG-004, for converted documents
+	TextOnly                bool `json:"text_only,omitempty"`           // RAG-004, for converted documents
+	ExtractImages           bool `json:"extract_images,omitempty"`      // RAG-010
+	FetchRemoteImages       bool `json:"fetch_remote_images,omitempty"` // RAG-010
 }
 
 // MCPIngestRequest represents request to ingest multiple documents.
@@ -1021,6 +1043,7 @@ type MCPClient interface {
 	FindDuplicates(ctx context.Context, req *MCPFindDuplicatesRequest) (*MCPFindDuplicatesResponse, error)
 	// Bulk ingest
 	Ingest(ctx context.Context, req *MCPIngestRequest) (*MCPIngestResponse, error)
+	UploadFile(ctx context.Context, req *MCPUploadFileRequest) (map[string]interface{}, error)
 	// Aggregations
 	Aggregate(ctx context.Context, req *AggregateRequest) (*AggregateResponse, error)
 	Close() error

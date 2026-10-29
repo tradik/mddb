@@ -1199,6 +1199,122 @@ curl -X POST http://localhost:11023/v1/eval -d '{"collection": "kb", "configs": 
   {"searchType": "vector", "summaryMode": "expand"}]}'
 ```
 
+### Images — Alt Text, Captions and Pictures (v2.18.9+)
+
+Diagrams, screenshots and tables saved as pictures carry content a text
+index never sees. MDDB keeps a document's images as **image documents** of
+their own and returns them with the hits they belong to. The server runs no
+image model: a picture is found by its alt text and caption always, and by
+what it shows when the embedding provider embeds images.
+
+**Storing images.** Extraction is asked for, so a file written the way it
+always was stores what it always did:
+
+```bash
+# A Markdown file and the images its links name, in one upload
+curl -X POST http://localhost:11023/v1/upload \
+  -F collection=docs -F lang=en -F extractImages=true \
+  -F "files[]=@manual.md" -F "files[]=@img/seal.png" -F "files[]=@img/wiring.jpg"
+
+# A PDF through ingest
+curl -X POST http://localhost:11023/v1/ingest -d '{"collection": "docs",
+  "options": {"extractImages": true},
+  "documents": [{"key": "manual-pdf", "lang": "en", "format": "pdf", "contentBase64": "JVBERi0..."}]}'
+```
+
+- **Markdown**: every `![alt](target "title")` outside code fences. The
+  target is a data URI, a relative path to a file sent with the document
+  (`files[]` beside it on upload, `images: [{path, contentBase64}]` on
+  ingest, `mddb-cli autoindex --images` reads them from disk), or, only with
+  `fetchRemoteImages: true`, an http(s) URL fetched through the SSRF guard
+  that `import-url` uses. Absolute paths, paths leaving the document's
+  directory and other schemes are not read.
+- **PDF**: the image XObjects. JPEG (`DCTDecode`) streams are kept as they
+  are; 8-bit RGB or gray `FlateDecode` pictures (`DeviceRGB`, `DeviceGray`,
+  `CalRGB`, `CalGray`, one- or three-component `ICCBased`; PNG predictors
+  undone) are written as PNG. Skipped, and counted in `meta.imageWarnings`
+  of the PDF: other filters (JPX, CCITT, JBIG2, filter chains), CMYK in
+  Flate, Indexed and other colour spaces, bit depths other than 8, stencil
+  and soft masks, inline images and pictures drawn only inside a form
+  XObject (those are kept without a page).
+- **Limits**: JPEG, PNG, GIF and WebP only, at most 2 MB each, at least
+  16×16 pixels (smaller ones are bullets and rules), at most 64 per document.
+  What was skipped and why is in the parent's `meta.imageWarnings`. The
+  pictures inside other formats (DOCX, ODT, PPTX, EPUB, an email's image
+  attachments) are not extracted.
+- **A collection of type `images`** extracts by default, and an image file
+  uploaded or ingested on its own becomes an image document, its alt text,
+  caption and parent taken from the request's `meta.altText`, `meta.caption`
+  and `meta.parent` (with a parent, it is returned with that document's
+  hits). Elsewhere an image file is still not a document format.
+
+Each image is stored under `KEY/images/NAME` (`seal.png`,
+`page-2-image-1.png`) with `meta.kind: image`, `meta.parent` (the document's
+key), `meta.altText`, `meta.caption` (the link's title, an emphasised or
+"Figure …"/"Fig. …" line under the image, or a PDF page's "Figure" line, in
+order), `meta.page` (PDF), `meta.position`, `meta.mimeType`, `meta.width`,
+`meta.height` and `meta.size`. Its text is `![alt](name)` and the caption, so
+**alt text and captions are in full-text search** (and in text embeddings)
+like any other words. The bytes are kept apart from the document, in the
+collection's `images` bucket: out of full-text search, chunking, the
+metadata index, revisions and every response that returns a document. They
+move with the collection in the per-collection layout, are encrypted with an
+encrypted collection, replicate, are in every backup, and go when the image
+document or its collection goes. `GET /v1/image?collection=&key=&lang=`
+serves them with the type the bytes have and `nosniff`.
+
+**Images with search results.** `includeImages: true` on full-text, vector,
+hybrid and cross-collection search (REST, MCP, gRPC, GraphQL; results and
+passages alike) attaches each hit's images:
+
+```json
+{"document": {"key": "manual", ...}, "score": 0.42,
+ "images": [{"key": "manual/images/seal.png", "lang": "en", "altText": "Exploded view of the pump seal",
+             "caption": "Figure 1: the seal", "mimeType": "image/png", "width": 40, "height": 30,
+             "parent": "manual", "url": "/v1/image?collection=docs&key=manual%2Fimages%2Fseal.png&lang=en"}]}
+```
+
+It is one metadata-index lookup for all the hits of a collection. Without
+`includeImages` nothing is looked up and nothing is added: the response is
+byte-for-byte what it was before v2.18.9 (a golden test holds every surface
+to that).
+
+**Searching by picture.** With a provider that embeds images (Voyage's
+multimodal models, Cohere Embed v3 and newer — see
+[EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#images-v2189)), the embedding
+worker embeds each image document's picture into the image space, after its
+text. Then:
+
+- `includeImages` on vector and hybrid search also embeds the query into the
+  image space and returns the nearest images as `imageHits`, each with its
+  `score` and `parent`. They are kept beside `results`, never mixed in: the
+  two spaces' scores do not compare. This is how a text query finds a
+  picture that has no alt text at all. With `explain`, the plan says how
+  many image vectors were searched and with which model, or why none were.
+- `queryImage` on vector search (REST, MCP `query_image`, gRPC
+  `query_image`, GraphQL `queryImage`) searches by an image: base64, a data
+  URI or an http(s) URL fetched through the SSRF guard. The results are the
+  image documents nearest it, `algorithm: "image"`, each naming its parent.
+  Without an image-capable provider it is refused with 400
+  (gRPC `FAILED_PRECONDITION`); an unreadable image is 400 too.
+
+Image embedding spends the collection's daily embedding budget (GO-043): one
+call, and tokens counted as Voyage counts them (one per 560 pixels). When the
+budget is spent the job waits in the queue. An unchanged image is not
+embedded again: its vector record carries the hash of the bytes and the
+model. Image vectors live in the `vectors` bucket under their own prefix
+(`vimg|`) and in an index of their own; no chunk algorithm, count or quota
+(`embedded_documents`, `quota.maxVectors`) sees them. A provider that embeds
+no images (OpenAI, Ollama, lexical) skips them, and `indexing-status` says
+so:
+
+```json
+"images": {"documents": 6, "embedded": 0,
+           "note": "embedding provider \"lexical-ngram-v1\" does not embed images: images are skipped and found by their alt text and captions only"}
+```
+
+`POST /v1/vector-reindex` with `force` re-embeds images too.
+
 ## Passages — What an Agent Gets (v2.18.8+)
 
 A document answers "which file"; an agent editing code needs "which lines,

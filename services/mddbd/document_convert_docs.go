@@ -14,18 +14,31 @@ type convertedDoc struct {
 	// Confidence is meaningful when Converted.
 	Confidence float64
 	Warnings   []string
+	// Image is set for an image document: its bytes are stored apart from
+	// it (RAG-010).
+	Image *extractedImage
 }
 
 // convertedDocs lists the documents a conversion of the file stored under
-// key yields: the file's own first, then its parts. Each gets a copy of base,
-// the conversion's score and the file's own meta (base wins over the file's
-// meta, so a caller can always override); parts also get meta.parent.
+// key yields: the file's own first, then its parts, then its images under
+// KEY/images/ (RAG-010). Each gets a copy of base, the conversion's score and
+// the file's own meta (base wins over the file's meta, so a caller can always
+// override); parts and images also get meta.parent.
 func convertedDocs(c conversion, key string, base map[string][]string) []convertedDoc {
 	docs := []convertedDoc{convertedDocOf(c, key, base)}
+	if c.Image != nil {
+		docs[0] = imageDocOf(*c.Image, key, "", base)
+	}
+	if len(c.ImageWarnings) > 0 {
+		docs[0].Meta["imageWarnings"] = c.ImageWarnings
+	}
 	for _, p := range c.Parts {
 		d := convertedDocOf(p.conversion, key+p.Suffix, base)
 		d.Meta["parent"] = []string{key + p.ParentSuffix}
 		docs = append(docs, d)
+	}
+	for _, im := range c.Images {
+		docs = append(docs, imageDocOf(im, key+"/images/"+im.Name, key, base))
 	}
 	return docs
 }

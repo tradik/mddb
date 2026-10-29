@@ -25,6 +25,7 @@ var notTools = map[string]bool{
 	"chunk": true, "window": true, "parent": true, "key": true,
 	"meta.title": true, "true": true, "false": true,
 	"expected_revision": true, "revision": true, // update_document arguments (INT-021)
+	"query_image": true, "extract_images": true, "include_images": true, // search and ingest arguments (RAG-010)
 }
 
 func TestAgentInstructionsNameRealTools(t *testing.T) {

@@ -526,6 +526,7 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 		PassageOptions:  passageOptions(req.Format, req.PassageLines),
 		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
 		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
+		ImageOptions:    ImageOptions{IncludeImages: req.IncludeImages}, // RAG-010
 	})
 	if err != nil {
 		return nil, searchStatus(err)
@@ -540,7 +541,8 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 	for _, it := range res.Results {
 		d := it.Document
 		resp.Results = append(resp.Results, &proto.CrossSearchResultItem{Collection: it.Collection, Document: docToProto(&d),
-			Score: it.Score, Rank: safeInt32(it.Rank), Group: it.Group, GroupRank: safeInt32(it.GroupRank)})
+			Score: it.Score, Rank: safeInt32(it.Rank), Group: it.Group, GroupRank: safeInt32(it.GroupRank),
+			Images: imageRefsToProto(it.Images)})
 	}
 	return resp, nil
 }

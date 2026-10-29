@@ -40,7 +40,8 @@ type CrossSearchRequest struct {
 	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
 	// include "role:reference" for every reference collection.
-	SearchType string `json:"searchType,omitempty"`
+	SearchType   string `json:"searchType,omitempty"`
+	ImageOptions        // includeImages (RAG-010): each hit's images, from its own collection
 }
 
 // CrossSearchResultItem represents a single cross-collection search result.
@@ -53,6 +54,8 @@ type CrossSearchResultItem struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 	// chunks are summaryMode expand's chunks for the document, chosen by its
 	// own collection's profile (RAG-009): one passage each with passages.
 	chunks []int
@@ -224,9 +227,12 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	s.countCross(algo, items, req.wantsPassages())
 	if req.wantsPassages() {
-		ok(w, s.crossPassages(req.Query, items, req.PassageOptions, waited))
+		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
+		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
+		ok(w, p)
 		return
 	}
+	s.crossImages(items, req.IncludeImages) // RAG-010
 
 	resp := CrossSearchResponse{
 		Results:           items,

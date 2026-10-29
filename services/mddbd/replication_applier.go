@@ -179,6 +179,11 @@ func (ra *ReplicationApplier) applyVector(entry *binlog.BinlogEntry) {
 		ra.server.applyReplicatedSummary(entry)
 		return
 	}
+	// RAG-010: an image vector goes to the image index, never a chunk one.
+	if vector.IsImageKey(entry.Key) {
+		ra.server.applyReplicatedImage(entry)
+		return
+	}
 
 	// Parse key: vec|collection|docID
 	parts := vector.SplitKey(entry.Key)

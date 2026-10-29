@@ -228,6 +228,22 @@ follow it:
 With `expand` and `format: "passages"`, a summary hit returns one passage per
 chunk it brought in. All of this is additive.
 
+Images (RAG-010) are additive fields; see
+[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189):
+
+| Field | Message | Meaning |
+|---|---|---|
+| `include_images` | `VectorSearchRequest` (26), `FTSRequest` (17), `HybridSearchRequest` (35), `CrossSearchRequest` (27) | Attach each hit's images; on vector and hybrid also return `image_hits` when image vectors exist |
+| `query_image` (27) | `VectorSearchRequest` | Search by an image: base64, a data URI or an http(s) URL. `FAILED_PRECONDITION` without a provider that embeds images, `INVALID_ARGUMENT` for an unreadable image |
+| `images` (`repeated ImageRef`) | `VectorSearchResult` (10), `FTSResult` (7), `HybridSearchResult` (11), `CrossSearchResultItem` (7), `Passage` (13) | The hit's image documents |
+| `image_hits` (`repeated ImageRef`) | `VectorSearchResponse` (10), `HybridSearchResponse` (11) | Images the query matched by their picture |
+| `images` (`ImageIndexingStatus`, 10) | `IndexingStatusResponse` | `documents`, `embedded`, `model`, `note`; unset without images |
+| `images` (`repeated IngestImage`, 12) | `IngestDocument` | Files a Markdown document's links name: `path`, `content` |
+| `extract_images` (7), `fetch_remote_images` (8) | `IngestOptions` | Store Markdown and PDF images as image documents; fetch http(s) links |
+
+`ImageRef` is `key`, `lang`, `alt_text`, `caption`, `page`, `mime_type`,
+`width`, `height`, `parent`, `score` (image hits) and `url`.
+
 Scheduled backups (OPS-023) and the lexical provider (SRCH-014) reach gRPC
 too:
 

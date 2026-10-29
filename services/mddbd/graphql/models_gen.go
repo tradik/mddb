@@ -163,6 +163,8 @@ type FTSInput struct {
 	// results (default) or passages: path, lines, symbol and text per hit (AGT-002).
 	Format       *string `json:"format,omitempty"`
 	PassageLines *int    `json:"passageLines,omitempty"`
+	// Attach each hit's images (RAG-010).
+	IncludeImages *bool `json:"includeImages,omitempty"`
 }
 
 type FTSResponse struct {
@@ -176,6 +178,8 @@ type FTSResult struct {
 	Document     *Document `json:"document"`
 	Score        float64   `json:"score"`
 	MatchedTerms []string  `json:"matchedTerms"`
+	// The document's images, with includeImages (RAG-010).
+	Images []*ImageRef `json:"images,omitempty"`
 }
 
 // What relevance feedback did (SRCH-015). alpha, beta, gamma and queryShift
@@ -222,6 +226,35 @@ type GroupPermission struct {
 	Admin      bool   `json:"admin"`
 }
 
+// Image documents and their vectors (RAG-010).
+type ImageIndexingStatus struct {
+	Documents int `json:"documents"`
+	Embedded  int `json:"embedded"`
+	// Multimodal model; null when the provider embeds no images.
+	Model *string `json:"model,omitempty"`
+	// Why images are not embedded, when they are not.
+	Note *string `json:"note,omitempty"`
+}
+
+// An image document attached to a hit or found by its picture (RAG-010).
+type ImageRef struct {
+	Key     string  `json:"key"`
+	Lang    string  `json:"lang"`
+	AltText *string `json:"altText,omitempty"`
+	Caption *string `json:"caption,omitempty"`
+	// PDF page, null when unknown.
+	Page     *int    `json:"page,omitempty"`
+	MimeType *string `json:"mimeType,omitempty"`
+	Width    *int    `json:"width,omitempty"`
+	Height   *int    `json:"height,omitempty"`
+	// The document the image came from.
+	Parent *string `json:"parent,omitempty"`
+	// Similarity to the query, on image hits.
+	Score *float64 `json:"score,omitempty"`
+	// GET path of the image bytes.
+	URL string `json:"url"`
+}
+
 // Queued indexing work (GO-042); fields match GET /v1/indexing-status.
 type IndexingStatus struct {
 	Collection          *string `json:"collection,omitempty"`
@@ -233,6 +266,8 @@ type IndexingStatus struct {
 	OldestPendingAt     *int64  `json:"oldestPendingAt,omitempty"`
 	Provider            *string `json:"provider,omitempty"`
 	Indexed             bool    `json:"indexed"`
+	// Image documents and their vectors (RAG-010); null when there are none.
+	Images *ImageIndexingStatus `json:"images,omitempty"`
 }
 
 type IngestDocumentInput struct {
@@ -254,6 +289,10 @@ type IngestOptionsInput struct {
 	SkipWebhooks            *bool `json:"skipWebhooks,omitempty"`
 	AutoConfigureCollection *bool `json:"autoConfigureCollection,omitempty"`
 	SaveRevision            *bool `json:"saveRevision,omitempty"`
+	// Images in Markdown documents become image documents (RAG-010); data URIs, and remote links with fetchRemoteImages.
+	ExtractImages *bool `json:"extractImages,omitempty"`
+	// Fetch Markdown image links to http(s) URLs, SSRF-guarded (RAG-010).
+	FetchRemoteImages *bool `json:"fetchRemoteImages,omitempty"`
 }
 
 type IngestResult struct {
@@ -294,6 +333,8 @@ type Passage struct {
 	Score      *float64      `json:"score,omitempty"`
 	Source     *string       `json:"source,omitempty"`
 	Tokens     int           `json:"tokens"`
+	// The document's images, with includeImages (RAG-010).
+	Images []*ImageRef `json:"images,omitempty"`
 }
 
 // A 1-based, inclusive line range.
@@ -458,6 +499,12 @@ type VectorSearchInput struct {
 	FeedbackWeight *float64 `json:"feedbackWeight,omitempty"`
 	// Rocchio weights for query mode; omitted ones keep 1, 0.75, 0.25.
 	Rocchio *RocchioInput `json:"rocchio,omitempty"`
+	// Attach each hit's images; with a provider that embeds images, also return imageHits (RAG-010).
+	IncludeImages *bool `json:"includeImages,omitempty"`
+	// Search by an image instead of text (RAG-010): base64, a data URI or an
+	// http(s) URL. Needs a provider that embeds images; the results are image
+	// documents.
+	QueryImage *string `json:"queryImage,omitempty"`
 }
 
 type VectorSearchResponse struct {
@@ -469,6 +516,8 @@ type VectorSearchResponse struct {
 	Passages []*Passage `json:"passages,omitempty"`
 	// How the search ran and why (SRCH-013); null unless the input set explain.
 	Plan *SearchPlan `json:"plan,omitempty"`
+	// Images the query matched by their picture, with includeImages and a provider that embeds images (RAG-010).
+	ImageHits []*ImageRef `json:"imageHits,omitempty"`
 }
 
 type VectorSearchResult struct {
@@ -479,6 +528,8 @@ type VectorSearchResult struct {
 	Group *string `json:"group,omitempty"`
 	// 1-based place of this result within its group.
 	GroupRank *int `json:"groupRank,omitempty"`
+	// The document's images, with includeImages (RAG-010).
+	Images []*ImageRef `json:"images,omitempty"`
 }
 
 type VectorStats struct {

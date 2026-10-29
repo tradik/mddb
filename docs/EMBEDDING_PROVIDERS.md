@@ -272,6 +272,39 @@ change: the vectors are not comparable, so re-embed every collection with
 
 ---
 
+## Images (v2.18.9+)
+
+Image documents (see [SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189))
+are always found by their alt text and captions. Their pictures are embedded
+only by a provider whose API takes images, into the same space as text
+embedded by the same model, so a text query can find a picture with no
+words on it. Checked against each provider's API reference on 2026-10-29:
+
+| Provider | Embeds images | How MDDB calls it | Text query into the image space | Source |
+|---|---|---|---|---|
+| **Voyage** | Yes, with a `voyage-multimodal-*` model: `voyage-multimodal-3.5` by default, the text model itself when it is multimodal, or `MDDB_EMBEDDING_IMAGE_MODEL` | `POST /v1/multimodalembeddings`, one `image_base64` data URI per input, `input_type` document/query. PNG, JPEG, WebP, GIF; ≤ 16 Mpx, ≤ 20 MB | The same multimodal model, `type: text` | [Multimodal embeddings API](https://docs.voyageai.com/reference/multimodal-embeddings-api), [guide](https://docs.voyageai.com/docs/multimodal-embeddings) |
+| **Cohere** | Yes, Embed v3.0 and newer (`embed-english-v3.0`, `embed-multilingual-v3.0`, the light variants, `embed-v4.0`) | `POST /v1/embed` with `input_type: image` and `images: [data URI]`. JPEG, PNG, WebP, GIF; v3 models one image ≤ 5 MB per call | `Embed` itself: Cohere's text and images share one space | [Embed (v1)](https://docs.cohere.com/v1/reference/embed), [Embed (v2)](https://docs.cohere.com/reference/embed) |
+| **OpenAI** | No | — | — | The [embeddings API](https://platform.openai.com/docs/api-reference/embeddings/create) takes a string, strings or token arrays; no image input is documented. (The page refused an automated fetch; checked through its published reference and SDK types.) |
+| **Ollama** | No | — | — | [`/api/embed`](https://docs.ollama.com/api/embed) takes `input` text only; no image field |
+| **Lexical** | No | — | — | It hashes words |
+
+Not checked against a live API in CI (no keys there): the request shapes
+above are tested against recorded-format test servers, and
+`TestImages_MultimodalProviderE2E` runs the whole path against a real one
+when `MDDB_TEST_MULTIMODAL_PROVIDER` (`voyage` or `cohere`) and
+`MDDB_TEST_MULTIMODAL_API_KEY` are set.
+
+```bash
+export MDDB_EMBEDDING_PROVIDER=voyage
+export MDDB_EMBEDDING_MODEL=voyage-3                       # text chunks
+export MDDB_EMBEDDING_IMAGE_MODEL=voyage-multimodal-3.5    # pictures (default)
+# MDDB_EMBEDDING_IMAGE_MODEL=none embeds no pictures, with Voyage or Cohere
+```
+
+Each picture is one provider call against the collection's embedding budget,
+its tokens estimated as one per 560 pixels. An unchanged picture is not
+embedded again.
+
 ## Configuration Methods
 
 ### Method 1: Environment Variables (Legacy)
@@ -316,13 +349,13 @@ If you're using environment variables and want to migrate to database config:
 
 ## Comparison Matrix
 
-| Provider | Cost | Quality | Speed | Multilingual | Local | API Key Required |
-|----------|------|---------|-------|--------------|-------|------------------|
-| **OpenAI** | $$ | Excellent | Fast | Good | No | Yes |
-| **Cohere** | $$ | Excellent | Fast | **Best** | No | Yes |
-| **Voyage** | $$ | Excellent | Fast | Good | No | Yes |
-| **Ollama** | **Free** | Good | **Fastest** | Fair | **Yes** | No |
-| **Lexical** | **Free** | Spelling only, no meaning | **Fastest** | No | **Yes** | No |
+| Provider | Cost | Quality | Speed | Multilingual | Local | API Key Required | Images (v2.18.9+) |
+|----------|------|---------|-------|--------------|-------|------------------|-------------------|
+| **OpenAI** | $$ | Excellent | Fast | Good | No | Yes | No |
+| **Cohere** | $$ | Excellent | Fast | **Best** | No | Yes | Yes (v3+) |
+| **Voyage** | $$ | Excellent | Fast | Good | No | Yes | Yes (multimodal model) |
+| **Ollama** | **Free** | Good | **Fastest** | Fair | **Yes** | No | No |
+| **Lexical** | **Free** | Spelling only, no meaning | **Fastest** | No | **Yes** | No | No |
 
 ---
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"mime/multipart"
 	"net/http"
@@ -304,7 +305,7 @@ func TestCovJProcessUploadedFileOpenAndReadErrors(t *testing.T) {
 	defer cleanup()
 
 	// A header with neither content nor a temp file cannot be opened.
-	if _, err := s.processUploadedFile(&multipart.FileHeader{Filename: "a.md"}, "docs", "en", "", nil, 0, 100, false); err == nil ||
+	if _, err := s.processUploadedFile(context.Background(), &multipart.FileHeader{Filename: "a.md"}, "docs", "en", "", nil, 0, 100, false, imageOptions{}); err == nil ||
 		!strings.Contains(err.Error(), "open file") {
 		t.Errorf("open: %v", err)
 	}
@@ -328,7 +329,7 @@ func TestCovJProcessUploadedFileOpenAndReadErrors(t *testing.T) {
 	if err := os.Mkdir(p, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.processUploadedFile(fh, "docs", "en", "", nil, 0, 100, false); err == nil ||
+	if _, err := s.processUploadedFile(context.Background(), fh, "docs", "en", "", nil, 0, 100, false, imageOptions{}); err == nil ||
 		!strings.Contains(err.Error(), "read file") {
 		t.Errorf("read: %v", err)
 	}
@@ -341,7 +342,7 @@ func TestCovJProcessUploadedFileChecksBytesRead(t *testing.T) {
 
 	fh := covJFileHeader(t, "c.md", bytes.Repeat([]byte("y"), 64), 1<<20)
 	fh.Size = 1
-	if _, err := s.processUploadedFile(fh, "docs", "en", "", nil, 0, 16, false); err == nil ||
+	if _, err := s.processUploadedFile(context.Background(), fh, "docs", "en", "", nil, 0, 16, false, imageOptions{}); err == nil ||
 		!strings.Contains(err.Error(), "exceeds max size") {
 		t.Errorf("understated size: %v", err)
 	}

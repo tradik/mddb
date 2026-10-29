@@ -68,6 +68,7 @@ type HybridSearchRequest struct {
 	IndexWait
 	PlanOptions     // explain, latencyTargetMs (SRCH-013), for the vector half
 	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015), for the vector half
+	ImageOptions    // includeImages (RAG-010)
 
 	// onlyIDs restricts the full-text half to these documents. Internal:
 	// used to find matches among documents still waiting for their
@@ -108,6 +109,8 @@ type HybridSearchResultItem struct {
 	// PendingEmbedding is true for a document whose embedding is still queued:
 	// found by its text, not yet by its meaning (GO-042).
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 }
 
 // HybridSearchResponse represents the response from hybrid search.
@@ -136,6 +139,9 @@ type HybridSearchResponse struct {
 	// Plan is how the vector search ran and why, when the request set explain
 	// (SRCH-013).
 	Plan *SearchPlan `json:"plan,omitempty"`
+	// ImageHits are the images the query matched by their picture, with
+	// includeImages and a provider that embeds images (RAG-010).
+	ImageHits []ImageRef `json:"imageHits,omitempty"`
 }
 
 // handleHybridSearch handles POST /v1/hybrid-search
@@ -376,9 +382,13 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	if req.TopK > 0 && len(items) > req.TopK {
 		items = items[:req.TopK]
 	}
+	req.plan = plan
+	imageHits := s.hybridImages(r.Context(), req, items) // RAG-010
 
 	if req.wantsPassages() {
-		ok(w, s.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, plan))
+		p := s.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, plan)
+		s.passageImages(&p, req.IncludeImages, imageHits)
+		ok(w, p)
 		return
 	}
 
@@ -397,6 +407,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		DistanceMetric:  distMetric,
 		Indexing:        waited,
 		Plan:            req.explained(plan),
+		ImageHits:       imageHits,
 	}
 	if req.Strategy == "alpha" {
 		resp.Alpha = alpha

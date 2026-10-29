@@ -195,14 +195,7 @@ func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew b
 		// document and /v1/vector-stats reports the running total (#232).
 		// A single write has nothing useful to do with the boolean that a
 		// batch does — there is no per-request tally to add it to.
-		_ = s.EmbeddingWorker.Enqueue(EmbeddingJob{
-			Collection: collection,
-			DocID:      saved.ID,
-			ContentMD:  saved.ContentMD,
-			ChunkMode:  s.chunkModeFor(collection, &saved),
-			ChunkSize:  s.chunkSizeFor(collection),
-			Summary:    documentSummary(&saved), // RAG-009
-		})
+		_ = s.EmbeddingWorker.Enqueue(s.embeddingJob(collection, &saved)) // RAG-009, RAG-010
 	}
 
 	// TTL bucket entry
@@ -338,6 +331,7 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 	// Clean up vector embedding (legacy key + all chunk keys), and the
 	// summary vector (RAG-009).
 	s.dropDocumentSummary(collection, docID)
+	s.dropDocumentImage(collection, docID) // RAG-010: its bytes and image vector
 	if s.VectorStore != nil {
 		_ = s.VectorStore.Delete(collection, docID)
 		for _, searcher := range s.VectorSearchers {
@@ -426,14 +420,7 @@ func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.
 		// document and /v1/vector-stats reports the running total (#232).
 		// A single write has nothing useful to do with the boolean that a
 		// batch does — there is no per-request tally to add it to.
-		_ = s.EmbeddingWorker.Enqueue(EmbeddingJob{
-			Collection: collection,
-			DocID:      saved.ID,
-			ContentMD:  saved.ContentMD,
-			ChunkMode:  s.chunkModeFor(collection, &saved),
-			ChunkSize:  s.chunkSizeFor(collection),
-			Summary:    documentSummary(&saved), // RAG-009
-		})
+		_ = s.EmbeddingWorker.Enqueue(s.embeddingJob(collection, &saved)) // RAG-009, RAG-010
 	}
 
 	if s.TTLManager != nil {

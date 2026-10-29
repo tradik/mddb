@@ -87,6 +87,19 @@ func (f *covBFakeClient) Add(_ context.Context, req *MCPAddRequest) (*MCPDocumen
 	return &MCPDocument{ID: "doc-" + req.Key, Key: req.Key, Lang: req.Lang, Meta: req.Meta, ContentMD: req.ContentMD}, nil
 }
 
+// UploadFile converts the file as the server does and stores its documents
+// through the fake's Add, so the upload_file tool is tested without a store;
+// a file that does not convert never reaches Add.
+func (f *covBFakeClient) UploadFile(ctx context.Context, req *MCPUploadFileRequest) (map[string]interface{}, error) {
+	conv, err := convertToMarkdown(formatFromFilename(req.Filename), req.Content, req.TextOnly)
+	if err != nil {
+		return nil, err
+	}
+	return uploadFileResult(req, conv, func(d convertedDoc) (*MCPDocument, error) {
+		return f.Add(ctx, &MCPAddRequest{Collection: req.Collection, Key: d.Key, Lang: req.Lang, ContentMD: d.Markdown, Meta: d.Meta})
+	})
+}
+
 func (f *covBFakeClient) AddBatch(_ context.Context, req *MCPAddBatchRequest) (*MCPAddBatchResponse, error) {
 	if err := f.covBRecord("AddBatch", req); err != nil {
 		return nil, err

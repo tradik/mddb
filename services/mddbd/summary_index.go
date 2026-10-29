@@ -28,7 +28,8 @@ func documentSummary(doc *storage.Doc) string {
 	return strings.TrimSpace(strings.Join(doc.Meta[summaryMetaKey], " "))
 }
 
-// summaryIndex holds one summary vector per document.
+// summaryIndex holds one vector per document: a summary's (RAG-009) or, in
+// the server's second instance, an image's (RAG-010).
 type summaryIndex struct {
 	flat  *vec.VectorIndex
 	quant *vec.QuantizedVectorIndex
@@ -103,6 +104,17 @@ func (x *summaryIndex) size(collection string) int {
 	return len(x.present[collection])
 }
 
+// total is how many documents of every collection have a vector here.
+func (x *summaryIndex) total() int {
+	x.mu.RLock()
+	defer x.mu.RUnlock()
+	n := 0
+	for _, docs := range x.present {
+		n += len(docs)
+	}
+	return n
+}
+
 // drop forgets a collection.
 func (x *summaryIndex) drop(collection string) {
 	x.flat.DropCollection(collection)
@@ -125,11 +137,17 @@ func (x *summaryIndex) reset() {
 	}
 }
 
-// search returns the documents whose summaries are nearest the query. A
-// disk-only collection is searched quantized and rescored from disk.
+// searchSummaries returns the documents whose summaries are nearest the
+// query.
 func (s *Server) searchSummaries(collection string, query []float32, topK int, threshold float64,
 	allowed map[string]bool, filtered bool, metric vec.SimilarityFunc) []vec.VectorResult {
-	x := s.summaries()
+	return s.searchDocIndex(s.summaries(), collection, query, topK, threshold, allowed, filtered, metric, s.VectorStore.SummaryVectors)
+}
+
+// searchDocIndex searches a one-vector-per-document index. A disk-only
+// collection is searched quantized and rescored from disk, read by full.
+func (s *Server) searchDocIndex(x *summaryIndex, collection string, query []float32, topK int, threshold float64,
+	allowed map[string]bool, filtered bool, metric vec.SimilarityFunc, full func(string, []string) map[string][]float32) []vec.VectorResult {
 	if x.size(collection) == 0 {
 		return nil
 	}
@@ -155,9 +173,9 @@ func (s *Server) searchSummaries(collection string, query []float32, topK int, t
 	for i, h := range hits {
 		ids[i] = h.DocID
 	}
-	full := s.VectorStore.SummaryVectors(collection, ids)
+	vectors := full(collection, ids)
 	for i := range hits {
-		if v, ok := full[hits[i].DocID]; ok {
+		if v, ok := vectors[hits[i].DocID]; ok {
 			hits[i].Score = metric(query, v)
 		}
 	}

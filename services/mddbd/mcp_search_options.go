@@ -26,6 +26,41 @@ var (
 	}
 )
 
+// Image arguments (RAG-010).
+var (
+	mcpIncludeImagesSchema = map[string]interface{}{
+		"type": "boolean",
+		"description": "Attach each hit's images (alt text, caption, page, url) as images; with a provider that embeds images, " +
+			"also return the images whose picture matches the query as imageHits",
+	}
+	mcpQueryImageSchema = map[string]interface{}{
+		"type": "string",
+		"description": "Search by an image instead of text: base64, a data URI or an http(s) URL. Needs a provider that embeds " +
+			"images (voyage, cohere v3+); the results are image documents, each with meta.parent. query may then be omitted",
+	}
+	mcpExtractImagesSchema = map[string]interface{}{
+		"type": "boolean",
+		"description": "Store the images of Markdown documents and PDFs as image documents (kind image, meta.parent, altText, caption, page); " +
+			"default on in a collection of type images",
+	}
+	mcpFetchRemoteImagesSchema = map[string]interface{}{
+		"type": "boolean", "description": "With extract_images: fetch Markdown image links to http(s) URLs (SSRF-guarded); off by default",
+	}
+	mcpImageFilesSchema = map[string]interface{}{
+		"type":        "array",
+		"description": "The files the Markdown's image links name by relative path, each {path, content_base64}",
+		"items": map[string]interface{}{"type": "object", "properties": map[string]interface{}{
+			"path":           map[string]interface{}{"type": "string"},
+			"content_base64": map[string]interface{}{"type": "string"},
+		}},
+	}
+)
+
+// mcpGetImageOptions reads include_images.
+func mcpGetImageOptions(args map[string]interface{}) ImageOptions {
+	return ImageOptions{IncludeImages: mcpGetBool(args, "include_images")}
+}
+
 // Relevance feedback arguments (SRCH-015).
 var (
 	mcpFeedbackExampleSchema = map[string]interface{}{

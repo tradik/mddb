@@ -50,6 +50,14 @@ that answered, `negative` for the ones that did not. The second round moves
 towards the first and away from the second. On a test corpus, one round
 raised recall@10 from 0.31 to 0.49.
 
+When the answer may be in a figure — a diagram, a screenshot, a chart — pass
+`include_images: true`. Each hit then lists its images with their alt text,
+caption, page and `url`, and an image is also a hit of its own by its alt
+text and caption. With a provider that embeds images, `imageHits` adds the
+pictures that match by what they show, and `semantic_search` takes
+`query_image` to search with a picture. Images exist only where the writer
+asked for them (`extract_images` on `upload_file` and `ingest_documents`).
+
 When a search keeps missing what it should find, measure instead of guessing.
 Record the question and the document that answers it with `add_eval_query`,
 then compare configurations with `run_eval`.

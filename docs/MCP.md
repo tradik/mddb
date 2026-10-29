@@ -544,6 +544,18 @@ handle the gap, cheapest first:
 
 `add_document` reports `indexing.embeddingQueued` when it queued an embedding.
 
+## Images of the Documents You Find (v2.18.9+)
+
+Pass `include_images: true` to `full_text_search`, `semantic_search`,
+`hybrid_search` or `cross_search` and each hit carries `images`: its image
+documents with `altText`, `caption`, `page` and the `url` of the bytes. Alt
+text and captions are searchable text, so an image is also a hit of its own.
+With a provider that embeds images, `semantic_search` and `hybrid_search`
+also return `imageHits` (pictures matching the query by what they show), and
+`semantic_search` takes `query_image` to search by a picture. Images are
+stored when a write asks for them: `extract_images` on `upload_file` and
+`ingest_documents`. See [SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189).
+
 ## Built-in Tool Catalog
 
 All 93 built-in tools, grouped by area. Tool inputs are self-describing via
@@ -568,24 +580,24 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `set_ttl_where` | (v2.18.8) Set the time to live (`ttl` seconds, 0 removes it) of every document a filter matches. |
 | `get_meta_keys` | List all unique metadata keys and their values for a collection. |
 | `get_checksum` | Get a CRC32 checksum for a collection that changes when documents are modified. |
-| `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. Since v2.18.9 a document may carry a file (`format`, `content_base64`) that the server converts, and options take `text_only`. |
-| `upload_file` | Upload a file and convert it to markdown. Since v2.18.9: `text_only`; xlsx, ods, csv, tsv, pptx, odp, epub, eml and mbox; the result carries `conversionConfidence`, `conversionWarnings` and `parts` (the keys of an email's attachments or a mailbox's messages, stored with `meta.parent`). |
+| `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. Since v2.18.9 a document may carry a file (`format`, `content_base64`) that the server converts, and options take `text_only`; options `extract_images` / `fetch_remote_images` and a document's `images` (`[{path, content_base64}]`) store its images as image documents ([images](SEARCH.md#images--alt-text-captions-and-pictures-v2189)). |
+| `upload_file` | Upload a file and convert it to markdown. Since v2.18.9: `text_only`; xlsx, ods, csv, tsv, pptx, odp, epub, eml and mbox; the result carries `conversionConfidence`, `conversionWarnings` and `parts` (the keys of an email's attachments or a mailbox's messages, stored with `meta.parent`); `extract_images`, `fetch_remote_images` and `images` store a Markdown file's or PDF's images as image documents, listed in `parts`. |
 
 ### Search
 
 | Tool | Description |
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
-| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`). |
+| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), `include_images` (each hit's images, and `imageHits` with an image-capable provider) and `query_image` (search by an image; `query` may then be omitted). |
 | `get_indexing_status` | (v2.18.8) Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
 | `run_eval` | (v2.18.8) Measure search configurations on the collection's evaluation set: recall@k, nDCG@k, MRR, p50/p99 latency and tokens per configuration. Read-only. See [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188). Since v2.18.9 a configuration takes `summaryMode` (`off`, `blend`, `expand`) to measure [summaries](SEARCH.md#summaries--a-second-representation-v2189). |
 | `get_gain` | (v2.18.8) What retrieval saved over a window of days: searches by type and algorithm, tokens returned and tokens avoided by passages and chunks. Counts only. Read-only. |
 | `add_eval_query` | (v2.18.8) Add a query and the keys of the documents that should answer it, optionally graded 0–3, to the collection's evaluation set. |
-| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). |
+| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). Since v2.18.9 `include_images` attaches each hit's images. |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
-| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback on the vector half (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`). |
-| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`, and relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`). |
+| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback on the vector half (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images`. |
+| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`, relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`), and `include_images` (each hit's images from its own collection). |
 | `find_duplicates` | Find duplicate and similar documents within a collection. |
 
 ### Geo

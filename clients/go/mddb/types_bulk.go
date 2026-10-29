@@ -28,6 +28,16 @@ type IngestDocument struct {
 	// base64; Format ("pdf", "docx", "html", ...) defaults to Key's extension.
 	Format  string `json:"format,omitempty"`
 	Content []byte `json:"contentBase64,omitempty"`
+	// Images are the files a Markdown document's image links name by
+	// relative path, read with IngestOptions.ExtractImages (v2.18.9+).
+	Images []IngestImage `json:"images,omitempty"`
+}
+
+// IngestImage is a file an image link names: its path as the link writes it
+// and its bytes (base64 on the wire).
+type IngestImage struct {
+	Path    string `json:"path"`
+	Content []byte `json:"contentBase64"`
 }
 
 // IngestOptions turns optional ingest steps off. Profile names a preset of
@@ -41,6 +51,11 @@ type IngestOptions struct {
 	SaveRevision            bool   `json:"saveRevision,omitempty"`
 	Profile                 string `json:"profile,omitempty"`
 	TextOnly                bool   `json:"textOnly,omitempty"`
+	// ExtractImages stores the images of Markdown documents and PDFs as
+	// image documents under them; FetchRemoteImages also fetches http(s)
+	// image links (v2.18.9+).
+	ExtractImages     bool `json:"extractImages,omitempty"`
+	FetchRemoteImages bool `json:"fetchRemoteImages,omitempty"`
 }
 
 // IngestResponse reports what an ingest did.

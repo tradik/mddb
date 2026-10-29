@@ -70,11 +70,14 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 		Mode ChunkMode
 		// Summary is re-embedded with the chunks (RAG-009).
 		Summary string
+		// Image marks an image document, whose picture is re-embedded too
+		// (RAG-010).
+		Image bool
 	}
 	var docs []docEntry
 	if err := s.DBScanC(collection, s.BucketNames.Docs, []byte("doc|"+collection+"|"), func(_, v []byte) bool {
 		if d, err := loadDoc(v); err == nil {
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(collection, d), Summary: documentSummary(d)})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(collection, d), Summary: documentSummary(d), Image: isImageDoc(d)})
 		}
 		return true
 	}); err != nil {
@@ -97,6 +100,9 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 		}
 		s.reindexOne(ctx, collection, d.ID, d.ContentMD, d.Mode, force, chunkEnabled, chunkSize, qt, diskOnly, &res)
 		s.reindexSummary(ctx, collection, d.ID, d.Summary, force, &res)
+		if d.Image {
+			s.reindexImage(ctx, collection, d.ID, force, &res) // RAG-010
+		}
 		if progress != nil {
 			progress(i+1, res)
 		}

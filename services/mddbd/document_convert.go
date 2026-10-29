@@ -42,6 +42,13 @@ type conversion struct {
 	// Parts are further documents the file holds: a mailbox's messages, an
 	// email's convertible attachments.
 	Parts []conversionPart
+	// Images are the file's images, extracted when the write asked for them
+	// (RAG-010), and ImageWarnings what was skipped and why.
+	Images        []extractedImage
+	ImageWarnings []string
+	// Image is set when the file is itself an image, stored as an image
+	// document (a collection of type "images").
+	Image *extractedImage
 }
 
 // conversionPart is a document found inside another. Its key is the

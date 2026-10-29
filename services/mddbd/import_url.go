@@ -80,6 +80,14 @@ func (s *Server) handleImportURL(w http.ResponseWriter, r *http.Request) {
 // uses an SSRF-safe dialer (SEC-004) that rejects private/loopback/link-local
 // destinations and re-validates redirects.
 func fetchURL(ctx context.Context, rawURL string) (string, error) {
+	data, err := fetchURLBytes(ctx, rawURL, 10*1024*1024)
+	return string(data), err
+}
+
+// fetchURLBytes downloads at most limit bytes from a URL through the SSRF
+// guard: import-url's pages and, since RAG-010, remote images and image
+// queries, one guard for every fetch a request can cause.
+func fetchURLBytes(ctx context.Context, rawURL string, limit int64) ([]byte, error) {
 	// GO-034: carried through the request's context, so an import from a slow
 	// or hostile host is abandoned when the caller gives up rather than
 	// holding the connection for the full client timeout.
@@ -91,30 +99,22 @@ func fetchURL(ctx context.Context, rawURL string) (string, error) {
 	// because a dialer inside a transport is invisible to it.
 	safeURL, err := httpclient.ValidateOutboundURL(rawURL)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, safeURL, nil)
-	if err != nil {
-		return "", err
-	}
+	// GET of a URL ValidateOutboundURL has just parsed: building the request
+	// cannot fail.
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, safeURL, nil)
 	resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req) // #nosec G107 -- SSRF-guarded by httpclient.SafeDialContext
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
-		return "", errors.New("fetch failed: " + resp.Status)
+		return nil, errors.New("fetch failed: " + resp.Status)
 	}
-
-	// Limit to 10MB
-	limited := io.LimitReader(resp.Body, 10*1024*1024)
-	data, err := io.ReadAll(limited)
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	return io.ReadAll(io.LimitReader(resp.Body, limit))
 }
 
 // parseFrontmatter extracts YAML frontmatter (between --- markers) from markdown.

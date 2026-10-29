@@ -714,6 +714,18 @@ paths:
                   type: string
                   enum: ["true", "false"]
                   description: Extract plain text from html, docx, odt and epub instead of rebuilding Markdown structure
+                extractImages:
+                  type: string
+                  enum: ["true", "false"]
+                  description: >
+                    (v2.18.9, RAG-010) Images in the files become image documents; image
+                    files sent with a Markdown file are the files its links name, not
+                    documents of their own. On by default in a collection of type images,
+                    where an image file uploaded on its own is an image document.
+                fetchRemoteImages:
+                  type: string
+                  enum: ["true", "false"]
+                  description: (v2.18.9, RAG-010) Fetch Markdown image links to http(s) URLs, SSRF-guarded.
       responses:
         "200":
           description: File(s) uploaded and stored
@@ -5285,6 +5297,37 @@ paths:
         "405":
           description: Method not allowed
 
+  /v1/image:
+    get:
+      tags:
+        - Documents
+      summary: An image document's bytes
+      description: |
+        (v2.18.9, RAG-010) The bytes of an image document, served with the
+        type the bytes have (never a stored claim) and `nosniff`. The `url`
+        of every ImageRef a search returns points here.
+      operationId: getImage
+      parameters:
+        - { name: collection, in: query, required: true, schema: { type: string } }
+        - { name: key, in: query, required: true, schema: { type: string } }
+        - { name: lang, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The image
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/gif: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        "400":
+          description: Missing collection, key or lang
+        "403":
+          description: Forbidden
+        "404":
+          description: No image under that key
+        "405":
+          description: Method not allowed
+
   /v1/aliases:
     get:
       tags:
@@ -6690,6 +6733,10 @@ components:
         total: { type: integer }
         contextTruncated: { type: boolean }
         indexing: { $ref: '#/components/schemas/IndexWaitResult' }
+        imageHits:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: (v2.18.9, RAG-010) Images the query matched by their picture, with includeImages.
     Passage:
       type: object
       description: |
@@ -6714,6 +6761,36 @@ components:
         score: { type: number }
         source: { type: string, description: 'fts, vector, hybrid, cross, or a symbol relation.' }
         tokens: { type: integer, description: Estimated tokens of content. }
+        images:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: (v2.18.9, RAG-010) The document's images, with includeImages.
+    ImageRef:
+      type: object
+      description: >
+        (v2.18.9, RAG-010) An image document: one stored from a Markdown
+        image link or a PDF picture, with kind image and meta.parent.
+      required: [ key, lang, url ]
+      properties:
+        key: { type: string, example: manual/images/seal.png }
+        lang: { type: string }
+        altText: { type: string }
+        caption: { type: string, description: 'The figure caption: a link title, an emphasised or "Figure" line under the image, a PDF page''s "Figure" line.' }
+        page: { type: integer, description: The PDF page; absent when unknown. }
+        mimeType: { type: string, enum: [ image/jpeg, image/png, image/gif, image/webp ] }
+        width: { type: integer }
+        height: { type: integer }
+        parent: { type: string, description: The document the image came from. }
+        score: { type: number, description: Similarity to the query, on image hits. }
+        url: { type: string, description: 'GET path of the bytes: /v1/image?collection=…&key=…&lang=…' }
+    ImageIndexingStatus:
+      type: object
+      description: (v2.18.9, RAG-010) Image documents and their vectors.
+      properties:
+        documents: { type: integer, description: Image documents holding an image. }
+        embedded: { type: integer, description: Of them, with an image vector. }
+        model: { type: string, description: The multimodal model; absent when the provider embeds no images. }
+        note: { type: string, description: 'Why images are not embedded: they are then found by alt text and captions only.' }
     SymbolRequest:
       type: object
       required: [ collection, name ]
@@ -6762,6 +6839,7 @@ components:
         oldestPendingAt: { type: string, format: date-time }
         provider: { type: string, description: Embedding model; absent when none is configured. }
         indexed: { type: boolean, description: Nothing pending — a search sees every document written so far. }
+        images: { $ref: '#/components/schemas/ImageIndexingStatus' }
     IndexWaitResult:
       type: object
       properties:
@@ -7467,6 +7545,18 @@ components:
             (v2.18.9+) The file to convert, base64-encoded. With
             `skipDuplicates`, the converted Markdown is what is compared, so an
             unchanged file is skipped.
+        images:
+          type: array
+          description: >
+            (v2.18.9, RAG-010) The files a Markdown document's image links
+            name by relative path, read with options.extractImages. An image
+            whose bytes changed is written even under skipDuplicates.
+          items:
+            type: object
+            required: [ path, contentBase64 ]
+            properties:
+              path: { type: string, example: img/seal.png }
+              contentBase64: { type: string, format: byte }
 
     IngestOptions:
       type: object
@@ -7516,6 +7606,21 @@ components:
             rebuilding their structure as Markdown. Implied by `profile: fast`.
             PDF has no text-only variant: its extractor already produces plain
             text and builds no structure.
+        extractImages:
+          type: boolean
+          default: false
+          description: >
+            (v2.18.9, RAG-010) Store the images of Markdown documents (data
+            URIs, files sent in `images`) and PDFs (JPEG and 8-bit RGB/gray
+            Flate pictures) as image documents under KEY/images/: kind image,
+            meta.parent, altText, caption, page. At most 2 MB each; JPEG, PNG,
+            GIF, WebP. On by default in a collection of type images.
+        fetchRemoteImages:
+          type: boolean
+          default: false
+          description: >
+            (v2.18.9, RAG-010) With extractImages, fetch Markdown image links
+            to http(s) URLs through the SSRF guard. Off by default.
 
     IngestResponse:
       type: object
@@ -7834,6 +7939,21 @@ components:
       required:
         - collection
       properties:
+        includeImages:
+          type: boolean
+          description: >
+            (v2.18.9, RAG-010) Attach each hit's image documents — those whose
+            `meta.parent` is the hit's key — as `images`, with alt text,
+            caption and page. Without it nothing is looked up and the response
+            is unchanged.
+        queryImage:
+          type: string
+          description: >
+            (v2.18.9, RAG-010) Search by an image instead of text: base64, a
+            data URI, or an http(s) URL fetched through the SSRF guard (at most
+            2 MB; JPEG, PNG, GIF or WebP). Needs a provider that embeds images
+            (Voyage, Cohere Embed v3+); otherwise 400. The results are image
+            documents (algorithm `image`), each naming its `meta.parent`.
         format:
           type: string
           enum: [ results, passages ]
@@ -8107,6 +8227,13 @@ components:
     VectorSearchResponse:
       type: object
       properties:
+        imageHits:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: >
+            (v2.18.9, RAG-010) With includeImages and a provider that embeds
+            images: the images whose picture matches the query, scored in the
+            image space and kept apart from results.
         plan:
           $ref: '#/components/schemas/SearchPlan'
         indexing:
@@ -8141,6 +8268,10 @@ components:
     VectorSearchResultItem:
       type: object
       properties:
+        images:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: (v2.18.9, RAG-010) The document's images, with includeImages.
         pendingEmbedding:
           type: boolean
           description: The document's embedding is still queued; it was found by its text (GO-042).
@@ -8335,6 +8466,13 @@ components:
         - collection
         - query
       properties:
+        includeImages:
+          type: boolean
+          description: >
+            (v2.18.9, RAG-010) Attach each hit's image documents — those whose
+            `meta.parent` is the hit's key — as `images`, with alt text,
+            caption and page. Without it nothing is looked up and the response
+            is unchanged.
         format:
           type: string
           enum: [ results, passages ]
@@ -8648,6 +8786,10 @@ components:
     FTSResultItem:
       type: object
       properties:
+        images:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: (v2.18.9, RAG-010) The document's images, with includeImages.
         group:
           type: string
           description: Group this result counted against (only with groupBy, SRCH-016).
@@ -8979,6 +9121,13 @@ components:
         - collection
         - query
       properties:
+        includeImages:
+          type: boolean
+          description: >
+            (v2.18.9, RAG-010) Attach each hit's image documents — those whose
+            `meta.parent` is the hit's key — as `images`, with alt text,
+            caption and page. Without it nothing is looked up and the response
+            is unchanged.
         format:
           type: string
           enum: [ results, passages ]
@@ -9220,6 +9369,13 @@ components:
     HybridSearchResponse:
       type: object
       properties:
+        imageHits:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: >
+            (v2.18.9, RAG-010) With includeImages and a provider that embeds
+            images: the images whose picture matches the query, scored in the
+            image space and kept apart from results.
         plan:
           $ref: '#/components/schemas/SearchPlan'
         indexing:
@@ -9264,6 +9420,10 @@ components:
     HybridSearchResultItem:
       type: object
       properties:
+        images:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: (v2.18.9, RAG-010) The document's images, with includeImages.
         pendingEmbedding:
           type: boolean
           description: The document's embedding is still queued; it was found by its text (GO-042).
@@ -11328,6 +11488,13 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        includeImages:
+          type: boolean
+          description: >
+            (v2.18.9, RAG-010) Attach each hit's image documents — those whose
+            `meta.parent` is the hit's key — as `images`, with alt text,
+            caption and page. Without it nothing is looked up and the response
+            is unchanged.
         searchType:
           type: string
           enum: [ vector, fts, hybrid ]
@@ -11483,6 +11650,10 @@ components:
     CrossSearchResultItem:
       type: object
       properties:
+        images:
+          type: array
+          items: { $ref: '#/components/schemas/ImageRef' }
+          description: (v2.18.9, RAG-010) The document's images, with includeImages.
         group:
           type: string
           description: Group this result counted against (only with groupBy, SRCH-016).

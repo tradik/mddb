@@ -101,6 +101,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/search-advisor", s.handleSearchAdvisor)
 	// GO-042: is what I just wrote searchable yet?
 	mux.HandleFunc("/v1/indexing-status", s.handleIndexingStatus)
+	mux.HandleFunc("/v1/image", s.handleImage) // RAG-010: an image document's bytes
 	mux.HandleFunc("/v1/collection-config", s.handleCollectionConfig)
 	// SRCH-019: measure retrieval on the collection's own evaluation set.
 	mux.HandleFunc("/v1/eval", s.withSearchLimit(s.handleEval))

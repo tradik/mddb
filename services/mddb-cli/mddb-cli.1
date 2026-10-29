@@ -139,6 +139,12 @@ Skip larger files (default 1048576).
 .BR \-\-profile " " \fINAME\fR
 Ingest profile: fast trades parsing fidelity for speed.
 .TP
+.B \-\-images
+Send each Markdown file with the JPEG, PNG, GIF and WebP files its relative
+image links name (inside the indexed tree, at most 2 MB each); the server
+stores them, and the pictures of PDFs, as image documents with their alt text
+and captions searchable (v2.18.9).
+.TP
 .B \-\-prune
 Delete documents whose file no longer exists.
 .TP

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -59,6 +60,9 @@ type UploadBatchResponse struct {
 //	meta            – JSON-encoded metadata map (optional)
 //	ttl             – TTL in seconds (optional)
 //	maxSize         – per-file size limit in bytes (optional, default 10 MB, max 100 MB)
+//	extractImages   – "true": images in the files become image documents (RAG-010);
+//	                  image files sent alongside a Markdown file are what its links name
+//	fetchRemoteImages – "true": a Markdown image link to an http(s) URL is fetched
 //
 // Supported file types: see supportedFormatsHint (document_convert.go).
 // Default (md/txt) is stored as-is; others are converted to markdown.
@@ -154,9 +158,23 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// RAG-010: with extraction on, image files sent with Markdown files are
+	// the files their links name, not documents of their own — except in a
+	// collection of type images, where an image file is a document.
+	images := s.imageOptionsFor(collection, r.FormValue("extractImages") == "true", r.FormValue("fetchRemoteImages") == "true", nil)
+	if images.Extract && len(files) > 1 && !s.imagesCollection(collection) {
+		var assets map[string][]byte
+		files, assets = splitImageUploads(files)
+		images.Local = localFiles(assets)
+	}
+	if len(files) == 0 {
+		bad(w, errors.New("only image files were uploaded; they are stored in a collection of type images"))
+		return
+	}
+
 	// Single file → simple response; multiple → batch response
 	if len(files) == 1 {
-		res, err := s.processUploadedFile(files[0], collection, lang, keyOverride, meta, ttl, maxSize, resolved.TextOnly)
+		res, err := s.processUploadedFile(r.Context(), files[0], collection, lang, keyOverride, meta, ttl, maxSize, resolved.TextOnly, images)
 		if err != nil {
 			bad(w, err)
 			return
@@ -169,7 +187,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	// Multi-file upload
 	resp := UploadBatchResponse{}
 	for _, fh := range files {
-		res, err := s.processUploadedFile(fh, collection, lang, "", meta, ttl, maxSize, resolved.TextOnly)
+		res, err := s.processUploadedFile(r.Context(), fh, collection, lang, "", meta, ttl, maxSize, resolved.TextOnly, images)
 		if err != nil {
 			resp.Failed++
 			resp.Errors = append(resp.Errors, fmt.Sprintf("%s: %s", fh.Filename, err.Error()))
@@ -188,26 +206,17 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 
 // processUploadedFile reads a single multipart file, converts to markdown if needed,
 // and stores via addDocument.
-func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang, keyOverride string, baseMeta map[string][]string, ttl, maxSize int64, textOnly bool) (*UploadResponse, error) {
+func (s *Server) processUploadedFile(ctx context.Context, fh *multipart.FileHeader, collection, lang, keyOverride string, baseMeta map[string][]string, ttl, maxSize int64, textOnly bool, images imageOptions) (*UploadResponse, error) {
 	if fh.Size > maxSize {
 		return nil, fmt.Errorf("file %q exceeds max size (%d bytes)", fh.Filename, maxSize)
 	}
 
-	f, err := fh.Open()
+	data, err := readUpload(fh, maxSize)
 	if err != nil {
-		return nil, fmt.Errorf("open file: %w", err)
-	}
-	defer func() { _ = f.Close() }()
-
-	data, err := io.ReadAll(io.LimitReader(f, maxSize+1))
-	if err != nil {
-		return nil, fmt.Errorf("read file: %w", err)
-	}
-	if int64(len(data)) > maxSize {
-		return nil, fmt.Errorf("file %q exceeds max size (%d bytes)", fh.Filename, maxSize)
+		return nil, err
 	}
 
-	conv, err := convertToMarkdown(formatFromFilename(fh.Filename), data, textOnly)
+	conv, err := s.convertFile(ctx, collection, formatFromFilename(fh.Filename), data, textOnly, images)
 	if err != nil {
 		return nil, err
 	}
@@ -258,8 +267,11 @@ func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang,
 		if err := s.SchemaManager.Validate(collection, d.Meta); err != nil {
 			return res, fmt.Errorf("%s: %w", d.Key, err)
 		}
-		saved, _, err := s.addDocument(collection, d.Key, lang, d.Meta, d.Markdown, ttl, true)
-		if err != nil {
+		var saved storage.Doc
+		if err := s.withImageBytes(collection, lang, d, func() (err error) {
+			saved, _, err = s.addDocument(collection, d.Key, lang, d.Meta, d.Markdown, ttl, true)
+			return err
+		}); err != nil {
 			return res, fmt.Errorf("%s: %w", d.Key, err)
 		}
 		r := UploadResponse{Key: d.Key, Format: d.Format, Converted: d.Converted, Doc: saved}
@@ -274,6 +286,45 @@ func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang,
 		}
 	}
 	return res, nil
+}
+
+// splitImageUploads separates the image files of an upload, read into a
+// map by file name, from the files to store. An image file that cannot be
+// read or is too large stays a file to store, and fails there with its
+// reason.
+func splitImageUploads(files []*multipart.FileHeader) ([]*multipart.FileHeader, map[string][]byte) {
+	assets := map[string][]byte{}
+	var rest []*multipart.FileHeader
+	for _, fh := range files {
+		if imageFormats[formatFromFilename(fh.Filename)] == "" || fh.Size > maxImageBytes {
+			rest = append(rest, fh)
+			continue
+		}
+		data, err := readUpload(fh, maxImageBytes)
+		if err != nil {
+			rest = append(rest, fh)
+			continue
+		}
+		assets[fh.Filename] = data
+	}
+	return rest, assets
+}
+
+// readUpload reads an uploaded file of at most limit bytes.
+func readUpload(fh *multipart.FileHeader, limit int64) ([]byte, error) {
+	f, err := fh.Open()
+	if err != nil {
+		return nil, fmt.Errorf("open file: %w", err)
+	}
+	defer func() { _ = f.Close() }()
+	data, err := io.ReadAll(io.LimitReader(f, limit+1))
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("file %q exceeds max size (%d bytes)", fh.Filename, limit)
+	}
+	return data, nil
 }
 
 // deriveKeyFromFilename strips the extension and returns a URL-safe key.

@@ -101,6 +101,12 @@ func (b *embeddingBudget) exhausted(collection string) *QuotaError {
 // spend records one provider call embedding text for the collection. Only
 // collections with a budget are counted.
 func (b *embeddingBudget) spend(collection, text string) {
+	b.spendTokens(collection, estimateTokens(text))
+}
+
+// spendTokens records one provider call of the given size: an image's, whose
+// tokens are counted from its pixels (RAG-010).
+func (b *embeddingBudget) spendTokens(collection string, tokens int64) {
 	if !b.limits(collection).limitsEmbedding() {
 		return
 	}
@@ -109,7 +115,7 @@ func (b *embeddingBudget) spend(collection, text string) {
 	b.rollLocked()
 	u := b.used[collection]
 	u.calls++
-	u.tokens += estimateTokens(text)
+	u.tokens += tokens
 	b.used[collection] = u
 }
 

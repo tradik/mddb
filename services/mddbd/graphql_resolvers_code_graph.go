@@ -123,6 +123,7 @@ func passagesToGQL(in []Passage) []*gql.Passage {
 			score := p.Score
 			g.Score = &score
 		}
+		g.Images = imageRefsToGQL(p.Images) // RAG-010
 		out = append(out, g)
 	}
 	return out

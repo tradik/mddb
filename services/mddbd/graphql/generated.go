@@ -135,6 +135,7 @@ type ComplexityRoot struct {
 
 	FTSResult struct {
 		Document     func(childComplexity int) int
+		Images       func(childComplexity int) int
 		MatchedTerms func(childComplexity int) int
 		Score        func(childComplexity int) int
 	}
@@ -166,10 +167,32 @@ type ComplexityRoot struct {
 		Write      func(childComplexity int) int
 	}
 
+	ImageIndexingStatus struct {
+		Documents func(childComplexity int) int
+		Embedded  func(childComplexity int) int
+		Model     func(childComplexity int) int
+		Note      func(childComplexity int) int
+	}
+
+	ImageRef struct {
+		AltText  func(childComplexity int) int
+		Caption  func(childComplexity int) int
+		Height   func(childComplexity int) int
+		Key      func(childComplexity int) int
+		Lang     func(childComplexity int) int
+		MimeType func(childComplexity int) int
+		Page     func(childComplexity int) int
+		Parent   func(childComplexity int) int
+		Score    func(childComplexity int) int
+		URL      func(childComplexity int) int
+		Width    func(childComplexity int) int
+	}
+
 	IndexingStatus struct {
 		Collection          func(childComplexity int) int
 		CompletedEmbeddings func(childComplexity int) int
 		FailedEmbeddings    func(childComplexity int) int
+		Images              func(childComplexity int) int
 		Indexed             func(childComplexity int) int
 		OldestPendingAt     func(childComplexity int) int
 		PendingEmbeddings   func(childComplexity int) int
@@ -223,6 +246,7 @@ type ComplexityRoot struct {
 	Passage struct {
 		Collection func(childComplexity int) int
 		Content    func(childComplexity int) int
+		Images     func(childComplexity int) int
 		Key        func(childComplexity int) int
 		Kind       func(childComplexity int) int
 		Lang       func(childComplexity int) int
@@ -312,6 +336,7 @@ type ComplexityRoot struct {
 
 	VectorSearchResponse struct {
 		Dimensions func(childComplexity int) int
+		ImageHits  func(childComplexity int) int
 		Model      func(childComplexity int) int
 		Passages   func(childComplexity int) int
 		Plan       func(childComplexity int) int
@@ -323,6 +348,7 @@ type ComplexityRoot struct {
 		Document  func(childComplexity int) int
 		Group     func(childComplexity int) int
 		GroupRank func(childComplexity int) int
+		Images    func(childComplexity int) int
 		Rank      func(childComplexity int) int
 		Score     func(childComplexity int) int
 	}
@@ -783,6 +809,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.FTSResult.Document(childComplexity), true
+	case "FTSResult.images":
+		if e.ComplexityRoot.FTSResult.Images == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FTSResult.Images(childComplexity), true
 	case "FTSResult.matchedTerms":
 		if e.ComplexityRoot.FTSResult.MatchedTerms == nil {
 			break
@@ -907,6 +939,98 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.GroupPermission.Write(childComplexity), true
 
+	case "ImageIndexingStatus.documents":
+		if e.ComplexityRoot.ImageIndexingStatus.Documents == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageIndexingStatus.Documents(childComplexity), true
+	case "ImageIndexingStatus.embedded":
+		if e.ComplexityRoot.ImageIndexingStatus.Embedded == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageIndexingStatus.Embedded(childComplexity), true
+	case "ImageIndexingStatus.model":
+		if e.ComplexityRoot.ImageIndexingStatus.Model == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageIndexingStatus.Model(childComplexity), true
+	case "ImageIndexingStatus.note":
+		if e.ComplexityRoot.ImageIndexingStatus.Note == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageIndexingStatus.Note(childComplexity), true
+
+	case "ImageRef.altText":
+		if e.ComplexityRoot.ImageRef.AltText == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.AltText(childComplexity), true
+	case "ImageRef.caption":
+		if e.ComplexityRoot.ImageRef.Caption == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Caption(childComplexity), true
+	case "ImageRef.height":
+		if e.ComplexityRoot.ImageRef.Height == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Height(childComplexity), true
+	case "ImageRef.key":
+		if e.ComplexityRoot.ImageRef.Key == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Key(childComplexity), true
+	case "ImageRef.lang":
+		if e.ComplexityRoot.ImageRef.Lang == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Lang(childComplexity), true
+	case "ImageRef.mimeType":
+		if e.ComplexityRoot.ImageRef.MimeType == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.MimeType(childComplexity), true
+	case "ImageRef.page":
+		if e.ComplexityRoot.ImageRef.Page == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Page(childComplexity), true
+	case "ImageRef.parent":
+		if e.ComplexityRoot.ImageRef.Parent == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Parent(childComplexity), true
+	case "ImageRef.score":
+		if e.ComplexityRoot.ImageRef.Score == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Score(childComplexity), true
+	case "ImageRef.url":
+		if e.ComplexityRoot.ImageRef.URL == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.URL(childComplexity), true
+	case "ImageRef.width":
+		if e.ComplexityRoot.ImageRef.Width == nil {
+			break
+		}
+
+		return e.ComplexityRoot.ImageRef.Width(childComplexity), true
+
 	case "IndexingStatus.collection":
 		if e.ComplexityRoot.IndexingStatus.Collection == nil {
 			break
@@ -925,6 +1049,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.IndexingStatus.FailedEmbeddings(childComplexity), true
+	case "IndexingStatus.images":
+		if e.ComplexityRoot.IndexingStatus.Images == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.Images(childComplexity), true
 	case "IndexingStatus.indexed":
 		if e.ComplexityRoot.IndexingStatus.Indexed == nil {
 			break
@@ -1285,6 +1415,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Passage.Content(childComplexity), true
+	case "Passage.images":
+		if e.ComplexityRoot.Passage.Images == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Images(childComplexity), true
 	case "Passage.key":
 		if e.ComplexityRoot.Passage.Key == nil {
 			break
@@ -1705,6 +1841,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.VectorSearchResponse.Dimensions(childComplexity), true
+	case "VectorSearchResponse.imageHits":
+		if e.ComplexityRoot.VectorSearchResponse.ImageHits == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResponse.ImageHits(childComplexity), true
 	case "VectorSearchResponse.model":
 		if e.ComplexityRoot.VectorSearchResponse.Model == nil {
 			break
@@ -1754,6 +1896,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.VectorSearchResult.GroupRank(childComplexity), true
+	case "VectorSearchResult.images":
+		if e.ComplexityRoot.VectorSearchResult.Images == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResult.Images(childComplexity), true
 	case "VectorSearchResult.rank":
 		if e.ComplexityRoot.VectorSearchResult.Rank == nil {
 			break
@@ -2157,6 +2305,8 @@ func (ec *executionContext) childFields_FTSResult(ctx context.Context, field gra
 		return ec.fieldContext_FTSResult_score(ctx, field)
 	case "matchedTerms":
 		return ec.fieldContext_FTSResult_matchedTerms(ctx, field)
+	case "images":
+		return ec.fieldContext_FTSResult_images(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type FTSResult", field.Name)
 }
@@ -2215,6 +2365,48 @@ func (ec *executionContext) childFields_GroupPermission(ctx context.Context, fie
 	return nil, fmt.Errorf("no field named %q was found under type GroupPermission", field.Name)
 }
 
+func (ec *executionContext) childFields_ImageIndexingStatus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "documents":
+		return ec.fieldContext_ImageIndexingStatus_documents(ctx, field)
+	case "embedded":
+		return ec.fieldContext_ImageIndexingStatus_embedded(ctx, field)
+	case "model":
+		return ec.fieldContext_ImageIndexingStatus_model(ctx, field)
+	case "note":
+		return ec.fieldContext_ImageIndexingStatus_note(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ImageIndexingStatus", field.Name)
+}
+
+func (ec *executionContext) childFields_ImageRef(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "key":
+		return ec.fieldContext_ImageRef_key(ctx, field)
+	case "lang":
+		return ec.fieldContext_ImageRef_lang(ctx, field)
+	case "altText":
+		return ec.fieldContext_ImageRef_altText(ctx, field)
+	case "caption":
+		return ec.fieldContext_ImageRef_caption(ctx, field)
+	case "page":
+		return ec.fieldContext_ImageRef_page(ctx, field)
+	case "mimeType":
+		return ec.fieldContext_ImageRef_mimeType(ctx, field)
+	case "width":
+		return ec.fieldContext_ImageRef_width(ctx, field)
+	case "height":
+		return ec.fieldContext_ImageRef_height(ctx, field)
+	case "parent":
+		return ec.fieldContext_ImageRef_parent(ctx, field)
+	case "score":
+		return ec.fieldContext_ImageRef_score(ctx, field)
+	case "url":
+		return ec.fieldContext_ImageRef_url(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type ImageRef", field.Name)
+}
+
 func (ec *executionContext) childFields_IndexingStatus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "collection":
@@ -2235,6 +2427,8 @@ func (ec *executionContext) childFields_IndexingStatus(ctx context.Context, fiel
 		return ec.fieldContext_IndexingStatus_provider(ctx, field)
 	case "indexed":
 		return ec.fieldContext_IndexingStatus_indexed(ctx, field)
+	case "images":
+		return ec.fieldContext_IndexingStatus_images(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type IndexingStatus", field.Name)
 }
@@ -2297,6 +2491,8 @@ func (ec *executionContext) childFields_Passage(ctx context.Context, field graph
 		return ec.fieldContext_Passage_source(ctx, field)
 	case "tokens":
 		return ec.fieldContext_Passage_tokens(ctx, field)
+	case "images":
+		return ec.fieldContext_Passage_images(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Passage", field.Name)
 }
@@ -2427,6 +2623,8 @@ func (ec *executionContext) childFields_VectorSearchResponse(ctx context.Context
 		return ec.fieldContext_VectorSearchResponse_passages(ctx, field)
 	case "plan":
 		return ec.fieldContext_VectorSearchResponse_plan(ctx, field)
+	case "imageHits":
+		return ec.fieldContext_VectorSearchResponse_imageHits(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type VectorSearchResponse", field.Name)
 }
@@ -2443,6 +2641,8 @@ func (ec *executionContext) childFields_VectorSearchResult(ctx context.Context, 
 		return ec.fieldContext_VectorSearchResult_group(ctx, field)
 	case "groupRank":
 		return ec.fieldContext_VectorSearchResult_groupRank(ctx, field)
+	case "images":
+		return ec.fieldContext_VectorSearchResult_images(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type VectorSearchResult", field.Name)
 }
@@ -4875,6 +5075,38 @@ func (ec *executionContext) fieldContext_FTSResult_matchedTerms(_ context.Contex
 	return graphql.NewScalarFieldContext("FTSResult", field, false, false, "String")
 }
 
+func (ec *executionContext) _FTSResult_images(ctx context.Context, field graphql.CollectedField, obj *FTSResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FTSResult_images(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Images, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ImageRef) graphql.Marshaler {
+			return ec.marshalOImageRef2ᚕᚖmddbᚋgraphqlᚐImageRefᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FTSResult_images(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FTSResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImageRef(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _FeedbackApplied_mode(ctx context.Context, field graphql.CollectedField, obj *FeedbackApplied) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5289,6 +5521,351 @@ func (ec *executionContext) fieldContext_GroupPermission_admin(_ context.Context
 	return graphql.NewScalarFieldContext("GroupPermission", field, false, false, "Boolean")
 }
 
+func (ec *executionContext) _ImageIndexingStatus_documents(ctx context.Context, field graphql.CollectedField, obj *ImageIndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageIndexingStatus_documents(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Documents, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImageIndexingStatus_documents(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageIndexingStatus", field, false, false, "Int")
+}
+
+func (ec *executionContext) _ImageIndexingStatus_embedded(ctx context.Context, field graphql.CollectedField, obj *ImageIndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageIndexingStatus_embedded(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Embedded, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImageIndexingStatus_embedded(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageIndexingStatus", field, false, false, "Int")
+}
+
+func (ec *executionContext) _ImageIndexingStatus_model(ctx context.Context, field graphql.CollectedField, obj *ImageIndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageIndexingStatus_model(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Model, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageIndexingStatus_model(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageIndexingStatus", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageIndexingStatus_note(ctx context.Context, field graphql.CollectedField, obj *ImageIndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageIndexingStatus_note(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Note, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageIndexingStatus_note(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageIndexingStatus", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageRef_key(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_key(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageRef_lang(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_lang(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Lang, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_lang(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageRef_altText(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_altText(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.AltText, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_altText(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageRef_caption(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_caption(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Caption, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_caption(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageRef_page(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_page(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Page, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_page(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "Int")
+}
+
+func (ec *executionContext) _ImageRef_mimeType(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_mimeType(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.MimeType, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_mimeType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageRef_width(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_width(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Width, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_width(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "Int")
+}
+
+func (ec *executionContext) _ImageRef_height(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_height(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Height, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_height(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "Int")
+}
+
+func (ec *executionContext) _ImageRef_parent(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_parent(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Parent, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_parent(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "String")
+}
+
+func (ec *executionContext) _ImageRef_score(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_score(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Score, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_score(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "Float")
+}
+
+func (ec *executionContext) _ImageRef_url(ctx context.Context, field graphql.CollectedField, obj *ImageRef) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_ImageRef_url(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.URL, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_ImageRef_url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("ImageRef", field, false, false, "String")
+}
+
 func (ec *executionContext) _IndexingStatus_collection(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5494,6 +6071,38 @@ func (ec *executionContext) _IndexingStatus_indexed(ctx context.Context, field g
 }
 func (ec *executionContext) fieldContext_IndexingStatus_indexed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _IndexingStatus_images(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_images(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Images, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *ImageIndexingStatus) graphql.Marshaler {
+			return ec.marshalOImageIndexingStatus2ᚖmddbᚋgraphqlᚐImageIndexingStatus(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_images(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "IndexingStatus",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImageIndexingStatus(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _IngestResult_added(ctx context.Context, field graphql.CollectedField, obj *IngestResult) (ret graphql.Marshaler) {
@@ -7370,6 +7979,38 @@ func (ec *executionContext) _Passage_tokens(ctx context.Context, field graphql.C
 }
 func (ec *executionContext) fieldContext_Passage_tokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Passage", field, false, false, "Int")
+}
+
+func (ec *executionContext) _Passage_images(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_images(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Images, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ImageRef) graphql.Marshaler {
+			return ec.marshalOImageRef2ᚕᚖmddbᚋgraphqlᚐImageRefᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_images(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Passage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImageRef(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _PassageLines_start(ctx context.Context, field graphql.CollectedField, obj *PassageLines) (ret graphql.Marshaler) {
@@ -9324,6 +9965,38 @@ func (ec *executionContext) fieldContext_VectorSearchResponse_plan(_ context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _VectorSearchResponse_imageHits(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResponse_imageHits(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.ImageHits, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ImageRef) graphql.Marshaler {
+			return ec.marshalOImageRef2ᚕᚖmddbᚋgraphqlᚐImageRefᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResponse_imageHits(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VectorSearchResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImageRef(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _VectorSearchResult_document(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9446,6 +10119,38 @@ func (ec *executionContext) _VectorSearchResult_groupRank(ctx context.Context, f
 }
 func (ec *executionContext) fieldContext_VectorSearchResult_groupRank(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("VectorSearchResult", field, false, false, "Int")
+}
+
+func (ec *executionContext) _VectorSearchResult_images(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResult_images(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Images, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*ImageRef) graphql.Marshaler {
+			return ec.marshalOImageRef2ᚕᚖmddbᚋgraphqlᚐImageRefᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResult_images(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "VectorSearchResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_ImageRef(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _VectorStats_enabled(ctx context.Context, field graphql.CollectedField, obj *VectorStats) (ret graphql.Marshaler) {
@@ -11179,7 +11884,7 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "limit", "format", "passageLines"}
+	fieldsInOrder := [...]string{"collection", "query", "limit", "format", "passageLines", "includeImages"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11221,6 +11926,13 @@ func (ec *executionContext) unmarshalInputFTSInput(ctx context.Context, obj any)
 				return it, err
 			}
 			it.PassageLines = data
+		case "includeImages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeImages"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IncludeImages = data
 		}
 	}
 	return it, nil
@@ -11445,7 +12157,7 @@ func (ec *executionContext) unmarshalInputIngestOptionsInput(ctx context.Context
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"skipDuplicates", "skipEmbeddings", "skipFts", "skipWebhooks", "autoConfigureCollection", "saveRevision"}
+	fieldsInOrder := [...]string{"skipDuplicates", "skipEmbeddings", "skipFts", "skipWebhooks", "autoConfigureCollection", "saveRevision", "extractImages", "fetchRemoteImages"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11494,6 +12206,20 @@ func (ec *executionContext) unmarshalInputIngestOptionsInput(ctx context.Context
 				return it, err
 			}
 			it.SaveRevision = data
+		case "extractImages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("extractImages"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExtractImages = data
+		case "fetchRemoteImages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("fetchRemoteImages"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.FetchRemoteImages = data
 		}
 	}
 	return it, nil
@@ -12033,7 +12759,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio", "includeImages", "queryImage"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12180,6 +12906,20 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.Rocchio = data
+		case "includeImages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeImages"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IncludeImages = data
+		case "queryImage":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("queryImage"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.QueryImage = data
 		}
 	}
 	return it, nil
@@ -12862,6 +13602,11 @@ func (ec *executionContext) _FTSResult(ctx context.Context, sel ast.SelectionSet
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "images":
+			out.Values[i] = ec._FTSResult_images(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13053,6 +13798,137 @@ func (ec *executionContext) _GroupPermission(ctx context.Context, sel ast.Select
 	return out
 }
 
+var imageIndexingStatusImplementors = []string{"ImageIndexingStatus"}
+
+func (ec *executionContext) _ImageIndexingStatus(ctx context.Context, sel ast.SelectionSet, obj *ImageIndexingStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, imageIndexingStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ImageIndexingStatus")
+		case "documents":
+			out.Values[i] = ec._ImageIndexingStatus_documents(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "embedded":
+			out.Values[i] = ec._ImageIndexingStatus_embedded(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "model":
+			out.Values[i] = ec._ImageIndexingStatus_model(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "note":
+			out.Values[i] = ec._ImageIndexingStatus_note(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var imageRefImplementors = []string{"ImageRef"}
+
+func (ec *executionContext) _ImageRef(ctx context.Context, sel ast.SelectionSet, obj *ImageRef) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, imageRefImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ImageRef")
+		case "key":
+			out.Values[i] = ec._ImageRef_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lang":
+			out.Values[i] = ec._ImageRef_lang(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "altText":
+			out.Values[i] = ec._ImageRef_altText(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "caption":
+			out.Values[i] = ec._ImageRef_caption(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "page":
+			out.Values[i] = ec._ImageRef_page(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "mimeType":
+			out.Values[i] = ec._ImageRef_mimeType(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "width":
+			out.Values[i] = ec._ImageRef_width(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "height":
+			out.Values[i] = ec._ImageRef_height(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "parent":
+			out.Values[i] = ec._ImageRef_parent(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "score":
+			out.Values[i] = ec._ImageRef_score(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "url":
+			out.Values[i] = ec._ImageRef_url(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var indexingStatusImplementors = []string{"IndexingStatus"}
 
 func (ec *executionContext) _IndexingStatus(ctx context.Context, sel ast.SelectionSet, obj *IndexingStatus) graphql.Marshaler {
@@ -13107,6 +13983,11 @@ func (ec *executionContext) _IndexingStatus(ctx context.Context, sel ast.Selecti
 		case "indexed":
 			out.Values[i] = ec._IndexingStatus_indexed(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "images":
+			out.Values[i] = ec._IndexingStatus_images(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:
@@ -13491,6 +14372,11 @@ func (ec *executionContext) _Passage(ctx context.Context, sel ast.SelectionSet, 
 		case "tokens":
 			out.Values[i] = ec._Passage_tokens(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "images":
+			out.Values[i] = ec._Passage_images(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
 		default:
@@ -14087,6 +14973,11 @@ func (ec *executionContext) _VectorSearchResponse(ctx context.Context, sel ast.S
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "imageHits":
+			out.Values[i] = ec._VectorSearchResponse_imageHits(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -14137,6 +15028,11 @@ func (ec *executionContext) _VectorSearchResult(ctx context.Context, sel ast.Sel
 			}
 		case "groupRank":
 			out.Values[i] = ec._VectorSearchResult_groupRank(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "images":
+			out.Values[i] = ec._VectorSearchResult_images(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -14926,6 +15822,14 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 	return res
 }
 
+func (ec *executionContext) marshalNImageRef2ᚖmddbᚋgraphqlᚐImageRef(ctx context.Context, sel ast.SelectionSet, v *ImageRef) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "ImageRef!")
+		return graphql.Null
+	}
+	return ec._ImageRef(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNIngestDocumentInput2ᚕᚖmddbᚋgraphqlᚐIngestDocumentInputᚄ(ctx context.Context, v any) ([]*IngestDocumentInput, error) {
 	vSlice := graphql.CoerceList(v)
 	var err error
@@ -15587,6 +16491,32 @@ func (ec *executionContext) unmarshalOGroupByInput2ᚖmddbᚋgraphqlᚐGroupByIn
 	}
 	res, err := ec.unmarshalInputGroupByInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOImageIndexingStatus2ᚖmddbᚋgraphqlᚐImageIndexingStatus(ctx context.Context, sel ast.SelectionSet, v *ImageIndexingStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ImageIndexingStatus(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOImageRef2ᚕᚖmddbᚋgraphqlᚐImageRefᚄ(ctx context.Context, sel ast.SelectionSet, v []*ImageRef) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNImageRef2ᚖmddbᚋgraphqlᚐImageRef(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOIndexingStatus2ᚖmddbᚋgraphqlᚐIndexingStatus(ctx context.Context, sel ast.SelectionSet, v *IndexingStatus) graphql.Marshaler {

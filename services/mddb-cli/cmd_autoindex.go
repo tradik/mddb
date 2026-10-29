@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,6 +33,9 @@ type autoindexOptions struct {
 	include, exclude                []string
 	maxSize                         int64
 	prune, dryRun                   bool
+	// images sends each Markdown file's linked images and asks the server
+	// to store them, and a PDF's pictures, as image documents (RAG-010).
+	images bool
 	// extraMeta is added to every document: a reference repository's
 	// licence and source (AGT-003).
 	extraMeta map[string][]string
@@ -106,6 +110,7 @@ server extracts symbols. A second run only rewrites files whose content changed.
 	f.StringVar(&o.profile, "profile", "", `Ingest profile: "" (default) or "fast"`)
 	f.BoolVar(&o.prune, "prune", false, "Delete documents whose file no longer exists")
 	f.BoolVar(&o.dryRun, "dry-run", false, "Show what would be indexed, skipped and pruned; write nothing")
+	f.BoolVar(&o.images, "images", false, "Store the images of Markdown files (their linked JPEG, PNG, GIF and WebP files) and PDFs as image documents")
 	return cmd
 }
 
@@ -218,7 +223,7 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 			return
 		}
 		resp, err := client.Ingest(ctx, mddb.IngestRequest{Collection: rep.Collection, Documents: batch,
-			Options: mddb.IngestOptions{SkipDuplicates: true, Profile: o.profile}})
+			Options: mddb.IngestOptions{SkipDuplicates: true, Profile: o.profile, ExtractImages: o.images}})
 		if err != nil {
 			rep.Failed += len(batch)
 			rep.Errors = append(rep.Errors, err.Error())
@@ -237,14 +242,17 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 			rep.Errors = append(rep.Errors, f.Rel+": "+err.Error())
 			continue
 		}
-		if len(batch) > 0 && (len(batch) >= autoindexBatchDocs || size+wireSize(f, content) > autoindexBatchBytes) {
+		doc := mddb.IngestDocument{Key: f.Rel, Lang: o.lang}
+		if o.images && docExtensions[strings.ToLower(filepath.Ext(f.Rel))] {
+			doc.Images = markdownImageFiles(rep.Root, f.Rel, content) // RAG-010
+		}
+		if len(batch) > 0 && (len(batch) >= autoindexBatchDocs || size+wireSize(f, content, doc.Images) > autoindexBatchBytes) {
 			flush()
 		}
-		meta := fileMeta(f, rep.Git)
+		doc.Meta = fileMeta(f, rep.Git)
 		for k, v := range o.extraMeta {
-			meta[k] = v
+			doc.Meta[k] = v
 		}
-		doc := mddb.IngestDocument{Key: f.Rel, Lang: o.lang, Meta: meta}
 		if f.Format != "" {
 			// The server converts it, with the converters /v1/upload uses.
 			doc.Format, doc.Content = f.Format, content
@@ -253,7 +261,7 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 			doc.ContentMD = string(content)
 		}
 		batch = append(batch, doc)
-		size += wireSize(f, content)
+		size += wireSize(f, content, doc.Images)
 	}
 	flush()
 }
@@ -290,12 +298,16 @@ func (c autoConverted) quality() string {
 }
 
 // wireSize is what a file adds to a batch: its bytes, or their base64 when
-// it is sent for conversion.
-func wireSize(f autoFile, content []byte) int {
+// it is sent for conversion, and the base64 of the images sent with it.
+func wireSize(f autoFile, content []byte, images []mddb.IngestImage) int {
+	n := len(content)
 	if f.Format != "" {
-		return base64.StdEncoding.EncodedLen(len(content))
+		n = base64.StdEncoding.EncodedLen(len(content))
 	}
-	return len(content)
+	for _, im := range images {
+		n += base64.StdEncoding.EncodedLen(len(im.Content))
+	}
+	return n
 }
 
 func printAutoindex(rep *autoindexReport, start time.Time) error {

@@ -31,6 +31,7 @@ type HybridSearchRequest struct {
 	FacetBy         []string            `json:"facetBy,omitempty"`
 	FacetMaxValues  int                 `json:"facetMaxValues,omitempty"`
 	Oversample      float64             `json:"oversample,omitempty"`
+	IncludeImages   bool                `json:"includeImages,omitempty"`
 }
 
 // GeoFilter restricts a hybrid search to documents within a radius.
@@ -60,14 +61,15 @@ type SignalBreakdown struct {
 
 // HybridSearchResult is one hit of a hybrid search.
 type HybridSearchResult struct {
-	Document       Document `json:"document"`
-	CombinedScore  float64  `json:"combinedScore"`
-	FTSScore       float64  `json:"ftsScore"`
-	VectorScore    float64  `json:"vectorScore"`
-	DistanceMeters float64  `json:"distanceMeters,omitempty"`
-	MatchedTerms   []string `json:"matchedTerms,omitempty"`
-	Rank           int      `json:"rank"`
-	Pinned         bool     `json:"pinned,omitempty"`
+	Document       Document   `json:"document"`
+	CombinedScore  float64    `json:"combinedScore"`
+	FTSScore       float64    `json:"ftsScore"`
+	VectorScore    float64    `json:"vectorScore"`
+	DistanceMeters float64    `json:"distanceMeters,omitempty"`
+	MatchedTerms   []string   `json:"matchedTerms,omitempty"`
+	Rank           int        `json:"rank"`
+	Pinned         bool       `json:"pinned,omitempty"`
+	Images         []ImageRef `json:"images,omitempty"` // with IncludeImages
 }
 
 // HybridSearchResponse is the /v1/hybrid-search response.
@@ -85,4 +87,5 @@ type HybridSearchResponse struct {
 	ContextTruncated bool                     `json:"contextTruncated,omitempty"`
 	Stats            *SearchStats             `json:"searchStats,omitempty"`
 	Facets           map[string][]FacetBucket `json:"facets,omitempty"`
+	ImageHits        []ImageRef               `json:"imageHits,omitempty"` // with IncludeImages
 }

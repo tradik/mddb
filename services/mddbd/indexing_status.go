@@ -60,6 +60,9 @@ type IndexingStatus struct {
 	// Indexed is true when nothing is pending: a search now sees every
 	// document written so far.
 	Indexed bool `json:"indexed"`
+	// Images reports image documents and their vectors (RAG-010); absent
+	// when there are none.
+	Images *ImageIndexingStatus `json:"images,omitempty"`
 }
 
 // IndexWait is the read-your-writes part of a search request.
@@ -140,6 +143,7 @@ func (s *Server) IndexingStatus(collection string) IndexingStatus {
 	if s.Embedding != nil {
 		st.Provider = s.Embedding.Model()
 	}
+	st.Images = s.imageStatus(collection)
 	return st
 }
 

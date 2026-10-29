@@ -402,6 +402,7 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 | `MDDB_EMBEDDING_API_URL` | *(see below)* | string | API base URL |
 | `MDDB_EMBEDDING_MODEL` | *(see below)* | string | Embedding model name |
 | `MDDB_EMBEDDING_DIMENSIONS` | *(see below)* | int | Vector dimensionality |
+| `MDDB_EMBEDDING_IMAGE_MODEL` | `""` | string | (v2.18.9+, RAG-010) Voyage: the multimodal model pictures are embedded with (default `voyage-multimodal-3.5`, or the text model itself when it is multimodal). `none` embeds no pictures, with Voyage or Cohere. Other providers embed no images. See [EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#images-v2189) |
 | `MDDB_EMBEDDING_CHUNK_ENABLED` | `true` | bool | Enable text chunking before embedding |
 | `MDDB_EMBEDDING_CHUNK_MODE` | `""` | string | `code` or `prose` for every document; empty decides per document. A collection's `embedding.chunkMode` takes precedence (v2.18.1+) |
 | `MDDB_EMBEDDING_CHUNK_SIZE` | `1500` | int | Maximum chunk size in characters. A collection can set its own with `embedding.chunkSize` in its collection config (v2.18.1+) |

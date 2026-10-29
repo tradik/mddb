@@ -106,6 +106,7 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		Oversample:       mcpGetFloat(args, "oversample"),
 		SearchType:       mcpGetString(args, "search_type"),
 		FilterMeta:       mcpGetMetaMap(args, "filter_meta"),
+		ImageOptions:     mcpGetImageOptions(args), // RAG-010
 	}
 	filter, filterErr := mcpGetFilter(args)
 	if filterErr != nil {
@@ -249,6 +250,11 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 			}
 			docs[i].Content = data
 		}
+		images, err := mcpGetImageFiles(docMap)
+		if err != nil {
+			return "", fmt.Errorf("document at index %d: %w", i, err)
+		}
+		docs[i].Images = images
 	}
 
 	var opts MCPIngestOptions
@@ -272,6 +278,8 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 			opts.SaveRevision = v
 		}
 		opts.TextOnly = mcpGetBool(optsRaw, "text_only")
+		opts.ExtractImages = mcpGetBool(optsRaw, "extract_images")
+		opts.FetchRemoteImages = mcpGetBool(optsRaw, "fetch_remote_images")
 	}
 
 	resp, err := s.client.Ingest(ctx, &MCPIngestRequest{
@@ -285,6 +293,22 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil
+}
+
+// mcpGetImageFiles reads a document's "images": the files its Markdown image
+// links name, each {path, content_base64} (RAG-010).
+func mcpGetImageFiles(m map[string]interface{}) ([]IngestImage, error) {
+	raw, _ := m["images"].([]interface{})
+	out := make([]IngestImage, 0, len(raw))
+	for j, it := range raw {
+		im, _ := it.(map[string]interface{})
+		data, err := mcpDecodeBase64(mcpGetString(im, "content_base64"))
+		if err != nil {
+			return nil, fmt.Errorf("image %d: %w", j, err)
+		}
+		out = append(out, IngestImage{Path: mcpGetString(im, "path"), Content: data})
+	}
+	return out, nil
 }
 
 // mcpDecodeBase64 decodes file content an agent sent as base64: standard,
@@ -304,87 +328,32 @@ func mcpDecodeBase64(content string) ([]byte, error) {
 }
 
 func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]interface{}) (string, error) {
-	collection := mcpGetString(args, "collection")
-	filename := mcpGetString(args, "filename")
+	req := &MCPUploadFileRequest{
+		Collection:        mcpGetString(args, "collection"),
+		Filename:          mcpGetString(args, "filename"),
+		Lang:              mcpGetString(args, "lang"),
+		Key:               mcpGetString(args, "key"),
+		Meta:              mcpGetMetaMap(args, "meta"),
+		TextOnly:          mcpGetBool(args, "text_only"),
+		ExtractImages:     mcpGetBool(args, "extract_images"),
+		FetchRemoteImages: mcpGetBool(args, "fetch_remote_images"),
+	}
 	contentB64 := mcpGetString(args, "content")
-	lang := mcpGetString(args, "lang")
-	key := mcpGetString(args, "key")
-	meta := mcpGetMetaMap(args, "meta")
-	ttl := int64(mcpGetInt(args, "ttl"))
-
-	if collection == "" || filename == "" || contentB64 == "" || lang == "" {
+	if req.Collection == "" || req.Filename == "" || contentB64 == "" || req.Lang == "" {
 		return "", fmt.Errorf("missing required fields: collection, filename, content, lang")
 	}
-
 	data, err := mcpDecodeBase64(contentB64)
 	if err != nil {
 		return "", err
 	}
-
-	// One conversion path for every surface (AGT-001); text_only is the
-	// RAG-004 option upload and ingest already had.
-	conv, err := convertToMarkdown(formatFromFilename(filename), data, mcpGetBool(args, "text_only"))
-	if err != nil {
+	req.Content = data
+	if req.Images, err = mcpGetImageFiles(args); err != nil {
 		return "", err
 	}
-	contentMD, converted := conv.Markdown, conv.Converted
-
-	// Extract frontmatter for md/txt. meta is never nil (mcpGetMetaMap always
-	// returns a map); explicitly passed keys win over frontmatter.
-	if !converted {
-		fmMeta, body := parseFrontmatter(contentMD)
-		if fmMeta != nil {
-			contentMD = body
-			for k, v := range fmMeta {
-				if _, exists := meta[k]; !exists {
-					meta[k] = v
-				}
-			}
-		}
-	}
-
-	// Derive key from filename if not provided
-	if key == "" {
-		key = deriveKeyFromFilename(filename)
-	}
-	if key == "" {
-		return "", fmt.Errorf("cannot derive key from filename; provide key explicitly")
-	}
-
-	// Add upload metadata
-	meta["upload_format"] = []string{conv.Format}
-	meta["upload_filename"] = []string{filename}
-	if converted {
-		meta["upload_converted"] = []string{"true"}
-	}
-	_ = ttl // TTL is set via /v1/set-ttl or SetTTL MCP tool separately
-
-	// The file's own document first, then what it held (GO-046).
-	conv.Markdown = contentMD
-	var result map[string]interface{}
-	var parts []string
-	for _, d := range convertedDocs(conv, key, meta) {
-		doc, err := s.client.Add(ctx, &MCPAddRequest{Collection: collection, Key: d.Key, Lang: lang, ContentMD: d.Markdown, Meta: d.Meta})
-		if err != nil {
-			return "", err
-		}
-		if result != nil {
-			parts = append(parts, d.Key)
-			continue
-		}
-		result = map[string]interface{}{
-			"key":       d.Key,
-			"format":    d.Format,
-			"converted": d.Converted,
-			"document":  doc,
-		}
-		if d.Converted {
-			result["conversionConfidence"] = d.Confidence
-			result["conversionWarnings"] = d.Warnings
-		}
-	}
-	if len(parts) > 0 {
-		result["parts"] = parts
+	// TTL is set via /v1/set-ttl or the set_ttl tool separately.
+	result, err := s.client.UploadFile(ctx, req)
+	if err != nil {
+		return "", err
 	}
 	out, _ := json.MarshalIndent(result, "", "  ")
 	return string(out), nil

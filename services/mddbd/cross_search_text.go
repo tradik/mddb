@@ -153,9 +153,12 @@ func (s *Server) respondCrossText(w http.ResponseWriter, r *http.Request, req Cr
 	}
 	s.countCross("", items, req.wantsPassages())
 	if req.wantsPassages() {
-		ok(w, s.crossPassages(req.Query, items, req.PassageOptions, waited))
+		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
+		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
+		ok(w, p)
 		return
 	}
+	s.crossImages(items, req.IncludeImages) // RAG-010
 	ok(w, CrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
 		Algorithm: req.SearchType, Indexing: waited})
 }

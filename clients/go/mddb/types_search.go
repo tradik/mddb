@@ -30,6 +30,23 @@ type FTSRequest struct {
 	FacetMaxValues  int                 `json:"facetMaxValues,omitempty"`
 	FacetScope      string              `json:"facetScope,omitempty"` // returned|all
 	CacheTTL        int                 `json:"cacheTtl,omitempty"`   // seconds; 0 = no result cache
+	IncludeImages   bool                `json:"includeImages,omitempty"`
+}
+
+// ImageRef is an image document attached to a hit, or found by its picture
+// (v2.18.9+). URL is the GET path of its bytes.
+type ImageRef struct {
+	Key      string  `json:"key"`
+	Lang     string  `json:"lang"`
+	AltText  string  `json:"altText,omitempty"`
+	Caption  string  `json:"caption,omitempty"`
+	Page     int     `json:"page,omitempty"`
+	MimeType string  `json:"mimeType,omitempty"`
+	Width    int     `json:"width,omitempty"`
+	Height   int     `json:"height,omitempty"`
+	Parent   string  `json:"parent,omitempty"`
+	Score    float32 `json:"score,omitempty"`
+	URL      string  `json:"url"`
 }
 
 // RangeFilter bounds a metadata key, or addedAt/updatedAt, in an FTS query.
@@ -72,6 +89,7 @@ type FTSResult struct {
 	MatchedTerms []string    `json:"matchedTerms"`
 	Highlights   []Highlight `json:"highlights,omitempty"`
 	Pinned       bool        `json:"pinned,omitempty"`
+	Images       []ImageRef  `json:"images,omitempty"` // with IncludeImages
 }
 
 // FTSResponse is the /v1/fts response.
@@ -109,6 +127,10 @@ type VectorSearchRequest struct {
 	MMR            bool                `json:"mmr,omitempty"`
 	MMRLambda      float64             `json:"mmrLambda,omitempty"`
 	Oversample     float64             `json:"oversample,omitempty"`
+	IncludeImages  bool                `json:"includeImages,omitempty"`
+	// QueryImage searches by an image (base64, a data URI or an http(s)
+	// URL) instead of Query; needs a server provider that embeds images.
+	QueryImage string `json:"queryImage,omitempty"`
 }
 
 // GraphExpand tunes vector search in retrievalMode "graph".
@@ -121,13 +143,14 @@ type GraphExpand struct {
 
 // VectorSearchResult is one hit of a vector search.
 type VectorSearchResult struct {
-	Document   Document `json:"document"`
-	Score      float32  `json:"score"`
-	Rank       int      `json:"rank"`
-	ChunkIndex *int     `json:"chunkIndex,omitempty"` // chunk/window modes
-	ChunkText  string   `json:"chunkText,omitempty"`
-	StartLine  int      `json:"startLine,omitempty"`
-	EndLine    int      `json:"endLine,omitempty"`
+	Document   Document   `json:"document"`
+	Score      float32    `json:"score"`
+	Rank       int        `json:"rank"`
+	ChunkIndex *int       `json:"chunkIndex,omitempty"` // chunk/window modes
+	ChunkText  string     `json:"chunkText,omitempty"`
+	StartLine  int        `json:"startLine,omitempty"`
+	EndLine    int        `json:"endLine,omitempty"`
+	Images     []ImageRef `json:"images,omitempty"` // with IncludeImages
 }
 
 // GraphExpansion explains a document added by retrievalMode "graph".
@@ -151,4 +174,5 @@ type VectorSearchResponse struct {
 	Stats            *SearchStats         `json:"searchStats,omitempty"`
 	ContextTruncated bool                 `json:"contextTruncated,omitempty"`
 	GraphExpansions  []GraphExpansion     `json:"graphExpansions,omitempty"`
+	ImageHits        []ImageRef           `json:"imageHits,omitempty"` // with IncludeImages
 }

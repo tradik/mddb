@@ -232,6 +232,8 @@ func (a *GraphQLAdapter) IngestDocuments(ctx context.Context, collection string,
 		mcpOpts.SkipWebhooks = derefBool(opts.SkipWebhooks, false)
 		mcpOpts.AutoConfigureCollection = derefBool(opts.AutoConfigureCollection, false)
 		mcpOpts.SaveRevision = derefBool(opts.SaveRevision, false)
+		mcpOpts.ExtractImages = derefBool(opts.ExtractImages, false)         // RAG-010
+		mcpOpts.FetchRemoteImages = derefBool(opts.FetchRemoteImages, false) // RAG-010
 	}
 	resp, err := a.mcp.Ingest(ctx, &MCPIngestRequest{
 		Collection: collection,
@@ -331,6 +333,8 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		Algorithm:       derefString(input.Algorithm),
 		PlanOptions:     planOptionsFromGQL(input),
 		FeedbackOptions: feedbackFromGQL(input),
+		ImageOptions:    ImageOptions{IncludeImages: derefBool(input.IncludeImages, false)}, // RAG-010
+		QueryImage:      derefString(input.QueryImage),
 	}
 	resp, err := a.mcp.VectorSearch(ctx, req)
 	if err != nil {
@@ -338,7 +342,7 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 	}
 	if resp.Passages != nil {
 		return &gql.VectorSearchResponse{Results: []*gql.VectorSearchResult{}, Total: resp.Passages.Total,
-			Passages: passagesToGQL(resp.Passages.Passages)}, nil
+			Passages: passagesToGQL(resp.Passages.Passages), ImageHits: imageRefsToGQL(resp.Passages.ImageHits)}, nil
 	}
 	results := make([]*gql.VectorSearchResult, 0, len(resp.Results))
 	for i := range resp.Results {
@@ -347,6 +351,7 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 			Document: mcpDocToGQL(&r.Document),
 			Score:    float64(r.Score),
 			Rank:     r.Rank,
+			Images:   imageRefsToGQL(r.Images),
 		}
 		if r.GroupRank > 0 {
 			group, rank := r.Group, r.GroupRank
@@ -362,6 +367,7 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		Model:      &model,
 		Dimensions: &dims,
 		Plan:       searchPlanToGQL(resp.Plan),
+		ImageHits:  imageRefsToGQL(resp.ImageHits),
 	}, nil
 }
 
@@ -409,6 +415,7 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 		Limit:          derefInt(input.Limit, 50),
 		IncludeContent: true,
 		PassageOptions: passageOptionsFromGQL(input.Format, input.PassageLines),
+		ImageOptions:   ImageOptions{IncludeImages: derefBool(input.IncludeImages, false)}, // RAG-010
 	})
 	if err != nil {
 		return nil, err
@@ -423,6 +430,7 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 			Document:     mcpDocToGQL(&r.Document),
 			Score:        r.Score,
 			MatchedTerms: r.MatchedTerms,
+			Images:       imageRefsToGQL(r.Images),
 		})
 	}
 	return &gql.FTSResponse{Results: out, Total: resp.Total}, nil
@@ -470,6 +478,10 @@ func (a *GraphQLAdapter) IndexingStatus(ctx context.Context, collection *string)
 	}
 	if st.Provider != "" {
 		out.Provider = &st.Provider
+	}
+	if st.Images != nil { // RAG-010
+		out.Images = &gql.ImageIndexingStatus{Documents: st.Images.Documents, Embedded: st.Images.Embedded,
+			Model: optString(st.Images.Model), Note: optString(st.Images.Note)}
 	}
 	return out, nil
 }

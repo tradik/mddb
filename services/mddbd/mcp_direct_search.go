@@ -37,7 +37,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if req.Collection == "" {
 		return nil, errors.New("missing collection")
 	}
-	if req.Query == "" && len(req.QueryVector) == 0 {
+	if req.Query == "" && len(req.QueryVector) == 0 && req.QueryImage == "" {
 		return nil, errors.New("either query or queryVector is required")
 	}
 
@@ -46,6 +46,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	// Oversample for chunk deduplication (SRCH-005).
 	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 	allowedIDs, filtered := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
+	if req.QueryImage != "" { // RAG-010: search the image vectors with an image
+		return s.mcpImageQuery(ctx, req, topK, allowedIDs, filtered, includeContent, waited)
+	}
 
 	// SRCH-013: the named algorithm, the profile's, flat — or the planner's
 	// choice for "auto". Disk-only collections exist ONLY in the quantized
@@ -205,6 +208,14 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		}
 	}
 
+	// RAG-010: each hit's images, and the images the query matches.
+	var imageHits []ImageRef
+	if req.IncludeImages {
+		imageHits = s.imageHitsFor(ctx, req.Collection, req.Query, topK, req.Threshold, allowedIDs, filtered, ps.Plan)
+		attachImages(s, items, func(it *MCPVectorSearchResult) imageOwner { return mcpDocImages(req.Collection, &it.Document) },
+			func(it *MCPVectorSearchResult, refs []ImageRef) { it.Images = refs })
+	}
+
 	if req.wantsPassages() {
 		hits := make([]passageSource, 0, len(items))
 		terms := queryTerms(req.Query)
@@ -218,6 +229,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 				chunks: ps.Plan.expandedChunks(it.Document.ID)})
 		}
 		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited)
+		s.passageImages(&p, req.IncludeImages, imageHits)
 		return &MCPVectorSearchResponse{Passages: &p, Algorithm: algo}, nil
 	}
 
@@ -227,6 +239,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		Algorithm: algo,
 		Indexing:  waited,
 		Plan:      req.explained(ps.Plan),
+		ImageHits: imageHits,
 		// RAG-002: the collection's formatting instruction travels with the
 		// results, so an agent does not need a second call to learn how this
 		// collection wants its answers shaped.
@@ -385,6 +398,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		PassageOptions:    req.PassageOptions,
 		BM25K1:            req.BM25K1,
 		BM25B:             req.BM25B,
+		ImageOptions:      req.ImageOptions,
 		skipContextBudget: true,
 	}, time.Now())
 	if err != nil {
@@ -416,6 +430,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 			Highlights:   r.Highlights,
 			Group:        r.Group,
 			GroupRank:    r.GroupRank,
+			Images:       r.Images,
 		})
 	}
 	// RAG-001: the budget counts what this answer carries, so it applies
@@ -519,6 +534,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		IncludeContent:  true,
 		PlanOptions:     req.PlanOptions,
 		FeedbackOptions: req.FeedbackOptions,
+		ImageOptions:    req.ImageOptions,
 	}
 
 	items, httpReq, err := c.server.hybridItems(ctx, httpReq)
@@ -526,8 +542,10 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		return nil, err
 	}
 	c.server.Gain.Search(gainKind{Type: SearchTypeHybrid, Algorithm: httpReq.VectorAlgorithm, Fusion: httpReq.Strategy}) // AGT-004
+	imageHits := c.server.hybridImages(ctx, httpReq, items)                                                              // RAG-010
 	if req.wantsPassages() {
 		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, httpReq.plan)
+		c.server.passageImages(&p, httpReq.IncludeImages, imageHits)
 		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy}, nil
 	}
 
@@ -544,6 +562,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		ResponsePrompt:  c.server.ResponsePrompt(httpReq.Collection, httpReq.Query),
 		Indexing:        waited,
 		Plan:            req.explained(httpReq.plan),
+		ImageHits:       imageHits,
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{
@@ -559,6 +578,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 			// The full-text half already finds documents still waiting
 			// for their embedding; say which ones they are (GO-042).
 			PendingEmbedding: c.server.pendingEmbedding(req.Collection, item.Document.ID),
+			Images:           item.Images,
 		})
 	}
 	// RAG-001: cap what this collection hands back. The MCP paths resolved

@@ -249,6 +249,7 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 
 	req.PassageOptions = mcpGetPassageOptions(args)
 	req.PlanOptions = mcpGetPlanOptions(args)
+	req.ImageOptions, req.QueryImage = mcpGetImageOptions(args), mcpGetString(args, "query_image") // RAG-010
 	feedbackOpts, feedbackErr := mcpGetFeedback(args)
 	if feedbackErr != nil {
 		return "", feedbackErr
@@ -350,6 +351,7 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		BM25K1:         mcpGetFloatPtr(args, "bm25_k1"),
 		BM25B:          mcpGetFloatPtr(args, "bm25_b"),
 		IncludeContent: includeContent,
+		ImageOptions:   mcpGetImageOptions(args), // RAG-010
 		// CODE-002: highlights carry the line range, which is what lets an
 		// agent edit a place instead of reading a file.
 		Highlight:     mcpGetBool(args, "highlight"),
@@ -454,6 +456,7 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 
 	req.PassageOptions = mcpGetPassageOptions(args)
 	req.PlanOptions = mcpGetPlanOptions(args)
+	req.ImageOptions = mcpGetImageOptions(args) // RAG-010
 	feedbackOpts, feedbackErr := mcpGetFeedback(args)
 	if feedbackErr != nil {
 		return "", feedbackErr

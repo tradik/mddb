@@ -134,7 +134,7 @@ func TestAutoindex_DryRunShowsFormat(t *testing.T) {
 
 func TestAutoindex_ConvertedFilesCountBase64InBatchSize(t *testing.T) {
 	f := autoFile{Format: "pdf"}
-	if wireSize(f, make([]byte, 3)) != 4 || wireSize(autoFile{}, make([]byte, 3)) != 3 {
+	if wireSize(f, make([]byte, 3), nil) != 4 || wireSize(autoFile{}, make([]byte, 3), nil) != 3 {
 		t.Fatal("wire size")
 	}
 }

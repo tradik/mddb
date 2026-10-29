@@ -32,6 +32,9 @@ type EmbeddingJob struct {
 	// Summary is the document's client-written summary (RAG-009), embedded
 	// as a vector of its own after the chunks; "" removes one it had.
 	Summary string
+	// Image is true for an image document (RAG-010): its picture is embedded
+	// after the summary, when the provider embeds images.
+	Image bool
 	// trace is the span of the request that queued the job, so its
 	// ingest.embed span joins that request's trace (OPS-024). Zero = none.
 	trace tracing.SpanContext
@@ -349,7 +352,10 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) jobOutcome {
 	if out := w.processChunks(job); out != jobDone {
 		return out
 	}
-	return w.processSummary(job) // RAG-009, summary_embed.go
+	if out := w.processSummary(job); out != jobDone { // RAG-009, summary_embed.go
+		return out
+	}
+	return w.processImage(job) // RAG-010, image_embed.go
 }
 
 // processChunks embeds the document's chunks: processJob without the summary.

@@ -368,6 +368,26 @@ query {
 }
 ```
 
+### Images (v2.18.9+)
+
+`vectorSearch` and `fts` take `includeImages: true`: each result (and each
+passage) carries `images { key altText caption page url }`. With a provider
+that embeds images, `vectorSearch` also returns `imageHits` (pictures that
+match the query by what they show) and takes `queryImage` (base64, a data URI
+or an http(s) URL) to search by a picture. `indexingStatus` reports
+`images { documents embedded model note }`, and `ingestDocuments` options take
+`extractImages` and `fetchRemoteImages`. See
+[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189).
+
+```graphql
+query {
+  vectorSearch(input: {collection: "docs", query: "pump wiring", includeImages: true}) {
+    results { document { key } score images { key altText caption page url } }
+    imageHits { key parent score url }
+  }
+}
+```
+
 ### Database Statistics
 
 ```graphql

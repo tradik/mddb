@@ -43,6 +43,8 @@ type Passage struct {
 	Source string `json:"source,omitempty"`
 	// Tokens estimates Content's size with the context budget's estimator.
 	Tokens int `json:"tokens"`
+	// Images are the document's images, with includeImages (RAG-010).
+	Images []ImageRef `json:"images,omitempty"`
 	// docTokens is the whole document's estimate, for the gain counters
 	// (AGT-004): what the caller would have read without the passage.
 	docTokens int

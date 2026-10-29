@@ -455,6 +455,30 @@ Upload, `/v1/ingest` with `contentBase64`, and the MCP tools `upload_file`
 and `ingest_documents` share one conversion path (v2.18.9+), so a format
 converts the same way whichever door it comes through.
 
+### Images (v2.18.9+)
+
+- `extractImages=true` (form field; `options.extractImages` on
+  `/v1/ingest`): the images of Markdown files and PDFs become image
+  documents under `KEY/images/` with `meta.kind: image`, `meta.parent`,
+  `meta.altText`, `meta.caption` and `meta.page`. On by default in a
+  collection of type `images`, where an image file on its own is an image
+  document too. Image files uploaded with a Markdown file are the files its
+  links name; an upload of only image files elsewhere is 400.
+- `fetchRemoteImages=true` (`options.fetchRemoteImages`): fetch Markdown
+  image links to http(s) URLs, through the SSRF guard. Off by default.
+- On `/v1/ingest`, a Markdown document's `images: [{"path": "img/a.png",
+  "contentBase64": "..."}]` are the files its relative links name. Under
+  `skipDuplicates`, an image whose bytes changed is written even when its
+  text did not.
+- `GET /v1/image?collection=docs&key=manual%2Fimages%2Fseal.png&lang=en`
+  returns an image document's bytes (`image/jpeg`, `image/png`, `image/gif`
+  or `image/webp`, `X-Content-Type-Options: nosniff`); 404 when the key holds
+  no image.
+
+What is extracted, what is skipped, and how images come back with search
+results (`includeImages`, `imageHits`, `queryImage`):
+[SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189).
+
 ### Document keys are case-insensitive
 
 A document's identity is built by lowercasing (ASCII letters of) the
@@ -796,6 +820,8 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `includeContent` (optional): Include `contentMd` in results (default: false)
 - `algorithm` (optional): `flat` (default), `auto`, `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`. With `auto` (v2.18.9+) the query planner chooses per query; the collection profile's `retrieval.vectorAlgorithm` applies when the request names none ([SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189))
 - `explain` (optional, v2.18.9+): Add `plan` to the response — the index that answered, `prefilter`, `candidates`, `iterativeScan` and the reasons
+- `includeImages` (optional, v2.18.9+): Attach each hit's image documents as `images` (alt text, caption, page, `url`); with a provider that embeds images also return `imageHits`, the images whose picture matches the query. Also on `/v1/fts`, `/v1/hybrid-search` and `/v1/cross-search` ([SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189))
+- `queryImage` (optional*, v2.18.9+): Search by an image instead of text — base64, a data URI or an http(s) URL (SSRF-guarded). Needs a provider that embeds images, else 400; the results are image documents, `algorithm: "image"`
 - `latencyTargetMs` (optional, v2.18.9+): Latency goal for `auto`, 0–60000; 10 or less favours a quantized index on 10,000+ vectors
 - `positive`, `negative` (optional, v2.18.9+): Relevance feedback — results that were right or wrong, each a document key or ID (string) or a vector (array of numbers); at most 50 per side ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189))
 - `feedbackMode` (optional, v2.18.9+): `query` (default: Rocchio on the query vector) or `rescore` (re-rank the candidates by similarity to the examples)
@@ -1616,6 +1642,10 @@ document once `pendingEmbeddings` reaches 0.
 ```bash
 curl "http://localhost:11023/v1/indexing-status?collection=notes"
 ```
+
+Since v2.18.9 a collection holding image documents also reports `images`:
+`documents`, `embedded` (with an image vector), the multimodal `model`, or a
+`note` saying why images are not embedded (RAG-010).
 
 ```json
 {
@@ -2815,7 +2845,7 @@ Set or update collection configuration including storage backend.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `collection` | string | Yes | Collection name |
-| `type` | string | No | Collection type (`default`, `website`, `images`, `audio`, `documents`) |
+| `type` | string | No | Collection type (`default`, `website`, `images`, `audio`, `documents`). Since v2.18.9 `images` means something: writes extract images by default and an image file is an image document ([SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189)); the others are labels |
 | `description` | string | No | Collection description |
 | `icon` | string | No | Emoji icon |
 | `color` | string | No | Hex color code |

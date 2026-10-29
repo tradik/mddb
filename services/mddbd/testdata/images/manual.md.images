@@ -1,0 +1,5 @@
+1 seal.png image/png 40x30 page=0 alt="Exploded view of the pump seal" caption="Figure 1: the seal" source="img/seal.png"
+2 wiring.jpg image/jpeg 48x32 page=0 alt="" caption="Figure 2: wiring of the motor" source="img/wiring.jpg"
+3 image-3.gif image/gif 16x16 page=0 alt="Green status lamp" caption="" source="data:image/gif"
+warning: image https://example.com/logo.png skipped: remote image not fetched (fetchRemoteImages is off)
+warning: image img/missing.png skipped: file not sent with the document

@@ -59,6 +59,37 @@ type VectorSearchResult {
   group: String
   "1-based place of this result within its group."
   groupRank: Int
+  "The document's images, with includeImages (RAG-010)."
+  images: [ImageRef!]
+}
+
+"An image document attached to a hit or found by its picture (RAG-010)."
+type ImageRef {
+  key: String!
+  lang: String!
+  altText: String
+  caption: String
+  "PDF page, null when unknown."
+  page: Int
+  mimeType: String
+  width: Int
+  height: Int
+  "The document the image came from."
+  parent: String
+  "Similarity to the query, on image hits."
+  score: Float
+  "GET path of the image bytes."
+  url: String!
+}
+
+"Image documents and their vectors (RAG-010)."
+type ImageIndexingStatus {
+  documents: Int!
+  embedded: Int!
+  "Multimodal model; null when the provider embeds no images."
+  model: String
+  "Why images are not embedded, when they are not."
+  note: String
 }
 
 "A 1-based, inclusive line range."
@@ -80,6 +111,8 @@ type Passage {
   score: Float
   source: String
   tokens: Int!
+  "The document's images, with includeImages (RAG-010)."
+  images: [ImageRef!]
 }
 
 input CodeSymbolInput {
@@ -115,6 +148,8 @@ type IndexingStatus {
   oldestPendingAt: Time
   provider: String
   indexed: Boolean!
+  "Image documents and their vectors (RAG-010); null when there are none."
+  images: ImageIndexingStatus
 }
 
 type VectorSearchResponse {
@@ -126,6 +161,8 @@ type VectorSearchResponse {
   passages: [Passage!]
   "How the search ran and why (SRCH-013); null unless the input set explain."
   plan: SearchPlan
+  "Images the query matched by their picture, with includeImages and a provider that embeds images (RAG-010)."
+  imageHits: [ImageRef!]
 }
 
 "How a vector search ran and why (SRCH-013): the index chosen and the reasons."
@@ -165,6 +202,8 @@ type FTSResult {
   document: Document!
   score: Float!
   matchedTerms: [String!]!
+  "The document's images, with includeImages (RAG-010)."
+  images: [ImageRef!]
 }
 
 type FTSResponse {
@@ -359,6 +398,14 @@ input VectorSearchInput {
   feedbackWeight: Float
   "Rocchio weights for query mode; omitted ones keep 1, 0.75, 0.25."
   rocchio: RocchioInput
+  "Attach each hit's images; with a provider that embeds images, also return imageHits (RAG-010)."
+  includeImages: Boolean
+  """
+  Search by an image instead of text (RAG-010): base64, a data URI or an
+  http(s) URL. Needs a provider that embeds images; the results are image
+  documents.
+  """
+  queryImage: String
 }
 
 "A relevance-feedback example (SRCH-015): a document key or ID, or a vector — one, not both."
@@ -390,6 +437,8 @@ input FTSInput {
   "results (default) or passages: path, lines, symbol and text per hit (AGT-002)."
   format: String
   passageLines: Int
+  "Attach each hit's images (RAG-010)."
+  includeImages: Boolean
 }
 
 input RegisterWebhookInput {
@@ -458,6 +507,10 @@ input IngestOptionsInput {
   skipWebhooks: Boolean
   autoConfigureCollection: Boolean
   saveRevision: Boolean
+  "Images in Markdown documents become image documents (RAG-010); data URIs, and remote links with fetchRemoteImages."
+  extractImages: Boolean
+  "Fetch Markdown image links to http(s) URLs, SSRF-guarded (RAG-010)."
+  fetchRemoteImages: Boolean
 }
 
 type IngestResult {

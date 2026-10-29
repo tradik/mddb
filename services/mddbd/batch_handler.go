@@ -165,15 +165,9 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 
 		// Embedding
 		if !opts.SkipEmbeddings && s.EmbeddingWorker != nil && p.Doc.ContentMD != "" {
-			if !s.EmbeddingWorker.Enqueue(EmbeddingJob{
-				Collection: collection,
-				DocID:      p.DocID,
-				ContentMD:  p.Doc.ContentMD,
-				ChunkMode:  s.chunkModeFor(collection, &p.Doc),
-				ChunkSize:  s.chunkSizeFor(collection),
-				Summary:    documentSummary(&p.Doc), // RAG-009
-				trace:      opts.Trace,
-			}) {
+			job := s.embeddingJob(collection, &p.Doc) // RAG-009, RAG-010
+			job.DocID, job.trace = p.DocID, opts.Trace
+			if !s.EmbeddingWorker.Enqueue(job) {
 				embeddingDropped++
 			}
 		}

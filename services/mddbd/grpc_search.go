@@ -26,7 +26,7 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 	if req.Collection == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
 	}
-	if req.Query == "" && len(req.QueryVector) == 0 {
+	if req.Query == "" && len(req.QueryVector) == 0 && req.QueryImage == "" {
 		return nil, status.Error(codes.InvalidArgument, "either query or query_vector is required")
 	}
 	// The search MCP and REST run (2.18.8): filter, groupBy, passages,
@@ -40,21 +40,24 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		PassageOptions:  passageOptions(req.Format, req.PassageLines),
 		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
 		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
+		ImageOptions:    ImageOptions{IncludeImages: req.IncludeImages}, // RAG-010
+		QueryImage:      req.QueryImage,
 	})
 	if err != nil {
 		return nil, searchStatus(err)
 	}
 	resp := &proto.VectorSearchResponse{Total: safeInt32(res.Total), Model: res.Model, Dimensions: safeInt32(res.Dimensions),
 		Algorithm: res.Algorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated,
-		Plan: planToProto(res.Plan)}
+		Plan: planToProto(res.Plan), ImageHits: imageRefsToProto(res.ImageHits)}
 	if res.Passages != nil {
 		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
+		resp.ImageHits = imageRefsToProto(res.Passages.ImageHits)
 		return resp, nil
 	}
 	for _, r := range res.Results {
 		resp.Results = append(resp.Results, &proto.VectorSearchResult{Document: mcpDocToProto(r.Document, true), Score: r.Score,
 			Rank: safeInt32(r.Rank), ChunkText: r.ChunkText, StartLine: safeInt32(r.StartLine), EndLine: safeInt32(r.EndLine),
-			Group: r.Group, GroupRank: safeInt32(r.GroupRank), PendingEmbedding: r.PendingEmbedding})
+			Group: r.Group, GroupRank: safeInt32(r.GroupRank), PendingEmbedding: r.PendingEmbedding, Images: imageRefsToProto(r.Images)})
 	}
 	return resp, nil
 }
@@ -312,7 +315,7 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 		Fuzzy: int(req.Fuzzy), FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
 		Lang: req.Lang, Boost: req.Boost, FacetBy: req.FacetBy, FacetMaxValues: int(req.FacetMaxValues),
 		GroupBy: groupByOf(req.GroupBy), PassageOptions: passageOptions(req.Format, req.PassageLines),
-		BM25K1: req.Bm25K1, BM25B: req.Bm25B}
+		BM25K1: req.Bm25K1, BM25B: req.Bm25B, ImageOptions: ImageOptions{IncludeImages: req.IncludeImages}}
 	if err := g.server.normalizeFTSRequest(&fr); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -329,7 +332,8 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 	for _, r := range res.Results {
 		d := r.Document
 		resp.Results = append(resp.Results, &proto.FTSResult{Document: docToProto(&d), Score: r.Score,
-			MatchedTerms: r.MatchedTerms, Pinned: r.Pinned, Group: r.Group, GroupRank: safeInt32(r.GroupRank)})
+			MatchedTerms: r.MatchedTerms, Pinned: r.Pinned, Group: r.Group, GroupRank: safeInt32(r.GroupRank),
+			Images: imageRefsToProto(r.Images)})
 	}
 	if len(res.Facets) > 0 {
 		resp.Facets = facetsToProto(res.Facets)
@@ -426,15 +430,17 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		PassageOptions:  passageOptions(req.Format, req.PassageLines),
 		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
 		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
+		ImageOptions:    ImageOptions{IncludeImages: req.IncludeImages}, // RAG-010
 	})
 	if err != nil {
 		return nil, searchStatus(err)
 	}
 	resp := &proto.HybridSearchResponse{Total: safeInt32(res.Total), Strategy: res.Strategy, FtsAlgorithm: res.FTSAlgorithm,
 		VectorAlgorithm: res.VectorAlgorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated,
-		Plan: planToProto(res.Plan)}
+		Plan: planToProto(res.Plan), ImageHits: imageRefsToProto(res.ImageHits)}
 	if res.Passages != nil {
 		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
+		resp.ImageHits = imageRefsToProto(res.Passages.ImageHits)
 		return resp, nil
 	}
 	docs := make([]MCPDocument, 0, len(res.Results))
@@ -443,7 +449,7 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		resp.Results = append(resp.Results, &proto.HybridSearchResult{Document: mcpDocToProto(r.Document, req.IncludeContent),
 			CombinedScore: r.CombinedScore, FtsScore: r.FTSScore, VectorScore: r.VectorScore, MatchedTerms: r.MatchedTerms,
 			Rank: safeInt32(r.Rank), Pinned: r.Pinned, Group: r.Group, GroupRank: safeInt32(r.GroupRank),
-			PendingEmbedding: r.PendingEmbedding})
+			PendingEmbedding: r.PendingEmbedding, Images: imageRefsToProto(r.Images)})
 	}
 	if len(req.FacetBy) > 0 && len(docs) > 0 {
 		resp.Facets = facetsToProto(computeFacets(docsOfMCP(docs), req.FacetBy, int(req.FacetMaxValues)))
@@ -545,6 +551,7 @@ func (g *GRPCServer) GetIndexingStatus(ctx context.Context, req *proto.IndexingS
 		Progress:            st.Progress,
 		Provider:            st.Provider,
 		Indexed:             st.Indexed,
+		Images:              imageStatusToProto(st.Images), // RAG-010
 	}
 	if st.OldestPendingAt != nil {
 		resp.OldestPendingAt = st.OldestPendingAt.Unix()

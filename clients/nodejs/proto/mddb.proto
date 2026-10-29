@@ -466,6 +466,23 @@ message VectorSearchRequest {
   string feedback_mode = 23;                     // (v2.18.9, SRCH-015) "query" (default) or "rescore"
   double feedback_weight = 24;                   // (v2.18.9, SRCH-015) rescore weight; 0 = 0.5
   RocchioWeights rocchio = 25;                   // (v2.18.9, SRCH-015) query-mode weights
+  bool include_images = 26;                      // (v2.18.9, RAG-010) attach each hit's images; image hits too when image vectors exist
+  string query_image = 27;                       // (v2.18.9, RAG-010) search by an image: base64 or an http(s) URL; needs a multimodal provider
+}
+
+// An image document attached to a result, or found itself (v2.18.9, RAG-010).
+message ImageRef {
+  string key = 1;
+  string lang = 2;
+  string alt_text = 3;
+  string caption = 4;
+  int32 page = 5;                                // PDF page, 0 when unknown
+  string mime_type = 6;
+  int32 width = 7;
+  int32 height = 8;
+  string parent = 9;                             // the document it came from
+  float score = 10;                              // set on image hits
+  string url = 11;                               // GET path of the image bytes
 }
 
 // A relevance feedback example (v2.18.9, SRCH-015): a document key or id, or a vector.
@@ -506,6 +523,7 @@ message VectorSearchResult {
   string group = 7;                              // (v2.18.8)
   int32 group_rank = 8;
   bool pending_embedding = 9;                    // (v2.18.8) found by text while its embedding is queued
+  repeated ImageRef images = 10;                 // (v2.18.9, RAG-010) with include_images
 }
 
 // Vector search response
@@ -519,6 +537,7 @@ message VectorSearchResponse {
   IndexWaitResult indexing = 7;                  // (v2.18.8) set when the request waited
   bool context_truncated = 8;
   SearchPlan plan = 9;                           // (v2.18.9, SRCH-013) set when the request had explain
+  repeated ImageRef image_hits = 10;             // (v2.18.9, RAG-010) images the query matched by their picture
 }
 
 // How a vector search ran and why (v2.18.9, SRCH-013), returned with explain.
@@ -604,6 +623,7 @@ message FTSRequest {
   int32 passage_lines = 14;                      // (v2.18.8) context lines around a passage's hit
   optional double bm25_k1 = 15;                  // (v2.18.8, SRCH-018) BM25 k1 for this query; unset = collection profile, then 1.2
   optional double bm25_b = 16;                   // (v2.18.8, SRCH-018) BM25 b for this query; unset = collection profile, then 0.75
+  bool include_images = 17;                      // (v2.18.9, RAG-010) attach each hit's images
 }
 
 message FTSResult {
@@ -613,6 +633,7 @@ message FTSResult {
   bool pinned = 4;                               // (v2.9.14+) this row was injected by a curation rule
   string group = 5;                              // (v2.18.8) the group this result counted against
   int32 group_rank = 6;
+  repeated ImageRef images = 7;                  // (v2.18.9, RAG-010) with include_images
 }
 
 // FacetBucketProto is one value bucket inside a facet — reused by
@@ -701,6 +722,7 @@ message HybridSearchRequest {
   string feedback_mode = 32;
   double feedback_weight = 33;
   RocchioWeights rocchio = 34;
+  bool include_images = 35;                      // (v2.18.9, RAG-010) attach each hit's images; image hits too when image vectors exist
 }
 
 message HybridSearchResult {
@@ -714,6 +736,7 @@ message HybridSearchResult {
   string group = 8;                              // (v2.18.8)
   int32 group_rank = 9;
   bool pending_embedding = 10;                   // (v2.18.8)
+  repeated ImageRef images = 11;                 // (v2.18.9, RAG-010) with include_images
 }
 
 message HybridSearchResponse {
@@ -727,6 +750,7 @@ message HybridSearchResponse {
   IndexWaitResult indexing = 8;                  // (v2.18.8)
   bool context_truncated = 9;
   SearchPlan plan = 10;                          // (v2.18.9, SRCH-013) the vector half's plan, with explain
+  repeated ImageRef image_hits = 11;             // (v2.18.9, RAG-010) images the query matched by their picture
 }
 
 // --- Webhooks ---
@@ -1322,6 +1346,7 @@ message CrossSearchRequest {
   string feedback_mode = 24;
   double feedback_weight = 25;
   RocchioWeights rocchio = 26;
+  bool include_images = 27;                      // (v2.18.9, RAG-010) attach each hit's images, from its own collection
 }
 
 message CrossSearchResultItem {
@@ -1331,6 +1356,7 @@ message CrossSearchResultItem {
   int32 rank = 4;
   string group = 5;                              // (v2.18.8)
   int32 group_rank = 6;
+  repeated ImageRef images = 7;                  // (v2.18.9, RAG-010) with include_images
 }
 
 message CrossSearchResponse {
@@ -1401,6 +1427,15 @@ message IngestDocument {
   // converters /v1/upload uses. Without content, content_md is the file.
   string format = 10;                     // pdf, docx, html, ...; empty: the key's extension
   bytes content = 11;                     // The file's bytes
+  // (v2.18.9, RAG-010) files a Markdown document's image links name by
+  // relative path; read with options.extract_images.
+  repeated IngestImage images = 12;
+}
+
+// A file an image link names: its path as the link writes it, and its bytes.
+message IngestImage {
+  string path = 1;
+  bytes content = 2;
 }
 
 message IngestOptions {
@@ -1410,6 +1445,8 @@ message IngestOptions {
   bool skip_webhooks = 4;                 // Skip webhook firing
   bool auto_configure_collection = 5;     // Auto-set collection config to type="scraping"
   bool save_revision = 6;                 // Save revision for all documents
+  bool extract_images = 7;                // (v2.18.9, RAG-010) Markdown and PDF images become image documents
+  bool fetch_remote_images = 8;           // (v2.18.9, RAG-010) fetch http(s) image links, through the SSRF guard
 }
 
 message IngestRequest {
@@ -1797,6 +1834,15 @@ message IndexingStatusResponse {
   int64 oldest_pending_at = 7;        // unix seconds; 0 when nothing is pending
   string provider = 8;                // embedding model; empty when none
   bool indexed = 9;                   // nothing pending
+  ImageIndexingStatus images = 10;    // (v2.18.9, RAG-010) unset when the collection holds no images
+}
+
+// Image documents and their vectors (v2.18.9, RAG-010).
+message ImageIndexingStatus {
+  int32 documents = 1;                // image documents holding an image
+  int32 embedded = 2;                 // of them, with an image vector
+  string model = 3;                   // multimodal model; empty when the provider embeds no images
+  string note = 4;                    // why images are not embedded, when they are not
 }
 
 // CollectionProfile is what the advisor measured.
@@ -1876,6 +1922,7 @@ message Passage {
   double score = 10;
   string source = 11;                            // fts, vector, hybrid, cross, or a symbol relation
   int32 tokens = 12;
+  repeated ImageRef images = 13;                 // (v2.18.9, RAG-010) the document's images, with include_images
 }
 
 // How long a search waited for queued embeddings (GO-042).

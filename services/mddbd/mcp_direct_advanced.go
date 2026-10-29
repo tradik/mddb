@@ -401,8 +401,10 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		s.countCross("", items, req.wantsPassages())
 		if req.wantsPassages() {
 			p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
+			s.passageImages(&p, req.IncludeImages, nil) // RAG-010
 			return &MCPCrossSearchResponse{Passages: &p}, nil
 		}
+		s.crossImages(items, req.IncludeImages) // RAG-010
 		return &MCPCrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
 			Algorithm: req.SearchType, Indexing: waited}, nil
 	}
@@ -470,8 +472,10 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 
 	if req.wantsPassages() {
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
+		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
 		return &MCPCrossSearchResponse{Passages: &p}, nil
 	}
+	s.crossImages(items, req.IncludeImages) // RAG-010
 	return &MCPCrossSearchResponse{
 		Results:           items,
 		Total:             len(items),
@@ -515,6 +519,8 @@ func (c *DirectClient) Ingest(ctx context.Context, req *MCPIngestRequest) (*MCPI
 		AutoConfigureCollection: req.Options.AutoConfigureCollection,
 		SaveRevision:            req.Options.SaveRevision,
 		TextOnly:                req.Options.TextOnly,
+		ExtractImages:           req.Options.ExtractImages,
+		FetchRemoteImages:       req.Options.FetchRemoteImages,
 	}
 
 	resp, err := c.server.ingestDocuments(ctx, req.Collection, docs, opts)
