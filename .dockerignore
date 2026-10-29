@@ -33,6 +33,18 @@ LICENSE
 **/coverage.out
 **/coverage/
 
+# Go binaries built in place (`go build -o mddb` and friends) and the tools
+# scripts/build-deadcode.sh writes to ./bin — never part of an image's source.
+/mddb
+/mddbd
+/mddb-cli
+/bin/
+services/mddbd/mddb
+services/mddbd/mddb-server
+services/mddb-cli/mddb-cli
+tools/bench/mddb-bench
+tools/bench/maxsim/maxsim
+
 # Rust / cargo build output (can be gigabytes) — any depth
 **/target/
 
