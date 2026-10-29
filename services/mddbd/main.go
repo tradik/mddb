@@ -38,8 +38,14 @@ import (
 	"google.golang.org/grpc/credentials"
 )
 
-// VERSION is the current release version of the MDDB server.
+// VERSION is the current release version of the MDDB server. It is a
+// constant on purpose: scripts/bump-version.sh writes it and
+// scripts/check-version.sh guards it, so builds take no -X flag (OPS-022);
+// the release checks the artifact with `mddbd -version`.
 const VERSION = "2.18.8"
+
+// versionLine is what `mddbd -version` prints.
+func versionLine() string { return "mddbd version " + VERSION }
 
 // AccessMode defines the database access mode (read, write, or both).
 type AccessMode string

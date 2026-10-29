@@ -669,6 +669,12 @@ Curation is data, not configuration — rules live in a dedicated bolt bucket an
 | `--mcp-stdio` | | string | MCP stdio mode (true/false) |
 | `--http3-enabled` | | string | Enable HTTP/3 server (true/false) |
 | `--http3-addr` | | string | HTTP/3 listen address |
+| `--version` | | bool | Print `mddbd version X.Y.Z` and exit (v2.18.8) |
+| `--check-update` | | bool | Report whether a newer release exists, then exit |
+
+The version is the constant `VERSION` in `services/mddbd/main.go`. It is not
+injected at build time. The release checks the built binary with
+`mddbd -version` against the tag (OPS-022).
 
 ---
 

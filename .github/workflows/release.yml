@@ -129,8 +129,20 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: 0
         run: |
+          # No -X flag: mddbd's version is `const VERSION` in main.go, written
+          # by bump-version.sh and guarded by check-version.sh (OPS-022).
+          go build -ldflags="-s -w" -o mddbd-${{ matrix.platform }} .
+
+      # OPS-022: check the artifact, not the source. Only the binary built for
+      # the runner's own platform can run here.
+      - name: Check the built server reports the release version
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        working-directory: services/mddbd
+        run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          go build -ldflags="-s -w -X main.Version=${VERSION}" -o mddbd-${{ matrix.platform }} .
+          got=$(./mddbd-${{ matrix.platform }} -version)
+          echo "$got"
+          test "$got" = "mddbd version ${VERSION#v}"
 
       - name: Create tarball
         working-directory: services/mddbd
@@ -867,12 +879,10 @@ jobs:
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           mkdir -p snapbuild
-          # The ldflags match the release job's byte for byte so the snap ships
-          # what was published. -X main.Version is a no-op for this binary —
-          # mddbd carries `const VERSION`, not a variable — and is kept only so
-          # the two build commands do not silently diverge. See OPS-022.
-          go build -trimpath -ldflags="-s -w -X main.Version=${VERSION}" -o snapbuild/mddbd .
-          test -x snapbuild/mddbd
+          # mddbd's version is `const VERSION`, so no -X flag (OPS-022); the
+          # binary is checked to report the tag it is published under.
+          go build -trimpath -ldflags="-s -w" -o snapbuild/mddbd .
+          test "$(snapbuild/mddbd -version)" = "mddbd version ${VERSION#v}"
 
       - name: Build snap
         id: build

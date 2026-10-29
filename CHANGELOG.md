@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`mddbd -version`** prints `mddbd version X.Y.Z` and exits. The release
+  workflow and the snap build run it on the built binary and fail when the
+  version does not match the tag (OPS-022).
+
 - **Filter operators: `prefix`, `contains`, ranges, `not`, `exists`
   (SRCH-017).** `filterMeta` could only ask whether a value is one of a list,
   so "files under `internal/`", "modified after September" or "not a test"
@@ -133,6 +137,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   best case, in one call per task (`docs/BENCHMARK.md`).
 
 ### Fixed
+
+- **The server build no longer passes a flag that did nothing (OPS-022).**
+  `release.yml`, the snap job and `make build` passed `-X main.Version` to
+  `mddbd`, which has no such variable, only the constant `VERSION`. The flag
+  suggested the version came from the build. It is gone, and the artifact
+  is checked instead.
 
 - **Revisions written within one second overwrote each other
   ([#358](https://github.com/tradik/mddb/issues/358)).** A revision's key is

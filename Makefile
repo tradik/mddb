@@ -175,7 +175,7 @@ version: ## Show current version
 build: ## Build the server and CLI for the host platform
 	@echo "Building $(MDDB_VERSION) for $$(go env GOOS)/$$(go env GOARCH)"
 	@set -e; \
-	cd services/mddbd && go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" -o mddbd . ; \
+	cd services/mddbd && go build -trimpath -ldflags="-s -w" -o mddbd . ; \
 	cd ../mddb-cli && go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" -o mddb-cli .
 	@echo "  services/mddbd/mddbd"
 	@echo "  services/mddb-cli/mddb-cli"
@@ -186,7 +186,7 @@ build-windows: ## Cross-compile the Windows binaries into dist/windows-amd64 (WI
 	@mkdir -p dist/windows-amd64
 	@set -e; \
 	cd services/mddbd && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
-		go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" \
+		go build -trimpath -ldflags="-s -w" \
 		-o ../../dist/windows-amd64/mddbd.exe . ; \
 	cd ../mddb-cli && CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
 		go build -trimpath -ldflags="-s -w -X main.Version=$(MDDB_VERSION)" \

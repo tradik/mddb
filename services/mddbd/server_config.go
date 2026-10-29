@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -122,62 +123,78 @@ func defaultServerConfig() ServerConfig {
 }
 
 // loadServerConfig loads configuration with precedence: CLI flags > env vars > config file > defaults.
+// A flag that names an offline tool (-version, -check-update, -verify-db, …)
+// runs it and exits instead.
 func loadServerConfig() ServerConfig {
+	cfg, tool := parseServerConfig(flag.CommandLine, os.Args[1:])
+	if tool != nil {
+		os.Exit(tool(os.Stdout))
+	}
+	return cfg
+}
+
+// offlineTool is a command run instead of the server; it returns the exit code.
+type offlineTool func(out io.Writer) int
+
+// parseServerConfig reads flags from fs and args, then the config file and
+// environment. It returns the tool to run instead of the server when a flag
+// names one, so the choice is testable without exiting.
+func parseServerConfig(fs *flag.FlagSet, args []string) (ServerConfig, offlineTool) {
 	cfg := defaultServerConfig()
 
 	// 1. Parse CLI flags (but don't apply yet — need config file path first)
 	var (
 		configFile   string
-		dbPath       = flag.String("db", "", "Database file path (default: mddb.db)")
-		dbMode       = flag.String("mode", "", "Access mode: read, write, or wr (default: wr)")
-		httpEnabled  = flag.String("http-enabled", "", "Enable HTTP API server (true/false)")
-		httpAddr     = flag.String("http-addr", "", "HTTP API listen address (e.g. :11023)")
-		grpcEnabled  = flag.String("grpc-enabled", "", "Enable gRPC server (true/false)")
-		grpcAddr     = flag.String("grpc-addr", "", "gRPC listen address (e.g. :11024)")
-		mcpEnabled   = flag.String("mcp-enabled", "", "Enable MCP protocol (true/false)")
-		mcpAddr      = flag.String("mcp-addr", "", "MCP HTTP listen address (e.g. :9000)")
-		mcpStdio     = flag.String("mcp-stdio", "", "Run in MCP stdio mode (true/false)")
-		http3Enabled = flag.String("http3-enabled", "", "Enable HTTP/3 server (true/false)")
-		http3Addr    = flag.String("http3-addr", "", "HTTP/3 listen address (e.g. :11443)")
+		dbPath       = fs.String("db", "", "Database file path (default: mddb.db)")
+		dbMode       = fs.String("mode", "", "Access mode: read, write, or wr (default: wr)")
+		httpEnabled  = fs.String("http-enabled", "", "Enable HTTP API server (true/false)")
+		httpAddr     = fs.String("http-addr", "", "HTTP API listen address (e.g. :11023)")
+		grpcEnabled  = fs.String("grpc-enabled", "", "Enable gRPC server (true/false)")
+		grpcAddr     = fs.String("grpc-addr", "", "gRPC listen address (e.g. :11024)")
+		mcpEnabled   = fs.String("mcp-enabled", "", "Enable MCP protocol (true/false)")
+		mcpAddr      = fs.String("mcp-addr", "", "MCP HTTP listen address (e.g. :9000)")
+		mcpStdio     = fs.String("mcp-stdio", "", "Run in MCP stdio mode (true/false)")
+		http3Enabled = fs.String("http3-enabled", "", "Enable HTTP/3 server (true/false)")
+		http3Addr    = fs.String("http3-addr", "", "HTTP/3 listen address (e.g. :11443)")
 		// OPS-019: reports and exits. The daemon never replaces itself — it is
 		// a data server, and an unexpected restart is an incident. Installing
 		// is `mddb-cli self-update`, run on purpose.
-		checkUpdate = flag.Bool("check-update", false, "Report whether a newer release exists, then exit")
+		checkUpdate = fs.Bool("check-update", false, "Report whether a newer release exists, then exit")
+		// OPS-022: the release checks the built artifact with this, not the source.
+		showVersion = fs.Bool("version", false, "Print the version and exit")
 		// #266/#270: offline tools for a database file, run instead of the server.
-		verifyDB = flag.String("verify-db", "", "Check a database file with bbolt's full integrity check, then exit")
-		repairDB = flag.String("repair-db", "", "Copy everything readable from a damaged database into -repair-to, then exit")
-		repairTo = flag.String("repair-to", "", "Where -repair-db writes the rebuilt database (must not exist)")
+		verifyDB = fs.String("verify-db", "", "Check a database file with bbolt's full integrity check, then exit")
+		repairDB = fs.String("repair-db", "", "Copy everything readable from a damaged database into -repair-to, then exit")
+		repairTo = fs.String("repair-to", "", "Where -repair-db writes the rebuilt database (must not exist)")
 		// #335: shrink a file after large deletes, optionally with larger pages.
-		compactDB       = flag.String("compact-db", "", "Copy a database into -compact-to without its free space, then exit (server stopped)")
-		compactTo       = flag.String("compact-to", "", "Where -compact-db writes the compacted database (must not exist)")
-		compactPageSize = flag.Int("compact-page-size", 0, "Page size of the compacted database, 4096-65536 (default: the system's)")
+		compactDB       = fs.String("compact-db", "", "Copy a database into -compact-to without its free space, then exit (server stopped)")
+		compactTo       = fs.String("compact-to", "", "Where -compact-db writes the compacted database (must not exist)")
+		compactPageSize = fs.Int("compact-page-size", 0, "Page size of the compacted database, 4096-65536 (default: the system's)")
 		// #336: move collections between the single-file and per-collection layouts.
-		splitCollectionsDB = flag.String("split-collections", "", "Move every collection out of this database into one file per collection (<file>.d/), then exit (server stopped)")
-		mergeCollectionsDB = flag.String("merge-collections", "", "Move every collection file back into this database, then exit (server stopped)")
+		splitCollectionsDB = fs.String("split-collections", "", "Move every collection out of this database into one file per collection (<file>.d/), then exit (server stopped)")
+		mergeCollectionsDB = fs.String("merge-collections", "", "Move every collection file back into this database, then exit (server stopped)")
 	)
-	flag.StringVar(&configFile, "config", "", "Path to YAML config file")
-	flag.StringVar(&configFile, "c", "", "Path to YAML config file (shorthand)")
-	flag.Parse()
+	fs.StringVar(&configFile, "config", "", "Path to YAML config file")
+	fs.StringVar(&configFile, "c", "", "Path to YAML config file (shorthand)")
+	_ = fs.Parse(args) // flag.CommandLine exits on a bad flag, as flag.Parse did
 
 	// Before any config is interpreted: this asks GitHub a question and exits,
 	// so nothing about this installation needs to be loaded to answer it.
-	if *checkUpdate {
-		reportUpdateAndExit()
-	}
-	if *verifyDB != "" {
-		os.Exit(runVerifyChild(*verifyDB))
-	}
-	if *repairDB != "" {
-		os.Exit(runRepair(*repairDB, *repairTo))
-	}
-	if *compactDB != "" {
-		os.Exit(runCompact(*compactDB, *compactTo, *compactPageSize))
-	}
-	if *splitCollectionsDB != "" {
-		os.Exit(runSplitCollections(*splitCollectionsDB))
-	}
-	if *mergeCollectionsDB != "" {
-		os.Exit(runMergeCollections(*mergeCollectionsDB))
+	switch {
+	case *showVersion:
+		return cfg, func(out io.Writer) int { _, _ = fmt.Fprintln(out, versionLine()); return 0 }
+	case *checkUpdate:
+		return cfg, func(io.Writer) int { reportUpdateAndExit(); return 0 }
+	case *verifyDB != "":
+		return cfg, func(io.Writer) int { return runVerifyChild(*verifyDB) }
+	case *repairDB != "":
+		return cfg, func(io.Writer) int { return runRepair(*repairDB, *repairTo) }
+	case *compactDB != "":
+		return cfg, func(io.Writer) int { return runCompact(*compactDB, *compactTo, *compactPageSize) }
+	case *splitCollectionsDB != "":
+		return cfg, func(io.Writer) int { return runSplitCollections(*splitCollectionsDB) }
+	case *mergeCollectionsDB != "":
+		return cfg, func(io.Writer) int { return runMergeCollections(*mergeCollectionsDB) }
 	}
 
 	// 2. Load config file (lowest priority after defaults)
@@ -200,7 +217,7 @@ func loadServerConfig() ServerConfig {
 	// 4. Apply CLI flags (highest priority)
 	applyCLIFlags(&cfg, *dbPath, *dbMode, *httpEnabled, *httpAddr, *grpcEnabled, *grpcAddr, *mcpEnabled, *mcpAddr, *mcpStdio, *http3Enabled, *http3Addr)
 
-	return cfg
+	return cfg, nil
 }
 
 // fileConfig mirrors ServerConfig for YAML unmarshalling with pointer fields
