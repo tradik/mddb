@@ -260,7 +260,7 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 
 			// Revision (optional - only if requested)
 			if p.SaveRevision {
-				rkey := append(storage.RevPrefix(collection, p.Doc.ID), []byte(fmt.Sprintf("%020d", now))...)
+				rkey := nextRevisionKey(bRev, collection, p.Doc.ID, now)
 				if err := bRev.Put(rkey, p.Buf); err != nil {
 					resp.Failed++
 					resp.Errors = append(resp.Errors, fmt.Sprintf("%s: revision error: %v", p.Doc.Key, err))

@@ -195,8 +195,9 @@ func reindexMeta(bIdx *bolt.Bucket, bo *binlog.BinlogOps, collection, docID stri
 // writeRevision records a version in the history and keeps the history
 // within the collection's MaxRevisions.
 func (s *Server) writeRevision(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string, now int64, buf []byte) error {
-	rkey := append(storage.RevPrefix(collection, docID), []byte(fmt.Sprintf("%020d", now))...)
-	if err := tx.Bucket([]byte("rev")).Put(rkey, buf); err != nil {
+	bRev := tx.Bucket([]byte("rev"))
+	rkey := nextRevisionKey(bRev, collection, docID, now)
+	if err := bRev.Put(rkey, buf); err != nil {
 		return err
 	}
 	bo.Put("rev", rkey, buf)

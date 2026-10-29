@@ -134,6 +134,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Revisions written within one second overwrote each other
+  ([#358](https://github.com/tradik/mddb/issues/358)).** A revision's key is
+  its unix second, so a second write in the same second replaced the first
+  revision. This affected add, update, batch add and batch update. A new
+  revision now takes the next free second for its document. The timestamp
+  stays the restore identifier, and existing keys are unchanged.
+
 - **One update path for every transport.** REST, gRPC and MCP each had their
   own document update; the MCP one (also behind GraphQL) skipped the metadata
   index, the revision history, the binlog and the full-text and embedding

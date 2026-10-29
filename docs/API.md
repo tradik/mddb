@@ -3312,6 +3312,12 @@ List document revision history.
 }
 ```
 
+`timestamp` identifies the revision; `restore` takes it. It is the write's
+unix second. When a document already has a revision in that second, the new
+one takes the next free second (since 2.18.8, #358). Several writes within a
+second therefore keep every version, dated a second or so apart in order.
+`updatedAt` keeps the actual write time.
+
 ---
 
 ### POST /v1/revisions/restore

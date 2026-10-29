@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
 	"mddb/internal/storage"
@@ -149,7 +148,7 @@ func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]s
 		}
 
 		if saveRevision {
-			rkey := append(storage.RevPrefix(collection, doc.ID), []byte(fmt.Sprintf("%020d", now))...)
+			rkey := nextRevisionKey(bRev, collection, doc.ID, now)
 			if err := bRev.Put(rkey, buf); err != nil {
 				return err
 			}

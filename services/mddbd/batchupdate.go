@@ -239,7 +239,7 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 
 			// Revision (optional)
 			if u.SaveRevision {
-				rkey := append(storage.RevPrefix(collection, u.Doc.ID), []byte(fmt.Sprintf("%020d", now))...)
+				rkey := nextRevisionKey(bRev, collection, u.Doc.ID, now)
 				if err := bRev.Put(rkey, u.Buf); err != nil {
 					resp.Failed++
 					resp.Errors = append(resp.Errors, fmt.Sprintf("%s/%s: revision error: %v", u.Key, u.Lang, err))
