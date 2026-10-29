@@ -16,7 +16,7 @@ finding cheaper and easier to measure. It also stops two agents that share a
 document from losing each other's edits.
 
 The full list is in the
-[changelog](https://github.com/tradik/mddb/blob/2.18.8/CHANGELOG.md). This
+[changelog](https://github.com/tradik/mddb/blob/v2.18.8/CHANGELOG.md). This
 article covers what changes for you.
 
 ## A repository in one command

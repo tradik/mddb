@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Changelog links in the 2.17 and 2.18.8 blog posts returned 404.** They
+  pointed at `blob/2.17.0` and `blob/2.18.8`, but those releases are tagged
+  `v2.17.0` and `v2.18.8`.
+
 - **A metadata-only update left full-text search on the old metadata
   (#362).** `PATCH /v1/update`, gRPC `UpdateDocument` and MCP
   `update_document` re-indexed FTS only when the content changed. Every

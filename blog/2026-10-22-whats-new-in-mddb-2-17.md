@@ -14,7 +14,7 @@ a ports index of 105,000 documents with filters by system, repository,
 category and maintainer.
 
 The full list is in the
-[changelog](https://github.com/tradik/mddb/blob/2.17.0/CHANGELOG.md). This
+[changelog](https://github.com/tradik/mddb/blob/v2.17.0/CHANGELOG.md). This
 article covers what changes for you.
 
 ## Filters now see every match
@@ -99,7 +99,7 @@ rate(mddb_db_write_transactions_total[1m])
 ```
 
 Divide it by the documents you load to get commits per document.
-[DEPLOYMENT.md](https://github.com/tradik/mddb/blob/2.17.0/docs/DEPLOYMENT.md)
+[DEPLOYMENT.md](https://github.com/tradik/mddb/blob/v2.17.0/docs/DEPLOYMENT.md)
 has a new section on spinning disks: what each kind of write commits, and
 when `sync=disabled` on the dataset is a reasonable trade — an index you can
 rebuild from its sources — and when it is not.

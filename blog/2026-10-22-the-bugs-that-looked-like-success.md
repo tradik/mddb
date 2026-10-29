@@ -165,4 +165,4 @@ please [open an issue](https://github.com/tradik/mddb/issues). Most of what
 is in these releases started as exactly that.
 
 The full details are in the
-[changelog](https://github.com/tradik/mddb/blob/2.17.0/CHANGELOG.md).
+[changelog](https://github.com/tradik/mddb/blob/v2.17.0/CHANGELOG.md).

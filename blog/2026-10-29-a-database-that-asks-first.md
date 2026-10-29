@@ -19,7 +19,7 @@ tenants loose on a shared server: *what stops this from going wrong?* Before
 2.18.9 the honest answer was "not much, so be careful". Here is what changed.
 
 The full list is in the
-[changelog](https://github.com/tradik/mddb/blob/2.18.9/CHANGELOG.md).
+[changelog](https://github.com/tradik/mddb/blob/v2.18.9/CHANGELOG.md).
 
 ## Asking before deleting
 
@@ -47,7 +47,7 @@ protocol get an `input_required` result and retry with the answer.
 
 `require` goes further and refuses outright when a client cannot ask. The
 default is `off`, so nothing changes until you opt in. See
-[Confirming Destructive Tools](https://github.com/tradik/mddb/blob/2.18.9/docs/MCP.md).
+[Confirming Destructive Tools](https://github.com/tradik/mddb/blob/v2.18.9/docs/MCP.md).
 
 ## Saying no before the disk is full
 
