@@ -1,0 +1,47 @@
+# SonarCloud through the sonar-scanner (OPS-021).
+#
+# Automatic Analysis ignores sonar.issue.ignore.* in sonar-project.properties,
+# so per-rule exceptions never applied. This job runs the scanner, which
+# honours them. It does nothing until the owner:
+#   1. adds the repository secret SONAR_TOKEN (SonarCloud → My Account →
+#      Security), and
+#   2. turns off Automatic Analysis in the SonarCloud project (Administration
+#      → Analysis Method) — both at once make the scanner fail.
+name: SonarCloud
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: sonarcloud-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: SonarCloud scan
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Without SONAR_TOKEN, Automatic Analysis stays in use
+        if: env.SONAR_TOKEN == ''
+        run: echo "SONAR_TOKEN is not set; nothing to do (OPS-021)."
+
+      - name: Checkout code
+        if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # blame data for new-code detection
+
+      - name: Scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0

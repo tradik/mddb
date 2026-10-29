@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **SonarCloud can run through the sonar-scanner (OPS-021).** Automatic
+  Analysis ignores `sonar.issue.ignore.*`, so none of the per-rule exceptions
+  in `sonar-project.properties` ever applied. `.github/workflows/sonarcloud.yml`
+  runs the scanner. It stays idle until the repository has a `SONAR_TOKEN`
+  secret and Automatic Analysis is turned off in the SonarCloud project.
+
 ## [2.18.8] - 2026-10-29
 
 ### Added
