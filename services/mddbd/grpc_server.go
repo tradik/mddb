@@ -72,7 +72,14 @@ func startGRPCServer(s *Server, addr string, opts ...grpc.ServerOption) error {
 		return err
 	}
 	defer func() { _ = closeListener(lis, addr) }()
+	return newGRPCTransport(s, opts...).Serve(lis)
+}
 
+// newGRPCTransport builds the gRPC server with every service registered:
+// MDDB, replication on a leader or follower, and reflection for grpcurl.
+// Split from startGRPCServer so the server can be built, served and stopped
+// on a listener of the caller's choosing.
+func newGRPCTransport(s *Server, opts ...grpc.ServerOption) *grpc.Server {
 	// Default options
 	defaultOpts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(10 * 1024 * 1024), // 10MB
@@ -109,7 +116,7 @@ func startGRPCServer(s *Server, addr string, opts ...grpc.ServerOption) error {
 	// Register reflection service for grpcurl
 	reflection.Register(grpcServer)
 
-	return grpcServer.Serve(lis)
+	return grpcServer
 }
 
 // Add implements the Add RPC.

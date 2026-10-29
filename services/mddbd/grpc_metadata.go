@@ -381,6 +381,10 @@ func (g *GRPCServer) DeleteDocument(ctx context.Context, req *proto.DeleteDocume
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, key, lang")
 	}
 	if err := g.server.deleteDocumentInternal(req.Collection, req.Key, req.Lang); err != nil {
+		// A missing document is the caller's NotFound, not a server fault.
+		if err.Error() == "document not found" {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &proto.DeleteDocumentResponse{
