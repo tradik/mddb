@@ -50,8 +50,8 @@ export default function SystemInfo() {
     return `${minutes}m`;
   };
 
+  // Only called once systemInfo is loaded (see the early returns below).
   const getMemoryPercentage = () => {
-    if (!systemInfo) return 0;
     return Math.round((systemInfo.memoryUsed / systemInfo.memorySystem) * 100);
   };
 

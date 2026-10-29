@@ -16,12 +16,15 @@ class MDDBClient {
     const url = `${this.baseUrl}${endpoint}`;
     const token = authManager.getToken();
 
+    // `...options` goes first: spreading it last would replace the merged
+    // headers with the caller's object, dropping Content-Type and writing the
+    // Authorization header into an object the caller still owns.
     const config = {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-      ...options,
     };
 
     // Add authentication header if token exists
@@ -139,14 +142,10 @@ class MDDBClient {
    * Create database backup
    */
   async backup(filename) {
-    const url = `${this.baseUrl}/backup${filename ? `?to=${filename}` : ''}`;
-    const response = await fetch(url, { method: 'GET' });
-    
-    if (!response.ok) {
-      throw new Error(`Backup failed: ${response.statusText}`);
-    }
-    
-    return response.json();
+    // Through request() so the backup carries the session token like every
+    // other admin call; the filename is encoded so it cannot add parameters.
+    const query = filename ? `?to=${encodeURIComponent(filename)}` : '';
+    return this.request(`/backup${query}`, { method: 'GET' });
   }
 
   /**
@@ -626,7 +625,7 @@ class MDDBClient {
    * Delete a user (admin only)
    */
   async deleteUser(username) {
-    return this.request(`/auth/users/${username}`, { method: 'DELETE' });
+    return this.request(`/auth/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
   }
 
   /**
@@ -643,7 +642,7 @@ class MDDBClient {
    * Get user permissions
    */
   async getUserPermissions(username) {
-    return this.request(`/auth/permissions?username=${username}`, {
+    return this.request(`/auth/permissions?username=${encodeURIComponent(username)}`, {
       method: 'GET',
     });
   }
@@ -671,14 +670,14 @@ class MDDBClient {
    * Get group details
    */
   async getGroup(name) {
-    return this.request(`/auth/groups/${name}`, { method: 'GET' });
+    return this.request(`/auth/groups/${encodeURIComponent(name)}`, { method: 'GET' });
   }
 
   /**
    * Update group
    */
   async updateGroup(name, { description, members }) {
-    return this.request(`/auth/groups/${name}`, {
+    return this.request(`/auth/groups/${encodeURIComponent(name)}`, {
       method: 'PUT',
       body: JSON.stringify({ description, members }),
     });
@@ -688,7 +687,7 @@ class MDDBClient {
    * Delete group
    */
   async deleteGroup(name) {
-    return this.request(`/auth/groups/${name}`, { method: 'DELETE' });
+    return this.request(`/auth/groups/${encodeURIComponent(name)}`, { method: 'DELETE' });
   }
 
   /**
@@ -725,7 +724,7 @@ class MDDBClient {
    * Get embedding configuration by ID
    */
   async getEmbeddingConfig(id) {
-    return this.request(`/embedding-configs/${id}`, { method: 'GET' });
+    return this.request(`/embedding-configs/${encodeURIComponent(id)}`, { method: 'GET' });
   }
 
   /**
@@ -742,7 +741,7 @@ class MDDBClient {
    * Update embedding configuration
    */
   async updateEmbeddingConfig(id, { name, provider, model, dimensions, apiKey, apiUrl, isDefault }) {
-    return this.request(`/embedding-configs/${id}`, {
+    return this.request(`/embedding-configs/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify({ name, provider, model, dimensions, apiKey, apiUrl, isDefault }),
     });
@@ -752,7 +751,7 @@ class MDDBClient {
    * Delete embedding configuration
    */
   async deleteEmbeddingConfig(id) {
-    return this.request(`/embedding-configs/${id}`, { method: 'DELETE' });
+    return this.request(`/embedding-configs/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   /**
@@ -799,7 +798,7 @@ class MDDBClient {
    * List automation rules, optionally filtered by type
    */
   async listAutomation(type) {
-    const params = type ? `?type=${type}` : '';
+    const params = type ? `?type=${encodeURIComponent(type)}` : '';
     return this.request(`/automation${params}`, { method: 'GET' });
   }
 
@@ -817,14 +816,14 @@ class MDDBClient {
    * Get a single automation rule by ID
    */
   async getAutomation(id) {
-    return this.request(`/automation/${id}`, { method: 'GET' });
+    return this.request(`/automation/${encodeURIComponent(id)}`, { method: 'GET' });
   }
 
   /**
    * Update an automation rule
    */
   async updateAutomation(id, rule) {
-    return this.request(`/automation/${id}`, {
+    return this.request(`/automation/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: JSON.stringify(rule),
     });
@@ -834,14 +833,14 @@ class MDDBClient {
    * Delete an automation rule
    */
   async deleteAutomation(id) {
-    return this.request(`/automation/${id}`, { method: 'DELETE' });
+    return this.request(`/automation/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   /**
    * Test an automation rule (trigger)
    */
   async testAutomation(id) {
-    return this.request(`/automation/${id}/test`, { method: 'POST' });
+    return this.request(`/automation/${encodeURIComponent(id)}/test`, { method: 'POST' });
   }
 
   /**

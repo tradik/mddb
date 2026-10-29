@@ -139,7 +139,9 @@ services/mddb-panel/
 │   └── index.css            # Global styles
 ├── public/                  # Static assets
 ├── index.html               # HTML template
+├── test/                    # Shared test helpers (fetch stub, node:test shim)
 ├── vite.config.js           # Vite configuration
+├── vitest.config.js         # Test runner and coverage thresholds
 ├── tailwind.config.js       # Tailwind configuration
 └── package.json             # Dependencies
 ```
@@ -190,6 +192,36 @@ Output in `dist/` directory.
 ```bash
 npm run lint
 ```
+
+### Testing and coverage
+
+```bash
+npm test            # every suite once, with the coverage check
+npm run test:watch  # re-run suites as files change
+npx vitest run src/lib/mddb-client.request.test.js   # one file
+```
+
+All suites run under [Vitest](https://vitest.dev/) (`vitest.config.js`, which
+extends `vite.config.js`):
+
+- `*.test.js` files written for `node:test` run unchanged: the config aliases
+  `node:test` to `test/node-test-shim.js`. They still run on their own with
+  `node --test <file>`.
+- Component suites are `*.test.jsx`, start with
+  `// @vitest-environment jsdom` and use `@testing-library/react`.
+- API client suites stub the global `fetch` with the helpers in
+  `test/fetch-mock.js`; `expectEndpoints()` takes a table of calls and checks
+  the URL, query string, method and JSON body each one sends.
+
+`npm test` also measures coverage with `@vitest/coverage-v8`. Every file
+listed in `coverageFiles` in `vitest.config.js` must keep **at least 97%** of
+its lines, statements, functions and branches covered, checked per file;
+below that the run fails. The text summary prints to the terminal and the
+HTML report is written to `coverage/index.html` (ignored by git and Docker).
+A file a release touches is added to `coverageFiles` with its tests.
+
+Covered today, all at 100%: `src/lib/mddb-client.js`, `src/lib/gain-format.js`,
+`src/components/GainCard.jsx`, `src/components/SystemInfo.jsx`.
 
 ## Docker Support
 

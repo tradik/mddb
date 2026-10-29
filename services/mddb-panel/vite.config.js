@@ -4,8 +4,8 @@ import path from 'path'
 import fs from 'fs'
 
 // Resolve scripts dir: Docker puts it at ./scripts/, local dev at ../../scripts/
-const dockerScripts = path.resolve(__dirname, 'scripts')
-const localScripts = path.resolve(__dirname, '../../scripts')
+const dockerScripts = path.resolve(import.meta.dirname, 'scripts')
+const localScripts = path.resolve(import.meta.dirname, '../../scripts')
 const scriptsDir = fs.existsSync(path.join(dockerScripts, 'mddb_model.py')) ? dockerScripts : localScripts
 
 // https://vite.dev/config/

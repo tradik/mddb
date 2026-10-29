@@ -151,6 +151,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   uses the shared walk now.
 - **`MddbVectorStore.delete` used a message that does not exist**
   (`DeleteBatchDocument`); it sends `DeleteDocument`.
+- **Panel API client: headers, backup and names in URLs.** A call that passed
+  its own `headers` replaced the client's instead of adding to them, so it
+  went without `Content-Type`, and the token was written into the caller's
+  object. `backup()` called `fetch` directly, without the session token, and
+  put the file name into the query string unencoded. User names, group names,
+  embedding-config IDs and automation IDs and types were also put into URLs
+  unencoded, so a name with `/`, `&` or a space reached the wrong endpoint or
+  added a query parameter; they are encoded now.
 
 ### Changed
 
@@ -179,6 +187,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `addedAt` and `updatedAt` still read the document.
 - **MCP `cross_search` lists `filter_meta` in its schema.** The tool read
   the argument, but its schema did not say so.
+- **Panel tests run on Vitest, with per-file coverage.** `npm test` in
+  `services/mddb-panel` runs every suite under Vitest (jsdom and Testing
+  Library for components; the existing `node:test` files run unchanged) and
+  fails when a covered file drops under 97% of lines, statements, functions
+  or branches. The API client, the retrieval gain card and the System page
+  are covered at 100%; every client method is checked for the URL, method,
+  query string and body it sends.
 
 ### Documentation
 

@@ -57,9 +57,9 @@ export default [
     },
   },
 
-  // Node-side files: dev/build tooling and the SSR server + its tests.
+  // Node-side files: dev/build tooling, the SSR server, tests and test helpers.
   {
-    files: ['*.js', '**/*.test.js'],
+    files: ['*.js', '**/*.test.js', 'test/**/*.js'],
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
