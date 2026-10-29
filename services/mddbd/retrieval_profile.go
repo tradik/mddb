@@ -75,6 +75,10 @@ type RetrievalProfileDef struct {
 	// the index is asked for per requested result, before deduplication,
 	// merging or rescoring trims them. 0 = unset.
 	Oversample float64 `json:"oversample,omitempty"`
+	// GroupBy is the collection's default result grouping (SRCH-016), used
+	// when a request does not send its own — e.g. one passage per file for
+	// a code collection.
+	GroupBy *GroupBy `json:"groupBy,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -113,6 +117,9 @@ func (p *RetrievalProfileDef) Validate() error {
 		return errors.New("invalid retrieval.hybridAlpha: must be between 0.0 and 1.0")
 	}
 	if err := ValidateOversample(p.Oversample); err != nil {
+		return fmt.Errorf("invalid retrieval.%w", err)
+	}
+	if err := p.GroupBy.Validate(); err != nil {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if p.ContextTokenBudget < 0 || p.ContextTokenBudget > maxProfileContextTokenBudget {
@@ -196,6 +203,18 @@ func (s *Server) ContextTokenBudget(collection string) int {
 	return 0
 }
 
+// ResolveGroupBy applies the precedence rule to result grouping (SRCH-016):
+// the request's groupBy, else the collection profile's, else none.
+func (s *Server) ResolveGroupBy(collection string, requested *GroupBy) *GroupBy {
+	if requested != nil {
+		return requested
+	}
+	if p := s.RetrievalProfile(collection); p != nil {
+		return p.GroupBy
+	}
+	return nil
+}
+
 // --- proto conversion (RAG-001) ---
 
 // retrievalProfileFromProto converts a gRPC retrieval block into the stored
@@ -213,7 +232,15 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		HybridAlpha:        p.HybridAlpha,
 		HybridAlphaSet:     p.HybridAlphaSet,
 		ContextTokenBudget: int(p.ContextTokenBudget),
+		GroupBy:            groupByFromProto(p.GroupByKey, p.GroupByPerGroup),
 	}
+}
+
+func groupByFromProto(key string, perGroup int32) *GroupBy {
+	if key == "" {
+		return nil
+	}
+	return &GroupBy{Key: key, PerGroup: int(perGroup)}
 }
 
 // retrievalProfileToProto converts a stored profile for the wire, nil for nil —
@@ -232,5 +259,21 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		HybridAlpha:        p.HybridAlpha,
 		HybridAlphaSet:     p.HybridAlphaSet,
 		ContextTokenBudget: safeInt32(p.ContextTokenBudget),
+		GroupByKey:         groupByKey(p.GroupBy),
+		GroupByPerGroup:    groupByPerGroup(p.GroupBy),
 	}
+}
+
+func groupByKey(g *GroupBy) string {
+	if g == nil {
+		return ""
+	}
+	return g.Key
+}
+
+func groupByPerGroup(g *GroupBy) int32 {
+	if g == nil {
+		return 0
+	}
+	return safeInt32(g.PerGroup)
 }

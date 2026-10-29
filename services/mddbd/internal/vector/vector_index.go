@@ -1,6 +1,7 @@
 package vector
 
 import (
+	"mddb/internal/sliceutil"
 	"sort"
 	"strings"
 	"sync"
@@ -261,30 +262,20 @@ func BaseDocID(key string) string {
 	return key[:idx]
 }
 
-// DeduplicateChunkResults groups vector results by base docID and returns
-// the highest score per document. Useful when chunks produce multiple results
-// for the same document.
+// DeduplicateChunkResults keeps the best-scoring hit of each document and
+// reports it under the document's ID. It is grouping by document with one
+// result per group (sliceutil.GroupTop, shared with the groupBy parameter,
+// SRCH-016) plus the rename from chunk key to document ID.
 func DeduplicateChunkResults(results []VectorResult) []VectorResult {
 	if len(results) == 0 {
 		return results
 	}
-
-	best := make(map[string]float32)
-	for _, r := range results {
-		base := BaseDocID(r.DocID)
-		if score, exists := best[base]; !exists || r.Score > score {
-			best[base] = r.Score
-		}
+	sorted := make([]VectorResult, len(results))
+	copy(sorted, results)
+	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Score > sorted[j].Score })
+	deduped, _ := sliceutil.GroupTop(sorted, 1, func(r VectorResult) string { return BaseDocID(r.DocID) })
+	for i := range deduped {
+		deduped[i] = VectorResult{DocID: BaseDocID(deduped[i].DocID), Score: deduped[i].Score}
 	}
-
-	deduped := make([]VectorResult, 0, len(best))
-	for docID, score := range best {
-		deduped = append(deduped, VectorResult{DocID: docID, Score: score})
-	}
-
-	sort.Slice(deduped, func(i, j int) bool {
-		return deduped[i].Score > deduped[j].Score
-	})
-
 	return deduped
 }

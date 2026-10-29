@@ -15,6 +15,10 @@ import (
 // VectorSearch performs a vector similarity search via the direct client.
 func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchRequest) (*MCPVectorSearchResponse, error) {
 	s := c.server
+	req.GroupBy = s.ResolveGroupBy(req.Collection, req.GroupBy)
+	if err := req.GroupBy.Validate(); err != nil {
+		return nil, err
+	}
 
 	if req.Collection == "" {
 		return nil, errors.New("missing collection")
@@ -108,20 +112,10 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	}
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
-	if !chunkMode {
-		results = vec.DeduplicateChunkResults(results)
-	}
-	if req.MMR {
-		results = vec.MMRRerank(results, mmrLambdaOrDefault(req.MMRLambda), topK, func(id string) []float32 {
-			if v, ok := diskVecs[id]; ok {
-				return v
-			}
-			return s.VectorIndex.GetVector(req.Collection, id)
-		})
-	}
-	if len(results) > topK {
-		results = results[:topK]
-	}
+	results, groupTags := s.shapeVectorResults(vectorShaping{
+		Collection: req.Collection, ChunkMode: chunkMode, GroupBy: req.GroupBy,
+		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: topK, DiskVecs: diskVecs,
+	}, results)
 	windowSize := 0
 	if mode == RetrievalModeWindow {
 		windowSize = req.WindowSize
@@ -150,6 +144,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 			item := MCPVectorSearchResult{
 				Score: vr.Score,
 				Rank:  rank + 1,
+			}
+			if t, ok := groupTags[vr.DocID]; ok {
+				item.Group, item.GroupRank = t.Group, t.Rank
 			}
 			if chunkMode {
 				idx := chunkIndex
@@ -354,6 +351,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		FragmentSize:      req.FragmentSize,
 		FilterMeta:        req.FilterMeta,
 		Filter:            req.Filter,
+		GroupBy:           req.GroupBy,
 		DisableStem:       req.DisableStem,
 		DisableSynonyms:   req.DisableSynonyms,
 		Mode:              req.Mode,
@@ -384,6 +382,8 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 			Score:        r.Score,
 			MatchedTerms: r.MatchedTerms,
 			Highlights:   r.Highlights,
+			Group:        r.Group,
+			GroupRank:    r.GroupRank,
 		})
 	}
 	// RAG-001: the budget counts what this answer carries, so it applies
@@ -442,6 +442,10 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if req.Collection == "" || req.Query == "" {
 		return nil, errors.New("missing required fields: collection, query")
 	}
+	req.GroupBy = c.server.ResolveGroupBy(req.Collection, req.GroupBy)
+	if err := req.GroupBy.Validate(); err != nil {
+		return nil, err
+	}
 
 	httpReq := HybridSearchRequest{
 		Collection:      req.Collection,
@@ -457,6 +461,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		DistanceMetric:  req.DistanceMetric,
 		FilterMeta:      req.FilterMeta,
 		Filter:          req.Filter,
+		GroupBy:         req.GroupBy,
 		Boost:           req.Boost,
 		Sort:            req.Sort,
 		Oversample:      req.Oversample,
@@ -491,21 +496,26 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		httpReq.Alpha = floatPtr(0.5)
 	}
 
+	mergeTopK := httpReq.TopK
+	if req.GroupBy != nil {
+		mergeTopK = groupedCandidates(httpReq.TopK)
+	}
 	var merged []HybridSearchResultItem
 	switch httpReq.Strategy {
 	case "rrf":
-		merged = mergeRRF(ftsResults, vectorResults, httpReq.RRFK, httpReq.TopK)
+		merged = mergeRRF(ftsResults, vectorResults, httpReq.RRFK, mergeTopK)
 	default:
-		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(httpReq.Alpha), httpReq.TopK)
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(httpReq.Alpha), mergeTopK)
 	}
 
 	// Apply per-query boosts/demotions (metadata-based score multipliers).
 	merged = c.server.applyBoostHybrid(req.Collection, merged, req.Boost)
-	if len(merged) > httpReq.TopK {
-		merged = merged[:httpReq.TopK]
+	if len(merged) > mergeTopK {
+		merged = merged[:mergeTopK]
 	}
 
 	items := c.server.loadHybridDocs(req.Collection, merged, true)
+	items = groupHybridItems(req.Collection, items, req.GroupBy, httpReq.TopK)
 
 	distMetric := httpReq.DistanceMetric
 	if distMetric == "" {
@@ -527,6 +537,8 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 			VectorScore:   item.VectorScore,
 			MatchedTerms:  item.MatchedTerms,
 			Rank:          item.Rank,
+			Group:         item.Group,
+			GroupRank:     item.GroupRank,
 		})
 	}
 	// RAG-001: cap what this collection hands back. The MCP paths resolved

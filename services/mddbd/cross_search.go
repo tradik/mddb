@@ -7,7 +7,6 @@ import (
 	"mddb/internal/storage"
 	"mddb/internal/vector"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
@@ -32,7 +31,8 @@ type CrossSearchRequest struct {
 	// the index per requested result, before deduplication, merging or
 	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
 	// the default.
-	Oversample float64 `json:"oversample,omitempty"`
+	Oversample float64  `json:"oversample,omitempty"`
+	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // CrossSearchResultItem represents a single cross-collection search result.
@@ -41,6 +41,10 @@ type CrossSearchResultItem struct {
 	Document   storage.Doc `json:"document"`
 	Score      float32     `json:"score"`
 	Rank       int         `json:"rank"`
+	// Group and GroupRank are set when the request had groupBy (SRCH-016):
+	// the group this result counted against and its 1-based place in it.
+	Group     string `json:"group,omitempty"`
+	GroupRank int    `json:"groupRank,omitempty"`
 }
 
 // CrossSearchResponse represents the response from cross-collection search.
@@ -70,6 +74,10 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
 	// number is the problem.
 	if err := ValidateOversample(req.Oversample); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	if err := req.GroupBy.Validate(); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -152,64 +160,16 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	// default apply.
 	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
-	// Search each target collection and collect results
-	type taggedResult struct {
-		collection string
-		result     vector.VectorResult
-	}
-	var allTagged []taggedResult
-
-	for _, coll := range req.TargetCollections {
-		var results []vector.VectorResult
-		if allowedIDs, active := s.allowedDocIDs(coll, req.FilterMeta, req.Filter); active {
-			if len(allowedIDs) == 0 {
-				continue
-			}
-			results = searcher.SearchWithFilter(coll, queryVector, searchTopK, req.Threshold, allowedIDs, metric)
-		} else {
-			results = searcher.Search(coll, queryVector, searchTopK, req.Threshold, metric)
-		}
-		results = vector.DeduplicateChunkResults(results)
-		for _, vr := range results {
-			allTagged = append(allTagged, taggedResult{collection: coll, result: vr})
-		}
-	}
-
-	// Sort all results by score descending
-	sort.Slice(allTagged, func(i, j int) bool {
-		return allTagged[i].result.Score > allTagged[j].result.Score
+	items := s.crossSearchItems(crossSearchParams{
+		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
+		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
+		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
+		IncludeContent: req.IncludeContent,
 	})
-	if len(allTagged) > topK {
-		allTagged = allTagged[:topK]
-	}
 
 	// Track operation
 	if s.Metrics != nil {
 		s.Metrics.IncOp("cross_search", algo)
-	}
-
-	// Load full documents
-	items := make([]CrossSearchResultItem, 0, len(allTagged))
-	// #336: documents of several collections, each read from its own file.
-	for rank, tr := range allTagged {
-		v := s.docBytes(tr.collection, tr.result.DocID)
-		if v == nil {
-			continue
-		}
-		docPtr, err := loadDoc(v)
-		if err != nil {
-			continue
-		}
-		doc := *docPtr
-		if !req.IncludeContent {
-			doc.ContentMD = ""
-		}
-		items = append(items, CrossSearchResultItem{
-			Collection: tr.collection,
-			Document:   doc,
-			Score:      tr.result.Score,
-			Rank:       rank + 1,
-		})
 	}
 
 	resp := CrossSearchResponse{
@@ -227,7 +187,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		resp.Stats = &SearchStats{
 			DurationMs:  float64(time.Since(start).Microseconds()) / 1000.0,
 			QueryTerms:  queryTerms,
-			IndexSize:   len(allTagged),
+			IndexSize:   len(items),
 			TotalTokens: len(queryTerms),
 		}
 	}

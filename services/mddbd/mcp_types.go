@@ -226,7 +226,8 @@ type MCPVectorSearchRequest struct {
 	// the index per requested result, before deduplication, merging or
 	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
 	// the default.
-	Oversample float64 `json:"oversample,omitempty"`
+	Oversample float64  `json:"oversample,omitempty"`
+	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -241,6 +242,10 @@ type MCPVectorSearchResult struct {
 	// rather than read a file.
 	StartLine int `json:"startLine,omitempty"`
 	EndLine   int `json:"endLine,omitempty"`
+	// Group and GroupRank are set when the request had groupBy (SRCH-016):
+	// the group this result counted against and its 1-based place in it.
+	Group     string `json:"group,omitempty"`
+	GroupRank int    `json:"groupRank,omitempty"`
 }
 
 // MCPVectorSearchResponse represents vector search results.
@@ -336,6 +341,7 @@ type MCPFTSSearchRequest struct {
 	Distance        int                 `json:"distance,omitempty"`
 	FacetBy         []string            `json:"facetBy,omitempty"`
 	FacetMaxValues  int                 `json:"facetMaxValues,omitempty"`
+	GroupBy         *GroupBy            `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // MCPFTSResult represents a single FTS result.
@@ -346,6 +352,10 @@ type MCPFTSResult struct {
 	// Highlights carry each matching fragment with the 1-based, inclusive line
 	// range it occupies (CODE-002).
 	Highlights []fts.Highlight `json:"highlights,omitempty"`
+	// Group and GroupRank are set when the request had groupBy (SRCH-016):
+	// the group this result counted against and its 1-based place in it.
+	Group     string `json:"group,omitempty"`
+	GroupRank int    `json:"groupRank,omitempty"`
 }
 
 // MCPFTSSearchResponse represents full-text search results.
@@ -411,7 +421,8 @@ type MCPHybridSearchRequest struct {
 	// the index per requested result, before deduplication, merging or
 	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
 	// the default.
-	Oversample float64 `json:"oversample,omitempty"`
+	Oversample float64  `json:"oversample,omitempty"`
+	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -422,6 +433,10 @@ type MCPHybridSearchResult struct {
 	VectorScore   float64     `json:"vectorScore"`
 	MatchedTerms  []string    `json:"matchedTerms,omitempty"`
 	Rank          int         `json:"rank"`
+	// Group and GroupRank are set when the request had groupBy (SRCH-016):
+	// the group this result counted against and its 1-based place in it.
+	Group     string `json:"group,omitempty"`
+	GroupRank int    `json:"groupRank,omitempty"`
 }
 
 // MCPHybridSearchResponse represents hybrid search results.
@@ -704,7 +719,8 @@ type MCPCrossSearchRequest struct {
 	Filter            MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	IncludeContent    bool                `json:"includeContent"`
 	// Oversample is the recall/latency knob (SRCH-005).
-	Oversample float64 `json:"oversample,omitempty"`
+	Oversample float64  `json:"oversample,omitempty"`
+	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // MCPCrossSearchResponse is the response for cross_search.

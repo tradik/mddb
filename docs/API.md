@@ -2213,6 +2213,8 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
 | `threshold` | number | `0.0` | Min vector similarity 0–1 |
 | `distanceMetric` | string | `"cosine"` | `cosine`, `dot_product`, `euclidean` |
 | `filterMeta` | object | | Metadata key-value filter |
+| `filter` | object | | Operator filter: `prefix`, `contains`, `gt`/`gte`/`lt`/`lte`, `not`, `exists` per key (v2.18.8+, [SEARCH.md](SEARCH.md#filter-operators-v2188)) |
+| `groupBy` | object | | `{key, perGroup}` — at most `perGroup` results per metadata value or document (v2.18.8+, [SEARCH.md](SEARCH.md#grouping-results-v2188)) |
 | `includeContent` | boolean | `false` | Include full content |
 | `disableStem` | boolean | `false` | Disable stemming |
 | `disableSynonyms` | boolean | `false` | Disable synonym expansion |
@@ -2277,6 +2279,8 @@ Alternative source modes (use one):
 | `algorithm` | string | `"flat"` | Vector algorithm |
 | `distanceMetric` | string | `"cosine"` | Distance metric |
 | `filterMeta` | object | | Metadata filter |
+| `filter` | object | | Operator filter applied in every target collection (v2.18.8+) |
+| `groupBy` | object | | `{key, perGroup}`; `key: "collection"` keeps the best per collection (v2.18.8+) |
 | `includeContent` | boolean | `false` | Include content |
 
 **Response**:
@@ -2611,6 +2615,7 @@ curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d 
 | `hybridAlpha` | number | 0 = keyword only, 1 = semantic only. Requires `hybridAlphaSet: true`, because 0.0 is a real weight and cannot double as "unset". |
 | `oversample` | number | 1.0–10.0. Candidates fetched per requested result before deduplication or merging — see [SEARCH.md](SEARCH.md#oversampling-v2120) for measured effect |
 | `contextTokenBudget` | integer | Cap on total returned context, in tokens |
+| `groupBy` | object | Default result grouping, e.g. `{"key": "path", "perGroup": 1}` for one passage per file (v2.18.8+); a request's own `groupBy` wins |
 
 **The context budget drops results, it does not truncate them.** Half a document
 still costs tokens and no longer says anything reliable, so the budget trims the

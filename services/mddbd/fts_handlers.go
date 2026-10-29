@@ -52,7 +52,8 @@ type FTSSearchRequest struct {
 	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
 	// caller that says nothing keeps today's behaviour and today's freshness.
 	// Capped at searchCacheMaxTTL.
-	CacheTTL int `json:"cacheTtl,omitempty"`
+	CacheTTL int      `json:"cacheTtl,omitempty"`
+	GroupBy  *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // FTSSearchResponse is the HTTP response for full-text search.
@@ -86,6 +87,10 @@ type FTSResultWithDoc struct {
 	MatchedTerms []string        `json:"matchedTerms"`
 	Highlights   []fts.Highlight `json:"highlights,omitempty"` // populated when request.highlight=true
 	Pinned       bool            `json:"pinned,omitempty"`     // set by curation rules (v2.9.14+)
+	// Group and GroupRank are set when the request had groupBy (SRCH-016):
+	// the group this result counted against and its 1-based place in it.
+	Group     string `json:"group,omitempty"`
+	GroupRank int    `json:"groupRank,omitempty"`
 }
 
 // --- HTTP handler ---
@@ -165,6 +170,10 @@ func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
 // had a reduced copy without filters, modes or stemming control (#328).
 func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchResponse, error) {
 	if err := s.normalizeFTSRequest(&req); err != nil {
+		return nil, err
+	}
+	req.GroupBy = s.ResolveGroupBy(req.Collection, req.GroupBy)
+	if err := req.GroupBy.Validate(); err != nil {
 		return nil, err
 	}
 	// Spell-correct the query when enabled for this collection
@@ -248,7 +257,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	// matches that happened to rank there (#311). The search functions score
 	// every match either way — the limit only truncates their sorted output.
 	searchLimit := req.Limit
-	if allowed != nil || len(docRanges) > 0 || len(req.Boost) > 0 || req.FacetScope == facetScopeAll {
+	if allowed != nil || len(docRanges) > 0 || len(req.Boost) > 0 || req.FacetScope == facetScopeAll || req.GroupBy != nil {
 		searchLimit = 0
 	}
 
@@ -376,7 +385,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	// Load only the page, unless curation may hide some of it: then load all
 	// and let the truncation after curation pick the page.
 	window := req.Limit
-	if s.CurationManager != nil && len(s.CurationManager.MatchingRules(req.Collection, req.Query)) > 0 {
+	if req.GroupBy != nil || (s.CurationManager != nil && len(s.CurationManager.MatchingRules(req.Collection, req.Query)) > 0) {
 		window = 0
 	}
 
@@ -430,6 +439,12 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	// Curation: pin/hide must run AFTER filtering and range/boost but BEFORE
 	// facets so facet counts reflect what the client actually sees.
 	resp.Results = s.applyCurationFTS(req.Collection, req.Query, resp.Results)
+	resp.Results = groupTop(resp.Results, req.GroupBy,
+		func(r FTSResultWithDoc) string { return r.Document.ID },
+		func(r FTSResultWithDoc) string {
+			return req.GroupBy.label(req.Collection, r.Document.ID, r.Document.Meta)
+		},
+		func(r *FTSResultWithDoc, t groupTag) { r.Group, r.GroupRank = t.Group, t.Rank })
 	if req.Limit > 0 && len(resp.Results) > req.Limit {
 		resp.Results = resp.Results[:req.Limit]
 	}

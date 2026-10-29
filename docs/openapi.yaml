@@ -6054,6 +6054,28 @@ paths:
 
 components:
   schemas:
+    GroupBy:
+      type: object
+      description: |
+        Result grouping (SRCH-016, v2.18.8). Keeps at most `perGroup` results
+        for each value of `key`, best first, then cuts to topK. `key` is a
+        metadata key (its first value), `document` (chunks of one document —
+        use with `retrievalMode: chunk`) or `collection` (cross-search).
+        Documents without the metadata key are never merged with each other.
+        Order: candidates (topK × oversample) → parent dedupe → groupBy → MMR
+        → topK. Parent-mode deduplication is `{key: document, perGroup: 1}`.
+        A collection's retrieval profile may set a default; a request's own
+        groupBy wins.
+      required: [ key ]
+      properties:
+        key:
+          type: string
+          example: path
+        perGroup:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 1
     MetaFilter:
       type: object
       description: |
@@ -7025,6 +7047,8 @@ components:
       required:
         - collection
       properties:
+        groupBy:
+          $ref: '#/components/schemas/GroupBy'
         oversample:
           type: number
           minimum: 1.0
@@ -7175,6 +7199,12 @@ components:
     VectorSearchResultItem:
       type: object
       properties:
+        group:
+          type: string
+          description: Group this result counted against (only with groupBy, SRCH-016).
+        groupRank:
+          type: integer
+          description: 1-based place of this result within its group (only with groupBy).
         document:
           $ref: "#/components/schemas/Document"
         score:
@@ -7360,6 +7390,8 @@ components:
         - collection
         - query
       properties:
+        groupBy:
+          $ref: '#/components/schemas/GroupBy'
         collection:
           type: string
           description: Collection name to search
@@ -7652,6 +7684,12 @@ components:
     FTSResultItem:
       type: object
       properties:
+        group:
+          type: string
+          description: Group this result counted against (only with groupBy, SRCH-016).
+        groupRank:
+          type: integer
+          description: 1-based place of this result within its group (only with groupBy).
         document:
           $ref: "#/components/schemas/Document"
         score:
@@ -7965,6 +8003,8 @@ components:
         - collection
         - query
       properties:
+        groupBy:
+          $ref: '#/components/schemas/GroupBy'
         oversample:
           type: number
           minimum: 1.0
@@ -8191,6 +8231,12 @@ components:
     HybridSearchResultItem:
       type: object
       properties:
+        group:
+          type: string
+          description: Group this result counted against (only with groupBy, SRCH-016).
+        groupRank:
+          type: integer
+          description: 1-based place of this result within its group (only with groupBy).
         document:
           $ref: "#/components/schemas/Document"
         combinedScore:
@@ -9428,6 +9474,8 @@ components:
         default for that endpoint — so a collection without a profile behaves
         exactly as it did before this existed.
       properties:
+        groupBy:
+          $ref: '#/components/schemas/GroupBy'
         defaultSearchType:
           type: string
           enum: [ fts, vector, hybrid ]
@@ -9807,6 +9855,8 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        groupBy:
+          $ref: '#/components/schemas/GroupBy'
         oversample:
           type: number
           minimum: 1.0
@@ -9916,6 +9966,12 @@ components:
     CrossSearchResultItem:
       type: object
       properties:
+        group:
+          type: string
+          description: Group this result counted against (only with groupBy, SRCH-016).
+        groupRank:
+          type: integer
+          description: 1-based place of this result within its group (only with groupBy).
         collection:
           type: string
           description: Collection the result came from

@@ -989,6 +989,8 @@ message RetrievalProfileProto {
   bool hybrid_alpha_set = 6;
   int32 context_token_budget = 7;   // cap on total returned context, in tokens
   double oversample = 8;            // (SRCH-005) candidates per result before dedup/merge/rescore; 1.0-10.0
+  string group_by_key = 9;          // (SRCH-016) default groupBy key: a metadata key, "document" or "collection"; empty = none
+  int32 group_by_per_group = 10;    // (SRCH-016) results kept per group; 0 = 1
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.

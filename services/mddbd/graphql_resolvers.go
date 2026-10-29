@@ -318,6 +318,7 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		Collection:     input.Collection,
 		FilterMeta:     gql.MapMetaInputToInternal(input.FilterMeta),
 		Filter:         filter,
+		GroupBy:        groupByFromGQL(input.GroupBy),
 		TopK:           derefInt(input.TopK, 5),
 		Threshold:      derefFloat64(input.Threshold, 0),
 		IncludeContent: derefBool(input.IncludeContent, false),
@@ -339,11 +340,16 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 	results := make([]*gql.VectorSearchResult, 0, len(resp.Results))
 	for i := range resp.Results {
 		r := resp.Results[i]
-		results = append(results, &gql.VectorSearchResult{
+		item := &gql.VectorSearchResult{
 			Document: mcpDocToGQL(&r.Document),
 			Score:    float64(r.Score),
 			Rank:     r.Rank,
-		})
+		}
+		if r.GroupRank > 0 {
+			group, rank := r.Group, r.GroupRank
+			item.Group, item.GroupRank = &group, &rank
+		}
+		results = append(results, item)
 	}
 	model := resp.Model
 	dims := resp.Dimensions
@@ -412,4 +418,12 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 		})
 	}
 	return &gql.FTSResponse{Results: out, Total: resp.Total}, nil
+}
+
+// groupByFromGQL converts the GraphQL groupBy input (SRCH-016).
+func groupByFromGQL(in *gql.GroupByInput) *GroupBy {
+	if in == nil {
+		return nil
+	}
+	return &GroupBy{Key: in.Key, PerGroup: derefInt(in.PerGroup, 0)}
 }

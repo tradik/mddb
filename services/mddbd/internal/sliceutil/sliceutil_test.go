@@ -34,3 +34,19 @@ func TestUniqueIntsDoesNotMutateInput(t *testing.T) {
 		t.Errorf("Unique(ints) = %v, want [1 2 3]", got)
 	}
 }
+
+func TestGroupTop(t *testing.T) {
+	in := []string{"a1", "b1", "a2", "a3", "c1", "b2"}
+	key := func(s string) string { return s[:1] }
+	out, ranks := GroupTop(in, 2, key)
+	if !reflect.DeepEqual(out, []string{"a1", "b1", "a2", "c1", "b2"}) || !reflect.DeepEqual(ranks, []int{1, 1, 2, 1, 2}) {
+		t.Fatalf("perGroup 2: %v %v", out, ranks)
+	}
+	out, _ = GroupTop(in, 0, key)
+	if !reflect.DeepEqual(out, []string{"a1", "b1", "c1"}) {
+		t.Fatalf("perGroup 0 is 1: %v", out)
+	}
+	if out, _ := GroupTop([]string(nil), 3, key); len(out) != 0 {
+		t.Fatal("nil input")
+	}
+}

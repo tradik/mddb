@@ -38,7 +38,8 @@ type VectorSearchRequest struct {
 	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
 	// the index per requested result, before deduplication trims them.
 	// 1.0-10.0; 0 = use the collection profile, then the default.
-	Oversample float64 `json:"oversample,omitempty"`
+	Oversample float64  `json:"oversample,omitempty"`
+	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -53,6 +54,10 @@ type VectorSearchResultItem struct {
 	// document matched and has to read it to find where.
 	StartLine int `json:"startLine,omitempty"`
 	EndLine   int `json:"endLine,omitempty"`
+	// Group and GroupRank are set when the request had groupBy (SRCH-016):
+	// the group this result counted against and its 1-based place in it.
+	Group     string `json:"group,omitempty"`
+	GroupRank int    `json:"groupRank,omitempty"`
 }
 
 // VectorSearchResponseHTTP represents the response from vector search.
@@ -188,6 +193,11 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	req.GroupBy = s.ResolveGroupBy(req.Collection, req.GroupBy)
+	if err := req.GroupBy.Validate(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	// RAG-008: request, then collection profile, then default — the same
 	// precedence ResolveTopK applies. The resolved value is what gets
 	// validated: an invalid explicit mode passes through Resolve unchanged and
@@ -277,21 +287,11 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
-	if !chunkMode {
-		results = vec.DeduplicateChunkResults(results)
-	}
-	if req.MMR {
-		// Diversify over the oversampled candidate set, then keep topK.
-		results = vec.MMRRerank(results, mmrLambdaOrDefault(req.MMRLambda), topK, func(id string) []float32 {
-			if v, ok := diskVecs[id]; ok {
-				return v
-			}
-			return s.VectorIndex.GetVector(req.Collection, id)
-		})
-	}
-	if len(results) > topK {
-		results = results[:topK]
-	}
+	// Dedupe (parent mode), groupBy, MMR over the oversampled set, then topK.
+	results, groupTags := s.shapeVectorResults(vectorShaping{
+		Collection: req.Collection, ChunkMode: chunkMode, GroupBy: req.GroupBy,
+		MMR: req.MMR, MMRLambda: req.MMRLambda, TopK: topK, DiskVecs: diskVecs,
+	}, results)
 
 	windowSize := 0
 	if mode == RetrievalModeWindow {
@@ -327,6 +327,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 			item := VectorSearchResultItem{
 				Score: vr.Score,
 				Rank:  rank + 1,
+			}
+			if t, ok := groupTags[vr.DocID]; ok {
+				item.Group, item.GroupRank = t.Group, t.Rank
 			}
 			if chunkMode {
 				idx := chunkIndex

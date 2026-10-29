@@ -224,6 +224,11 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		return "", filterErr
 	}
 	req.Filter = filter
+	groupBy, groupErr := mcpGetGroupBy(args)
+	if groupErr != nil {
+		return "", groupErr
+	}
+	req.GroupBy = groupBy
 	if mmr, ok := args["mmr"].(bool); ok {
 		req.MMR = mmr
 	}
@@ -347,6 +352,11 @@ func (s *MCPToolServer) toolFTSSearch(ctx context.Context, args map[string]inter
 		return "", filterErr
 	}
 	req.Filter = filter
+	groupBy, groupErr := mcpGetGroupBy(args)
+	if groupErr != nil {
+		return "", groupErr
+	}
+	req.GroupBy = groupBy
 
 	resp, err := s.client.FTSSearch(ctx, req)
 	if err != nil {
@@ -404,6 +414,11 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		return "", filterErr
 	}
 	req.Filter = filter
+	groupBy, groupErr := mcpGetGroupBy(args)
+	if groupErr != nil {
+		return "", groupErr
+	}
+	req.GroupBy = groupBy
 	if alpha, ok := args["alpha"].(float64); ok {
 		req.Alpha = alpha
 	}

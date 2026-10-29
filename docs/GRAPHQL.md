@@ -228,6 +228,10 @@ query {
 }
 ```
 
+`vectorSearch` also takes `groupBy: { key: "path", perGroup: 1 }`
+(v2.18.8+, [Grouping Results](SEARCH.md#grouping-results-v2188)); each result
+then reports `group` and `groupRank`.
+
 ### Vector Search (Semantic Search)
 
 ```graphql

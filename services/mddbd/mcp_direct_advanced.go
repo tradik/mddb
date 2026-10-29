@@ -381,6 +381,9 @@ func (c *DirectClient) ListCollectionConfigs(ctx context.Context) (*MCPCollectio
 // CrossSearch searches across multiple collections via the direct client.
 func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchRequest) (*MCPCrossSearchResponse, error) {
 	s := c.server
+	if err := req.GroupBy.Validate(); err != nil {
+		return nil, err
+	}
 
 	// Select algorithm
 	algo := req.Algorithm
@@ -437,59 +440,12 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	// request parameter and the default apply.
 	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
-	// Search each target collection
-	type taggedResult struct {
-		collection string
-		result     vec.VectorResult
-	}
-	var allTagged []taggedResult
-
-	for _, coll := range req.TargetCollections {
-		var results []vec.VectorResult
-		if allowedIDs, active := s.allowedDocIDs(coll, req.FilterMeta, req.Filter); active {
-			if len(allowedIDs) == 0 {
-				continue
-			}
-			results = searcher.SearchWithFilter(coll, queryVector, searchTopK, req.Threshold, allowedIDs, metric)
-		} else {
-			results = searcher.Search(coll, queryVector, searchTopK, req.Threshold, metric)
-		}
-		results = vec.DeduplicateChunkResults(results)
-		for _, vr := range results {
-			allTagged = append(allTagged, taggedResult{collection: coll, result: vr})
-		}
-	}
-
-	sort.Slice(allTagged, func(i, j int) bool {
-		return allTagged[i].result.Score > allTagged[j].result.Score
+	items := s.crossSearchItems(crossSearchParams{
+		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
+		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
+		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
+		IncludeContent: req.IncludeContent,
 	})
-	if len(allTagged) > topK {
-		allTagged = allTagged[:topK]
-	}
-
-	// Load full documents
-	items := make([]CrossSearchResultItem, 0, len(allTagged))
-	// #336: documents of several collections, each read from its own file.
-	for rank, tr := range allTagged {
-		v := s.docBytes(tr.collection, tr.result.DocID)
-		if v == nil {
-			continue
-		}
-		docPtr, err := loadDoc(v)
-		if err != nil {
-			continue
-		}
-		doc := *docPtr
-		if !req.IncludeContent {
-			doc.ContentMD = ""
-		}
-		items = append(items, CrossSearchResultItem{
-			Collection: tr.collection,
-			Document:   doc,
-			Score:      tr.result.Score,
-			Rank:       rank + 1,
-		})
-	}
 
 	return &MCPCrossSearchResponse{
 		Results:           items,

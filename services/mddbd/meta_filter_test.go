@@ -377,3 +377,22 @@ func TestFTS_RangeMetaUsesIndex(t *testing.T) {
 		t.Fatalf("rangeMeta through the index: %v %+v", err, resp)
 	}
 }
+
+func TestMetaCondition_MarshalKeepsEmptyIn(t *testing.T) {
+	empty, _ := json.Marshal(filterMetaAsFilter(map[string][]string{"k": {}}))
+	none, _ := json.Marshal(MetaFilter{"k": {}})
+	if string(empty) == string(none) {
+		t.Fatalf("empty in and no in serialize alike: %s", empty)
+	}
+	if !strings.Contains(string(empty), `"in":[]`) {
+		t.Fatalf("empty in: %s", empty)
+	}
+	round := parseFilter(t, string(empty))
+	if !round["k"].hasIn || len(round["k"].In) != 0 {
+		t.Fatalf("round trip lost the empty in: %+v", round["k"])
+	}
+	full, _ := json.Marshal(MetaFilter{"k": {In: []string{"a"}, Prefix: "p"}})
+	if !strings.Contains(string(full), `"in":["a"]`) || !strings.Contains(string(full), `"prefix":"p"`) {
+		t.Fatalf("full: %s", full)
+	}
+}

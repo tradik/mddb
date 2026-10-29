@@ -250,9 +250,11 @@ type ComplexityRoot struct {
 	}
 
 	VectorSearchResult struct {
-		Document func(childComplexity int) int
-		Rank     func(childComplexity int) int
-		Score    func(childComplexity int) int
+		Document  func(childComplexity int) int
+		Group     func(childComplexity int) int
+		GroupRank func(childComplexity int) int
+		Rank      func(childComplexity int) int
+		Score     func(childComplexity int) int
 	}
 
 	VectorStats struct {
@@ -1340,6 +1342,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.VectorSearchResult.Document(childComplexity), true
+	case "VectorSearchResult.group":
+		if e.ComplexityRoot.VectorSearchResult.Group == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResult.Group(childComplexity), true
+	case "VectorSearchResult.groupRank":
+		if e.ComplexityRoot.VectorSearchResult.GroupRank == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResult.GroupRank(childComplexity), true
 	case "VectorSearchResult.rank":
 		if e.ComplexityRoot.VectorSearchResult.Rank == nil {
 			break
@@ -1436,6 +1450,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("CreateAPIKeyInput", ec.unmarshalInputCreateAPIKeyInput),
 			graphql.NewInputUnmarshaler("CreateGroupInput", ec.unmarshalInputCreateGroupInput),
 			graphql.NewInputUnmarshaler("FTSInput", ec.unmarshalInputFTSInput),
+			graphql.NewInputUnmarshaler("GroupByInput", ec.unmarshalInputGroupByInput),
 			graphql.NewInputUnmarshaler("IngestDocumentInput", ec.unmarshalInputIngestDocumentInput),
 			graphql.NewInputUnmarshaler("IngestOptionsInput", ec.unmarshalInputIngestOptionsInput),
 			graphql.NewInputUnmarshaler("MetaInput", ec.unmarshalInputMetaInput),
@@ -1885,6 +1900,10 @@ func (ec *executionContext) childFields_VectorSearchResult(ctx context.Context, 
 		return ec.fieldContext_VectorSearchResult_score(ctx, field)
 	case "rank":
 		return ec.fieldContext_VectorSearchResult_rank(ctx, field)
+	case "group":
+		return ec.fieldContext_VectorSearchResult_group(ctx, field)
+	case "groupRank":
+		return ec.fieldContext_VectorSearchResult_groupRank(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type VectorSearchResult", field.Name)
 }
@@ -7453,6 +7472,52 @@ func (ec *executionContext) fieldContext_VectorSearchResult_rank(_ context.Conte
 	return graphql.NewScalarFieldContext("VectorSearchResult", field, false, false, "Int")
 }
 
+func (ec *executionContext) _VectorSearchResult_group(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResult_group(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Group, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResult_group(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("VectorSearchResult", field, false, false, "String")
+}
+
+func (ec *executionContext) _VectorSearchResult_groupRank(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResult) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResult_groupRank(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.GroupRank, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResult_groupRank(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("VectorSearchResult", field, false, false, "Int")
+}
+
 func (ec *executionContext) _VectorStats_enabled(ctx context.Context, field graphql.CollectedField, obj *VectorStats) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9159,6 +9224,55 @@ func UnmarshalFTSInput(ctx context.Context, raw any) (FTSInput, error) {
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputGroupByInput(ctx context.Context, obj any) (GroupByInput, error) {
+	var it GroupByInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"key", "perGroup"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "key":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("key"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Key = data
+		case "perGroup":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("perGroup"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PerGroup = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalGroupByInput unmarshals raw into the GroupByInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalGroupByInput(ctx context.Context, raw any) (GroupByInput, error) {
+	var out GroupByInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "GroupByInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputIngestDocumentInput(ctx context.Context, obj any) (IngestDocumentInput, error) {
 	var it IngestDocumentInput
 	if obj == nil {
@@ -9793,7 +9907,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -9863,6 +9977,13 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.Oversample = data
+		case "groupBy":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("groupBy"))
+			data, err := ec.unmarshalOGroupByInput2ᚖmddbᚋgraphqlᚐGroupByInput(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.GroupBy = data
 		}
 	}
 	return it, nil
@@ -11383,6 +11504,16 @@ func (ec *executionContext) _VectorSearchResult(ctx context.Context, sel ast.Sel
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "group":
+			out.Values[i] = ec._VectorSearchResult_group(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "groupRank":
+			out.Values[i] = ec._VectorSearchResult_groupRank(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -12749,6 +12880,14 @@ func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel as
 	_ = sel
 	res := graphql.MarshalFloatContext(*v)
 	return graphql.WrapContextMarshaler(ctx, res)
+}
+
+func (ec *executionContext) unmarshalOGroupByInput2ᚖmddbᚋgraphqlᚐGroupByInput(ctx context.Context, v any) (*GroupByInput, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalInputGroupByInput(ctx, v)
+	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
 func (ec *executionContext) unmarshalOIngestOptionsInput2ᚖmddbᚋgraphqlᚐIngestOptionsInput(ctx context.Context, v any) (*IngestOptionsInput, error) {

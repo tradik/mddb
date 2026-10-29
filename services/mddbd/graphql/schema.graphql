@@ -53,6 +53,10 @@ type VectorSearchResult {
   document: Document!
   score: Float!
   rank: Int!
+  "Group this result counted against when the request had groupBy (SRCH-016)."
+  group: String
+  "1-based place of this result within its group."
+  groupRank: Int
 }
 
 type VectorSearchResponse {
@@ -233,6 +237,17 @@ input VectorSearchInput {
   retrieval profile, then MDDB's default of 3.0.
   """
   oversample: Float
+  "Keep at most perGroup results per value of key (SRCH-016)."
+  groupBy: GroupByInput
+}
+
+"""
+Result grouping (SRCH-016): key is a metadata key, "document" or
+"collection"; perGroup defaults to 1.
+"""
+input GroupByInput {
+  key: String!
+  perGroup: Int
 }
 
 input FTSInput {

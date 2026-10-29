@@ -414,6 +414,20 @@ The filter is evaluated on the metadata index before scoring, so narrowing to
 one directory costs nothing extra. An unknown operator is an error naming it.
 Full semantics: [Filter Operators](SEARCH.md#filter-operators-v2188).
 
+`semantic_search`, `full_text_search`, `hybrid_search` and `cross_search` also
+take `group_by`, which keeps at most `per_group` results for each value of a
+key — one passage per file instead of five from the same one:
+
+```json
+{"name": "semantic_search", "arguments": {
+  "collection": "repo", "query": "retry with backoff", "retrieval_mode": "chunk",
+  "group_by": {"key": "path", "per_group": 1}
+}}
+```
+
+Each result reports its `group` and `groupRank`. See
+[Grouping Results](SEARCH.md#grouping-results-v2188).
+
 ## Built-in Tool Catalog
 
 All 81 built-in tools, grouped by area. Tool inputs are self-describing via

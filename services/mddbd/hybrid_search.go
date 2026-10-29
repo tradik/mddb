@@ -59,7 +59,8 @@ type HybridSearchRequest struct {
 	// the index per requested result, before deduplication, merging or
 	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
 	// the default.
-	Oversample float64 `json:"oversample,omitempty"`
+	Oversample float64  `json:"oversample,omitempty"`
+	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 }
 
 // HybridGeoFilter restricts hybrid search to docs within radius of a point.
@@ -82,6 +83,10 @@ type HybridSearchResultItem struct {
 	MatchedTerms   []string    `json:"matchedTerms,omitempty"`
 	Rank           int         `json:"rank"`
 	Pinned         bool        `json:"pinned,omitempty"` // set by curation rules (v2.9.14+)
+	// Group and GroupRank are set when the request had groupBy (SRCH-016):
+	// the group this result counted against and its 1-based place in it.
+	Group     string `json:"group,omitempty"`
+	GroupRank int    `json:"groupRank,omitempty"`
 }
 
 // HybridSearchResponse represents the response from hybrid search.
@@ -122,6 +127,11 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
 	// number is the problem.
 	if err := ValidateOversample(req.Oversample); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	req.GroupBy = s.ResolveGroupBy(req.Collection, req.GroupBy)
+	if err := req.GroupBy.Validate(); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -243,11 +253,8 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	// intersection below still has enough candidates. The caller-requested
 	// TopK is applied again after the spatial pass.
 	mergeTopK := req.TopK
-	if geoAllowed != nil {
-		mergeTopK = req.TopK * 10
-		if mergeTopK < 50 {
-			mergeTopK = 50
-		}
+	if geoAllowed != nil || req.GroupBy != nil {
+		mergeTopK = groupedCandidates(req.TopK)
 	}
 	var merged []HybridSearchResultItem
 	var signalBreakdowns []SignalBreakdown
@@ -288,7 +295,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 				return merged[i].DistanceMeters < merged[j].DistanceMeters
 			})
 		}
-		if len(merged) > req.TopK {
+		if len(merged) > req.TopK && req.GroupBy == nil {
 			merged = merged[:req.TopK]
 		}
 		for i := range merged {
@@ -310,6 +317,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		distMetric = "cosine"
 	}
 	items = s.applyCurationHybrid(req.Collection, req.Query, items)
+	items = groupHybridItems(req.Collection, items, req.GroupBy, req.TopK)
 	if req.TopK > 0 && len(items) > req.TopK {
 		items = items[:req.TopK]
 	}

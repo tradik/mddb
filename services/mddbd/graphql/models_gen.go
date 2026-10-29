@@ -156,6 +156,13 @@ type Group struct {
 	CreatedAt   int64    `json:"createdAt"`
 }
 
+// Result grouping (SRCH-016): key is a metadata key, "document" or
+// "collection"; perGroup defaults to 1.
+type GroupByInput struct {
+	Key      string `json:"key"`
+	PerGroup *int   `json:"perGroup,omitempty"`
+}
+
 type GroupPermission struct {
 	GroupName  string `json:"groupName"`
 	Collection string `json:"collection"`
@@ -321,6 +328,8 @@ type VectorSearchInput struct {
 	// before deduplication trims them. 1.0-10.0; omit to use the collection's
 	// retrieval profile, then MDDB's default of 3.0.
 	Oversample *float64 `json:"oversample,omitempty"`
+	// Keep at most perGroup results per value of key (SRCH-016).
+	GroupBy *GroupByInput `json:"groupBy,omitempty"`
 }
 
 type VectorSearchResponse struct {
@@ -334,6 +343,10 @@ type VectorSearchResult struct {
 	Document *Document `json:"document"`
 	Score    float64   `json:"score"`
 	Rank     int       `json:"rank"`
+	// Group this result counted against when the request had groupBy (SRCH-016).
+	Group *string `json:"group,omitempty"`
+	// 1-based place of this result within its group.
+	GroupRank *int `json:"groupRank,omitempty"`
 }
 
 type VectorStats struct {

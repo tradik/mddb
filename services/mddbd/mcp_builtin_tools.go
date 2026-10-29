@@ -108,6 +108,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"threshold":       map[string]interface{}{"type": "number", "description": "Minimum similarity score 0-1 (default: 0.0)"},
 					"filter_meta":     map[string]interface{}{"type": "object", "description": "Optional metadata filter to combine with semantic search"},
 					"filter":          mcpFilterSchema,
+					"group_by":        mcpGroupBySchema,
 					"algorithm":       map[string]interface{}{"type": "string", "description": "Vector search algorithm: flat (exact, default), hnsw (approximate), ivf (clustered), pq (compressed)"},
 					"distance_metric": map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"retrieval_mode":  map[string]interface{}{"type": "string", "description": "Result granularity: parent (default, one result per document), chunk (matching passage with chunkIndex/chunkText), window (passage plus neighboring chunks)"},
@@ -193,6 +194,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"fragment_size":    map[string]interface{}{"type": "integer", "description": "(v2.12.0+) Approximate characters per fragment; default 150. Lower it for source, whose lines are short — 150 bytes covers roughly fifteen lines of CSS."},
 					"filter_meta":      map[string]interface{}{"type": "object", "description": "(v2.18.1) Metadata pre-filter, e.g. {\"language\":[\"c\"],\"module\":[\"net\"]}: only matching documents are searched."},
 					"filter":           mcpFilterSchema,
+					"group_by":         mcpGroupBySchema,
 					"disable_stem":     map[string]interface{}{"type": "boolean", "description": "(v2.18.1) Turn stemming off for this query. For source code and exact identifiers."},
 					"disable_synonyms": map[string]interface{}{"type": "boolean", "description": "(v2.18.1) Turn synonym expansion off for this query."},
 					"mode":             map[string]interface{}{"type": "string", "description": "(v2.18.1) simple (default), boolean, phrase, wildcard, proximity or auto. Phrase mode finds an identifier such as \"mem_page_alloc\" in code."},
@@ -603,6 +605,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"distance_metric":  map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"filter_meta":      map[string]interface{}{"type": "object", "description": "Metadata filter"},
 					"filter":           mcpFilterSchema,
+					"group_by":         mcpGroupBySchema,
 					"boost":            map[string]interface{}{"type": "object", "description": "Per-query score multiplier keyed by \"metaKey:metaValue\" (e.g. {\"tag:featured\":5.0,\"status:archived\":-2.0}). Positive boosts, negative demotes; combined multiplicatively."},
 					"sort":             map[string]interface{}{"type": "string", "description": "Result ordering: \"combined\" (default, by fused score) or \"distance\" (by proximity ascending — requires a geo filter on the HTTP path)"},
 					"facet_by":         map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "(v2.9.14+) Metadata keys to aggregate into response.facets."},
@@ -985,6 +988,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"oversample":         map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication or merging (1.0-10.0, default 3.0). Higher finds more, costs more."},
 					"filter_meta":        map[string]interface{}{"type": "object", "description": "Metadata equality filter applied in every target collection"},
 					"filter":             mcpFilterSchema,
+					"group_by":           mcpGroupBySchema,
 				},
 				"required": []string{"target_collections"},
 			},
@@ -1246,4 +1250,17 @@ var mcpFilterSchema = map[string]interface{}{
 		`"kind":{"not":["test"]},"summary":{"exists":true},"title":{"contains":"hnsw"}}. ` +
 		"Operators: in, prefix, contains (case-insensitive), gt, gte, lt, lte (numeric when both sides are numbers, else lexical — ISO dates sort correctly), not, exists.",
 	"additionalProperties": map[string]interface{}{"type": "object"},
+}
+
+// mcpGroupBySchema describes group_by (SRCH-016) once for every search tool.
+var mcpGroupBySchema = map[string]interface{}{
+	"type": "object",
+	"description": "Keep at most per_group results for each value of key, e.g. {\"key\":\"path\",\"per_group\":2} " +
+		"for two passages per file. key is a metadata key, \"document\" (chunks of one document, with retrieval_mode chunk) " +
+		"or \"collection\" (cross_search). Results carry group and groupRank.",
+	"properties": map[string]interface{}{
+		"key":       map[string]interface{}{"type": "string"},
+		"per_group": map[string]interface{}{"type": "integer", "minimum": 1, "maximum": maxPerGroup},
+	},
+	"required": []string{"key"},
 }

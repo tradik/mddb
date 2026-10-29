@@ -91,6 +91,25 @@ func (c *MetaCondition) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// MarshalJSON keeps an explicit empty "in", which matches nothing, distinct
+// from an absent one, which matches everything — the search cache keys on the
+// marshalled request, so the two must not serialize alike.
+func (c MetaCondition) MarshalJSON() ([]byte, error) {
+	type plain MetaCondition
+	out := struct {
+		plain
+		In *[]string `json:"in,omitempty"`
+	}{plain: plain(c)}
+	if c.hasIn || len(c.In) > 0 {
+		in := c.In
+		if in == nil {
+			in = []string{}
+		}
+		out.In = &in
+	}
+	return json.Marshal(out)
+}
+
 func (c *MetaCondition) bound(op string) **string {
 	switch op {
 	case "gt":

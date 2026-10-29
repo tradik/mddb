@@ -361,6 +361,20 @@ func mcpGetFilter(m map[string]interface{}) (MetaFilter, error) {
 	return f, nil
 }
 
+// mcpGetGroupBy reads group_by (SRCH-016): {"key": "...", "per_group": n}.
+// perGroup is accepted too, so an agent copying the REST shape is not wrong.
+func mcpGetGroupBy(m map[string]interface{}) (*GroupBy, error) {
+	raw, ok := m["group_by"].(map[string]interface{})
+	if !ok {
+		return nil, nil
+	}
+	g := &GroupBy{Key: mcpGetString(raw, "key"), PerGroup: mcpGetInt(raw, "per_group")}
+	if g.PerGroup == 0 {
+		g.PerGroup = mcpGetInt(raw, "perGroup")
+	}
+	return g, g.Validate()
+}
+
 // mcpGetFloat64Map reads a JSON object of numeric values into a float64 map.
 // Returns nil when the key is absent so downstream callers can treat empty
 // and "not provided" identically.

@@ -942,6 +942,45 @@ curl -X POST http://localhost:11023/v1/vector-search \
   applies across chunks, in `parent` mode across documents.
 - Also available on the `semantic_search` MCP tool (`mmr`, `mmr_lambda`).
 
+## Grouping Results (v2.18.8+)
+
+Parent mode already keeps one hit per document. `groupBy` is the general
+form: keep the `perGroup` best results for each value of a key, then cut to
+`topK`. An agent reading code wants one passage per file; a reviewer, two
+per author; a cross-collection search, one per collection.
+
+```bash
+curl -X POST http://localhost:11023/v1/vector-search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "collection": "repo",
+    "query": "retry with backoff",
+    "retrievalMode": "chunk",
+    "topK": 10,
+    "groupBy": {"key": "path", "perGroup": 2}
+  }'
+```
+
+| `key` | Groups by | Typical use |
+|---|---|---|
+| a metadata key | its first value | `path`, `author`, `language` |
+| `document` | the document a chunk belongs to | several chunks of one document, with `retrievalMode: chunk` |
+| `collection` | the collection | `/v1/cross-search` |
+
+- Accepted on `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search` and
+  `/v1/cross-search`, on the MCP tools as `group_by` (`{"key": "path",
+  "per_group": 2}`) and on GraphQL `vectorSearch`.
+- Each result carries `group` and `groupRank` (its place in the group), so
+  a caller can tell what the grouping held back.
+- Documents without the metadata key are never merged with each other.
+- Order: candidates (`topK × oversample`) → parent dedupe → `groupBy` → MMR
+  → `topK`. MMR diversifies among what grouping kept.
+- `perGroup` is 1–100 and defaults to 1. A missing `key` is a 422.
+- A collection's retrieval profile may set `groupBy` as its default; a
+  request's own `groupBy` wins. `/v1/cross-search` has no single profile and
+  uses only the request.
+- Without `groupBy` responses are exactly as before.
+
 ## Oversampling (v2.12.0+)
 
 Every search that post-processes its results — deduplicating chunks of one

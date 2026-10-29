@@ -21,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document body. An unknown operator is a 400 that names it. `filterMeta` is
   unchanged and ANDed with `filter`; the five copies of its index walk are
   now one.
+- **`groupBy`: k results per file, author or collection (SRCH-016).**
+  Parent mode always kept one hit per document and nothing else could be
+  grouped. `groupBy: {key, perGroup}` keeps the `perGroup` best results for
+  each value of a metadata key, for each document (chunks) or for each
+  collection, on `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search`,
+  `/v1/cross-search`, the MCP search tools (`group_by`) and GraphQL
+  `vectorSearch`. Results carry `group` and `groupRank`. A collection's
+  retrieval profile may set a default, over REST and gRPC
+  (`group_by_key`, `group_by_per_group`). Parent-mode deduplication now runs
+  through the same code, and REST and MCP share one implementation of vector
+  and cross-collection search instead of a copy each.
 
 ### Changed
 

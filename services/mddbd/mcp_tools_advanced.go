@@ -104,6 +104,11 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		return "", filterErr
 	}
 	req.Filter = filter
+	groupBy, groupErr := mcpGetGroupBy(args)
+	if groupErr != nil {
+		return "", groupErr
+	}
+	req.GroupBy = groupBy
 	if ic, ok := args["include_content"].(bool); ok {
 		req.IncludeContent = ic
 	}
