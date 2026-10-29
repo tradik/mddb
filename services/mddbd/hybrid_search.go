@@ -37,25 +37,25 @@ type HybridSearchRequest struct {
 	// Signals configures the "weighted" strategy (SRCH-002). Ignored by the
 	// other strategies, so a request carrying both is not ambiguous — the
 	// strategy decides.
-	Signals         FusionSignals       `json:"signals,omitempty"`
-	RRFK            int                 `json:"rrfK"`           // RRF parameter k (default 60)
-	Fuzzy           int                 `json:"fuzzy"`          // typo tolerance: 0, 1, 2
-	Threshold       float64             `json:"threshold"`      // min vector similarity 0-1
-	DistanceMetric  string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
-	FilterMeta      map[string][]string `json:"filterMeta"`
-	Filter          MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
-	Geo             *HybridGeoFilter    `json:"geo,omitempty"`    // optional spatial pre-filter
-	IncludeContent  bool                `json:"includeContent"`
-	FieldWeights    map[string]float64  `json:"fieldWeights,omitempty"`
+	Signals        FusionSignals       `json:"signals,omitempty"`
+	RRFK           int                 `json:"rrfK"`           // RRF parameter k (default 60)
+	Fuzzy          int                 `json:"fuzzy"`          // typo tolerance: 0, 1, 2
+	Threshold      float64             `json:"threshold"`      // min vector similarity 0-1
+	DistanceMetric string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
+	FilterMeta     map[string][]string `json:"filterMeta"`
+	Filter         MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
+	Geo            *HybridGeoFilter    `json:"geo,omitempty"`    // optional spatial pre-filter
+	IncludeContent bool                `json:"includeContent"`
+	FieldWeights   map[string]float64  `json:"fieldWeights,omitempty"`
 	// BM25K1 and BM25B override the BM25 constants for this query (SRCH-018);
 	// nil = the collection profile's, then 1.2 / 0.75. bm25 and bm25f only.
-	BM25K1 *float64 `json:"bm25K1,omitempty"`
-	BM25B  *float64 `json:"bm25B,omitempty"`
-	DisableStem     bool                `json:"disableStem"`
-	DisableSynonyms bool                `json:"disableSynonyms"`
-	Lang            string              `json:"lang,omitempty"`
-	Boost           map[string]float64  `json:"boost,omitempty"` // per-query boost: "metaKey:metaValue" → multiplier
-	Sort            string              `json:"sort,omitempty"`  // "" / "combined" (default) | "distance" (requires geo filter)
+	BM25K1          *float64           `json:"bm25K1,omitempty"`
+	BM25B           *float64           `json:"bm25B,omitempty"`
+	DisableStem     bool               `json:"disableStem"`
+	DisableSynonyms bool               `json:"disableSynonyms"`
+	Lang            string             `json:"lang,omitempty"`
+	Boost           map[string]float64 `json:"boost,omitempty"` // per-query boost: "metaKey:metaValue" → multiplier
+	Sort            string             `json:"sort,omitempty"`  // "" / "combined" (default) | "distance" (requires geo filter)
 	// Faceted search (v2.9.14+): per-key value counts aggregated over matched documents.
 	FacetBy        []string `json:"facetBy,omitempty"`
 	FacetMaxValues int      `json:"facetMaxValues,omitempty"` // 0 = unlimited
@@ -299,10 +299,8 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Apply per-query boosts/demotions after merging — operates on CombinedScore.
+	// Boosting reorders; it never adds, so merged is still at most mergeTopK.
 	merged = s.applyBoostHybrid(req.Collection, merged, req.Boost)
-	if len(merged) > mergeTopK {
-		merged = merged[:mergeTopK]
-	}
 
 	// Spatial post-filter: keep only results inside the geo radius, attach
 	// distanceMeters from the pre-computed lookup, optionally re-sort by

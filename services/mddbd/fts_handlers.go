@@ -17,21 +17,21 @@ import (
 
 // FTSSearchRequest is the HTTP request for full-text search.
 type FTSSearchRequest struct {
-	Collection      string              `json:"collection"`
-	Query           string              `json:"query"`
-	Limit           int                 `json:"limit"`
-	Algorithm       string              `json:"algorithm"`              // "tfidf", "bm25", "bm25f", "pmisparse"
-	Fuzzy           int                 `json:"fuzzy"`                  // typo tolerance: 0 (off), 1 (1 edit), 2 (2 edits)
-	DisableStem     bool                `json:"disableStem"`            // temporarily disable stemming for this query
-	DisableSynonyms bool                `json:"disableSynonyms"`        // temporarily disable synonyms for this query
-	FieldWeights    map[string]float64  `json:"fieldWeights,omitempty"` // BM25F field weights
+	Collection      string             `json:"collection"`
+	Query           string             `json:"query"`
+	Limit           int                `json:"limit"`
+	Algorithm       string             `json:"algorithm"`              // "tfidf", "bm25", "bm25f", "pmisparse"
+	Fuzzy           int                `json:"fuzzy"`                  // typo tolerance: 0 (off), 1 (1 edit), 2 (2 edits)
+	DisableStem     bool               `json:"disableStem"`            // temporarily disable stemming for this query
+	DisableSynonyms bool               `json:"disableSynonyms"`        // temporarily disable synonyms for this query
+	FieldWeights    map[string]float64 `json:"fieldWeights,omitempty"` // BM25F field weights
 	// BM25K1 and BM25B override the BM25 constants for this query (SRCH-018);
 	// nil = the collection profile's, then 1.2 / 0.75. bm25 and bm25f only.
-	BM25K1 *float64 `json:"bm25K1,omitempty"`
-	BM25B  *float64 `json:"bm25B,omitempty"`
-	bm25            fts.BM25Params      // resolved by normalizeFTSRequest
-	FilterMeta      map[string][]string `json:"filterMeta,omitempty"`   // metadata pre-filter (in-graph filtering)
-	Filter          MetaFilter          `json:"filter,omitempty"`       // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
+	BM25K1     *float64            `json:"bm25K1,omitempty"`
+	BM25B      *float64            `json:"bm25B,omitempty"`
+	bm25       fts.BM25Params      // resolved by normalizeFTSRequest
+	FilterMeta map[string][]string `json:"filterMeta,omitempty"` // metadata pre-filter (in-graph filtering)
+	Filter     MetaFilter          `json:"filter,omitempty"`     // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	// Advanced search modes
 	Mode          string             `json:"mode,omitempty"`          // "simple" (default), "boolean", "phrase", "wildcard", "proximity", "auto"
 	Distance      int                `json:"distance,omitempty"`      // proximity distance (words) for mode=proximity

@@ -661,10 +661,8 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 	}
 
 	// Apply per-query boosts/demotions (metadata-based score multipliers).
+	// Boosting reorders; it never adds, so merged is still at most mergeTopK.
 	merged = s.applyBoostHybrid(httpReq.Collection, merged, httpReq.Boost)
-	if len(merged) > mergeTopK {
-		merged = merged[:mergeTopK]
-	}
 
 	items := s.loadHybridDocs(httpReq.Collection, merged, true)
 	// Curation rules (pin and hide) apply to every hybrid search, as they do

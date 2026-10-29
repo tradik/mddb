@@ -346,6 +346,10 @@ func (g *GRPCServer) Classify(ctx context.Context, req *proto.ClassifyRequest) (
 		if err.Error() == "no embedding provider configured" {
 			return nil, status.Error(codes.FailedPrecondition, err.Error())
 		}
+		var bad invalidInput
+		if errors.As(err, &bad) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
 		if err.Error() == "not found" {
 			return nil, status.Error(codes.NotFound, "document not found")
 		}
@@ -451,7 +455,7 @@ func (g *GRPCServer) AddSynonym(ctx context.Context, req *proto.AddSynonymReques
 	if err := g.checkWritable(); err != nil {
 		return nil, err
 	}
-	if req.Collection == "" || req.Term == "" || len(req.Synonyms) == 0 {
+	if req.Collection == "" || strings.TrimSpace(req.Term) == "" || len(req.Synonyms) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, term, synonyms")
 	}
 	if g.server.SynonymManager == nil {
@@ -512,7 +516,7 @@ func (g *GRPCServer) AddStopwords(ctx context.Context, req *proto.AddStopwordsRe
 	if err := g.checkWritable(); err != nil {
 		return nil, err
 	}
-	if req.Collection == "" || len(req.Words) == 0 {
+	if req.Collection == "" || !anyNonBlank(req.Words) {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, words")
 	}
 	if g.server.StopWordManager == nil {
@@ -609,4 +613,14 @@ func (g *GRPCServer) GetChecksum(ctx context.Context, req *proto.GetChecksumRequ
 		Checksum:      checksum,
 		DocumentCount: safeInt32(count),
 	}, nil
+}
+
+// anyNonBlank reports whether some string has more than whitespace.
+func anyNonBlank(ss []string) bool {
+	for _, s := range ss {
+		if strings.TrimSpace(s) != "" {
+			return true
+		}
+	}
+	return false
 }

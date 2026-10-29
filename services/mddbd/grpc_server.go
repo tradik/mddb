@@ -336,80 +336,25 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 		}
 	}
 
-	// Convert proto filter to internal format
-	filterMeta := make(map[string][]string)
-	for k, v := range req.FilterMeta {
-		filterMeta[k] = v.Values
-	}
-
-	// Single transaction for both ID collection and document loading
-	var docs []storage.Doc
-	var docIDs []string
-
-	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-
-		// The shared index walk (SRCH-017). The copy that stood here cut the
-		// document ID out of the key as one "|"-separated part, but an ID is
-		// "<collection>|<key>|<lang>", so it never matched a document.
-		if f := mergeFilters(filterMeta, metaFilterFromProto(req.Filter)); len(f) > 0 {
-			docIDs = sortedIDs(metaFilterIDs(tx, req.Collection, f))
-		} else {
-			docIDs = sortedIDs(collectionDocIDs(tx, req.Collection))
-		}
-
-		// Load documents in the same transaction
-		for _, id := range docIDs {
-			v := bDocs.Get(storage.DocKey(req.Collection, id))
-			if v != nil {
-				d, err := unmarshalDoc(v)
-				if err == nil {
-					docs = append(docs, *d)
-				}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// Sort
+	// gRPC's historical defaults: newest first, 50 per page.
 	sortField := req.Sort
-	if sortField == "" {
+	if sortField != "addedAt" && sortField != "key" {
 		sortField = "updatedAt"
 	}
-	sortDocs(docs, sortField, req.Asc)
-
-	// Pagination
-	total := len(docs)
-	offset := int(req.Offset)
 	limit := int(req.Limit)
 	if limit == 0 {
 		limit = 50
 	}
-
-	if offset > len(docs) {
-		offset = len(docs)
+	filter := mergeFilters(metaValuesFromProto(req.FilterMeta), metaFilterFromProto(req.Filter))
+	page, total, err := g.server.searchDocuments(req.Collection, filter, sortField, req.Asc, int(req.Offset), limit)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	end := offset + limit
-	if end > len(docs) {
-		end = len(docs)
+	protoDocs := make([]*proto.Document, len(page))
+	for i := range page {
+		protoDocs[i] = docToProto(&page[i])
 	}
-	docs = docs[offset:end]
-
-	// Convert to proto
-	protoDocs := make([]*proto.Document, len(docs))
-	for i, doc := range docs {
-		protoDocs[i] = docToProto(&doc)
-	}
-
-	return &proto.SearchResponse{
-		Documents: protoDocs,
-		Total:     safeInt32(total),
-	}, nil
+	return &proto.SearchResponse{Documents: protoDocs, Total: safeInt32(total)}, nil
 }
 
 // Export implements the Export RPC (streaming)

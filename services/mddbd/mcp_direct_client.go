@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"time"
 
 	"mddb/internal/storage"
@@ -217,114 +216,28 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 		req.IncludeContent = true
 	}
 
-	type row struct{ Doc storage.Doc }
-	var rows []row
-
-	filter := mergeFilters(req.FilterMeta, req.Filter)
-	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		seen := make(map[string]bool)
-
-		if len(filter) == 0 {
-			c2 := bDocs.Cursor()
-			prefix := []byte("doc|" + req.Collection + "|")
-			for k, v := c2.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c2.Next() {
-				d, err := loadDoc(v)
-				if err != nil {
-					return err
-				}
-				if d.ExpiresAt > 0 && d.ExpiresAt < time.Now().Unix() {
-					continue
-				}
-				if !req.IncludeContent {
-					d.ContentMD = "" // GO-022: don't carry a body the caller discards
-				}
-				rows = append(rows, row{*d})
-			}
-		} else {
-			ids := sortedIDs(metaFilterIDs(tx, req.Collection, filter))
-			for _, id := range ids {
-				if seen[id] {
-					continue
-				}
-				seen[id] = true
-				v := bDocs.Get(storage.DocKey(req.Collection, id))
-				if v == nil {
-					continue
-				}
-				d, err := loadDoc(v)
-				if err != nil {
-					return err
-				}
-				if d.ExpiresAt > 0 && d.ExpiresAt < time.Now().Unix() {
-					continue
-				}
-				if !req.IncludeContent {
-					d.ContentMD = "" // GO-022: don't carry a body the caller discards
-				}
-				rows = append(rows, row{*d})
-			}
-		}
-		return nil
-	})
+	page, total, err := c.server.searchDocuments(req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit)
 	if err != nil {
 		return nil, err
 	}
 
-	// Sort
-	switch req.Sort {
-	case "addedAt":
-		sort.Slice(rows, func(i, j int) bool {
-			if req.Asc {
-				return rows[i].Doc.AddedAt < rows[j].Doc.AddedAt
-			}
-			return rows[i].Doc.AddedAt > rows[j].Doc.AddedAt
-		})
-	case "updatedAt":
-		sort.Slice(rows, func(i, j int) bool {
-			if req.Asc {
-				return rows[i].Doc.UpdatedAt < rows[j].Doc.UpdatedAt
-			}
-			return rows[i].Doc.UpdatedAt > rows[j].Doc.UpdatedAt
-		})
-	case "key":
-		sort.Slice(rows, func(i, j int) bool {
-			if req.Asc {
-				return rows[i].Doc.Key < rows[j].Doc.Key
-			}
-			return rows[i].Doc.Key > rows[j].Doc.Key
-		})
-	}
-
-	// Paginate
-	total := len(rows)
-	start := req.Offset
-	if start > total {
-		start = total
-	}
-	end := start + req.Limit
-	if end > total {
-		end = total
-	}
-
 	if req.wantsPassages() {
-		hits := make([]passageSource, 0, end-start)
-		for _, r := range rows[start:end] {
-			hits = append(hits, passageSource{doc: r.Doc, bestChunk: -1})
+		hits := make([]passageSource, 0, len(page))
+		for _, d := range page {
+			hits = append(hits, passageSource{doc: d, bestChunk: -1})
 		}
 		p := c.server.finishPassages(req.Collection, c.server.buildPassages(req.Collection, hits, req.PassageOptions, "search"), nil)
 		return &MCPSearchResponse{Passages: &p, Total: total}, nil
 	}
 
-	docs := make([]MCPDocument, 0, end-start)
-	for _, r := range rows[start:end] {
-		docs = append(docs, docToMCPDocument(r.Doc))
+	docs := make([]MCPDocument, 0, len(page))
+	for _, d := range page {
+		if !req.IncludeContent {
+			d.ContentMD = "" // GO-022: don't carry a body the caller discards
+		}
+		docs = append(docs, docToMCPDocument(d))
 	}
-
-	return &MCPSearchResponse{
-		Documents: docs,
-		Total:     total,
-	}, nil
+	return &MCPSearchResponse{Documents: docs, Total: total}, nil
 }
 
 // Delete removes a document via the direct client.

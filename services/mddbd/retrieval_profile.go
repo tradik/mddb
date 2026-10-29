@@ -1,9 +1,9 @@
 package main
 
 import (
-	"mddb/internal/fts"
 	"errors"
 	"fmt"
+	"mddb/internal/fts"
 
 	proto "mddb/proto"
 )

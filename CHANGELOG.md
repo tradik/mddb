@@ -153,6 +153,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     characters, which MCP `memory_add_message` accepts.
   - **`POST /v1/mcp/keys` crashed when the keys bucket was missing,** for
     example after a restore.
+  - **Startup crashed with automations disabled** (`MDDB_AUTOMATIONS=disable`)
+    while the binlog was on. The binlog is on when enabled explicitly, or
+    when replication runs as leader.
+  - **A data race on the HTTP/3 server during shutdown.** The server is now
+    created before its goroutine starts.
+  - **gRPC `DeleteDocument` returned `INTERNAL` for a missing document.** It
+    now returns `NOT_FOUND`.
+  - **gRPC answered some input errors with `INTERNAL`.** These were
+    `AddSynonym` with a blank term, `AddStopwords` with only blank words, and
+    `Classify` with more than 100 labels. They now return
+    `INVALID_ARGUMENT`.
+  - **gRPC `Search` returned expired documents.** REST, MCP and gRPC now run
+    one metadata search. REST and MCP each had their own copy before.
   - **Panel API client:** passing your own headers dropped `Content-Type`.
     `backup()` sent no session token and did not encode the file name.
     User, group, embedding-config and automation names were not encoded in

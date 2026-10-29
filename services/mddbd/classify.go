@@ -47,13 +47,13 @@ func (s *Server) classifyDocument(ctx context.Context, collection, key, lang, te
 		return nil, errors.New("no embedding provider configured")
 	}
 	if len(labels) == 0 {
-		return nil, errors.New("labels are required")
+		return nil, invalidInput("labels are required")
 	}
 	if len(labels) > 100 {
-		return nil, errors.New("maximum 100 labels allowed")
+		return nil, invalidInput("maximum 100 labels allowed")
 	}
 	if text == "" && (collection == "" || key == "") {
-		return nil, errors.New("provide either text or collection+key")
+		return nil, invalidInput("provide either text or collection+key")
 	}
 
 	var docVector []float32
@@ -241,3 +241,9 @@ func (s *Server) handleClassify(w http.ResponseWriter, r *http.Request) {
 
 	ok(w, resp)
 }
+
+// invalidInput is an error in what the caller sent, so gRPC answers it with
+// INVALID_ARGUMENT rather than INTERNAL.
+type invalidInput string
+
+func (e invalidInput) Error() string { return string(e) }

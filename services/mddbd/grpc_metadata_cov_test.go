@@ -345,7 +345,7 @@ func TestCovEClassify(t *testing.T) {
 	_, err = gs.Classify(ctx, &pb.ClassifyRequest{Collection: "c", Key: "missing", Labels: []string{"a"}})
 	covEWant(t, "missing doc", err, codes.NotFound, "document not found")
 	_, err = gs.Classify(ctx, &pb.ClassifyRequest{Text: "x", Labels: make([]string, 101)})
-	covEWant(t, "too many labels", err, codes.Internal, "maximum 100 labels")
+	covEWant(t, "too many labels", err, codes.InvalidArgument, "maximum 100 labels")
 
 	resp, err := gs.Classify(ctx, &pb.ClassifyRequest{Text: "invoice", Labels: []string{"billing", "sports"}, TopK: 2})
 	if err != nil {
@@ -417,12 +417,12 @@ func TestCovESynonymsAndStopwords(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := gs.AddSynonym(ctx, &pb.AddSynonymRequest{Collection: "c", Term: "   ", Synonyms: []string{"s"}})
-	covEWant(t, "blank term", err, codes.Internal, "collection and term are required")
+	covEWant(t, "blank term", err, codes.InvalidArgument, "missing required fields")
 	_, err = gs.DeleteSynonym(ctx, &pb.DeleteSynonymRequest{Collection: "c"})
 	covEWant(t, "delete without term", err, codes.InvalidArgument, "missing required fields")
 
 	_, err = gs.AddStopwords(ctx, &pb.AddStopwordsRequest{Collection: "c", Words: []string{"  "}})
-	covEWant(t, "blank words", err, codes.Internal, "cannot be empty")
+	covEWant(t, "blank words", err, codes.InvalidArgument, "missing required fields")
 	_, err = gs.DeleteStopwords(ctx, &pb.DeleteStopwordsRequest{Collection: "c"})
 	covEWant(t, "delete without words", err, codes.InvalidArgument, "missing required fields")
 

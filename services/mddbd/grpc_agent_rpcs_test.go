@@ -231,3 +231,28 @@ func TestGRPC_SearchStatus(t *testing.T) {
 		t.Fatal("nil conversions")
 	}
 }
+
+// Input errors are INVALID_ARGUMENT, not INTERNAL.
+func TestGRPC_InputErrorsAreInvalidArgument(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	s.Embedding = &mockEmbedding{dims: 3, model: "test-model"}
+	g := &GRPCServer{server: s}
+	ctx := context.Background()
+	if _, err := g.AddSynonym(ctx, &proto.AddSynonymRequest{Collection: "c", Term: "  ", Synonyms: []string{"x"}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("blank term: %v", err)
+	}
+	if _, err := g.AddStopwords(ctx, &proto.AddStopwordsRequest{Collection: "c", Words: []string{" ", ""}}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("blank words: %v", err)
+	}
+	labels := make([]string, 101)
+	for i := range labels {
+		labels[i] = "l"
+	}
+	if _, err := g.Classify(ctx, &proto.ClassifyRequest{Text: "x", Labels: labels}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("too many labels: %v", err)
+	}
+	if anyNonBlank([]string{" "}) || !anyNonBlank([]string{" ", "a"}) || invalidInput("x").Error() != "x" {
+		t.Fatal("helpers")
+	}
+}

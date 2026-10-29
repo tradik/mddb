@@ -13,7 +13,6 @@ import (
 	"mddb/internal/storage"
 	"mddb/internal/temporal"
 	"net/http"
-	"sort"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -139,98 +138,16 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type row struct{ Doc storage.Doc }
-	var rows []row
-
-	filter := mergeFilters(req.FilterMeta, req.Filter)
-	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		seen := make(map[string]bool)
-
-		// No filter: walk the whole collection. Otherwise resolve the filter
-		// on the meta index and load only the matching documents.
-		if len(filter) == 0 {
-			c := bDocs.Cursor()
-			prefix := []byte("doc|" + req.Collection + "|")
-			for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-				d, err := loadDoc(v)
-				if err != nil {
-					return err
-				}
-				if d.ExpiresAt > 0 && d.ExpiresAt < time.Now().Unix() {
-					continue
-				}
-				rows = append(rows, row{*d})
-			}
-		} else {
-			ids := sortedIDs(metaFilterIDs(tx, req.Collection, filter))
-			for _, id := range ids {
-				if seen[id] {
-					continue
-				}
-				seen[id] = true
-				v := tx.Bucket([]byte("docs")).Get(storage.DocKey(req.Collection, id))
-				if v == nil {
-					continue
-				}
-				d, err := loadDoc(v)
-				if err != nil {
-					return err
-				}
-				if d.ExpiresAt > 0 && d.ExpiresAt < time.Now().Unix() {
-					continue
-				}
-				rows = append(rows, row{*d})
-			}
-		}
-		return nil
-	})
+	page, total, err := s.searchDocuments(req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit)
 	if err != nil {
 		bad(w, err)
 		return
 	}
-
-	// sort
-	switch req.Sort {
-	case "addedAt":
-		sort.Slice(rows, func(i, j int) bool {
-			if req.Asc {
-				return rows[i].Doc.AddedAt < rows[j].Doc.AddedAt
-			}
-			return rows[i].Doc.AddedAt > rows[j].Doc.AddedAt
-		})
-	case "updatedAt":
-		sort.Slice(rows, func(i, j int) bool {
-			if req.Asc {
-				return rows[i].Doc.UpdatedAt < rows[j].Doc.UpdatedAt
-			}
-			return rows[i].Doc.UpdatedAt > rows[j].Doc.UpdatedAt
-		})
-	case "key":
-		sort.Slice(rows, func(i, j int) bool {
-			if req.Asc {
-				return rows[i].Doc.Key < rows[j].Doc.Key
-			}
-			return rows[i].Doc.Key > rows[j].Doc.Key
-		})
+	if page == nil {
+		page = []storage.Doc{}
 	}
-
-	// paginate
-	start := req.Offset
-	if start > len(rows) {
-		start = len(rows)
-	}
-	end := start + req.Limit
-	if end > len(rows) {
-		end = len(rows)
-	}
-
-	out := make([]storage.Doc, 0, end-start)
-	for _, r := range rows[start:end] {
-		out = append(out, r.Doc)
-	}
-	w.Header().Set("X-Total-Count", fmt.Sprintf("%d", len(rows)))
-	ok(w, out)
+	w.Header().Set("X-Total-Count", fmt.Sprintf("%d", total))
+	ok(w, page)
 }
 
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
