@@ -49,11 +49,15 @@ func verifyTimeout() time.Duration {
 	return time.Hour
 }
 
+// currentExecutable is os.Executable; tests replace it to reach the branch
+// where this binary cannot find itself.
+var currentExecutable = os.Executable
+
 // verifyDatabase reports whether the file at path passes bbolt's integrity
 // check, run in a child process. The error carries bbolt's own description of
 // the damage.
 func verifyDatabase(path string) error {
-	exe, err := os.Executable()
+	exe, err := currentExecutable()
 	if err != nil {
 		return fmt.Errorf("cannot run the integrity check: %w", err)
 	}
