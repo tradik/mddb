@@ -14,7 +14,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -22,8 +21,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sort"
 	"time"
+
+	"mddb-bench/internal/benchkit"
 )
 
 // config is everything a run needs.
@@ -82,9 +82,9 @@ func serveAndRun(cfg config, addr string, out io.Writer) error {
 // run loads the corpus, then searches every query without feedback and with
 // one round of it in each mode.
 func run(client *http.Client, cfg config, c *corpus) ([]modeResult, error) {
-	_, _ = post(client, cfg.URL+"/v1/delete-collection", map[string]any{"collection": cfg.Collection})
+	_, _ = benchkit.Post(client, cfg.URL+"/v1/delete-collection", map[string]any{"collection": cfg.Collection})
 	for i := range c.docs {
-		if _, err := post(client, cfg.URL+"/v1/add", map[string]any{"collection": cfg.Collection,
+		if _, err := benchkit.Post(client, cfg.URL+"/v1/add", map[string]any{"collection": cfg.Collection,
 			"key": docKey(i), "lang": "en", "contentMd": docText(i)}); err != nil {
 			return nil, err
 		}
@@ -121,7 +121,7 @@ func run(client *http.Client, cfg config, c *corpus) ([]modeResult, error) {
 	}
 	out := make([]modeResult, 0, len(modes))
 	for _, m := range modes {
-		out = append(out, modeResult{Name: m, Recall: mean(recall[m]), P50: percentile(took[m], 50), P99: percentile(took[m], 99)})
+		out = append(out, modeResult{Name: m, Recall: benchkit.Mean(recall[m]), P50: benchkit.Percentile(took[m], 50), P99: benchkit.Percentile(took[m], 99)})
 	}
 	return out, nil
 }
@@ -161,7 +161,7 @@ func recallAt(keys []string, relevant map[int]bool) float64 {
 
 // search runs one vector search and returns the result keys in rank order.
 func search(client *http.Client, url string, req map[string]any) ([]string, error) {
-	raw, err := post(client, url+"/v1/vector-search", req)
+	raw, err := benchkit.Post(client, url+"/v1/vector-search", req)
 	if err != nil {
 		return nil, err
 	}
@@ -180,38 +180,6 @@ func search(client *http.Client, url string, req map[string]any) ([]string, erro
 		keys = append(keys, r.Document.Key)
 	}
 	return keys, nil
-}
-
-// post sends body as JSON and returns the response, or why it failed.
-func post(client *http.Client, url string, body any) ([]byte, error) {
-	buf, _ := json.Marshal(body)
-	resp, err := client.Post(url, "application/json", bytes.NewReader(buf)) // #nosec G107 -- the operator's own server
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("POST %s: %d %s", url, resp.StatusCode, raw)
-	}
-	return raw, nil
-}
-
-func mean(xs []float64) float64 {
-	var s float64
-	for _, x := range xs {
-		s += x
-	}
-	return s / float64(max(len(xs), 1))
-}
-
-func percentile(xs []float64, p int) float64 {
-	if len(xs) == 0 {
-		return 0
-	}
-	s := append([]float64(nil), xs...)
-	sort.Float64s(s)
-	return s[min(len(s)-1, len(s)*p/100)]
 }
 
 // report prints the results as the markdown table docs/BENCHMARK.md carries.

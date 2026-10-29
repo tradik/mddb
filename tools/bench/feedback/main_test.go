@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"mddb-bench/internal/benchkit"
 )
 
 // fakeMDDB answers the three calls the bench makes, searching exactly over
@@ -48,7 +50,9 @@ func (f *fakeMDDB) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			q[i] = float32(x.(float64))
 		}
 		keys := append([]string(nil), f.keys...)
-		sort.Slice(keys, func(i, j int) bool { return dot(q, f.c.docs[keyDoc(keys[i])]) > dot(q, f.c.docs[keyDoc(keys[j])]) })
+		sort.Slice(keys, func(i, j int) bool {
+			return benchkit.Dot(q, f.c.docs[keyDoc(keys[i])]) > benchkit.Dot(q, f.c.docs[keyDoc(keys[j])])
+		})
 		var results []map[string]any
 		for _, k := range keys[:10] {
 			results = append(results, map[string]any{"document": map[string]any{"key": k}})
@@ -134,7 +138,7 @@ func TestCorpus_EmbeddingsEndpoint(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil || len(got.Data) != 3 {
 		t.Fatalf("%v %+v", err, got)
 	}
-	if dot(got.Data[0].Embedding, c.docs[3]) < 0.999 || got.Data[1].Embedding[0] != 1 || got.Data[2].Embedding[0] != 1 {
+	if benchkit.Dot(got.Data[0].Embedding, c.docs[3]) < 0.999 || got.Data[1].Embedding[0] != 1 || got.Data[2].Embedding[0] != 1 {
 		t.Fatalf("%+v", got.Data)
 	}
 	bad, _ := srv.Client().Post(srv.URL+"/v1/embeddings", "application/json", strings.NewReader("{"))
@@ -150,7 +154,7 @@ func TestCorpus_EmbeddingsEndpoint(t *testing.T) {
 	if pos, neg := judge([]string{docKey(0), docKey(9)}, map[int]bool{0: true}); len(pos) != 1 || len(neg) != 1 {
 		t.Fatal("judge")
 	}
-	if percentile(nil, 50) != 0 || mean(nil) != 0 {
+	if benchkit.Percentile(nil, 50) != 0 || benchkit.Mean(nil) != 0 {
 		t.Fatal("empty statistics")
 	}
 }
@@ -169,5 +173,13 @@ func TestMain_RunsFromFlags(t *testing.T) {
 	main()
 	if len(f.searched) != 18 {
 		t.Fatalf("searches: %d", len(f.searched))
+	}
+}
+
+// A query whose second topic would be its own is typed towards the next one.
+func TestCorpus_SecondTopicIsNeverTheFirst(t *testing.T) {
+	c := newCorpus(1, 8, 3, 4, 1) // query 0: topic 0, and (0*7+3)%3 is 0 too
+	if len(c.queries) != 1 || len(c.queries[0].relevant) != 10 {
+		t.Fatalf("%+v", c.queries)
 	}
 }

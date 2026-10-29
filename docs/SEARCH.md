@@ -894,6 +894,11 @@ target under `plan.collections`. Without `explain` the response has no
   `cross_search`), gRPC and GraphQL `vectorSearch`, where `plan` is a
   `SearchPlan` ([GRAPHQL.md](GRAPHQL.md#vector-search-semantic-search)).
 
+Measured before and after at 2k, 200k and 2M vectors (recall@10, p50/p99,
+what `auto` picked, and a filter admitting 2%): see
+[Vector query planner](BENCHMARK.md#vector-query-planner-v2189) in
+docs/BENCHMARK.md. The bench is `tools/bench/planner`.
+
 ### API Examples
 
 ```bash
