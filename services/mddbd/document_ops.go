@@ -25,6 +25,13 @@ import (
 // per-request SaveRevision flag); all other callers pass true to preserve the
 // always-record-a-revision behaviour they have always had.
 func (s *Server) addDocument(collection, key, lang string, meta map[string][]string, contentMD string, ttl int64, saveRevision bool) (storage.Doc, bool, error) {
+	return s.addDocumentIf(collection, key, lang, meta, contentMD, ttl, saveRevision, "")
+}
+
+// addDocumentIf is addDocument made conditional (INT-021): with
+// expectedRevision set, the write succeeds only if the document is at that
+// revision — and fails if it does not exist yet. "" is unconditional.
+func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]string, contentMD string, ttl int64, saveRevision bool, expectedRevision string) (storage.Doc, bool, error) {
 	// GO-003: validate in the single write path so EVERY transport is covered.
 	// Previously only gRPC Add and HTTP handleAdd validated; MCP (DirectClient)
 	// and GraphQL went straight to addDocument with no checks, and the batch
@@ -71,6 +78,9 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 				return err
 			}
 			existing = *existingPtr
+		}
+		if err := checkRevision(&existing, expectedRevision); err != nil {
+			return err
 		}
 		added := existing.AddedAt
 		if added == 0 {

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"mddb/internal/cache"
-	"mddb/internal/sliceutil"
 	"mddb/internal/storage"
 	proto "mddb/proto"
 	"os"
@@ -158,7 +157,7 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return docToProto(&saved), nil
+	return withRevision(docToProto(&saved), docRevision(&saved)), nil
 }
 
 // AddBatch implements the AddBatch RPC - adds multiple documents in a single transaction
@@ -256,11 +255,12 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 	if found {
 		docPtr, err := unmarshalDoc(cachedData)
 		if err == nil {
+			revision := docRevision(docPtr) // of the stored text, before templating
 			// Apply template variables if needed
 			if len(req.Env) > 0 {
 				docPtr.ContentMD = applyEnv(docPtr.ContentMD, req.Env)
 			}
-			return docToProto(docPtr), nil
+			return withRevision(docToProto(docPtr), revision), nil
 		}
 	}
 
@@ -307,12 +307,13 @@ func (g *GRPCServer) Get(ctx context.Context, req *proto.GetRequest) (*proto.Doc
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	revision := docRevision(&doc) // of the stored text, before templating
 	// Apply template variables
 	if len(req.Env) > 0 {
 		doc.ContentMD = applyEnv(doc.ContentMD, req.Env)
 	}
 
-	return docToProto(&doc), nil
+	return withRevision(docToProto(&doc), revision), nil
 }
 
 // Search implements the Search RPC
@@ -339,37 +340,15 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 	var docIDs []string
 
 	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bIdx := tx.Bucket(g.server.BucketNames.IdxMeta)
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
 
-		if len(filterMeta) == 0 {
-			// No filter: scan all docs
-			c := bDocs.Cursor()
-			prefix := []byte("doc|" + req.Collection + "|")
-			for k, _ := c.Seek(prefix); k != nil && BytesHasPrefix(k, prefix); k, _ = c.Next() {
-				// Extract docID (3rd part) without string allocations
-				if docID := ExtractPart(k, 2); docID != nil {
-					docIDs = append(docIDs, string(docID))
-				}
-			}
+		// The shared index walk (SRCH-017). The copy that stood here cut the
+		// document ID out of the key as one "|"-separated part, but an ID is
+		// "<collection>|<key>|<lang>", so it never matched a document.
+		if f := filterMetaAsFilter(filterMeta); len(f) > 0 {
+			docIDs = sortedIDs(metaFilterIDs(tx, req.Collection, f))
 		} else {
-			// Filter by meta
-			sets := [][]string{}
-			for mk, mvs := range filterMeta {
-				union := []string{}
-				for _, mv := range mvs {
-					c := bIdx.Cursor()
-					prefix := storage.MetaKeyPrefix(req.Collection, mk, mv)
-					for k, _ := c.Seek(prefix); k != nil && BytesHasPrefix(k, prefix); k, _ = c.Next() {
-						// Extract docID (5th part) without string allocations
-						if docID := ExtractPart(k, 4); docID != nil {
-							union = append(union, string(docID))
-						}
-					}
-				}
-				sets = append(sets, sliceutil.Unique(union))
-			}
-			docIDs = intersect(sets...)
+			docIDs = sortedIDs(collectionDocIDs(tx, req.Collection))
 		}
 
 		// Load documents in the same transaction

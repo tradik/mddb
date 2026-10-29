@@ -112,6 +112,7 @@ type ComplexityRoot struct {
 		Key       func(childComplexity int) int
 		Lang      func(childComplexity int) int
 		Meta      func(childComplexity int) int
+		Revision  func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 	}
 
@@ -690,6 +691,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Document.Meta(childComplexity), true
+	case "Document.revision":
+		if e.ComplexityRoot.Document.Revision == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Document.Revision(childComplexity), true
 	case "Document.updatedAt":
 		if e.ComplexityRoot.Document.UpdatedAt == nil {
 			break
@@ -1980,6 +1987,8 @@ func (ec *executionContext) childFields_Document(ctx context.Context, field grap
 		return ec.fieldContext_Document_updatedAt(ctx, field)
 	case "expiresAt":
 		return ec.fieldContext_Document_expiresAt(ctx, field)
+	case "revision":
+		return ec.fieldContext_Document_revision(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Document", field.Name)
 }
@@ -4368,6 +4377,29 @@ func (ec *executionContext) _Document_expiresAt(ctx context.Context, field graph
 }
 func (ec *executionContext) fieldContext_Document_expiresAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Document", field, false, false, "Time")
+}
+
+func (ec *executionContext) _Document_revision(ctx context.Context, field graphql.CollectedField, obj *Document) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Document_revision(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Revision, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Document_revision(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Document", field, false, false, "String")
 }
 
 func (ec *executionContext) _DocumentConnection_edges(ctx context.Context, field graphql.CollectedField, obj *DocumentConnection) (ret graphql.Marshaler) {
@@ -11267,7 +11299,7 @@ func (ec *executionContext) unmarshalInputUpdateDocumentInput(ctx context.Contex
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "key", "lang", "meta", "contentMd"}
+	fieldsInOrder := [...]string{"collection", "key", "lang", "meta", "contentMd", "expectedRevision"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -11309,6 +11341,13 @@ func (ec *executionContext) unmarshalInputUpdateDocumentInput(ctx context.Contex
 				return it, err
 			}
 			it.ContentMd = data
+		case "expectedRevision":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("expectedRevision"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.ExpectedRevision = data
 		}
 	}
 	return it, nil
@@ -11935,6 +11974,11 @@ func (ec *executionContext) _Document(ctx context.Context, sel ast.SelectionSet,
 			}
 		case "expiresAt":
 			out.Values[i] = ec._Document_expiresAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "revision":
+			out.Values[i] = ec._Document_revision(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}

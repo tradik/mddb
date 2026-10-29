@@ -1544,6 +1544,31 @@ collection should be searched ([SRCH-010](../docs/SEARCH.md)) — choosing
 Filters translate equality and membership. Operator forms (`{"$gt": ...}`)
 raise rather than being dropped: a dropped condition silently widens the search.
 
+### Deep Agents filesystem backend (v2.18.8)
+
+`MddbBackend` gives a [Deep Agents](https://github.com/langchain-ai/deepagents)
+agent its virtual filesystem in an MDDB collection: `ls`, `read`, `write`,
+`edit`, `glob`, `grep` (literal, with line numbers), `delete`,
+`upload_files`, `download_files`, plus `history()` — the revisions MDDB keeps
+for every write.
+
+```python
+from deepagents.backends import CompositeBackend, StateBackend
+from langchain_mddb import MddbBackend
+
+backend = CompositeBackend(
+    default=StateBackend(),
+    routes={"/memories/": MddbBackend(collection="agent-memory")},
+)
+```
+
+`edit` writes back with the revision it read, so two subagents editing one
+file cannot lose a change: one of them gets "changed since it was read" and
+retries. Files are documents keyed by path, with `path`, `dir` and
+`dirPrefix` metadata, so a listing is one indexed query and the same files
+are searchable with `full_text_search` and `semantic_search`. Install with
+`pip install "langchain-mddb[client,deepagents]"` (Python 3.11+).
+
 **[→ Full README](../integrations/langchain-mddb/README.md)**
 
 ---

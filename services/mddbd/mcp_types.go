@@ -21,6 +21,9 @@ type MCPDocument struct {
 	// Indexing is set on a write: what indexing the document still waits
 	// for (GO-042).
 	Indexing *WriteIndexing `json:"indexing,omitempty"`
+	// Revision is set on a read or write of the whole document (INT-021):
+	// send it back as expected_revision to make the next write conditional.
+	Revision string `json:"revision,omitempty"`
 }
 
 // MCPHealth represents server health status.
@@ -56,6 +59,8 @@ type MCPAddRequest struct {
 	Meta         map[string][]string `json:"meta"`
 	ContentMD    string              `json:"content_md"`
 	SaveRevision bool                `json:"save_revision"`
+	// ExpectedRevision makes the write conditional (INT-021).
+	ExpectedRevision string `json:"expected_revision,omitempty"`
 }
 
 // MCPGetRequest represents request to get a document.
@@ -602,6 +607,8 @@ type MCPUpdateDocumentRequest struct {
 	Meta       map[string][]string `json:"meta,omitempty"`
 	ContentMD  *string             `json:"contentMd,omitempty"`
 	TTL        *int64              `json:"ttl,omitempty"`
+	// ExpectedRevision makes the update conditional (INT-021).
+	ExpectedRevision string `json:"expectedRevision,omitempty"`
 }
 
 // MCPGetDocMetaRequest represents request to get document metadata only.

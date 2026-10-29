@@ -650,7 +650,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `export_documents` | Export documents from a collection in NDJSON format. |
 | `create_backup` | Create a backup of the MDDB database. |
 | `restore_backup` | Restore the MDDB database from a backup file. |
-| `update_document` | Partially update a document. |
+| `update_document` | Partially update a document. Since v2.18.8 `expected_revision` makes it conditional: pass the `revision` from a previous read or write, and a concurrent change is reported instead of overwritten. |
 | `get_document_meta` | Get document metadata without content. |
 | `reference_search` | (v2.18.8) Search reference code — other projects indexed with `mddb-cli reference add` — hybrid, as passages. See [REFERENCE-CODING.md](REFERENCE-CODING.md). |
 | `reference_symbol` | (v2.18.8) Where reference code defines and uses a symbol. |

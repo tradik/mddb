@@ -210,6 +210,14 @@ func (g *GRPCServer) VectorStats(ctx context.Context, req *proto.VectorStatsRequ
 }
 
 // Helper: convert internal storage.Doc to proto Document
+// withRevision sets a document's revision (INT-021). Only reads and writes of
+// whole documents carry one: a search result may have had its body dropped,
+// and a revision computed from that would be wrong.
+func withRevision(d *proto.Document, revision string) *proto.Document {
+	d.Revision = revision
+	return d
+}
+
 func docToProto(doc *storage.Doc) *proto.Document {
 	protoMeta := make(map[string]*proto.MetaValues)
 	for k, v := range doc.Meta {

@@ -14,6 +14,8 @@ func (s *MCPToolServer) toolAddDocument(ctx context.Context, args map[string]int
 		Lang:       mcpGetString(args, "lang"),
 		ContentMD:  mcpGetString(args, "content_md"),
 		Meta:       mcpGetMetaMap(args, "meta"),
+
+		ExpectedRevision: mcpGetString(args, "expected_revision"),
 	}
 
 	doc, err := s.client.Add(ctx, req)
@@ -581,6 +583,7 @@ func (s *MCPToolServer) toolUpdateDocument(ctx context.Context, args map[string]
 		ttlInt := int64(ttl)
 		req.TTL = &ttlInt
 	}
+	req.ExpectedRevision = mcpGetString(args, "expected_revision")
 
 	doc, err := s.client.UpdateDocument(ctx, req)
 	if err != nil {

@@ -123,6 +123,7 @@ func (a *GraphQLAdapter) UpdateDocument(ctx context.Context, input gql.UpdateDoc
 	if input.ContentMd != nil {
 		req.ContentMD = input.ContentMd
 	}
+	req.ExpectedRevision = derefString(input.ExpectedRevision)
 	doc, err := a.mcp.UpdateDocument(ctx, req)
 	if err != nil {
 		return nil, err

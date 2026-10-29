@@ -294,10 +294,19 @@ func (s *Server) writeIndexing(saved storage.Doc) *WriteIndexing {
 	return &WriteIndexing{EmbeddingQueued: true}
 }
 
-// AddResponse is the document POST /v1/add saved, plus what indexing it is
-// still waiting for. The document's fields stay at the top level, so the
-// response is the one clients already parse with one field more.
-type AddResponse struct {
+// DocResponse is a document as a write or a read returns it, plus its
+// revision (INT-021) and, after a write, what indexing it still waits for
+// (GO-042). The document's fields stay at the top level, so the response is
+// the one clients already parse with fields added.
+type DocResponse struct {
 	storage.Doc
+	// Revision identifies this version; send it back as expectedRevision to
+	// make the next write conditional on nobody having written in between.
+	Revision string         `json:"revision,omitempty"`
 	Indexing *WriteIndexing `json:"indexing,omitempty"`
+}
+
+// docResponse wraps a document for a response.
+func docResponse(doc storage.Doc, indexing *WriteIndexing) DocResponse {
+	return DocResponse{Doc: doc, Revision: docRevision(&doc), Indexing: indexing}
 }

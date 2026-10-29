@@ -45,12 +45,12 @@ func (s *Server) handleAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	saved, _, err := s.addDocument(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, req.TTL, true)
+	saved, _, err := s.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, req.TTL, true, req.ExpectedRevision)
 	if err != nil {
-		bad(w, err)
+		writeDocWriteError(w, err)
 		return
 	}
-	ok(w, AddResponse{Doc: saved, Indexing: s.writeIndexing(saved)})
+	ok(w, docResponse(saved, s.writeIndexing(saved)))
 }
 
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -113,11 +113,13 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The revision is of the stored document, before templating changes it.
+	revision := docRevision(&doc)
 	// Templating via ENV: replace %%var%%
 	if len(req.Env) > 0 && doc.ContentMD != "" {
 		doc.ContentMD = applyEnv(doc.ContentMD, req.Env)
 	}
-	ok(w, doc)
+	ok(w, DocResponse{Doc: doc, Revision: revision})
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {

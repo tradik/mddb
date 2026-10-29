@@ -45,7 +45,7 @@ def _make_pb2() -> types.ModuleType:
     pb2 = types.ModuleType("mddb_client.mddb_pb2")
     for name in (
         "BatchDocument", "AddBatchRequest", "DeleteBatchRequest",
-        "DeleteBatchDocument", "FTSRequest", "VectorSearchRequest",
+        "DeleteDocument", "FTSRequest", "VectorSearchRequest",
         "HybridSearchRequest", "SearchAdvisorRequest",
     ):
         setattr(pb2, name, _Message)

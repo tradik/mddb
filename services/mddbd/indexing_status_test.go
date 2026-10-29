@@ -54,7 +54,7 @@ func indexingServer(t *testing.T) (*Server, *docGateEmbedding, func()) {
 	}
 }
 
-func addViaHTTP(t *testing.T, s *Server, key, content string) AddResponse {
+func addViaHTTP(t *testing.T, s *Server, key, content string) DocResponse {
 	t.Helper()
 	rec := doRequest(t, s.handleAdd, map[string]any{
 		"collection": "notes", "key": key, "lang": "en", "contentMd": content,
@@ -62,7 +62,7 @@ func addViaHTTP(t *testing.T, s *Server, key, content string) AddResponse {
 	if rec.Code != 200 {
 		t.Fatalf("add: %d %s", rec.Code, rec.Body.String())
 	}
-	var resp AddResponse
+	var resp DocResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"mddb/internal/storage"
 	"strings"
-	"time"
 
 	"mddb/internal/schema"
 
@@ -120,71 +119,17 @@ func (c *DirectClient) ValidateDocument(ctx context.Context, req *MCPValidateReq
 
 // UpdateDocument updates an existing document via the direct client.
 func (c *DirectClient) UpdateDocument(ctx context.Context, req *MCPUpdateDocumentRequest) (*MCPDocument, error) {
-	if req.Collection == "" || req.Key == "" || req.Lang == "" {
-		return nil, errors.New("missing required fields: collection, key, lang")
-	}
-
-	hasMeta := req.Meta != nil
-	hasContent := req.ContentMD != nil
-	hasTTL := req.TTL != nil
-
-	if !hasMeta && !hasContent && !hasTTL {
-		return nil, errors.New("no fields to update")
-	}
-
-	now := time.Now().Unix()
-	var saved storage.Doc
-
-	err := c.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
-		bByK := tx.Bucket([]byte("bykey"))
-		bDocs := tx.Bucket([]byte("docs"))
-
-		docIDBytes := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
-		if docIDBytes == nil {
-			return errors.New("not found")
-		}
-		v := bDocs.Get(storage.DocKey(req.Collection, string(docIDBytes)))
-		if v == nil {
-			return errors.New("not found")
-		}
-		existing, err := loadDoc(v)
-		if err != nil {
-			return err
-		}
-
-		doc := *existing
-		doc.UpdatedAt = now
-
-		if hasMeta {
-			doc.Meta = req.Meta
-		}
-		if hasContent {
-			doc.ContentMD = *req.ContentMD
-		}
-		if hasTTL {
-			if *req.TTL > 0 {
-				doc.ExpiresAt = now + *req.TTL
-			} else {
-				doc.ExpiresAt = 0
-			}
-		}
-
-		buf, err := marshalAndEncrypt(&doc, req.Collection)
-		if err != nil {
-			return err
-		}
-		if err := bDocs.Put(storage.DocKey(req.Collection, doc.ID), buf); err != nil {
-			return err
-		}
-
-		saved = doc
-		return nil
+	// The shared update (INT-021): this copy used to skip the metadata
+	// index, the revision history, the binlog and the post-write hooks.
+	saved, err := c.server.updateDocument(req.Collection, req.Key, req.Lang, DocPatch{
+		Meta: req.Meta, HasMeta: req.Meta != nil, Content: req.ContentMD, TTL: req.TTL,
+		ExpectedRevision: req.ExpectedRevision,
 	})
 	if err != nil {
 		return nil, err
 	}
-
 	result := docToMCPDocument(saved)
+	result.Revision = docRevision(&saved)
 	return &result, nil
 }
 

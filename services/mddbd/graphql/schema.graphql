@@ -27,6 +27,8 @@ type Document {
   addedAt: Time!
   updatedAt: Time!
   expiresAt: Time
+  "Identifies this version on a read or write of the whole document; send it back as expectedRevision (INT-021)."
+  revision: String
 }
 
 # Search and pagination
@@ -260,6 +262,8 @@ input UpdateDocumentInput {
   lang: String!
   meta: [MetaInput!]
   contentMd: String
+  "Update only if the document is still at this revision; otherwise a revision conflict (INT-021)."
+  expectedRevision: String
 }
 
 input SearchInput {

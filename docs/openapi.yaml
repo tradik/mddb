@@ -421,13 +421,19 @@ paths:
         "200":
           description: |
             Document added/updated successfully. Since v2.18.8 the document
-            carries `indexing` when the write queued an embedding (GO-042):
-            the document is searchable by text now, by meaning once the job
-            finishes.
+            carries `revision` (INT-021) and, when the write queued an
+            embedding, `indexing` (GO-042): searchable by text now, by meaning
+            once the job finishes.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AddResponse"
+        "409":
+          description: expectedRevision did not match; nothing was written
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionConflict"
         "400":
           description: Invalid request
           content:
@@ -4136,6 +4142,9 @@ paths:
                 ttl:
                   type: integer
                   description: "If provided, updates TTL in seconds. 0 = no expiry."
+                expectedRevision:
+                  type: string
+                  description: "(v2.18.8, INT-021) Update only if the document is at this revision (from a read or write); otherwise 409."
             examples:
               meta-only:
                 summary: Update only metadata
@@ -4154,15 +4163,21 @@ paths:
                   contentMd: "# New Content"
       responses:
         "200":
-          description: Updated document
+          description: Updated document, with its new revision
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Document"
+                $ref: "#/components/schemas/AddResponse"
         "400":
           description: Missing required fields or no fields to update
         "404":
           description: Document not found
+        "409":
+          description: expectedRevision did not match; nothing was written
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionConflict"
         "405":
           description: Method not allowed
 
@@ -6213,6 +6228,12 @@ paths:
 
 components:
   schemas:
+    RevisionConflict:
+      type: object
+      properties:
+        error: { type: string, example: revision conflict }
+        expectedRevision: { type: string }
+        currentRevision: { type: string, description: The document's revision now; empty when it does not exist. }
     PassagesResponse:
       type: object
       description: What a search returns with format "passages" (AGT-002).
@@ -6307,6 +6328,9 @@ components:
         - $ref: '#/components/schemas/Document'
         - type: object
           properties:
+            revision:
+              type: string
+              description: Identifies this version; send it back as expectedRevision (INT-021).
             indexing:
               $ref: '#/components/schemas/WriteIndexing'
     GroupBy:
@@ -6628,6 +6652,9 @@ components:
         - lang
         - contentMd
       properties:
+        expectedRevision:
+          type: string
+          description: '(v2.18.8, INT-021) Write only if the document is at this revision; 409 otherwise, including when it does not exist yet.'
         collection:
           type: string
           description: Collection name

@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
-	"mddb/internal/binlog"
 	"mddb/internal/storage"
 	proto "mddb/proto"
 	"strings"
@@ -248,120 +246,30 @@ func (g *GRPCServer) UpdateDocument(ctx context.Context, req *proto.UpdateDocume
 		return nil, status.Error(codes.InvalidArgument, "no fields to update")
 	}
 
-	// Convert proto meta
-	var newMeta map[string][]string
+	patch := DocPatch{HasMeta: req.UpdateMeta, ExpectedRevision: req.ExpectedRevision}
 	if req.UpdateMeta {
-		newMeta = make(map[string][]string)
+		patch.Meta = make(map[string][]string, len(req.Meta))
 		for k, v := range req.Meta {
-			newMeta[k] = v.Values
-		}
-		if err := g.server.SchemaManager.Validate(req.Collection, newMeta); err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			patch.Meta[k] = v.Values
 		}
 	}
-
-	now := time.Now().Unix()
-	var saved storage.Doc
-	var metaDidChange bool
-	var bo binlog.BinlogOps
-
-	err := g.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		bRev := tx.Bucket([]byte("rev"))
-		bByK := tx.Bucket([]byte("bykey"))
-
-		docIDBytes := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
-		if docIDBytes == nil {
-			return errors.New("not found")
-		}
-
-		v := bDocs.Get(storage.DocKey(req.Collection, string(docIDBytes)))
-		if v == nil {
-			return errors.New("not found")
-		}
-
-		existing, err := loadDoc(v)
-		if err != nil {
-			return err
-		}
-
-		doc := *existing
-		doc.UpdatedAt = now
-
-		if req.UpdateMeta {
-			metaDidChange = metadataChanged(doc.Meta, newMeta)
-			doc.Meta = newMeta
-		}
-		if req.UpdateContent {
-			doc.ContentMD = req.ContentMd
-		}
-		if req.UpdateTtl {
-			if req.Ttl > 0 {
-				doc.ExpiresAt = now + req.Ttl
-			} else {
-				doc.ExpiresAt = 0
-			}
-		}
-
-		buf, err := marshalAndEncrypt(&doc, req.Collection)
-		if err != nil {
-			return err
-		}
-
-		docKey := storage.DocKey(req.Collection, doc.ID)
-		if err := bDocs.Put(docKey, buf); err != nil {
-			return err
-		}
-		bo.Put("docs", docKey, buf)
-
-		if metaDidChange {
-			if existing.Meta != nil {
-				for mk, vals := range existing.Meta {
-					for _, mv := range vals {
-						mkey := append(storage.MetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-						_ = bIdx.Delete(mkey)
-						bo.Delete("idxmeta", mkey)
-					}
-				}
-			}
-			for mk, vals := range doc.Meta {
-				for _, mv := range vals {
-					mkey := append(storage.MetaKeyPrefix(req.Collection, mk, mv), []byte(doc.ID)...)
-					if err := bIdx.Put(mkey, []byte("1")); err != nil {
-						return err
-					}
-					bo.Put("idxmeta", mkey, []byte("1"))
-				}
-			}
-		}
-
-		rkey := append(storage.RevPrefix(req.Collection, doc.ID), []byte(fmt.Sprintf("%020d", now))...)
-		if err := bRev.Put(rkey, buf); err != nil {
-			return err
-		}
-		bo.Put("rev", rkey, buf)
-
-		saved = doc
-		return nil
-	})
-	if err == nil {
-		bo.FlushTo(g.server.Binlog)
+	if req.UpdateContent {
+		patch.Content = &req.ContentMd
 	}
-	if err != nil {
-		if err.Error() == "not found" {
-			return nil, status.Error(codes.NotFound, "document not found")
-		}
-		return nil, status.Error(codes.Internal, err.Error())
+	if req.UpdateTtl {
+		patch.TTL = &req.Ttl
 	}
-
-	// Post-update side effects — the same pipeline as PATCH /v1/update.
-	// GO-038: this path used to run only embedding/TTL/triggers, so the read
-	// caches kept serving the pre-update document (a gRPC Get consults them)
-	// and FTS never saw the new content.
-	g.server.runPostUpdateHooks(req.Collection, req.Key, req.Lang, saved, req.UpdateContent, req.UpdateTtl)
-
-	return docToProto(&saved), nil
+	saved, err := g.server.updateDocument(req.Collection, req.Key, req.Lang, patch)
+	var conflict *RevisionConflictError
+	switch {
+	case errors.Is(err, errDocNotFound):
+		return nil, status.Error(codes.NotFound, "document not found")
+	case errors.As(err, &conflict):
+		return nil, status.Error(codes.Aborted, conflict.Error())
+	case err != nil:
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	return withRevision(docToProto(&saved), docRevision(&saved)), nil
 }
 
 // GetDocumentMeta implements the GetDocumentMeta RPC - returns metadata only

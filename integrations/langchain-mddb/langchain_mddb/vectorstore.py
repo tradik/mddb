@@ -165,7 +165,7 @@ class MddbVectorStore(VectorStore):
             mddb_pb2.DeleteBatchRequest(
                 collection=self.collection,
                 documents=[
-                    mddb_pb2.DeleteBatchDocument(key=key, lang=self.lang) for key in ids
+                    mddb_pb2.DeleteDocument(key=key, lang=self.lang) for key in ids
                 ],
             )
         )

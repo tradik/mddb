@@ -141,6 +141,8 @@ type Document struct {
 	AddedAt   int64          `json:"addedAt"`
 	UpdatedAt int64          `json:"updatedAt"`
 	ExpiresAt *int64         `json:"expiresAt,omitempty"`
+	// Identifies this version on a read or write of the whole document; send it back as expectedRevision (INT-021).
+	Revision *string `json:"revision,omitempty"`
 }
 
 type DocumentConnection struct {
@@ -343,6 +345,8 @@ type UpdateDocumentInput struct {
 	Lang       string       `json:"lang"`
 	Meta       []*MetaInput `json:"meta,omitempty"`
 	ContentMd  *string      `json:"contentMd,omitempty"`
+	// Update only if the document is still at this revision; otherwise a revision conflict (INT-021).
+	ExpectedRevision *string `json:"expectedRevision,omitempty"`
 }
 
 type User struct {

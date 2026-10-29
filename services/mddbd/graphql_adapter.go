@@ -153,6 +153,10 @@ func mcpDocToGQL(d *MCPDocument) *gql.Document {
 	if out.ID == "" {
 		out.ID = fmt.Sprintf("%s|%s", d.Key, d.Lang)
 	}
+	if d.Revision != "" {
+		rev := d.Revision
+		out.Revision = &rev
+	}
 	return out
 }
 

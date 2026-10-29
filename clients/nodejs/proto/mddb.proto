@@ -237,6 +237,8 @@ message Document {
   int64 added_at = 6;
   int64 updated_at = 7;
   int64 expires_at = 8;
+  // (INT-021) identifies this version; send it back as expected_revision.
+  string revision = 9;
 }
 
 // MetaValues holds multiple values for a metadata key
@@ -707,6 +709,9 @@ message UpdateDocumentRequest {
   bool update_meta = 7;     // explicit flag: should meta be updated?
   bool update_content = 8;  // explicit flag: should content be updated?
   bool update_ttl = 9;      // explicit flag: should TTL be updated?
+  // (INT-021) fail with ABORTED unless the document is at this revision
+  // (Document.revision of the version the change was based on).
+  string expected_revision = 10;
 }
 
 message GetDocumentMetaRequest {

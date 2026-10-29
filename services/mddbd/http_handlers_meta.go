@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"mddb/internal/binlog"
 	"mddb/internal/storage"
 	"net/http"
 	"os"
@@ -68,6 +66,10 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	if hasTTL {
 		_ = json.Unmarshal(raw["ttl"], &newTTL)
 	}
+	var expectedRevision string
+	if v, ok := raw["expectedRevision"]; ok {
+		_ = json.Unmarshal(v, &expectedRevision)
+	}
 
 	// Auth check
 	if s.AuthManager != nil {
@@ -77,137 +79,19 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Schema validation for meta update
-	if hasMeta {
-		if err := s.SchemaManager.Validate(collection, newMeta); err != nil {
-			bad(w, err)
-			return
-		}
+	patch := DocPatch{Meta: newMeta, HasMeta: hasMeta, ExpectedRevision: expectedRevision}
+	if hasContent {
+		patch.Content = &newContent
 	}
-
-	// Load existing doc, apply partial changes, save
-	now := time.Now().Unix()
-	var saved storage.Doc
-	var bo binlog.BinlogOps
-	var metaDidChange bool
-
-	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		bRev := tx.Bucket([]byte("rev"))
-		bByK := tx.Bucket([]byte("bykey"))
-
-		// Find existing doc
-		docIDBytes := bByK.Get(storage.ByKeyKey(collection, key, lang))
-		if docIDBytes == nil {
-			return errors.New("not found")
-		}
-
-		v := bDocs.Get(storage.DocKey(collection, string(docIDBytes)))
-		if v == nil {
-			return errors.New("not found")
-		}
-
-		existing, err := loadDoc(v)
-		if err != nil {
-			return err
-		}
-
-		// Check TTL expiry
-		if existing.ExpiresAt > 0 && existing.ExpiresAt < now {
-			return errors.New("not found")
-		}
-
-		// Apply partial updates
-		doc := *existing
-		doc.UpdatedAt = now
-
-		if hasMeta {
-			metaDidChange = metadataChanged(doc.Meta, newMeta)
-			doc.Meta = newMeta
-		}
-		if hasContent {
-			doc.ContentMD = newContent
-		}
-		if hasTTL {
-			if newTTL > 0 {
-				doc.ExpiresAt = now + newTTL
-			} else {
-				doc.ExpiresAt = 0
-			}
-		}
-
-		// Persist
-		buf, err := marshalAndEncrypt(&doc, collection)
-		if err != nil {
-			return err
-		}
-
-		docKey := storage.DocKey(collection, doc.ID)
-		if err := bDocs.Put(docKey, buf); err != nil {
-			return err
-		}
-		bo.Put("docs", docKey, buf)
-
-		// Reindex metadata if changed
-		if metaDidChange {
-			// Remove old meta index entries
-			if existing.Meta != nil {
-				for mk, vals := range existing.Meta {
-					for _, mv := range vals {
-						mkey := append(storage.MetaKeyPrefix(collection, mk, mv), []byte(doc.ID)...)
-						_ = bIdx.Delete(mkey)
-						bo.Delete("idxmeta", mkey)
-					}
-				}
-			}
-			// Add new meta index entries
-			for mk, vals := range doc.Meta {
-				for _, mv := range vals {
-					mkey := append(storage.MetaKeyPrefix(collection, mk, mv), []byte(doc.ID)...)
-					if err := bIdx.Put(mkey, []byte("1")); err != nil {
-						return err
-					}
-					bo.Put("idxmeta", mkey, []byte("1"))
-				}
-			}
-		}
-
-		// Save revision
-		rkey := append(storage.RevPrefix(collection, doc.ID), []byte(fmt.Sprintf("%020d", now))...)
-		if err := bRev.Put(rkey, buf); err != nil {
-			return err
-		}
-		bo.Put("rev", rkey, buf)
-
-		if s.CollectionManager != nil {
-			if cfg, found := s.CollectionManager.Get(collection); found && cfg.MaxRevisions > 0 {
-				if err := trimRevisions(tx, &bo, collection, doc.ID, cfg.MaxRevisions); err != nil {
-					return err
-				}
-			}
-		}
-
-		saved = doc
-		return nil
-	})
-	if err == nil {
-		bo.FlushTo(s.Binlog)
+	if hasTTL {
+		patch.TTL = &newTTL
 	}
+	saved, err := s.updateDocument(collection, key, lang, patch)
 	if err != nil {
-		if err.Error() == "not found" {
-			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
-			return
-		}
-		bad(w, err)
+		writeDocWriteError(w, err)
 		return
 	}
-
-	// Post-update side effects (cache invalidation, embedding, TTL, FTS, geo,
-	// webhooks, triggers, metrics) — shared with gRPC UpdateDocument (GO-038).
-	s.runPostUpdateHooks(collection, key, lang, saved, hasContent, hasTTL)
-
-	ok(w, saved)
+	ok(w, docResponse(saved, nil))
 }
 
 func (s *Server) handleDocMeta(w http.ResponseWriter, r *http.Request) {

@@ -99,6 +99,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `reference_search`, `reference_symbol`, `reference_examples`,
   `reference_dependencies` — answer in passages. The server never clones and
   never takes a repository address. New guide: docs/REFERENCE-CODING.md.
+- **Conditional writes and a Deep Agents backend (INT-021).** Reads and
+  writes return a document `revision`; `expectedRevision` on `PATCH
+  /v1/update` and `POST /v1/add` (gRPC `expected_revision`, MCP
+  `expected_revision`, GraphQL `expectedRevision`) makes the write fail with
+  `409` (gRPC `ABORTED`) when someone else wrote in between, so two agents
+  editing one document cannot lose an edit. `langchain-mddb` gained
+  `MddbBackend`, a Deep Agents filesystem backend (ls, read, write, edit,
+  glob, grep, delete, upload, download, history) over one collection.
+
+### Fixed
+
+- **One update path for every transport.** REST, gRPC and MCP each had their
+  own document update; the MCP one (also behind GraphQL) skipped the metadata
+  index, the revision history, the binlog and the full-text and embedding
+  refresh. All four now share one implementation, which also re-extracts code
+  symbols when an update changes a code document's content.
+- **gRPC `Search` found nothing.** Its index walk cut the document ID out of
+  each key as one `|`-separated part, but an ID is `collection|key|lang`. It
+  uses the shared walk now.
+- **`MddbVectorStore.delete` used a message that does not exist**
+  (`DeleteBatchDocument`); it sends `DeleteDocument`.
 
 ### Changed
 

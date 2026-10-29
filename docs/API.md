@@ -2104,6 +2104,28 @@ Partially update a document's metadata and/or content independently without re-s
 | `meta` | object | No | New metadata (replaces all). Use `{}` to clear |
 | `contentMd` | string | No | New content (replaces existing) |
 | `ttl` | int | No | New TTL in seconds (0 = remove) |
+| `expectedRevision` | string | No | (v2.18.8) Update only if the document is still at this revision; otherwise `409 Conflict` |
+
+**Conditional writes (v2.18.8, INT-021).** `GET /v1/get`, `POST /v1/add` and
+this endpoint return the document's `revision`. Send it back as
+`expectedRevision` and the write succeeds only if nobody wrote in between;
+otherwise the response is `409 Conflict` with `currentRevision`, and nothing
+is changed. Two agents editing one file cannot silently lose an edit. Without
+`expectedRevision` writes are unconditional, as before. `POST /v1/add` takes
+`expectedRevision` too (an expectation on a document that does not exist is a
+conflict). gRPC `UpdateDocument` takes `expected_revision` and answers
+`ABORTED`; MCP `update_document` and `add_document` take `expected_revision`;
+GraphQL `updateDocument` takes `expectedRevision`.
+
+```bash
+curl -X PATCH http://localhost:11023/v1/update -d '{"collection":"notes","key":"plan.md","lang":"en",
+  "contentMd":"# Plan v2","expectedRevision":"53f8149d734342a9"}'
+# 409 {"error":"revision conflict","expectedRevision":"53f8149d734342a9","currentRevision":"9a0c..."}
+```
+
+Since v2.18.8 an update also re-extracts code symbols from new content, and
+REST, gRPC, MCP and GraphQL updates share one implementation — the MCP one
+used to skip the metadata index, revision history and full-text reindex.
 
 **Example:**
 ```bash

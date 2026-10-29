@@ -176,8 +176,12 @@ Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blo
 `GetIndexingStatus` reports queued work for a collection, or for the server
 when `collection` is empty (GO-042), as `GET /v1/indexing-status` does.
 `RetrievalProfileProto` gained `group_by_key` (9) and `group_by_per_group`
-(10), the collection's default result grouping (SRCH-016). Both are additive:
-clients built against an older proto keep working.
+(10), the collection's default result grouping (SRCH-016), and `format` (11,
+AGT-002). `Document.revision` (9) and `UpdateDocumentRequest.expected_revision`
+(10) make updates conditional (INT-021): a stale revision is `ABORTED`.
+`CodeConfigProto.role` (2) marks reference collections (AGT-003). All are
+additive: clients built against an older proto keep working. `Search` also
+finds documents again — its index walk cut document IDs wrongly.
 
 ### New in v2.9.12
 

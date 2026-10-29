@@ -69,12 +69,13 @@ func (c *DirectClient) Stats(ctx context.Context) (*MCPStats, error) {
 
 // Add creates a new document via the direct client.
 func (c *DirectClient) Add(ctx context.Context, req *MCPAddRequest) (*MCPDocument, error) {
-	saved, _, err := c.server.addDocument(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, 0, true)
+	saved, _, err := c.server.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, 0, true, req.ExpectedRevision)
 	if err != nil {
 		return nil, err
 	}
 	doc := docToMCPDocument(saved)
 	doc.Indexing = c.server.writeIndexing(saved)
+	doc.Revision = docRevision(&saved)
 	return &doc, nil
 }
 
@@ -197,6 +198,7 @@ func (c *DirectClient) Get(ctx context.Context, req *MCPGetRequest) (*MCPDocumen
 	}
 
 	result := docToMCPDocument(doc)
+	result.Revision = docRevision(&doc)
 	return &result, nil
 }
 

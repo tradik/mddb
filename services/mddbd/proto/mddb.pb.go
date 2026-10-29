@@ -23,15 +23,17 @@ const (
 
 // Document represents a markdown document
 type Document struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
-	Lang          string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
-	Meta          map[string]*MetaValues `protobuf:"bytes,4,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ContentMd     string                 `protobuf:"bytes,5,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
-	AddedAt       int64                  `protobuf:"varint,6,opt,name=added_at,json=addedAt,proto3" json:"added_at,omitempty"`
-	UpdatedAt     int64                  `protobuf:"varint,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	ExpiresAt     int64                  `protobuf:"varint,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	Id        string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Key       string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Lang      string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
+	Meta      map[string]*MetaValues `protobuf:"bytes,4,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ContentMd string                 `protobuf:"bytes,5,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
+	AddedAt   int64                  `protobuf:"varint,6,opt,name=added_at,json=addedAt,proto3" json:"added_at,omitempty"`
+	UpdatedAt int64                  `protobuf:"varint,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	ExpiresAt int64                  `protobuf:"varint,8,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	// (INT-021) identifies this version; send it back as expected_revision.
+	Revision      string `protobuf:"bytes,9,opt,name=revision,proto3" json:"revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -120,6 +122,13 @@ func (x *Document) GetExpiresAt() int64 {
 		return x.ExpiresAt
 	}
 	return 0
+}
+
+func (x *Document) GetRevision() string {
+	if x != nil {
+		return x.Revision
+	}
+	return ""
 }
 
 // MetaValues holds multiple values for a metadata key
@@ -4161,8 +4170,11 @@ type UpdateDocumentRequest struct {
 	UpdateMeta    bool                   `protobuf:"varint,7,opt,name=update_meta,json=updateMeta,proto3" json:"update_meta,omitempty"`          // explicit flag: should meta be updated?
 	UpdateContent bool                   `protobuf:"varint,8,opt,name=update_content,json=updateContent,proto3" json:"update_content,omitempty"` // explicit flag: should content be updated?
 	UpdateTtl     bool                   `protobuf:"varint,9,opt,name=update_ttl,json=updateTtl,proto3" json:"update_ttl,omitempty"`             // explicit flag: should TTL be updated?
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// (INT-021) fail with ABORTED unless the document is at this revision
+	// (Document.revision of the version the change was based on).
+	ExpectedRevision string `protobuf:"bytes,10,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *UpdateDocumentRequest) Reset() {
@@ -4256,6 +4268,13 @@ func (x *UpdateDocumentRequest) GetUpdateTtl() bool {
 		return x.UpdateTtl
 	}
 	return false
+}
+
+func (x *UpdateDocumentRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
+	}
+	return ""
 }
 
 type GetDocumentMetaRequest struct {
@@ -12312,7 +12331,7 @@ var File_mddb_proto protoreflect.FileDescriptor
 const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"mddb.proto\x12\x04mddb\"\xb1\x02\n" +
+	"mddb.proto\x12\x04mddb\"\xcd\x02\n" +
 	"\bDocument\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
@@ -12324,7 +12343,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\a \x01(\x03R\tupdatedAt\x12\x1d\n" +
 	"\n" +
-	"expires_at\x18\b \x01(\x03R\texpiresAt\x1aI\n" +
+	"expires_at\x18\b \x01(\x03R\texpiresAt\x12\x1a\n" +
+	"\brevision\x18\t \x01(\tR\brevision\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"$\n" +
@@ -12720,7 +12740,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x18ValidateDocumentResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x16\n" +
 	"\x06errors\x18\x02 \x03(\tR\x06errors\x12\x1a\n" +
-	"\bwarnings\x18\x03 \x03(\tR\bwarnings\"\xfb\x02\n" +
+	"\bwarnings\x18\x03 \x03(\tR\bwarnings\"\xa8\x03\n" +
 	"\x15UpdateDocumentRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -12735,7 +12755,9 @@ const file_mddb_proto_rawDesc = "" +
 	"updateMeta\x12%\n" +
 	"\x0eupdate_content\x18\b \x01(\bR\rupdateContent\x12\x1d\n" +
 	"\n" +
-	"update_ttl\x18\t \x01(\bR\tupdateTtl\x1aI\n" +
+	"update_ttl\x18\t \x01(\bR\tupdateTtl\x12+\n" +
+	"\x11expected_revision\x18\n" +
+	" \x01(\tR\x10expectedRevision\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"^\n" +

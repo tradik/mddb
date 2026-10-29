@@ -24,6 +24,7 @@ var notTools = map[string]bool{
 	"highlight": true, "limit": true, "fields": true, "alpha": true,
 	"chunk": true, "window": true, "parent": true, "key": true,
 	"meta.title": true, "true": true, "false": true,
+	"expected_revision": true, "revision": true, // update_document arguments (INT-021)
 }
 
 func TestAgentInstructionsNameRealTools(t *testing.T) {

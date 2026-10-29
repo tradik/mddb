@@ -97,6 +97,35 @@ MDDB addresses documents by `(collection, key, lang)`, so `ids` are used as
 keys. Without them the store derives a key from the text, so re-running an
 ingest script updates the same documents instead of doubling the collection.
 
+## Deep Agents backend
+
+`MddbBackend` (extra `deepagents`, Python 3.11+) implements Deep Agents'
+`BackendProtocol` over one collection:
+
+```python
+from deepagents.backends import CompositeBackend, StateBackend
+from langchain_mddb import MddbBackend
+
+backend = CompositeBackend(
+    default=StateBackend(),
+    routes={"/memories/": MddbBackend(collection="agent-memory", address="localhost:11024")},
+)
+```
+
+| Protocol | MDDB |
+|---|---|
+| `write` | `Add`, key = path without the leading `/`, meta `path`, `dir`, `dirPrefix` |
+| `read(offset, limit)` | `Get`, sliced by lines |
+| `edit` | `Get`, then `UpdateDocument` with `expected_revision`: a concurrent edit returns an error instead of being overwritten |
+| `ls`, `glob` | `Search` with `dirPrefix` (an indexed equality filter), glob matched here |
+| `grep` | literal substring over every file under the path, at most 1000 matches |
+| `delete` | `DeleteBatch` of the file and everything under it |
+| `upload_files` / `download_files` | text as is, other bytes base64 with `meta.encoding` |
+| `history(path)` | `ListRevisions` — every earlier version |
+
+Paths must be absolute; a path with `..` is refused in the result's `error`,
+never sent to the server.
+
 ## Development
 
 ```bash

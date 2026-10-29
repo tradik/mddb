@@ -127,6 +127,9 @@ Record decisions and constraints, not transcripts.
 - `add_document` for one document; `bulk_ingest_submit` for many. The bulk path
   is asynchronous — poll `bulk_ingest_status`, or subscribe to the job's events
   and wait rather than poll.
+- When several agents may edit the same document, pass the `revision` you read
+  as `expected_revision` to `update_document`. A conflict means someone else
+  wrote first: read again and redo the change, never retry blindly.
 - Metadata is flat: `map[string][]string`. Nested structure does not survive —
   JSON-encode it into a single value if you must keep it.
 - Full-text and metadata indexing follow the write before it returns, so

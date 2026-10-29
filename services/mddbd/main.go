@@ -186,6 +186,9 @@ type AddRequest struct {
 	Meta       map[string][]string `json:"meta"`
 	ContentMD  string              `json:"contentMd"`
 	TTL        int64               `json:"ttl,omitempty"` // seconds; 0 = no expiry
+	// ExpectedRevision makes the write conditional (INT-021): 409 unless
+	// the document is at this revision. Empty = unconditional.
+	ExpectedRevision string `json:"expectedRevision,omitempty"`
 }
 
 // GetRequest is the HTTP request body for retrieving a document.
