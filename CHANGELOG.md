@@ -308,6 +308,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Late-interaction scoring measured and not adopted (SRCH-004).** A new
+  tool, `tools/bench/maxsim`, compared today's best-chunk scoring with
+  MaxSim over the existing chunks. It used `nomic-embed-text`, the 60 pages
+  of `docs/`, and bootstrap confidence intervals.
+  - **Plain questions:** MaxSim changes nothing measurable.
+  - **Questions that join two topics:** it loses 0.12 nDCG@10. It favours
+    a page halfway between the topics over the two pages that each answer
+    one.
+  - **No server change.** None of the supported providers returns
+    per-token vectors, and per-token storage would be ×7.8 even with SQ4.
+  - **What did help two-topic questions** was splitting the query and
+    keeping each document's best-matching part: +0.05 nDCG@10. It is
+    tracked separately.
+
+  The numbers are in docs/BENCHMARK.md.
+
 - **SonarCloud can run through the sonar-scanner (OPS-021).** Automatic
   Analysis ignores `sonar.issue.ignore.*`, so none of the per-rule exceptions
   in `sonar-project.properties` ever applied. `.github/workflows/sonarcloud.yml`
