@@ -116,6 +116,11 @@ func newBareProvider() Provider {
 		dims := envconf.Int("MDDB_EMBEDDING_DIMENSIONS", 1024)
 		return NewCohereProvider(apiKey, apiURL, model, dims)
 
+	case ProviderLexical:
+		// SRCH-014: hashed words and n-grams — no network, no model. Chosen
+		// only here, by name; autodetection never picks it.
+		return NewLexicalProvider(LexicalDimensionsFromEnv())
+
 	default:
 		slog.Warn("unknown MDDB_EMBEDDING_PROVIDER, embedding disabled", "provider", provider) // #nosec G706 -- internal log
 		return nil

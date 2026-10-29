@@ -26,6 +26,19 @@ type EmbeddingConfig struct {
 	CreatedAt  int64  `json:"createdAt"`  // creation timestamp
 }
 
+// validEmbeddingProviders are the providers a stored configuration may name.
+// "lexical" (SRCH-014) needs no key or URL, and is never chosen unless named.
+var validEmbeddingProviders = map[string]bool{
+	"openai":                  true,
+	"ollama":                  true,
+	"cohere":                  true,
+	"voyage":                  true,
+	embedding.ProviderLexical: true,
+}
+
+// invalidEmbeddingProvider is the answer to a configuration naming any other.
+const invalidEmbeddingProvider = "provider must be 'openai', 'ollama', 'cohere', 'voyage' or 'lexical'"
+
 // SaveEmbeddingConfig saves an embedding configuration to the database.
 //
 // SEC-013: apiUrl is validated here rather than in each handler, because every
@@ -245,14 +258,8 @@ func (s *Server) handleCreateEmbeddingConfig(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	validProviders := map[string]bool{
-		"openai": true,
-		"ollama": true,
-		"cohere": true,
-		"voyage": true,
-	}
-	if !validProviders[config.Provider] {
-		http.Error(w, "provider must be 'openai', 'ollama', 'cohere', or 'voyage'", http.StatusBadRequest)
+	if !validEmbeddingProviders[config.Provider] {
+		http.Error(w, invalidEmbeddingProvider, http.StatusBadRequest)
 		return
 	}
 
@@ -307,14 +314,8 @@ func (s *Server) handleUpdateEmbeddingConfig(w http.ResponseWriter, r *http.Requ
 	config.ID = id // Ensure ID matches path
 
 	// Validate
-	validProviders := map[string]bool{
-		"openai": true,
-		"ollama": true,
-		"cohere": true,
-		"voyage": true,
-	}
-	if !validProviders[config.Provider] {
-		http.Error(w, "provider must be 'openai', 'ollama', 'cohere', or 'voyage'", http.StatusBadRequest)
+	if !validEmbeddingProviders[config.Provider] {
+		http.Error(w, invalidEmbeddingProvider, http.StatusBadRequest)
 		return
 	}
 
@@ -431,6 +432,8 @@ func (s *Server) InitializeEmbeddingFromConfig(config *EmbeddingConfig) {
 		emb = embedding.NewCohereProvider(config.APIKey, config.APIURL, config.Model, config.Dimensions)
 	case "voyage":
 		emb = embedding.NewVoyageProvider(config.APIKey, config.APIURL, config.Model, config.Dimensions)
+	case embedding.ProviderLexical:
+		emb = embedding.NewLexicalProvider(config.Dimensions)
 	default:
 		return
 	}

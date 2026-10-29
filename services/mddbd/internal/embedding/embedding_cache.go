@@ -255,3 +255,10 @@ func copyVector(v []float32) []float32 {
 func (c *CachingProvider) DocumentVariant() string {
 	return DocumentVariantOf(c.inner)
 }
+
+// Semantic passes the wrapped provider's answer through, for the same reason
+// DocumentVariant does: a cache must not turn the lexical provider into one
+// that claims to understand meaning.
+func (c *CachingProvider) Semantic() bool {
+	return IsSemantic(c.inner)
+}

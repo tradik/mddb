@@ -51,7 +51,7 @@ Complete list of MDDB features organized by category.
 
 #### Vector Search (Semantic)
 - **Auto-embeddings** - Documents embedded automatically in background
-- **Multiple Providers** - OpenAI, Cohere, Voyage AI, Ollama
+- **Multiple Providers** - OpenAI, Cohere, Voyage AI, Ollama, plus `lexical` (hashed n-grams, no model — for CI and offline; matches spelling, not meaning)
 - **Similarity Search** - Find documents by meaning, not keywords
 - **Multiple Algorithms** - Flat (exact), HNSW (approximate), IVF (clustered), PQ (compressed), SQ (scalar quantized), BQ (binary quantized)
 - **Query-time Algorithm Selection** - Choose algorithm per request via `algorithm` parameter
@@ -449,7 +449,7 @@ Enable with `MDDB_EXTREME=true`:
 - `MDDB_GRAPHQL_ENABLED` - Enable GraphQL endpoint
 - `MDDB_GRAPHQL_PLAYGROUND` - Enable GraphQL Playground
 - `MDDB_METRICS` - Enable Prometheus metrics
-- `MDDB_EMBEDDING_PROVIDER` - openai, cohere, voyage, ollama
+- `MDDB_EMBEDDING_PROVIDER` - openai, cohere, voyage, ollama, lexical
 - `MDDB_EMBEDDING_API_KEY` - API key for embedding provider
 - `MDDB_EMBEDDING_MODEL` - Model name
 - `MDDB_EMBEDDING_DIMENSIONS` - Vector dimensions

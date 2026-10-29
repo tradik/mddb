@@ -159,6 +159,14 @@ export default function ConfigPanel() {
                 <span className="text-sm text-gray-600">Model</span>
                 <span className="text-sm font-medium text-gray-900">{config.vectorConfig.model}</span>
               </div>
+              {config.vectorConfig.semantic !== undefined && (
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-sm text-gray-600">Matches by meaning</span>
+                  <span className="text-sm font-medium text-gray-900">
+                    {config.vectorConfig.semantic ? 'Yes' : 'No — shared spelling only (semantic: false)'}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between py-2 border-b">
                 <span className="text-sm text-gray-600">Dimensions</span>
                 <span className="text-sm font-medium text-gray-900">{config.vectorConfig.dimensions}</span>

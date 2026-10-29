@@ -376,7 +376,7 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_EMBEDDING_PROVIDER` | `""` (disabled) | string | Provider: `"openai"`, `"ollama"`, `"voyage"`, `"cohere"`, or `""`. When empty and nothing is stored, MDDB probes a local Ollama once at startup — see `MDDB_EMBEDDING_AUTODETECT` |
+| `MDDB_EMBEDDING_PROVIDER` | `""` (disabled) | string | Provider: `"openai"`, `"ollama"`, `"voyage"`, `"cohere"`, `"lexical"` (v2.18.9+: hashed words and n-grams, no model, no network, does not match by meaning — see [EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#5-lexical-no-model-no-network--v2189); never autodetected), or `""`. When empty and nothing is stored, MDDB probes a local Ollama once at startup — see `MDDB_EMBEDDING_AUTODETECT` |
 | `MDDB_UPDATE_CHECK` | `"1"` | bool | Set to `0` to skip the startup release check. One GET to a pinned GitHub URL, carrying nothing about this installation; the answer is cached in `/health` |
 | `MDDB_EMBEDDING_AUTODETECT` | `"1"` | bool | Set to `0` to skip the startup probe for a local Ollama. The probe is one `GET localhost:11434/api/tags` with a two-second budget, and only runs when no provider is configured |
 | `OLLAMA_HOST` | `http://localhost:11434` | string | Where the autodetection probe looks. Accepted with or without a scheme |
@@ -400,6 +400,13 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 | `ollama` | `http://localhost:11434` | `nomic-embed-text` | `768` |
 | `voyage` | `https://api.voyageai.com/v1` | `voyage-3` | `1024` |
 | `cohere` | `https://api.cohere.ai/v1` | `embed-english-v3.0` | `1024` |
+| `lexical` | — (no network) | `lexical-ngram-v1` (fixed) | `512`, clamped to `256`–`2048` |
+
+`GET /config` reports `vectorConfig.semantic`: `true` for every model-backed
+provider, `false` for `lexical`, whose vectors match shared spelling rather
+than meaning. The search advisor (`/v1/search-advisor`) reports the same in
+`profile.semantic` and recommends keyword search for lexical collections
+unless the collection's own evaluation set measures hybrid better.
 
 ---
 

@@ -194,6 +194,22 @@ MDDB_MODE="read" MDDB_ADDR=":11024" ./mddbd
 MDDB_ADDR=":8080" MDDB_PATH="/data/mddb.db" ./mddbd
 ```
 
+### Vector Search in CI or Offline, Without a Model
+
+For search by meaning, configure an embedding model — a local Ollama with
+`nomic-embed-text` is picked up automatically
+([Embedding Providers](EMBEDDING_PROVIDERS.md)). When no model can run — a CI
+job, an air-gapped test box — the `lexical` provider keeps the vector and
+hybrid endpoints working with hashed words and n-grams:
+
+```bash
+MDDB_EMBEDDING_PROVIDER=lexical ./mddbd
+```
+
+It is not the default and not a substitute for a model: it matches shared
+spelling, not meaning, and on the MDDB docs it ranked no better than plain
+keyword search. See [when it makes sense](EMBEDDING_PROVIDERS.md#when-lexical-makes-sense--and-when-it-does-not).
+
 ## Testing the Installation
 
 ```bash

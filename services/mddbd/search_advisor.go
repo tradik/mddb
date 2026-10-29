@@ -7,6 +7,7 @@ import (
 
 	bolt "go.etcd.io/bbolt"
 
+	"mddb/internal/embedding"
 	"mddb/internal/storage"
 )
 
@@ -84,6 +85,10 @@ type CollectionProfile struct {
 	// Sampled reports how many documents were actually read. A recommendation
 	// from a sample should say so.
 	Sampled int `json:"sampled"`
+
+	// Semantic says whether the collection's vectors encode meaning; absent
+	// when nothing is embedded. False for the lexical provider (SRCH-014).
+	Semantic *bool `json:"semantic,omitempty"`
 }
 
 // SearchRecommendation is the advice, with the reasons for it.
@@ -253,6 +258,8 @@ func (s *Server) profileVectors(collection string, p *CollectionProfile) {
 	}
 	if s.Embedding != nil {
 		p.VectorDimensions = s.Embedding.Dimensions()
+		semantic := embedding.IsSemantic(s.Embedding)
+		p.Semantic = &semantic
 	}
 	if p.VectorDimensions > 0 {
 		p.EstimatedVectorBytes = int64(p.EmbeddedDocuments) * int64(p.VectorDimensions) * 4
@@ -286,6 +293,9 @@ func buildRecommendation(p *CollectionProfile, embeddingConfigured bool) *Search
 			"An embedding provider is configured but this collection has no vectors. Run a vector reindex to make hybrid search possible.")
 		r.Reasons = append(r.Reasons,
 			"Keyword search for now: the provider is configured but nothing in this collection is embedded yet.")
+	case p.Semantic != nil && !*p.Semantic:
+		r.SearchType = "fts"
+		r.Reasons = append(r.Reasons, lexicalAdvice)
 	case coverage < 0.8:
 		r.SearchType = "hybrid"
 		r.Warnings = append(r.Warnings, fmt.Sprintf(
@@ -324,7 +334,7 @@ func buildRecommendation(p *CollectionProfile, embeddingConfigured bool) *Search
 
 	// --- vector index ---
 
-	if embedded {
+	if embedded && r.SearchType != "fts" {
 		const gib = 1 << 30
 		switch {
 		case p.EstimatedVectorBytes > gib:

@@ -9397,6 +9397,13 @@ components:
         estimatedVectorBytes:
           type: integer
           format: int64
+        semantic:
+          type: boolean
+          description: >-
+            Whether the collection's vectors encode meaning (v2.18.9+); absent
+            when nothing is embedded. False for the `lexical` provider, and the
+            advisor then recommends keyword search unless the collection's own
+            evaluation set measures hybrid better.
 
     FusionSignals:
       type: object
@@ -9640,8 +9647,11 @@ components:
           example: OpenAI Small
         provider:
           type: string
-          enum: [ openai, ollama, cohere, voyage ]
-          description: Embedding provider
+          enum: [ openai, ollama, cohere, voyage, lexical ]
+          description: >-
+            Embedding provider. `lexical` (v2.18.9+) needs no key or URL; its
+            vectors are hashed words and n-grams and do not encode meaning,
+            `model` is ignored and `dimensions` is clamped to 256–2048.
           example: openai
         model:
           type: string
@@ -9871,6 +9881,19 @@ components:
             apiUrl:
               type: string
               example: https://api.openai.com/v1
+            semantic:
+              type: boolean
+              description: >-
+                Whether the vectors encode meaning (v2.18.9+). False only for
+                the `lexical` provider, whose vectors are hashed words and
+                character n-grams: vector search then matches shared spelling,
+                not meaning.
+              example: true
+            source:
+              type: string
+              description: Where the configuration came from
+              enum: [environment, stored, autodetected]
+              example: environment
         chunkConfig:
           type: object
           description: Document chunking configuration

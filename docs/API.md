@@ -111,7 +111,7 @@ The server can be configured using environment variables:
 | `MDDB_ADDR` | `:11023` | Server address and port |
 | `MDDB_MODE` | `wr` | Access mode: `read`, `write`, or `wr` (read+write). Also: `--mode` flag, `database.mode` in YAML |
 | `MDDB_PATH` | `mddb.db` | Path to the BoltDB database file. Also: `--db` flag, `database.path` in YAML |
-| `MDDB_EMBEDDING_PROVIDER` | `none` | Embedding provider: `openai`, `ollama`, `voyage`, or `none` |
+| `MDDB_EMBEDDING_PROVIDER` | `none` | Embedding provider: `openai`, `ollama`, `voyage`, `cohere`, `lexical` (no model, not meaning-aware), or `none` |
 | `MDDB_EMBEDDING_API_KEY` | | API key for OpenAI or Voyage AI |
 | `MDDB_EMBEDDING_API_URL` | *(per provider)* | API base URL (see [Vector Search](#vector-search-configuration)) |
 | `MDDB_EMBEDDING_MODEL` | *(per provider)* | Embedding model name |
@@ -941,6 +941,7 @@ curl http://localhost:11023/v1/vector-stats
 | OpenAI | `openai` | `text-embedding-3-small` | 1536 | Yes |
 | Voyage AI (Anthropic) | `voyage` | `voyage-3` | 1024 | Yes |
 | Ollama (local) | `ollama` | `nomic-embed-text` | 768 | No |
+| Lexical (no model; matches spelling, not meaning — [details](EMBEDDING_PROVIDERS.md#5-lexical-no-model-no-network--v2189)) | `lexical` | `lexical-ngram-v1` | 512 (256–2048) | No |
 | Disabled | `none` or empty | - | - | - |
 
 #### Provider-Specific Configuration

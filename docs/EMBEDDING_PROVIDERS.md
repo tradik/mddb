@@ -1,7 +1,7 @@
 ---
 title: "Embedding Providers Guide"
 slug: "docs/embedding-providers"
-description: "Configure embedding providers for MDDB vector search - OpenAI, Ollama, Cohere and Voyage - through environment variables or the admin panel."
+description: "Configure embedding providers for MDDB vector search - OpenAI, Ollama, Cohere, Voyage and the model-free lexical provider - through environment variables or the admin panel."
 status: publish
 ---
 
@@ -176,6 +176,100 @@ export MDDB_EMBEDDING_MODEL=nomic-embed-text
 export MDDB_EMBEDDING_DIMENSIONS=768
 ```
 
+### 5. Lexical (no model, no network) — v2.18.9+
+
+> **This provider does not understand meaning.** Its vectors are hashed
+> words and word fragments. Two texts are close when they share spelling:
+> "car" and "automobile" are as far apart as any two unrelated words. It does
+> not replace a model and must not be described as if it did. `GET /config`
+> marks it as such (see `vectorConfig` in [config.md](config.md)), and the
+> search advisor recommends keyword search for its collections.
+
+**API URL:** none — nothing is called
+**Authentication:** none
+**Model name reported:** `lexical-ngram-v1`
+
+#### What it does
+
+Every word, and every character n-gram of length 3 to 5 of the word wrapped
+in boundary markers (`<deploy>` gives `<de`, `dep`, `epl`, …), is hashed into
+one of D dimensions. A second hash gives the sign, so collisions cancel out
+on average. Weights are `1 + ln(count)`, so a repeated word does not drown
+the rest, and each vector is L2-normalised. Pure Go, no download, no GPU. The
+same text gives the same vector on every machine and every run.
+
+The n-grams give typo tolerance: `replicaton` still lands near `replication`.
+That is the only ranking gain to expect, and on the documentation set below
+it was too small to measure reliably.
+
+#### Environment Variables
+
+```bash
+export MDDB_EMBEDDING_PROVIDER=lexical
+export MDDB_EMBEDDING_DIMENSIONS=512   # 256–2048, default 512; values outside are clamped
+```
+
+It is never chosen automatically. Precedence is unchanged: a stored
+configuration, then `MDDB_EMBEDDING_PROVIDER`, then Ollama autodetection —
+and autodetection only ever picks a model. To use `lexical` you name it. In a
+stored configuration (`POST /v1/embedding-configs`) use `"provider":
+"lexical"`; `model` is required by the endpoint but ignored, and
+`dimensions` is clamped to 256–2048.
+
+#### Measured: MDDB docs evaluation set
+
+The 20 questions of
+[`tools/bench/evalsets/docs.json`](https://github.com/tradik/mddb/blob/main/tools/bench/evalsets/docs.json)
+against the 60 pages of `docs/`, keyed by file name, measured 2026-10-29 on
+a server built from this release. The method is the one in
+[BENCHMARK.md](BENCHMARK.md#retrieval-quality-on-the-mddb-docs-v2188); hybrid
+is the default fusion (alpha 0.5).
+
+```bash
+MDDB_EMBEDDING_PROVIDER=lexical mddbd &
+# load docs/*.md into collection "docs", key = file name, then:
+mddb-cli eval docs --queries tools/bench/evalsets/docs.json \
+  --config fts/bm25 --config vector --config hybrid
+```
+
+| Configuration | recall@10 | nDCG@10 | MRR | p50 ms |
+|---------------|-----------|---------|-----|--------|
+| fts/bm25 | 0.825 | 0.719 | 0.698 | 0.8 |
+| vector, lexical 512 | 0.775 | 0.649 | 0.644 | 1.2 |
+| hybrid, lexical 512 | 0.875 | 0.726 | 0.686 | 1.4 |
+| hybrid, lexical 256 | 0.900 | 0.724 | 0.681 | 1.2 |
+| hybrid, lexical 2048 | 0.825 | 0.715 | 0.682 | 2.1 |
+| vector, `nomic-embed-text` (Ollama) | 0.875 | 0.758 | 0.750 | 12.0 |
+| hybrid, `nomic-embed-text` (Ollama) | 0.875 | 0.782 | 0.764 | 1.5 |
+
+- **Lexical vectors alone rank worse than BM25.** They measure the same
+  thing — shared words — with less precision.
+- **Hybrid with lexical vectors finds one more answer in twenty and ranks no
+  better.** nDCG moves by 0.007 and MRR drops. On a twenty-query set one
+  query is noise, so this is not a measured gain. More dimensions did not
+  help.
+- **A model is a different thing.** `nomic-embed-text` lifts nDCG by 0.06 and
+  MRR by 0.07 over BM25, because it matches questions to pages that use
+  other words.
+
+So the search advisor recommends `fts` (bm25) for a collection with lexical
+vectors and says why. A collection with its own evaluation set is measured
+instead, and hybrid wins the advice there only if it scores better.
+
+#### When lexical makes sense — and when it does not
+
+| Makes sense | Does not |
+|---|---|
+| CI and tests that must run vector, hybrid, cross-collection, `retrievalMode: graph`, MMR, quantization or HNSW without a network | Finding documents that answer a question in different words — use a model |
+| Air-gapped or very small installs where no model can run, and the vector pipeline still has to work | Improving ranking over BM25 — the measurement above shows no gain |
+| Demos and laptops without Ollama | Multilingual matching — words in two languages share no spelling |
+| Reproducible vectors: the same on every machine, replica and run | Classification by meaning (zero-shot labels) — labels match by spelling only |
+| Typo-tolerant lookups of names and identifiers | Any place a reader would assume the search understands the query |
+
+Switching from `lexical` to a model later is the same as any provider
+change: the vectors are not comparable, so re-embed every collection with
+`POST /v1/vector-reindex` and `"force": true`.
+
 ---
 
 ## Configuration Methods
@@ -228,6 +322,7 @@ If you're using environment variables and want to migrate to database config:
 | **Cohere** | $$ | Excellent | Fast | **Best** | No | Yes |
 | **Voyage** | $$ | Excellent | Fast | Good | No | Yes |
 | **Ollama** | **Free** | Good | **Fastest** | Fair | **Yes** | No |
+| **Lexical** | **Free** | Spelling only, no meaning | **Fastest** | No | **Yes** | No |
 
 ---
 
@@ -257,6 +352,11 @@ If you're using environment variables and want to migrate to database config:
 - ✅ You need to work **offline**
 - ✅ You have sufficient local compute resources
 - ✅ You prefer open-source solutions
+
+### Use **Lexical** if:
+- ✅ CI, tests or an air-gapped install need the vector pipeline to work with no model
+- ✅ You need identical vectors on every machine
+- ❌ Not to find documents by meaning, and not to improve ranking over BM25
 
 ---
 

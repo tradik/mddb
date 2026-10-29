@@ -311,6 +311,10 @@ function EmbeddingConfigModal({ config, onClose, onSave }) {
         if (!model) setModel('voyage-3');
         if (!dimensions) setDimensions('1024');
         if (!apiUrl) setApiUrl('https://api.voyageai.com/v1');
+      } else if (provider === 'lexical') {
+        // No model and no network: hashed words and n-grams (SRCH-014).
+        if (!model) setModel('lexical-ngram-v1');
+        if (!dimensions) setDimensions('512');
       }
     }
   }, [provider, isEdit]);
@@ -404,7 +408,14 @@ function EmbeddingConfigModal({ config, onClose, onSave }) {
                 <option value="ollama">Ollama (Local)</option>
                 <option value="cohere">Cohere</option>
                 <option value="voyage">Voyage AI</option>
+                <option value="lexical">Lexical (no model, spelling only)</option>
               </select>
+              {provider === 'lexical' && (
+                <p className="text-xs text-gray-700 mt-1" role="note">
+                  Lexical vectors match shared words and word fragments, not meaning. Use it for CI or
+                  offline installs; configure a model for search by meaning. Dimensions: 256–2048.
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -472,7 +483,8 @@ function EmbeddingConfigModal({ config, onClose, onSave }) {
               </div>
             )}
 
-            {/* API URL - required for Ollama, optional for others */}
+            {/* API URL - required for Ollama, optional for others, none for lexical */}
+            {provider !== 'lexical' && (
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 API URL {provider === 'ollama' && <span className="text-red-600">*</span>}
@@ -495,6 +507,7 @@ function EmbeddingConfigModal({ config, onClose, onSave }) {
                 {provider === 'ollama' ? 'Ollama server URL' : 'Optional: Leave empty to use default'}
               </p>
             </div>
+            )}
 
             <div className="mb-4 flex items-center">
               <input

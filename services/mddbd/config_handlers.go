@@ -3,7 +3,6 @@ package main
 import (
 	"mddb/internal/envconf"
 	"net/http"
-	"os"
 
 	json "mddb/internal/jsonx"
 )
@@ -81,20 +80,6 @@ type HTTP3ProtocolStatus struct {
 	Addr    string `json:"addr"`
 }
 
-// VectorConfig holds the vector/embedding configuration settings.
-type VectorConfig struct {
-	Enabled    bool   `json:"enabled"`
-	Provider   string `json:"provider"`
-	Model      string `json:"model"`
-	Dimensions int    `json:"dimensions"`
-	APIURL     string `json:"apiUrl"`
-	// Source says where this configuration came from: "environment",
-	// "stored" or "autodetected" (SRCH-001). A provider MDDB found on the
-	// machine rather than one anybody chose should say so — otherwise the
-	// panel shows a configuration nobody recognises writing.
-	Source string `json:"source,omitempty"`
-}
-
 // ---- Handlers ----
 
 // handleConfig returns the current server configuration
@@ -141,48 +126,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		SearchStatsEnabled:    searchStatsEnabled(),
 	}
 
-	// Add vector configuration if embedding provider is set
-	provider := os.Getenv("MDDB_EMBEDDING_PROVIDER")
-	if provider != "" {
-		var apiURL, model string
-		var dimensions int
-
-		switch provider {
-		case "openai":
-			apiURL = envconf.String("MDDB_EMBEDDING_API_URL", "https://api.openai.com/v1")
-			model = envconf.String("MDDB_EMBEDDING_MODEL", "text-embedding-3-small")
-			dimensions = envconf.Int("MDDB_EMBEDDING_DIMENSIONS", 1536)
-		case "ollama":
-			apiURL = envconf.String("MDDB_EMBEDDING_API_URL", "http://localhost:11434")
-			model = envconf.String("MDDB_EMBEDDING_MODEL", "nomic-embed-text")
-			dimensions = envconf.Int("MDDB_EMBEDDING_DIMENSIONS", 768)
-		case "voyage":
-			apiURL = envconf.String("MDDB_EMBEDDING_API_URL", "https://api.voyageai.com/v1")
-			model = envconf.String("MDDB_EMBEDDING_MODEL", "voyage-3")
-			dimensions = envconf.Int("MDDB_EMBEDDING_DIMENSIONS", 1024)
-		}
-
-		response.VectorConfig = &VectorConfig{
-			Enabled:    true,
-			Provider:   provider,
-			Model:      model,
-			Dimensions: dimensions,
-			APIURL:     apiURL,
-			Source:     "environment",
-		}
-	} else if detected := s.DetectedEmbedding; detected != nil {
-		// SRCH-001: nothing was configured and startup found a provider on
-		// this machine. Reporting nothing here would leave the panel saying
-		// vector search is off while the server is embedding documents.
-		response.VectorConfig = &VectorConfig{
-			Enabled:    true,
-			Provider:   detected.Name,
-			Model:      detected.Model,
-			Dimensions: detected.Dimensions,
-			APIURL:     detected.APIURL,
-			Source:     "autodetected",
-		}
-	}
+	response.VectorConfig = s.vectorConfig()
 
 	// Add chunk configuration
 	chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
