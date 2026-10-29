@@ -68,6 +68,9 @@ curl -X POST http://localhost:11023/v1/automation -H 'Content-Type: application/
 }'
 ```
 
+Over gRPC, `CreateAutomation` takes the same block as
+`AutomationRuleProto.backup` ([GRPC.md](GRPC.md#new-in-v2189)).
+
 Each run:
 
 1. writes the backup with the same code as `GET /v1/backup`: a consistent

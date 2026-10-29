@@ -409,7 +409,9 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 provider, `false` for `lexical`, whose vectors match shared spelling rather
 than meaning. The search advisor (`/v1/search-advisor`) reports the same in
 `profile.semantic` and recommends keyword search for lexical collections
-unless the collection's own evaluation set measures hybrid better.
+unless the collection's own evaluation set measures hybrid better. The gRPC
+`SearchAdvisor` carries it as `CollectionProfile.semantic` (15,
+`optional bool`), unset when nothing in the collection is embedded.
 
 ---
 

@@ -35,8 +35,10 @@ func storageConfigToProto(cfg *StorageConfigDef) *proto.StorageConfigProto {
 		AccessKey: cfg.AccessKey,
 		Prefix:    cfg.Prefix,
 		UseTls:    cfg.UseTLS,
-		// SecretKey deliberately unset; the flag says one exists.
-		SecretKeySet: cfg.SecretKey != "",
+		// SecretKey deliberately unset; the flag says one exists. A config
+		// that was already redacted (a backup rule read from the
+		// AutomationManager) carries the flag instead of the secret.
+		SecretKeySet: cfg.SecretKey != "" || cfg.SecretKeySet,
 	}
 }
 

@@ -1026,6 +1026,23 @@ message AutomationRuleProto {
   string trigger_id = 22;
   int64 last_run = 23;
   int64 next_run = 24;
+  // (OPS-023) A cron rule's other action: a backup instead of webhook_id.
+  // Unset on an update keeps the stored backup unless webhook_id is set.
+  BackupActionProto backup = 25;
+}
+
+// BackupActionProto is what a cron rule with a backup does on each run
+// (OPS-023). Its storage_config reuses StorageConfigProto: the S3 secret is
+// write-only, reads set secret_key_set instead, and an update without a
+// secret keeps the stored one.
+message BackupActionProto {
+  string target = 1;                             // "local" (default) or "s3"
+  string path = 2;                               // local: directory inside MDDB_BACKUP_DIR; empty = the directory itself
+  string bucket = 3;                             // s3: empty takes storage_config.bucket
+  string prefix = 4;                             // name/key prefix; empty takes storage_config.prefix, then "mddb-"
+  int32 keep = 5;                                // backups kept on the target; 0 keeps all
+  repeated string collections = 6;               // ["*"] (default) or the collections to back up
+  StorageConfigProto storage_config = 7;         // s3 endpoint, region, credentials, TLS
 }
 
 message ListAutomationRequest {
@@ -1788,6 +1805,7 @@ message CollectionProfile {
   int64 estimated_vector_bytes = 12;
   int32 summary_documents = 13;     // (RAG-009) sampled documents carrying a client-written summary
   double summary_ratio = 14;        // (RAG-009) their share of the sample, 0-1
+  optional bool semantic = 15;      // (SRCH-014) the vectors encode meaning; false for the lexical provider, unset when nothing is embedded
 }
 
 // SearchAdvisorResponse is the advice, with the reasons for it.

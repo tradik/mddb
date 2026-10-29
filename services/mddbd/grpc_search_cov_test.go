@@ -146,6 +146,9 @@ func TestCovESearchAdvisor(t *testing.T) {
 		resp.SearchType == "" || len(resp.Reasons) == 0 {
 		t.Fatalf("advisor: %+v", resp)
 	}
+	if resp.Profile.Semantic != nil {
+		t.Errorf("semantic = %v with nothing embedded, want unset", *resp.Profile.Semantic)
+	}
 
 	covEDenyAll(t, s)
 	_, err = gs.SearchAdvisor(ctx, &pb.SearchAdvisorRequest{Collection: "c"})

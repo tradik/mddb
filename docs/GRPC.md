@@ -228,6 +228,19 @@ follow it:
 With `expand` and `format: "passages"`, a summary hit returns one passage per
 chunk it brought in. All of this is additive.
 
+Scheduled backups (OPS-023) and the lexical provider (SRCH-014) reach gRPC
+too:
+
+| Field | Message | Meaning |
+|---|---|---|
+| `backup` (25, `BackupActionProto`) | `AutomationRuleProto` | A cron rule's backup, instead of `webhook_id`; unset on `UpdateAutomation` keeps the stored backup unless `webhook_id` is set |
+| `target` (1), `path` (2), `bucket` (3), `prefix` (4), `keep` (5, `int32`), `collections` (6, repeated) | `BackupActionProto` | As the REST `backup` block; see [AUTOMATIONS.md](AUTOMATIONS.md#scheduled-backups) |
+| `storage_config` (7, `StorageConfigProto`) | `BackupActionProto` | S3 endpoint, region, credentials, TLS. `secret_key` is write-only: reads return it empty with `secret_key_set: true`, and an update without one keeps the stored key |
+| `semantic` (15, `optional bool`) | `CollectionProfile` | `false` for the lexical provider, `true` for a model; unset when nothing is embedded |
+
+Validation and masking are the REST code, so a rule is the same whichever
+surface wrote it. All of this is additive.
+
 ### New in v2.18.8
 
 `GetIndexingStatus` reports queued work for a collection, or for the server

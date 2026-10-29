@@ -729,8 +729,14 @@ curl -X POST http://localhost:11023/v1/automation \
 Reads (`GET`, list, and the rule returned by create and update) blank
 `storageConfig.secretKey` and set `secretKeySet: true`; an update that sends
 no `secretKey` keeps the stored one. An update that names neither a
-`webhookId` nor a `backup` — the gRPC rule message has no backup field —
-keeps the rule's backup.
+`webhookId` nor a `backup` keeps the rule's backup, so a client can toggle
+`enabled` without sending the backup back.
+
+Over gRPC the same block is `AutomationRuleProto.backup` (25,
+`BackupActionProto`), whose `storage_config` is the `StorageConfigProto` of
+S3-backed collections: `secret_key` is write-only, reads set
+`secret_key_set`. Validation and masking are the REST ones; see
+[GRPC.md](GRPC.md#new-in-v2189).
 
 A backup run's log entry has `action: "backup"`, `target` (where the backup
 is) and `removed` (what retention deleted). A failed run fires the

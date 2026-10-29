@@ -43,6 +43,7 @@ func automationRuleToProto(r *AutomationRule) *proto.AutomationRuleProto {
 		TriggerId:        r.TriggerID,
 		LastRun:          r.LastRun,
 		NextRun:          r.NextRun,
+		Backup:           backupActionToProto(r.Backup),
 	}
 	if r.SearchParams != nil {
 		if b, err := json.Marshal(r.SearchParams); err == nil {
@@ -78,6 +79,7 @@ func protoToAutomationRule(p *proto.AutomationRuleProto) AutomationRule {
 		TriggerID:        p.TriggerId,
 		LastRun:          p.LastRun,
 		NextRun:          p.NextRun,
+		Backup:           backupActionFromProto(p.GetBackup()),
 	}
 	if p.SearchParamsJson != "" {
 		var sp map[string]interface{}
@@ -86,6 +88,44 @@ func protoToAutomationRule(p *proto.AutomationRuleProto) AutomationRule {
 		}
 	}
 	return r
+}
+
+// backupActionToProto converts a cron rule's backup action (OPS-023) for the
+// wire. The rule comes from the AutomationManager already redacted, so the
+// storage config carries secretKeySet and no secret; storageConfigToProto
+// withholds the secret either way.
+func backupActionToProto(a *BackupAction) *proto.BackupActionProto {
+	if a == nil {
+		return nil
+	}
+	return &proto.BackupActionProto{
+		Target:        a.Target,
+		Path:          a.Path,
+		Bucket:        a.Bucket,
+		Prefix:        a.Prefix,
+		Keep:          clampInt32(a.Keep),
+		Collections:   a.Collections,
+		StorageConfig: storageConfigToProto(a.StorageConfig),
+	}
+}
+
+// backupActionFromProto converts an incoming backup action. Validation and the
+// defaults are BackupAction.normalize's, and an empty secret on an update is
+// filled from the stored rule by carryOverBackup — both run inside the
+// AutomationManager, the same code a REST write goes through.
+func backupActionFromProto(p *proto.BackupActionProto) *BackupAction {
+	if p == nil {
+		return nil
+	}
+	return &BackupAction{
+		Target:        p.GetTarget(),
+		Path:          p.GetPath(),
+		Bucket:        p.GetBucket(),
+		Prefix:        p.GetPrefix(),
+		Keep:          int(p.GetKeep()),
+		Collections:   p.GetCollections(),
+		StorageConfig: storageConfigFromProto(p.GetStorageConfig(), nil),
+	}
 }
 
 // ListAutomation implements the ListAutomation RPC.

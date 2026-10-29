@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +9,7 @@ import (
 
 	"mddb/internal/embedding"
 	json "mddb/internal/jsonx"
+	pb "mddb/proto"
 )
 
 // SRCH-014: the lexical provider runs every vector path with no network and no
@@ -92,6 +94,17 @@ func TestLexicalAdvisorRecommendsKeywordSearch(t *testing.T) {
 	}
 	if rec.Reasons[0] != lexicalAdvice {
 		t.Errorf("first reason = %q", rec.Reasons[0])
+	}
+}
+
+func TestLexicalAdvisorOverGRPCSaysNotSemantic(t *testing.T) {
+	s := lexicalServer(t)
+	resp, err := (&GRPCServer{server: s}).SearchAdvisor(context.Background(), &pb.SearchAdvisorRequest{Collection: "docs"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.GetProfile().Semantic == nil || resp.GetProfile().GetSemantic() || resp.GetSearchType() != "fts" {
+		t.Errorf("gRPC profile semantic = %v, search %s; want false, fts", resp.GetProfile().Semantic, resp.GetSearchType())
 	}
 }
 

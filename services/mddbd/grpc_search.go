@@ -493,6 +493,7 @@ func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisor
 			EstimatedVectorBytes: p.EstimatedVectorBytes,
 			SummaryDocuments:     clampInt32(p.SummaryDocuments),
 			SummaryRatio:         p.SummaryRatio,
+			Semantic:             p.Semantic, // (SRCH-014) nil when nothing is embedded
 		},
 		SearchType:      rec.SearchType,
 		FtsAlgorithm:    rec.FTSAlgorithm,
