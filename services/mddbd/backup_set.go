@@ -45,7 +45,7 @@ func hashBackupSet(dir, name string) (*backupSet, error) {
 
 	rels := []string{name}
 	sub := name + ".d"
-	entries, err := fs.ReadDir(root.FS(), sub)
+	entries, err := fs.ReadDir(root.FS(), sub) // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func hashBackupSet(dir, name string) (*backupSet, error) {
 		fmt.Fprintf(&list, "%s  %s\n", file.sum, rel)
 	}
 	listed := []byte(list.String())
-	if err := root.WriteFile(sumFileName(name), listed, 0o600); err != nil {
+	if err := root.WriteFile(sumFileName(name), listed, 0o600); err != nil { // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 		return nil, err
 	}
 	listSum := sha256.Sum256(listed)
@@ -77,7 +77,7 @@ func hashBackupSet(dir, name string) (*backupSet, error) {
 
 // hashFile reads one file inside root and returns its sha256 and size.
 func hashFile(root *os.Root, rel string) (backupSetFile, error) {
-	f, err := root.Open(rel)
+	f, err := root.Open(rel) // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 	if err != nil {
 		return backupSetFile{}, err
 	}
@@ -106,11 +106,11 @@ func removeBackupSet(dir, name string) error {
 	defer func() { _ = root.Close() }()
 	var errs []error
 	for _, p := range []string{name, sumFileName(name)} {
-		if err := root.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if err := root.Remove(p); err != nil && !errors.Is(err, fs.ErrNotExist) { // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 			errs = append(errs, err)
 		}
 	}
-	if err := root.RemoveAll(name + ".d"); err != nil {
+	if err := root.RemoveAll(name + ".d"); err != nil { // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)

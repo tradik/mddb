@@ -55,8 +55,8 @@ func (s *Server) backupCollections(dst string, only []string) error {
 	// the files are copied one after another, not at one instant.
 	if cf := s.collectionStore(); cf != nil {
 		sub := filepath.Base(collectionDir(name))
-		_ = dir.Mkdir(sub, 0o700) // already there is fine; OpenRoot reports anything else
-		subDir, err := dir.OpenRoot(sub)
+		_ = dir.Mkdir(sub, 0o700)        // already there is fine; OpenRoot reports anything else
+		subDir, err := dir.OpenRoot(sub) // NOSONAR gosecurity:S2083 -- os.Root: sub is a base name and cannot leave dir
 		if err != nil {
 			return err
 		}

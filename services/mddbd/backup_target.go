@@ -45,7 +45,7 @@ func mkdirInBackupDir(rel string) error {
 		return err
 	}
 	defer func() { _ = root.Close() }()
-	return root.MkdirAll(rel, 0o750)
+	return root.MkdirAll(rel, 0o750) // NOSONAR gosecurity:S2083 -- os.Root: rel cannot leave MDDB_BACKUP_DIR
 }
 
 // stageIn is stage for a directory rel inside MDDB_BACKUP_DIR.

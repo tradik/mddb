@@ -71,7 +71,7 @@ func (t *s3BackupTarget) store(set *backupSet, name string) (string, error) {
 // upload puts one file at key and proves the object holds the bytes whose
 // sha256 the set recorded.
 func (t *s3BackupTarget) upload(root *os.Root, file backupSetFile, key string) error {
-	f, err := root.Open(file.rel)
+	f, err := root.Open(file.rel) // NOSONAR gosecurity:S2083 -- os.Root: cannot leave dir
 	if err != nil {
 		return err
 	}

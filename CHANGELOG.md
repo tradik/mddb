@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SonarCloud quality gate failed on main after 2.18.8.** It reported
+  `gosecurity:S2083`, path traversal, on the collection directory of a
+  backup (`db_backup.go`). This is a false positive: the call goes through
+  an `os.Root`, which cannot leave the backup directory. That line, and the
+  new `os.Root` calls of scheduled backups, now carry the same `NOSONAR`
+  justification as the other writes in that code.
+
 - **A float32 vector record whose model name is 2 bytes long was read as
   quantized (#361).** Such a record starts with the byte `2`, the same as
   the quantized format's version byte. `Get`, index loading and chunk reuse
