@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -279,32 +278,7 @@ func (c *DirectClient) DeleteStopWords(ctx context.Context, collection string, w
 
 // GetMetaKeys returns all metadata keys for a collection via the direct client.
 func (c *DirectClient) GetMetaKeys(ctx context.Context, collection string) (*MCPMetaKeysResponse, error) {
-	meta := make(map[string][]string)
-	_ = c.server.DBViewC(collection, func(tx *bolt.Tx) error {
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		if bIdx == nil {
-			return nil
-		}
-		prefix := []byte("meta|" + collection + "|")
-		cur := bIdx.Cursor()
-		seen := make(map[string]map[string]bool)
-		for k, _ := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = cur.Next() {
-			rest := string(k[len(prefix):])
-			parts := strings.SplitN(rest, "|", 3)
-			if len(parts) < 2 {
-				continue
-			}
-			mk, mv := parts[0], parts[1]
-			if seen[mk] == nil {
-				seen[mk] = make(map[string]bool)
-			}
-			if !seen[mk][mv] {
-				seen[mk][mv] = true
-				meta[mk] = append(meta[mk], mv)
-			}
-		}
-		return nil
-	})
+	meta := c.server.metaKeys(collection)
 	return &MCPMetaKeysResponse{Meta: meta}, nil
 }
 

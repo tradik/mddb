@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"mddb/internal/storage"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -186,35 +184,7 @@ func (s *Server) handleMetaKeys(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	meta := make(map[string][]string)
-
-	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		if bIdx == nil {
-			return nil
-		}
-
-		prefix := []byte("meta|" + collection + "|")
-		c := bIdx.Cursor()
-		seen := make(map[string]map[string]bool)
-
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			rest := string(k[len(prefix):])
-			parts := strings.SplitN(rest, "|", 3)
-			if len(parts) < 2 {
-				continue
-			}
-			mk, mv := parts[0], parts[1]
-			if seen[mk] == nil {
-				seen[mk] = make(map[string]bool)
-			}
-			if !seen[mk][mv] {
-				seen[mk][mv] = true
-				meta[mk] = append(meta[mk], mv)
-			}
-		}
-		return nil
-	})
+	meta := s.metaKeys(collection)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{"meta": meta})

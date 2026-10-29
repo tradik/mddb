@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"mddb/internal/storage"
@@ -562,33 +561,7 @@ func (g *GRPCServer) GetMetaKeys(ctx context.Context, req *proto.GetMetaKeysRequ
 		}
 	}
 
-	meta := make(map[string][]string)
-
-	_ = g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bIdx := tx.Bucket([]byte("idxmeta"))
-		if bIdx == nil {
-			return nil
-		}
-		prefix := []byte("meta|" + req.Collection + "|")
-		c := bIdx.Cursor()
-		seen := make(map[string]map[string]bool)
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			rest := string(k[len(prefix):])
-			parts := strings.SplitN(rest, "|", 3)
-			if len(parts) < 2 {
-				continue
-			}
-			mk, mv := parts[0], parts[1]
-			if seen[mk] == nil {
-				seen[mk] = make(map[string]bool)
-			}
-			if !seen[mk][mv] {
-				seen[mk][mv] = true
-				meta[mk] = append(meta[mk], mv)
-			}
-		}
-		return nil
-	})
+	meta := g.server.metaKeys(req.Collection)
 
 	protoMeta := make(map[string]*proto.MetaValues)
 	for k, v := range meta {

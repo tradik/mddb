@@ -159,7 +159,7 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	// then FTS/geo/webhooks/SSE/temporal/embedding via runPostWriteHooks).
 	// addDocument also refreshes the read cache (GO-002), so the gRPC Get path
 	// stays coherent without re-marshaling here.
-	saved, _, err := g.server.addDocument(req.Collection, req.Key, req.Lang, meta, req.ContentMd, 0, req.SaveRevision)
+	saved, _, err := g.server.addDocument(req.Collection, req.Key, req.Lang, meta, req.ContentMd, req.Ttl, req.SaveRevision)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

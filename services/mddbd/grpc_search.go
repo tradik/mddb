@@ -8,7 +8,6 @@ import (
 	proto "mddb/proto"
 	"time"
 
-	bolt "go.etcd.io/bbolt"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -281,47 +280,13 @@ func (g *GRPCServer) SetTTL(ctx context.Context, req *proto.SetTTLRequest) (*pro
 		return nil, status.Error(codes.InvalidArgument, "missing required fields")
 	}
 
-	docID := genID(req.Collection, req.Key, req.Lang)
-	now := time.Now().Unix()
-	var expiresAt int64
-	if req.Ttl > 0 {
-		expiresAt = now + req.Ttl
+	updated, err := g.server.setDocumentTTL(req.Collection, req.Key, req.Lang, req.Ttl)
+	if errors.Is(err, errNotFound) {
+		return nil, status.Error(codes.NotFound, err.Error())
 	}
-
-	var updated storage.Doc
-	err := g.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		v := bDocs.Get(storage.DocKey(req.Collection, docID))
-		if v == nil {
-			return errDocNotFound
-		}
-		d, err := unmarshalDoc(v)
-		if err != nil {
-			return err
-		}
-		d.ExpiresAt = expiresAt
-		buf, err := marshalDoc(d)
-		if err != nil {
-			return err
-		}
-		updated = *d
-		return bDocs.Put(storage.DocKey(req.Collection, docID), buf)
-	})
 	if err != nil {
-		if errors.Is(err, errNotFound) {
-			return nil, status.Error(codes.NotFound, "document not found")
-		}
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	if g.server.TTLManager != nil {
-		if expiresAt > 0 {
-			_ = g.server.TTLManager.Set(req.Collection, docID, expiresAt)
-		} else {
-			_ = g.server.TTLManager.Remove(req.Collection, docID)
-		}
-	}
-
 	return docToProto(&updated), nil
 }
 

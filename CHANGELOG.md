@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Setting a TTL stored an encrypted collection's document unencrypted.**
+  REST, MCP and gRPC each had their own set-TTL. None of them encrypted the
+  rewritten document, and only REST wrote it to the binlog. gRPC also left
+  the read cache stale, so an expired document could be served. There is
+  now one implementation that encrypts, writes the binlog and refreshes the
+  cache.
+- **gRPC `Add` ignored `ttl`.**
+- **Listing metadata keys cut values that contain `|`.** REST
+  `/v1/meta-keys`, MCP `get_meta_keys` and gRPC `GetMetaKeys` were three
+  copies, and each cut a value at its first `|`. They are now one.
+
 ### Added
 
 - **LangGraph Store on MDDB: `MddbStore` (INT-020).** `langchain-mddb`

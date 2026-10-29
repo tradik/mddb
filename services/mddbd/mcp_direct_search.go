@@ -333,50 +333,10 @@ func (c *DirectClient) ImportURL(ctx context.Context, req *MCPImportURLRequest) 
 
 // SetTTL sets a time-to-live on a document via the direct client.
 func (c *DirectClient) SetTTL(ctx context.Context, req *MCPSetTTLRequest) (*MCPDocument, error) {
-	if req.Collection == "" || req.Key == "" || req.Lang == "" {
-		return nil, errors.New("missing required fields")
-	}
-
-	docID := genID(req.Collection, req.Key, req.Lang)
-
-	now := time.Now().Unix()
-	var expiresAt int64
-	if req.TTL > 0 {
-		expiresAt = now + req.TTL
-	}
-
-	var updated storage.Doc
-	err := c.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		dk := storage.DocKey(req.Collection, docID)
-		v := bDocs.Get(dk)
-		if v == nil {
-			return errDocNotFound
-		}
-		docPtr, err := loadDoc(v)
-		if err != nil {
-			return err
-		}
-		updated = *docPtr
-		updated.ExpiresAt = expiresAt
-		buf, err := marshalDoc(&updated)
-		if err != nil {
-			return err
-		}
-		return bDocs.Put(dk, buf)
-	})
+	updated, err := c.server.setDocumentTTL(req.Collection, req.Key, req.Lang, req.TTL)
 	if err != nil {
 		return nil, err
 	}
-
-	if c.server.TTLManager != nil {
-		if expiresAt > 0 {
-			_ = c.server.TTLManager.Set(req.Collection, docID, expiresAt)
-		} else {
-			_ = c.server.TTLManager.Remove(req.Collection, docID)
-		}
-	}
-
 	doc := docToMCPDocument(updated)
 	return &doc, nil
 }

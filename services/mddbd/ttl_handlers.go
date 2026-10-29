@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"mddb/internal/binlog"
 	"mddb/internal/storage"
 	"net/http"
@@ -28,26 +27,33 @@ func (s *Server) handleSetTTL(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
-	if req.Collection == "" || req.Key == "" || req.Lang == "" {
-		bad(w, fmt.Errorf("missing required fields"))
+	updated, err := s.setDocumentTTL(req.Collection, req.Key, req.Lang, req.TTL)
+	if err != nil {
+		bad(w, err)
 		return
 	}
+	ok(w, updated)
+}
 
-	docID := genID(req.Collection, req.Key, req.Lang)
-
-	// Update ExpiresAt on the document itself
-	now := time.Now().Unix()
-	var expiresAt int64
-	if req.TTL > 0 {
-		expiresAt = now + req.TTL
+// setDocumentTTL sets or clears a document's expiry: the one implementation
+// behind REST /v1/set-ttl, MCP set_ttl and gRPC SetTTL, which were three
+// copies. ttl is seconds from now; 0 clears the expiry. The document is
+// stored as every write stores it — encrypted when the collection is,
+// recorded in the binlog — and the read caches drop their copy.
+func (s *Server) setDocumentTTL(collection, key, lang string, ttl int64) (storage.Doc, error) {
+	if collection == "" || key == "" || lang == "" {
+		return storage.Doc{}, invalidInput("missing required fields: collection, key, lang")
 	}
-
-	// Update document in DB
+	docID := genID(collection, key, lang)
+	var expiresAt int64
+	if ttl > 0 {
+		expiresAt = time.Now().Unix() + ttl
+	}
 	var updated storage.Doc
 	var bo binlog.BinlogOps
-	err := s.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
+	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
-		dk := storage.DocKey(req.Collection, docID)
+		dk := storage.DocKey(collection, docID)
 		v := bDocs.Get(dk)
 		if v == nil {
 			return errDocNotFound
@@ -58,29 +64,24 @@ func (s *Server) handleSetTTL(w http.ResponseWriter, r *http.Request) {
 		}
 		updated = *docPtr
 		updated.ExpiresAt = expiresAt
-		buf, err := marshalDoc(&updated)
+		buf, err := marshalAndEncrypt(&updated, collection)
 		if err != nil {
 			return err
 		}
 		bo.Put("docs", dk, buf)
 		return bDocs.Put(dk, buf)
 	})
-	if err == nil {
-		bo.FlushTo(s.Binlog)
-	}
 	if err != nil {
-		bad(w, err)
-		return
+		return storage.Doc{}, err
 	}
-
-	// Update TTL bucket
+	bo.FlushTo(s.Binlog)
+	s.invalidateDocReadCaches(collection, key, lang)
 	if s.TTLManager != nil {
 		if expiresAt > 0 {
-			_ = s.TTLManager.Set(req.Collection, docID, expiresAt)
+			_ = s.TTLManager.Set(collection, docID, expiresAt)
 		} else {
-			_ = s.TTLManager.Remove(req.Collection, docID)
+			_ = s.TTLManager.Remove(collection, docID)
 		}
 	}
-
-	ok(w, updated)
+	return updated, nil
 }

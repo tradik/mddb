@@ -204,3 +204,42 @@ func sortedIDs(set map[string]bool) []string {
 	sort.Strings(out)
 	return out
 }
+
+// metaKeys lists every metadata key of a collection with its distinct
+// values, in index order — the one implementation behind REST /v1/meta-keys,
+// MCP get_meta_keys and gRPC GetMetaKeys, which were three copies. A value
+// may contain '|': it is split off the document ID with splitMetaEntry, not
+// cut at its first '|' as the copies did.
+func (s *Server) metaKeys(collection string) map[string][]string {
+	meta := map[string][]string{}
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
+		bIdx := tx.Bucket([]byte("idxmeta"))
+		if bIdx == nil {
+			return nil
+		}
+		prefix := []byte("meta|" + collection + "|")
+		seen := map[string]map[string]bool{}
+		cur := bIdx.Cursor()
+		for k, _ := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = cur.Next() {
+			rest := k[len(prefix):]
+			sep := bytes.IndexByte(rest, '|')
+			if sep < 0 {
+				continue
+			}
+			mk := string(rest[:sep])
+			mv, _, ok := splitMetaEntry(rest[sep+1:], collection)
+			if !ok {
+				continue
+			}
+			if seen[mk] == nil {
+				seen[mk] = map[string]bool{}
+			}
+			if !seen[mk][mv] {
+				seen[mk][mv] = true
+				meta[mk] = append(meta[mk], mv)
+			}
+		}
+		return nil
+	})
+	return meta
+}
