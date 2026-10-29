@@ -7918,6 +7918,16 @@ components:
           $ref: '#/components/schemas/PlanExplain'
         latencyTargetMs:
           $ref: '#/components/schemas/PlanLatencyTarget'
+        positive:
+          $ref: '#/components/schemas/FeedbackExamples'
+        negative:
+          $ref: '#/components/schemas/FeedbackExamples'
+        feedbackMode:
+          $ref: '#/components/schemas/FeedbackMode'
+        feedbackWeight:
+          $ref: '#/components/schemas/FeedbackWeight'
+        rocchio:
+          $ref: '#/components/schemas/RocchioWeights'
 
     PlanExplain:
       type: boolean
@@ -7959,6 +7969,70 @@ components:
           description: Cross search with `auto`, one plan per target collection.
           additionalProperties:
             $ref: '#/components/schemas/SearchPlan'
+        feedback:
+          $ref: '#/components/schemas/FeedbackApplied'
+
+    FeedbackExamples:
+      type: array
+      maxItems: 50
+      description: >-
+        (v2.18.9+, SRCH-015) Relevance feedback examples: a document key or ID
+        from an earlier result, or a vector of the query's dimensions.
+        `{"key": ...}` and `{"vector": [...]}` are accepted too. A key with no
+        embedding returns 422.
+      items:
+        oneOf:
+          - type: string
+          - type: array
+            items: { type: number, format: float }
+          - type: object
+            properties:
+              key: { type: string }
+              vector:
+                type: array
+                items: { type: number, format: float }
+
+    FeedbackMode:
+      type: string
+      enum: [ query, rescore ]
+      default: query
+      description: >-
+        (v2.18.9+, SRCH-015) `query` moves the query vector (Rocchio) and works
+        with every index; `rescore` re-ranks the topK × oversample candidates by
+        similarity to the examples.
+
+    FeedbackWeight:
+      type: number
+      minimum: 0
+      maximum: 10
+      default: 0.5
+      description: (v2.18.9+, SRCH-015) `rescore` mode — how much the examples move a score.
+
+    RocchioWeights:
+      type: object
+      description: (v2.18.9+, SRCH-015) `query` mode weights of q′ = alpha·q + beta·mean(positive) − gamma·mean(negative).
+      properties:
+        alpha: { type: number, minimum: 0, maximum: 10, default: 1 }
+        beta: { type: number, minimum: 0, maximum: 10, default: 0.75 }
+        gamma: { type: number, minimum: 0, maximum: 10, default: 0.25 }
+
+    FeedbackApplied:
+      type: object
+      description: (v2.18.9+, SRCH-015) The correction relevance feedback made, in the plan.
+      properties:
+        mode: { type: string, enum: [ query, rescore ] }
+        positive: { type: integer }
+        negative: { type: integer }
+        alpha: { type: number }
+        beta: { type: number }
+        gamma: { type: number }
+        queryShift:
+          type: number
+          description: 1 − cosine(query, corrected query), query mode.
+        weight: { type: number }
+        rescored:
+          type: integer
+          description: Candidates rescored, rescore mode.
 
     VectorSearchResponse:
       type: object
@@ -8905,6 +8979,16 @@ components:
           $ref: '#/components/schemas/PlanExplain'
         latencyTargetMs:
           $ref: '#/components/schemas/PlanLatencyTarget'
+        positive:
+          $ref: '#/components/schemas/FeedbackExamples'
+        negative:
+          $ref: '#/components/schemas/FeedbackExamples'
+        feedbackMode:
+          $ref: '#/components/schemas/FeedbackMode'
+        feedbackWeight:
+          $ref: '#/components/schemas/FeedbackWeight'
+        rocchio:
+          $ref: '#/components/schemas/RocchioWeights'
         signals:
           $ref: "#/components/schemas/FusionSignals"
         strategy:
@@ -11182,6 +11266,16 @@ components:
           $ref: '#/components/schemas/PlanExplain'
         latencyTargetMs:
           $ref: '#/components/schemas/PlanLatencyTarget'
+        positive:
+          $ref: '#/components/schemas/FeedbackExamples'
+        negative:
+          $ref: '#/components/schemas/FeedbackExamples'
+        feedbackMode:
+          $ref: '#/components/schemas/FeedbackMode'
+        feedbackWeight:
+          $ref: '#/components/schemas/FeedbackWeight'
+        rocchio:
+          $ref: '#/components/schemas/RocchioWeights'
         distanceMetric:
           type: string
           description: Distance metric for similarity computation

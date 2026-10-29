@@ -36,6 +36,12 @@ Do not guess a vector index. Pass `algorithm: "auto"` to `semantic_search` and
 then picks one per query, from the collection size, the indexes already built
 and how much your filter admits. Add `explain: true` once to see why.
 
+When a vector or hybrid search returned some right and some wrong results, do
+not rewrite the query. Search again with the keys: `positive` for the hits
+that answered, `negative` for the ones that did not. The second round moves
+towards the first and away from the second. On a test corpus, one round
+raised recall@10 from 0.31 to 0.49.
+
 When a search keeps missing what it should find, measure instead of guessing.
 Record the question and the document that answers it with `add_eval_query`,
 then compare configurations with `run_eval`.

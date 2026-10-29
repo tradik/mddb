@@ -243,9 +243,10 @@ type MCPVectorSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions // format, passageLines (AGT-002)
-	PlanOptions    // explain, latencyTargetMs (SRCH-013)
+	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions  // format, passageLines (AGT-002)
+	PlanOptions     // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -466,9 +467,10 @@ type MCPHybridSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions // format, passageLines (AGT-002)
-	PlanOptions    // explain, latencyTargetMs (SRCH-013)
+	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions  // format, passageLines (AGT-002)
+	PlanOptions     // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -787,9 +789,10 @@ type MCPCrossSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions // format, passageLines (AGT-002)
-	PlanOptions    // explain, latencyTargetMs (SRCH-013)
+	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions  // format, passageLines (AGT-002)
+	PlanOptions     // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
 	// include "role:reference" for every reference collection.
 	SearchType string `json:"searchType,omitempty"`

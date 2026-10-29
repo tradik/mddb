@@ -249,6 +249,11 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 
 	req.PassageOptions = mcpGetPassageOptions(args)
 	req.PlanOptions = mcpGetPlanOptions(args)
+	feedbackOpts, feedbackErr := mcpGetFeedback(args)
+	if feedbackErr != nil {
+		return "", feedbackErr
+	}
+	req.FeedbackOptions = feedbackOpts
 	resp, err := s.client.VectorSearch(ctx, req)
 	if err != nil {
 		return "", err
@@ -449,6 +454,11 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 
 	req.PassageOptions = mcpGetPassageOptions(args)
 	req.PlanOptions = mcpGetPlanOptions(args)
+	feedbackOpts, feedbackErr := mcpGetFeedback(args)
+	if feedbackErr != nil {
+		return "", feedbackErr
+	}
+	req.FeedbackOptions = feedbackOpts
 	resp, err := s.client.HybridSearch(ctx, req)
 	if err != nil {
 		return "", err

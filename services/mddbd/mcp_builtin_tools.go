@@ -108,7 +108,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 			Description: "Search documents by meaning using semantic similarity. Use this when you need to find documents related to a concept or question, rather than filtering by exact metadata tags. Requires embedding provider to be configured on the server.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
-				"properties": map[string]interface{}{
+				"properties": mcpFeedbackProperties(map[string]interface{}{
 					"collection":        map[string]interface{}{"type": "string", "description": "Collection to search in"},
 					"query":             map[string]interface{}{"type": "string", "description": "Natural language search query"},
 					"top_k":             map[string]interface{}{"type": "integer", "description": "Number of results to return (default: 5)"},
@@ -132,7 +132,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"include_content":   map[string]interface{}{"type": "boolean", "description": mcpIncludeContentDesc},
 					"fields":            map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": mcpFieldsDesc},
 					"oversample":        map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication or merging (1.0-10.0, default 3.0). Higher finds more, costs more."},
-				},
+				}),
 				"required": []string{"collection", "query"},
 			},
 		},
@@ -644,7 +644,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 			Description: "Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Requires both FTS index and embedding provider.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
-				"properties": map[string]interface{}{
+				"properties": mcpFeedbackProperties(map[string]interface{}{
 					"collection":        map[string]interface{}{"type": "string", "description": "Collection to search"},
 					"query":             map[string]interface{}{"type": "string", "description": "Search query (used for both FTS and embedding)"},
 					"top_k":             map[string]interface{}{"type": "integer", "description": "Number of results (default: 10)"},
@@ -673,7 +673,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"facet_by":          map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "(v2.9.14+) Metadata keys to aggregate into response.facets."},
 					"facet_max_values":  map[string]interface{}{"type": "integer", "description": "(v2.9.14+) Cap per-key bucket count; 0 = unlimited."},
 					"oversample":        map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication (1.0-10.0, default 3.0). Higher finds more, costs more."},
-				},
+				}),
 				"required": []string{"collection", "query"},
 			},
 		},
@@ -1048,7 +1048,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 			Description: "Search across multiple collections using a source document's embedding or a text query. Useful for finding related content across different collection types (e.g. matching images to blog posts).",
 			InputSchema: map[string]interface{}{
 				"type": "object",
-				"properties": map[string]interface{}{
+				"properties": mcpFeedbackProperties(map[string]interface{}{
 					"source_collection":  map[string]interface{}{"type": "string", "description": "Collection containing the source document"},
 					"source_doc_id":      map[string]interface{}{"type": "string", "description": "Source document ID whose embedding to use as query"},
 					"query":              map[string]interface{}{"type": "string", "description": "Text query (alternative to source_doc_id)"},
@@ -1070,7 +1070,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"read_level":         mcpReadLevelSchema,
 					"wait_for_index":     mcpWaitForIndexSchema,
 					"wait_for_keys":      mcpWaitForKeysSchema,
-				},
+				}),
 				"required": []string{"target_collections"},
 			},
 		},

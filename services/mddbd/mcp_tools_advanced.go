@@ -136,6 +136,11 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 	}
 	req.PassageOptions = mcpGetPassageOptions(args)
 	req.PlanOptions = mcpGetPlanOptions(args)
+	feedbackOpts, feedbackErr := mcpGetFeedback(args)
+	if feedbackErr != nil {
+		return "", feedbackErr
+	}
+	req.FeedbackOptions = feedbackOpts
 	resp, err := s.client.CrossSearch(ctx, req)
 	if err != nil {
 		return "", err

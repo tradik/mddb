@@ -36,9 +36,10 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		Threshold: req.Threshold, FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
 		IncludeContent: req.IncludeContent, Algorithm: req.Algorithm, RetrievalMode: req.RetrievalMode,
 		WindowSize: int(req.WindowSize), Oversample: req.Oversample, GroupBy: groupByOf(req.GroupBy),
-		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
-		PassageOptions: passageOptions(req.Format, req.PassageLines),
-		PlanOptions:    planOptions(req.Explain, req.LatencyTargetMs),
+		IndexWait:       indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
+		PassageOptions:  passageOptions(req.Format, req.PassageLines),
+		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
+		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
 	})
 	if err != nil {
 		return nil, searchStatus(err)
@@ -420,10 +421,11 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		Fuzzy: int(req.Fuzzy), Threshold: req.Threshold, FilterMeta: metaValuesFromProto(req.FilterMeta),
 		Filter: metaFilterFromProto(req.Filter), Boost: req.Boost, FieldWeights: req.FieldWeights, Lang: req.Lang,
 		BM25K1: req.Bm25K1, BM25B: req.Bm25B,
-		GroupBy:        groupByOf(req.GroupBy),
-		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
-		PassageOptions: passageOptions(req.Format, req.PassageLines),
-		PlanOptions:    planOptions(req.Explain, req.LatencyTargetMs),
+		GroupBy:         groupByOf(req.GroupBy),
+		IndexWait:       indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
+		PassageOptions:  passageOptions(req.Format, req.PassageLines),
+		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
+		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
 	})
 	if err != nil {
 		return nil, searchStatus(err)

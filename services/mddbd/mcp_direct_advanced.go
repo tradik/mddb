@@ -383,6 +383,9 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	if err := req.ValidatePlanOptions(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateFeedback(); err != nil {
+		return nil, err
+	}
 	req.TargetCollections = s.expandTargets(req.TargetCollections)
 	if len(req.TargetCollections) == 0 {
 		return nil, fmt.Errorf("no collection matches target_collections")
@@ -443,6 +446,11 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	} else {
 		return nil, fmt.Errorf("one of query, queryVector or sourceDocID is required")
 	}
+	// SRCH-015: the examples as vectors; query mode corrects the query here.
+	fb, queryVector, err := s.crossFeedback(req.FeedbackOptions, req.SourceCollection, req.TargetCollections, queryVector, plan)
+	if err != nil {
+		return nil, err
+	}
 
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
@@ -456,7 +464,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
-		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs,
+		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb,
 	})
 	s.countCross(algo, items, req.wantsPassages())
 

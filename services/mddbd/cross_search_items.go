@@ -25,6 +25,9 @@ type crossSearchParams struct {
 	// is planned on its own and its plan recorded under Plan.Collections.
 	Plan            *SearchPlan
 	LatencyTargetMs int
+	// Feedback rescores each target's candidates in rescore mode (SRCH-015);
+	// query mode has already corrected QueryVector.
+	Feedback *feedback
 }
 
 // crossSearcher resolves a cross search's searcher and plan (SRCH-013): the
@@ -72,6 +75,7 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 			}
 		}
 		results := s.runPlanned(ps, coll, p.QueryVector, p.SearchTopK, p.Threshold, allowedIDs, active, p.Metric)
+		results = s.rescoreFeedback(p.Feedback, coll, results, p.Metric)
 		for _, vr := range vec.DeduplicateChunkResults(results) {
 			cands = append(cands, crossCandidate{collection: coll, result: vr})
 		}

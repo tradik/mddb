@@ -744,6 +744,10 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `algorithm` (optional): `flat` (default), `auto`, `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`. With `auto` (v2.18.9+) the query planner chooses per query; the collection profile's `retrieval.vectorAlgorithm` applies when the request names none ([SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189))
 - `explain` (optional, v2.18.9+): Add `plan` to the response — the index that answered, `prefilter`, `candidates`, `iterativeScan` and the reasons
 - `latencyTargetMs` (optional, v2.18.9+): Latency goal for `auto`, 0–60000; 10 or less favours a quantized index on 10,000+ vectors
+- `positive`, `negative` (optional, v2.18.9+): Relevance feedback — results that were right or wrong, each a document key or ID (string) or a vector (array of numbers); at most 50 per side ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189))
+- `feedbackMode` (optional, v2.18.9+): `query` (default: Rocchio on the query vector) or `rescore` (re-rank the candidates by similarity to the examples)
+- `feedbackWeight` (optional, v2.18.9+): Rescore weight, 0–10 (default 0.5)
+- `rocchio` (optional, v2.18.9+): `{alpha, beta, gamma}` for `query` mode (default 1, 0.75, 0.25)
 
 \* Either `query` or `queryVector` is required.
 
@@ -2442,6 +2446,8 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
 | `vectorAlgorithm` | string | `"flat"` | Vector algorithm: `flat`, `auto` (v2.18.9+, the query planner chooses), `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`; the profile's `retrieval.vectorAlgorithm` applies when unset |
 | `explain` | boolean | `false` | (v2.18.9+) Add `plan` — the vector half's index and why — to the response |
 | `latencyTargetMs` | integer | `0` | (v2.18.9+) Latency goal for `auto`, 0–60000 |
+| `positive`, `negative` | array | | (v2.18.9+) Relevance feedback for the vector half only: document keys/IDs or vectors ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189)) |
+| `feedbackMode`, `feedbackWeight`, `rocchio` | | `query`, 0.5, 1/0.75/0.25 | (v2.18.9+) How the examples are applied |
 | `alpha` | number | `0.5` | Weight blending (0=FTS only, 1=vector only) |
 | `strategy` | string | `"alpha"` | Fusion strategy: `alpha` or `rrf` |
 | `rrfK` | integer | `60` | RRF parameter k |
@@ -2516,6 +2522,8 @@ Alternative source modes (use one):
 | `algorithm` | string | `"flat"` | Vector algorithm; `auto` (v2.18.9+) plans each target collection and reports `"algorithm": "auto"` |
 | `explain` | boolean | `false` | (v2.18.9+) Add `plan` to the response; with `auto`, one plan per target under `plan.collections` |
 | `latencyTargetMs` | integer | `0` | (v2.18.9+) Latency goal for `auto`, 0–60000 |
+| `positive`, `negative` | array | | (v2.18.9+) Relevance feedback: keys resolve in `sourceCollection`, then each target; or vectors |
+| `feedbackMode`, `feedbackWeight`, `rocchio` | | `query`, 0.5, 1/0.75/0.25 | (v2.18.9+) How the examples are applied |
 | `distanceMetric` | string | `"cosine"` | Distance metric |
 | `filterMeta` | object | | Metadata filter |
 | `filter` | object | | Operator filter applied in every target collection (v2.18.8+) |

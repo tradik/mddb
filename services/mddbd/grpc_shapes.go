@@ -71,6 +71,27 @@ func planToProto(p *SearchPlan) *proto.SearchPlan {
 			out.Collections[coll] = planToProto(cp)
 		}
 	}
+	if f := p.Feedback; f != nil {
+		out.Feedback = &proto.FeedbackApplied{Mode: f.Mode, Positive: safeInt32(f.Positive), Negative: safeInt32(f.Negative),
+			Alpha: f.Alpha, Beta: f.Beta, Gamma: f.Gamma, QueryShift: f.QueryShift, Weight: f.Weight, Rescored: safeInt32(f.Rescored)}
+	}
+	return out
+}
+
+// feedbackOptions converts a request's relevance feedback (SRCH-015).
+func feedbackOptions(pos, neg []*proto.FeedbackExample, mode string, weight float64, r *proto.RocchioWeights) FeedbackOptions {
+	f := FeedbackOptions{Positive: examplesFromProto(pos), Negative: examplesFromProto(neg), FeedbackMode: mode, FeedbackWeight: weight}
+	if r != nil {
+		f.Rocchio = &RocchioOptions{Alpha: r.Alpha, Beta: r.Beta, Gamma: r.Gamma}
+	}
+	return f
+}
+
+func examplesFromProto(es []*proto.FeedbackExample) []FeedbackExample {
+	out := make([]FeedbackExample, 0, len(es))
+	for _, e := range es {
+		out = append(out, FeedbackExample{Key: e.GetKey(), Vector: e.GetVector()})
+	}
 	return out
 }
 

@@ -461,6 +461,38 @@ message VectorSearchRequest {
   int32 window_size = 18;                        // neighbour chunks per side in "window" mode
   bool explain = 19;                             // (v2.18.9, SRCH-013) return the plan: index chosen and why
   int32 latency_target_ms = 20;                  // (v2.18.9, SRCH-013) optional goal for algorithm "auto"
+  repeated FeedbackExample positive = 21;        // (v2.18.9, SRCH-015) results that were right
+  repeated FeedbackExample negative = 22;        // (v2.18.9, SRCH-015) results that were wrong
+  string feedback_mode = 23;                     // (v2.18.9, SRCH-015) "query" (default) or "rescore"
+  double feedback_weight = 24;                   // (v2.18.9, SRCH-015) rescore weight; 0 = 0.5
+  RocchioWeights rocchio = 25;                   // (v2.18.9, SRCH-015) query-mode weights
+}
+
+// A relevance feedback example (v2.18.9, SRCH-015): a document key or id, or a vector.
+message FeedbackExample {
+  string key = 1;
+  repeated float vector = 2;
+}
+
+// Rocchio weights of q' = alpha·q + beta·mean(positive) − gamma·mean(negative);
+// unset = 1, 0.75, 0.25 (v2.18.9, SRCH-015).
+message RocchioWeights {
+  optional double alpha = 1;
+  optional double beta = 2;
+  optional double gamma = 3;
+}
+
+// The correction relevance feedback made, in the plan (v2.18.9, SRCH-015).
+message FeedbackApplied {
+  string mode = 1;
+  int32 positive = 2;
+  int32 negative = 3;
+  double alpha = 4;                              // query mode
+  double beta = 5;
+  double gamma = 6;
+  double query_shift = 7;                        // 1 − cosine(query, corrected query)
+  double weight = 8;                             // rescore mode
+  int32 rescored = 9;
 }
 
 // Vector search result
@@ -497,6 +529,7 @@ message SearchPlan {
   bool iterative_scan = 4;                       // a short filtered search continued further into the index
   repeated string reasons = 5;
   map<string, SearchPlan> collections = 6;       // cross search: one plan per target collection
+  FeedbackApplied feedback = 7;                  // (SRCH-015) the correction relevance feedback made
 }
 
 // Vector reindex request
@@ -663,6 +696,11 @@ message HybridSearchRequest {
   optional double bm25_b = 27;                   // (v2.18.8, SRCH-018) BM25 b of the full-text half
   bool explain = 28;                             // (v2.18.9, SRCH-013) return the vector half's plan
   int32 latency_target_ms = 29;                  // (v2.18.9, SRCH-013) optional goal for vector_algorithm "auto"
+  repeated FeedbackExample positive = 30;        // (v2.18.9, SRCH-015) corrects the vector half only
+  repeated FeedbackExample negative = 31;
+  string feedback_mode = 32;
+  double feedback_weight = 33;
+  RocchioWeights rocchio = 34;
 }
 
 message HybridSearchResult {
@@ -1260,6 +1298,11 @@ message CrossSearchRequest {
   string read_level = 19;                         // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
   bool explain = 20;                             // (v2.18.9, SRCH-013) return the plan per target collection
   int32 latency_target_ms = 21;                  // (v2.18.9, SRCH-013) optional goal for algorithm "auto"
+  repeated FeedbackExample positive = 22;        // (v2.18.9, SRCH-015) keys resolve in source_collection, then the targets
+  repeated FeedbackExample negative = 23;
+  string feedback_mode = 24;
+  double feedback_weight = 25;
+  RocchioWeights rocchio = 26;
 }
 
 message CrossSearchResultItem {

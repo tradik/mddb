@@ -482,9 +482,10 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 		TargetCollections: targets, TopK: int(req.TopK), Threshold: req.Threshold, Algorithm: req.Algorithm,
 		DistanceMetric: req.DistanceMetric, FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
 		IncludeContent: req.IncludeContent, GroupBy: groupByOf(req.GroupBy), SearchType: req.SearchType,
-		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
-		PassageOptions: passageOptions(req.Format, req.PassageLines),
-		PlanOptions:    planOptions(req.Explain, req.LatencyTargetMs),
+		IndexWait:       indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
+		PassageOptions:  passageOptions(req.Format, req.PassageLines),
+		PlanOptions:     planOptions(req.Explain, req.LatencyTargetMs),
+		FeedbackOptions: feedbackOptions(req.Positive, req.Negative, req.FeedbackMode, req.FeedbackWeight, req.Rocchio),
 	})
 	if err != nil {
 		return nil, searchStatus(err)

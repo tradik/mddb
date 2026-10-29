@@ -41,9 +41,10 @@ type VectorSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions // format, passageLines (AGT-002)
-	PlanOptions    // explain, latencyTargetMs (SRCH-013)
+	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions  // format, passageLines (AGT-002)
+	PlanOptions     // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -224,6 +225,10 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidateFeedback(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
 	if err := req.ValidatePassageOptions(); err != nil {
 		unprocessable(w, err)
@@ -282,6 +287,14 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, errors.New("no embedding provider configured and no queryVector provided"))
 		return
 	}
+	// SRCH-015: the examples as vectors; query mode corrects the query here.
+	fb, err := s.resolveFeedback(req.FeedbackOptions, []string{req.Collection}, len(queryVector))
+	if err != nil {
+		unprocessable(w, err)
+		return
+	}
+	queryVector = fb.query(queryVector)
+	ps.Plan.Feedback = fb.report()
 
 	// Resolve distance metric
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
@@ -312,6 +325,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	if s.collectionDiskOnly(req.Collection) {
 		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
 	}
+	results = s.rescoreFeedback(fb, req.Collection, results, metric) // SRCH-015, rescore mode
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
 	var bestChunk map[string]int

@@ -121,6 +121,8 @@ type SearchPlan struct {
 	Reasons       []string `json:"reasons"`
 	// Collections holds one plan per target of a cross-collection search.
 	Collections map[string]*SearchPlan `json:"collections,omitempty"`
+	// Feedback is the correction relevance feedback made (SRCH-015).
+	Feedback *FeedbackApplied `json:"feedback,omitempty"`
 
 	// mayIterate: the planner allows the iterative scan for this search.
 	mayIterate bool

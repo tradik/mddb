@@ -253,6 +253,45 @@ go run ./agent -url http://localhost:11023 -collection mddb -root ../.. \
 The tool prints per-task rows as well, and `-json` writes them for further
 processing.
 
+## Relevance feedback (v2.18.9)
+
+How much one round of `positive` and `negative` examples recovers on a vector
+search (SRCH-015). The corpus is synthetic and built for the case feedback is
+for. It has 2,000 documents in 20 topics, at 64 dimensions. Each query means
+one topic but is typed half way towards another, so a plain search returns a
+mix. The answers are the 10 documents nearest what the query meant. Each
+query is searched once and its top 10 is judged against those answers. The
+right results go back as `positive` and the wrong ones as `negative`, and the
+search runs again in each mode.
+
+Measured 2026-10-29 on an AMD Ryzen 9 7950X (WSL2), against a server built
+from this release, flat index, `topK` 10, default oversample:
+
+```bash
+MDDB_EMBEDDING_PROVIDER=openai MDDB_EMBEDDING_API_KEY=bench \
+MDDB_EMBEDDING_API_URL=http://127.0.0.1:11099/v1 MDDB_EMBEDDING_DIMENSIONS=64 mddbd &
+cd tools/bench && go run ./feedback -url http://localhost:11023 -queries 200 -seed 1
+```
+
+| Feedback | recall@10 seed 1 | seed 2 | seed 3 | p50 ms | p99 ms |
+|----------|------------------|--------|--------|--------|--------|
+| none | 0.305 | 0.298 | 0.325 | 0.4 | 1.0 |
+| `query` (Rocchio 1 / 0.75 / 0.25) | 0.491 | 0.490 | 0.503 | 0.5 | 1.4 |
+| `rescore` (weight 0.5) | 0.478 | 0.469 | 0.480 | 0.5 | 1.0 |
+
+- **One round lifts recall@10 from about 0.31 to about 0.49.** That is 60%
+  more of the right documents, and the agent rewrote nothing.
+- **`query` is slightly better than `rescore` here, and costs the same.**
+  `rescore` can only reorder the 30 candidates the index returned, while
+  `query` searches again from a better starting point. `rescore` is for when
+  the query vector must stay as it is.
+- **Latency barely moves.** Resolving the example keys and one vector
+  operation add about 0.1 ms at the median.
+- **This corpus favours feedback.** The bench serves its own
+  OpenAI-compatible embeddings, so the numbers are reproducible but not
+  representative of a real embedding model. Read them as what the mechanism
+  can recover, not as what every collection will gain.
+
 ---
 
 # Insert Throughput Benchmark

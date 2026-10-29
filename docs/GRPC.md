@@ -197,8 +197,20 @@ on the other two. A plan has `algorithm`, `prefilter`, `candidates`,
 `iterative_scan`, `reasons` and, for cross search, one `SearchPlan` per
 target in `collections`. `RetrievalProfileProto.vector_algorithm` (14) stores
 a collection's default, for example `"auto"`. The table the planner decides by
-is in [SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189). All of this is
-additive.
+is in [SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189).
+
+Relevance feedback (SRCH-015) is available on the same three requests:
+
+| Field | Number on `VectorSearchRequest` / `HybridSearchRequest` / `CrossSearchRequest` | Meaning |
+|---|---|---|
+| `positive`, `negative` (`repeated FeedbackExample`) | 21–22 / 30–31 / 22–23 | Examples: `key` (a document key or ID) or `vector` |
+| `feedback_mode` | 23 / 32 / 24 | `query` (default) or `rescore` |
+| `feedback_weight` | 24 / 33 / 25 | Rescore weight; 0 = 0.5 |
+| `rocchio` (`RocchioWeights`) | 25 / 34 / 26 | `optional double alpha, beta, gamma`; unset = 1, 0.75, 0.25 |
+
+With `explain`, `SearchPlan.feedback` (7, `FeedbackApplied`) reports the
+correction. An example that names nothing usable is `INVALID_ARGUMENT`. All
+of this is additive.
 
 ### New in v2.18.8
 

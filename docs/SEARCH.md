@@ -1022,6 +1022,46 @@ curl -X POST http://localhost:11023/v1/vector-search \
   applies across chunks, in `parent` mode across documents.
 - Also available on the `semantic_search` MCP tool (`mmr`, `mmr_lambda`).
 
+### Relevance Feedback — Positive and Negative Examples (v2.18.9+)
+
+After a first search you know which results were right and which were not.
+Send that back instead of rewriting the query. `positive` and `negative` list
+examples. An example is a document key (or ID) from the earlier results, or a
+vector:
+
+```bash
+curl -X POST http://localhost:11023/v1/vector-search \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "kb", "query": "rotate the signing key", "topK": 10,
+       "positive": ["key-rotation", "jwt-secrets"], "negative": ["tls-certificates"]}'
+```
+
+`feedbackMode` chooses how the examples are used:
+
+| Mode | What it does | Cost |
+|------|--------------|------|
+| `query` (default) | Moves the query vector: q′ = α·q + β·mean(positive) − γ·mean(negative), with α = 1, β = 0.75, γ = 0.25 (Rocchio). Override them with `rocchio: {alpha, beta, gamma}`. | One vector operation; works with every index |
+| `rescore` | Searches with the query as given, then adds `feedbackWeight` (default 0.5) × (mean similarity to the positives − mean similarity to the negatives) to each candidate's score. | Reads every candidate's vector; reorders only the `topK × oversample` candidates the index returned |
+
+- **Every vector counts at unit length.** A document example stands for the
+  mean of its chunks, so a long document does not outweigh a short one.
+- **Hybrid search corrects the vector half only.** The full-text half keeps
+  the query's words; words from the positives are not added to it.
+- **Cross search looks keys up** in `sourceCollection` first, then in each
+  target collection.
+- **Refusals.** A key with no embedding, a vector of the wrong dimension, an
+  unknown mode and more than 50 examples per side are refused with 422.
+- **No `positive` or `negative` means today's search.** Empty lists also count
+  as none.
+- With `explain: true`, `plan.feedback` shows the correction. It gives the
+  mode, the example counts, and either the Rocchio weights and `queryShift`
+  (1 − cosine between the query and the corrected query) or the rescore
+  `weight` and how many candidates were rescored.
+
+Measured in [BENCHMARK.md](BENCHMARK.md#relevance-feedback-v2189): one round
+of feedback raises recall@10 from 0.31 to 0.49–0.50 on a corpus built so
+that the query is ambiguous.
+
 ## Passages — What an Agent Gets (v2.18.8+)
 
 A document answers "which file"; an agent editing code needs "which lines,

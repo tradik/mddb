@@ -451,6 +451,27 @@ Send `auto` rather than guessing an index. Without `algorithm`, the search is
 flat, as before. The table behind the choice is in
 [`auto`: the server chooses](SEARCH.md#auto-the-server-chooses-v2189).
 
+## Telling the Search Which Results Were Right (v2.18.9+)
+
+`semantic_search`, `hybrid_search` and `cross_search` take `positive` and
+`negative`. These are the keys of results from an earlier call (vectors work
+too). The second search moves towards the positives and away from the
+negatives. You don't have to rewrite the query:
+
+```json
+{"name": "semantic_search", "arguments": {
+  "collection": "kb", "query": "rotate the signing key",
+  "positive": ["key-rotation"], "negative": ["tls-certificates"]
+}}
+```
+
+`feedback_mode` is `query` (default) or `rescore`. `query` moves the query
+vector (Rocchio; weights in `rocchio: {alpha, beta, gamma}`). `rescore`
+re-ranks the candidates by similarity to the examples, with `feedback_weight`
+(default 0.5). On `hybrid_search` only the vector half changes. With
+`explain: true`, `plan.feedback` shows the correction. See
+[Relevance Feedback](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189).
+
 ## Passages for Code (v2.18.8+)
 
 `search_documents`, `full_text_search`, `semantic_search`, `hybrid_search` and
@@ -555,7 +576,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | Tool | Description |
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
-| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`. |
+| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`). |
 | `get_indexing_status` | (v2.18.8) Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
 | `run_eval` | (v2.18.8) Measure search configurations on the collection's evaluation set: recall@k, nDCG@k, MRR, p50/p99 latency and tokens per configuration. Read-only. See [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188). |
 | `get_gain` | (v2.18.8) What retrieval saved over a window of days: searches by type and algorithm, tokens returned and tokens avoided by passages and chunks. Counts only. Read-only. |
@@ -563,8 +584,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
-| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`. |
-| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`. |
+| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`, and relevance feedback on the vector half (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`). |
+| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`, and relevance feedback (`positive`, `negative`, `feedback_mode`, `feedback_weight`, `rocchio`). |
 | `find_duplicates` | Find duplicate and similar documents within a collection. |
 
 ### Geo

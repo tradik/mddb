@@ -29,6 +29,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if err := req.ValidatePlanOptions(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateFeedback(); err != nil {
+		return nil, err
+	}
 	includeContent := req.IncludeContent || req.wantsPassages()
 	waited := s.waitForIndex(ctx, req.Collection, req.IndexWait)
 
@@ -70,6 +73,13 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	} else {
 		return nil, fmt.Errorf("%w and no queryVector provided", errNoEmbeddingProvider)
 	}
+	// SRCH-015: the examples as vectors; query mode corrects the query here.
+	fb, err := s.resolveFeedback(req.FeedbackOptions, []string{req.Collection}, len(queryVector))
+	if err != nil {
+		return nil, err
+	}
+	queryVector = fb.query(queryVector)
+	ps.Plan.Feedback = fb.report()
 
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
@@ -115,6 +125,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if s.collectionDiskOnly(req.Collection) {
 		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
 	}
+	results = s.rescoreFeedback(fb, req.Collection, results, metric) // SRCH-015, rescore mode
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
 	var bestChunk map[string]int
@@ -470,6 +481,9 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if err := req.ValidatePlanOptions(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateFeedback(); err != nil {
+		return nil, err
+	}
 	waited := c.server.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	httpReq := HybridSearchRequest{
@@ -496,6 +510,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		BM25B:           req.BM25B,
 		IncludeContent:  true,
 		PlanOptions:     req.PlanOptions,
+		FeedbackOptions: req.FeedbackOptions,
 	}
 
 	items, httpReq, err := c.server.hybridItems(ctx, httpReq)

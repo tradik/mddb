@@ -34,9 +34,10 @@ type CrossSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions // format, passageLines (AGT-002)
-	PlanOptions    // explain, latencyTargetMs (SRCH-013)
+	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions  // format, passageLines (AGT-002)
+	PlanOptions     // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
 	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
 	// include "role:reference" for every reference collection.
 	SearchType string `json:"searchType,omitempty"`
@@ -119,6 +120,10 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidateFeedback(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	if req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocID == "" {
 		bad(w, errors.New("one of query, queryVector, or sourceDocID is required"))
 		return
@@ -188,6 +193,12 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, errors.New("no embedding provider configured and no queryVector/sourceDocID provided"))
 		return
 	}
+	// SRCH-015: the examples as vectors; query mode corrects the query here.
+	fb, queryVector, err := s.crossFeedback(req.FeedbackOptions, req.SourceCollection, req.TargetCollections, queryVector, plan)
+	if err != nil {
+		unprocessable(w, err)
+		return
+	}
 
 	metric := vector.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
@@ -201,7 +212,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
-		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs,
+		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs, Feedback: fb,
 	})
 
 	// Track operation

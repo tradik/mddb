@@ -3,6 +3,7 @@ package vector
 import (
 	"mddb/internal/sliceutil"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -56,6 +57,26 @@ func (vi *VectorIndex) Add(collection, docID string, vector []float32) error {
 	}
 	vi.collections[collection][docID] = vector
 	return nil
+}
+
+// DocumentVectors returns a document's vectors in chunk order — "docID#0",
+// "docID#1", ... up to the first missing chunk — or its one unchunked vector
+// (SRCH-015: a document given as a feedback example stands for all of it).
+func (vi *VectorIndex) DocumentVectors(collection, docID string) [][]float32 {
+	vi.mu.RLock()
+	defer vi.mu.RUnlock()
+	coll := vi.collections[collection]
+	if v, ok := coll[docID]; ok {
+		return [][]float32{v}
+	}
+	var out [][]float32
+	for i := 0; ; i++ {
+		v, ok := coll[docID+"#"+strconv.Itoa(i)]
+		if !ok {
+			return out
+		}
+		out = append(out, v)
+	}
 }
 
 // GetVector returns the stored vector for a doc/chunk ID, or nil if absent.
