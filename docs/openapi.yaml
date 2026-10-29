@@ -3798,6 +3798,34 @@ paths:
                   hasMore:
                     type: boolean
 
+  /v1/code-languages:
+    get:
+      tags:
+        - Search
+      summary: Extension to language table for source files
+      description: |
+        The table the server classifies code by (AGT-001, v2.18.8), so a
+        client walking a directory — `mddb-cli autoindex` — marks files the
+        way the server would.
+      operationId: getCodeLanguages
+      responses:
+        "200":
+          description: The table
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  extensions:
+                    type: object
+                    additionalProperties: { type: string }
+                    example: { ".go": go, ".tsx": typescript }
+                  languages:
+                    type: array
+                    items: { type: string }
+        "405":
+          description: Method not allowed
+
   /v1/symbol:
     get:
       tags:

@@ -96,6 +96,19 @@ make dev-start-with-ollama
 | **mddbd** | 11023 (HTTP), 11024 (gRPC), 9000 (MCP), 11443 (HTTP/3) | `tradik/mddb:latest` | Database server with MCP built-in |
 | **mddb-panel** | 3000 | `tradik/mddb:panel` | React web admin UI |
 
+### Index a Repository in One Command
+
+```bash
+mddb-cli autoindex .
+```
+
+Every text file under the directory goes into one collection (named after the
+repository), with `path`, `kind`, `language`, `size`, `modified` and the git
+commit in its metadata; the server extracts symbols, and the search advisor
+stores a retrieval profile. Running it again only rewrites what changed;
+`--prune` removes what was deleted, `--dry-run` shows the plan first. See
+[Bulk Import](docs/BULK-IMPORT.md#autoindex-one-command-v2188).
+
 ### Connect to Claude / Cursor / Windsurf (MCP)
 
 MDDB has a built-in MCP server, so no extra service is needed. Add to your MCP config:

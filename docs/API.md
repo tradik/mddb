@@ -4198,6 +4198,12 @@ Spans by language:
 Interfaces and traits ("implementations") are left out on purpose: telling an
 implementation from a namesake needs type information a scanner does not have.
 
+### GET /v1/code-languages (v2.18.8+)
+
+The extension → language table the server classifies source by:
+`{"extensions": {".go": "go", ".tsx": "typescript", ...}, "languages": [...]}`.
+`mddb-cli autoindex` reads it so a client marks files the way the server would.
+
 ### Passages instead of documents (v2.18.8+)
 
 `/v1/fts`, `/v1/vector-search`, `/v1/hybrid-search` and `/v1/cross-search`

@@ -35,6 +35,44 @@ Display help information
 .BR \-\-version
 Display version information
 .SH COMMANDS
+.SS autoindex
+Index every text file under a directory into one collection (v2.18.8).
+.PP
+.B mddb-cli autoindex
+[\fIOPTIONS\fR] [\fIPATH\fR]
+.PP
+In a git repository the files are those git tracks or would track; elsewhere
+all files except build, dependency and cache directories. Binary files and
+files over the size limit are skipped. Each document is keyed by its path and
+carries meta path, extension, kind, language, size, modified, and gitCommit
+and gitBranch in a repository. Unchanged files are not rewritten. The search
+advisor then stores a retrieval profile for the collection.
+.PP
+Options:
+.TP
+.BR \-c ", " \-\-collection " " \fINAME\fR
+Collection (default: the repository or directory name).
+.TP
+.BR \-\-lang " " \fICODE\fR
+Language stored on every document (default en).
+.TP
+.BR \-\-include " " \fIGLOB\fR
+Only index matching paths; repeatable.
+.TP
+.BR \-\-exclude " " \fIGLOB\fR
+Skip matching paths; repeatable. dir/** matches a subtree.
+.TP
+.BR \-\-max\-file\-size " " \fIBYTES\fR
+Skip larger files (default 1048576).
+.TP
+.BR \-\-profile " " \fINAME\fR
+Ingest profile: fast trades parsing fidelity for speed.
+.TP
+.B \-\-prune
+Delete documents whose file no longer exists.
+.TP
+.B \-\-dry\-run
+Print the plan \(em files, skipped files and why, documents to prune \(em and write nothing.
 .SS add
 Add or update a markdown document in the database.
 .PP

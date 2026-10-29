@@ -62,8 +62,8 @@ func TestTypedMethodErrors(t *testing.T) {
 			if !errors.As(err, &apiErr) || apiErr.StatusCode != http.StatusBadRequest {
 				t.Errorf("want *APIError 400, got %v", err)
 			}
-			if tc.name == "SetCollectionConfig" {
-				return
+			if tc.name == "SetCollectionConfig" || tc.name == "SearchAdvisor" {
+				return // these return the body undecoded
 			}
 			if _, err := tc.call(context.Background(), New(badSrv.URL)); err == nil || !strings.Contains(err.Error(), "decode response") {
 				t.Errorf("want decode error, got %v", err)

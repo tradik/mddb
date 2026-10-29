@@ -75,6 +75,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Finding a CSS declaration in a 4 KB stylesheet takes one call and 292
   bytes. A collection profile may make it the default, and the search
   advisor recommends it for code. Without `format` nothing changes.
+- **`mddb-cli autoindex [path]` (AGT-001).** Loading a directory meant a
+  Markdown-only shell script or a hand-built bulk request. One command now
+  indexes a directory or repository: git-aware file list (or sensible
+  exclusions outside git), binary and oversized files skipped by content,
+  documents keyed by path with `path`, `extension`, `kind`, `language`,
+  `size`, `modified`, `gitCommit` and `gitBranch` meta, batches with
+  `skipDuplicates` so a second run rewrites only changed files, `--prune` for
+  deleted files, `--dry-run` for the plan, C/C++ include roots stored as
+  `code.includePaths`, and a retrieval profile from the search advisor.
+  This repository (1455 files, 14 MB) indexes in 41 s and re-checks in
+  0.5 s. The server classifies by its own table, now served at
+  `GET /v1/code-languages`; the Go client gained `CodeLanguages` and
+  `SearchAdvisor`.
 
 ### Changed
 

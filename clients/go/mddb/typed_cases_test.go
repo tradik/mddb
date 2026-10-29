@@ -2,6 +2,8 @@ package mddb
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -21,6 +23,29 @@ func typedCases() []typedCase {
 	alpha := 0.0
 	off := false
 	return []typedCase{
+		{
+			name:   "CodeLanguages",
+			call:   func(ctx context.Context, c *Client) (any, error) { return c.CodeLanguages(ctx) },
+			method: "GET", path: "/v1/code-languages",
+			respBody: `{"extensions":{".go":"go"},"languages":["go"]}`,
+			check: func(t *testing.T, got any) {
+				if r := got.(*CodeLanguages); r.Extensions[".go"] != "go" || r.Languages[0] != "go" {
+					t.Errorf("CodeLanguages = %+v", r)
+				}
+			},
+		},
+		{
+			name:   "SearchAdvisor",
+			call:   func(ctx context.Context, c *Client) (any, error) { return c.SearchAdvisor(ctx, "repo", true) },
+			method: "POST", path: "/v1/search-advisor",
+			wantBody: `"apply":true`,
+			respBody: `{"searchType":"hybrid"}`,
+			check: func(t *testing.T, got any) {
+				if !strings.Contains(string(got.(json.RawMessage)), "hybrid") {
+					t.Errorf("SearchAdvisor = %s", got)
+				}
+			},
+		},
 		{
 			name: "Ingest",
 			call: func(ctx context.Context, c *Client) (any, error) {

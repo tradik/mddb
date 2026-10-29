@@ -66,6 +66,7 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/meta-keys", s.handleMetaKeys)
 	mux.HandleFunc("/v1/code-graph", s.withSearchLimit(s.handleCodeGraph))
 	mux.HandleFunc("/v1/symbol", s.withSearchLimit(s.handleSymbol)) // CODE-008
+	mux.HandleFunc("/v1/code-languages", s.handleCodeLanguages)     // AGT-001
 	mux.HandleFunc("/v1/checksum", s.handleChecksum)
 	mux.HandleFunc("/v1/update", s.guardWrite(s.handleUpdate))
 	mux.HandleFunc("/v1/doc-meta", s.handleDocMeta)

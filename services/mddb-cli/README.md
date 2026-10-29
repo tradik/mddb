@@ -29,6 +29,9 @@ sudo cp mddb-cli.1 /usr/local/share/man/man1/
 ## Quick Start
 
 ```bash
+# Index this repository (or any directory) in one command
+mddb-cli autoindex .
+
 # Add a document
 echo "# Hello World" | mddb-cli add blog hello en_US
 
@@ -55,6 +58,18 @@ mddb-cli backup
 ```
 
 ### Commands
+
+#### autoindex - Index a directory or repository
+
+```bash
+mddb-cli autoindex [path] [-c collection] [--lang en] [--include glob]... [--exclude glob]...
+                   [--max-file-size bytes] [--profile fast] [--prune] [--dry-run]
+```
+
+Walks the directory (git-aware), skips binary and oversized files, sends the
+rest in batches with path, kind, language, size, modified and git metadata,
+and stores a retrieval profile from the search advisor. A second run rewrites
+only changed files. See [docs/BULK-IMPORT.md](../../docs/BULK-IMPORT.md).
 
 #### add - Add or update a document
 

@@ -7,9 +7,38 @@ status: publish
 
 # Bulk Import Guide
 
-## Overview
+## autoindex: one command (v2.18.8+)
 
-The `load-md-folder.sh` script allows you to bulk import markdown files from a folder into MDDB. It's perfect for migrating existing documentation, importing blog posts, or loading large collections of markdown content.
+`mddb-cli autoindex [path]` is the way to load a directory or a repository:
+
+```bash
+mddb-cli autoindex .                       # this repository, collection named after it
+mddb-cli autoindex ~/notes -c notes        # a folder, an explicit collection
+mddb-cli autoindex . --dry-run             # the plan: files, skipped files and why
+mddb-cli autoindex . --prune               # also delete documents whose file is gone
+mddb-cli autoindex . --exclude 'testdata/**' --max-file-size 2000000 --profile fast
+```
+
+| Step | What happens |
+|---|---|
+| Files | In a git repository, what git tracks or would track (`.gitignore` honoured); elsewhere everything except `node_modules`, `target`, `dist`, `build`, `vendor`, `.venv`, `__pycache__` and editor folders. `--include` / `--exclude` take globs (`dir/**` for a subtree). |
+| Skipped | Binary files (a NUL byte in the first 8 KiB, whatever the extension) and files over `--max-file-size` (default 1 MiB). `--dry-run` lists each with the reason. |
+| Documents | Key = the file's path; `lang` from `--lang` (default `en`). Meta: `path`, `extension`, `kind` (`code`, `doc` for Markdown, `text`), `language` (from the server's table, `GET /v1/code-languages`), `size`, `modified` (RFC 3339), and `gitCommit`, `gitBranch` in a repository. The server extracts `defines` / `uses` / `imports`. |
+| Sending | Batches of 200 documents or 4 MiB to `/v1/ingest`, with `skipDuplicates`: an unchanged file is counted `unchanged` and not rewritten, so a second run takes about a second. |
+| C and C++ | Directories named `include` holding headers become the collection's `code.includePaths`, unless it already has some, so `#include <...>` resolves in the code graph. |
+| After | The search advisor stores a retrieval profile for the collection (for code: hybrid search, graph mode, `format: passages`). |
+
+Measured on this repository (2.18.8): 1455 files, 14 MB, indexed in 41 s on a
+first run and checked in 0.5 s on a second with nothing changed.
+
+The CLI walks the directory; the server never takes a filesystem path, so
+there is no endpoint that could be pointed at the server's own disk. For
+the same reason there is no MCP tool for it: an agent runs `mddb-cli
+autoindex` like any other command.
+
+## Overview (load-md-folder.sh, legacy)
+
+`autoindex` replaces this script for new work. The `load-md-folder.sh` script imports markdown files from a folder into MDDB. It's perfect for migrating existing documentation, importing blog posts, or loading large collections of markdown content.
 
 ## Features
 

@@ -2,6 +2,7 @@ package mddb
 
 import (
 	"context"
+	"encoding/json"
 	"net/url"
 )
 
@@ -37,4 +38,27 @@ func (c *Client) Storage(ctx context.Context, collection string) (*StorageBreakd
 		return nil, err
 	}
 	return &out, nil
+}
+
+// CodeLanguages is the server's extension → language table (AGT-001).
+type CodeLanguages struct {
+	Extensions map[string]string `json:"extensions"`
+	Languages  []string          `json:"languages"`
+}
+
+// CodeLanguages returns the table the server classifies source files by, so
+// a client walking a directory marks files the way the server would.
+func (c *Client) CodeLanguages(ctx context.Context) (*CodeLanguages, error) {
+	var out CodeLanguages
+	if err := c.doJSON(ctx, "GET", "/v1/code-languages", nil, &out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+// SearchAdvisor measures a collection and recommends how to search it; with
+// apply it also stores the recommendation as the collection's retrieval
+// profile. The recommendation is returned as the server sends it.
+func (c *Client) SearchAdvisor(ctx context.Context, collection string, apply bool) (json.RawMessage, error) {
+	return c.Do(ctx, "POST", "/v1/search-advisor", map[string]any{"collection": collection, "apply": apply})
 }

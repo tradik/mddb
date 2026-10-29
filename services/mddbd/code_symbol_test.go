@@ -256,3 +256,24 @@ func TestLookupSymbol_Edges(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCodeLanguagesEndpoint(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	rec := httptest.NewRecorder()
+	s.handleCodeLanguages(rec, httptest.NewRequest(http.MethodGet, "/v1/code-languages", nil))
+	var resp CodeLanguagesResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil || resp.Extensions[".go"] != "go" || resp.Extensions[".tsx"] != "typescript" {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	for i := 1; i < len(resp.Languages); i++ {
+		if resp.Languages[i-1] >= resp.Languages[i] {
+			t.Fatalf("languages not sorted and unique: %v", resp.Languages)
+		}
+	}
+	rec = httptest.NewRecorder()
+	s.handleCodeLanguages(rec, httptest.NewRequest(http.MethodPost, "/v1/code-languages", nil))
+	if rec.Code != 405 {
+		t.Fatalf("POST: %d", rec.Code)
+	}
+}
