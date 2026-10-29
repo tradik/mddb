@@ -20,7 +20,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Wikipedia Import** - Stream and import MediaWiki XML dumps (`.xml.bz2`). Wikitext is auto-converted to Markdown, with namespace filtering, and multi-GB files are handled
 - **Built-in MCP Server** - 93 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
 - **Vector Search** - Auto-embed documents, semantic similarity with 7 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, BQ) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode-v2114) + ARM NEON/SME hardware acceleration + goroutine parallel search
-- **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere, configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
+- **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere, plus an offline lexical provider (spelling, not meaning), configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
 - **[Geo Search](docs/GEOSEARCH.md)** - R-tree and geohash indexes for radius/bounding-box queries, composable with FTS/vector via `hybrid-search`, optional postcode lookup
 - **RAG-Ready** - Hybrid search (BM25 keyword + vector, fused with RRF or alpha blending), [parent/chunk/window retrieval modes](docs/SEARCH.md#retrieval-modes--parent-chunk-window-v2114) for precise LLM context, [MMR result diversification](docs/SEARCH.md#mmr-result-diversification-v2114), and per-query metadata boosting (freshness/recency ranking)
 - **Native Multi-Tenancy** - [Namespace isolation per tenant](docs/MULTI_TENANCY.md) across HTTP/gRPC/GraphQL/MCP, ready for SaaS backends
@@ -389,6 +389,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Authorization** - Collection-level RBAC (Read/Write/Admin)
 - ✅ **Per-Protocol Access Modes** - `MDDB_MCP_MODE=read` (MCP read-only), `MDDB_API_MODE`, `MDDB_GRPC_MODE`, `MDDB_HTTP3_MODE`
 - ✅ **MCP Tool Control** - `MDDB_MCP_BUILTIN_TOOLS=false` to expose only custom YAML tools; `MDDB_MCP_TOOLSETS=search,code` (or per API key) to expose only some groups
+- ✅ **Confirm Destructive MCP Tools** - `MDDB_MCP_CONFIRM_DESTRUCTIVE=elicit|require` makes deletes, truncation and restore ask the human through MCP elicitation first ([guide](docs/MCP.md))
 - ✅ **User Management** - Multi-user with admin roles
 - ✅ **[Native Multi-Tenancy](docs/MULTI_TENANCY.md)** - Namespace isolation per tenant, enforced centrally across HTTP/gRPC/GraphQL/MCP; zero config for single-tenant deployments
 - ✅ **Group Permissions** - Organize users into groups

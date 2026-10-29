@@ -22,6 +22,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MCP: destructive tools can ask the user first (MCP-004).** New
+  `MDDB_MCP_CONFIRM_DESTRUCTIVE=off|elicit|require`; the default `off`
+  changes nothing.
+  - **What is gated.** With `elicit` or `require`, `delete_collection`,
+    `delete_documents_batch`, `delete_where`, `truncate_revisions` and
+    `restore_backup` ask the human behind the MCP client through
+    elicitation, and do nothing unless the answer is yes.
+    `delete_collection` also asks for the collection name to be typed.
+  - **2026-07-28 clients.** These are stateless, so the server returns an
+    `InputRequiredResult` (`resultType: "input_required"`). The client
+    retries with `inputResponses` and a `requestState` that is bound to the
+    call's arguments.
+  - **2025-11-25 clients.** The server sends `elicitation/create`: on stdio
+    it is written to stdout; over Streamable HTTP it comes as an SSE stream
+    answering the `tools/call` POST, and the client POSTs its answer back.
+  - **Clients without `elicitation`.** Under `elicit` they run the tool as
+    before. Under `require` they are refused with `-32021
+    MissingRequiredClientCapability`. The SSE transport and REST
+    `/mcp/tools/call` cannot ask.
+  - **stdio loop.** It now reads input on its own goroutine, so a response
+    to a server request reaches the call waiting for it.
+  - **Docs.** MCP.md "Confirming Destructive Tools", MCP-REVISIONS.md,
+    config.md.
+- **Lexical embedding provider (SRCH-014).** `MDDB_EMBEDDING_PROVIDER=lexical`
+  makes vector, hybrid and cross-collection search work with no model, no
+  network and no download. So do `retrievalMode: graph`, MMR, quantization
+  and HNSW.
+  - **How it works.** It hashes words and their 3–5-character n-grams into
+    512 dimensions by default (`MDDB_EMBEDDING_DIMENSIONS`, 256–2048). It
+    uses a signed second hash, `1+ln(tf)` weights and L2 normalisation, and
+    gives identical vectors on every machine.
+  - **It matches spelling, not meaning, and says so.** `GET /config` reports
+    `vectorConfig.semantic: false`, the search advisor reports
+    `profile.semantic: false`, and the panel shows "Matches by meaning: No".
+  - **Selection.** It is never autodetected. It is used only when named,
+    from the environment or a stored embedding config.
+  - **Results.** On the MDDB docs evaluation set, hybrid with lexical
+    vectors scored nDCG@10 0.726 against bm25's 0.719, a difference within
+    noise. `nomic-embed-text` hybrid scored 0.782. The advisor therefore
+    recommends keyword search for lexical collections, unless a collection's
+    own evaluation set measures hybrid better.
+  - **Intended for** CI, air-gapped installs and demos; see
+    docs/EMBEDDING_PROVIDERS.md.
 - **LangGraph Store on MDDB: `MddbStore` (INT-020).** `langchain-mddb`
   implements LangGraph's `BaseStore`, sync and async (`put`, `get`, `delete`,
   `search`, `list_namespaces`, `batch`), on one MDDB collection. This gives
