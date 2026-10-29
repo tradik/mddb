@@ -9881,6 +9881,13 @@ components:
             against, as a compiler's -I does. ["src"] makes `<net/conn.h>` in
             any file the document `src/net/conn.h`, which gives code_graph its
             include edges. Applied when a document is written.
+        role:
+          type: string
+          enum: [ "", reference ]
+          description: >
+            (v2.18.8, AGT-003) "" for the project's own code, "reference" for
+            code kept to learn from. Cross-search target "role:reference"
+            selects every reference collection.
           example: ["src"]
     CollectionFTS:
       type: object
@@ -10191,6 +10198,11 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        searchType:
+          type: string
+          enum: [ vector, fts, hybrid ]
+          default: vector
+          description: '(v2.18.8, AGT-003) fts and hybrid run the single-collection search in each target and fuse the lists by reciprocal rank; they need a query. A target "role:reference" stands for every collection whose code.role is reference.'
         format:
           type: string
           enum: [ results, passages ]

@@ -104,38 +104,59 @@ func passageAtHit(collection string, doc *storage.Doc, terms []string, highlight
 	return passageAround(collection, doc, hitLine(doc.ContentMD, terms), opts.radius(), score, source)
 }
 
-// hitLine is the line of the earliest term occurrence: as a whole word when
-// one exists, else as part of a word (a stem matches "classes" by "class").
-// A fuzzy match "query~indexed" is looked up by its indexed form.
+// hitLine picks the line where the most distinct terms meet, counting each
+// line together with the two on either side, so a passage lands in the
+// function that is about the query rather than on the first import that
+// shares a word with it. Whole-word matches are tried first, then parts of
+// words (a stem matches "classes" by "class"); a fuzzy match "query~indexed"
+// is looked up by its indexed form. Ties go to the earlier line.
 func hitLine(content string, terms []string) int {
-	lower := strings.ToLower(content)
-	best := -1
+	var clean []string
+	for _, t := range terms {
+		if i := strings.LastIndexByte(t, '~'); i >= 0 {
+			t = t[i+1:]
+		}
+		if t = strings.ToLower(t); t != "" && !containsString(clean, t) {
+			clean = append(clean, t)
+		}
+	}
+	lines := strings.Split(strings.ToLower(content), "\n")
 	for _, wholeWord := range []bool{true, false} {
-		for _, t := range terms {
-			if i := strings.LastIndexByte(t, '~'); i >= 0 {
-				t = t[i+1:]
-			}
-			if t = strings.ToLower(t); t == "" {
-				continue
-			}
-			for from := 0; ; {
-				i := strings.Index(lower[from:], t)
-				if i < 0 {
-					break
-				}
-				i += from
-				if !wholeWord || ((i == 0 || !isNameByte(lower[i-1])) && (i+len(t) >= len(lower) || !isNameByte(lower[i+len(t)]))) {
-					if best < 0 || i < best {
-						best = i
+		hits := make([][]bool, len(lines)) // hits[line][term]
+		any := false
+		for li, line := range lines {
+			for ti, t := range clean {
+				if (wholeWord && containsWord(line, t)) || (!wholeWord && strings.Contains(line, t)) {
+					if hits[li] == nil {
+						hits[li] = make([]bool, len(clean))
 					}
-					break
+					hits[li][ti], any = true, true
 				}
-				from = i + 1
 			}
 		}
-		if best >= 0 {
-			return strings.Count(content[:best], "\n") + 1
+		if !any {
+			continue
 		}
+		best, bestScore := 0, -1
+		for li := range lines {
+			if hits[li] == nil {
+				continue // a passage is centred on a line that matches
+			}
+			seen := make([]bool, len(clean))
+			score := 0
+			for k := max(li-2, 0); k <= min(li+2, len(lines)-1); k++ {
+				for ti, h := range hits[k] {
+					if h && !seen[ti] {
+						seen[ti] = true
+						score++
+					}
+				}
+			}
+			if score > bestScore {
+				best, bestScore = li, score
+			}
+		}
+		return best + 1
 	}
 	return 1
 }

@@ -397,6 +397,9 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	if err := validateChunking(cfg.Embedding); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+	if err := cfg.Code.Validate(); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
 
 	// RAG-001: a nil retrieval block means "not sent", which leaves any
 	// profile configured over REST in place.

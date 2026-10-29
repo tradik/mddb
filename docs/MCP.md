@@ -178,7 +178,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 83 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 87 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 
 ### API Key Authentication
@@ -454,7 +454,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
 | Toolset | Tools |
 |---|---|
 | `search` | `search_documents`, `aggregate`, `semantic_search`, `full_text_search`, `hybrid_search`, `cross_search`, `autocomplete`, `fts_languages`, `search_advisor`, `get_indexing_status`, `find_duplicates`, `classify_document`, `get_meta_keys` |
-| `code` | `code_graph`, `code_symbol` |
+| `code` | `code_graph`, `code_symbol`, `reference_search`, `reference_symbol`, `reference_examples`, `reference_dependencies` |
 | `documents` | `add_document`, `update_document`, `delete_document`, `get_document_meta`, `set_ttl`, `add_documents_batch`, `delete_documents_batch`, `export_documents`, `list_revisions`, `restore_revision` |
 | `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*` |
 | `memory` | `memory_*` |
@@ -502,7 +502,7 @@ handle the gap, cheapest first:
 
 ## Built-in Tool Catalog
 
-All 83 built-in tools, grouped by area. Tool inputs are self-describing via
+All 87 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -535,7 +535,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
 | `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. |
-| `cross_search` | Search across multiple collections using a source document's embedding or a text query. |
+| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. |
 | `find_duplicates` | Find duplicate and similar documents within a collection. |
 
 ### Geo
@@ -652,6 +652,10 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `restore_backup` | Restore the MDDB database from a backup file. |
 | `update_document` | Partially update a document. |
 | `get_document_meta` | Get document metadata without content. |
+| `reference_search` | (v2.18.8) Search reference code — other projects indexed with `mddb-cli reference add` — hybrid, as passages. See [REFERENCE-CODING.md](REFERENCE-CODING.md). |
+| `reference_symbol` | (v2.18.8) Where reference code defines and uses a symbol. |
+| `reference_examples` | (v2.18.8) The definitions in reference code that call a symbol, with their text. |
+| `reference_dependencies` | (v2.18.8) What a file in a reference collection imports, or what imports it. |
 | `code_symbol` | (v2.18.8) Everything about one symbol as path + line passages: definitions with their span, references with the definition each sits in, callers, callees, tests that touch it and siblings in the same directory. Read-only. |
 | `code_graph` | Code connection graph: what a document depends on and what depends on it: which stylesheet declares a selector, which pages load a script, which file defines a function this one calls (C, C++, assembly, Go, Rust, Java, Python, Ruby, PHP), which manifest declares the ConfigMap a Deployment refers to (Kubernetes, OpenShift, Kustomize, Terraform, Ansible). Edge kinds: `uses-selector`, `calls`, `references`, `imports`. |
 | `delete_collection` | Delete an entire collection and all its documents, revisions, and metadata indices. |

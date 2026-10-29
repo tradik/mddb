@@ -45,7 +45,7 @@ var mcpToolsets = map[string][]string{
 	ToolsetSearch: {"search_documents", "aggregate", "semantic_search", "full_text_search", "hybrid_search",
 		"cross_search", "autocomplete", "fts_languages", "search_advisor", "get_indexing_status",
 		"find_duplicates", "classify_document", "get_meta_keys"},
-	ToolsetCode: {"code_graph", "code_symbol"},
+	ToolsetCode: {"code_graph", "code_symbol", "reference_search", "reference_symbol", "reference_examples", "reference_dependencies"},
 	ToolsetDocuments: {"add_document", "update_document", "delete_document", "get_document_meta", "set_ttl",
 		"add_documents_batch", "delete_documents_batch", "export_documents", "list_revisions", "restore_revision"},
 	ToolsetIngest: {"import_url", "upload_file", "ingest_documents", "bulk_ingest_submit", "bulk_ingest_status",

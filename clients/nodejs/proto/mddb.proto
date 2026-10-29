@@ -1031,6 +1031,9 @@ message CodeConfigProto {
   // Collection-relative directories that angle-bracket includes resolve
   // against, as a compiler's -I does: ["src"] makes <net/conn.h> src/net/conn.h.
   repeated string include_paths = 1;
+  // (AGT-003) "" for the project's own code, "reference" for code kept to
+  // learn from; cross-search target "role:reference" selects them all.
+  string role = 2;
 }
 
 // CollectionFTSProto mirrors CollectionFTSDef (#335).

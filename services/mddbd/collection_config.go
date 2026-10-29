@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"mddb/internal/binlog"
 	"mddb/internal/boltx"
@@ -78,6 +79,21 @@ type CodeConfigDef struct {
 	// include edges. Applied when a document is written; documents stored
 	// before it was set keep their old imports until they are written again.
 	IncludePaths []string `json:"includePaths,omitempty"`
+	// Role says whose code this is (AGT-003): "" for the project's own,
+	// "reference" for someone else's code kept to learn from. Cross-search
+	// targets "role:reference" select every reference collection at once.
+	Role string `json:"role,omitempty"`
+}
+
+// CodeRoleReference marks a collection of code to learn from, not to edit.
+const CodeRoleReference = "reference"
+
+// Validate rejects a role nothing understands.
+func (c *CodeConfigDef) Validate() error {
+	if c == nil || c.Role == "" || c.Role == CodeRoleReference {
+		return nil
+	}
+	return fmt.Errorf("invalid code.role %q: must be empty or %q", c.Role, CodeRoleReference)
 }
 
 // WordPressTargetConfig holds the outbound publishing endpoint for a collection.
@@ -390,6 +406,10 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 	// RAG-001: a profile is stored data, so a value that cannot mean anything
 	// is refused here rather than surfacing as a strange result months later.
 	if err := req.Retrieval.Validate(); err != nil {
+		bad(w, err)
+		return
+	}
+	if err := req.Code.Validate(); err != nil {
 		bad(w, err)
 		return
 	}

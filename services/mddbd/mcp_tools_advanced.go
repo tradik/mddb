@@ -97,6 +97,7 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		Algorithm:        mcpGetString(args, "algorithm"),
 		DistanceMetric:   mcpGetString(args, "distance_metric"),
 		Oversample:       mcpGetFloat(args, "oversample"),
+		SearchType:       mcpGetString(args, "search_type"),
 		FilterMeta:       mcpGetMetaMap(args, "filter_meta"),
 	}
 	filter, filterErr := mcpGetFilter(args)

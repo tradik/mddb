@@ -36,6 +36,9 @@ type CrossSearchRequest struct {
 
 	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions // format, passageLines (AGT-002)
+	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
+	// include "role:reference" for every reference collection.
+	SearchType string `json:"searchType,omitempty"`
 }
 
 // CrossSearchResultItem represents a single cross-collection search result.
@@ -76,6 +79,20 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, errors.New("missing targetCollections"))
 		return
 	}
+	req.TargetCollections = s.expandTargets(req.TargetCollections)
+	if len(req.TargetCollections) == 0 {
+		bad(w, errors.New("no collection matches targetCollections"))
+		return
+	}
+	if err := validCrossSearchType(req.SearchType); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	textSearch := req.SearchType == CrossSearchFTS || req.SearchType == CrossSearchHybrid
+	if textSearch && req.Query == "" {
+		bad(w, errors.New("searchType "+req.SearchType+" needs a query"))
+		return
+	}
 	// SRCH-005: out of range is 422, not 400 — the body parsed fine, the
 	// number is the problem.
 	if err := ValidateOversample(req.Oversample); err != nil {
@@ -113,6 +130,11 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
+	}
+
+	if textSearch {
+		s.respondCrossText(w, r, req)
+		return
 	}
 
 	// Select algorithm

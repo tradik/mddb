@@ -7024,7 +7024,10 @@ type CodeConfigProto struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Collection-relative directories that angle-bracket includes resolve
 	// against, as a compiler's -I does: ["src"] makes <net/conn.h> src/net/conn.h.
-	IncludePaths  []string `protobuf:"bytes,1,rep,name=include_paths,json=includePaths,proto3" json:"include_paths,omitempty"`
+	IncludePaths []string `protobuf:"bytes,1,rep,name=include_paths,json=includePaths,proto3" json:"include_paths,omitempty"`
+	// (AGT-003) "" for the project's own code, "reference" for code kept to
+	// learn from; cross-search target "role:reference" selects them all.
+	Role          string `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7064,6 +7067,13 @@ func (x *CodeConfigProto) GetIncludePaths() []string {
 		return x.IncludePaths
 	}
 	return nil
+}
+
+func (x *CodeConfigProto) GetRole() string {
+	if x != nil {
+		return x.Role
+	}
+	return ""
 }
 
 // CollectionFTSProto mirrors CollectionFTSDef (#335).
@@ -12988,9 +12998,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\x14WordPressTargetProto\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x17\n" +
 	"\aapi_key\x18\x02 \x01(\tR\x06apiKey\x12\x1e\n" +
-	"\vapi_key_set\x18\x03 \x01(\bR\tapiKeySet\"6\n" +
+	"\vapi_key_set\x18\x03 \x01(\bR\tapiKeySet\"J\n" +
 	"\x0fCodeConfigProto\x12#\n" +
-	"\rinclude_paths\x18\x01 \x03(\tR\fincludePaths\"?\n" +
+	"\rinclude_paths\x18\x01 \x03(\tR\fincludePaths\x12\x12\n" +
+	"\x04role\x18\x02 \x01(\tR\x04role\"?\n" +
 	"\x12CollectionFTSProto\x12\x1d\n" +
 	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01B\n" +
 	"\n" +

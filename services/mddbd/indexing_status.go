@@ -233,13 +233,11 @@ func (s *Server) pendingMatches(collection, query string, filterMeta map[string]
 	if len(only) == 0 {
 		return nil
 	}
-	results, err := s.runFTSSearch(HybridSearchRequest{
+	// A search that cannot run finds nothing pending, which is the answer.
+	results, _ := s.runFTSSearch(HybridSearchRequest{
 		Collection: collection, Query: query, TopK: limit,
 		FilterMeta: filterMeta, Filter: filter, onlyIDs: only,
 	})
-	if err != nil {
-		return nil
-	}
 	ids := make([]string, 0, min(len(results), limit))
 	for _, r := range results {
 		if len(ids) == limit {

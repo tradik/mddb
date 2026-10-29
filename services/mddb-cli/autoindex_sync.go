@@ -59,22 +59,38 @@ func setIncludePaths(ctx context.Context, client *mddb.Client, collection string
 	if len(dirs) == 0 {
 		return nil
 	}
+	return updateCollectionConfig(ctx, client, collection, func(req *mddb.SetCollectionConfigRequest) bool {
+		if req.Code != nil && len(req.Code.IncludePaths) > 0 {
+			return false
+		}
+		if req.Code == nil {
+			req.Code = &mddb.CodeConfig{}
+		}
+		req.Code.IncludePaths = dirs
+		return true
+	})
+}
+
+// updateCollectionConfig reads a collection's config, lets change edit it,
+// and writes the whole of it back when change reports a change. A PUT
+// replaces the config, so every field is carried over; the server keeps
+// stored secrets when the masked ones come back empty.
+func updateCollectionConfig(ctx context.Context, client *mddb.Client, collection string, change func(*mddb.SetCollectionConfigRequest) bool) error {
 	cur, err := client.GetCollectionConfig(ctx, collection)
 	if err != nil {
 		return err
 	}
 	cfg := cur.Config
-	if cfg.Code != nil && len(cfg.Code.IncludePaths) > 0 {
-		return nil
-	}
-	// Read, change, write the whole config: a PUT replaces it, and the
-	// server keeps stored secrets when the masked ones come back empty.
-	return client.SetCollectionConfig(ctx, mddb.SetCollectionConfigRequest{
+	req := mddb.SetCollectionConfigRequest{
 		Collection: collection, Type: cfg.Type, Description: cfg.Description, Icon: cfg.Icon, Color: cfg.Color,
 		CustomMeta: cfg.CustomMeta, StorageBackend: cfg.StorageBackend, StorageConfig: cfg.StorageConfig,
 		Quantization: cfg.Quantization, DiskOnlyVectors: cfg.DiskOnlyVectors, MaxRevisions: cfg.MaxRevisions,
 		Encrypted: cfg.Encrypted, WordPress: cfg.WordPress, Retrieval: cfg.Retrieval, ResponsePrompt: cfg.ResponsePrompt,
-		Code: &mddb.CodeConfig{IncludePaths: dirs}, Embedding: cfg.Embedding, FTS: cfg.FTS,
+		Code: cfg.Code, Embedding: cfg.Embedding, FTS: cfg.FTS,
 		TrackAccess: cfg.TrackAccess, TrackHot: cfg.TrackHot, SpellCorrect: cfg.SpellCorrect, SpellLang: cfg.SpellLang,
-	})
+	}
+	if !change(&req) {
+		return nil
+	}
+	return client.SetCollectionConfig(ctx, req)
 }

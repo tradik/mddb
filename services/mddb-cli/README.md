@@ -59,6 +59,21 @@ mddb-cli backup
 
 ### Commands
 
+#### reference - Index other projects' code to learn from
+
+```bash
+mddb-cli reference add github.com/etcd-io/bbolt [--ref v1.4.0] [--name bbolt]
+mddb-cli reference list
+mddb-cli reference update [name]
+mddb-cli reference remove <name>
+mddb-cli reference search "how are freelist pages released"
+```
+
+Shallow-clones into the user cache directory (`MDDB_REFERENCES_DIR` overrides
+it), indexes the clone into `ref-<owner>-<repo>` marked `code.role:
+reference`, with the licence and source on every document. See
+[docs/REFERENCE-CODING.md](../../docs/REFERENCE-CODING.md).
+
 #### autoindex - Index a directory or repository
 
 ```bash

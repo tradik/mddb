@@ -88,6 +88,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   0.5 s. The server classifies by its own table, now served at
   `GET /v1/code-languages`; the Go client gained `CodeLanguages` and
   `SearchAdvisor`.
+- **Reference coding (AGT-003).** There was no way to keep another
+  project's code next to yours and ask how it solved something.
+  `mddb-cli reference add|list|update|remove|search` shallow-clones a
+  repository on the client (https, ssh only) and indexes it into a
+  collection marked `code.role: "reference"`, with the repository, commit
+  and licence in its description and `meta.license` on every document.
+  Cross-search takes `searchType: fts|hybrid` (fused across collections by
+  rank) and the selector `role:reference`; four read-only MCP tools —
+  `reference_search`, `reference_symbol`, `reference_examples`,
+  `reference_dependencies` — answer in passages. The server never clones and
+  never takes a repository address. New guide: docs/REFERENCE-CODING.md.
 
 ### Changed
 

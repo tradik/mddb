@@ -130,14 +130,14 @@ func codeConfigToProto(cfg *CodeConfigDef) *proto.CodeConfigProto {
 	if cfg == nil {
 		return nil
 	}
-	return &proto.CodeConfigProto{IncludePaths: cfg.IncludePaths}
+	return &proto.CodeConfigProto{IncludePaths: cfg.IncludePaths, Role: cfg.Role}
 }
 
 func codeConfigFromProto(in *proto.CodeConfigProto) *CodeConfigDef {
 	if in == nil {
 		return nil
 	}
-	return &CodeConfigDef{IncludePaths: in.GetIncludePaths()}
+	return &CodeConfigDef{IncludePaths: in.GetIncludePaths(), Role: in.GetRole()}
 }
 
 // applyCollectionConfigRequest merges a SetCollectionConfig request into cfg.

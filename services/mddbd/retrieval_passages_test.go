@@ -249,6 +249,8 @@ func TestHitLine(t *testing.T) {
 		{"many classes", []string{"class"}, 1},                    // then a stem
 		{"x\ny\njavascript", []string{"javascrip~javascript"}, 3}, // fuzzy: indexed form
 		{"nothing", []string{"zzz", ""}, 1},
+		// The cluster wins over the first lone match.
+		{"import os\nx\ny\nz\nw\nfunc release() {\n\tfree(pages)\n}", []string{"os", "release", "pages", "free"}, 6},
 	}
 	for _, tc := range cases {
 		if got := hitLine(tc.content, tc.terms); got != tc.want {

@@ -139,11 +139,9 @@ func (s *Server) symbolCallees(req SymbolRequest, defs []*sourceText) []Passage 
 		if len(out) > req.Limit {
 			break
 		}
-		def, err := s.LookupSymbol(SymbolRequest{Collection: req.Collection, Name: name, Include: []string{RelDefinitions},
+		// name is a non-empty meta value, so the lookup cannot be refused.
+		def, _ := s.LookupSymbol(SymbolRequest{Collection: req.Collection, Name: name, Include: []string{RelDefinitions},
 			Limit: req.Limit, IncludeContent: req.IncludeContent})
-		if err != nil {
-			continue
-		}
 		for _, p := range def.Definitions {
 			p.Source = RelCallees
 			out = append(out, p)

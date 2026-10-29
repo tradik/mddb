@@ -105,6 +105,9 @@ type RetrievalProfile struct {
 // collection-relative directories angle-bracket includes resolve against.
 type CodeConfig struct {
 	IncludePaths []string `json:"includePaths,omitempty"`
+	// Role is "" for a project's own code and "reference" for code kept to
+	// learn from (v2.18.8).
+	Role string `json:"role,omitempty"`
 }
 
 // EmbeddingChunking overrides the server's embedding chunk size (characters)

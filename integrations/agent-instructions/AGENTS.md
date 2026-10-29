@@ -31,6 +31,15 @@ Do you know words that appear in the text?
   narrow a set, not to find text.
 - **`aggregate`** — counts and groupings. Never fetch documents to count them.
 
+## Before implementing something new
+
+If a project that already solved it is indexed as a reference (`mddb-cli
+reference list`), ask it first: `reference_search` for "how did they do X",
+`reference_examples` for code that calls a function, `reference_symbol` for
+where something is defined. Each answer names the licence in
+`meta.license` — learn from the approach; copy code only when that licence
+allows it, and say which licence applies.
+
 ## Before changing code
 
 Ask `code_symbol` about the function, type or selector first: one call returns

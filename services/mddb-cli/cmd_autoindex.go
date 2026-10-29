@@ -31,6 +31,9 @@ type autoindexOptions struct {
 	include, exclude                []string
 	maxSize                         int64
 	prune, dryRun                   bool
+	// extraMeta is added to every document: a reference repository's
+	// licence and source (AGT-003).
+	extraMeta map[string][]string
 }
 
 // autoindexReport is what a run did; printed as text or, with --json, as is.
@@ -217,7 +220,11 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 		if len(batch) > 0 && (len(batch) >= autoindexBatchDocs || size+len(content) > autoindexBatchBytes) {
 			flush()
 		}
-		batch = append(batch, mddb.IngestDocument{Key: f.Rel, Lang: o.lang, ContentMD: string(content), Meta: fileMeta(f, rep.Git)})
+		meta := fileMeta(f, rep.Git)
+		for k, v := range o.extraMeta {
+			meta[k] = v
+		}
+		batch = append(batch, mddb.IngestDocument{Key: f.Rel, Lang: o.lang, ContentMD: string(content), Meta: meta})
 		size += len(content)
 	}
 	flush()

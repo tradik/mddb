@@ -757,6 +757,9 @@ type MCPCrossSearchRequest struct {
 
 	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions // format, passageLines (AGT-002)
+	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
+	// include "role:reference" for every reference collection.
+	SearchType string `json:"searchType,omitempty"`
 }
 
 // MCPCrossSearchResponse is the response for cross_search.
@@ -918,6 +921,8 @@ type MCPClient interface {
 	// (SRCH-010), so an agent picks an algorithm from evidence rather than
 	// from the names.
 	SearchAdvisor(ctx context.Context, collection string) (*SearchRecommendation, error)
+	// ExpandTargets resolves "role:<role>" collection selectors (AGT-003).
+	ExpandTargets(ctx context.Context, targets []string) []string
 	// CodeSymbol answers where a symbol is defined and used (CODE-008).
 	CodeSymbol(ctx context.Context, req *SymbolRequest) (*SymbolResult, error)
 	// IndexingStatus reports queued embedding and metadata work (GO-042).

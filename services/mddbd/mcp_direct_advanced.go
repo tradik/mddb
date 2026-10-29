@@ -261,6 +261,9 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 		cfg.MaxRevisions = *req.MaxRevisions
 	}
 	if req.Code != nil {
+		if err := req.Code.Validate(); err != nil {
+			return err
+		}
 		cfg.Code = req.Code
 	}
 	if req.Embedding != nil {
@@ -389,6 +392,28 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	}
 	if err := req.ValidatePassageOptions(); err != nil {
 		return nil, err
+	}
+	if err := validCrossSearchType(req.SearchType); err != nil {
+		return nil, err
+	}
+	req.TargetCollections = s.expandTargets(req.TargetCollections)
+	if len(req.TargetCollections) == 0 {
+		return nil, fmt.Errorf("no collection matches target_collections")
+	}
+	if req.SearchType == CrossSearchFTS || req.SearchType == CrossSearchHybrid {
+		if req.Query == "" {
+			return nil, fmt.Errorf("searchType %s needs a query", req.SearchType)
+		}
+		waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
+		items := s.crossTextItems(ctx, crossTextParams{SearchType: req.SearchType, Query: req.Query,
+			Targets: req.TargetCollections, TopK: crossTopK(req.TopK), FilterMeta: req.FilterMeta, Filter: req.Filter,
+			GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
+		if req.wantsPassages() {
+			p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
+			return &MCPCrossSearchResponse{Passages: &p}, nil
+		}
+		return &MCPCrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
+			Algorithm: req.SearchType, Indexing: waited}, nil
 	}
 
 	// Select algorithm

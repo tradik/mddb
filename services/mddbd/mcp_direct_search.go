@@ -520,54 +520,10 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		IncludeContent:  true,
 	}
 
-	// Run FTS
-	ftsResults, err := c.server.runFTSSearch(httpReq)
+	items, httpReq, err := c.server.hybridItems(ctx, httpReq)
 	if err != nil {
 		return nil, err
 	}
-
-	// Run vector
-	vectorResults, err := c.server.runVectorSearch(ctx, httpReq)
-	if err != nil {
-		return nil, err
-	}
-
-	// Defaults. RAG-001: request > collection profile > historical default.
-	httpReq.TopK = c.server.ResolveTopK(httpReq.Collection, httpReq.TopK, 10)
-	if httpReq.Strategy == "" {
-		httpReq.Strategy = "alpha"
-	}
-	if httpReq.RRFK <= 0 {
-		httpReq.RRFK = 60
-	}
-	// SRCH-007: the MCP request carries a plain float, so this path cannot
-	// distinguish an omitted alpha from an explicit zero either. Left as it
-	// was rather than half-fixed — the HTTP surface now honours a zero, and
-	// bringing MCP with it means a shape change in the tool schema.
-	if httpReq.Strategy == "alpha" && httpReq.Alpha != nil && *httpReq.Alpha == 0 {
-		httpReq.Alpha = floatPtr(0.5)
-	}
-
-	mergeTopK := httpReq.TopK
-	if req.GroupBy != nil {
-		mergeTopK = groupedCandidates(httpReq.TopK)
-	}
-	var merged []HybridSearchResultItem
-	switch httpReq.Strategy {
-	case "rrf":
-		merged = mergeRRF(ftsResults, vectorResults, httpReq.RRFK, mergeTopK)
-	default:
-		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(httpReq.Alpha), mergeTopK)
-	}
-
-	// Apply per-query boosts/demotions (metadata-based score multipliers).
-	merged = c.server.applyBoostHybrid(req.Collection, merged, req.Boost)
-	if len(merged) > mergeTopK {
-		merged = merged[:mergeTopK]
-	}
-
-	items := c.server.loadHybridDocs(req.Collection, merged, true)
-	items = groupHybridItems(req.Collection, items, req.GroupBy, httpReq.TopK)
 	if req.wantsPassages() {
 		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited)
 		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy}, nil
@@ -613,6 +569,11 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	return resp, nil
 }
 
+// ExpandTargets resolves "role:<role>" selectors to collection names (AGT-003).
+func (c *DirectClient) ExpandTargets(_ context.Context, targets []string) []string {
+	return c.server.expandTargets(targets)
+}
+
 // CodeSymbol looks a symbol up (CODE-008).
 func (c *DirectClient) CodeSymbol(ctx context.Context, req *SymbolRequest) (*SymbolResult, error) {
 	return c.server.LookupSymbol(*req)
@@ -632,4 +593,60 @@ func (c *DirectClient) SearchAdvisor(ctx context.Context, collection string) (*S
 		return nil, errors.New("missing required field: collection")
 	}
 	return c.server.RecommendSearch(collection)
+}
+
+// hybridItems is hybrid search over one collection as MCP hybrid_search and
+// cross-collection hybrid search (AGT-003) run it: full-text and vector
+// halves, fused, boosted, loaded and grouped. It returns the request with its
+// defaults resolved, for the response to report.
+func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) ([]HybridSearchResultItem, HybridSearchRequest, error) {
+	// Run FTS
+	ftsResults, err := s.runFTSSearch(httpReq)
+	if err != nil {
+		return nil, httpReq, err
+	}
+
+	// Run vector
+	vectorResults, err := s.runVectorSearch(ctx, httpReq)
+	if err != nil {
+		return nil, httpReq, err
+	}
+
+	// Defaults. RAG-001: request > collection profile > historical default.
+	httpReq.TopK = s.ResolveTopK(httpReq.Collection, httpReq.TopK, 10)
+	if httpReq.Strategy == "" {
+		httpReq.Strategy = "alpha"
+	}
+	if httpReq.RRFK <= 0 {
+		httpReq.RRFK = 60
+	}
+	// SRCH-007: the MCP request carries a plain float, so this path cannot
+	// distinguish an omitted alpha from an explicit zero either. Left as it
+	// was rather than half-fixed — the HTTP surface now honours a zero, and
+	// bringing MCP with it means a shape change in the tool schema.
+	if httpReq.Strategy == "alpha" && httpReq.Alpha != nil && *httpReq.Alpha == 0 {
+		httpReq.Alpha = floatPtr(0.5)
+	}
+
+	mergeTopK := httpReq.TopK
+	if httpReq.GroupBy != nil {
+		mergeTopK = groupedCandidates(httpReq.TopK)
+	}
+	var merged []HybridSearchResultItem
+	switch httpReq.Strategy {
+	case "rrf":
+		merged = mergeRRF(ftsResults, vectorResults, httpReq.RRFK, mergeTopK)
+	default:
+		merged = mergeAlpha(ftsResults, vectorResults, alphaOrDefault(httpReq.Alpha), mergeTopK)
+	}
+
+	// Apply per-query boosts/demotions (metadata-based score multipliers).
+	merged = s.applyBoostHybrid(httpReq.Collection, merged, httpReq.Boost)
+	if len(merged) > mergeTopK {
+		merged = merged[:mergeTopK]
+	}
+
+	items := s.loadHybridDocs(httpReq.Collection, merged, true)
+	items = groupHybridItems(httpReq.Collection, items, httpReq.GroupBy, httpReq.TopK)
+	return items, httpReq, nil
 }

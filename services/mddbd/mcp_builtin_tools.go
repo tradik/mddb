@@ -12,7 +12,8 @@ const (
 // core + advanced groups (GO-015) to keep any single function manageable.
 func mcpBuiltinTools() []MCPTool {
 	t := mcpBuiltinToolsCore()
-	return append(t, mcpBuiltinToolsAdvanced()...)
+	t = append(t, mcpBuiltinToolsAdvanced()...)
+	return append(t, mcpReferenceTools()...)
 }
 
 // mcpBuiltinToolsCore lists the core document / search / index / webhook /
@@ -1027,13 +1028,14 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"source_collection":  map[string]interface{}{"type": "string", "description": "Collection containing the source document"},
 					"source_doc_id":      map[string]interface{}{"type": "string", "description": "Source document ID whose embedding to use as query"},
 					"query":              map[string]interface{}{"type": "string", "description": "Text query (alternative to source_doc_id)"},
-					"target_collections": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Collections to search in"},
+					"target_collections": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Collections to search in; \"role:reference\" means every reference collection"},
 					"top_k":              map[string]interface{}{"type": "integer", "description": "Number of results (default: 10)"},
 					"threshold":          map[string]interface{}{"type": "number", "description": "Minimum similarity threshold 0-1"},
 					"algorithm":          map[string]interface{}{"type": "string", "description": "Vector algorithm: flat (default), hnsw, ivf, pq, sq, bq"},
 					"distance_metric":    map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"include_content":    map[string]interface{}{"type": "boolean", "description": "Include document content in results"},
 					"oversample":         map[string]interface{}{"type": "number", "description": "Recall/latency knob: candidates fetched per result before deduplication or merging (1.0-10.0, default 3.0). Higher finds more, costs more."},
+					"search_type":        map[string]interface{}{"type": "string", "enum": []string{CrossSearchVector, CrossSearchFTS, CrossSearchHybrid}, "description": "vector (default), fts or hybrid; fts and hybrid fuse the collections by rank (v2.18.8)"},
 					"filter_meta":        map[string]interface{}{"type": "object", "description": "Metadata equality filter applied in every target collection"},
 					"filter":             mcpFilterSchema,
 					"format":             mcpFormatSchema,
@@ -1347,3 +1349,48 @@ var (
 		"description": "Lines of context on each side of a hit in a passage (default 10); a hit inside a shorter definition returns the definition",
 	}
 )
+
+// mcpReferenceTools are the reference coding tools (AGT-003).
+func mcpReferenceTools() []MCPTool {
+	collections := map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"},
+		"description": "Reference collections to use; default every collection with code.role reference"}
+	return []MCPTool{
+		{
+			Name: "reference_search",
+			Description: "Search reference code — other projects indexed with `mddb-cli reference add` — for how they " +
+				"solved something, before implementing it. Hybrid by default, answered as passages (path, lines, " +
+				"definition, text). Check the collection's licence before copying.",
+			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{
+				"query": map[string]interface{}{"type": "string"}, "collections": collections,
+				"search_type":   map[string]interface{}{"type": "string", "enum": []string{CrossSearchHybrid, CrossSearchFTS, CrossSearchVector}},
+				"top_k":         map[string]interface{}{"type": "integer"},
+				"passage_lines": mcpPassageLinesSchema, "filter": mcpFilterSchema,
+			}, "required": []string{"query"}},
+		},
+		{
+			Name:        "reference_symbol",
+			Description: "Where reference code defines and uses a symbol, as passages across every reference collection.",
+			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{
+				"name": map[string]interface{}{"type": "string"}, "collections": collections,
+				"limit": map[string]interface{}{"type": "integer"}, "include_content": map[string]interface{}{"type": "boolean"},
+			}, "required": []string{"name"}},
+		},
+		{
+			Name:        "reference_examples",
+			Description: "How reference code uses a symbol: the definitions that call it, with their code — worked examples to learn from.",
+			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{
+				"name": map[string]interface{}{"type": "string"}, "collections": collections,
+				"limit": map[string]interface{}{"type": "integer"},
+			}, "required": []string{"name"}},
+		},
+		{
+			Name:        "reference_dependencies",
+			Description: "What a file in a reference collection imports (direction out, default) or what imports it (in), with lines.",
+			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{
+				"collection": map[string]interface{}{"type": "string"}, "key": map[string]interface{}{"type": "string"},
+				"direction": map[string]interface{}{"type": "string", "enum": []string{"out", "in", "both"}},
+				"depth":     map[string]interface{}{"type": "integer"},
+			}, "required": []string{"collection", "key"}},
+		},
+	}
+}

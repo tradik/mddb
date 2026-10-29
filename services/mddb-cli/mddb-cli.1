@@ -35,6 +35,29 @@ Display help information
 .BR \-\-version
 Display version information
 .SH COMMANDS
+.SS reference
+Index other projects' code as reference collections and search them (v2.18.8).
+.PP
+.B mddb-cli reference add
+\fIREPOSITORY\fR [\fB\-\-ref\fR \fIREF\fR] [\fB\-\-name\fR \fINAME\fR]
+.br
+.B mddb-cli reference list
+.br
+.B mddb-cli reference update
+[\fINAME\fR]
+.br
+.B mddb-cli reference remove
+\fINAME\fR
+.br
+.B mddb-cli reference search
+\fIQUERY\fR [\fB\-\-top\-k\fR \fIN\fR] [\fB\-\-collection\fR \fINAME\fR]
+.PP
+add makes a shallow git clone under the user cache directory
+(\fBMDDB_REFERENCES_DIR\fR overrides it) and indexes it into
+ref-OWNER-REPO with code.role reference, recording the repository, commit and
+licence. Only https://, ssh:// and user@host:path addresses are accepted. The
+server never clones. search runs a hybrid search over every reference
+collection and prints path:lines passages.
 .SS autoindex
 Index every text file under a directory into one collection (v2.18.8).
 .PP
