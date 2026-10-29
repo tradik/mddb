@@ -45,7 +45,7 @@ import (
 // constant on purpose: scripts/bump-version.sh writes it and
 // scripts/check-version.sh guards it, so builds take no -X flag (OPS-022);
 // the release checks the artifact with `mddbd -version`.
-const VERSION = "2.18.8"
+const VERSION = "2.18.9"
 
 // versionLine is what `mddbd -version` prints.
 func versionLine() string { return "mddbd version " + VERSION }

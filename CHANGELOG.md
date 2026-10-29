@@ -7,171 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- **OPQ panicked on vectors under 8 dimensions (#364).** Training clamps the
-  subspace count to the dimension. A vector added after training was then
-  encoded with the configured count, past the trained codebooks. Encoding now
-  uses the count training produced.
-- **A per-collection restore that had to undo its file swap overflowed the
-  stack.** The undo closure called itself. It is now a separate function,
-  with a test.
-
-- **HNSW recall, the cost of the exact prefilter, and the `auto` thresholds
-  (SRCH-013).** The planner benchmark at 2k, 200k and 2M vectors found all
-  three.
-  - **HNSW recall@10 was 0.74–0.88 and changed between loads.**
-    - `coder/hnsw` kept each node's M closest candidates as neighbours. Documents
-      stored topic by topic therefore linked only inside their own topic, and a
-      search that entered the wrong topic could not leave it.
-    - It also ignored `efConstruction` and drew levels from the clock.
-    - MDDB now has its own graph with the paper's neighbour-selection
-      heuristic, 2M links on layer 0, `efConstruction` 200 (honoured),
-      `efSearch` 64 and a fixed seed.
-    - Recall@10 is now 1.000 at 20k and 200k vectors. Queries are 3–5× faster
-      (0.46 ms against 2.18 ms at 200k), and loading 200k vectors takes 53 s
-      instead of 322 s.
-    - `coder/hnsw` and our Windows fork of it (WIN-003) are no longer
-      dependencies.
-  - **The exact prefilter scanned the whole collection.** It now looks up
-    only the documents the filter admits. At 200k vectors with a 2% filter,
-    p50 dropped from 5.5 to 1.1 ms and p99 from 31 to 1.8 ms. Exact scans
-    also keep their top k in a heap instead of sorting every score, so flat
-    search at 200k takes 5 ms instead of 20.
-  - **`auto` thresholds.**
-    - A filter admitting between 5% and a third of the collection leaves HNSW
-      short of results. `auto` now sends it to a trained IVF, or else the
-      prefilter: 2.5 ms against 36 ms at 10%.
-    - `auto` also falls back to a trained IVF before flat.
-- **The `mddb-cli` Docker image could not be built.** It copied only `main.go`
-  of the CLI's 28 source files, and its build context did not include the Go
-  client that `go.mod` points to. It now builds from the repository root:
-  `docker build -f services/mddb-cli/Dockerfile .`.
-- **`mddb-cli` ignored `MDDB_SERVER`.** The README and the man page
-  documented it, but the CLI never read it. It now sets the default server,
-  and `--server` still overrides it.
-- **Two binaries were committed to the repository.** One was the 44 MB
-  server binary at the root, added with #358 in 2.18.8. The other was
-  `bin/deadcode`, added with GO-021. Both are removed, root binaries and
-  `bin/` are ignored, and the Docker build context excludes binaries built
-  in place.
-
-- **`mddb-cli autoindex` converts documents instead of skipping them or
-  indexing them raw (#363, AGT-001).**
-  - **The bug.** PDF, DOCX and ODT files were skipped as "binary". HTML,
-    RTF and TeX were sent as raw text, so tags and control words reached
-    the index.
-  - **Detection.** Autoindex now recognises convertible files by content
-    (`%PDF`, `{\rtf`, the zip main part, or the ODF/EPUB mimetype) or by
-    extension (HTML, TeX, CSV, mail).
-  - **Conversion on the server.** Autoindex sends these files as files, and
-    the server converts them with the same converters `/v1/upload` uses.
-    `/v1/ingest`, gRPC `Ingest` and MCP `ingest_documents` accept a file per
-    document (`format` + `contentBase64`, or `content_base64` over MCP).
-  - **Converted documents** carry `meta.sourceFormat` and `meta.kind` "doc".
-    skipDuplicates compares the converted Markdown, so a second run still
-    skips unchanged files. Unknown binaries are still skipped.
-  - **`--prune`** also removes the messages and attachments of a deleted
-    mail file.
-  - **One conversion dispatch.** Upload and MCP `upload_file` now share it,
-    instead of two copies that had drifted apart, and MCP gained
-    `text_only`.
-- **Ingest TTLs landed on the wrong documents.** They were applied by
-  position, so one skipped or failed document moved every later TTL onto
-  the next document. They are now applied by document ID.
-
-- **Hybrid search returned tied results in a different order on every call.**
-  Fused results came out of a map and were sorted by score alone. Under RRF,
-  ties are common: a document at rank r in one list ties with a document at
-  rank r in the other. When the `topK` cut fell inside a tie, even which
-  documents were returned changed between identical requests. Equal scores
-  are now ordered by document ID, in both RRF and alpha fusion. This covers
-  single-collection and cross-collection hybrid search.
-
-- **Changelog links in the 2.17 and 2.18.8 blog posts returned 404.** They
-  pointed at `blob/2.17.0` and `blob/2.18.8`, but those releases are tagged
-  `v2.17.0` and `v2.18.8`.
-
-- **A metadata-only update left full-text search on the old metadata
-  (#362).** `PATCH /v1/update`, gRPC `UpdateDocument` and MCP
-  `update_document` re-indexed FTS only when the content changed. Every
-  meta key is a BM25F field (`meta.<key>`), so the old values stayed
-  searchable and the new ones were not. A metadata change now re-indexes
-  the document.
-
-- **Data race between router wiring and the vector index reload after a
-  restore (#359).** In the per-collection layout, the first use of the
-  collection files after a restore, or at startup, sets every component's
-  router again: full-text index, vectors, geo points, TTL, temporal events
-  and document storage.
-  - **The race.** The vector index reload and request handlers read those
-    routers at the same time. Each router was a plain field, so
-    `go test -race` failed now and then.
-  - **The fix.** Routers are now held in `boltx.RouterSlot`, an atomic
-    pointer. A full-text index shares its slot with its per-request query
-    views.
-- **`-verify-db` reported a stack trace instead of the reason when bbolt's
-  check read past the file.** That read is a fatal runtime fault, not a
-  panic, so only panics were recognised. The report now gives
-  `fatal error: fault (unexpected fault address …)`.
-
-- **The S3 and memory storage backends key their index as bbolt does
-  (#360).** The key and language are stored with ASCII letters in lower
-  case, and the collection as written. So `README.md` is found as
-  `readme.md`, and two spellings of one key leave a single entry.
-  - **No bucket is rewritten, because there is nothing to migrate.** MDDB
-    keeps the key index of every collection in its local database, which
-    DOC-017 already migrates. It moves only document bodies to a backend,
-    so no release has written key-index objects to S3.
-
-- **SonarCloud quality gate failed on main after 2.18.8.** It reported
-  `gosecurity:S2083`, path traversal, on the collection directory of a
-  backup (`db_backup.go`). This is a false positive: the call goes through
-  an `os.Root`, which cannot leave the backup directory. That line, and the
-  new `os.Root` calls of scheduled backups, now carry the same `NOSONAR`
-  justification as the other writes in that code.
-
-- **A float32 vector record whose model name is 2 bytes long was read as
-  quantized (#361).** Such a record starts with the byte `2`, the same as
-  the quantized format's version byte. `Get`, index loading and chunk reuse
-  then failed on it with "truncated record" or skipped it. A record is now
-  read as quantized only if it does not decode as a float32 record.
-
-- **A document key finds its document under any spelling (DOC-017).** The
-  identifier has always been case-insensitive, but the key index stored the
-  key as written. So `README.md` was not found as `readme.md`, and writing
-  both spellings left two index entries.
-  - **The new rule.** The index now stores the key and language with ASCII
-    letters in lower case, as the identifier does. Collections stay
-    case-sensitive.
-  - **Schema version.** Every database file now records its on-disk schema
-    version (`schema_version`/`version`).
-  - **Migration.** On first open, 2.18.9 migrates older files before
-    serving any read or write: at startup, as each per-collection file
-    opens, and when a restore or a replication snapshot installs a file.
-    The rewrite is chunked and crash-safe. It merges duplicate spellings and
-    keeps the entry that points at an existing document.
-  - **Replication.** A follower applying entries from an older leader
-    stores them in the new form. Upgrade followers before the leader.
-  - **Downgrade.** Restore a backup taken before the upgrade: 2.18.8 finds
-    keys written with upper-case letters only by their lower-case spelling.
-- **Five-field cron schedules never ran.** The scheduler accepted only
-  six-field schedules, so a rule such as `0 9 * * *` (the documented form)
-  was stored and silently never fired. Both forms run now, and a schedule
-  that does not parse is refused when the rule is created or updated.
-- **The extreme-mode batch processor crashed on a cancelled request.** It
-  left empty slots that the commit then read; every document now gets an
-  answer.
-- **Setting a TTL stored an encrypted collection's document unencrypted.**
-  REST, MCP and gRPC each had their own set-TTL. None of them encrypted the
-  rewritten document, and only REST wrote it to the binlog. gRPC also left
-  the read cache stale, so an expired document could be served. There is
-  now one implementation that encrypts, writes the binlog and refreshes the
-  cache.
-- **gRPC `Add` ignored `ttl`.**
-- **Listing metadata keys cut values that contain `|`.** REST
-  `/v1/meta-keys`, MCP `get_meta_keys` and gRPC `GetMetaKeys` were three
-  copies, and each cut a value at its first `|`. They are now one.
+## [2.18.9] - 2026-10-29
 
 ### Added
 
@@ -450,6 +286,172 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `sonar-project.properties` ever applied. `.github/workflows/sonarcloud.yml`
   runs the scanner. It stays idle until the repository has a `SONAR_TOKEN`
   secret and Automatic Analysis is turned off in the SonarCloud project.
+
+### Fixed
+
+- **OPQ panicked on vectors under 8 dimensions (#364).** Training clamps the
+  subspace count to the dimension. A vector added after training was then
+  encoded with the configured count, past the trained codebooks. Encoding now
+  uses the count training produced.
+- **A per-collection restore that had to undo its file swap overflowed the
+  stack.** The undo closure called itself. It is now a separate function,
+  with a test.
+
+- **HNSW recall, the cost of the exact prefilter, and the `auto` thresholds
+  (SRCH-013).** The planner benchmark at 2k, 200k and 2M vectors found all
+  three.
+  - **HNSW recall@10 was 0.74–0.88 and changed between loads.**
+    - `coder/hnsw` kept each node's M closest candidates as neighbours. Documents
+      stored topic by topic therefore linked only inside their own topic, and a
+      search that entered the wrong topic could not leave it.
+    - It also ignored `efConstruction` and drew levels from the clock.
+    - MDDB now has its own graph with the paper's neighbour-selection
+      heuristic, 2M links on layer 0, `efConstruction` 200 (honoured),
+      `efSearch` 64 and a fixed seed.
+    - Recall@10 is now 1.000 at 20k and 200k vectors. Queries are 3–5× faster
+      (0.46 ms against 2.18 ms at 200k), and loading 200k vectors takes 53 s
+      instead of 322 s.
+    - `coder/hnsw` and our Windows fork of it (WIN-003) are no longer
+      dependencies.
+  - **The exact prefilter scanned the whole collection.** It now looks up
+    only the documents the filter admits. At 200k vectors with a 2% filter,
+    p50 dropped from 5.5 to 1.1 ms and p99 from 31 to 1.8 ms. Exact scans
+    also keep their top k in a heap instead of sorting every score, so flat
+    search at 200k takes 5 ms instead of 20.
+  - **`auto` thresholds.**
+    - A filter admitting between 5% and a third of the collection leaves HNSW
+      short of results. `auto` now sends it to a trained IVF, or else the
+      prefilter: 2.5 ms against 36 ms at 10%.
+    - `auto` also falls back to a trained IVF before flat.
+- **The `mddb-cli` Docker image could not be built.** It copied only `main.go`
+  of the CLI's 28 source files, and its build context did not include the Go
+  client that `go.mod` points to. It now builds from the repository root:
+  `docker build -f services/mddb-cli/Dockerfile .`.
+- **`mddb-cli` ignored `MDDB_SERVER`.** The README and the man page
+  documented it, but the CLI never read it. It now sets the default server,
+  and `--server` still overrides it.
+- **Two binaries were committed to the repository.** One was the 44 MB
+  server binary at the root, added with #358 in 2.18.8. The other was
+  `bin/deadcode`, added with GO-021. Both are removed, root binaries and
+  `bin/` are ignored, and the Docker build context excludes binaries built
+  in place.
+
+- **`mddb-cli autoindex` converts documents instead of skipping them or
+  indexing them raw (#363, AGT-001).**
+  - **The bug.** PDF, DOCX and ODT files were skipped as "binary". HTML,
+    RTF and TeX were sent as raw text, so tags and control words reached
+    the index.
+  - **Detection.** Autoindex now recognises convertible files by content
+    (`%PDF`, `{\rtf`, the zip main part, or the ODF/EPUB mimetype) or by
+    extension (HTML, TeX, CSV, mail).
+  - **Conversion on the server.** Autoindex sends these files as files, and
+    the server converts them with the same converters `/v1/upload` uses.
+    `/v1/ingest`, gRPC `Ingest` and MCP `ingest_documents` accept a file per
+    document (`format` + `contentBase64`, or `content_base64` over MCP).
+  - **Converted documents** carry `meta.sourceFormat` and `meta.kind` "doc".
+    skipDuplicates compares the converted Markdown, so a second run still
+    skips unchanged files. Unknown binaries are still skipped.
+  - **`--prune`** also removes the messages and attachments of a deleted
+    mail file.
+  - **One conversion dispatch.** Upload and MCP `upload_file` now share it,
+    instead of two copies that had drifted apart, and MCP gained
+    `text_only`.
+- **Ingest TTLs landed on the wrong documents.** They were applied by
+  position, so one skipped or failed document moved every later TTL onto
+  the next document. They are now applied by document ID.
+
+- **Hybrid search returned tied results in a different order on every call.**
+  Fused results came out of a map and were sorted by score alone. Under RRF,
+  ties are common: a document at rank r in one list ties with a document at
+  rank r in the other. When the `topK` cut fell inside a tie, even which
+  documents were returned changed between identical requests. Equal scores
+  are now ordered by document ID, in both RRF and alpha fusion. This covers
+  single-collection and cross-collection hybrid search.
+
+- **Changelog links in the 2.17 and 2.18.8 blog posts returned 404.** They
+  pointed at `blob/2.17.0` and `blob/2.18.8`, but those releases are tagged
+  `v2.17.0` and `v2.18.8`.
+
+- **A metadata-only update left full-text search on the old metadata
+  (#362).** `PATCH /v1/update`, gRPC `UpdateDocument` and MCP
+  `update_document` re-indexed FTS only when the content changed. Every
+  meta key is a BM25F field (`meta.<key>`), so the old values stayed
+  searchable and the new ones were not. A metadata change now re-indexes
+  the document.
+
+- **Data race between router wiring and the vector index reload after a
+  restore (#359).** In the per-collection layout, the first use of the
+  collection files after a restore, or at startup, sets every component's
+  router again: full-text index, vectors, geo points, TTL, temporal events
+  and document storage.
+  - **The race.** The vector index reload and request handlers read those
+    routers at the same time. Each router was a plain field, so
+    `go test -race` failed now and then.
+  - **The fix.** Routers are now held in `boltx.RouterSlot`, an atomic
+    pointer. A full-text index shares its slot with its per-request query
+    views.
+- **`-verify-db` reported a stack trace instead of the reason when bbolt's
+  check read past the file.** That read is a fatal runtime fault, not a
+  panic, so only panics were recognised. The report now gives
+  `fatal error: fault (unexpected fault address …)`.
+
+- **The S3 and memory storage backends key their index as bbolt does
+  (#360).** The key and language are stored with ASCII letters in lower
+  case, and the collection as written. So `README.md` is found as
+  `readme.md`, and two spellings of one key leave a single entry.
+  - **No bucket is rewritten, because there is nothing to migrate.** MDDB
+    keeps the key index of every collection in its local database, which
+    DOC-017 already migrates. It moves only document bodies to a backend,
+    so no release has written key-index objects to S3.
+
+- **SonarCloud quality gate failed on main after 2.18.8.** It reported
+  `gosecurity:S2083`, path traversal, on the collection directory of a
+  backup (`db_backup.go`). This is a false positive: the call goes through
+  an `os.Root`, which cannot leave the backup directory. That line, and the
+  new `os.Root` calls of scheduled backups, now carry the same `NOSONAR`
+  justification as the other writes in that code.
+
+- **A float32 vector record whose model name is 2 bytes long was read as
+  quantized (#361).** Such a record starts with the byte `2`, the same as
+  the quantized format's version byte. `Get`, index loading and chunk reuse
+  then failed on it with "truncated record" or skipped it. A record is now
+  read as quantized only if it does not decode as a float32 record.
+
+- **A document key finds its document under any spelling (DOC-017).** The
+  identifier has always been case-insensitive, but the key index stored the
+  key as written. So `README.md` was not found as `readme.md`, and writing
+  both spellings left two index entries.
+  - **The new rule.** The index now stores the key and language with ASCII
+    letters in lower case, as the identifier does. Collections stay
+    case-sensitive.
+  - **Schema version.** Every database file now records its on-disk schema
+    version (`schema_version`/`version`).
+  - **Migration.** On first open, 2.18.9 migrates older files before
+    serving any read or write: at startup, as each per-collection file
+    opens, and when a restore or a replication snapshot installs a file.
+    The rewrite is chunked and crash-safe. It merges duplicate spellings and
+    keeps the entry that points at an existing document.
+  - **Replication.** A follower applying entries from an older leader
+    stores them in the new form. Upgrade followers before the leader.
+  - **Downgrade.** Restore a backup taken before the upgrade: 2.18.8 finds
+    keys written with upper-case letters only by their lower-case spelling.
+- **Five-field cron schedules never ran.** The scheduler accepted only
+  six-field schedules, so a rule such as `0 9 * * *` (the documented form)
+  was stored and silently never fired. Both forms run now, and a schedule
+  that does not parse is refused when the rule is created or updated.
+- **The extreme-mode batch processor crashed on a cancelled request.** It
+  left empty slots that the commit then read; every document now gets an
+  answer.
+- **Setting a TTL stored an encrypted collection's document unencrypted.**
+  REST, MCP and gRPC each had their own set-TTL. None of them encrypted the
+  rewritten document, and only REST wrote it to the binlog. gRPC also left
+  the read cache stale, so an expired document could be served. There is
+  now one implementation that encrypts, writes the binlog and refreshes the
+  cache.
+- **gRPC `Add` ignored `ttl`.**
+- **Listing metadata keys cut values that contain `|`.** REST
+  `/v1/meta-keys`, MCP `get_meta_keys` and gRPC `GetMetaKeys` were three
+  copies, and each cut a value at its first `|`. They are now one.
 
 ## [2.18.8] - 2026-10-29
 
