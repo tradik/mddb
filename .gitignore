@@ -121,6 +121,7 @@ services/mddb-cli/mddb-cli
 services/mddbd/mddb
 services/mddbd/mddb-server
 tools/bench/mddb-bench
+tools/bench/maxsim/maxsim
 
 # Rust build artifacts
 services/mddb-chat/target/

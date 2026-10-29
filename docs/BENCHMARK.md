@@ -292,6 +292,144 @@ cd tools/bench && go run ./feedback -url http://localhost:11023 -queries 200 -se
   representative of a real embedding model. Read them as what the mechanism
   can recover, not as what every collection will gain.
 
+## Late interaction over chunks: the SRCH-004 spike (v2.18.9)
+
+MDDB stores a document as one vector per chunk (keys `docID#N`) and scores
+it by its best chunk against one vector of the whole query. Late interaction
+(ColBERT's MaxSim) scores many query vectors against many document vectors.
+The cheap variant tested here needs no new storage. It splits the query into
+parts and embeds each part. A document's score is the mean, over the parts,
+of each part's best chunk. Mean and sum give the same order, because every
+document is scored against the same number of parts.
+
+Two ways of splitting were tried:
+
+- **clauses**: split at punctuation and at "and". A part of one word joins
+  the part before it, and a query with nothing to split stays whole.
+- **4-word windows**: overlapping windows of 4 words, one every 2 words.
+
+Each split was also tried with the whole query added as one more part.
+**best part** is a control, not MaxSim. It scores a document by its best part
+instead of the mean, which makes it multi-query fusion. It shows whether a
+change comes from splitting the query or from summing over the parts.
+
+The server was not changed. The tool, [`tools/bench/maxsim`](https://github.com/tradik/mddb/tree/main/tools/bench/maxsim),
+reads each chunk's similarity to a query part through the existing API. It
+calls vector search with `retrievalMode: "chunk"`, the flat index and a
+`topK` above the chunk count, and does the aggregation itself. The vector
+and hybrid rows come from `POST /v1/eval` with per-query details. Every row
+is scored by the same function, which uses the formulas from
+`services/mddbd/eval.go`.
+
+There are two query sets:
+
+- **plain**: the 20 questions of `docs.json`.
+- **multi-topic**: every pair of those questions joined with "and", 190
+  queries. Both answer pages count as relevant. One query vector has to sit
+  between two topics here, which is the case MaxSim is supposed to help.
+
+Δ is the difference from **max, whole query**, which is today's scoring
+computed on the same client path, so the difference is the aggregation alone.
+The interval is a paired bootstrap, 2,000 resamples of the queries. A second
+seed moved no bound by more than 0.006. "better / worse" counts the queries
+whose nDCG@10 rose or fell.
+
+Measured 2026-10-29 on an AMD Ryzen 9 7950X (WSL2, Go 1.27.3, Ollama 0.33.3).
+The server was built from this release, using `nomic-embed-text` through
+Ollama, the default chunk size of 1,500 characters (891 chunks over the 60
+pages), and the embedding cache off so that every part costs one embedding
+call:
+
+```bash
+MDDB_EMBEDDING_PROVIDER=ollama MDDB_EMBEDDING_CACHE_SIZE=0 mddbd &
+cd tools/bench && go run ./maxsim -url http://localhost:11023 -load -docs ../../docs
+```
+
+**Plain set, 20 queries**
+
+| Scoring | recall@10 | nDCG@10 | MRR | Δ nDCG [95% CI] | better / worse | embed calls | p50 ms | p99 ms |
+|---|---|---|---|---|---|---|---|---|
+| vector (server) | 0.875 | 0.741 | 0.722 | +0.000 [+0.000, +0.000] | 0 / 0 | 1.0 | 11.8 | 52.8 |
+| hybrid (server) | 0.875 | 0.814 | 0.806 | +0.073 [−0.026, +0.177] | 6 / 2 | 1.0 | 12.2 | 20.0 |
+| max, whole query | 0.875 | 0.741 | 0.722 | — | — | 1.0 | 146.2 | 157.6 |
+| maxsim, clauses | 0.875 | 0.750 | 0.722 | +0.008 [−0.003, +0.028] | 1 / 1 | 1.3 | 147.5 | 430.3 |
+| maxsim, 4-word windows | 0.925 | 0.723 | 0.690 | −0.018 [−0.121, +0.079] | 4 / 5 | 3.0 | 483.1 | 813.4 |
+| maxsim, whole + clauses | 0.875 | 0.744 | 0.722 | +0.002 [−0.003, +0.010] | 1 / 1 | 1.5 | 147.5 | 587.5 |
+| maxsim, whole + windows | 0.925 | 0.739 | 0.704 | −0.003 [−0.076, +0.069] | 3 / 5 | 4.1 | 627.4 | 959.5 |
+| best part, clauses (control) | 0.850 | 0.711 | 0.689 | −0.030 [−0.079, +0.000] | 0 / 2 | 1.3 | 147.5 | 430.3 |
+
+**Multi-topic set, 190 queries**
+
+| Scoring | recall@10 | nDCG@10 | MRR | Δ nDCG [95% CI] | Δ recall [95% CI] | better / worse | embed calls | p50 ms | p99 ms |
+|---|---|---|---|---|---|---|---|---|---|
+| vector (server) | 0.736 | 0.602 | 0.760 | −0.002 [−0.005, +0.000] | −0.005 [−0.013, +0.000] | 0 / 2 | 1.0 | 12.9 | 28.3 |
+| hybrid (server) | 0.754 | 0.609 | 0.732 | +0.006 [−0.025, +0.037] | +0.014 [−0.015, +0.043] | 80 / 73 | 1.0 | 12.7 | 22.0 |
+| max, whole query | 0.741 | 0.603 | 0.760 | — | — | — | 1.0 | 153.3 | 260.2 |
+| maxsim, clauses | 0.663 | 0.481 | 0.575 | −0.123 [−0.147, −0.098] | −0.078 [−0.112, −0.044] | 32 / 128 | 2.5 | 299.6 | 724.4 |
+| maxsim, 4-word windows | 0.685 | 0.440 | 0.464 | −0.164 [−0.191, −0.135] | −0.056 [−0.090, −0.019] | 30 / 141 | 7.5 | 1173.6 | 1629.0 |
+| maxsim, whole + clauses | 0.708 | 0.528 | 0.635 | −0.076 [−0.098, −0.055] | −0.032 [−0.065, −0.000] | 37 / 108 | 3.5 | 461.0 | 878.5 |
+| maxsim, whole + windows | 0.696 | 0.475 | 0.534 | −0.128 [−0.154, −0.102] | −0.045 [−0.078, −0.013] | 31 / 130 | 8.5 | 1330.3 | 1781.8 |
+| best part, clauses (control) | 0.783 | 0.655 | 0.765 | +0.051 [+0.023, +0.080] | +0.042 [+0.005, +0.079] | 101 / 58 | 2.5 | 299.6 | 724.4 |
+
+The server rows give the server's own latency from `/v1/eval`. The other rows
+give client round trips, one after another, one per part. Each round trip
+returns all 891 chunks as JSON, about 150 ms, so those rows show only how
+latency grows with the number of parts. They are not what a server-side
+implementation would cost. That cost would be one embedding call per part,
+about 10 ms each with this model, plus one flat pass over the chunks per
+part. On the plain set the client path returns the same top 10 as the
+server's vector search on 19 of 20 queries, and on 175 of 190 multi-topic
+queries. The difference comes from the server's parent mode: it collapses an
+oversampled chunk list into documents and can then return fewer than 10.
+
+- **MaxSim makes multi-topic queries worse, well beyond the noise.** Every
+  split loses 0.08 to 0.16 nDCG@10, and every interval lies entirely below
+  zero. The mean over the parts rewards a page that is moderately close to
+  both topics over the two pages that each answer one of them. ColBERT's
+  MaxSim assumes that one document answers the whole query. In a query that
+  joins two needs, that assumption is false.
+- **On plain questions it changes nothing measurable.** Clause splitting
+  rarely finds anything to split (1.3 parts per query). Windows find one
+  more page in recall but rank worse, and every interval spans zero.
+- **The gain on multi-topic queries comes from splitting, not from summing.**
+  The best-part control gains +0.051 nDCG@10 [+0.023, +0.080] and +0.042
+  recall. It loses 0.030 on plain questions, with an interval that touches
+  zero. That is multi-query fusion, which is query decomposition and not late
+  interaction. If it is pursued, it needs its own ticket and its own
+  measurements.
+- **Hybrid stays the strongest single-call option on plain questions**
+  (+0.073 nDCG@10, though 20 queries cannot separate it from noise).
+
+**Verdict: no-go** for MaxSim over the existing chunks. The full variant,
+with token-level vectors, is **deferred**. None of the supported embedding
+providers returns token vectors today:
+
+- OpenAI `/v1/embeddings` returns one vector per input
+  ([API reference](https://developers.openai.com/api/reference/resources/embeddings/methods/create)).
+- Ollama `/api/embed` returns one vector per input and has no per-token
+  option ([API](https://docs.ollama.com/api/embed)).
+- Voyage returns one vector per input. Its contextualized chunk embeddings
+  (`voyage-context-4`) are also one vector per chunk
+  ([embeddings](https://docs.voyageai.com/docs/embeddings),
+  [contextualized](https://docs.voyageai.com/docs/contextualized-chunk-embeddings)).
+- Cohere `embed` returns one vector per input
+  ([API reference](https://docs.cohere.com/reference/embed)).
+
+Storing token vectors for this corpus would take about 279,000 tokens. That
+assumes 4 bytes per token and a 128-dimension ColBERT-style model. Today the
+corpus takes 891 × 768 × 4 B = 2.7 MB. The token vectors would take:
+
+| Format | Bytes per token | Corpus | vs today |
+|---|---|---|---|
+| float32 | 512 | 143 MB | 52× |
+| SQ (int8) | ~141 | 39 MB | 14× |
+| SQ4 (int4) | ~77 | 21 MB | 7.8× |
+| BQ (1 bit) | 16 | 4.5 MB | 1.6× |
+
+The SQ and SQ4 overheads come from the per-vector calibration listed in
+[QUANTIZATION.md](QUANTIZATION.md). The BQ figure assumes no per-vector
+overhead, which has not been measured.
+
 ---
 
 # Insert Throughput Benchmark
