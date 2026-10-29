@@ -202,6 +202,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `AddSynonym` with a blank term, `AddStopwords` with only blank words, and
     `Classify` with more than 100 labels. They now return
     `INVALID_ARGUMENT`.
+  - **`POST /v1/upload` had no request size limit.** The cap was applied
+    after the form had already been read, so an upload of any size was
+    written to temporary files in full. The body is now capped at 1 GB
+    before it is read.
+  - **Wiki import lost pages that failed inside a partly successful batch.**
+    They were counted neither as imported nor as failed, and their errors
+    were dropped. They are now counted as failed, with their errors.
   - **A boolean query starting with `NOT` lost its operators.** The clauses
     after it were joined with the wrong operator, so `NOT java python OR
     ruby` behaved like an AND.
