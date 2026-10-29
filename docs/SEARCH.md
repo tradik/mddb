@@ -1253,7 +1253,8 @@ Each image is stored under `KEY/images/NAME` (`seal.png`,
 key), `meta.altText`, `meta.caption` (the link's title, an emphasised or
 "Figure …"/"Fig. …" line under the image, or a PDF page's "Figure" line, in
 order), `meta.page` (PDF), `meta.position`, `meta.mimeType`, `meta.width`,
-`meta.height` and `meta.size`. Its text is `![alt](name)` and the caption, so
+`meta.height` and `meta.size`. Its text is a Markdown image link carrying
+the alt text, plus the caption, so
 **alt text and captions are in full-text search** (and in text embeddings)
 like any other words. The bytes are kept apart from the document, in the
 collection's `images` bucket: out of full-text search, chunking, the

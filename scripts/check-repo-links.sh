@@ -33,7 +33,8 @@ broken=()
 checked=0
 
 # Only files git tracks: node_modules, build output and vendored trees are not
-# ours to police.
+# ours to police. Test fixtures under testdata/ are inputs, and some link to
+# files that are missing on purpose (RAG-010's image-extraction warnings).
 while IFS= read -r file; do
 	dir="$(dirname "${file}")"
 
@@ -65,7 +66,7 @@ while IFS= read -r file; do
 			broken+=("${file} → ${target}")
 		fi
 	done < <(grep -oE '\]\([^)"'"'"' ]+\)' "${file}" 2>/dev/null | sed -E 's/^\]\(//; s/\)$//')
-done < <(git ls-files '*.md' | grep -vE '^(integrations/[^/]+/node_modules/|clients/nodejs/node_modules/)')
+done < <(git ls-files '*.md' | grep -vE '^(integrations/[^/]+/node_modules/|clients/nodejs/node_modules/)|/testdata/')
 
 if [[ ${checked} -eq 0 ]]; then
 	echo "check-repo-links: no relative links found — nothing to verify" >&2
