@@ -362,3 +362,36 @@ func TestAutoindex_NoGitOnPath(t *testing.T) {
 		t.Fatal("no git, no repository")
 	}
 }
+
+// A mail file that is gone takes its messages and attachments with it: they
+// carry its meta.path under keys of their own (GO-046).
+func TestAutoindex_PruneTakesAMailFilesParts(t *testing.T) {
+	dir := sampleTree(t)
+	routes := autoindexRoutes()
+	routes["/v1/aggregate"] = `{"facets":{"path":[{"value":"main.go","count":1},{"value":"inbox.mbox","count":3},{"value":"gone.go","count":1}]}}`
+	routes["/v1/search"] = `[{"key":"inbox.mbox","lang":"en"},{"key":"inbox.mbox/message-1","lang":"en"},{"key":"inbox.mbox/message-1/attachments/a.pdf","lang":"en"}]`
+	fs := newFakeServer(t, routes)
+	if _, err := runCLI(t, fs.URL, "autoindex", "--prune", "-c", "mail", dir); err != nil {
+		t.Fatal(err)
+	}
+	search := callsTo(fs, "POST", "/v1/search")
+	if len(search) != 1 || !strings.Contains(fmt.Sprint(search[0].Body["filterMeta"]), "inbox.mbox") {
+		t.Fatalf("only the path with several documents is looked up: %+v", search)
+	}
+	del := callsTo(fs, "POST", "/v1/delete-batch")
+	got := fmt.Sprint(del[0].Body["documents"])
+	for _, key := range []string{"gone.go", "inbox.mbox/message-1", "inbox.mbox/message-1/attachments/a.pdf"} {
+		if !strings.Contains(got, key) {
+			t.Errorf("%s not pruned: %s", key, got)
+		}
+	}
+	if strings.Count(got, "key:inbox.mbox ") != 1 {
+		t.Errorf("the file's own document is deleted once: %s", got)
+	}
+
+	routes["/v1/search"] = failure{500, `{"error":"search down"}`}
+	fs2 := newFakeServer(t, routes)
+	if out, _ := runCLI(t, fs2.URL, "autoindex", "--prune", "-c", "mail", dir); !strings.Contains(out, "prune inbox.mbox:") {
+		t.Fatalf("a failed lookup is reported: %s", out)
+	}
+}

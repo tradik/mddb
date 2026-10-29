@@ -14,34 +14,58 @@ import (
 const pruneFacetLimit = 1_000_000
 
 // prunable lists the paths the collection holds that the directory no longer
-// does. Only documents with a meta.path are considered, so documents added
-// by other means are never touched.
-func prunable(ctx context.Context, client *mddb.Client, collection string, files []autoFile) ([]string, error) {
+// does, with how many documents carry each. Only documents with a meta.path
+// are considered, so documents added by other means are never touched.
+func prunable(ctx context.Context, client *mddb.Client, collection string, files []autoFile) ([]string, map[string]int, error) {
 	agg, err := client.Aggregate(ctx, mddb.AggregateRequest{Collection: collection,
 		Facets: []mddb.FacetRequest{{Field: "path", OrderBy: "value"}}, MaxFacetSize: pruneFacetLimit})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	present := make(map[string]bool, len(files))
 	for _, f := range files {
 		present[f.Rel] = true
 	}
 	var gone []string
+	counts := make(map[string]int)
 	for _, b := range agg.Facets["path"] {
 		if !present[b.Value] {
 			gone = append(gone, b.Value)
+			counts[b.Value] = b.Count
 		}
 	}
 	sort.Strings(gone)
-	return gone, nil
+	return gone, counts, nil
 }
 
 // pruneDocs deletes the documents of files that are gone. Autoindex keys a
-// document by its path, so the path is the key.
+// document by its path, so the path is the key — except that a mail file
+// also leaves its messages and attachments (KEY/message-N,
+// KEY/attachments/NAME) under the same meta.path. A path carried by more
+// than one document is looked up, so those go with the file.
 func pruneDocs(ctx context.Context, client *mddb.Client, rep *autoindexReport, lang string) {
 	refs := make([]mddb.DocumentRef, 0, len(rep.ToPrune))
+	seen := make(map[mddb.DocumentRef]bool)
+	add := func(r mddb.DocumentRef) {
+		if !seen[r] {
+			seen[r] = true
+			refs = append(refs, r)
+		}
+	}
 	for _, p := range rep.ToPrune {
-		refs = append(refs, mddb.DocumentRef{Key: p, Lang: lang})
+		add(mddb.DocumentRef{Key: p, Lang: lang})
+		if rep.pruneCounts[p] < 2 {
+			continue
+		}
+		docs, err := client.Search(ctx, mddb.SearchRequest{Collection: rep.Collection,
+			FilterMeta: map[string][]string{"path": {p}}, Limit: rep.pruneCounts[p]})
+		if err != nil {
+			rep.Errors = append(rep.Errors, "prune "+p+": "+err.Error())
+			continue
+		}
+		for _, d := range docs {
+			add(mddb.DocumentRef{Key: d.Key, Lang: d.Lang})
+		}
 	}
 	resp, err := client.DeleteBatch(ctx, mddb.DeleteBatchRequest{Collection: rep.Collection, Documents: refs})
 	if err != nil {

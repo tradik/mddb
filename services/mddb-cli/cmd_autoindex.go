@@ -54,6 +54,9 @@ type autoindexReport struct {
 	IncludeDirs []string   `json:"includePaths,omitempty"`
 	Plan        []autoFile `json:"plan,omitempty"`
 	ToPrune     []string   `json:"toPrune,omitempty"`
+	// pruneCounts is how many documents carry each path in ToPrune: more
+	// than one means a mail file's messages and attachments (GO-046).
+	pruneCounts map[string]int
 	Skipped     []autoSkip `json:"skipped,omitempty"`
 	// Converted lists the files the server converted to Markdown, with the
 	// format each was converted from.
@@ -132,7 +135,7 @@ func runAutoindex(ctx context.Context, client *mddb.Client, o autoindexOptions) 
 	}
 	rep.IncludeDirs = includeDirs(files)
 	if o.prune {
-		if rep.ToPrune, err = prunable(ctx, client, rep.Collection, files); err != nil {
+		if rep.ToPrune, rep.pruneCounts, err = prunable(ctx, client, rep.Collection, files); err != nil {
 			return err
 		}
 	}

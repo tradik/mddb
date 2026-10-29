@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`mddb-cli autoindex` converts documents instead of skipping them or
+  indexing them raw (#363, AGT-001).**
+  - **The bug.** PDF, DOCX and ODT files were skipped as "binary". HTML,
+    RTF and TeX were sent as raw text, so tags and control words reached
+    the index.
+  - **Detection.** Autoindex now recognises convertible files by content
+    (`%PDF`, `{\rtf`, the zip main part, or the ODF/EPUB mimetype) or by
+    extension (HTML, TeX, CSV, mail).
+  - **Conversion on the server.** Autoindex sends these files as files, and
+    the server converts them with the same converters `/v1/upload` uses.
+    `/v1/ingest`, gRPC `Ingest` and MCP `ingest_documents` accept a file per
+    document (`format` + `contentBase64`, or `content_base64` over MCP).
+  - **Converted documents** carry `meta.sourceFormat` and `meta.kind` "doc".
+    skipDuplicates compares the converted Markdown, so a second run still
+    skips unchanged files. Unknown binaries are still skipped.
+  - **`--prune`** also removes the messages and attachments of a deleted
+    mail file.
+  - **One conversion dispatch.** Upload and MCP `upload_file` now share it,
+    instead of two copies that had drifted apart, and MCP gained
+    `text_only`.
+- **Ingest TTLs landed on the wrong documents.** They were applied by
+  position, so one skipped or failed document moved every later TTL onto
+  the next document. They are now applied by document ID.
+
 - **Hybrid search returned tied results in a different order on every call.**
   Fused results came out of a map and were sorted by score alone. Under RRF,
   ties are common: a document at rank r in one list ties with a document at
@@ -104,6 +128,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **New converters and a conversion confidence score (GO-046).**
+  - **New formats.**
+    - XLSX and ODS: one table per sheet, dates in ISO 8601.
+    - CSV and TSV: one table, separator detected.
+    - PPTX and ODP: one section per slide, speaker notes included.
+    - EPUB: chapters in reading (spine) order.
+    - EML and MBOX: headers in meta (`from`, `to`, `date`, `subject`,
+      `messageId`) and HTML bodies sanitised. Each convertible attachment
+      and each mailbox message is stored as its own document with
+      `meta.parent`.
+  - **No new dependency.** Everything is pure Go.
+  - **Detection by content.** The format is decided by content where the
+    format has a signature. Binary content no converter recognises is
+    refused.
+  - **PDF.** Compressed (FlateDecode) streams are now inflated. A scan
+    without a text layer is stored and flagged instead of failing.
+  - **Confidence.** Every converted document carries
+    `meta.conversionConfidence` (0–1, heuristic; a scan scores 0) and
+    `meta.conversionWarnings`.
+    - Upload responses return both, along with `parts`, and ingest
+      responses list `conversions`.
+    - `filter: {"conversionConfidence": {"lt": 0.5}}` finds low-confidence
+      documents, and the search advisor reports how many there are.
+  - **HTML conversion** now drops the `<head>` and decodes all entities.
 - **OpenTelemetry trace export (OPS-024).** With `MDDB_OTEL_ENDPOINT` set,
   MDDB sends spans over OTLP/HTTP (JSON) to any OpenTelemetry collector.
   - **Spans.** `search.fts`, `search.embed_query`, `search.vector`,
