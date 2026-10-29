@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"mddb/internal/embedding"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	"time"
@@ -63,10 +62,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if len(req.QueryVector) > 0 {
 		queryVector = req.QueryVector
 	} else if s.Embedding != nil {
-		embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
 		var err error
-		queryVector, err = s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
+		queryVector, err = s.embedQuery(ctx, req.Query)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errEmbedQuery, err)
 		}
@@ -103,7 +100,11 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		}
 		return resp, nil
 	}
+	vsp := s.Tracer.Stage(ctx, spanSearchVector) // OPS-024
+	vsp.SetString("mddb.vector.algorithm", algo)
 	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
+	vsp.SetInt("mddb.results", len(results))
+	vsp.End()
 
 	// Parent mode (default): dedupe chunks to their parent document.
 	// Chunk/window modes keep chunk hits and return the matching passage.
@@ -151,6 +152,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		s.Gain.Search(gainKind{Type: SearchTypeVector, Algorithm: algo}) // AGT-004
 	}
 	items := make([]MCPVectorSearchResult, 0, len(results))
+	load := s.Tracer.Stage(ctx, spanSearchLoadContent)
 	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
@@ -190,6 +192,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		}
 		return nil
 	})
+	load.SetInt("mddb.documents", len(items))
+	load.End()
 
 	if req.ReadLevel == ReadLevelIndexedPlusPending {
 		for _, doc := range pendingDocsFor(s, req.Collection, req.Query, req.FilterMeta, req.Filter, topK, items,
@@ -602,7 +606,7 @@ func (c *DirectClient) SearchAdvisor(ctx context.Context, collection string) (*S
 // defaults resolved, for the response to report.
 func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) ([]HybridSearchResultItem, HybridSearchRequest, error) {
 	// Run FTS
-	ftsResults, err := s.runFTSSearch(httpReq)
+	ftsResults, err := s.tracedFTS(ctx, httpReq)
 	if err != nil {
 		return nil, httpReq, err
 	}
@@ -636,6 +640,8 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 		mergeTopK = groupedCandidates(httpReq.TopK)
 	}
 	var merged []HybridSearchResultItem
+	fuse := s.Tracer.Stage(ctx, spanSearchFuse) // OPS-024
+	fuse.SetString("mddb.fusion.strategy", httpReq.Strategy)
 	switch httpReq.Strategy {
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, httpReq.RRFK, mergeTopK)
@@ -646,8 +652,10 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 	// Apply per-query boosts/demotions (metadata-based score multipliers).
 	// Boosting reorders; it never adds, so merged is still at most mergeTopK.
 	merged = s.applyBoostHybrid(httpReq.Collection, merged, httpReq.Boost)
+	fuse.SetInt("mddb.results", len(merged))
+	fuse.End()
 
-	items := s.loadHybridDocs(httpReq.Collection, merged, true)
+	items := s.tracedLoadHybridDocs(ctx, httpReq.Collection, merged, true)
 	// Curation rules (pin and hide) apply to every hybrid search, as they do
 	// over REST; the MCP and gRPC paths used to differ here.
 	items = s.applyCurationHybrid(httpReq.Collection, httpReq.Query, items)

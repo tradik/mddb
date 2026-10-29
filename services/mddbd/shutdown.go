@@ -53,6 +53,9 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	add("bulk-ingest", s.BulkIngest != nil, func() { s.BulkIngest.Stop() })
 	add("index-queue", s.IndexQueue != nil, func() { s.IndexQueue.Shutdown() })
 	add("embedding-worker", s.EmbeddingWorker != nil, func() { s.EmbeddingWorker.Stop() })
+	//    The spans those queues ended go out before anything else stops
+	//    (OPS-024).
+	add("tracing", s.Tracer != nil, s.shutdownTracing)
 
 	// 3. Stop the periodic workers; nothing is producing for them now.
 	add("ttl", s.TTLManager != nil, func() { s.TTLManager.Stop() })

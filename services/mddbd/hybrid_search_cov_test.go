@@ -27,7 +27,7 @@ func (covGFailEmbedding) Embed(context.Context, string, embedding.Role) ([]float
 
 // covGVectorServer is covGServer with a ready flat index, a mock provider
 // and a running embedding worker.
-func covGVectorServer(t *testing.T) *Server {
+func covGVectorServer(t testing.TB) *Server {
 	t.Helper()
 	s := covGServer(t)
 	s.VectorIndex.SetReady()
@@ -38,7 +38,7 @@ func covGVectorServer(t *testing.T) *Server {
 }
 
 // covGEmbedded adds a document and waits until its vector is searchable.
-func covGEmbedded(t *testing.T, s *Server, coll, key, content string, meta map[string][]string) storage.Doc {
+func covGEmbedded(t testing.TB, s *Server, coll, key, content string, meta map[string][]string) storage.Doc {
 	t.Helper()
 	d := addTestDoc(t, s, coll, key, "en", content, meta)
 	waitForEmbedding(t, s, coll, d.ID)

@@ -22,7 +22,7 @@ import (
 // shared by every covG test file in this package.
 
 // covGServer is the full handler test server with a language-aware FTS index.
-func covGServer(t *testing.T) *Server {
+func covGServer(t testing.TB) *Server {
 	t.Helper()
 	s, cleanup := newHandlerTestServer(t)
 	t.Cleanup(cleanup)

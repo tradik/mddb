@@ -14,6 +14,7 @@ Complete reference for all MDDB configuration parameters.
 ## Table of Contents
 
 - [General / Core](#general--core)
+- [OpenTelemetry Tracing](#opentelemetry-tracing-v2189)
 - [HTTP Server](#http-server)
 - [gRPC Server](#grpc-server)
 - [MCP (Model Context Protocol)](#mcp-model-context-protocol)
@@ -58,6 +59,20 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_METRICS_PUBLIC` | `"false"` | bool | With `MDDB_AUTH_ENABLED=true`, serve `/metrics` without credentials (SEC-009). No effect when auth is off ([TELEMETRY.md](TELEMETRY.md)) |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |
+
+---
+
+## OpenTelemetry Tracing (v2.18.9+)
+
+Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is set, and free when off. Spans, attributes and an example collector: [TELEMETRY.md](TELEMETRY.md#opentelemetry-tracing-v2189).
+
+| Variable | Default | Type | Description |
+|---|---|---|---|
+| `MDDB_OTEL_ENDPOINT` | — | string | Collector URL, e.g. `http://otel-collector:4318`. `/v1/traces` is appended unless the path already ends in it. Unset = no tracing |
+| `MDDB_OTEL_HEADERS` | — | string | Headers sent with every export, `key=value` pairs separated by commas, values percent-decoded (the `OTEL_EXPORTER_OTLP_HEADERS` format), e.g. `x-api-key=abc,authorization=Bearer%20t` |
+| `MDDB_OTEL_SAMPLE_RATIO` | `1` | float | Share of new traces recorded, `0`–`1`. A request whose `traceparent` carries a sampling decision keeps it |
+| `MDDB_OTEL_SERVICE_NAME` | `mddb` | string | The `service.name` resource attribute |
+| `MDDB_OTEL_QUEUE_SIZE` | `2048` | int | Spans waiting for export. When full, new spans are dropped and counted in `mddb_operations_total{operation="otel_spans_dropped"}` |
 
 ---
 

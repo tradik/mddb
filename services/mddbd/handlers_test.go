@@ -28,7 +28,7 @@ import (
 // handler tests.  Every subsystem that the handlers touch (Cache, FTSIndex,
 // TTLManager, WebhookManager, schema.SchemaManager, Metrics, VectorStore,
 // VectorIndex) is wired up so that no nil-pointer panics occur.
-func newHandlerTestServer(t *testing.T) (*Server, func()) {
+func newHandlerTestServer(t testing.TB) (*Server, func()) {
 	t.Helper()
 
 	f, err := os.CreateTemp("", "handler_test_*.db")
@@ -151,7 +151,7 @@ func newHandlerTestServer(t *testing.T) (*Server, func()) {
 // addTestDoc is a convenience helper that creates a document via the internal
 // addDocument method (bypassing HTTP) so that other handlers can be tested
 // against pre-existing data.
-func addTestDoc(t *testing.T, s *Server, coll, key, lang, content string, meta map[string][]string) storage.Doc {
+func addTestDoc(t testing.TB, s *Server, coll, key, lang, content string, meta map[string][]string) storage.Doc {
 	t.Helper()
 	doc, _, err := s.addDocument(coll, key, lang, meta, content, 0, true)
 	if err != nil {

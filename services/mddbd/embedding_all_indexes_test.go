@@ -22,7 +22,7 @@ import (
 // waitForEmbedding polls until the worker has put a document's first chunk
 // into the flat index, which it reaches last in no particular order but always
 // reaches. Embedding is asynchronous; the test must not race it.
-func waitForEmbedding(t *testing.T, s *Server, collection, docID string) {
+func waitForEmbedding(t testing.TB, s *Server, collection, docID string) {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {

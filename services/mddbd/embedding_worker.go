@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	"mddb/internal/metrics"
 	"mddb/internal/pending"
+	"mddb/internal/tracing"
 	vec "mddb/internal/vector"
 	"strings"
 	"sync"
@@ -30,6 +32,9 @@ type EmbeddingJob struct {
 	// Summary is the document's client-written summary (RAG-009), embedded
 	// as a vector of its own after the chunks; "" removes one it had.
 	Summary string
+	// trace is the span of the request that queued the job, so its
+	// ingest.embed span joins that request's trace (OPS-024). Zero = none.
+	trace tracing.SpanContext
 }
 
 // EmbeddingWorker processes embedding jobs asynchronously.
@@ -43,6 +48,7 @@ type EmbeddingWorker struct {
 	chunkSize    int
 	chunkEnabled bool
 	metrics      *metrics.Metrics
+	tracer       *tracing.Tracer // OPS-024; nil = tracing off
 
 	// enqueueWait is how long a writer waits for room in a full queue before
 	// the job is abandoned. It is the difference between an import that takes
@@ -262,11 +268,21 @@ func (w *EmbeddingWorker) worker(id int) {
 
 // run processes one job and records its end with the tracker. A parked job
 // has not ended: it stays pending until it is run again.
+//
+// A job queued by a traced request records an ingest.embed span in that
+// request's trace (OPS-024), ending after the response did.
 func (w *EmbeddingWorker) run(job EmbeddingJob) {
-	switch w.processJob(job) {
+	sp := w.tracer.Child(job.trace, spanIngestEmbed)
+	sp.SetString("mddb.collection", job.Collection)
+	sp.SetString("mddb.document.id", job.DocID)
+	outcome := w.processJob(job)
+	defer sp.End()
+	switch outcome {
 	case jobParked:
+		sp.SetString("mddb.embedding.outcome", "parked")
 		w.park(job)
 	case jobFailed:
+		sp.SetError(errEmbeddingJobFailed)
 		w.pending.Done(job.Collection, job.DocID, true)
 	default:
 		w.pending.Done(job.Collection, job.DocID, false)
@@ -324,6 +340,10 @@ func (w *EmbeddingWorker) Pending() *pending.Tracker { return w.pending }
 // worker waits one unit after the first failure, two after the second. A
 // variable only so tests of the failure path need not wait six seconds.
 var embeddingRetryDelay = time.Second
+
+// errEmbeddingJobFailed is what a failed job's ingest.embed span reports; the
+// cause is already in the log.
+var errEmbeddingJobFailed = errors.New("document left without its embedding")
 
 func (w *EmbeddingWorker) processJob(job EmbeddingJob) jobOutcome {
 	if out := w.processChunks(job); out != jobDone {

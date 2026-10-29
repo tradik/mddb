@@ -1,7 +1,7 @@
 ---
 title: "MDDB Telemetry & Monitoring"
 slug: "docs/telemetry"
-description: "MDDB's Prometheus-compatible /metrics endpoint exposing server, database and Go runtime telemetry with no external dependencies, plus Grafana panels."
+description: "MDDB's Prometheus-compatible /metrics endpoint exposing server, database and Go runtime telemetry with no external dependencies, Grafana panels, and OpenTelemetry trace export over OTLP/HTTP."
 status: publish
 ---
 
@@ -484,6 +484,141 @@ metadata:
     prometheus.io/port: "11023"
     prometheus.io/path: "/metrics"
 ```
+
+## OpenTelemetry Tracing (v2.18.9+)
+
+Metrics say how many searches ran and how long they took overall. They cannot
+say why one query took 900 ms: 20 ms of full-text search, 700 ms embedding the
+query, 5 ms fusing, 150 ms loading documents. Traces can. MDDB exports a span for
+each stage of a search or an ingest over OTLP/HTTP (JSON) to any OpenTelemetry
+collector (OPS-024). If the caller sends a W3C `traceparent`, the spans join the
+caller's own trace, so an agent framework's trace shows the database's work
+inside it.
+
+Prometheus remains the source of metrics. MDDB does not export OTLP metrics.
+
+### Setup
+
+```bash
+MDDB_OTEL_ENDPOINT=http://otel-collector:4318 mddbd
+```
+
+That is the only required setting. `/v1/traces` is appended to the endpoint
+unless its path already ends in it. The other settings are listed in
+[config.md](config.md#opentelemetry-tracing-v2189):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MDDB_OTEL_ENDPOINT` | — | Collector URL. Unset = tracing off |
+| `MDDB_OTEL_HEADERS` | — | `key=value,key2=value2`, sent with every export (API keys for hosted backends) |
+| `MDDB_OTEL_SAMPLE_RATIO` | `1` | Share of new traces recorded, 0–1. A caller's `traceparent` sampling flag is respected |
+| `MDDB_OTEL_SERVICE_NAME` | `mddb` | `service.name` resource attribute |
+| `MDDB_OTEL_QUEUE_SIZE` | `2048` | Spans waiting for export before new ones are dropped |
+
+To try it locally, run Jaeger, which accepts OTLP/HTTP on port 4318 and shows
+traces on 16686:
+
+```bash
+docker run --rm -p 4318:4318 -p 16686:16686 jaegertracing/jaeger:2.22.0
+MDDB_OTEL_ENDPOINT=http://localhost:4318 mddbd
+curl -s localhost:11023/v1/hybrid-search \
+  -H 'traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01' \
+  -d '{"collection":"kb","query":"snapshot backup"}'
+# open http://localhost:16686 and look up trace 4bf92f3577b34da6a3ce929d0e0e4736
+```
+
+The repository's compose files have no observability profile. In your own
+compose file, point `MDDB_OTEL_ENDPOINT` at the collector's service name, for
+example `http://otel-collector:4318`.
+
+### Where the trace context comes from
+
+| Transport | `traceparent` source | Server span name |
+|---|---|---|
+| REST (HTTP API, GraphQL) | `traceparent` request header | `POST /v1/hybrid-search` (method and path) |
+| gRPC | `traceparent` metadata key | `/mddb.MDDB/HybridSearch` (full method) |
+| MCP over HTTP (`/mcp`, `/sse`, `/tools/call`) | `traceparent` request header | `POST /mcp` |
+| MCP over stdio | none: every request starts its own trace | `mcp.stdio` |
+
+If a request has no `traceparent`, MDDB starts a new trace at its server span,
+sampled at `MDDB_OTEL_SAMPLE_RATIO`. If the endpoint is not set, no spans are
+created. A `traceparent` with the sampled flag off (`-00`) is honoured: nothing
+from that trace is exported.
+
+### Spans
+
+Every stage span is a child of the request's server span.
+
+| Span | Measured in | Covers | Attributes |
+|---|---|---|---|
+| `search.fts` | `tracedFTS` (`otel.go`), hybrid search over REST, gRPC, MCP and eval | The full-text half: filter, tokenise, BM25/BM25F | `mddb.collection`, `mddb.fts.algorithm`, `mddb.results` |
+| `search.embed_query` | `embedQuery` (`otel.go`), every vector-backed search | The embedding provider call for the query text | — |
+| `search.vector` | `vectorHalf` (`hybrid_search.go`), `VectorSearch` (`mcp_direct_search.go`) | The index search the planner chose, the iterative scan, feedback rescoring and summaries | `mddb.vector.algorithm`, `mddb.results` |
+| `search.fuse` | `handleHybridSearch`, `hybridItems` | Merging the halves (alpha, rrf, weighted) and per-query boosts | `mddb.fusion.strategy`, `mddb.results` |
+| `search.load_content` | `tracedLoadHybridDocs` (`otel.go`), `VectorSearch` | Reading the hit documents from the database | `mddb.documents` |
+| `ingest.convert` | `ingestDocuments` (`ingest.go`) | Keys from URLs, frontmatter, metadata injection, deduplication | `mddb.collection`, `mddb.documents` |
+| `ingest.index` | `ingestDocuments` | The batch write, TTLs, and the full-text, geo and temporal indexes | `mddb.collection`, `mddb.documents` |
+| `ingest.embed` | `EmbeddingWorker.run` (`embedding_worker.go`) | One document's embedding on the background worker. It ends after the ingest response, in the same trace | `mddb.collection`, `mddb.document.id` |
+
+Server spans carry `http.request.method`, `url.path` and
+`http.response.status_code` (REST, MCP over HTTP), or `rpc.system` and
+`rpc.method` (gRPC, MCP over stdio). A span is marked as an error when its stage
+returned one, when an HTTP response is a 5xx, or when an RPC fails. The resource
+carries `service.name` and `service.version`.
+
+The stage names are defined in one place (`otel.go`). They follow the stages the
+`explain` plan (SRCH-013) describes. The plan says which index answered and why;
+the spans say how long each stage took. Neither the plan nor the evaluation run
+(SRCH-019, which reports end-to-end latency per configuration) has its own stage
+timers: the spans are the only per-stage measurement.
+
+### Delivery
+
+- **Asynchronous and batched.** Ended spans go into a bounded queue. One
+  goroutine sends them in batches of up to 512, or every 5 seconds, whichever
+  comes first.
+- **Requests are never slowed by the collector.** When the queue is full, new
+  spans are dropped and counted as
+  `mddb_operations_total{operation="otel_spans_dropped"}`. A failed export (the
+  collector is down, or returns an error status) is logged at debug level and
+  counted as `mddb_operations_total{operation="otel_export_failed"}`.
+- **Flushed on shutdown.** The ordered shutdown sends the queued spans after the
+  embedding worker has drained, waiting at most 5 seconds.
+
+### Cost
+
+**Binary size.** The exporter is written in-house, with no OpenTelemetry SDK
+dependency. It implements the subset MDDB needs: W3C trace context, span timing,
+and OTLP/HTTP JSON. Measured on the stripped release build
+(`CGO_ENABLED=0 go build -trimpath -ldflags="-s -w"`, linux/amd64, Go 1.27.3):
+
+| Build | Bytes | Change |
+|---|---|---|
+| v2.18.9 before tracing | 30,974,112 | — |
+| With the OpenTelemetry Go SDK v1.47.0 + `otlptracehttp` (exporter set up only, no instrumentation) | 32,522,400 | +1,548,288 (+5.0%) |
+| With the in-house exporter and all instrumentation | 31,019,168 | +45,056 (+0.15%) |
+
+The SDK option would also have added five modules to `go.mod`
+(`otlptrace`, `otlptracehttp`, `go.opentelemetry.io/proto/otlp`,
+`grpc-gateway/v2`, `cenkalti/backoff/v5`). That cost buys nothing a
+default deployment uses.
+
+**Zero cost when off.** Without `MDDB_OTEL_ENDPOINT` the tracer is nil. The
+HTTP and gRPC chains are not wrapped, and each stage costs one nil check with no
+allocation (`TestDisabledIsFree` in `internal/tracing` asserts zero
+allocations). Hybrid search, 50 embedded documents, `go test -bench
+HybridSearchTracing -benchtime=3000x -count=8`, AMD Ryzen 9 7950X (medians):
+
+| Build | ns/op | B/op | allocs/op |
+|---|---|---|---|
+| Before tracing (b4f7821) | 65,522 | 63,717 | 1,052 |
+| Tracing off | 66,163 | 63,683 | 1,052 |
+| Tracing on, every trace sampled | 85,535 | 82,709 | 1,129 |
+
+Off is the same as before, within run-to-run noise (the two ranges overlap:
+64.5–66.8 µs before, 62.9–70.5 µs after). With tracing on, a search records six
+spans and pays about 20 µs and 77 allocations for them. On a real deployment
+that is small next to a provider round trip for the query embedding.
 
 ## Existing Monitoring Endpoints
 

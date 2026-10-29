@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"mddb/internal/embedding"
 	"mddb/internal/fts"
 	"mddb/internal/geo"
 	"mddb/internal/storage"
@@ -282,7 +281,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ---- Step 1: Run FTS search ----
-	ftsResults, err := s.runFTSSearch(req)
+	ftsResults, err := s.tracedFTS(r.Context(), req)
 	if err != nil {
 		bad(w, fmt.Errorf("FTS search failed: %w", err))
 		return
@@ -309,6 +308,8 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	var merged []HybridSearchResultItem
 	var signalBreakdowns []SignalBreakdown
+	fuse := s.Tracer.Stage(r.Context(), spanSearchFuse) // OPS-024
+	fuse.SetString("mddb.fusion.strategy", req.Strategy)
 	switch req.Strategy {
 	case "rrf":
 		merged = mergeRRF(ftsResults, vectorResults, req.RRFK, mergeTopK)
@@ -325,6 +326,8 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	// Apply per-query boosts/demotions after merging — operates on CombinedScore.
 	// Boosting reorders; it never adds, so merged is still at most mergeTopK.
 	merged = s.applyBoostHybrid(req.Collection, merged, req.Boost)
+	fuse.SetInt("mddb.results", len(merged))
+	fuse.End()
 
 	// Spatial post-filter: keep only results inside the geo radius, attach
 	// distanceMeters from the pre-computed lookup, optionally re-sort by
@@ -353,7 +356,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ---- Step 4: Load full documents ----
-	items := s.loadHybridDocs(req.Collection, merged, req.IncludeContent || req.wantsPassages())
+	items := s.tracedLoadHybridDocs(r.Context(), req.Collection, merged, req.IncludeContent || req.wantsPassages())
 	// loadHybridDocs copies merged items but may drop DistanceMeters; re-attach.
 	if geoAllowed != nil {
 		for i := range items {
@@ -566,9 +569,7 @@ func (s *Server) vectorHalf(ctx context.Context, req HybridSearchRequest) ([]vec
 		return nil, nil, nil // the full-text half still answers (#346: per collection now)
 	}
 
-	embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	queryVector, err := s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
+	queryVector, err := s.embedQuery(ctx, req.Query)
 	if err != nil {
 		return nil, nil, fmt.Errorf("embedding failed: %w", err)
 	}
@@ -585,12 +586,17 @@ func (s *Server) vectorHalf(ctx context.Context, req HybridSearchRequest) ([]vec
 	if filtered && len(allowedIDs) == 0 {
 		return nil, ps.Plan, nil
 	}
+	sp := s.Tracer.Stage(ctx, spanSearchVector) // OPS-024
+	defer sp.End()
+	sp.SetString("mddb.vector.algorithm", ps.Algorithm)
 	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
 	results = s.rescoreFeedback(fb, req.Collection, results, metric)
 	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, req.summaryMode),
 		Query: queryVector, SearchTopK: searchTopK, TopK: req.TopK, Threshold: req.Threshold, Allowed: allowedIDs,
 		Filtered: filtered, Metric: metric}, results, ps.Plan) // RAG-009
-	return vector.DeduplicateChunkResults(results), ps.Plan, nil
+	results = vector.DeduplicateChunkResults(results)
+	sp.SetInt("mddb.results", len(results))
+	return results, ps.Plan, nil
 }
 
 // ranVectorAlgorithm is the vector algorithm a hybrid response reports: the

@@ -10,6 +10,7 @@ import (
 
 	"mddb/internal/fts"
 	"mddb/internal/temporal"
+	"mddb/internal/tracing"
 	proto "mddb/proto"
 
 	json "mddb/internal/jsonx"
@@ -108,6 +109,9 @@ type postBatchOptions struct {
 	SkipEmbeddings bool
 	SkipFTS        bool
 	SkipWebhooks   bool
+	// Trace is the span of the request that wrote the batch: the embedding
+	// jobs carry it so their ingest.embed spans join its trace (OPS-024).
+	Trace tracing.SpanContext
 }
 
 // processBatchWithDocs runs the batch processor and returns both the response and processed docs.
@@ -168,6 +172,7 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 				ChunkMode:  s.chunkModeFor(collection, &p.Doc),
 				ChunkSize:  s.chunkSizeFor(collection),
 				Summary:    documentSummary(&p.Doc), // RAG-009
+				trace:      opts.Trace,
 			}) {
 				embeddingDropped++
 			}

@@ -24,6 +24,7 @@ import (
 	"mddb/internal/schema"
 	"mddb/internal/spell"
 	"mddb/internal/temporal"
+	"mddb/internal/tracing"
 	"mddb/internal/ttl"
 	"mddb/internal/vector"
 	"mddb/internal/webhooks"
@@ -118,6 +119,7 @@ type Server struct {
 	WebhookManager     *webhooks.WebhookManager // Webhook subscriptions and delivery
 	SchemaManager      *schema.SchemaManager    // Per-collection metadata schema validation
 	Metrics            *metrics.Metrics         // Prometheus-compatible telemetry
+	Tracer             *tracing.Tracer          // OTLP trace export (OPS-024); nil = off
 	Gain               *GainRecorder            // AGT-004: tokens returned and avoided, per day
 	Aliases            *AliasManager            // GO-044: alias → collection
 	AuthManager        *AuthManager             // Authentication and authorization
@@ -1022,6 +1024,7 @@ func (s *Server) initEventsAndMetrics() {
 		s.EmbeddingWorker.metrics = s.Metrics
 	}
 	s.WebhookManager.SetMetrics(s.Metrics)
+	s.initTracing() // OPS-024: after the metrics its drops are counted in
 }
 
 // initReplication sets the node's replication role, opens the binlog and,
@@ -1208,6 +1211,8 @@ func (s *Server) wrapHTTPHandler(mux *http.ServeMux, authEnabled bool, panelMode
 		handler = withAccessLog(handler)
 		slog.Info("access logging enabled")
 	}
+	// OPS-024: the server span covers everything inside CORS, auth included.
+	handler = s.withTracing(handler)
 	if panelMode != "external" {
 		handler = withCORS(handler)
 		// SEC-008: a wildcard CORS policy lets any website read responses from a
@@ -1353,6 +1358,7 @@ func (s *Server) serveMCP(mcpSSE *MCPSSETransport, mcpStreamable *MCPStreamableT
 	// #322: OAuth 2.1 for clients that cannot send an API key
 	// (claude.ai connectors). Off unless MDDB_MCP_OAUTH_ENABLED=true.
 	mcpHandler = newMCPOAuthFromEnv(mcpAuth).Wrap(mcpHandler)
+	mcpHandler = s.withTracing(mcpHandler) // OPS-024
 
 	if panelMode != "external" {
 		mcpHandler = withCORS(mcpHandler)
@@ -1443,6 +1449,9 @@ func (s *Server) grpcServerOptions(authEnabled bool) ([]grpc.ServerOption, strin
 	// collection an alias points at.
 	unaryChain := []grpc.UnaryServerInterceptor{s.aliasUnaryInterceptor()}
 	streamChain := []grpc.StreamServerInterceptor{s.aliasStreamInterceptor()}
+	if s.Tracer != nil { // OPS-024: first, so the span covers the whole call
+		unaryChain = append([]grpc.UnaryServerInterceptor{s.tracingUnaryInterceptor()}, unaryChain...)
+	}
 	if s.RateLimiter.Enabled() {
 		unaryChain = append(unaryChain, s.RateLimiter.UnaryInterceptor())
 		streamChain = append(streamChain, s.RateLimiter.StreamInterceptor())

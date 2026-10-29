@@ -152,7 +152,11 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	}
 
 	// Phase 1: Pre-process documents (key derivation, frontmatter, meta injection)
+	convert := s.Tracer.Stage(ctx, spanIngestConvert) // OPS-024
 	protoDocs, skippedIdx, errs, sanitized := s.preProcessIngest(collection, docs, opts)
+	convert.SetString("mddb.collection", collection)
+	convert.SetInt("mddb.documents", len(protoDocs))
+	convert.End()
 
 	resp := &IngestResponseHTTP{
 		Collection: collection,
@@ -173,9 +177,15 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 		return resp, nil
 	}
 
-	// Phase 2: Batch process via existing processors
+	// Phase 2: Batch process via existing processors. ingest.index spans the
+	// write and the indexing after it, phases 2 to 4.
+	index := s.Tracer.Stage(ctx, spanIngestIndex)
+	defer index.End()
+	index.SetString("mddb.collection", collection)
+	index.SetInt("mddb.documents", len(protoDocs))
 	batchResp, processed, err := s.processBatchWithDocs(ctx, collection, protoDocs)
 	if err != nil {
+		index.SetError(err)
 		return nil, err
 	}
 
@@ -192,6 +202,7 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 		SkipEmbeddings: opts.SkipEmbeddings,
 		SkipFTS:        opts.SkipFTS,
 		SkipWebhooks:   opts.SkipWebhooks,
+		Trace:          s.requestTrace(ctx),
 	})
 
 	resp.DurationMs = time.Since(start).Milliseconds()

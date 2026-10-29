@@ -469,7 +469,14 @@ func (s *Server) serveMCPStdio(in io.Reader, out io.Writer) {
 			}
 		}
 
-		resp := handler.HandleWithNotifierContext(withMCPConfirmer(context.Background(), confirmer), req, notify)
+		// OPS-024: stdio carries no traceparent, so each request is a trace
+		// of its own when tracing is on.
+		method, _ := req["method"].(string)
+		ctx, sp := s.Tracer.StartServer(withMCPConfirmer(context.Background(), confirmer), "mcp.stdio", "")
+		sp.SetString("rpc.system", "jsonrpc")
+		sp.SetString("rpc.method", method)
+		resp := handler.HandleWithNotifierContext(ctx, req, notify)
+		sp.End()
 		if resp == nil {
 			// Notification — no response to send
 			continue
