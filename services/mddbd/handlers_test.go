@@ -374,8 +374,8 @@ func TestHandleGet_NotFound(t *testing.T) {
 	}
 	rec := doRequest(t, s.handleGet, payload)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (DOC-018), got %d", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "not found") {
 		t.Errorf("expected 'not found' in body, got: %s", rec.Body.String())
@@ -445,8 +445,8 @@ func TestHandleDelete_Success(t *testing.T) {
 
 	// Confirm gone
 	getRec := doRequest(t, s.handleGet, GetRequest{Collection: "blog", Key: "to-delete", Lang: "en"})
-	if getRec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 after delete, got %d", getRec.Code)
+	if getRec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (DOC-018) after delete, got %d", getRec.Code)
 	}
 }
 
@@ -459,8 +459,8 @@ func TestHandleDelete_NotFound(t *testing.T) {
 	payload := DeleteRequest{Collection: "blog", Key: "ghost", Lang: "en"}
 	rec := doRequest(t, s.handleDelete, payload)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (DOC-018), got %d", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "not found") {
 		t.Errorf("expected not-found error, got: %s", rec.Body.String())
@@ -525,8 +525,8 @@ func TestHandleDeleteCollection_Success(t *testing.T) {
 
 	// Confirm notes are gone
 	getRec := doRequest(t, s.handleGet, GetRequest{Collection: "notes", Key: "n1", Lang: "en"})
-	if getRec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for deleted doc, got %d", getRec.Code)
+	if getRec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (DOC-018) for deleted doc, got %d", getRec.Code)
 	}
 
 	// Confirm blog still exists

@@ -193,7 +193,7 @@ func TestCovCRevisionsWithoutTheirBucketOrDatabase(t *testing.T) {
 	if list, err := bare.ListRevisions(ctx, "c", "k", "en"); err != nil || list.Total != 0 {
 		t.Errorf("ListRevisions on a bare database = %+v, %v", list, err)
 	}
-	if _, err := bare.RestoreRevision(ctx, "c", "k", "en", 1); err == nil || err.Error() != "revision not found" {
+	if _, err := bare.RestoreRevision(ctx, "c", "k", "en", 1); err == nil || !errors.Is(err, errNotFound) {
 		t.Errorf("RestoreRevision on a bare database: %v", err)
 	}
 	closed, _ := covCClosedClient(t)

@@ -167,29 +167,7 @@ func (c *DirectClient) ListRevisions(ctx context.Context, collection, key, lang 
 
 // RestoreRevision restores a document to a previous revision via the direct client.
 func (c *DirectClient) RestoreRevision(ctx context.Context, collection, key, lang string, timestamp int64) (*MCPDocument, error) {
-	docID := genID(collection, key, lang)
-	tsKey := fmt.Sprintf("%020d", timestamp)
-	revKey := append(storage.RevPrefix(collection, docID), []byte(tsKey)...)
-
-	var revDoc *storage.Doc
-	err := c.server.DBViewC(collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		if bRev == nil {
-			return fmt.Errorf("revision not found")
-		}
-		v := bRev.Get(revKey)
-		if v == nil {
-			return fmt.Errorf("revision not found for timestamp %d", timestamp)
-		}
-		var err error
-		revDoc, err = loadDoc(v)
-		return err
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	doc, _, err := c.server.addDocument(collection, key, lang, revDoc.Meta, revDoc.ContentMD, 0, true)
+	doc, err := c.server.restoreRevision(collection, key, lang, timestamp)
 	if err != nil {
 		return nil, err
 	}

@@ -243,6 +243,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **⚠ A missing document now answers 404 instead of 400 (DOC-018).** This
+  covers `POST /v1/get`, `/v1/delete`, `/v1/set-ttl` and
+  `/v1/revisions/restore`, and every other REST path that reports a missing
+  document or revision.
+  - **The body keeps its shape.** It is `{"error":"document not found"}`, or
+    `revision not found for timestamp N`.
+  - **Who must change.** A client that tests `status == 400` to detect a
+    missing document must test for 404 instead. The clients in this
+    repository and ssg needed no change.
+  - **gRPC already used `NOT_FOUND`** and now does so everywhere, including
+    `DeleteDocument`.
+  - **Revision restore** was three copies (REST, MCP, gRPC) and is now one.
+
 - **gRPC search runs the shared search code.** `FTS`, `VectorSearch`,
   `HybridSearch` and `CrossSearch` were separate copies of the search, so
   gRPC lacked this release's features. They now call the code REST and MCP

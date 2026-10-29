@@ -797,6 +797,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Document not found (v2.18.8; was 400 before, DOC-018)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "403":
           description: Read-only mode
           content:
@@ -2051,6 +2057,12 @@ paths:
                 $ref: "#/components/schemas/Document"
         "400":
           description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Document not found (v2.18.8; was 400 before, DOC-018)
           content:
             application/json:
               schema:

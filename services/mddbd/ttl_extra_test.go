@@ -194,8 +194,8 @@ func TestHandleSetTTL_DocumentNotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	s.handleSetTTL(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (DOC-018), got %d: %s", w.Code, w.Body.String())
 	}
 }
 

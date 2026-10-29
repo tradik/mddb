@@ -108,7 +108,7 @@ func TestCovCGetRefusesMissingDamagedAndExpiredDocuments(t *testing.T) {
 	covCRewrite(t, s, "g", old, covCExpire)
 
 	for _, key := range []string{"never", "gone", "old"} {
-		if _, err := c.Get(ctx, &MCPGetRequest{Collection: "g", Key: key, Lang: "en"}); err == nil || err.Error() != "not found" {
+		if _, err := c.Get(ctx, &MCPGetRequest{Collection: "g", Key: key, Lang: "en"}); err == nil || !errors.Is(err, errDocNotFound) {
 			t.Errorf("Get(%s) err = %v, want not found", key, err)
 		}
 	}

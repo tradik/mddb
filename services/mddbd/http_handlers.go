@@ -77,11 +77,11 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 		bByK := tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
 		if docID == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		v := bDocs.Get(storage.DocKey(req.Collection, string(docID)))
 		if v == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		docPtr, unmErr := loadDoc(v)
 		if unmErr != nil {
@@ -97,7 +97,7 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	// Check TTL expiry
 	if doc.ExpiresAt > 0 && doc.ExpiresAt < time.Now().Unix() {
-		bad(w, errors.New("not found"))
+		bad(w, errDocNotFound)
 		return
 	}
 
@@ -375,6 +375,13 @@ func ok(w http.ResponseWriter, v any) {
 	_, _ = w.Write(b) // #nosec G705 -- response write to http.ResponseWriter
 }
 func bad(w http.ResponseWriter, err error) {
+	// DOC-018: a request for something that does not exist is not a bad
+	// request; the body keeps its shape.
+	if errors.Is(err, errNotFound) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error()) // #nosec G705 -- response write to http.ResponseWriter
+		return
+	}
 	w.WriteHeader(400)
 	_, _ = fmt.Fprintf(w, `{"error":%q}`, err.Error()) // #nosec G705 -- response write to http.ResponseWriter
 }

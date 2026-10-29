@@ -153,7 +153,7 @@ func (s *Server) loadDocByRef(collection, key, lang string) (*storage.Doc, error
 		if err := s.DBViewC(collection, func(tx *bolt.Tx) error {
 			bByK := tx.Bucket([]byte("bykey"))
 			if bByK == nil {
-				return errors.New("not found")
+				return errDocNotFound
 			}
 			if v := bByK.Get(storage.ByKeyKey(collection, key, lang)); v != nil {
 				docID = string(v)
@@ -163,14 +163,14 @@ func (s *Server) loadDocByRef(collection, key, lang string) (*storage.Doc, error
 			return nil, err
 		}
 		if docID == "" {
-			return nil, errors.New("not found")
+			return nil, errDocNotFound
 		}
 		d, err := s.LoadDocFromBackend(collection, docID)
 		if err != nil {
 			return nil, err
 		}
 		if d == nil {
-			return nil, errors.New("not found")
+			return nil, errDocNotFound
 		}
 		return d, nil
 	}
@@ -181,11 +181,11 @@ func (s *Server) loadDocByRef(collection, key, lang string) (*storage.Doc, error
 		bDocs := tx.Bucket([]byte("docs"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
 		if docID == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		v := bDocs.Get(storage.DocKey(collection, string(docID)))
 		if v == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		d, err := loadDoc(v)
 		if err != nil {
@@ -198,7 +198,7 @@ func (s *Server) loadDocByRef(collection, key, lang string) (*storage.Doc, error
 		return nil, err
 	}
 	if doc.ExpiresAt > 0 && doc.ExpiresAt < time.Now().Unix() {
-		return nil, errors.New("not found")
+		return nil, errDocNotFound
 	}
 	return &doc, nil
 }
@@ -225,7 +225,7 @@ func (s *Server) handleClassify(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := s.classifyDocument(r.Context(), req.Collection, req.Key, req.Lang, req.Text, req.Labels, req.TopK, req.Multi, req.Threshold)
 	if err != nil {
-		if err.Error() == "not found" {
+		if errors.Is(err, errNotFound) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusNotFound)
 			_, _ = w.Write([]byte(`{"error":"document not found"}`))

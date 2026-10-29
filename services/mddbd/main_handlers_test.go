@@ -326,8 +326,8 @@ func TestMainHandleSetTTL_NotFound(t *testing.T) {
 	}
 	rec := doRequest(t, s.handleSetTTL, payload)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (DOC-018), got %d", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "not found") {
 		t.Errorf("expected not found error, got: %s", rec.Body.String())
@@ -1634,8 +1634,8 @@ func TestMainHandleGet_ExpiredDocument(t *testing.T) {
 	}
 	rec := doRequest(t, s.handleGet, payload)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400 for expired doc, got %d", rec.Code)
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404 (DOC-018) for expired doc, got %d", rec.Code)
 	}
 	if !strings.Contains(rec.Body.String(), "not found") {
 		t.Errorf("expected 'not found' for expired doc, got: %s", rec.Body.String())

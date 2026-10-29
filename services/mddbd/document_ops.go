@@ -273,7 +273,7 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 
 		v := bDocs.Get(storage.DocKey(collection, docID))
 		if v == nil {
-			return errors.New("document not found")
+			return errDocNotFound
 		}
 		docPtr, err := loadDoc(v)
 		if err != nil {

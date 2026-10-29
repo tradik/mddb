@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"mddb/internal/storage"
 	proto "mddb/proto"
 	"sort"
@@ -652,29 +651,10 @@ func (g *GRPCServer) RestoreRevision(ctx context.Context, req *proto.RestoreRevi
 		}
 	}
 
-	docID := genID(req.Collection, req.Key, req.Lang)
-	tsKey := fmt.Sprintf("%020d", req.Timestamp)
-	revKey := append(storage.RevPrefix(req.Collection, docID), []byte(tsKey)...)
-
-	var revDoc *storage.Doc
-	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		if bRev == nil {
-			return errors.New("revision not found")
-		}
-		v := bRev.Get(revKey)
-		if v == nil {
-			return fmt.Errorf("revision not found for timestamp %d", req.Timestamp)
-		}
-		var err error
-		revDoc, err = loadDoc(v)
-		return err
-	})
-	if err != nil {
+	doc, err := g.server.restoreRevision(req.Collection, req.Key, req.Lang, req.Timestamp)
+	if errors.Is(err, errNotFound) {
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
-
-	doc, _, err := g.server.addDocument(req.Collection, req.Key, req.Lang, revDoc.Meta, revDoc.ContentMD, 0, true)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

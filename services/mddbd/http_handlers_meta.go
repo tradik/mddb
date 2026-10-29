@@ -125,11 +125,11 @@ func (s *Server) handleDocMeta(w http.ResponseWriter, r *http.Request) {
 		bDocs := tx.Bucket([]byte("docs"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
 		if docID == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		v := bDocs.Get(storage.DocKey(collection, string(docID)))
 		if v == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		d, err := loadDoc(v)
 		if err != nil {
@@ -139,16 +139,12 @@ func (s *Server) handleDocMeta(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 	if err != nil {
-		if err.Error() == "not found" {
-			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
-			return
-		}
 		bad(w, err)
 		return
 	}
 
 	if doc.ExpiresAt > 0 && doc.ExpiresAt < time.Now().Unix() {
-		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		bad(w, errDocNotFound)
 		return
 	}
 

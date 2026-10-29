@@ -170,12 +170,12 @@ func (c *DirectClient) Get(ctx context.Context, req *MCPGetRequest) (*MCPDocumen
 		bByK := tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
 		if docID == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		bDocs := tx.Bucket([]byte("docs"))
 		v := bDocs.Get(storage.DocKey(req.Collection, string(docID)))
 		if v == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		docPtr, unmErr := loadDoc(v)
 		if unmErr != nil {
@@ -189,7 +189,7 @@ func (c *DirectClient) Get(ctx context.Context, req *MCPGetRequest) (*MCPDocumen
 	}
 
 	if doc.ExpiresAt > 0 && doc.ExpiresAt < time.Now().Unix() {
-		return nil, errors.New("not found")
+		return nil, errDocNotFound
 	}
 
 	if len(req.Env) > 0 && doc.ContentMD != "" {

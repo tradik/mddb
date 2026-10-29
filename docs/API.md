@@ -4446,7 +4446,7 @@ and `h2` and `utf8` are real names.
 | `200` | Success |
 | `400` | Bad Request - Invalid JSON or missing required fields |
 | `403` | Forbidden - Write operation in read-only mode |
-| `404` | Not Found - Document doesn't exist |
+| `404` | Not Found - the document or revision does not exist (every path since v2.18.8; some answered 400 before) |
 | `500` | Internal Server Error |
 
 ### Common Errors
@@ -4458,10 +4458,10 @@ and `h2` and `utf8` are real names.
 }
 ```
 
-**Document not found**:
+**Document not found** (`404`):
 ```json
 {
-  "error": "not found"
+  "error": "document not found"
 }
 ```
 

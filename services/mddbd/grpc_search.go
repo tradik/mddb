@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"math"
 	"mddb/internal/storage"
 	proto "mddb/proto"
@@ -293,7 +293,7 @@ func (g *GRPCServer) SetTTL(ctx context.Context, req *proto.SetTTLRequest) (*pro
 		bDocs := tx.Bucket([]byte("docs"))
 		v := bDocs.Get(storage.DocKey(req.Collection, docID))
 		if v == nil {
-			return fmt.Errorf("not found")
+			return errDocNotFound
 		}
 		d, err := unmarshalDoc(v)
 		if err != nil {
@@ -308,7 +308,7 @@ func (g *GRPCServer) SetTTL(ctx context.Context, req *proto.SetTTLRequest) (*pro
 		return bDocs.Put(storage.DocKey(req.Collection, docID), buf)
 	})
 	if err != nil {
-		if err.Error() == "not found" {
+		if errors.Is(err, errNotFound) {
 			return nil, status.Error(codes.NotFound, "document not found")
 		}
 		return nil, status.Error(codes.Internal, err.Error())

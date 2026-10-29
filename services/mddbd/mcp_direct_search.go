@@ -351,7 +351,7 @@ func (c *DirectClient) SetTTL(ctx context.Context, req *MCPSetTTLRequest) (*MCPD
 		dk := storage.DocKey(req.Collection, docID)
 		v := bDocs.Get(dk)
 		if v == nil {
-			return errors.New("document not found")
+			return errDocNotFound
 		}
 		docPtr, err := loadDoc(v)
 		if err != nil {

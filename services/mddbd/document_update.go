@@ -76,9 +76,6 @@ func checkRevision(existing *storage.Doc, expected string) error {
 	return nil
 }
 
-// errDocNotFound is an update of a document that does not exist (or expired).
-var errDocNotFound = errors.New("not found")
-
 // DocPatch is a partial update: nil fields are left as they are.
 type DocPatch struct {
 	Meta    map[string][]string // replaces the meta when HasMeta
@@ -237,7 +234,7 @@ func writeDocWriteError(w http.ResponseWriter, err error) {
 	var conflict *RevisionConflictError
 	switch {
 	case errors.Is(err, errDocNotFound):
-		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		http.Error(w, `{"error":"document not found"}`, http.StatusNotFound)
 	case errors.As(err, &conflict):
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusConflict)

@@ -290,11 +290,11 @@ func (g *GRPCServer) GetDocumentMeta(ctx context.Context, req *proto.GetDocument
 		bDocs := tx.Bucket([]byte("docs"))
 		docID := bByK.Get(storage.ByKeyKey(req.Collection, req.Key, req.Lang))
 		if docID == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		v := bDocs.Get(storage.DocKey(req.Collection, string(docID)))
 		if v == nil {
-			return errors.New("not found")
+			return errDocNotFound
 		}
 		d, err := loadDoc(v)
 		if err != nil {
@@ -304,7 +304,7 @@ func (g *GRPCServer) GetDocumentMeta(ctx context.Context, req *proto.GetDocument
 		return nil
 	})
 	if err != nil {
-		if err.Error() == "not found" {
+		if errors.Is(err, errNotFound) {
 			return nil, status.Error(codes.NotFound, "document not found")
 		}
 		return nil, status.Error(codes.Internal, err.Error())
@@ -350,7 +350,7 @@ func (g *GRPCServer) Classify(ctx context.Context, req *proto.ClassifyRequest) (
 		if errors.As(err, &bad) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
-		if err.Error() == "not found" {
+		if errors.Is(err, errNotFound) {
 			return nil, status.Error(codes.NotFound, "document not found")
 		}
 		return nil, status.Error(codes.Internal, err.Error())
@@ -386,7 +386,7 @@ func (g *GRPCServer) DeleteDocument(ctx context.Context, req *proto.DeleteDocume
 	}
 	if err := g.server.deleteDocumentInternal(req.Collection, req.Key, req.Lang); err != nil {
 		// A missing document is the caller's NotFound, not a server fault.
-		if err.Error() == "document not found" {
+		if errors.Is(err, errNotFound) {
 			return nil, status.Error(codes.NotFound, err.Error())
 		}
 		return nil, status.Error(codes.Internal, err.Error())

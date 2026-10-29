@@ -73,7 +73,7 @@ func TestCovGHTTPGetSkipsDanglingAndCorruptDocs(t *testing.T) {
 		t.Fatal(err)
 	}
 	rec := doRequest(t, s.handleGet, map[string]any{"collection": "blog", "key": "a", "lang": "en"})
-	covGWantCode(t, rec, http.StatusBadRequest)
+	covGWantCode(t, rec, http.StatusNotFound)
 	if !strings.Contains(rec.Body.String(), "not found") {
 		t.Errorf("dangling: %s", rec.Body.String())
 	}
