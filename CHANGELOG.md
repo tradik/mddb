@@ -206,6 +206,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **The S3 secret key** is masked on every read of a rule.
   - **New CLI:** `mddb-cli backup schedule add|list|remove`.
   - **With replication**, enable crons on one node only (docs/BACKUP.md).
+  - **Over gRPC.** `AutomationRuleProto.backup` (25) carries a new
+    `BackupActionProto`, and its `storage_config` reuses
+    `StorageConfigProto`. The S3 secret stays write-only; reads report
+    `secret_key_set`. An update without a backup keeps the stored one.
 - **MCP: destructive tools can ask the user first (MCP-004).** New
   `MDDB_MCP_CONFIRM_DESTRUCTIVE=off|elicit|require`; the default `off`
   changes nothing.
@@ -239,7 +243,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     gives identical vectors on every machine.
   - **It matches spelling, not meaning, and says so.** `GET /config` reports
     `vectorConfig.semantic: false`, the search advisor reports
-    `profile.semantic: false`, and the panel shows "Matches by meaning: No".
+    `profile.semantic: false` (over gRPC `CollectionProfile.semantic`,
+    unset when nothing is embedded), and the panel shows "Matches by
+    meaning: No".
   - **Selection.** It is never autodetected. It is used only when named,
     from the environment or a stored embedding config.
   - **Results.** On the MDDB docs evaluation set, hybrid with lexical
