@@ -17,11 +17,15 @@ type VoyageProvider struct {
 	model      string
 	dimensions int
 	client     *http.Client
+	// imageModel embeds images (RAG-010); "" = images are not embedded.
+	imageModel string
 }
 
-// NewVoyageProvider creates a new Voyage AI embedding provider.
+// NewVoyageProvider creates a new Voyage AI embedding provider. Images are
+// embedded with DefaultVoyageImageModel, or with model itself when it is a
+// multimodal one; SetImageModel changes that.
 func NewVoyageProvider(apiKey, apiURL, model string, dimensions int) *VoyageProvider {
-	return &VoyageProvider{
+	p := &VoyageProvider{
 		apiKey:     apiKey,
 		apiURL:     apiURL,
 		model:      model,
@@ -30,6 +34,8 @@ func NewVoyageProvider(apiKey, apiURL, model string, dimensions int) *VoyageProv
 			Timeout: 30 * time.Second,
 		},
 	}
+	p.SetImageModel("")
+	return p
 }
 
 // Model returns the model name used by this provider.
@@ -57,10 +63,8 @@ func (p *VoyageProvider) EmbedBatch(ctx context.Context, texts []string, role Ro
 		Model:     p.model,
 	}
 
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
-	}
+	// A struct of strings: marshalling it cannot fail.
+	body, _ := json.Marshal(reqBody)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", p.apiURL+"/embeddings", bytes.NewReader(body)) // #nosec G704 -- URL from server config
 	if err != nil {

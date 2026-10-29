@@ -17,6 +17,8 @@ type CohereProvider struct {
 	model      string
 	dimensions int
 	client     *http.Client
+	// imagesOff turns image embedding off (RAG-010, MDDB_EMBEDDING_IMAGE_MODEL=none).
+	imagesOff bool
 }
 
 // NewCohereProvider creates a new Cohere embedding provider
@@ -47,9 +49,8 @@ func (p *CohereProvider) Embed(ctx context.Context, text string, role Role) ([]f
 	if err != nil {
 		return nil, err
 	}
-	if len(vectors) == 0 {
-		return nil, fmt.Errorf("empty response from Cohere")
-	}
+	// EmbedBatch answers with exactly one usable vector per text or an
+	// error (checkVectors), so there is no empty result to guard against.
 	return vectors[0], nil
 }
 
@@ -64,10 +65,8 @@ func (p *CohereProvider) EmbedBatch(ctx context.Context, texts []string, role Ro
 		InputType: cohereInputType(role),
 	}
 
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("marshal request: %w", err)
-	}
+	// A struct of strings: marshalling it cannot fail.
+	body, _ := json.Marshal(reqBody)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", p.apiURL+"/embed", bytes.NewReader(body)) // #nosec G704 -- URL from server config
 	if err != nil {

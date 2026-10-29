@@ -36,10 +36,38 @@ func IsSummaryKey(key []byte) bool {
 // the summary text, which is what lets an unchanged summary skip the
 // provider on its next write (as RAG-003 does for chunks).
 func (vs *VectorStore) PutSummary(collection, docID string, vector []float32, model, summaryHash string) error {
-	key := SummaryKey(collection, docID)
+	return vs.putDocVector(SummaryKey(collection, docID), collection, docID, vector, model, summaryHash)
+}
+
+// GetSummary returns a document's summary vector record, nil when it has none.
+func (vs *VectorStore) GetSummary(collection, docID string) *EmbeddingRecord {
+	return vs.getDocVector(collection, SummaryKey(collection, docID))
+}
+
+// DeleteSummary removes a document's summary vector, if it has one.
+func (vs *VectorStore) DeleteSummary(collection, docID string) error {
+	return vs.deleteDocVector(collection, SummaryKey(collection, docID))
+}
+
+// LoadSummaries returns a collection's summary vectors keyed by document ID.
+func (vs *VectorStore) LoadSummaries(collection string) map[string][]float32 {
+	return vs.loadDocVectors(collection, SummaryKey(collection, ""))
+}
+
+// SummaryVectors reads the summary vectors of the given documents in one read
+// transaction — the disk half of a disk-only collection's summary search.
+func (vs *VectorStore) SummaryVectors(collection string, docIDs []string) map[string][]float32 {
+	return vs.docVectors(collection, docIDs, func(id string) []byte { return SummaryKey(collection, id) })
+}
+
+// One vector per document (RAG-009 summaries, RAG-010 images): a record under
+// a key of its own prefix, read and written the same way whatever it holds.
+
+// putDocVector stores a document-level vector record under key.
+func (vs *VectorStore) putDocVector(key []byte, collection, docID string, vector []float32, model, hash string) error {
 	data := MarshalEmbeddingRecord(&EmbeddingRecord{
 		DocID: docID, Vector: vector, Model: model, Dimensions: len(vector),
-		CreatedAt: time.Now().Unix(), ContentHash: summaryHash,
+		CreatedAt: time.Now().Unix(), ContentHash: hash,
 	})
 	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
@@ -54,12 +82,12 @@ func (vs *VectorStore) PutSummary(collection, docID string, vector []float32, mo
 	return err
 }
 
-// GetSummary returns a document's summary vector record, nil when it has none.
-func (vs *VectorStore) GetSummary(collection, docID string) *EmbeddingRecord {
+// getDocVector returns the record under key, nil when there is none.
+func (vs *VectorStore) getDocVector(collection string, key []byte) *EmbeddingRecord {
 	var rec *EmbeddingRecord
 	_ = boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		if b := tx.Bucket(vs.bucketName); b != nil {
-			if v := b.Get(SummaryKey(collection, docID)); v != nil {
+			if v := b.Get(key); v != nil {
 				rec, _ = UnmarshalEmbeddingRecord(v)
 			}
 		}
@@ -68,9 +96,8 @@ func (vs *VectorStore) GetSummary(collection, docID string) *EmbeddingRecord {
 	return rec
 }
 
-// DeleteSummary removes a document's summary vector, if it has one.
-func (vs *VectorStore) DeleteSummary(collection, docID string) error {
-	key := SummaryKey(collection, docID)
+// deleteDocVector removes the record under key, if there is one.
+func (vs *VectorStore) deleteDocVector(collection string, key []byte) error {
 	removed := false
 	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
@@ -86,9 +113,8 @@ func (vs *VectorStore) DeleteSummary(collection, docID string) error {
 	return err
 }
 
-// LoadSummaries returns a collection's summary vectors keyed by document ID.
-func (vs *VectorStore) LoadSummaries(collection string) map[string][]float32 {
-	prefix := SummaryKey(collection, "")
+// loadDocVectors returns the vectors under prefix keyed by document ID.
+func (vs *VectorStore) loadDocVectors(collection string, prefix []byte) map[string][]float32 {
 	out := map[string][]float32{}
 	_ = boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
@@ -106,9 +132,8 @@ func (vs *VectorStore) LoadSummaries(collection string) map[string][]float32 {
 	return out
 }
 
-// SummaryVectors reads the summary vectors of the given documents in one read
-// transaction — the disk half of a disk-only collection's summary search.
-func (vs *VectorStore) SummaryVectors(collection string, docIDs []string) map[string][]float32 {
+// docVectors reads the vectors of the given documents in one transaction.
+func (vs *VectorStore) docVectors(collection string, docIDs []string, key func(string) []byte) map[string][]float32 {
 	out := make(map[string][]float32, len(docIDs))
 	_ = boltx.View(vs.rt(), collection, func(tx *bolt.Tx) error {
 		b := tx.Bucket(vs.bucketName)
@@ -116,7 +141,7 @@ func (vs *VectorStore) SummaryVectors(collection string, docIDs []string) map[st
 			return nil
 		}
 		for _, id := range docIDs {
-			if v := b.Get(SummaryKey(collection, id)); v != nil {
+			if v := b.Get(key(id)); v != nil {
 				if rec, err := UnmarshalEmbeddingRecord(v); err == nil {
 					out[id] = rec.Vector
 				}

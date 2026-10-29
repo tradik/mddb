@@ -103,7 +103,9 @@ func newBareProvider() Provider {
 		apiURL := envconf.String("MDDB_EMBEDDING_API_URL", "https://api.voyageai.com/v1")
 		model := envconf.String("MDDB_EMBEDDING_MODEL", "voyage-3")
 		dims := envconf.Int("MDDB_EMBEDDING_DIMENSIONS", 1024)
-		return NewVoyageProvider(apiKey, apiURL, model, dims)
+		p := NewVoyageProvider(apiKey, apiURL, model, dims)
+		p.SetImageModel(os.Getenv("MDDB_EMBEDDING_IMAGE_MODEL")) // RAG-010
+		return p
 
 	case "cohere":
 		apiKey := os.Getenv("MDDB_EMBEDDING_API_KEY")
@@ -114,7 +116,9 @@ func newBareProvider() Provider {
 		apiURL := envconf.String("MDDB_EMBEDDING_API_URL", "https://api.cohere.ai/v1")
 		model := envconf.String("MDDB_EMBEDDING_MODEL", "embed-english-v3.0")
 		dims := envconf.Int("MDDB_EMBEDDING_DIMENSIONS", 1024)
-		return NewCohereProvider(apiKey, apiURL, model, dims)
+		p := NewCohereProvider(apiKey, apiURL, model, dims)
+		p.SetImageModel(os.Getenv("MDDB_EMBEDDING_IMAGE_MODEL")) // RAG-010
+		return p
 
 	case ProviderLexical:
 		// SRCH-014: hashed words and n-grams — no network, no model. Chosen

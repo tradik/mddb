@@ -262,3 +262,47 @@ func (c *CachingProvider) DocumentVariant() string {
 func (c *CachingProvider) Semantic() bool {
 	return IsSemantic(c.inner)
 }
+
+// Images (RAG-010) pass through the cache like DocumentVariant does, so a
+// cached provider embeds images exactly when the provider it wraps can. An
+// image is embedded once per stored image, so EmbedImage is not cached; the
+// text a query is embedded into the image space with is, keyed apart from
+// the same text's ordinary vector.
+
+// ImageModel is the wrapped provider's image model, "" when it has none.
+func (c *CachingProvider) ImageModel() string {
+	if ie, ok := ImageEmbedderOf(c.inner); ok {
+		return ie.ImageModel()
+	}
+	return ""
+}
+
+// EmbedImage asks the wrapped provider, uncached.
+func (c *CachingProvider) EmbedImage(ctx context.Context, img Image, role Role) ([]float32, error) {
+	ie, ok := ImageEmbedderOf(c.inner)
+	if !ok {
+		return nil, ErrNoImageEmbedding
+	}
+	return ie.EmbedImage(ctx, img, role)
+}
+
+// EmbedImageText returns a cached image-space vector of text when one is
+// live, otherwise asks the wrapped provider.
+func (c *CachingProvider) EmbedImageText(ctx context.Context, text string, role Role) ([]float32, error) {
+	ie, ok := ImageEmbedderOf(c.inner)
+	if !ok {
+		return nil, ErrNoImageEmbedding
+	}
+	key := cacheKey(ie.ImageModel()+"\x00image", text, role)
+	if vec, ok := c.get(key); ok {
+		c.hits.Add(1)
+		return vec, nil
+	}
+	c.misses.Add(1)
+	vec, err := ie.EmbedImageText(ctx, text, role)
+	if err != nil {
+		return nil, err
+	}
+	c.put(key, vec)
+	return copyVector(vec), nil
+}

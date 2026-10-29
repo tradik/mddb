@@ -10,11 +10,12 @@ import (
 )
 
 // DeleteCollection removes every stored vector of a collection — chunked and
-// legacy records alike, and the summary vectors (RAG-009) — and records each
+// legacy records alike, the summary vectors (RAG-009) and the image vectors
+// (RAG-010) — and records each
 // deletion in the binlog so that followers drop them too (#331). It returns
 // how many records it removed.
 func (vs *VectorStore) DeleteCollection(collection string) (int, error) {
-	prefixes := [][]byte{[]byte("vec|" + collection + "|"), SummaryKey(collection, "")}
+	prefixes := [][]byte{[]byte("vec|" + collection + "|"), SummaryKey(collection, ""), ImageKey(collection, "")}
 	var bo binlog.BinlogOps
 	removed := 0
 	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
