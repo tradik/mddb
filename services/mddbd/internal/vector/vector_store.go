@@ -536,14 +536,11 @@ func marshalEmbeddingRecordQuantized(rec *EmbeddingRecord, qt QuantizationType) 
 	buf[offset] = 2
 	offset++
 
-	// quantization type
-	switch qt {
-	case QuantInt8:
-		buf[offset] = 1
-	case QuantInt4:
+	// quantization type; QuantizeFloat32 returned nil for any other type
+	if qt == QuantInt4 {
 		buf[offset] = 2
-	default:
-		buf[offset] = 0
+	} else {
+		buf[offset] = 1
 	}
 	offset++
 
@@ -632,9 +629,16 @@ func unmarshalEmbeddingRecordQuantized(data []byte) (*EmbeddingRecord, *Quantize
 }
 
 // isQuantizedRecord checks if a binary record uses the v2 quantized format.
-// V2 records start with version byte = 2.
+// V2 records start with version byte = 2. A v1 record starts with its model
+// name's length as a little-endian uint32, so a name 2 (or 258, …) bytes long
+// also starts with 2 (#361); such a record still decodes as v1, which a v2
+// record does not.
 func isQuantizedRecord(data []byte) bool {
-	return len(data) > 0 && data[0] == 2
+	if len(data) == 0 || data[0] != 2 {
+		return false
+	}
+	_, err := UnmarshalEmbeddingRecord(data)
+	return err != nil
 }
 
 // Binary serialization for embedding records (compact, no JSON overhead).

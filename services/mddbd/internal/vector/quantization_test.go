@@ -4,6 +4,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"strings"
 	"testing"
 
 	bolt "go.etcd.io/bbolt"
@@ -213,6 +214,28 @@ func TestIsQuantizedRecord(t *testing.T) {
 	v2 := marshalEmbeddingRecordQuantized(rec, QuantInt8)
 	if !isQuantizedRecord(v2) {
 		t.Error("v2 record should be identified as quantized")
+	}
+}
+
+// A v1 record whose model name is 2 or 258 bytes long starts with the byte 2,
+// like a v2 record, and must still be read as v1 (#361).
+func TestIsQuantizedRecordModelNameLengthTwo(t *testing.T) {
+	for _, model := range []string{"e0", strings.Repeat("m", 258)} {
+		rec := &EmbeddingRecord{
+			DocID: "d", Vector: []float32{0.5, 0.25}, Model: model, Dimensions: 2, CreatedAt: 1, ContentHash: "h",
+		}
+		v1 := MarshalEmbeddingRecord(rec)
+		if v1[0] != 2 {
+			t.Fatalf("model %d bytes: first byte %d, the test needs 2", len(model), v1[0])
+		}
+		if isQuantizedRecord(v1) {
+			t.Errorf("v1 record with a %d-byte model name read as quantized", len(model))
+		}
+		for _, qt := range []QuantizationType{QuantInt8, QuantInt4} {
+			if !isQuantizedRecord(marshalEmbeddingRecordQuantized(rec, qt)) {
+				t.Errorf("v2 record (%v) with a %d-byte model name not read as quantized", qt, len(model))
+			}
+		}
 	}
 }
 
