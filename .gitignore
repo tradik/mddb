@@ -180,3 +180,12 @@ soak-report/
 # snapcraft.yaml files: the snap installs these rather than compiling).
 services/mddbd/snapbuild/
 services/mddb-cli/snapbuild/
+
+# Server and CLI binaries built in the repository root (`go build -o mddb`);
+# one was committed by mistake in 2.18.8 (4331367).
+/mddb
+/mddbd
+/mddb-cli
+# Tools built by scripts/build-deadcode.sh (default output ./bin); one was
+# committed by mistake with GO-021 (18cffbd).
+/bin/
