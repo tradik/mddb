@@ -539,13 +539,14 @@ func (x *GetRequest) GetEnv() map[string]string {
 
 // Search request
 type SearchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
-	FilterMeta    map[string]*MetaValues `protobuf:"bytes,2,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Sort          string                 `protobuf:"bytes,3,opt,name=sort,proto3" json:"sort,omitempty"` // addedAt, updatedAt, key
-	Asc           bool                   `protobuf:"varint,4,opt,name=asc,proto3" json:"asc,omitempty"`
-	Limit         int32                  `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
-	Offset        int32                  `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Collection    string                    `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	FilterMeta    map[string]*MetaValues    `protobuf:"bytes,2,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Sort          string                    `protobuf:"bytes,3,opt,name=sort,proto3" json:"sort,omitempty"` // addedAt, updatedAt, key
+	Asc           bool                      `protobuf:"varint,4,opt,name=asc,proto3" json:"asc,omitempty"`
+	Limit         int32                     `protobuf:"varint,5,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                     `protobuf:"varint,6,opt,name=offset,proto3" json:"offset,omitempty"`
+	Filter        map[string]*MetaCondition `protobuf:"bytes,7,rep,name=filter,proto3" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.18.8) operators: in, prefix, contains, ranges, not, exists; ANDed with filter_meta
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -620,6 +621,13 @@ func (x *SearchRequest) GetOffset() int32 {
 		return x.Offset
 	}
 	return 0
+}
+
+func (x *SearchRequest) GetFilter() map[string]*MetaCondition {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
 }
 
 // Search response
@@ -1650,16 +1658,25 @@ func (x *UpdateBatchResponse) GetErrors() []string {
 
 // Vector search request
 type VectorSearchRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Collection     string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
-	Query          string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`                                                                                                       // text query (will be embedded server-side)
-	QueryVector    []float32              `protobuf:"fixed32,3,rep,packed,name=query_vector,json=queryVector,proto3" json:"query_vector,omitempty"`                                                               // OR pre-computed vector
-	TopK           int32                  `protobuf:"varint,4,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`                                                                                            // number of results (default: 5)
-	Threshold      float64                `protobuf:"fixed64,5,opt,name=threshold,proto3" json:"threshold,omitempty"`                                                                                             // minimum similarity 0-1 (default: 0.0)
-	FilterMeta     map[string]*MetaValues `protobuf:"bytes,6,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // optional metadata pre-filter
-	IncludeContent bool                   `protobuf:"varint,7,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`                                                              // include full content_md in results
-	Algorithm      string                 `protobuf:"bytes,8,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                                                                               // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
-	Oversample     float64                `protobuf:"fixed64,9,opt,name=oversample,proto3" json:"oversample,omitempty"`                                                                                           // (SRCH-005) candidates per result before dedup; 1.0-10.0, 0 = collection profile then default
+	state          protoimpl.MessageState    `protogen:"open.v1"`
+	Collection     string                    `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Query          string                    `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`                                                                                                       // text query (will be embedded server-side)
+	QueryVector    []float32                 `protobuf:"fixed32,3,rep,packed,name=query_vector,json=queryVector,proto3" json:"query_vector,omitempty"`                                                               // OR pre-computed vector
+	TopK           int32                     `protobuf:"varint,4,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`                                                                                            // number of results (default: 5)
+	Threshold      float64                   `protobuf:"fixed64,5,opt,name=threshold,proto3" json:"threshold,omitempty"`                                                                                             // minimum similarity 0-1 (default: 0.0)
+	FilterMeta     map[string]*MetaValues    `protobuf:"bytes,6,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // optional metadata pre-filter
+	IncludeContent bool                      `protobuf:"varint,7,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`                                                              // include full content_md in results
+	Algorithm      string                    `protobuf:"bytes,8,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                                                                               // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
+	Oversample     float64                   `protobuf:"fixed64,9,opt,name=oversample,proto3" json:"oversample,omitempty"`                                                                                           // (SRCH-005) candidates per result before dedup; 1.0-10.0, 0 = collection profile then default
+	Filter         map[string]*MetaCondition `protobuf:"bytes,10,rep,name=filter,proto3" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`                          // (v2.18.8) operator filter, ANDed with filter_meta
+	GroupBy        *GroupBy                  `protobuf:"bytes,11,opt,name=group_by,json=groupBy,proto3" json:"group_by,omitempty"`                                                                                   // (v2.18.8)
+	Format         string                    `protobuf:"bytes,12,opt,name=format,proto3" json:"format,omitempty"`                                                                                                    // (v2.18.8) "passages"
+	PassageLines   int32                     `protobuf:"varint,13,opt,name=passage_lines,json=passageLines,proto3" json:"passage_lines,omitempty"`                                                                   // (v2.18.8)
+	WaitForIndexMs int32                     `protobuf:"varint,14,opt,name=wait_for_index_ms,json=waitForIndexMs,proto3" json:"wait_for_index_ms,omitempty"`                                                         // (v2.18.8) wait up to this long (max 30000) for queued embeddings
+	WaitForKeys    []string                  `protobuf:"bytes,15,rep,name=wait_for_keys,json=waitForKeys,proto3" json:"wait_for_keys,omitempty"`                                                                     // (v2.18.8) wait only for these keys
+	ReadLevel      string                    `protobuf:"bytes,16,opt,name=read_level,json=readLevel,proto3" json:"read_level,omitempty"`                                                                             // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
+	RetrievalMode  string                    `protobuf:"bytes,17,opt,name=retrieval_mode,json=retrievalMode,proto3" json:"retrieval_mode,omitempty"`                                                                 // "parent" (default), "chunk", "window"
+	WindowSize     int32                     `protobuf:"varint,18,opt,name=window_size,json=windowSize,proto3" json:"window_size,omitempty"`                                                                         // neighbour chunks per side in "window" mode
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1757,14 +1774,83 @@ func (x *VectorSearchRequest) GetOversample() float64 {
 	return 0
 }
 
+func (x *VectorSearchRequest) GetFilter() map[string]*MetaCondition {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *VectorSearchRequest) GetGroupBy() *GroupBy {
+	if x != nil {
+		return x.GroupBy
+	}
+	return nil
+}
+
+func (x *VectorSearchRequest) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *VectorSearchRequest) GetPassageLines() int32 {
+	if x != nil {
+		return x.PassageLines
+	}
+	return 0
+}
+
+func (x *VectorSearchRequest) GetWaitForIndexMs() int32 {
+	if x != nil {
+		return x.WaitForIndexMs
+	}
+	return 0
+}
+
+func (x *VectorSearchRequest) GetWaitForKeys() []string {
+	if x != nil {
+		return x.WaitForKeys
+	}
+	return nil
+}
+
+func (x *VectorSearchRequest) GetReadLevel() string {
+	if x != nil {
+		return x.ReadLevel
+	}
+	return ""
+}
+
+func (x *VectorSearchRequest) GetRetrievalMode() string {
+	if x != nil {
+		return x.RetrievalMode
+	}
+	return ""
+}
+
+func (x *VectorSearchRequest) GetWindowSize() int32 {
+	if x != nil {
+		return x.WindowSize
+	}
+	return 0
+}
+
 // Vector search result
 type VectorSearchResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Document      *Document              `protobuf:"bytes,1,opt,name=document,proto3" json:"document,omitempty"`
-	Score         float32                `protobuf:"fixed32,2,opt,name=score,proto3" json:"score,omitempty"`
-	Rank          int32                  `protobuf:"varint,3,opt,name=rank,proto3" json:"rank,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Document         *Document              `protobuf:"bytes,1,opt,name=document,proto3" json:"document,omitempty"`
+	Score            float32                `protobuf:"fixed32,2,opt,name=score,proto3" json:"score,omitempty"`
+	Rank             int32                  `protobuf:"varint,3,opt,name=rank,proto3" json:"rank,omitempty"`
+	ChunkText        string                 `protobuf:"bytes,4,opt,name=chunk_text,json=chunkText,proto3" json:"chunk_text,omitempty"`  // the matching chunk in chunk/window modes
+	StartLine        int32                  `protobuf:"varint,5,opt,name=start_line,json=startLine,proto3" json:"start_line,omitempty"` // 1-based lines of the chunk in its document
+	EndLine          int32                  `protobuf:"varint,6,opt,name=end_line,json=endLine,proto3" json:"end_line,omitempty"`
+	Group            string                 `protobuf:"bytes,7,opt,name=group,proto3" json:"group,omitempty"` // (v2.18.8)
+	GroupRank        int32                  `protobuf:"varint,8,opt,name=group_rank,json=groupRank,proto3" json:"group_rank,omitempty"`
+	PendingEmbedding bool                   `protobuf:"varint,9,opt,name=pending_embedding,json=pendingEmbedding,proto3" json:"pending_embedding,omitempty"` // (v2.18.8) found by text while its embedding is queued
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *VectorSearchResult) Reset() {
@@ -1818,16 +1904,61 @@ func (x *VectorSearchResult) GetRank() int32 {
 	return 0
 }
 
+func (x *VectorSearchResult) GetChunkText() string {
+	if x != nil {
+		return x.ChunkText
+	}
+	return ""
+}
+
+func (x *VectorSearchResult) GetStartLine() int32 {
+	if x != nil {
+		return x.StartLine
+	}
+	return 0
+}
+
+func (x *VectorSearchResult) GetEndLine() int32 {
+	if x != nil {
+		return x.EndLine
+	}
+	return 0
+}
+
+func (x *VectorSearchResult) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *VectorSearchResult) GetGroupRank() int32 {
+	if x != nil {
+		return x.GroupRank
+	}
+	return 0
+}
+
+func (x *VectorSearchResult) GetPendingEmbedding() bool {
+	if x != nil {
+		return x.PendingEmbedding
+	}
+	return false
+}
+
 // Vector search response
 type VectorSearchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Results       []*VectorSearchResult  `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
-	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
-	Model         string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
-	Dimensions    int32                  `protobuf:"varint,4,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
-	Algorithm     string                 `protobuf:"bytes,5,opt,name=algorithm,proto3" json:"algorithm,omitempty"` // algorithm used for this search
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Results          []*VectorSearchResult  `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	Total            int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	Model            string                 `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
+	Dimensions       int32                  `protobuf:"varint,4,opt,name=dimensions,proto3" json:"dimensions,omitempty"`
+	Algorithm        string                 `protobuf:"bytes,5,opt,name=algorithm,proto3" json:"algorithm,omitempty"` // algorithm used for this search
+	Passages         []*Passage             `protobuf:"bytes,6,rep,name=passages,proto3" json:"passages,omitempty"`   // (v2.18.8) set when format is "passages"
+	Indexing         *IndexWaitResult       `protobuf:"bytes,7,opt,name=indexing,proto3" json:"indexing,omitempty"`   // (v2.18.8) set when the request waited
+	ContextTruncated bool                   `protobuf:"varint,8,opt,name=context_truncated,json=contextTruncated,proto3" json:"context_truncated,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *VectorSearchResponse) Reset() {
@@ -1893,6 +2024,27 @@ func (x *VectorSearchResponse) GetAlgorithm() string {
 		return x.Algorithm
 	}
 	return ""
+}
+
+func (x *VectorSearchResponse) GetPassages() []*Passage {
+	if x != nil {
+		return x.Passages
+	}
+	return nil
+}
+
+func (x *VectorSearchResponse) GetIndexing() *IndexWaitResult {
+	if x != nil {
+		return x.Indexing
+	}
+	return nil
+}
+
+func (x *VectorSearchResponse) GetContextTruncated() bool {
+	if x != nil {
+		return x.ContextTruncated
+	}
+	return false
 }
 
 // Vector reindex request
@@ -2345,17 +2497,21 @@ func (x *SetTTLRequest) GetTtl() int64 {
 }
 
 type FTSRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Collection     string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
-	Query          string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	Limit          int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
-	Algorithm      string                 `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                                                                               // "tfidf" (default) or "bm25"
-	Fuzzy          int32                  `protobuf:"varint,5,opt,name=fuzzy,proto3" json:"fuzzy,omitempty"`                                                                                                      // typo tolerance: 0 (off), 1 (1 edit), 2 (2 edits)
-	FilterMeta     map[string]*MetaValues `protobuf:"bytes,6,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // optional metadata pre-filter
-	Lang           string                 `protobuf:"bytes,7,opt,name=lang,proto3" json:"lang,omitempty"`                                                                                                         // language for stemming/stop words (default: server default)
-	Boost          map[string]float64     `protobuf:"bytes,8,rep,name=boost,proto3" json:"boost,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`                           // per-query boost: "metaKey:metaValue" → multiplier (positive boosts, negative demotes)
-	FacetBy        []string               `protobuf:"bytes,9,rep,name=facet_by,json=facetBy,proto3" json:"facet_by,omitempty"`                                                                                    // (v2.9.14+) meta keys to aggregate into response.facets
-	FacetMaxValues int32                  `protobuf:"varint,10,opt,name=facet_max_values,json=facetMaxValues,proto3" json:"facet_max_values,omitempty"`                                                           // (v2.9.14+) cap per-key bucket count (0 = unlimited)
+	state          protoimpl.MessageState    `protogen:"open.v1"`
+	Collection     string                    `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Query          string                    `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	Limit          int32                     `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	Algorithm      string                    `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                                                                               // "tfidf" (default) or "bm25"
+	Fuzzy          int32                     `protobuf:"varint,5,opt,name=fuzzy,proto3" json:"fuzzy,omitempty"`                                                                                                      // typo tolerance: 0 (off), 1 (1 edit), 2 (2 edits)
+	FilterMeta     map[string]*MetaValues    `protobuf:"bytes,6,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // optional metadata pre-filter
+	Lang           string                    `protobuf:"bytes,7,opt,name=lang,proto3" json:"lang,omitempty"`                                                                                                         // language for stemming/stop words (default: server default)
+	Boost          map[string]float64        `protobuf:"bytes,8,rep,name=boost,proto3" json:"boost,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`                           // per-query boost: "metaKey:metaValue" → multiplier (positive boosts, negative demotes)
+	FacetBy        []string                  `protobuf:"bytes,9,rep,name=facet_by,json=facetBy,proto3" json:"facet_by,omitempty"`                                                                                    // (v2.9.14+) meta keys to aggregate into response.facets
+	FacetMaxValues int32                     `protobuf:"varint,10,opt,name=facet_max_values,json=facetMaxValues,proto3" json:"facet_max_values,omitempty"`                                                           // (v2.9.14+) cap per-key bucket count (0 = unlimited)
+	Filter         map[string]*MetaCondition `protobuf:"bytes,11,rep,name=filter,proto3" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`                          // (v2.18.8) operator filter, ANDed with filter_meta
+	GroupBy        *GroupBy                  `protobuf:"bytes,12,opt,name=group_by,json=groupBy,proto3" json:"group_by,omitempty"`                                                                                   // (v2.18.8) at most per_group results per metadata value or document
+	Format         string                    `protobuf:"bytes,13,opt,name=format,proto3" json:"format,omitempty"`                                                                                                    // (v2.18.8) "passages" returns passages instead of documents
+	PassageLines   int32                     `protobuf:"varint,14,opt,name=passage_lines,json=passageLines,proto3" json:"passage_lines,omitempty"`                                                                   // (v2.18.8) context lines around a passage's hit
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2460,12 +2616,42 @@ func (x *FTSRequest) GetFacetMaxValues() int32 {
 	return 0
 }
 
+func (x *FTSRequest) GetFilter() map[string]*MetaCondition {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *FTSRequest) GetGroupBy() *GroupBy {
+	if x != nil {
+		return x.GroupBy
+	}
+	return nil
+}
+
+func (x *FTSRequest) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *FTSRequest) GetPassageLines() int32 {
+	if x != nil {
+		return x.PassageLines
+	}
+	return 0
+}
+
 type FTSResult struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Document      *Document              `protobuf:"bytes,1,opt,name=document,proto3" json:"document,omitempty"`
 	Score         float64                `protobuf:"fixed64,2,opt,name=score,proto3" json:"score,omitempty"`
 	MatchedTerms  []string               `protobuf:"bytes,3,rep,name=matched_terms,json=matchedTerms,proto3" json:"matched_terms,omitempty"`
 	Pinned        bool                   `protobuf:"varint,4,opt,name=pinned,proto3" json:"pinned,omitempty"` // (v2.9.14+) this row was injected by a curation rule
+	Group         string                 `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"`    // (v2.18.8) the group this result counted against
+	GroupRank     int32                  `protobuf:"varint,6,opt,name=group_rank,json=groupRank,proto3" json:"group_rank,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2526,6 +2712,20 @@ func (x *FTSResult) GetPinned() bool {
 		return x.Pinned
 	}
 	return false
+}
+
+func (x *FTSResult) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *FTSResult) GetGroupRank() int32 {
+	if x != nil {
+		return x.GroupRank
+	}
+	return 0
 }
 
 // FacetBucketProto is one value bucket inside a facet — reused by
@@ -2627,15 +2827,17 @@ func (x *FacetBucketList) GetBuckets() []*FacetBucketProto {
 }
 
 type FTSResponse struct {
-	state         protoimpl.MessageState      `protogen:"open.v1"`
-	Results       []*FTSResult                `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
-	Total         int32                       `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
-	Algorithm     string                      `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                                                     // algorithm used for this search
-	Fuzzy         int32                       `protobuf:"varint,4,opt,name=fuzzy,proto3" json:"fuzzy,omitempty"`                                                                            // typo tolerance level used
-	Lang          string                      `protobuf:"bytes,5,opt,name=lang,proto3" json:"lang,omitempty"`                                                                               // language used for tokenization
-	Facets        map[string]*FacetBucketList `protobuf:"bytes,6,rep,name=facets,proto3" json:"facets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.9.14+) per-key facet counts
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState      `protogen:"open.v1"`
+	Results          []*FTSResult                `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	Total            int32                       `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	Algorithm        string                      `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                                                     // algorithm used for this search
+	Fuzzy            int32                       `protobuf:"varint,4,opt,name=fuzzy,proto3" json:"fuzzy,omitempty"`                                                                            // typo tolerance level used
+	Lang             string                      `protobuf:"bytes,5,opt,name=lang,proto3" json:"lang,omitempty"`                                                                               // language used for tokenization
+	Facets           map[string]*FacetBucketList `protobuf:"bytes,6,rep,name=facets,proto3" json:"facets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.9.14+) per-key facet counts
+	Passages         []*Passage                  `protobuf:"bytes,7,rep,name=passages,proto3" json:"passages,omitempty"`                                                                       // (v2.18.8) set when format is "passages"
+	ContextTruncated bool                        `protobuf:"varint,8,opt,name=context_truncated,json=contextTruncated,proto3" json:"context_truncated,omitempty"`                              // (v2.18.8) the collection's context budget dropped results
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *FTSResponse) Reset() {
@@ -2708,6 +2910,20 @@ func (x *FTSResponse) GetFacets() map[string]*FacetBucketList {
 		return x.Facets
 	}
 	return nil
+}
+
+func (x *FTSResponse) GetPassages() []*Passage {
+	if x != nil {
+		return x.Passages
+	}
+	return nil
+}
+
+func (x *FTSResponse) GetContextTruncated() bool {
+	if x != nil {
+		return x.ContextTruncated
+	}
+	return false
 }
 
 type FTSReindexRequest struct {
@@ -2956,25 +3172,32 @@ func (x *FTSLanguagesResponse) GetDefaultLang() string {
 
 // Hybrid search request - combines FTS and vector search
 type HybridSearchRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Collection      string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
-	Query           string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	TopK            int32                  `protobuf:"varint,3,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
-	Algorithm       string                 `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                    // FTS algorithm: "bm25" (default), "bm25f"
-	VectorAlgorithm string                 `protobuf:"bytes,5,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"` // vector algorithm: "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
-	Alpha           float64                `protobuf:"fixed64,6,opt,name=alpha,proto3" json:"alpha,omitempty"`                                          // weight for alpha blending: 0=keyword only, 1=semantic only
-	Strategy        string                 `protobuf:"bytes,7,opt,name=strategy,proto3" json:"strategy,omitempty"`                                      // "alpha" (default) or "rrf"
-	RrfK            int32                  `protobuf:"varint,8,opt,name=rrf_k,json=rrfK,proto3" json:"rrf_k,omitempty"`                                 // RRF parameter k (default 60)
-	Fuzzy           int32                  `protobuf:"varint,9,opt,name=fuzzy,proto3" json:"fuzzy,omitempty"`
-	Threshold       float64                `protobuf:"fixed64,10,opt,name=threshold,proto3" json:"threshold,omitempty"`
-	FilterMeta      map[string]*MetaValues `protobuf:"bytes,11,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	IncludeContent  bool                   `protobuf:"varint,12,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`
-	FieldWeights    map[string]float64     `protobuf:"bytes,13,rep,name=field_weights,json=fieldWeights,proto3" json:"field_weights,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`
-	Lang            string                 `protobuf:"bytes,14,opt,name=lang,proto3" json:"lang,omitempty"`                                                                               // language for FTS stemming/stop words
-	Boost           map[string]float64     `protobuf:"bytes,15,rep,name=boost,proto3" json:"boost,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"` // per-query boost: "metaKey:metaValue" → multiplier (positive boosts, negative demotes)
-	Sort            string                 `protobuf:"bytes,16,opt,name=sort,proto3" json:"sort,omitempty"`                                                                               // result ordering: "" or "combined" (default, by fused score), or "distance" (by distanceMeters asc — requires geo filter)
-	FacetBy         []string               `protobuf:"bytes,17,rep,name=facet_by,json=facetBy,proto3" json:"facet_by,omitempty"`                                                          // (v2.9.14+) meta keys to aggregate
-	FacetMaxValues  int32                  `protobuf:"varint,18,opt,name=facet_max_values,json=facetMaxValues,proto3" json:"facet_max_values,omitempty"`                                  // (v2.9.14+) cap per-key bucket count (0 = unlimited)
+	state           protoimpl.MessageState    `protogen:"open.v1"`
+	Collection      string                    `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Query           string                    `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	TopK            int32                     `protobuf:"varint,3,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
+	Algorithm       string                    `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`                                    // FTS algorithm: "bm25" (default), "bm25f"
+	VectorAlgorithm string                    `protobuf:"bytes,5,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"` // vector algorithm: "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
+	Alpha           float64                   `protobuf:"fixed64,6,opt,name=alpha,proto3" json:"alpha,omitempty"`                                          // weight for alpha blending: 0=keyword only, 1=semantic only
+	Strategy        string                    `protobuf:"bytes,7,opt,name=strategy,proto3" json:"strategy,omitempty"`                                      // "alpha" (default) or "rrf"
+	RrfK            int32                     `protobuf:"varint,8,opt,name=rrf_k,json=rrfK,proto3" json:"rrf_k,omitempty"`                                 // RRF parameter k (default 60)
+	Fuzzy           int32                     `protobuf:"varint,9,opt,name=fuzzy,proto3" json:"fuzzy,omitempty"`
+	Threshold       float64                   `protobuf:"fixed64,10,opt,name=threshold,proto3" json:"threshold,omitempty"`
+	FilterMeta      map[string]*MetaValues    `protobuf:"bytes,11,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	IncludeContent  bool                      `protobuf:"varint,12,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`
+	FieldWeights    map[string]float64        `protobuf:"bytes,13,rep,name=field_weights,json=fieldWeights,proto3" json:"field_weights,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"`
+	Lang            string                    `protobuf:"bytes,14,opt,name=lang,proto3" json:"lang,omitempty"`                                                                               // language for FTS stemming/stop words
+	Boost           map[string]float64        `protobuf:"bytes,15,rep,name=boost,proto3" json:"boost,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"fixed64,2,opt,name=value"` // per-query boost: "metaKey:metaValue" → multiplier (positive boosts, negative demotes)
+	Sort            string                    `protobuf:"bytes,16,opt,name=sort,proto3" json:"sort,omitempty"`                                                                               // result ordering: "" or "combined" (default, by fused score), or "distance" (by distanceMeters asc — requires geo filter)
+	FacetBy         []string                  `protobuf:"bytes,17,rep,name=facet_by,json=facetBy,proto3" json:"facet_by,omitempty"`                                                          // (v2.9.14+) meta keys to aggregate
+	FacetMaxValues  int32                     `protobuf:"varint,18,opt,name=facet_max_values,json=facetMaxValues,proto3" json:"facet_max_values,omitempty"`                                  // (v2.9.14+) cap per-key bucket count (0 = unlimited)
+	Filter          map[string]*MetaCondition `protobuf:"bytes,19,rep,name=filter,proto3" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.18.8) operator filter, ANDed with filter_meta
+	GroupBy         *GroupBy                  `protobuf:"bytes,20,opt,name=group_by,json=groupBy,proto3" json:"group_by,omitempty"`                                                          // (v2.18.8)
+	Format          string                    `protobuf:"bytes,21,opt,name=format,proto3" json:"format,omitempty"`                                                                           // (v2.18.8) "passages"
+	PassageLines    int32                     `protobuf:"varint,22,opt,name=passage_lines,json=passageLines,proto3" json:"passage_lines,omitempty"`                                          // (v2.18.8)
+	WaitForIndexMs  int32                     `protobuf:"varint,23,opt,name=wait_for_index_ms,json=waitForIndexMs,proto3" json:"wait_for_index_ms,omitempty"`                                // (v2.18.8) wait up to this long (max 30000) for queued embeddings
+	WaitForKeys     []string                  `protobuf:"bytes,24,rep,name=wait_for_keys,json=waitForKeys,proto3" json:"wait_for_keys,omitempty"`                                            // (v2.18.8) wait only for these keys
+	ReadLevel       string                    `protobuf:"bytes,25,opt,name=read_level,json=readLevel,proto3" json:"read_level,omitempty"`                                                    // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -3135,17 +3358,69 @@ func (x *HybridSearchRequest) GetFacetMaxValues() int32 {
 	return 0
 }
 
+func (x *HybridSearchRequest) GetFilter() map[string]*MetaCondition {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *HybridSearchRequest) GetGroupBy() *GroupBy {
+	if x != nil {
+		return x.GroupBy
+	}
+	return nil
+}
+
+func (x *HybridSearchRequest) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *HybridSearchRequest) GetPassageLines() int32 {
+	if x != nil {
+		return x.PassageLines
+	}
+	return 0
+}
+
+func (x *HybridSearchRequest) GetWaitForIndexMs() int32 {
+	if x != nil {
+		return x.WaitForIndexMs
+	}
+	return 0
+}
+
+func (x *HybridSearchRequest) GetWaitForKeys() []string {
+	if x != nil {
+		return x.WaitForKeys
+	}
+	return nil
+}
+
+func (x *HybridSearchRequest) GetReadLevel() string {
+	if x != nil {
+		return x.ReadLevel
+	}
+	return ""
+}
+
 type HybridSearchResult struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Document      *Document              `protobuf:"bytes,1,opt,name=document,proto3" json:"document,omitempty"`
-	CombinedScore float64                `protobuf:"fixed64,2,opt,name=combined_score,json=combinedScore,proto3" json:"combined_score,omitempty"`
-	FtsScore      float64                `protobuf:"fixed64,3,opt,name=fts_score,json=ftsScore,proto3" json:"fts_score,omitempty"`
-	VectorScore   float64                `protobuf:"fixed64,4,opt,name=vector_score,json=vectorScore,proto3" json:"vector_score,omitempty"`
-	MatchedTerms  []string               `protobuf:"bytes,5,rep,name=matched_terms,json=matchedTerms,proto3" json:"matched_terms,omitempty"`
-	Rank          int32                  `protobuf:"varint,6,opt,name=rank,proto3" json:"rank,omitempty"`
-	Pinned        bool                   `protobuf:"varint,7,opt,name=pinned,proto3" json:"pinned,omitempty"` // (v2.9.14+) injected by a curation rule
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Document         *Document              `protobuf:"bytes,1,opt,name=document,proto3" json:"document,omitempty"`
+	CombinedScore    float64                `protobuf:"fixed64,2,opt,name=combined_score,json=combinedScore,proto3" json:"combined_score,omitempty"`
+	FtsScore         float64                `protobuf:"fixed64,3,opt,name=fts_score,json=ftsScore,proto3" json:"fts_score,omitempty"`
+	VectorScore      float64                `protobuf:"fixed64,4,opt,name=vector_score,json=vectorScore,proto3" json:"vector_score,omitempty"`
+	MatchedTerms     []string               `protobuf:"bytes,5,rep,name=matched_terms,json=matchedTerms,proto3" json:"matched_terms,omitempty"`
+	Rank             int32                  `protobuf:"varint,6,opt,name=rank,proto3" json:"rank,omitempty"`
+	Pinned           bool                   `protobuf:"varint,7,opt,name=pinned,proto3" json:"pinned,omitempty"` // (v2.9.14+) injected by a curation rule
+	Group            string                 `protobuf:"bytes,8,opt,name=group,proto3" json:"group,omitempty"`    // (v2.18.8)
+	GroupRank        int32                  `protobuf:"varint,9,opt,name=group_rank,json=groupRank,proto3" json:"group_rank,omitempty"`
+	PendingEmbedding bool                   `protobuf:"varint,10,opt,name=pending_embedding,json=pendingEmbedding,proto3" json:"pending_embedding,omitempty"` // (v2.18.8)
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *HybridSearchResult) Reset() {
@@ -3227,16 +3502,40 @@ func (x *HybridSearchResult) GetPinned() bool {
 	return false
 }
 
+func (x *HybridSearchResult) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *HybridSearchResult) GetGroupRank() int32 {
+	if x != nil {
+		return x.GroupRank
+	}
+	return 0
+}
+
+func (x *HybridSearchResult) GetPendingEmbedding() bool {
+	if x != nil {
+		return x.PendingEmbedding
+	}
+	return false
+}
+
 type HybridSearchResponse struct {
-	state           protoimpl.MessageState      `protogen:"open.v1"`
-	Results         []*HybridSearchResult       `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
-	Total           int32                       `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
-	Strategy        string                      `protobuf:"bytes,3,opt,name=strategy,proto3" json:"strategy,omitempty"`
-	FtsAlgorithm    string                      `protobuf:"bytes,4,opt,name=fts_algorithm,json=ftsAlgorithm,proto3" json:"fts_algorithm,omitempty"`
-	VectorAlgorithm string                      `protobuf:"bytes,5,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"`
-	Facets          map[string]*FacetBucketList `protobuf:"bytes,6,rep,name=facets,proto3" json:"facets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.9.14+)
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state            protoimpl.MessageState      `protogen:"open.v1"`
+	Results          []*HybridSearchResult       `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
+	Total            int32                       `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	Strategy         string                      `protobuf:"bytes,3,opt,name=strategy,proto3" json:"strategy,omitempty"`
+	FtsAlgorithm     string                      `protobuf:"bytes,4,opt,name=fts_algorithm,json=ftsAlgorithm,proto3" json:"fts_algorithm,omitempty"`
+	VectorAlgorithm  string                      `protobuf:"bytes,5,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"`
+	Facets           map[string]*FacetBucketList `protobuf:"bytes,6,rep,name=facets,proto3" json:"facets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.9.14+)
+	Passages         []*Passage                  `protobuf:"bytes,7,rep,name=passages,proto3" json:"passages,omitempty"`                                                                       // (v2.18.8)
+	Indexing         *IndexWaitResult            `protobuf:"bytes,8,opt,name=indexing,proto3" json:"indexing,omitempty"`                                                                       // (v2.18.8)
+	ContextTruncated bool                        `protobuf:"varint,9,opt,name=context_truncated,json=contextTruncated,proto3" json:"context_truncated,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *HybridSearchResponse) Reset() {
@@ -3309,6 +3608,27 @@ func (x *HybridSearchResponse) GetFacets() map[string]*FacetBucketList {
 		return x.Facets
 	}
 	return nil
+}
+
+func (x *HybridSearchResponse) GetPassages() []*Passage {
+	if x != nil {
+		return x.Passages
+	}
+	return nil
+}
+
+func (x *HybridSearchResponse) GetIndexing() *IndexWaitResult {
+	if x != nil {
+		return x.Indexing
+	}
+	return nil
+}
+
+func (x *HybridSearchResponse) GetContextTruncated() bool {
+	if x != nil {
+		return x.ContextTruncated
+	}
+	return false
 }
 
 type WebhookProto struct {
@@ -7918,18 +8238,26 @@ func (x *ListCollectionConfigsResponse) GetTotal() int32 {
 }
 
 type CrossSearchRequest struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	SourceCollection  string                 `protobuf:"bytes,1,opt,name=source_collection,json=sourceCollection,proto3" json:"source_collection,omitempty"`
-	SourceDocId       string                 `protobuf:"bytes,2,opt,name=source_doc_id,json=sourceDocId,proto3" json:"source_doc_id,omitempty"`
-	Query             string                 `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
-	QueryVector       []float32              `protobuf:"fixed32,4,rep,packed,name=query_vector,json=queryVector,proto3" json:"query_vector,omitempty"`
-	TargetCollections []string               `protobuf:"bytes,5,rep,name=target_collections,json=targetCollections,proto3" json:"target_collections,omitempty"`
-	TopK              int32                  `protobuf:"varint,6,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
-	Threshold         float64                `protobuf:"fixed64,7,opt,name=threshold,proto3" json:"threshold,omitempty"`
-	Algorithm         string                 `protobuf:"bytes,8,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
-	DistanceMetric    string                 `protobuf:"bytes,9,opt,name=distance_metric,json=distanceMetric,proto3" json:"distance_metric,omitempty"`
-	FilterMeta        map[string]*MetaValues `protobuf:"bytes,10,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	IncludeContent    bool                   `protobuf:"varint,11,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`
+	state             protoimpl.MessageState    `protogen:"open.v1"`
+	SourceCollection  string                    `protobuf:"bytes,1,opt,name=source_collection,json=sourceCollection,proto3" json:"source_collection,omitempty"`
+	SourceDocId       string                    `protobuf:"bytes,2,opt,name=source_doc_id,json=sourceDocId,proto3" json:"source_doc_id,omitempty"`
+	Query             string                    `protobuf:"bytes,3,opt,name=query,proto3" json:"query,omitempty"`
+	QueryVector       []float32                 `protobuf:"fixed32,4,rep,packed,name=query_vector,json=queryVector,proto3" json:"query_vector,omitempty"`
+	TargetCollections []string                  `protobuf:"bytes,5,rep,name=target_collections,json=targetCollections,proto3" json:"target_collections,omitempty"`
+	TopK              int32                     `protobuf:"varint,6,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
+	Threshold         float64                   `protobuf:"fixed64,7,opt,name=threshold,proto3" json:"threshold,omitempty"`
+	Algorithm         string                    `protobuf:"bytes,8,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	DistanceMetric    string                    `protobuf:"bytes,9,opt,name=distance_metric,json=distanceMetric,proto3" json:"distance_metric,omitempty"`
+	FilterMeta        map[string]*MetaValues    `protobuf:"bytes,10,rep,name=filter_meta,json=filterMeta,proto3" json:"filter_meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	IncludeContent    bool                      `protobuf:"varint,11,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`
+	Filter            map[string]*MetaCondition `protobuf:"bytes,12,rep,name=filter,proto3" json:"filter,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.18.8) operator filter, ANDed with filter_meta
+	GroupBy           *GroupBy                  `protobuf:"bytes,13,opt,name=group_by,json=groupBy,proto3" json:"group_by,omitempty"`                                                          // (v2.18.8) key may be "collection"
+	Format            string                    `protobuf:"bytes,14,opt,name=format,proto3" json:"format,omitempty"`                                                                           // (v2.18.8) "passages"
+	PassageLines      int32                     `protobuf:"varint,15,opt,name=passage_lines,json=passageLines,proto3" json:"passage_lines,omitempty"`                                          // (v2.18.8)
+	SearchType        string                    `protobuf:"bytes,16,opt,name=search_type,json=searchType,proto3" json:"search_type,omitempty"`                                                 // (v2.18.8) "vector" (default), "fts" or "hybrid"; targets may be "role:reference"
+	WaitForIndexMs    int32                     `protobuf:"varint,17,opt,name=wait_for_index_ms,json=waitForIndexMs,proto3" json:"wait_for_index_ms,omitempty"`                                // (v2.18.8) wait up to this long (max 30000) for queued embeddings
+	WaitForKeys       []string                  `protobuf:"bytes,18,rep,name=wait_for_keys,json=waitForKeys,proto3" json:"wait_for_keys,omitempty"`                                            // (v2.18.8) wait only for these keys
+	ReadLevel         string                    `protobuf:"bytes,19,opt,name=read_level,json=readLevel,proto3" json:"read_level,omitempty"`                                                    // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -8041,12 +8369,70 @@ func (x *CrossSearchRequest) GetIncludeContent() bool {
 	return false
 }
 
+func (x *CrossSearchRequest) GetFilter() map[string]*MetaCondition {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *CrossSearchRequest) GetGroupBy() *GroupBy {
+	if x != nil {
+		return x.GroupBy
+	}
+	return nil
+}
+
+func (x *CrossSearchRequest) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *CrossSearchRequest) GetPassageLines() int32 {
+	if x != nil {
+		return x.PassageLines
+	}
+	return 0
+}
+
+func (x *CrossSearchRequest) GetSearchType() string {
+	if x != nil {
+		return x.SearchType
+	}
+	return ""
+}
+
+func (x *CrossSearchRequest) GetWaitForIndexMs() int32 {
+	if x != nil {
+		return x.WaitForIndexMs
+	}
+	return 0
+}
+
+func (x *CrossSearchRequest) GetWaitForKeys() []string {
+	if x != nil {
+		return x.WaitForKeys
+	}
+	return nil
+}
+
+func (x *CrossSearchRequest) GetReadLevel() string {
+	if x != nil {
+		return x.ReadLevel
+	}
+	return ""
+}
+
 type CrossSearchResultItem struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
 	Document      *Document              `protobuf:"bytes,2,opt,name=document,proto3" json:"document,omitempty"`
 	Score         float32                `protobuf:"fixed32,3,opt,name=score,proto3" json:"score,omitempty"`
 	Rank          int32                  `protobuf:"varint,4,opt,name=rank,proto3" json:"rank,omitempty"`
+	Group         string                 `protobuf:"bytes,5,opt,name=group,proto3" json:"group,omitempty"` // (v2.18.8)
+	GroupRank     int32                  `protobuf:"varint,6,opt,name=group_rank,json=groupRank,proto3" json:"group_rank,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -8109,6 +8495,20 @@ func (x *CrossSearchResultItem) GetRank() int32 {
 	return 0
 }
 
+func (x *CrossSearchResultItem) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *CrossSearchResultItem) GetGroupRank() int32 {
+	if x != nil {
+		return x.GroupRank
+	}
+	return 0
+}
+
 type CrossSearchResponse struct {
 	state             protoimpl.MessageState   `protogen:"open.v1"`
 	Results           []*CrossSearchResultItem `protobuf:"bytes,1,rep,name=results,proto3" json:"results,omitempty"`
@@ -8118,6 +8518,8 @@ type CrossSearchResponse struct {
 	TargetCollections []string                 `protobuf:"bytes,5,rep,name=target_collections,json=targetCollections,proto3" json:"target_collections,omitempty"`
 	Algorithm         string                   `protobuf:"bytes,6,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
 	DistanceMetric    string                   `protobuf:"bytes,7,opt,name=distance_metric,json=distanceMetric,proto3" json:"distance_metric,omitempty"`
+	Passages          []*Passage               `protobuf:"bytes,8,rep,name=passages,proto3" json:"passages,omitempty"` // (v2.18.8)
+	Indexing          *IndexWaitResult         `protobuf:"bytes,9,opt,name=indexing,proto3" json:"indexing,omitempty"` // (v2.18.8)
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -8199,6 +8601,20 @@ func (x *CrossSearchResponse) GetDistanceMetric() string {
 		return x.DistanceMetric
 	}
 	return ""
+}
+
+func (x *CrossSearchResponse) GetPassages() []*Passage {
+	if x != nil {
+		return x.Passages
+	}
+	return nil
+}
+
+func (x *CrossSearchResponse) GetIndexing() *IndexWaitResult {
+	if x != nil {
+		return x.Indexing
+	}
+	return nil
 }
 
 type FindDuplicatesRequest struct {
@@ -12326,6 +12742,1576 @@ func (x *SearchAdvisorResponse) GetWarnings() []string {
 	return nil
 }
 
+// One metadata condition (SRCH-017). Every set field must hold.
+type MetaCondition struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnyOf         []string               `protobuf:"bytes,1,rep,name=any_of,json=anyOf,proto3" json:"any_of,omitempty"` // the "in" operator: any of these values
+	Prefix        string                 `protobuf:"bytes,2,opt,name=prefix,proto3" json:"prefix,omitempty"`
+	Contains      string                 `protobuf:"bytes,3,opt,name=contains,proto3" json:"contains,omitempty"`
+	Gt            *string                `protobuf:"bytes,4,opt,name=gt,proto3,oneof" json:"gt,omitempty"` // numbers compare as numbers, dates as dates
+	Gte           *string                `protobuf:"bytes,5,opt,name=gte,proto3,oneof" json:"gte,omitempty"`
+	Lt            *string                `protobuf:"bytes,6,opt,name=lt,proto3,oneof" json:"lt,omitempty"`
+	Lte           *string                `protobuf:"bytes,7,opt,name=lte,proto3,oneof" json:"lte,omitempty"`
+	NoneOf        []string               `protobuf:"bytes,8,rep,name=none_of,json=noneOf,proto3" json:"none_of,omitempty"` // the "not" operator: none of these values
+	Exists        *bool                  `protobuf:"varint,9,opt,name=exists,proto3,oneof" json:"exists,omitempty"`        // the key is (true) or is not (false) set
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MetaCondition) Reset() {
+	*x = MetaCondition{}
+	mi := &file_mddb_proto_msgTypes[184]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MetaCondition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MetaCondition) ProtoMessage() {}
+
+func (x *MetaCondition) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[184]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MetaCondition.ProtoReflect.Descriptor instead.
+func (*MetaCondition) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{184}
+}
+
+func (x *MetaCondition) GetAnyOf() []string {
+	if x != nil {
+		return x.AnyOf
+	}
+	return nil
+}
+
+func (x *MetaCondition) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+func (x *MetaCondition) GetContains() string {
+	if x != nil {
+		return x.Contains
+	}
+	return ""
+}
+
+func (x *MetaCondition) GetGt() string {
+	if x != nil && x.Gt != nil {
+		return *x.Gt
+	}
+	return ""
+}
+
+func (x *MetaCondition) GetGte() string {
+	if x != nil && x.Gte != nil {
+		return *x.Gte
+	}
+	return ""
+}
+
+func (x *MetaCondition) GetLt() string {
+	if x != nil && x.Lt != nil {
+		return *x.Lt
+	}
+	return ""
+}
+
+func (x *MetaCondition) GetLte() string {
+	if x != nil && x.Lte != nil {
+		return *x.Lte
+	}
+	return ""
+}
+
+func (x *MetaCondition) GetNoneOf() []string {
+	if x != nil {
+		return x.NoneOf
+	}
+	return nil
+}
+
+func (x *MetaCondition) GetExists() bool {
+	if x != nil && x.Exists != nil {
+		return *x.Exists
+	}
+	return false
+}
+
+// At most per_group results per value of key (SRCH-016). key is a metadata
+// key, "document", or for cross-search "collection".
+type GroupBy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	PerGroup      int32                  `protobuf:"varint,2,opt,name=per_group,json=perGroup,proto3" json:"per_group,omitempty"` // 0 means 1
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GroupBy) Reset() {
+	*x = GroupBy{}
+	mi := &file_mddb_proto_msgTypes[185]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GroupBy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GroupBy) ProtoMessage() {}
+
+func (x *GroupBy) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[185]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GroupBy.ProtoReflect.Descriptor instead.
+func (*GroupBy) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{185}
+}
+
+func (x *GroupBy) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *GroupBy) GetPerGroup() int32 {
+	if x != nil {
+		return x.PerGroup
+	}
+	return 0
+}
+
+// A place in a document (AGT-002): the lines, the definition holding them,
+// and their text.
+type Passage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Lang          string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
+	Path          string                 `protobuf:"bytes,4,opt,name=path,proto3" json:"path,omitempty"`
+	StartLine     int32                  `protobuf:"varint,5,opt,name=start_line,json=startLine,proto3" json:"start_line,omitempty"`
+	EndLine       int32                  `protobuf:"varint,6,opt,name=end_line,json=endLine,proto3" json:"end_line,omitempty"`
+	Symbol        string                 `protobuf:"bytes,7,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Kind          string                 `protobuf:"bytes,8,opt,name=kind,proto3" json:"kind,omitempty"`
+	Content       string                 `protobuf:"bytes,9,opt,name=content,proto3" json:"content,omitempty"`
+	Score         float64                `protobuf:"fixed64,10,opt,name=score,proto3" json:"score,omitempty"`
+	Source        string                 `protobuf:"bytes,11,opt,name=source,proto3" json:"source,omitempty"` // fts, vector, hybrid, cross, or a symbol relation
+	Tokens        int32                  `protobuf:"varint,12,opt,name=tokens,proto3" json:"tokens,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Passage) Reset() {
+	*x = Passage{}
+	mi := &file_mddb_proto_msgTypes[186]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Passage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Passage) ProtoMessage() {}
+
+func (x *Passage) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[186]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Passage.ProtoReflect.Descriptor instead.
+func (*Passage) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{186}
+}
+
+func (x *Passage) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *Passage) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *Passage) GetLang() string {
+	if x != nil {
+		return x.Lang
+	}
+	return ""
+}
+
+func (x *Passage) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *Passage) GetStartLine() int32 {
+	if x != nil {
+		return x.StartLine
+	}
+	return 0
+}
+
+func (x *Passage) GetEndLine() int32 {
+	if x != nil {
+		return x.EndLine
+	}
+	return 0
+}
+
+func (x *Passage) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *Passage) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *Passage) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *Passage) GetScore() float64 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *Passage) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *Passage) GetTokens() int32 {
+	if x != nil {
+		return x.Tokens
+	}
+	return 0
+}
+
+// How long a search waited for queued embeddings (GO-042).
+type IndexWaitResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WaitedMs      int64                  `protobuf:"varint,1,opt,name=waited_ms,json=waitedMs,proto3" json:"waited_ms,omitempty"`
+	TimedOut      bool                   `protobuf:"varint,2,opt,name=timed_out,json=timedOut,proto3" json:"timed_out,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IndexWaitResult) Reset() {
+	*x = IndexWaitResult{}
+	mi := &file_mddb_proto_msgTypes[187]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IndexWaitResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IndexWaitResult) ProtoMessage() {}
+
+func (x *IndexWaitResult) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[187]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IndexWaitResult.ProtoReflect.Descriptor instead.
+func (*IndexWaitResult) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{187}
+}
+
+func (x *IndexWaitResult) GetWaitedMs() int64 {
+	if x != nil {
+		return x.WaitedMs
+	}
+	return 0
+}
+
+func (x *IndexWaitResult) GetTimedOut() bool {
+	if x != nil {
+		return x.TimedOut
+	}
+	return false
+}
+
+type CodeSymbolRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Collection     string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	Include        []string               `protobuf:"bytes,3,rep,name=include,proto3" json:"include,omitempty"` // relations to return; empty = all
+	Limit          int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`    // passages per relation (default 20, max 200)
+	IncludeContent bool                   `protobuf:"varint,5,opt,name=include_content,json=includeContent,proto3" json:"include_content,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CodeSymbolRequest) Reset() {
+	*x = CodeSymbolRequest{}
+	mi := &file_mddb_proto_msgTypes[188]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeSymbolRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeSymbolRequest) ProtoMessage() {}
+
+func (x *CodeSymbolRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[188]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeSymbolRequest.ProtoReflect.Descriptor instead.
+func (*CodeSymbolRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{188}
+}
+
+func (x *CodeSymbolRequest) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *CodeSymbolRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CodeSymbolRequest) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
+}
+
+func (x *CodeSymbolRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *CodeSymbolRequest) GetIncludeContent() bool {
+	if x != nil {
+		return x.IncludeContent
+	}
+	return false
+}
+
+type CodeSymbolResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Symbol        string                 `protobuf:"bytes,2,opt,name=symbol,proto3" json:"symbol,omitempty"`
+	Definitions   []*Passage             `protobuf:"bytes,3,rep,name=definitions,proto3" json:"definitions,omitempty"`
+	References    []*Passage             `protobuf:"bytes,4,rep,name=references,proto3" json:"references,omitempty"`
+	Callers       []*Passage             `protobuf:"bytes,5,rep,name=callers,proto3" json:"callers,omitempty"`
+	Callees       []*Passage             `protobuf:"bytes,6,rep,name=callees,proto3" json:"callees,omitempty"`
+	Tests         []*Passage             `protobuf:"bytes,7,rep,name=tests,proto3" json:"tests,omitempty"`
+	Siblings      []*Passage             `protobuf:"bytes,8,rep,name=siblings,proto3" json:"siblings,omitempty"`
+	Truncated     bool                   `protobuf:"varint,9,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CodeSymbolResponse) Reset() {
+	*x = CodeSymbolResponse{}
+	mi := &file_mddb_proto_msgTypes[189]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CodeSymbolResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CodeSymbolResponse) ProtoMessage() {}
+
+func (x *CodeSymbolResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[189]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CodeSymbolResponse.ProtoReflect.Descriptor instead.
+func (*CodeSymbolResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{189}
+}
+
+func (x *CodeSymbolResponse) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *CodeSymbolResponse) GetSymbol() string {
+	if x != nil {
+		return x.Symbol
+	}
+	return ""
+}
+
+func (x *CodeSymbolResponse) GetDefinitions() []*Passage {
+	if x != nil {
+		return x.Definitions
+	}
+	return nil
+}
+
+func (x *CodeSymbolResponse) GetReferences() []*Passage {
+	if x != nil {
+		return x.References
+	}
+	return nil
+}
+
+func (x *CodeSymbolResponse) GetCallers() []*Passage {
+	if x != nil {
+		return x.Callers
+	}
+	return nil
+}
+
+func (x *CodeSymbolResponse) GetCallees() []*Passage {
+	if x != nil {
+		return x.Callees
+	}
+	return nil
+}
+
+func (x *CodeSymbolResponse) GetTests() []*Passage {
+	if x != nil {
+		return x.Tests
+	}
+	return nil
+}
+
+func (x *CodeSymbolResponse) GetSiblings() []*Passage {
+	if x != nil {
+		return x.Siblings
+	}
+	return nil
+}
+
+func (x *CodeSymbolResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
+type EvalQueryProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Query         string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	ExpectedKeys  []string               `protobuf:"bytes,3,rep,name=expected_keys,json=expectedKeys,proto3" json:"expected_keys,omitempty"`
+	Grades        map[string]int32       `protobuf:"bytes,4,rep,name=grades,proto3" json:"grades,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"` // key -> relevance 0..3
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EvalQueryProto) Reset() {
+	*x = EvalQueryProto{}
+	mi := &file_mddb_proto_msgTypes[190]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvalQueryProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvalQueryProto) ProtoMessage() {}
+
+func (x *EvalQueryProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[190]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvalQueryProto.ProtoReflect.Descriptor instead.
+func (*EvalQueryProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{190}
+}
+
+func (x *EvalQueryProto) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *EvalQueryProto) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *EvalQueryProto) GetExpectedKeys() []string {
+	if x != nil {
+		return x.ExpectedKeys
+	}
+	return nil
+}
+
+func (x *EvalQueryProto) GetGrades() map[string]int32 {
+	if x != nil {
+		return x.Grades
+	}
+	return nil
+}
+
+type EvalConfigProto struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	SearchType      string                 `protobuf:"bytes,2,opt,name=search_type,json=searchType,proto3" json:"search_type,omitempty"` // fts, vector, hybrid
+	Algorithm       string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	VectorAlgorithm string                 `protobuf:"bytes,4,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"`
+	Alpha           *float64               `protobuf:"fixed64,5,opt,name=alpha,proto3,oneof" json:"alpha,omitempty"`
+	Strategy        string                 `protobuf:"bytes,6,opt,name=strategy,proto3" json:"strategy,omitempty"`
+	RetrievalMode   string                 `protobuf:"bytes,7,opt,name=retrieval_mode,json=retrievalMode,proto3" json:"retrieval_mode,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *EvalConfigProto) Reset() {
+	*x = EvalConfigProto{}
+	mi := &file_mddb_proto_msgTypes[191]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvalConfigProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvalConfigProto) ProtoMessage() {}
+
+func (x *EvalConfigProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[191]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvalConfigProto.ProtoReflect.Descriptor instead.
+func (*EvalConfigProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{191}
+}
+
+func (x *EvalConfigProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *EvalConfigProto) GetSearchType() string {
+	if x != nil {
+		return x.SearchType
+	}
+	return ""
+}
+
+func (x *EvalConfigProto) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *EvalConfigProto) GetVectorAlgorithm() string {
+	if x != nil {
+		return x.VectorAlgorithm
+	}
+	return ""
+}
+
+func (x *EvalConfigProto) GetAlpha() float64 {
+	if x != nil && x.Alpha != nil {
+		return *x.Alpha
+	}
+	return 0
+}
+
+func (x *EvalConfigProto) GetStrategy() string {
+	if x != nil {
+		return x.Strategy
+	}
+	return ""
+}
+
+func (x *EvalConfigProto) GetRetrievalMode() string {
+	if x != nil {
+		return x.RetrievalMode
+	}
+	return ""
+}
+
+type RunEvalRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	K             int32                  `protobuf:"varint,2,opt,name=k,proto3" json:"k,omitempty"`            // default 10, max 100
+	Configs       []*EvalConfigProto     `protobuf:"bytes,3,rep,name=configs,proto3" json:"configs,omitempty"` // default fts/bm25, hybrid, vector; max 8
+	Queries       []*EvalQueryProto      `protobuf:"bytes,4,rep,name=queries,proto3" json:"queries,omitempty"` // inline queries instead of the stored set; max 200
+	Details       bool                   `protobuf:"varint,5,opt,name=details,proto3" json:"details,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunEvalRequest) Reset() {
+	*x = RunEvalRequest{}
+	mi := &file_mddb_proto_msgTypes[192]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunEvalRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunEvalRequest) ProtoMessage() {}
+
+func (x *RunEvalRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[192]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunEvalRequest.ProtoReflect.Descriptor instead.
+func (*RunEvalRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{192}
+}
+
+func (x *RunEvalRequest) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *RunEvalRequest) GetK() int32 {
+	if x != nil {
+		return x.K
+	}
+	return 0
+}
+
+func (x *RunEvalRequest) GetConfigs() []*EvalConfigProto {
+	if x != nil {
+		return x.Configs
+	}
+	return nil
+}
+
+func (x *RunEvalRequest) GetQueries() []*EvalQueryProto {
+	if x != nil {
+		return x.Queries
+	}
+	return nil
+}
+
+func (x *RunEvalRequest) GetDetails() bool {
+	if x != nil {
+		return x.Details
+	}
+	return false
+}
+
+type EvalQueryResultProto struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Query          string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	Recall         float64                `protobuf:"fixed64,3,opt,name=recall,proto3" json:"recall,omitempty"`
+	Ndcg           float64                `protobuf:"fixed64,4,opt,name=ndcg,proto3" json:"ndcg,omitempty"`
+	ReciprocalRank float64                `protobuf:"fixed64,5,opt,name=reciprocal_rank,json=reciprocalRank,proto3" json:"reciprocal_rank,omitempty"`
+	Returned       []string               `protobuf:"bytes,6,rep,name=returned,proto3" json:"returned,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *EvalQueryResultProto) Reset() {
+	*x = EvalQueryResultProto{}
+	mi := &file_mddb_proto_msgTypes[193]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvalQueryResultProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvalQueryResultProto) ProtoMessage() {}
+
+func (x *EvalQueryResultProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[193]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvalQueryResultProto.ProtoReflect.Descriptor instead.
+func (*EvalQueryResultProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{193}
+}
+
+func (x *EvalQueryResultProto) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *EvalQueryResultProto) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *EvalQueryResultProto) GetRecall() float64 {
+	if x != nil {
+		return x.Recall
+	}
+	return 0
+}
+
+func (x *EvalQueryResultProto) GetNdcg() float64 {
+	if x != nil {
+		return x.Ndcg
+	}
+	return 0
+}
+
+func (x *EvalQueryResultProto) GetReciprocalRank() float64 {
+	if x != nil {
+		return x.ReciprocalRank
+	}
+	return 0
+}
+
+func (x *EvalQueryResultProto) GetReturned() []string {
+	if x != nil {
+		return x.Returned
+	}
+	return nil
+}
+
+type EvalConfigResultProto struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Config        string                  `protobuf:"bytes,1,opt,name=config,proto3" json:"config,omitempty"`
+	RecallAtK     float64                 `protobuf:"fixed64,2,opt,name=recall_at_k,json=recallAtK,proto3" json:"recall_at_k,omitempty"`
+	NdcgAtK       float64                 `protobuf:"fixed64,3,opt,name=ndcg_at_k,json=ndcgAtK,proto3" json:"ndcg_at_k,omitempty"`
+	Mrr           float64                 `protobuf:"fixed64,4,opt,name=mrr,proto3" json:"mrr,omitempty"`
+	P50Ms         float64                 `protobuf:"fixed64,5,opt,name=p50_ms,json=p50Ms,proto3" json:"p50_ms,omitempty"`
+	P99Ms         float64                 `protobuf:"fixed64,6,opt,name=p99_ms,json=p99Ms,proto3" json:"p99_ms,omitempty"`
+	Tokens        int64                   `protobuf:"varint,7,opt,name=tokens,proto3" json:"tokens,omitempty"`
+	Error         string                  `protobuf:"bytes,8,opt,name=error,proto3" json:"error,omitempty"`
+	PerQuery      []*EvalQueryResultProto `protobuf:"bytes,9,rep,name=per_query,json=perQuery,proto3" json:"per_query,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EvalConfigResultProto) Reset() {
+	*x = EvalConfigResultProto{}
+	mi := &file_mddb_proto_msgTypes[194]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EvalConfigResultProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EvalConfigResultProto) ProtoMessage() {}
+
+func (x *EvalConfigResultProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[194]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EvalConfigResultProto.ProtoReflect.Descriptor instead.
+func (*EvalConfigResultProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{194}
+}
+
+func (x *EvalConfigResultProto) GetConfig() string {
+	if x != nil {
+		return x.Config
+	}
+	return ""
+}
+
+func (x *EvalConfigResultProto) GetRecallAtK() float64 {
+	if x != nil {
+		return x.RecallAtK
+	}
+	return 0
+}
+
+func (x *EvalConfigResultProto) GetNdcgAtK() float64 {
+	if x != nil {
+		return x.NdcgAtK
+	}
+	return 0
+}
+
+func (x *EvalConfigResultProto) GetMrr() float64 {
+	if x != nil {
+		return x.Mrr
+	}
+	return 0
+}
+
+func (x *EvalConfigResultProto) GetP50Ms() float64 {
+	if x != nil {
+		return x.P50Ms
+	}
+	return 0
+}
+
+func (x *EvalConfigResultProto) GetP99Ms() float64 {
+	if x != nil {
+		return x.P99Ms
+	}
+	return 0
+}
+
+func (x *EvalConfigResultProto) GetTokens() int64 {
+	if x != nil {
+		return x.Tokens
+	}
+	return 0
+}
+
+func (x *EvalConfigResultProto) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *EvalConfigResultProto) GetPerQuery() []*EvalQueryResultProto {
+	if x != nil {
+		return x.PerQuery
+	}
+	return nil
+}
+
+type RunEvalResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Collection    string                   `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	K             int32                    `protobuf:"varint,2,opt,name=k,proto3" json:"k,omitempty"`
+	Queries       int32                    `protobuf:"varint,3,opt,name=queries,proto3" json:"queries,omitempty"`
+	Results       []*EvalConfigResultProto `protobuf:"bytes,4,rep,name=results,proto3" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RunEvalResponse) Reset() {
+	*x = RunEvalResponse{}
+	mi := &file_mddb_proto_msgTypes[195]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RunEvalResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RunEvalResponse) ProtoMessage() {}
+
+func (x *RunEvalResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[195]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RunEvalResponse.ProtoReflect.Descriptor instead.
+func (*RunEvalResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{195}
+}
+
+func (x *RunEvalResponse) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *RunEvalResponse) GetK() int32 {
+	if x != nil {
+		return x.K
+	}
+	return 0
+}
+
+func (x *RunEvalResponse) GetQueries() int32 {
+	if x != nil {
+		return x.Queries
+	}
+	return 0
+}
+
+func (x *RunEvalResponse) GetResults() []*EvalConfigResultProto {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+type AddEvalQueryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Query         *EvalQueryProto        `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddEvalQueryRequest) Reset() {
+	*x = AddEvalQueryRequest{}
+	mi := &file_mddb_proto_msgTypes[196]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddEvalQueryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddEvalQueryRequest) ProtoMessage() {}
+
+func (x *AddEvalQueryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[196]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddEvalQueryRequest.ProtoReflect.Descriptor instead.
+func (*AddEvalQueryRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{196}
+}
+
+func (x *AddEvalQueryRequest) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *AddEvalQueryRequest) GetQuery() *EvalQueryProto {
+	if x != nil {
+		return x.Query
+	}
+	return nil
+}
+
+type ListEvalQueriesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListEvalQueriesRequest) Reset() {
+	*x = ListEvalQueriesRequest{}
+	mi := &file_mddb_proto_msgTypes[197]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListEvalQueriesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListEvalQueriesRequest) ProtoMessage() {}
+
+func (x *ListEvalQueriesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[197]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListEvalQueriesRequest.ProtoReflect.Descriptor instead.
+func (*ListEvalQueriesRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{197}
+}
+
+func (x *ListEvalQueriesRequest) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+type ListEvalQueriesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Queries       []*EvalQueryProto      `protobuf:"bytes,2,rep,name=queries,proto3" json:"queries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListEvalQueriesResponse) Reset() {
+	*x = ListEvalQueriesResponse{}
+	mi := &file_mddb_proto_msgTypes[198]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListEvalQueriesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListEvalQueriesResponse) ProtoMessage() {}
+
+func (x *ListEvalQueriesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[198]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListEvalQueriesResponse.ProtoReflect.Descriptor instead.
+func (*ListEvalQueriesResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{198}
+}
+
+func (x *ListEvalQueriesResponse) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *ListEvalQueriesResponse) GetQueries() []*EvalQueryProto {
+	if x != nil {
+		return x.Queries
+	}
+	return nil
+}
+
+type DeleteEvalQueryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteEvalQueryRequest) Reset() {
+	*x = DeleteEvalQueryRequest{}
+	mi := &file_mddb_proto_msgTypes[199]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteEvalQueryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteEvalQueryRequest) ProtoMessage() {}
+
+func (x *DeleteEvalQueryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[199]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteEvalQueryRequest.ProtoReflect.Descriptor instead.
+func (*DeleteEvalQueryRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{199}
+}
+
+func (x *DeleteEvalQueryRequest) GetCollection() string {
+	if x != nil {
+		return x.Collection
+	}
+	return ""
+}
+
+func (x *DeleteEvalQueryRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type DeleteEvalQueryResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Deleted       bool                   `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteEvalQueryResponse) Reset() {
+	*x = DeleteEvalQueryResponse{}
+	mi := &file_mddb_proto_msgTypes[200]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteEvalQueryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteEvalQueryResponse) ProtoMessage() {}
+
+func (x *DeleteEvalQueryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[200]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteEvalQueryResponse.ProtoReflect.Descriptor instead.
+func (*DeleteEvalQueryResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{200}
+}
+
+func (x *DeleteEvalQueryResponse) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
+type GetGainRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Window        string                 `protobuf:"bytes,1,opt,name=window,proto3" json:"window,omitempty"` // "30d" (default) .. "365d"
+	Daily         bool                   `protobuf:"varint,2,opt,name=daily,proto3" json:"daily,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetGainRequest) Reset() {
+	*x = GetGainRequest{}
+	mi := &file_mddb_proto_msgTypes[201]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGainRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGainRequest) ProtoMessage() {}
+
+func (x *GetGainRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[201]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGainRequest.ProtoReflect.Descriptor instead.
+func (*GetGainRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{201}
+}
+
+func (x *GetGainRequest) GetWindow() string {
+	if x != nil {
+		return x.Window
+	}
+	return ""
+}
+
+func (x *GetGainRequest) GetDaily() bool {
+	if x != nil {
+		return x.Daily
+	}
+	return false
+}
+
+type GainCountersProto struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Searches       map[string]int64       `protobuf:"bytes,1,rep,name=searches,proto3" json:"searches,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Algorithms     map[string]int64       `protobuf:"bytes,2,rep,name=algorithms,proto3" json:"algorithms,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	Fusion         map[string]int64       `protobuf:"bytes,3,rep,name=fusion,proto3" json:"fusion,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"varint,2,opt,name=value"`
+	TokensReturned int64                  `protobuf:"varint,4,opt,name=tokens_returned,json=tokensReturned,proto3" json:"tokens_returned,omitempty"`
+	TokensAvoided  int64                  `protobuf:"varint,5,opt,name=tokens_avoided,json=tokensAvoided,proto3" json:"tokens_avoided,omitempty"`
+	FragmentHits   int64                  `protobuf:"varint,6,opt,name=fragment_hits,json=fragmentHits,proto3" json:"fragment_hits,omitempty"`
+	DocumentHits   int64                  `protobuf:"varint,7,opt,name=document_hits,json=documentHits,proto3" json:"document_hits,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GainCountersProto) Reset() {
+	*x = GainCountersProto{}
+	mi := &file_mddb_proto_msgTypes[202]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GainCountersProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GainCountersProto) ProtoMessage() {}
+
+func (x *GainCountersProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[202]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GainCountersProto.ProtoReflect.Descriptor instead.
+func (*GainCountersProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{202}
+}
+
+func (x *GainCountersProto) GetSearches() map[string]int64 {
+	if x != nil {
+		return x.Searches
+	}
+	return nil
+}
+
+func (x *GainCountersProto) GetAlgorithms() map[string]int64 {
+	if x != nil {
+		return x.Algorithms
+	}
+	return nil
+}
+
+func (x *GainCountersProto) GetFusion() map[string]int64 {
+	if x != nil {
+		return x.Fusion
+	}
+	return nil
+}
+
+func (x *GainCountersProto) GetTokensReturned() int64 {
+	if x != nil {
+		return x.TokensReturned
+	}
+	return 0
+}
+
+func (x *GainCountersProto) GetTokensAvoided() int64 {
+	if x != nil {
+		return x.TokensAvoided
+	}
+	return 0
+}
+
+func (x *GainCountersProto) GetFragmentHits() int64 {
+	if x != nil {
+		return x.FragmentHits
+	}
+	return 0
+}
+
+func (x *GainCountersProto) GetDocumentHits() int64 {
+	if x != nil {
+		return x.DocumentHits
+	}
+	return 0
+}
+
+type GainDayProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Date          string                 `protobuf:"bytes,1,opt,name=date,proto3" json:"date,omitempty"`
+	Counters      *GainCountersProto     `protobuf:"bytes,2,opt,name=counters,proto3" json:"counters,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GainDayProto) Reset() {
+	*x = GainDayProto{}
+	mi := &file_mddb_proto_msgTypes[203]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GainDayProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GainDayProto) ProtoMessage() {}
+
+func (x *GainDayProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[203]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GainDayProto.ProtoReflect.Descriptor instead.
+func (*GainDayProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{203}
+}
+
+func (x *GainDayProto) GetDate() string {
+	if x != nil {
+		return x.Date
+	}
+	return ""
+}
+
+func (x *GainDayProto) GetCounters() *GainCountersProto {
+	if x != nil {
+		return x.Counters
+	}
+	return nil
+}
+
+type GetGainResponse struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	WindowDays             int32                  `protobuf:"varint,1,opt,name=window_days,json=windowDays,proto3" json:"window_days,omitempty"`
+	FromDate               string                 `protobuf:"bytes,2,opt,name=from_date,json=fromDate,proto3" json:"from_date,omitempty"`
+	ToDate                 string                 `protobuf:"bytes,3,opt,name=to_date,json=toDate,proto3" json:"to_date,omitempty"`
+	Totals                 *GainCountersProto     `protobuf:"bytes,4,opt,name=totals,proto3" json:"totals,omitempty"`
+	TotalSearches          int64                  `protobuf:"varint,5,opt,name=total_searches,json=totalSearches,proto3" json:"total_searches,omitempty"`
+	TokensWithoutRetrieval int64                  `protobuf:"varint,6,opt,name=tokens_without_retrieval,json=tokensWithoutRetrieval,proto3" json:"tokens_without_retrieval,omitempty"`
+	SavedPercent           float64                `protobuf:"fixed64,7,opt,name=saved_percent,json=savedPercent,proto3" json:"saved_percent,omitempty"`
+	Daily                  []*GainDayProto        `protobuf:"bytes,8,rep,name=daily,proto3" json:"daily,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *GetGainResponse) Reset() {
+	*x = GetGainResponse{}
+	mi := &file_mddb_proto_msgTypes[204]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetGainResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetGainResponse) ProtoMessage() {}
+
+func (x *GetGainResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[204]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetGainResponse.ProtoReflect.Descriptor instead.
+func (*GetGainResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{204}
+}
+
+func (x *GetGainResponse) GetWindowDays() int32 {
+	if x != nil {
+		return x.WindowDays
+	}
+	return 0
+}
+
+func (x *GetGainResponse) GetFromDate() string {
+	if x != nil {
+		return x.FromDate
+	}
+	return ""
+}
+
+func (x *GetGainResponse) GetToDate() string {
+	if x != nil {
+		return x.ToDate
+	}
+	return ""
+}
+
+func (x *GetGainResponse) GetTotals() *GainCountersProto {
+	if x != nil {
+		return x.Totals
+	}
+	return nil
+}
+
+func (x *GetGainResponse) GetTotalSearches() int64 {
+	if x != nil {
+		return x.TotalSearches
+	}
+	return 0
+}
+
+func (x *GetGainResponse) GetTokensWithoutRetrieval() int64 {
+	if x != nil {
+		return x.TokensWithoutRetrieval
+	}
+	return 0
+}
+
+func (x *GetGainResponse) GetSavedPercent() float64 {
+	if x != nil {
+		return x.SavedPercent
+	}
+	return 0
+}
+
+func (x *GetGainResponse) GetDaily() []*GainDayProto {
+	if x != nil {
+		return x.Daily
+	}
+	return nil
+}
+
 var File_mddb_proto protoreflect.FileDescriptor
 
 const file_mddb_proto_rawDesc = "" +
@@ -12396,7 +14382,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x03env\x18\x04 \x03(\v2\x19.mddb.GetRequest.EnvEntryR\x03env\x1a6\n" +
 	"\bEnvEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x9a\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa3\x03\n" +
 	"\rSearchRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -12406,10 +14392,14 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04sort\x18\x03 \x01(\tR\x04sort\x12\x10\n" +
 	"\x03asc\x18\x04 \x01(\bR\x03asc\x12\x14\n" +
 	"\x05limit\x18\x05 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06offset\x18\x06 \x01(\x05R\x06offset\x1aO\n" +
+	"\x06offset\x18\x06 \x01(\x05R\x06offset\x127\n" +
+	"\x06filter\x18\a \x03(\v2\x1f.mddb.SearchRequest.FilterEntryR\x06filter\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
-	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"T\n" +
+	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1aN\n" +
+	"\vFilterEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"T\n" +
 	"\x0eSearchResponse\x12,\n" +
 	"\tdocuments\x18\x01 \x03(\v2\x0e.mddb.DocumentR\tdocuments\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\"\xde\x01\n" +
@@ -12489,7 +14479,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\aupdated\x18\x01 \x01(\x05R\aupdated\x12\x1b\n" +
 	"\tnot_found\x18\x02 \x01(\x05R\bnotFound\x12\x16\n" +
 	"\x06failed\x18\x03 \x01(\x05R\x06failed\x12\x16\n" +
-	"\x06errors\x18\x04 \x03(\tR\x06errors\"\xa5\x03\n" +
+	"\x06errors\x18\x04 \x03(\tR\x06errors\"\xd1\x06\n" +
 	"\x13VectorSearchRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -12504,14 +14494,38 @@ const file_mddb_proto_rawDesc = "" +
 	"\talgorithm\x18\b \x01(\tR\talgorithm\x12\x1e\n" +
 	"\n" +
 	"oversample\x18\t \x01(\x01R\n" +
-	"oversample\x1aO\n" +
+	"oversample\x12=\n" +
+	"\x06filter\x18\n" +
+	" \x03(\v2%.mddb.VectorSearchRequest.FilterEntryR\x06filter\x12(\n" +
+	"\bgroup_by\x18\v \x01(\v2\r.mddb.GroupByR\agroupBy\x12\x16\n" +
+	"\x06format\x18\f \x01(\tR\x06format\x12#\n" +
+	"\rpassage_lines\x18\r \x01(\x05R\fpassageLines\x12)\n" +
+	"\x11wait_for_index_ms\x18\x0e \x01(\x05R\x0ewaitForIndexMs\x12\"\n" +
+	"\rwait_for_keys\x18\x0f \x03(\tR\vwaitForKeys\x12\x1d\n" +
+	"\n" +
+	"read_level\x18\x10 \x01(\tR\treadLevel\x12%\n" +
+	"\x0eretrieval_mode\x18\x11 \x01(\tR\rretrievalMode\x12\x1f\n" +
+	"\vwindow_size\x18\x12 \x01(\x05R\n" +
+	"windowSize\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
-	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"j\n" +
+	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1aN\n" +
+	"\vFilterEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"\xa5\x02\n" +
 	"\x12VectorSearchResult\x12*\n" +
 	"\bdocument\x18\x01 \x01(\v2\x0e.mddb.DocumentR\bdocument\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x02R\x05score\x12\x12\n" +
-	"\x04rank\x18\x03 \x01(\x05R\x04rank\"\xb4\x01\n" +
+	"\x04rank\x18\x03 \x01(\x05R\x04rank\x12\x1d\n" +
+	"\n" +
+	"chunk_text\x18\x04 \x01(\tR\tchunkText\x12\x1d\n" +
+	"\n" +
+	"start_line\x18\x05 \x01(\x05R\tstartLine\x12\x19\n" +
+	"\bend_line\x18\x06 \x01(\x05R\aendLine\x12\x14\n" +
+	"\x05group\x18\a \x01(\tR\x05group\x12\x1d\n" +
+	"\n" +
+	"group_rank\x18\b \x01(\x05R\tgroupRank\x12+\n" +
+	"\x11pending_embedding\x18\t \x01(\bR\x10pendingEmbedding\"\xbf\x02\n" +
 	"\x14VectorSearchResponse\x122\n" +
 	"\aresults\x18\x01 \x03(\v2\x18.mddb.VectorSearchResultR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x14\n" +
@@ -12519,7 +14533,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"dimensions\x18\x04 \x01(\x05R\n" +
 	"dimensions\x12\x1c\n" +
-	"\talgorithm\x18\x05 \x01(\tR\talgorithm\"L\n" +
+	"\talgorithm\x18\x05 \x01(\tR\talgorithm\x12)\n" +
+	"\bpassages\x18\x06 \x03(\v2\r.mddb.PassageR\bpassages\x121\n" +
+	"\bindexing\x18\a \x01(\v2\x15.mddb.IndexWaitResultR\bindexing\x12+\n" +
+	"\x11context_truncated\x18\b \x01(\bR\x10contextTruncated\"L\n" +
 	"\x14VectorReindexRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -12564,7 +14581,7 @@ const file_mddb_proto_rawDesc = "" +
 	"collection\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
 	"\x04lang\x18\x03 \x01(\tR\x04lang\x12\x10\n" +
-	"\x03ttl\x18\x04 \x01(\x03R\x03ttl\"\xe6\x03\n" +
+	"\x03ttl\x18\x04 \x01(\x03R\x03ttl\"\xd3\x05\n" +
 	"\n" +
 	"FTSRequest\x12\x1e\n" +
 	"\n" +
@@ -12580,31 +14597,43 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05boost\x18\b \x03(\v2\x1b.mddb.FTSRequest.BoostEntryR\x05boost\x12\x19\n" +
 	"\bfacet_by\x18\t \x03(\tR\afacetBy\x12(\n" +
 	"\x10facet_max_values\x18\n" +
-	" \x01(\x05R\x0efacetMaxValues\x1aO\n" +
+	" \x01(\x05R\x0efacetMaxValues\x124\n" +
+	"\x06filter\x18\v \x03(\v2\x1c.mddb.FTSRequest.FilterEntryR\x06filter\x12(\n" +
+	"\bgroup_by\x18\f \x01(\v2\r.mddb.GroupByR\agroupBy\x12\x16\n" +
+	"\x06format\x18\r \x01(\tR\x06format\x12#\n" +
+	"\rpassage_lines\x18\x0e \x01(\x05R\fpassageLines\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1a8\n" +
 	"\n" +
 	"BoostEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"\x8a\x01\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\x1aN\n" +
+	"\vFilterEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"\xbf\x01\n" +
 	"\tFTSResult\x12*\n" +
 	"\bdocument\x18\x01 \x01(\v2\x0e.mddb.DocumentR\bdocument\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x01R\x05score\x12#\n" +
 	"\rmatched_terms\x18\x03 \x03(\tR\fmatchedTerms\x12\x16\n" +
-	"\x06pinned\x18\x04 \x01(\bR\x06pinned\">\n" +
+	"\x06pinned\x18\x04 \x01(\bR\x06pinned\x12\x14\n" +
+	"\x05group\x18\x05 \x01(\tR\x05group\x12\x1d\n" +
+	"\n" +
+	"group_rank\x18\x06 \x01(\x05R\tgroupRank\">\n" +
 	"\x10FacetBucketProto\x12\x14\n" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x05R\x05count\"C\n" +
 	"\x0fFacetBucketList\x120\n" +
-	"\abuckets\x18\x01 \x03(\v2\x16.mddb.FacetBucketProtoR\abuckets\"\x9f\x02\n" +
+	"\abuckets\x18\x01 \x03(\v2\x16.mddb.FacetBucketProtoR\abuckets\"\xf7\x02\n" +
 	"\vFTSResponse\x12)\n" +
 	"\aresults\x18\x01 \x03(\v2\x0f.mddb.FTSResultR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1c\n" +
 	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x14\n" +
 	"\x05fuzzy\x18\x04 \x01(\x05R\x05fuzzy\x12\x12\n" +
 	"\x04lang\x18\x05 \x01(\tR\x04lang\x125\n" +
-	"\x06facets\x18\x06 \x03(\v2\x1d.mddb.FTSResponse.FacetsEntryR\x06facets\x1aP\n" +
+	"\x06facets\x18\x06 \x03(\v2\x1d.mddb.FTSResponse.FacetsEntryR\x06facets\x12)\n" +
+	"\bpassages\x18\a \x03(\v2\r.mddb.PassageR\bpassages\x12+\n" +
+	"\x11context_truncated\x18\b \x01(\bR\x10contextTruncated\x1aP\n" +
 	"\vFacetsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12+\n" +
 	"\x05value\x18\x02 \x01(\v2\x15.mddb.FacetBucketListR\x05value:\x028\x01\"3\n" +
@@ -12622,7 +14651,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"n\n" +
 	"\x14FTSLanguagesResponse\x123\n" +
 	"\tlanguages\x18\x01 \x03(\v2\x15.mddb.FTSLanguageInfoR\tlanguages\x12!\n" +
-	"\fdefault_lang\x18\x02 \x01(\tR\vdefaultLang\"\xe0\x06\n" +
+	"\fdefault_lang\x18\x02 \x01(\tR\vdefaultLang\"\xc4\t\n" +
 	"\x13HybridSearchRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -12645,7 +14674,15 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05boost\x18\x0f \x03(\v2$.mddb.HybridSearchRequest.BoostEntryR\x05boost\x12\x12\n" +
 	"\x04sort\x18\x10 \x01(\tR\x04sort\x12\x19\n" +
 	"\bfacet_by\x18\x11 \x03(\tR\afacetBy\x12(\n" +
-	"\x10facet_max_values\x18\x12 \x01(\x05R\x0efacetMaxValues\x1aO\n" +
+	"\x10facet_max_values\x18\x12 \x01(\x05R\x0efacetMaxValues\x12=\n" +
+	"\x06filter\x18\x13 \x03(\v2%.mddb.HybridSearchRequest.FilterEntryR\x06filter\x12(\n" +
+	"\bgroup_by\x18\x14 \x01(\v2\r.mddb.GroupByR\agroupBy\x12\x16\n" +
+	"\x06format\x18\x15 \x01(\tR\x06format\x12#\n" +
+	"\rpassage_lines\x18\x16 \x01(\x05R\fpassageLines\x12)\n" +
+	"\x11wait_for_index_ms\x18\x17 \x01(\x05R\x0ewaitForIndexMs\x12\"\n" +
+	"\rwait_for_keys\x18\x18 \x03(\tR\vwaitForKeys\x12\x1d\n" +
+	"\n" +
+	"read_level\x18\x19 \x01(\tR\treadLevel\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1a?\n" +
@@ -12655,7 +14692,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"BoostEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\"\xf8\x01\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value:\x028\x01\x1aN\n" +
+	"\vFilterEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"\xda\x02\n" +
 	"\x12HybridSearchResult\x12*\n" +
 	"\bdocument\x18\x01 \x01(\v2\x0e.mddb.DocumentR\bdocument\x12%\n" +
 	"\x0ecombined_score\x18\x02 \x01(\x01R\rcombinedScore\x12\x1b\n" +
@@ -12663,14 +14703,22 @@ const file_mddb_proto_rawDesc = "" +
 	"\fvector_score\x18\x04 \x01(\x01R\vvectorScore\x12#\n" +
 	"\rmatched_terms\x18\x05 \x03(\tR\fmatchedTerms\x12\x12\n" +
 	"\x04rank\x18\x06 \x01(\x05R\x04rank\x12\x16\n" +
-	"\x06pinned\x18\a \x01(\bR\x06pinned\"\xde\x02\n" +
+	"\x06pinned\x18\a \x01(\bR\x06pinned\x12\x14\n" +
+	"\x05group\x18\b \x01(\tR\x05group\x12\x1d\n" +
+	"\n" +
+	"group_rank\x18\t \x01(\x05R\tgroupRank\x12+\n" +
+	"\x11pending_embedding\x18\n" +
+	" \x01(\bR\x10pendingEmbedding\"\xe9\x03\n" +
 	"\x14HybridSearchResponse\x122\n" +
 	"\aresults\x18\x01 \x03(\v2\x18.mddb.HybridSearchResultR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1a\n" +
 	"\bstrategy\x18\x03 \x01(\tR\bstrategy\x12#\n" +
 	"\rfts_algorithm\x18\x04 \x01(\tR\fftsAlgorithm\x12)\n" +
 	"\x10vector_algorithm\x18\x05 \x01(\tR\x0fvectorAlgorithm\x12>\n" +
-	"\x06facets\x18\x06 \x03(\v2&.mddb.HybridSearchResponse.FacetsEntryR\x06facets\x1aP\n" +
+	"\x06facets\x18\x06 \x03(\v2&.mddb.HybridSearchResponse.FacetsEntryR\x06facets\x12)\n" +
+	"\bpassages\x18\a \x03(\v2\r.mddb.PassageR\bpassages\x121\n" +
+	"\bindexing\x18\b \x01(\v2\x15.mddb.IndexWaitResultR\bindexing\x12+\n" +
+	"\x11context_truncated\x18\t \x01(\bR\x10contextTruncated\x1aP\n" +
 	"\vFacetsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12+\n" +
 	"\x05value\x18\x02 \x01(\v2\x15.mddb.FacetBucketListR\x05value:\x028\x01\"\x87\x01\n" +
@@ -13124,7 +15172,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06config\x18\x02 \x01(\v2\x1b.mddb.CollectionConfigProtoR\x06config\"l\n" +
 	"\x1dListCollectionConfigsResponse\x125\n" +
 	"\aconfigs\x18\x01 \x03(\v2\x1b.mddb.CollectionConfigEntryR\aconfigs\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\x8c\x04\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\"\x90\a\n" +
 	"\x12CrossSearchRequest\x12+\n" +
 	"\x11source_collection\x18\x01 \x01(\tR\x10sourceCollection\x12\"\n" +
 	"\rsource_doc_id\x18\x02 \x01(\tR\vsourceDocId\x12\x14\n" +
@@ -13138,17 +15186,33 @@ const file_mddb_proto_rawDesc = "" +
 	"\vfilter_meta\x18\n" +
 	" \x03(\v2(.mddb.CrossSearchRequest.FilterMetaEntryR\n" +
 	"filterMeta\x12'\n" +
-	"\x0finclude_content\x18\v \x01(\bR\x0eincludeContent\x1aO\n" +
+	"\x0finclude_content\x18\v \x01(\bR\x0eincludeContent\x12<\n" +
+	"\x06filter\x18\f \x03(\v2$.mddb.CrossSearchRequest.FilterEntryR\x06filter\x12(\n" +
+	"\bgroup_by\x18\r \x01(\v2\r.mddb.GroupByR\agroupBy\x12\x16\n" +
+	"\x06format\x18\x0e \x01(\tR\x06format\x12#\n" +
+	"\rpassage_lines\x18\x0f \x01(\x05R\fpassageLines\x12\x1f\n" +
+	"\vsearch_type\x18\x10 \x01(\tR\n" +
+	"searchType\x12)\n" +
+	"\x11wait_for_index_ms\x18\x11 \x01(\x05R\x0ewaitForIndexMs\x12\"\n" +
+	"\rwait_for_keys\x18\x12 \x03(\tR\vwaitForKeys\x12\x1d\n" +
+	"\n" +
+	"read_level\x18\x13 \x01(\tR\treadLevel\x1aO\n" +
 	"\x0fFilterMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
-	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"\x8d\x01\n" +
+	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1aN\n" +
+	"\vFilterEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"\xc2\x01\n" +
 	"\x15CrossSearchResultItem\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
 	"collection\x12*\n" +
 	"\bdocument\x18\x02 \x01(\v2\x0e.mddb.DocumentR\bdocument\x12\x14\n" +
 	"\x05score\x18\x03 \x01(\x02R\x05score\x12\x12\n" +
-	"\x04rank\x18\x04 \x01(\x05R\x04rank\"\xa9\x02\n" +
+	"\x04rank\x18\x04 \x01(\x05R\x04rank\x12\x14\n" +
+	"\x05group\x18\x05 \x01(\tR\x05group\x12\x1d\n" +
+	"\n" +
+	"group_rank\x18\x06 \x01(\x05R\tgroupRank\"\x87\x03\n" +
 	"\x13CrossSearchResponse\x125\n" +
 	"\aresults\x18\x01 \x03(\v2\x1b.mddb.CrossSearchResultItemR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12+\n" +
@@ -13156,7 +15220,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\rsource_doc_id\x18\x04 \x01(\tR\vsourceDocId\x12-\n" +
 	"\x12target_collections\x18\x05 \x03(\tR\x11targetCollections\x12\x1c\n" +
 	"\talgorithm\x18\x06 \x01(\tR\talgorithm\x12'\n" +
-	"\x0fdistance_metric\x18\a \x01(\tR\x0edistanceMetric\"\xd6\x01\n" +
+	"\x0fdistance_metric\x18\a \x01(\tR\x0edistanceMetric\x12)\n" +
+	"\bpassages\x18\b \x03(\v2\r.mddb.PassageR\bpassages\x121\n" +
+	"\bindexing\x18\t \x01(\v2\x15.mddb.IndexWaitResultR\bindexing\"\xd6\x01\n" +
 	"\x15FindDuplicatesRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -13559,7 +15625,173 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05top_k\x18\b \x01(\x05R\x04topK\x12\x18\n" +
 	"\areasons\x18\t \x03(\tR\areasons\x12\x1a\n" +
 	"\bwarnings\x18\n" +
-	" \x03(\tR\bwarnings2\xf2&\n" +
+	" \x03(\tR\bwarnings\"\x91\x02\n" +
+	"\rMetaCondition\x12\x15\n" +
+	"\x06any_of\x18\x01 \x03(\tR\x05anyOf\x12\x16\n" +
+	"\x06prefix\x18\x02 \x01(\tR\x06prefix\x12\x1a\n" +
+	"\bcontains\x18\x03 \x01(\tR\bcontains\x12\x13\n" +
+	"\x02gt\x18\x04 \x01(\tH\x00R\x02gt\x88\x01\x01\x12\x15\n" +
+	"\x03gte\x18\x05 \x01(\tH\x01R\x03gte\x88\x01\x01\x12\x13\n" +
+	"\x02lt\x18\x06 \x01(\tH\x02R\x02lt\x88\x01\x01\x12\x15\n" +
+	"\x03lte\x18\a \x01(\tH\x03R\x03lte\x88\x01\x01\x12\x17\n" +
+	"\anone_of\x18\b \x03(\tR\x06noneOf\x12\x1b\n" +
+	"\x06exists\x18\t \x01(\bH\x04R\x06exists\x88\x01\x01B\x05\n" +
+	"\x03_gtB\x06\n" +
+	"\x04_gteB\x05\n" +
+	"\x03_ltB\x06\n" +
+	"\x04_lteB\t\n" +
+	"\a_exists\"8\n" +
+	"\aGroupBy\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1b\n" +
+	"\tper_group\x18\x02 \x01(\x05R\bperGroup\"\xa9\x02\n" +
+	"\aPassage\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12\x10\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
+	"\x04lang\x18\x03 \x01(\tR\x04lang\x12\x12\n" +
+	"\x04path\x18\x04 \x01(\tR\x04path\x12\x1d\n" +
+	"\n" +
+	"start_line\x18\x05 \x01(\x05R\tstartLine\x12\x19\n" +
+	"\bend_line\x18\x06 \x01(\x05R\aendLine\x12\x16\n" +
+	"\x06symbol\x18\a \x01(\tR\x06symbol\x12\x12\n" +
+	"\x04kind\x18\b \x01(\tR\x04kind\x12\x18\n" +
+	"\acontent\x18\t \x01(\tR\acontent\x12\x14\n" +
+	"\x05score\x18\n" +
+	" \x01(\x01R\x05score\x12\x16\n" +
+	"\x06source\x18\v \x01(\tR\x06source\x12\x16\n" +
+	"\x06tokens\x18\f \x01(\x05R\x06tokens\"K\n" +
+	"\x0fIndexWaitResult\x12\x1b\n" +
+	"\twaited_ms\x18\x01 \x01(\x03R\bwaitedMs\x12\x1b\n" +
+	"\ttimed_out\x18\x02 \x01(\bR\btimedOut\"\xa0\x01\n" +
+	"\x11CodeSymbolRequest\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
+	"\ainclude\x18\x03 \x03(\tR\ainclude\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit\x12'\n" +
+	"\x0finclude_content\x18\x05 \x01(\bR\x0eincludeContent\"\xec\x02\n" +
+	"\x12CodeSymbolResponse\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12\x16\n" +
+	"\x06symbol\x18\x02 \x01(\tR\x06symbol\x12/\n" +
+	"\vdefinitions\x18\x03 \x03(\v2\r.mddb.PassageR\vdefinitions\x12-\n" +
+	"\n" +
+	"references\x18\x04 \x03(\v2\r.mddb.PassageR\n" +
+	"references\x12'\n" +
+	"\acallers\x18\x05 \x03(\v2\r.mddb.PassageR\acallers\x12'\n" +
+	"\acallees\x18\x06 \x03(\v2\r.mddb.PassageR\acallees\x12#\n" +
+	"\x05tests\x18\a \x03(\v2\r.mddb.PassageR\x05tests\x12)\n" +
+	"\bsiblings\x18\b \x03(\v2\r.mddb.PassageR\bsiblings\x12\x1c\n" +
+	"\ttruncated\x18\t \x01(\bR\ttruncated\"\xd0\x01\n" +
+	"\x0eEvalQueryProto\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12#\n" +
+	"\rexpected_keys\x18\x03 \x03(\tR\fexpectedKeys\x128\n" +
+	"\x06grades\x18\x04 \x03(\v2 .mddb.EvalQueryProto.GradesEntryR\x06grades\x1a9\n" +
+	"\vGradesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xf7\x01\n" +
+	"\x0fEvalConfigProto\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
+	"\vsearch_type\x18\x02 \x01(\tR\n" +
+	"searchType\x12\x1c\n" +
+	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12)\n" +
+	"\x10vector_algorithm\x18\x04 \x01(\tR\x0fvectorAlgorithm\x12\x19\n" +
+	"\x05alpha\x18\x05 \x01(\x01H\x00R\x05alpha\x88\x01\x01\x12\x1a\n" +
+	"\bstrategy\x18\x06 \x01(\tR\bstrategy\x12%\n" +
+	"\x0eretrieval_mode\x18\a \x01(\tR\rretrievalModeB\b\n" +
+	"\x06_alpha\"\xb9\x01\n" +
+	"\x0eRunEvalRequest\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12\f\n" +
+	"\x01k\x18\x02 \x01(\x05R\x01k\x12/\n" +
+	"\aconfigs\x18\x03 \x03(\v2\x15.mddb.EvalConfigProtoR\aconfigs\x12.\n" +
+	"\aqueries\x18\x04 \x03(\v2\x14.mddb.EvalQueryProtoR\aqueries\x12\x18\n" +
+	"\adetails\x18\x05 \x01(\bR\adetails\"\xad\x01\n" +
+	"\x14EvalQueryResultProto\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12\x16\n" +
+	"\x06recall\x18\x03 \x01(\x01R\x06recall\x12\x12\n" +
+	"\x04ndcg\x18\x04 \x01(\x01R\x04ndcg\x12'\n" +
+	"\x0freciprocal_rank\x18\x05 \x01(\x01R\x0ereciprocalRank\x12\x1a\n" +
+	"\breturned\x18\x06 \x03(\tR\breturned\"\x92\x02\n" +
+	"\x15EvalConfigResultProto\x12\x16\n" +
+	"\x06config\x18\x01 \x01(\tR\x06config\x12\x1e\n" +
+	"\vrecall_at_k\x18\x02 \x01(\x01R\trecallAtK\x12\x1a\n" +
+	"\tndcg_at_k\x18\x03 \x01(\x01R\andcgAtK\x12\x10\n" +
+	"\x03mrr\x18\x04 \x01(\x01R\x03mrr\x12\x15\n" +
+	"\x06p50_ms\x18\x05 \x01(\x01R\x05p50Ms\x12\x15\n" +
+	"\x06p99_ms\x18\x06 \x01(\x01R\x05p99Ms\x12\x16\n" +
+	"\x06tokens\x18\a \x01(\x03R\x06tokens\x12\x14\n" +
+	"\x05error\x18\b \x01(\tR\x05error\x127\n" +
+	"\tper_query\x18\t \x03(\v2\x1a.mddb.EvalQueryResultProtoR\bperQuery\"\x90\x01\n" +
+	"\x0fRunEvalResponse\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12\f\n" +
+	"\x01k\x18\x02 \x01(\x05R\x01k\x12\x18\n" +
+	"\aqueries\x18\x03 \x01(\x05R\aqueries\x125\n" +
+	"\aresults\x18\x04 \x03(\v2\x1b.mddb.EvalConfigResultProtoR\aresults\"a\n" +
+	"\x13AddEvalQueryRequest\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12*\n" +
+	"\x05query\x18\x02 \x01(\v2\x14.mddb.EvalQueryProtoR\x05query\"8\n" +
+	"\x16ListEvalQueriesRequest\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\"i\n" +
+	"\x17ListEvalQueriesResponse\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12.\n" +
+	"\aqueries\x18\x02 \x03(\v2\x14.mddb.EvalQueryProtoR\aqueries\"H\n" +
+	"\x16DeleteEvalQueryRequest\x12\x1e\n" +
+	"\n" +
+	"collection\x18\x01 \x01(\tR\n" +
+	"collection\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"3\n" +
+	"\x17DeleteEvalQueryResponse\x12\x18\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\">\n" +
+	"\x0eGetGainRequest\x12\x16\n" +
+	"\x06window\x18\x01 \x01(\tR\x06window\x12\x14\n" +
+	"\x05daily\x18\x02 \x01(\bR\x05daily\"\xad\x04\n" +
+	"\x11GainCountersProto\x12A\n" +
+	"\bsearches\x18\x01 \x03(\v2%.mddb.GainCountersProto.SearchesEntryR\bsearches\x12G\n" +
+	"\n" +
+	"algorithms\x18\x02 \x03(\v2'.mddb.GainCountersProto.AlgorithmsEntryR\n" +
+	"algorithms\x12;\n" +
+	"\x06fusion\x18\x03 \x03(\v2#.mddb.GainCountersProto.FusionEntryR\x06fusion\x12'\n" +
+	"\x0ftokens_returned\x18\x04 \x01(\x03R\x0etokensReturned\x12%\n" +
+	"\x0etokens_avoided\x18\x05 \x01(\x03R\rtokensAvoided\x12#\n" +
+	"\rfragment_hits\x18\x06 \x01(\x03R\ffragmentHits\x12#\n" +
+	"\rdocument_hits\x18\a \x01(\x03R\fdocumentHits\x1a;\n" +
+	"\rSearchesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\x1a=\n" +
+	"\x0fAlgorithmsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\x1a9\n" +
+	"\vFusionEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"W\n" +
+	"\fGainDayProto\x12\x12\n" +
+	"\x04date\x18\x01 \x01(\tR\x04date\x123\n" +
+	"\bcounters\x18\x02 \x01(\v2\x17.mddb.GainCountersProtoR\bcounters\"\xc9\x02\n" +
+	"\x0fGetGainResponse\x12\x1f\n" +
+	"\vwindow_days\x18\x01 \x01(\x05R\n" +
+	"windowDays\x12\x1b\n" +
+	"\tfrom_date\x18\x02 \x01(\tR\bfromDate\x12\x17\n" +
+	"\ato_date\x18\x03 \x01(\tR\x06toDate\x12/\n" +
+	"\x06totals\x18\x04 \x01(\v2\x17.mddb.GainCountersProtoR\x06totals\x12%\n" +
+	"\x0etotal_searches\x18\x05 \x01(\x03R\rtotalSearches\x128\n" +
+	"\x18tokens_without_retrieval\x18\x06 \x01(\x03R\x16tokensWithoutRetrieval\x12#\n" +
+	"\rsaved_percent\x18\a \x01(\x01R\fsavedPercent\x12(\n" +
+	"\x05daily\x18\b \x03(\v2\x12.mddb.GainDayProtoR\x05daily2\x84*\n" +
 	"\x04MDDB\x12'\n" +
 	"\x03Add\x12\x10.mddb.AddRequest\x1a\x0e.mddb.Document\x129\n" +
 	"\bAddBatch\x12\x15.mddb.AddBatchRequest\x1a\x16.mddb.AddBatchResponse\x12B\n" +
@@ -13601,7 +15833,14 @@ const file_mddb_proto_rawDesc = "" +
 	"\x0fGetDocumentMeta\x12\x1c.mddb.GetDocumentMetaRequest\x1a\x1d.mddb.GetDocumentMetaResponse\x129\n" +
 	"\bClassify\x12\x15.mddb.ClassifyRequest\x1a\x16.mddb.ClassifyResponse\x12H\n" +
 	"\rSearchAdvisor\x12\x1a.mddb.SearchAdvisorRequest\x1a\x1b.mddb.SearchAdvisorResponse\x12N\n" +
-	"\x11GetIndexingStatus\x12\x1b.mddb.IndexingStatusRequest\x1a\x1c.mddb.IndexingStatusResponse\x12K\n" +
+	"\x11GetIndexingStatus\x12\x1b.mddb.IndexingStatusRequest\x1a\x1c.mddb.IndexingStatusResponse\x12?\n" +
+	"\n" +
+	"CodeSymbol\x12\x17.mddb.CodeSymbolRequest\x1a\x18.mddb.CodeSymbolResponse\x126\n" +
+	"\aRunEval\x12\x14.mddb.RunEvalRequest\x1a\x15.mddb.RunEvalResponse\x12?\n" +
+	"\fAddEvalQuery\x12\x19.mddb.AddEvalQueryRequest\x1a\x14.mddb.EvalQueryProto\x12N\n" +
+	"\x0fListEvalQueries\x12\x1c.mddb.ListEvalQueriesRequest\x1a\x1d.mddb.ListEvalQueriesResponse\x12N\n" +
+	"\x0fDeleteEvalQuery\x12\x1c.mddb.DeleteEvalQueryRequest\x1a\x1d.mddb.DeleteEvalQueryResponse\x126\n" +
+	"\aGetGain\x12\x14.mddb.GetGainRequest\x1a\x15.mddb.GetGainResponse\x12K\n" +
 	"\x0eDeleteDocument\x12\x1b.mddb.DeleteDocumentRequest\x1a\x1c.mddb.DeleteDocumentResponse\x12Q\n" +
 	"\x10DeleteCollection\x12\x1d.mddb.DeleteCollectionRequest\x1a\x1e.mddb.DeleteCollectionResponse\x12E\n" +
 	"\fListSynonyms\x12\x19.mddb.ListSynonymsRequest\x1a\x1a.mddb.ListSynonymsResponse\x12?\n" +
@@ -13655,7 +15894,7 @@ func file_mddb_proto_rawDescGZIP() []byte {
 	return file_mddb_proto_rawDescData
 }
 
-var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 216)
+var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 246)
 var file_mddb_proto_goTypes = []any{
 	(*Document)(nil),                      // 0: mddb.Document
 	(*MetaValues)(nil),                    // 1: mddb.MetaValues
@@ -13841,313 +16080,395 @@ var file_mddb_proto_goTypes = []any{
 	(*IndexingStatusResponse)(nil),        // 181: mddb.IndexingStatusResponse
 	(*CollectionProfile)(nil),             // 182: mddb.CollectionProfile
 	(*SearchAdvisorResponse)(nil),         // 183: mddb.SearchAdvisorResponse
-	nil,                                   // 184: mddb.Document.MetaEntry
-	nil,                                   // 185: mddb.AddRequest.MetaEntry
-	nil,                                   // 186: mddb.BatchDocument.MetaEntry
-	nil,                                   // 187: mddb.GetRequest.EnvEntry
-	nil,                                   // 188: mddb.SearchRequest.FilterMetaEntry
-	nil,                                   // 189: mddb.ExportRequest.FilterMetaEntry
-	nil,                                   // 190: mddb.UpdateDocument.MetaEntry
-	nil,                                   // 191: mddb.VectorSearchRequest.FilterMetaEntry
-	nil,                                   // 192: mddb.VectorStatsResponse.CollectionsEntry
-	nil,                                   // 193: mddb.ImportURLRequest.MetaEntry
-	nil,                                   // 194: mddb.FTSRequest.FilterMetaEntry
-	nil,                                   // 195: mddb.FTSRequest.BoostEntry
-	nil,                                   // 196: mddb.FTSResponse.FacetsEntry
-	nil,                                   // 197: mddb.HybridSearchRequest.FilterMetaEntry
-	nil,                                   // 198: mddb.HybridSearchRequest.FieldWeightsEntry
-	nil,                                   // 199: mddb.HybridSearchRequest.BoostEntry
-	nil,                                   // 200: mddb.HybridSearchResponse.FacetsEntry
-	nil,                                   // 201: mddb.ValidateDocumentRequest.MetaEntry
-	nil,                                   // 202: mddb.UpdateDocumentRequest.MetaEntry
-	nil,                                   // 203: mddb.GetDocumentMetaResponse.MetaEntry
-	nil,                                   // 204: mddb.GetMetaKeysResponse.MetaEntry
-	nil,                                   // 205: mddb.AutomationRuleProto.HeadersEntry
-	nil,                                   // 206: mddb.CollectionConfigProto.CustomMetaEntry
-	nil,                                   // 207: mddb.SetCollectionConfigRequest.CustomMetaEntry
-	nil,                                   // 208: mddb.CrossSearchRequest.FilterMetaEntry
-	nil,                                   // 209: mddb.IngestDocument.MetaEntry
-	nil,                                   // 210: mddb.RevisionEntryProto.MetaEntry
-	nil,                                   // 211: mddb.GeoSearchRequest.FilterMetaEntry
-	nil,                                   // 212: mddb.GeoWithinRequest.FilterMetaEntry
-	nil,                                   // 213: mddb.GeoReindexResponse.PostcodesLoadedEntry
-	nil,                                   // 214: mddb.GeoStatsResponse.CollectionsEntry
-	nil,                                   // 215: mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	(*MetaCondition)(nil),                 // 184: mddb.MetaCondition
+	(*GroupBy)(nil),                       // 185: mddb.GroupBy
+	(*Passage)(nil),                       // 186: mddb.Passage
+	(*IndexWaitResult)(nil),               // 187: mddb.IndexWaitResult
+	(*CodeSymbolRequest)(nil),             // 188: mddb.CodeSymbolRequest
+	(*CodeSymbolResponse)(nil),            // 189: mddb.CodeSymbolResponse
+	(*EvalQueryProto)(nil),                // 190: mddb.EvalQueryProto
+	(*EvalConfigProto)(nil),               // 191: mddb.EvalConfigProto
+	(*RunEvalRequest)(nil),                // 192: mddb.RunEvalRequest
+	(*EvalQueryResultProto)(nil),          // 193: mddb.EvalQueryResultProto
+	(*EvalConfigResultProto)(nil),         // 194: mddb.EvalConfigResultProto
+	(*RunEvalResponse)(nil),               // 195: mddb.RunEvalResponse
+	(*AddEvalQueryRequest)(nil),           // 196: mddb.AddEvalQueryRequest
+	(*ListEvalQueriesRequest)(nil),        // 197: mddb.ListEvalQueriesRequest
+	(*ListEvalQueriesResponse)(nil),       // 198: mddb.ListEvalQueriesResponse
+	(*DeleteEvalQueryRequest)(nil),        // 199: mddb.DeleteEvalQueryRequest
+	(*DeleteEvalQueryResponse)(nil),       // 200: mddb.DeleteEvalQueryResponse
+	(*GetGainRequest)(nil),                // 201: mddb.GetGainRequest
+	(*GainCountersProto)(nil),             // 202: mddb.GainCountersProto
+	(*GainDayProto)(nil),                  // 203: mddb.GainDayProto
+	(*GetGainResponse)(nil),               // 204: mddb.GetGainResponse
+	nil,                                   // 205: mddb.Document.MetaEntry
+	nil,                                   // 206: mddb.AddRequest.MetaEntry
+	nil,                                   // 207: mddb.BatchDocument.MetaEntry
+	nil,                                   // 208: mddb.GetRequest.EnvEntry
+	nil,                                   // 209: mddb.SearchRequest.FilterMetaEntry
+	nil,                                   // 210: mddb.SearchRequest.FilterEntry
+	nil,                                   // 211: mddb.ExportRequest.FilterMetaEntry
+	nil,                                   // 212: mddb.UpdateDocument.MetaEntry
+	nil,                                   // 213: mddb.VectorSearchRequest.FilterMetaEntry
+	nil,                                   // 214: mddb.VectorSearchRequest.FilterEntry
+	nil,                                   // 215: mddb.VectorStatsResponse.CollectionsEntry
+	nil,                                   // 216: mddb.ImportURLRequest.MetaEntry
+	nil,                                   // 217: mddb.FTSRequest.FilterMetaEntry
+	nil,                                   // 218: mddb.FTSRequest.BoostEntry
+	nil,                                   // 219: mddb.FTSRequest.FilterEntry
+	nil,                                   // 220: mddb.FTSResponse.FacetsEntry
+	nil,                                   // 221: mddb.HybridSearchRequest.FilterMetaEntry
+	nil,                                   // 222: mddb.HybridSearchRequest.FieldWeightsEntry
+	nil,                                   // 223: mddb.HybridSearchRequest.BoostEntry
+	nil,                                   // 224: mddb.HybridSearchRequest.FilterEntry
+	nil,                                   // 225: mddb.HybridSearchResponse.FacetsEntry
+	nil,                                   // 226: mddb.ValidateDocumentRequest.MetaEntry
+	nil,                                   // 227: mddb.UpdateDocumentRequest.MetaEntry
+	nil,                                   // 228: mddb.GetDocumentMetaResponse.MetaEntry
+	nil,                                   // 229: mddb.GetMetaKeysResponse.MetaEntry
+	nil,                                   // 230: mddb.AutomationRuleProto.HeadersEntry
+	nil,                                   // 231: mddb.CollectionConfigProto.CustomMetaEntry
+	nil,                                   // 232: mddb.SetCollectionConfigRequest.CustomMetaEntry
+	nil,                                   // 233: mddb.CrossSearchRequest.FilterMetaEntry
+	nil,                                   // 234: mddb.CrossSearchRequest.FilterEntry
+	nil,                                   // 235: mddb.IngestDocument.MetaEntry
+	nil,                                   // 236: mddb.RevisionEntryProto.MetaEntry
+	nil,                                   // 237: mddb.GeoSearchRequest.FilterMetaEntry
+	nil,                                   // 238: mddb.GeoWithinRequest.FilterMetaEntry
+	nil,                                   // 239: mddb.GeoReindexResponse.PostcodesLoadedEntry
+	nil,                                   // 240: mddb.GeoStatsResponse.CollectionsEntry
+	nil,                                   // 241: mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	nil,                                   // 242: mddb.EvalQueryProto.GradesEntry
+	nil,                                   // 243: mddb.GainCountersProto.SearchesEntry
+	nil,                                   // 244: mddb.GainCountersProto.AlgorithmsEntry
+	nil,                                   // 245: mddb.GainCountersProto.FusionEntry
 }
 var file_mddb_proto_depIdxs = []int32{
-	184, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
-	185, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
+	205, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
+	206, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
 	4,   // 2: mddb.AddBatchRequest.documents:type_name -> mddb.BatchDocument
-	186, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
-	187, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
-	188, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
-	0,   // 6: mddb.SearchResponse.documents:type_name -> mddb.Document
-	189, // 7: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
-	19,  // 8: mddb.StatsResponse.collections:type_name -> mddb.CollectionStats
-	21,  // 9: mddb.DeleteBatchRequest.documents:type_name -> mddb.DeleteDocument
-	24,  // 10: mddb.UpdateBatchRequest.documents:type_name -> mddb.UpdateDocument
-	190, // 11: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
-	191, // 12: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
-	0,   // 13: mddb.VectorSearchResult.document:type_name -> mddb.Document
-	27,  // 14: mddb.VectorSearchResponse.results:type_name -> mddb.VectorSearchResult
-	192, // 15: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
-	193, // 16: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
-	194, // 17: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
-	195, // 18: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
-	0,   // 19: mddb.FTSResult.document:type_name -> mddb.Document
-	38,  // 20: mddb.FacetBucketList.buckets:type_name -> mddb.FacetBucketProto
-	37,  // 21: mddb.FTSResponse.results:type_name -> mddb.FTSResult
-	196, // 22: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
-	44,  // 23: mddb.FTSLanguagesResponse.languages:type_name -> mddb.FTSLanguageInfo
-	197, // 24: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
-	198, // 25: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
-	199, // 26: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
-	0,   // 27: mddb.HybridSearchResult.document:type_name -> mddb.Document
-	47,  // 28: mddb.HybridSearchResponse.results:type_name -> mddb.HybridSearchResult
-	200, // 29: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
-	49,  // 30: mddb.ListWebhooksResponse.webhooks:type_name -> mddb.WebhookProto
-	63,  // 31: mddb.ListSchemasResponse.schemas:type_name -> mddb.SchemaInfo
-	201, // 32: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
-	202, // 33: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
-	203, // 34: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
-	70,  // 35: mddb.ClassifyResponse.results:type_name -> mddb.ClassifyLabelScore
-	76,  // 36: mddb.ListSynonymsResponse.entries:type_name -> mddb.SynonymEntry
-	83,  // 37: mddb.ListStopwordsResponse.entries:type_name -> mddb.StopwordEntry
-	204, // 38: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
-	205, // 39: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
-	94,  // 40: mddb.ListAutomationResponse.rules:type_name -> mddb.AutomationRuleProto
-	94,  // 41: mddb.CreateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
-	94,  // 42: mddb.UpdateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
-	94,  // 43: mddb.TestAutomationResponse.trigger:type_name -> mddb.AutomationRuleProto
-	0,   // 44: mddb.TestAutomationResponse.matches:type_name -> mddb.Document
-	104, // 45: mddb.GetAutomationLogsResponse.logs:type_name -> mddb.AutomationLogEntryProto
-	206, // 46: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
-	107, // 47: mddb.CollectionConfigProto.retrieval:type_name -> mddb.RetrievalProfileProto
-	108, // 48: mddb.CollectionConfigProto.storage_config:type_name -> mddb.StorageConfigProto
-	109, // 49: mddb.CollectionConfigProto.wordpress:type_name -> mddb.WordPressTargetProto
-	110, // 50: mddb.CollectionConfigProto.code:type_name -> mddb.CodeConfigProto
-	112, // 51: mddb.CollectionConfigProto.embedding:type_name -> mddb.EmbeddingChunkingProto
-	111, // 52: mddb.CollectionConfigProto.fts:type_name -> mddb.CollectionFTSProto
-	113, // 53: mddb.GetCollectionConfigResponse.config:type_name -> mddb.CollectionConfigProto
-	207, // 54: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
-	107, // 55: mddb.SetCollectionConfigRequest.retrieval:type_name -> mddb.RetrievalProfileProto
-	108, // 56: mddb.SetCollectionConfigRequest.storage_config:type_name -> mddb.StorageConfigProto
-	109, // 57: mddb.SetCollectionConfigRequest.wordpress:type_name -> mddb.WordPressTargetProto
-	110, // 58: mddb.SetCollectionConfigRequest.code:type_name -> mddb.CodeConfigProto
-	112, // 59: mddb.SetCollectionConfigRequest.embedding:type_name -> mddb.EmbeddingChunkingProto
-	111, // 60: mddb.SetCollectionConfigRequest.fts:type_name -> mddb.CollectionFTSProto
-	113, // 61: mddb.CollectionConfigEntry.config:type_name -> mddb.CollectionConfigProto
-	119, // 62: mddb.ListCollectionConfigsResponse.configs:type_name -> mddb.CollectionConfigEntry
-	208, // 63: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
-	0,   // 64: mddb.CrossSearchResultItem.document:type_name -> mddb.Document
-	122, // 65: mddb.CrossSearchResponse.results:type_name -> mddb.CrossSearchResultItem
-	125, // 66: mddb.DuplicateGroupProto.documents:type_name -> mddb.DuplicateDocInfoProto
-	126, // 67: mddb.FindDuplicatesResponse.exact_groups:type_name -> mddb.DuplicateGroupProto
-	126, // 68: mddb.FindDuplicatesResponse.similar_groups:type_name -> mddb.DuplicateGroupProto
-	209, // 69: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
-	128, // 70: mddb.IngestRequest.documents:type_name -> mddb.IngestDocument
-	129, // 71: mddb.IngestRequest.options:type_name -> mddb.IngestOptions
-	210, // 72: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
-	133, // 73: mddb.ListRevisionsResponse.revisions:type_name -> mddb.RevisionEntryProto
-	142, // 74: mddb.ReplicationStatusResponse.followers:type_name -> mddb.FollowerInfo
-	146, // 75: mddb.TemporalQueryResponse.events:type_name -> mddb.TemporalEventProto
-	0,   // 76: mddb.TemporalHotEntry.document:type_name -> mddb.Document
-	149, // 77: mddb.TemporalHotResponse.entries:type_name -> mddb.TemporalHotEntry
-	152, // 78: mddb.SpellSuggestResponse.token_suggestions:type_name -> mddb.SpellSuggestionProto
-	211, // 79: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
-	0,   // 80: mddb.GeoSearchResultItem.document:type_name -> mddb.Document
-	157, // 81: mddb.GeoSearchResponse.results:type_name -> mddb.GeoSearchResultItem
-	212, // 82: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
-	157, // 83: mddb.GeoWithinResponse.results:type_name -> mddb.GeoSearchResultItem
-	161, // 84: mddb.GeoReindexRequest.load_postcodes:type_name -> mddb.GeoPostcodeLoadProto
-	213, // 85: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
-	214, // 86: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
-	215, // 87: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
-	171, // 88: mddb.CurationRuleProto.pins:type_name -> mddb.PinnedDocProto
-	172, // 89: mddb.ListCurationRulesResponse.rules:type_name -> mddb.CurationRuleProto
-	172, // 90: mddb.CreateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
-	172, // 91: mddb.UpdateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
-	182, // 92: mddb.SearchAdvisorResponse.profile:type_name -> mddb.CollectionProfile
-	1,   // 93: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 94: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 95: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 96: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 97: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 98: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 99: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	33,  // 100: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
-	1,   // 101: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 102: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	39,  // 103: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 104: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	39,  // 105: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 106: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 107: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 108: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 109: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 110: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 111: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 112: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 113: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 114: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	165, // 115: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
-	2,   // 116: mddb.MDDB.Add:input_type -> mddb.AddRequest
-	3,   // 117: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
-	20,  // 118: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
-	23,  // 119: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
-	6,   // 120: mddb.MDDB.Get:input_type -> mddb.GetRequest
-	7,   // 121: mddb.MDDB.Search:input_type -> mddb.SearchRequest
-	9,   // 122: mddb.MDDB.Export:input_type -> mddb.ExportRequest
-	11,  // 123: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
-	13,  // 124: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
-	15,  // 125: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
-	17,  // 126: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
-	26,  // 127: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
-	29,  // 128: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
-	31,  // 129: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
-	156, // 130: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
-	159, // 131: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
-	162, // 132: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
-	164, // 133: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
-	167, // 134: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
-	169, // 135: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
-	34,  // 136: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
-	35,  // 137: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
-	36,  // 138: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
-	41,  // 139: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
-	43,  // 140: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
-	46,  // 141: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
-	50,  // 142: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
-	51,  // 143: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
-	53,  // 144: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
-	55,  // 145: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
-	57,  // 146: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
-	59,  // 147: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
-	61,  // 148: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
-	64,  // 149: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
-	66,  // 150: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
-	67,  // 151: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
-	69,  // 152: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
-	179, // 153: mddb.MDDB.SearchAdvisor:input_type -> mddb.SearchAdvisorRequest
-	180, // 154: mddb.MDDB.GetIndexingStatus:input_type -> mddb.IndexingStatusRequest
-	72,  // 155: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
-	74,  // 156: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
-	77,  // 157: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
-	79,  // 158: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
-	81,  // 159: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
-	84,  // 160: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
-	86,  // 161: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
-	88,  // 162: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
-	90,  // 163: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
-	92,  // 164: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
-	95,  // 165: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
-	97,  // 166: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
-	98,  // 167: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
-	99,  // 168: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
-	101, // 169: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
-	102, // 170: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
-	105, // 171: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
-	114, // 172: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
-	116, // 173: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
-	118, // 174: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
-	121, // 175: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
-	124, // 176: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
-	130, // 177: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
-	132, // 178: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
-	135, // 179: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
-	145, // 180: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
-	148, // 181: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
-	151, // 182: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
-	154, // 183: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
-	173, // 184: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
-	175, // 185: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
-	176, // 186: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
-	177, // 187: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
-	136, // 188: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
-	138, // 189: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
-	140, // 190: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
-	143, // 191: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
-	0,   // 192: mddb.MDDB.Add:output_type -> mddb.Document
-	5,   // 193: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
-	22,  // 194: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
-	25,  // 195: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
-	0,   // 196: mddb.MDDB.Get:output_type -> mddb.Document
-	8,   // 197: mddb.MDDB.Search:output_type -> mddb.SearchResponse
-	10,  // 198: mddb.MDDB.Export:output_type -> mddb.ExportChunk
-	12,  // 199: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
-	14,  // 200: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
-	16,  // 201: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
-	18,  // 202: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
-	28,  // 203: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
-	30,  // 204: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
-	32,  // 205: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
-	158, // 206: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
-	160, // 207: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
-	163, // 208: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
-	166, // 209: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
-	168, // 210: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
-	170, // 211: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
-	0,   // 212: mddb.MDDB.ImportURL:output_type -> mddb.Document
-	0,   // 213: mddb.MDDB.SetTTL:output_type -> mddb.Document
-	40,  // 214: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
-	42,  // 215: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
-	45,  // 216: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
-	48,  // 217: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
-	49,  // 218: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
-	52,  // 219: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
-	54,  // 220: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
-	56,  // 221: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
-	58,  // 222: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
-	60,  // 223: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
-	62,  // 224: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
-	65,  // 225: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
-	0,   // 226: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
-	68,  // 227: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
-	71,  // 228: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
-	183, // 229: mddb.MDDB.SearchAdvisor:output_type -> mddb.SearchAdvisorResponse
-	181, // 230: mddb.MDDB.GetIndexingStatus:output_type -> mddb.IndexingStatusResponse
-	73,  // 231: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
-	75,  // 232: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
-	78,  // 233: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
-	80,  // 234: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
-	82,  // 235: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
-	85,  // 236: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
-	87,  // 237: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
-	89,  // 238: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
-	91,  // 239: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
-	93,  // 240: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
-	96,  // 241: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
-	94,  // 242: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
-	94,  // 243: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
-	94,  // 244: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
-	100, // 245: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
-	103, // 246: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
-	106, // 247: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
-	115, // 248: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
-	117, // 249: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
-	120, // 250: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
-	123, // 251: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
-	127, // 252: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
-	131, // 253: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
-	134, // 254: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
-	0,   // 255: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
-	147, // 256: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
-	150, // 257: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
-	153, // 258: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
-	155, // 259: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
-	174, // 260: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
-	172, // 261: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
-	172, // 262: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
-	178, // 263: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
-	137, // 264: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
-	139, // 265: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
-	141, // 266: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
-	144, // 267: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
-	192, // [192:268] is the sub-list for method output_type
-	116, // [116:192] is the sub-list for method input_type
-	116, // [116:116] is the sub-list for extension type_name
-	116, // [116:116] is the sub-list for extension extendee
-	0,   // [0:116] is the sub-list for field type_name
+	207, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
+	208, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
+	209, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
+	210, // 6: mddb.SearchRequest.filter:type_name -> mddb.SearchRequest.FilterEntry
+	0,   // 7: mddb.SearchResponse.documents:type_name -> mddb.Document
+	211, // 8: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
+	19,  // 9: mddb.StatsResponse.collections:type_name -> mddb.CollectionStats
+	21,  // 10: mddb.DeleteBatchRequest.documents:type_name -> mddb.DeleteDocument
+	24,  // 11: mddb.UpdateBatchRequest.documents:type_name -> mddb.UpdateDocument
+	212, // 12: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
+	213, // 13: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
+	214, // 14: mddb.VectorSearchRequest.filter:type_name -> mddb.VectorSearchRequest.FilterEntry
+	185, // 15: mddb.VectorSearchRequest.group_by:type_name -> mddb.GroupBy
+	0,   // 16: mddb.VectorSearchResult.document:type_name -> mddb.Document
+	27,  // 17: mddb.VectorSearchResponse.results:type_name -> mddb.VectorSearchResult
+	186, // 18: mddb.VectorSearchResponse.passages:type_name -> mddb.Passage
+	187, // 19: mddb.VectorSearchResponse.indexing:type_name -> mddb.IndexWaitResult
+	215, // 20: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
+	216, // 21: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
+	217, // 22: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
+	218, // 23: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
+	219, // 24: mddb.FTSRequest.filter:type_name -> mddb.FTSRequest.FilterEntry
+	185, // 25: mddb.FTSRequest.group_by:type_name -> mddb.GroupBy
+	0,   // 26: mddb.FTSResult.document:type_name -> mddb.Document
+	38,  // 27: mddb.FacetBucketList.buckets:type_name -> mddb.FacetBucketProto
+	37,  // 28: mddb.FTSResponse.results:type_name -> mddb.FTSResult
+	220, // 29: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
+	186, // 30: mddb.FTSResponse.passages:type_name -> mddb.Passage
+	44,  // 31: mddb.FTSLanguagesResponse.languages:type_name -> mddb.FTSLanguageInfo
+	221, // 32: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
+	222, // 33: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
+	223, // 34: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
+	224, // 35: mddb.HybridSearchRequest.filter:type_name -> mddb.HybridSearchRequest.FilterEntry
+	185, // 36: mddb.HybridSearchRequest.group_by:type_name -> mddb.GroupBy
+	0,   // 37: mddb.HybridSearchResult.document:type_name -> mddb.Document
+	47,  // 38: mddb.HybridSearchResponse.results:type_name -> mddb.HybridSearchResult
+	225, // 39: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
+	186, // 40: mddb.HybridSearchResponse.passages:type_name -> mddb.Passage
+	187, // 41: mddb.HybridSearchResponse.indexing:type_name -> mddb.IndexWaitResult
+	49,  // 42: mddb.ListWebhooksResponse.webhooks:type_name -> mddb.WebhookProto
+	63,  // 43: mddb.ListSchemasResponse.schemas:type_name -> mddb.SchemaInfo
+	226, // 44: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
+	227, // 45: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
+	228, // 46: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
+	70,  // 47: mddb.ClassifyResponse.results:type_name -> mddb.ClassifyLabelScore
+	76,  // 48: mddb.ListSynonymsResponse.entries:type_name -> mddb.SynonymEntry
+	83,  // 49: mddb.ListStopwordsResponse.entries:type_name -> mddb.StopwordEntry
+	229, // 50: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
+	230, // 51: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
+	94,  // 52: mddb.ListAutomationResponse.rules:type_name -> mddb.AutomationRuleProto
+	94,  // 53: mddb.CreateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
+	94,  // 54: mddb.UpdateAutomationRequest.rule:type_name -> mddb.AutomationRuleProto
+	94,  // 55: mddb.TestAutomationResponse.trigger:type_name -> mddb.AutomationRuleProto
+	0,   // 56: mddb.TestAutomationResponse.matches:type_name -> mddb.Document
+	104, // 57: mddb.GetAutomationLogsResponse.logs:type_name -> mddb.AutomationLogEntryProto
+	231, // 58: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
+	107, // 59: mddb.CollectionConfigProto.retrieval:type_name -> mddb.RetrievalProfileProto
+	108, // 60: mddb.CollectionConfigProto.storage_config:type_name -> mddb.StorageConfigProto
+	109, // 61: mddb.CollectionConfigProto.wordpress:type_name -> mddb.WordPressTargetProto
+	110, // 62: mddb.CollectionConfigProto.code:type_name -> mddb.CodeConfigProto
+	112, // 63: mddb.CollectionConfigProto.embedding:type_name -> mddb.EmbeddingChunkingProto
+	111, // 64: mddb.CollectionConfigProto.fts:type_name -> mddb.CollectionFTSProto
+	113, // 65: mddb.GetCollectionConfigResponse.config:type_name -> mddb.CollectionConfigProto
+	232, // 66: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
+	107, // 67: mddb.SetCollectionConfigRequest.retrieval:type_name -> mddb.RetrievalProfileProto
+	108, // 68: mddb.SetCollectionConfigRequest.storage_config:type_name -> mddb.StorageConfigProto
+	109, // 69: mddb.SetCollectionConfigRequest.wordpress:type_name -> mddb.WordPressTargetProto
+	110, // 70: mddb.SetCollectionConfigRequest.code:type_name -> mddb.CodeConfigProto
+	112, // 71: mddb.SetCollectionConfigRequest.embedding:type_name -> mddb.EmbeddingChunkingProto
+	111, // 72: mddb.SetCollectionConfigRequest.fts:type_name -> mddb.CollectionFTSProto
+	113, // 73: mddb.CollectionConfigEntry.config:type_name -> mddb.CollectionConfigProto
+	119, // 74: mddb.ListCollectionConfigsResponse.configs:type_name -> mddb.CollectionConfigEntry
+	233, // 75: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
+	234, // 76: mddb.CrossSearchRequest.filter:type_name -> mddb.CrossSearchRequest.FilterEntry
+	185, // 77: mddb.CrossSearchRequest.group_by:type_name -> mddb.GroupBy
+	0,   // 78: mddb.CrossSearchResultItem.document:type_name -> mddb.Document
+	122, // 79: mddb.CrossSearchResponse.results:type_name -> mddb.CrossSearchResultItem
+	186, // 80: mddb.CrossSearchResponse.passages:type_name -> mddb.Passage
+	187, // 81: mddb.CrossSearchResponse.indexing:type_name -> mddb.IndexWaitResult
+	125, // 82: mddb.DuplicateGroupProto.documents:type_name -> mddb.DuplicateDocInfoProto
+	126, // 83: mddb.FindDuplicatesResponse.exact_groups:type_name -> mddb.DuplicateGroupProto
+	126, // 84: mddb.FindDuplicatesResponse.similar_groups:type_name -> mddb.DuplicateGroupProto
+	235, // 85: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
+	128, // 86: mddb.IngestRequest.documents:type_name -> mddb.IngestDocument
+	129, // 87: mddb.IngestRequest.options:type_name -> mddb.IngestOptions
+	236, // 88: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
+	133, // 89: mddb.ListRevisionsResponse.revisions:type_name -> mddb.RevisionEntryProto
+	142, // 90: mddb.ReplicationStatusResponse.followers:type_name -> mddb.FollowerInfo
+	146, // 91: mddb.TemporalQueryResponse.events:type_name -> mddb.TemporalEventProto
+	0,   // 92: mddb.TemporalHotEntry.document:type_name -> mddb.Document
+	149, // 93: mddb.TemporalHotResponse.entries:type_name -> mddb.TemporalHotEntry
+	152, // 94: mddb.SpellSuggestResponse.token_suggestions:type_name -> mddb.SpellSuggestionProto
+	237, // 95: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
+	0,   // 96: mddb.GeoSearchResultItem.document:type_name -> mddb.Document
+	157, // 97: mddb.GeoSearchResponse.results:type_name -> mddb.GeoSearchResultItem
+	238, // 98: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
+	157, // 99: mddb.GeoWithinResponse.results:type_name -> mddb.GeoSearchResultItem
+	161, // 100: mddb.GeoReindexRequest.load_postcodes:type_name -> mddb.GeoPostcodeLoadProto
+	239, // 101: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
+	240, // 102: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
+	241, // 103: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	171, // 104: mddb.CurationRuleProto.pins:type_name -> mddb.PinnedDocProto
+	172, // 105: mddb.ListCurationRulesResponse.rules:type_name -> mddb.CurationRuleProto
+	172, // 106: mddb.CreateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
+	172, // 107: mddb.UpdateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
+	182, // 108: mddb.SearchAdvisorResponse.profile:type_name -> mddb.CollectionProfile
+	186, // 109: mddb.CodeSymbolResponse.definitions:type_name -> mddb.Passage
+	186, // 110: mddb.CodeSymbolResponse.references:type_name -> mddb.Passage
+	186, // 111: mddb.CodeSymbolResponse.callers:type_name -> mddb.Passage
+	186, // 112: mddb.CodeSymbolResponse.callees:type_name -> mddb.Passage
+	186, // 113: mddb.CodeSymbolResponse.tests:type_name -> mddb.Passage
+	186, // 114: mddb.CodeSymbolResponse.siblings:type_name -> mddb.Passage
+	242, // 115: mddb.EvalQueryProto.grades:type_name -> mddb.EvalQueryProto.GradesEntry
+	191, // 116: mddb.RunEvalRequest.configs:type_name -> mddb.EvalConfigProto
+	190, // 117: mddb.RunEvalRequest.queries:type_name -> mddb.EvalQueryProto
+	193, // 118: mddb.EvalConfigResultProto.per_query:type_name -> mddb.EvalQueryResultProto
+	194, // 119: mddb.RunEvalResponse.results:type_name -> mddb.EvalConfigResultProto
+	190, // 120: mddb.AddEvalQueryRequest.query:type_name -> mddb.EvalQueryProto
+	190, // 121: mddb.ListEvalQueriesResponse.queries:type_name -> mddb.EvalQueryProto
+	243, // 122: mddb.GainCountersProto.searches:type_name -> mddb.GainCountersProto.SearchesEntry
+	244, // 123: mddb.GainCountersProto.algorithms:type_name -> mddb.GainCountersProto.AlgorithmsEntry
+	245, // 124: mddb.GainCountersProto.fusion:type_name -> mddb.GainCountersProto.FusionEntry
+	202, // 125: mddb.GainDayProto.counters:type_name -> mddb.GainCountersProto
+	202, // 126: mddb.GetGainResponse.totals:type_name -> mddb.GainCountersProto
+	203, // 127: mddb.GetGainResponse.daily:type_name -> mddb.GainDayProto
+	1,   // 128: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 129: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 130: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 131: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	184, // 132: mddb.SearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	1,   // 133: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 134: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 135: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	184, // 136: mddb.VectorSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	33,  // 137: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
+	1,   // 138: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 139: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	184, // 140: mddb.FTSRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	39,  // 141: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 142: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	184, // 143: mddb.HybridSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	39,  // 144: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 145: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 146: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 147: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 148: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 149: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	184, // 150: mddb.CrossSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	1,   // 151: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 152: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 153: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 154: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	165, // 155: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
+	2,   // 156: mddb.MDDB.Add:input_type -> mddb.AddRequest
+	3,   // 157: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
+	20,  // 158: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
+	23,  // 159: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
+	6,   // 160: mddb.MDDB.Get:input_type -> mddb.GetRequest
+	7,   // 161: mddb.MDDB.Search:input_type -> mddb.SearchRequest
+	9,   // 162: mddb.MDDB.Export:input_type -> mddb.ExportRequest
+	11,  // 163: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
+	13,  // 164: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
+	15,  // 165: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
+	17,  // 166: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
+	26,  // 167: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
+	29,  // 168: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
+	31,  // 169: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
+	156, // 170: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
+	159, // 171: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
+	162, // 172: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
+	164, // 173: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
+	167, // 174: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
+	169, // 175: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
+	34,  // 176: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
+	35,  // 177: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
+	36,  // 178: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
+	41,  // 179: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
+	43,  // 180: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
+	46,  // 181: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
+	50,  // 182: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
+	51,  // 183: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
+	53,  // 184: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
+	55,  // 185: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
+	57,  // 186: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
+	59,  // 187: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
+	61,  // 188: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
+	64,  // 189: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
+	66,  // 190: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
+	67,  // 191: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
+	69,  // 192: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
+	179, // 193: mddb.MDDB.SearchAdvisor:input_type -> mddb.SearchAdvisorRequest
+	180, // 194: mddb.MDDB.GetIndexingStatus:input_type -> mddb.IndexingStatusRequest
+	188, // 195: mddb.MDDB.CodeSymbol:input_type -> mddb.CodeSymbolRequest
+	192, // 196: mddb.MDDB.RunEval:input_type -> mddb.RunEvalRequest
+	196, // 197: mddb.MDDB.AddEvalQuery:input_type -> mddb.AddEvalQueryRequest
+	197, // 198: mddb.MDDB.ListEvalQueries:input_type -> mddb.ListEvalQueriesRequest
+	199, // 199: mddb.MDDB.DeleteEvalQuery:input_type -> mddb.DeleteEvalQueryRequest
+	201, // 200: mddb.MDDB.GetGain:input_type -> mddb.GetGainRequest
+	72,  // 201: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
+	74,  // 202: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
+	77,  // 203: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
+	79,  // 204: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
+	81,  // 205: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
+	84,  // 206: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
+	86,  // 207: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
+	88,  // 208: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
+	90,  // 209: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
+	92,  // 210: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
+	95,  // 211: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
+	97,  // 212: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
+	98,  // 213: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
+	99,  // 214: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
+	101, // 215: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
+	102, // 216: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
+	105, // 217: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
+	114, // 218: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
+	116, // 219: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
+	118, // 220: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
+	121, // 221: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
+	124, // 222: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
+	130, // 223: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
+	132, // 224: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
+	135, // 225: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
+	145, // 226: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
+	148, // 227: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
+	151, // 228: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
+	154, // 229: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
+	173, // 230: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
+	175, // 231: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
+	176, // 232: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
+	177, // 233: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
+	136, // 234: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
+	138, // 235: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
+	140, // 236: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
+	143, // 237: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
+	0,   // 238: mddb.MDDB.Add:output_type -> mddb.Document
+	5,   // 239: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
+	22,  // 240: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
+	25,  // 241: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
+	0,   // 242: mddb.MDDB.Get:output_type -> mddb.Document
+	8,   // 243: mddb.MDDB.Search:output_type -> mddb.SearchResponse
+	10,  // 244: mddb.MDDB.Export:output_type -> mddb.ExportChunk
+	12,  // 245: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
+	14,  // 246: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
+	16,  // 247: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
+	18,  // 248: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
+	28,  // 249: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
+	30,  // 250: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
+	32,  // 251: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
+	158, // 252: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
+	160, // 253: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
+	163, // 254: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
+	166, // 255: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
+	168, // 256: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
+	170, // 257: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
+	0,   // 258: mddb.MDDB.ImportURL:output_type -> mddb.Document
+	0,   // 259: mddb.MDDB.SetTTL:output_type -> mddb.Document
+	40,  // 260: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
+	42,  // 261: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
+	45,  // 262: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
+	48,  // 263: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
+	49,  // 264: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
+	52,  // 265: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
+	54,  // 266: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
+	56,  // 267: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
+	58,  // 268: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
+	60,  // 269: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
+	62,  // 270: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
+	65,  // 271: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
+	0,   // 272: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
+	68,  // 273: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
+	71,  // 274: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
+	183, // 275: mddb.MDDB.SearchAdvisor:output_type -> mddb.SearchAdvisorResponse
+	181, // 276: mddb.MDDB.GetIndexingStatus:output_type -> mddb.IndexingStatusResponse
+	189, // 277: mddb.MDDB.CodeSymbol:output_type -> mddb.CodeSymbolResponse
+	195, // 278: mddb.MDDB.RunEval:output_type -> mddb.RunEvalResponse
+	190, // 279: mddb.MDDB.AddEvalQuery:output_type -> mddb.EvalQueryProto
+	198, // 280: mddb.MDDB.ListEvalQueries:output_type -> mddb.ListEvalQueriesResponse
+	200, // 281: mddb.MDDB.DeleteEvalQuery:output_type -> mddb.DeleteEvalQueryResponse
+	204, // 282: mddb.MDDB.GetGain:output_type -> mddb.GetGainResponse
+	73,  // 283: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
+	75,  // 284: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
+	78,  // 285: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
+	80,  // 286: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
+	82,  // 287: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
+	85,  // 288: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
+	87,  // 289: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
+	89,  // 290: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
+	91,  // 291: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
+	93,  // 292: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
+	96,  // 293: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
+	94,  // 294: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
+	94,  // 295: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
+	94,  // 296: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
+	100, // 297: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
+	103, // 298: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
+	106, // 299: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
+	115, // 300: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
+	117, // 301: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
+	120, // 302: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
+	123, // 303: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
+	127, // 304: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
+	131, // 305: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
+	134, // 306: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
+	0,   // 307: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
+	147, // 308: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
+	150, // 309: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
+	153, // 310: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
+	155, // 311: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
+	174, // 312: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
+	172, // 313: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
+	172, // 314: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
+	178, // 315: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
+	137, // 316: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
+	139, // 317: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
+	141, // 318: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
+	144, // 319: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
+	238, // [238:320] is the sub-list for method output_type
+	156, // [156:238] is the sub-list for method input_type
+	156, // [156:156] is the sub-list for extension type_name
+	156, // [156:156] is the sub-list for extension extendee
+	0,   // [0:156] is the sub-list for field type_name
 }
 
 func init() { file_mddb_proto_init() }
@@ -14157,13 +16478,15 @@ func file_mddb_proto_init() {
 	}
 	file_mddb_proto_msgTypes[111].OneofWrappers = []any{}
 	file_mddb_proto_msgTypes[116].OneofWrappers = []any{}
+	file_mddb_proto_msgTypes[184].OneofWrappers = []any{}
+	file_mddb_proto_msgTypes[191].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mddb_proto_rawDesc), len(file_mddb_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   216,
+			NumMessages:   246,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

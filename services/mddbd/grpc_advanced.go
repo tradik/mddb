@@ -5,9 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"mddb/internal/embedding"
 	"mddb/internal/storage"
-	vec "mddb/internal/vector"
 	proto "mddb/proto"
 	"sort"
 	"strconv"
@@ -453,141 +451,47 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 	if req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocId == "" {
 		return nil, status.Error(codes.InvalidArgument, "one of query, query_vector, or source_doc_id is required")
 	}
-
-	// Check read permission on all collections
+	if req.SourceDocId != "" && req.SourceCollection == "" {
+		return nil, status.Error(codes.InvalidArgument, "source_collection required when using source_doc_id")
+	}
+	// Permission on every collection searched, after "role:" targets expand.
+	targets := g.server.expandTargets(req.TargetCollections)
 	if g.server.AuthManager != nil {
-		for _, coll := range req.TargetCollections {
+		for _, coll := range append(append([]string(nil), targets...), req.SourceCollection) {
+			if coll == "" {
+				continue
+			}
 			if err := g.server.AuthManager.CheckPermission(ctx, coll, PermRead); err != nil {
 				return nil, status.Error(codes.PermissionDenied, err.Error())
 			}
 		}
-		if req.SourceCollection != "" {
-			if err := g.server.AuthManager.CheckPermission(ctx, req.SourceCollection, PermRead); err != nil {
-				return nil, status.Error(codes.PermissionDenied, err.Error())
-			}
-		}
 	}
-
-	// Select algorithm
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "flat"
-	}
-	searcher, algo, err := g.server.readySearcher(req.SourceCollection, algo)
-	if err != nil {
-		return nil, vectorSearcherStatus(err)
-	}
-
-	// Resolve query vector
-	var queryVector []float32
-	if len(req.QueryVector) > 0 {
-		queryVector = req.QueryVector
-	} else if req.SourceDocId != "" {
-		if req.SourceCollection == "" {
-			return nil, status.Error(codes.InvalidArgument, "source_collection required when using source_doc_id")
-		}
-		rec, err := g.server.VectorStore.Get(req.SourceCollection, req.SourceDocId)
-		if err != nil || rec == nil {
-			return nil, status.Error(codes.NotFound, "source document has no embedding")
-		}
-		queryVector = rec.Vector
-	} else if g.server.Embedding != nil {
-		var err error
-		queryVector, err = g.server.Embedding.Embed(ctx, req.Query, embedding.RoleQuery)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to embed query: "+err.Error())
-		}
-	} else {
-		return nil, status.Error(codes.FailedPrecondition, "no embedding provider configured")
-	}
-
-	// RAG-001 deliberately does not apply here: a cross-collection search
-	// has no single collection whose profile could own topK, and picking
-	// one of N arbitrarily would be worse than the fixed default.
-	topK := int(req.TopK)
-	if topK <= 0 {
-		topK = 10
-	}
-
-	metric := vec.ResolveSimilarity(req.DistanceMetric)
-	metricName := req.DistanceMetric
-	if metricName == "" {
-		metricName = "cosine"
-	}
-
-	// Convert proto filter_meta
-	filterMeta := make(map[string][]string)
-	for k, v := range req.FilterMeta {
-		filterMeta[k] = v.Values
-	}
-
-	searchTopK := topK * 3
-	if searchTopK < 20 {
-		searchTopK = 20
-	}
-
-	type taggedResult struct {
-		collection string
-		result     vec.VectorResult
-	}
-	var allTagged []taggedResult
-
-	for _, coll := range req.TargetCollections {
-		var results []vec.VectorResult
-		if len(filterMeta) > 0 {
-			allowedIDs := g.server.getDocIDsByMeta(coll, filterMeta)
-			if len(allowedIDs) == 0 {
-				continue
-			}
-			results = searcher.SearchWithFilter(coll, queryVector, searchTopK, req.Threshold, allowedIDs, metric)
-		} else {
-			results = searcher.Search(coll, queryVector, searchTopK, req.Threshold, metric)
-		}
-		results = vec.DeduplicateChunkResults(results)
-		for _, vr := range results {
-			allTagged = append(allTagged, taggedResult{collection: coll, result: vr})
-		}
-	}
-
-	sort.Slice(allTagged, func(i, j int) bool {
-		return allTagged[i].result.Score > allTagged[j].result.Score
+	// The cross-search MCP runs (2.18.8): text and hybrid search types,
+	// role:reference targets, filter, groupBy, passages and waits.
+	res, err := NewDirectClient(g.server).CrossSearch(ctx, &MCPCrossSearchRequest{
+		SourceCollection: req.SourceCollection, SourceDocID: req.SourceDocId, Query: req.Query, QueryVector: req.QueryVector,
+		TargetCollections: targets, TopK: int(req.TopK), Threshold: req.Threshold, Algorithm: req.Algorithm,
+		DistanceMetric: req.DistanceMetric, FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
+		IncludeContent: req.IncludeContent, GroupBy: groupByOf(req.GroupBy), SearchType: req.SearchType,
+		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
+		PassageOptions: passageOptions(req.Format, req.PassageLines),
 	})
-	if len(allTagged) > topK {
-		allTagged = allTagged[:topK]
+	if err != nil {
+		return nil, searchStatus(err)
 	}
-
-	// Load full documents
-	protoResults := make([]*proto.CrossSearchResultItem, 0, len(allTagged))
-	// #336: documents of several collections, each read from its own file.
-	for rank, tr := range allTagged {
-		v := g.server.docBytes(tr.collection, tr.result.DocID)
-		if v == nil {
-			continue
-		}
-		d, err := unmarshalDoc(v)
-		if err != nil {
-			continue
-		}
-		if !req.IncludeContent {
-			d.ContentMD = ""
-		}
-		protoResults = append(protoResults, &proto.CrossSearchResultItem{
-			Collection: tr.collection,
-			Document:   docToProto(d),
-			Score:      tr.result.Score,
-			Rank:       int32(rank + 1),
-		})
+	if res.Passages != nil {
+		return &proto.CrossSearchResponse{Passages: passagesOf(res.Passages), Total: safeInt32(res.Passages.Total),
+			TargetCollections: targets, Indexing: indexWaitToProto(res.Passages.Indexing)}, nil
 	}
-
-	return &proto.CrossSearchResponse{
-		Results:           protoResults,
-		Total:             safeInt32(len(protoResults)),
-		SourceCollection:  req.SourceCollection,
-		SourceDocId:       req.SourceDocId,
-		TargetCollections: req.TargetCollections,
-		Algorithm:         algo,
-		DistanceMetric:    metricName,
-	}, nil
+	resp := &proto.CrossSearchResponse{Total: safeInt32(res.Total), SourceCollection: res.SourceCollection,
+		SourceDocId: res.SourceDocID, TargetCollections: res.TargetCollections, Algorithm: res.Algorithm,
+		DistanceMetric: res.DistanceMetric, Indexing: indexWaitToProto(res.Indexing)}
+	for _, it := range res.Results {
+		d := it.Document
+		resp.Results = append(resp.Results, &proto.CrossSearchResultItem{Collection: it.Collection, Document: docToProto(&d),
+			Score: it.Score, Rank: safeInt32(it.Rank), Group: it.Group, GroupRank: safeInt32(it.GroupRank)})
+	}
+	return resp, nil
 }
 
 // FindDuplicates implements the FindDuplicates RPC.

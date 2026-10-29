@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"mddb/internal/embedding"
-	"mddb/internal/fts"
 	"mddb/internal/storage"
-	vec "mddb/internal/vector"
 	proto "mddb/proto"
 	"time"
 
@@ -18,111 +15,45 @@ import (
 
 // VectorSearch implements the VectorSearch RPC
 func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRequest) (*proto.VectorSearchResponse, error) {
-	// Check read permission
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermRead); err != nil {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 	}
-
-	// SRCH-005: InvalidArgument is the gRPC equivalent of the REST 422 —
-	// the message parsed, the number is out of range.
+	// SRCH-005: InvalidArgument is the gRPC equivalent of the REST 422.
 	if err := ValidateOversample(req.Oversample); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-
 	if req.Collection == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
 	}
 	if req.Query == "" && len(req.QueryVector) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "either query or query_vector is required")
 	}
-
-	// Select algorithm
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "flat"
-	}
-	searcher, algo, err := g.server.readySearcher(req.Collection, algo)
-	if err != nil {
-		return nil, vectorSearcherStatus(err)
-	}
-
-	// Get query vector
-	var queryVector []float32
-	if len(req.QueryVector) > 0 {
-		queryVector = req.QueryVector
-	} else if g.server.Embedding != nil {
-		var err error
-		queryVector, err = g.server.Embedding.Embed(ctx, req.Query, embedding.RoleQuery)
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to embed query: "+err.Error())
-		}
-	} else {
-		return nil, status.Error(codes.FailedPrecondition, "no embedding provider configured")
-	}
-
-	// RAG-001: request > collection profile > historical default.
-	topK := g.server.ResolveTopK(req.Collection, int(req.TopK), 5)
-
-	// Convert proto filter
-	filterMeta := make(map[string][]string)
-	for k, v := range req.FilterMeta {
-		filterMeta[k] = v.Values
-	}
-
-	// Oversample for chunk deduplication (SRCH-005).
-	searchTopK := OversampledTopK(topK, g.server.ResolveOversample(req.Collection, req.Oversample), 20)
-
-	var results []vec.VectorResult
-	if len(filterMeta) > 0 {
-		allowedIDs := g.server.getDocIDsByMeta(req.Collection, filterMeta)
-		results = searcher.SearchWithFilter(req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, nil)
-	} else {
-		results = searcher.Search(req.Collection, queryVector, searchTopK, req.Threshold, nil)
-	}
-
-	// Deduplicate chunk results
-	results = vec.DeduplicateChunkResults(results)
-	if len(results) > topK {
-		results = results[:topK]
-	}
-
-	// Load documents
-	protoResults := make([]*proto.VectorSearchResult, 0, len(results))
-	_ = g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-		for rank, vr := range results {
-			v := bDocs.Get(storage.DocKey(req.Collection, vr.DocID))
-			if v == nil {
-				continue
-			}
-			d, err := unmarshalDoc(v)
-			if err != nil {
-				continue
-			}
-			if !req.IncludeContent {
-				d.ContentMD = ""
-			}
-			protoResults = append(protoResults, &proto.VectorSearchResult{
-				Document: docToProto(d),
-				Score:    vr.Score,
-				Rank:     int32(rank + 1),
-			})
-		}
-		return nil
+	// The search MCP and REST run (2.18.8): filter, groupBy, passages,
+	// retrieval modes, waits and the context budget come with it.
+	res, err := NewDirectClient(g.server).VectorSearch(ctx, &MCPVectorSearchRequest{
+		Collection: req.Collection, Query: req.Query, QueryVector: req.QueryVector, TopK: int(req.TopK),
+		Threshold: req.Threshold, FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
+		IncludeContent: req.IncludeContent, Algorithm: req.Algorithm, RetrievalMode: req.RetrievalMode,
+		WindowSize: int(req.WindowSize), Oversample: req.Oversample, GroupBy: groupByOf(req.GroupBy),
+		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
+		PassageOptions: passageOptions(req.Format, req.PassageLines),
 	})
-
-	resp := &proto.VectorSearchResponse{
-		Results:   protoResults,
-		Total:     safeInt32(len(protoResults)),
-		Algorithm: algo,
+	if err != nil {
+		return nil, searchStatus(err)
 	}
-	if g.server.Embedding != nil {
-		resp.Model = g.server.Embedding.Model()
-		resp.Dimensions = safeInt32(g.server.Embedding.Dimensions())
+	resp := &proto.VectorSearchResponse{Total: safeInt32(res.Total), Model: res.Model, Dimensions: safeInt32(res.Dimensions),
+		Algorithm: res.Algorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated}
+	if res.Passages != nil {
+		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
+		return resp, nil
 	}
-
+	for _, r := range res.Results {
+		resp.Results = append(resp.Results, &proto.VectorSearchResult{Document: mcpDocToProto(r.Document, true), Score: r.Score,
+			Rank: safeInt32(r.Rank), ChunkText: r.ChunkText, StartLine: safeInt32(r.StartLine), EndLine: safeInt32(r.EndLine),
+			Group: r.Group, GroupRank: safeInt32(r.GroupRank), PendingEmbedding: r.PendingEmbedding})
+	}
 	return resp, nil
 }
 
@@ -396,162 +327,43 @@ func (g *GRPCServer) SetTTL(ctx context.Context, req *proto.SetTTLRequest) (*pro
 
 // FTS implements the FTS RPC
 func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTSResponse, error) {
-	// Check read permission
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermRead); err != nil {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 	}
-
 	if req.Collection == "" || req.Query == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, query")
 	}
 	if g.server.FTSIndex == nil {
 		return nil, status.Error(codes.FailedPrecondition, "full-text search not initialized")
 	}
-
-	// RAG-001: request > collection profile > historical default.
-	limit := g.server.ResolveTopK(req.Collection, int(req.Limit), 50)
-
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "tfidf"
+	// The search POST /v1/fts runs (2.18.8): curation, boosts, facets,
+	// filter, groupBy, passages and the context budget come with it.
+	fr := FTSSearchRequest{Collection: req.Collection, Query: req.Query, Limit: int(req.Limit), Algorithm: req.Algorithm,
+		Fuzzy: int(req.Fuzzy), FilterMeta: metaValuesFromProto(req.FilterMeta), Filter: metaFilterFromProto(req.Filter),
+		Lang: req.Lang, Boost: req.Boost, FacetBy: req.FacetBy, FacetMaxValues: int(req.FacetMaxValues),
+		GroupBy: groupByOf(req.GroupBy), PassageOptions: passageOptions(req.Format, req.PassageLines)}
+	if err := g.server.normalizeFTSRequest(&fr); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-
-	fuzzy := int(req.Fuzzy)
-	if fuzzy < 0 {
-		fuzzy = 0
-	}
-	if fuzzy > 2 {
-		fuzzy = 2
-	}
-
-	// Convert proto filter_meta to internal format
-	var allowed map[string]bool
-	if len(req.FilterMeta) > 0 {
-		filterMeta := make(map[string][]string)
-		for k, v := range req.FilterMeta {
-			filterMeta[k] = v.Values
-		}
-		allowed = g.server.getDocIDsByMeta(req.Collection, filterMeta)
-		if len(allowed) == 0 {
-			return &proto.FTSResponse{
-				Results:   nil,
-				Total:     0,
-				Algorithm: algo,
-				Fuzzy:     int32(fuzzy),
-			}, nil
-		}
-	}
-
-	// Language-aware tokenization
-	queryLang := req.Lang
-	tokens := g.server.FTSIndex.TokenizeQueryLang(req.Collection, req.Query, queryLang)
-
-	var results []fts.FTSResult
-	var err error
-	switch algo {
-	case "bm25f":
-		if fuzzy > 0 {
-			results, err = g.server.FTSIndex.SearchBM25FFuzzy(req.Collection, tokens, limit, fuzzy, nil)
-		} else {
-			results, err = g.server.FTSIndex.SearchBM25F(req.Collection, tokens, limit, nil)
-		}
-	case "bm25":
-		if fuzzy > 0 {
-			results, err = g.server.FTSIndex.SearchBM25Fuzzy(req.Collection, req.Query, limit, fuzzy)
-		} else {
-			results, err = g.server.FTSIndex.SearchBM25(req.Collection, req.Query, limit)
-		}
-	case "tfidf":
-		if fuzzy > 0 {
-			results, err = g.server.FTSIndex.SearchFuzzy(req.Collection, req.Query, limit, fuzzy)
-		} else {
-			results, err = g.server.FTSIndex.Search(req.Collection, req.Query, limit)
-		}
-	case "pmisparse":
-		if fuzzy > 0 {
-			results, err = g.server.FTSIndex.SearchPMISparseFuzzy(req.Collection, req.Query, limit, fuzzy)
-		} else {
-			results, err = g.server.FTSIndex.SearchPMISparse(req.Collection, req.Query, limit)
-		}
-	default:
-		return nil, status.Error(codes.InvalidArgument, "unknown algorithm: "+algo+", available: tfidf, bm25, bm25f, pmisparse")
-	}
+	res, err := g.server.searchFTS(fr, time.Now())
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, searchStatus(err)
 	}
-
-	// Apply metadata filter if provided
-	if allowed != nil {
-		filtered := results[:0]
-		for _, r := range results {
-			if allowed[r.DocID] {
-				filtered = append(filtered, r)
-			}
-		}
-		results = filtered
+	resp := &proto.FTSResponse{Total: safeInt32(res.Total), Algorithm: res.Algorithm, Fuzzy: safeInt32(res.Fuzzy),
+		Lang: res.Lang, ContextTruncated: res.ContextTruncated}
+	if res.passages != nil {
+		resp.Passages, resp.Total = passagesOf(res.passages), safeInt32(res.passages.Total)
+		return resp, nil
 	}
-
-	// Apply per-query boosts/demotions from request.
-	results = g.server.applyBoostFTS(req.Collection, results, req.Boost)
-
-	// Load docs first, then apply curation (which needs doc.Key/lang). We
-	// accumulate FTSResultWithDoc locally so curation + facets see the full
-	// shape identical to the HTTP handler.
-	docResults := make([]FTSResultWithDoc, 0, len(results))
-	_ = g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		for _, res := range results {
-			v := bDocs.Get(storage.DocKey(req.Collection, res.DocID))
-			if v == nil {
-				continue
-			}
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < time.Now().Unix() {
-				continue
-			}
-			docResults = append(docResults, FTSResultWithDoc{
-				Document:     *docPtr,
-				Score:        res.Score,
-				MatchedTerms: res.MatchedTerms,
-			})
-		}
-		return nil
-	})
-
-	docResults = g.server.applyCurationFTS(req.Collection, req.Query, docResults)
-	if limit > 0 && len(docResults) > limit {
-		docResults = docResults[:limit]
-	}
-
-	protoResults := make([]*proto.FTSResult, 0, len(docResults))
-	for _, r := range docResults {
+	for _, r := range res.Results {
 		d := r.Document
-		protoResults = append(protoResults, &proto.FTSResult{
-			Document:     docToProto(&d),
-			Score:        r.Score,
-			MatchedTerms: r.MatchedTerms,
-			Pinned:       r.Pinned,
-		})
+		resp.Results = append(resp.Results, &proto.FTSResult{Document: docToProto(&d), Score: r.Score,
+			MatchedTerms: r.MatchedTerms, Pinned: r.Pinned, Group: r.Group, GroupRank: safeInt32(r.GroupRank)})
 	}
-
-	resp := &proto.FTSResponse{
-		Results:   protoResults,
-		Total:     safeInt32(len(protoResults)),
-		Algorithm: algo,
-		Fuzzy:     int32(fuzzy),
-		Lang:      queryLang,
-	}
-	if len(req.FacetBy) > 0 && len(docResults) > 0 {
-		docs := make([]storage.Doc, len(docResults))
-		for i, r := range docResults {
-			docs[i] = r.Document
-		}
-		resp.Facets = facetsToProto(computeFacets(docs, req.FacetBy, int(req.FacetMaxValues)))
+	if len(res.Facets) > 0 {
+		resp.Facets = facetsToProto(res.Facets)
 	}
 	return resp, nil
 }
@@ -613,160 +425,55 @@ func (g *GRPCServer) FTSLanguages(ctx context.Context, _ *proto.FTSLanguagesRequ
 
 // HybridSearch implements the HybridSearch RPC - combines FTS and vector search
 func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRequest) (*proto.HybridSearchResponse, error) {
-	// Check read permission
 	if g.server.AuthManager != nil {
 		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermRead); err != nil {
 			return nil, status.Error(codes.PermissionDenied, err.Error())
 		}
 	}
-
 	if req.Collection == "" || req.Query == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, query")
 	}
-
-	// Defaults. RAG-001: request > collection profile > historical default.
-	topK := g.server.ResolveTopK(req.Collection, int(req.TopK), 10)
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "bm25"
+	if req.Strategy != "" && req.Strategy != "alpha" && req.Strategy != "rrf" {
+		return nil, status.Error(codes.InvalidArgument, "unknown strategy: "+req.Strategy+", available: alpha, rrf")
 	}
-	vectorAlgo := req.VectorAlgorithm
-	if vectorAlgo == "" {
-		vectorAlgo = "flat"
-	}
-	strategy := req.Strategy
-	if strategy == "" {
-		strategy = "alpha"
-	}
-	alpha := req.Alpha
-	if strategy == "alpha" && alpha == 0 {
-		alpha = 0.5
-	}
-	rrfK := int(req.RrfK)
-	if rrfK <= 0 {
-		rrfK = 60
-	}
-	fuzzy := int(req.Fuzzy)
-	if fuzzy < 0 {
-		fuzzy = 0
-	}
-	if fuzzy > 2 {
-		fuzzy = 2
-	}
-
-	// Validate strategy
-	if strategy != "alpha" && strategy != "rrf" {
-		return nil, status.Error(codes.InvalidArgument, "unknown strategy: "+strategy+", available: alpha, rrf")
-	}
-
-	// Validate sort. The gRPC HybridSearchRequest does not carry a geo
-	// filter, so "distance" is never applicable over gRPC; clients who
-	// need distance sort must use the HTTP handler with its Geo field.
+	// The gRPC request carries no geo filter, so "distance" never applies here.
 	switch req.Sort {
 	case "", "combined":
-		// ok — "" normalizes to default "combined" behavior below
 	case "distance":
 		return nil, status.Error(codes.InvalidArgument, "sort=distance is only supported over HTTP where a geo filter can be attached")
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unknown sort: "+req.Sort+", available: combined, distance")
 	}
-
-	// Convert proto filter_meta to internal format
-	filterMeta := make(map[string][]string)
-	for k, v := range req.FilterMeta {
-		filterMeta[k] = v.Values
-	}
-
-	// Convert proto field_weights to internal format
-	var fieldWeights map[string]float64
-	if len(req.FieldWeights) > 0 {
-		fieldWeights = req.FieldWeights
-	}
-
-	// Build internal hybrid search request
-	hybridReq := HybridSearchRequest{
-		Collection:      req.Collection,
-		Query:           req.Query,
-		TopK:            topK,
-		Algorithm:       algo,
-		VectorAlgorithm: vectorAlgo,
-		Alpha:           floatPtr(alpha),
-		Strategy:        strategy,
-		RRFK:            rrfK,
-		Fuzzy:           fuzzy,
-		Threshold:       req.Threshold,
-		FilterMeta:      filterMeta,
-		IncludeContent:  req.IncludeContent,
-		FieldWeights:    fieldWeights,
-		Lang:            req.Lang,
-		Boost:           req.Boost,
-		Sort:            req.Sort,
-	}
-
-	// Step 1: Run FTS search
-	ftsResults, err := g.server.runFTSSearch(hybridReq)
+	// The hybrid search MCP runs (2.18.8): curation, filter, groupBy,
+	// passages, waits and the context budget come with it.
+	res, err := NewDirectClient(g.server).HybridSearch(ctx, &MCPHybridSearchRequest{
+		Collection: req.Collection, Query: req.Query, TopK: int(req.TopK), Algorithm: req.Algorithm,
+		VectorAlgorithm: req.VectorAlgorithm, Alpha: req.Alpha, Strategy: req.Strategy, RRFK: int(req.RrfK),
+		Fuzzy: int(req.Fuzzy), Threshold: req.Threshold, FilterMeta: metaValuesFromProto(req.FilterMeta),
+		Filter: metaFilterFromProto(req.Filter), Boost: req.Boost, FieldWeights: req.FieldWeights, Lang: req.Lang,
+		GroupBy:        groupByOf(req.GroupBy),
+		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
+		PassageOptions: passageOptions(req.Format, req.PassageLines),
+	})
 	if err != nil {
-		return nil, status.Error(codes.Internal, "FTS search failed: "+err.Error())
+		return nil, searchStatus(err)
 	}
-
-	// Step 2: Run vector search
-	vectorResults, err := g.server.runVectorSearch(ctx, hybridReq)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "vector search failed: "+err.Error())
+	resp := &proto.HybridSearchResponse{Total: safeInt32(res.Total), Strategy: res.Strategy, FtsAlgorithm: res.FTSAlgorithm,
+		VectorAlgorithm: res.VectorAlgorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated}
+	if res.Passages != nil {
+		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
+		return resp, nil
 	}
-
-	// Step 3: Merge results
-	var merged []HybridSearchResultItem
-	switch strategy {
-	case "rrf":
-		merged = mergeRRF(ftsResults, vectorResults, rrfK, topK)
-	default: // "alpha"
-		merged = mergeAlpha(ftsResults, vectorResults, alpha, topK)
+	docs := make([]MCPDocument, 0, len(res.Results))
+	for _, r := range res.Results {
+		docs = append(docs, r.Document)
+		resp.Results = append(resp.Results, &proto.HybridSearchResult{Document: mcpDocToProto(r.Document, req.IncludeContent),
+			CombinedScore: r.CombinedScore, FtsScore: r.FTSScore, VectorScore: r.VectorScore, MatchedTerms: r.MatchedTerms,
+			Rank: safeInt32(r.Rank), Pinned: r.Pinned, Group: r.Group, GroupRank: safeInt32(r.GroupRank),
+			PendingEmbedding: r.PendingEmbedding})
 	}
-
-	// Apply per-query boosts/demotions (metadata-based score multipliers).
-	merged = g.server.applyBoostHybrid(req.Collection, merged, req.Boost)
-	if len(merged) > topK {
-		merged = merged[:topK]
-	}
-
-	// Step 4: Load full documents
-	items := g.server.loadHybridDocs(req.Collection, merged, req.IncludeContent)
-
-	// Apply curation (pin/hide) on the loaded documents so Keys are available
-	// for matching, then trim to topK.
-	items = g.server.applyCurationHybrid(req.Collection, req.Query, items)
-	if topK > 0 && len(items) > topK {
-		items = items[:topK]
-	}
-
-	// Convert to proto response
-	protoResults := make([]*proto.HybridSearchResult, len(items))
-	for i, item := range items {
-		protoResults[i] = &proto.HybridSearchResult{
-			Document:      docToProto(&item.Document),
-			CombinedScore: item.CombinedScore,
-			FtsScore:      item.FTSScore,
-			VectorScore:   item.VectorScore,
-			MatchedTerms:  item.MatchedTerms,
-			Rank:          safeInt32(item.Rank),
-			Pinned:        item.Pinned,
-		}
-	}
-
-	resp := &proto.HybridSearchResponse{
-		Results:         protoResults,
-		Total:           safeInt32(len(protoResults)),
-		Strategy:        strategy,
-		FtsAlgorithm:    algo,
-		VectorAlgorithm: vectorAlgo,
-	}
-	if len(req.FacetBy) > 0 && len(items) > 0 {
-		docs := make([]storage.Doc, len(items))
-		for i, it := range items {
-			docs[i] = it.Document
-		}
-		resp.Facets = facetsToProto(computeFacets(docs, req.FacetBy, int(req.FacetMaxValues)))
+	if len(req.FacetBy) > 0 && len(docs) > 0 {
+		resp.Facets = facetsToProto(computeFacets(docsOfMCP(docs), req.FacetBy, int(req.FacetMaxValues)))
 	}
 	return resp, nil
 }

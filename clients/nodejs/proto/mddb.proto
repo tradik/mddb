@@ -127,6 +127,20 @@ service MDDB {
   // when collection is empty (GO-042): is what was just written searchable yet?
   rpc GetIndexingStatus(IndexingStatusRequest) returns (IndexingStatusResponse);
 
+  // Everything about one symbol in a code collection (CODE-008): its
+  // definitions, references, callers, callees, tests and siblings.
+  rpc CodeSymbol(CodeSymbolRequest) returns (CodeSymbolResponse);
+
+  // Retrieval evaluation (SRCH-019): score search configurations on the
+  // collection's evaluation set, and manage that set.
+  rpc RunEval(RunEvalRequest) returns (RunEvalResponse);
+  rpc AddEvalQuery(AddEvalQueryRequest) returns (EvalQueryProto);
+  rpc ListEvalQueries(ListEvalQueriesRequest) returns (ListEvalQueriesResponse);
+  rpc DeleteEvalQuery(DeleteEvalQueryRequest) returns (DeleteEvalQueryResponse);
+
+  // Tokens returned and avoided by retrieval over a window of days (AGT-004).
+  rpc GetGain(GetGainRequest) returns (GetGainResponse);
+
   // Delete a single document
   rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
 
@@ -296,6 +310,7 @@ message SearchRequest {
   bool asc = 4;
   int32 limit = 5;
   int32 offset = 6;
+  map<string, MetaCondition> filter = 7;             // (v2.18.8) operators: in, prefix, contains, ranges, not, exists; ANDed with filter_meta
 }
 
 // Search response
@@ -429,6 +444,15 @@ message VectorSearchRequest {
   bool include_content = 7;                      // include full content_md in results
   string algorithm = 8;                          // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "bq"
   double oversample = 9;                         // (SRCH-005) candidates per result before dedup; 1.0-10.0, 0 = collection profile then default
+  map<string, MetaCondition> filter = 10;        // (v2.18.8) operator filter, ANDed with filter_meta
+  GroupBy group_by = 11;                         // (v2.18.8)
+  string format = 12;                            // (v2.18.8) "passages"
+  int32 passage_lines = 13;                      // (v2.18.8)
+  int32 wait_for_index_ms = 14;                  // (v2.18.8) wait up to this long (max 30000) for queued embeddings
+  repeated string wait_for_keys = 15;             // (v2.18.8) wait only for these keys
+  string read_level = 16;                         // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
+  string retrieval_mode = 17;                    // "parent" (default), "chunk", "window"
+  int32 window_size = 18;                        // neighbour chunks per side in "window" mode
 }
 
 // Vector search result
@@ -436,6 +460,12 @@ message VectorSearchResult {
   Document document = 1;
   float score = 2;
   int32 rank = 3;
+  string chunk_text = 4;                         // the matching chunk in chunk/window modes
+  int32 start_line = 5;                          // 1-based lines of the chunk in its document
+  int32 end_line = 6;
+  string group = 7;                              // (v2.18.8)
+  int32 group_rank = 8;
+  bool pending_embedding = 9;                    // (v2.18.8) found by text while its embedding is queued
 }
 
 // Vector search response
@@ -445,6 +475,9 @@ message VectorSearchResponse {
   string model = 3;
   int32 dimensions = 4;
   string algorithm = 5;                          // algorithm used for this search
+  repeated Passage passages = 6;                 // (v2.18.8) set when format is "passages"
+  IndexWaitResult indexing = 7;                  // (v2.18.8) set when the request waited
+  bool context_truncated = 8;
 }
 
 // Vector reindex request
@@ -513,6 +546,10 @@ message FTSRequest {
   map<string, double> boost = 8;                 // per-query boost: "metaKey:metaValue" → multiplier (positive boosts, negative demotes)
   repeated string facet_by = 9;                  // (v2.9.14+) meta keys to aggregate into response.facets
   int32 facet_max_values = 10;                   // (v2.9.14+) cap per-key bucket count (0 = unlimited)
+  map<string, MetaCondition> filter = 11;        // (v2.18.8) operator filter, ANDed with filter_meta
+  GroupBy group_by = 12;                         // (v2.18.8) at most per_group results per metadata value or document
+  string format = 13;                            // (v2.18.8) "passages" returns passages instead of documents
+  int32 passage_lines = 14;                      // (v2.18.8) context lines around a passage's hit
 }
 
 message FTSResult {
@@ -520,6 +557,8 @@ message FTSResult {
   double score = 2;
   repeated string matched_terms = 3;
   bool pinned = 4;                               // (v2.9.14+) this row was injected by a curation rule
+  string group = 5;                              // (v2.18.8) the group this result counted against
+  int32 group_rank = 6;
 }
 
 // FacetBucketProto is one value bucket inside a facet — reused by
@@ -540,6 +579,8 @@ message FTSResponse {
   int32 fuzzy = 4;                               // typo tolerance level used
   string lang = 5;                               // language used for tokenization
   map<string, FacetBucketList> facets = 6;       // (v2.9.14+) per-key facet counts
+  repeated Passage passages = 7;                 // (v2.18.8) set when format is "passages"
+  bool context_truncated = 8;                    // (v2.18.8) the collection's context budget dropped results
 }
 
 // --- FTS reindex ---
@@ -590,6 +631,13 @@ message HybridSearchRequest {
   string sort = 16;                              // result ordering: "" or "combined" (default, by fused score), or "distance" (by distanceMeters asc — requires geo filter)
   repeated string facet_by = 17;                 // (v2.9.14+) meta keys to aggregate
   int32 facet_max_values = 18;                   // (v2.9.14+) cap per-key bucket count (0 = unlimited)
+  map<string, MetaCondition> filter = 19;        // (v2.18.8) operator filter, ANDed with filter_meta
+  GroupBy group_by = 20;                         // (v2.18.8)
+  string format = 21;                            // (v2.18.8) "passages"
+  int32 passage_lines = 22;                      // (v2.18.8)
+  int32 wait_for_index_ms = 23;                  // (v2.18.8) wait up to this long (max 30000) for queued embeddings
+  repeated string wait_for_keys = 24;             // (v2.18.8) wait only for these keys
+  string read_level = 25;                         // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
 }
 
 message HybridSearchResult {
@@ -600,6 +648,9 @@ message HybridSearchResult {
   repeated string matched_terms = 5;
   int32 rank = 6;
   bool pinned = 7;                               // (v2.9.14+) injected by a curation rule
+  string group = 8;                              // (v2.18.8)
+  int32 group_rank = 9;
+  bool pending_embedding = 10;                   // (v2.18.8)
 }
 
 message HybridSearchResponse {
@@ -609,6 +660,9 @@ message HybridSearchResponse {
   string fts_algorithm = 4;
   string vector_algorithm = 5;
   map<string, FacetBucketList> facets = 6;       // (v2.9.14+)
+  repeated Passage passages = 7;                 // (v2.18.8)
+  IndexWaitResult indexing = 8;                  // (v2.18.8)
+  bool context_truncated = 9;
 }
 
 // --- Webhooks ---
@@ -1154,6 +1208,14 @@ message CrossSearchRequest {
   string distance_metric = 9;
   map<string, MetaValues> filter_meta = 10;
   bool include_content = 11;
+  map<string, MetaCondition> filter = 12;        // (v2.18.8) operator filter, ANDed with filter_meta
+  GroupBy group_by = 13;                         // (v2.18.8) key may be "collection"
+  string format = 14;                            // (v2.18.8) "passages"
+  int32 passage_lines = 15;                      // (v2.18.8)
+  string search_type = 16;                       // (v2.18.8) "vector" (default), "fts" or "hybrid"; targets may be "role:reference"
+  int32 wait_for_index_ms = 17;                  // (v2.18.8) wait up to this long (max 30000) for queued embeddings
+  repeated string wait_for_keys = 18;             // (v2.18.8) wait only for these keys
+  string read_level = 19;                         // (v2.18.8) "indexedPlusPending" adds documents whose embedding is queued
 }
 
 message CrossSearchResultItem {
@@ -1161,6 +1223,8 @@ message CrossSearchResultItem {
   Document document = 2;
   float score = 3;
   int32 rank = 4;
+  string group = 5;                              // (v2.18.8)
+  int32 group_rank = 6;
 }
 
 message CrossSearchResponse {
@@ -1171,6 +1235,8 @@ message CrossSearchResponse {
   repeated string target_collections = 5;
   string algorithm = 6;
   string distance_metric = 7;
+  repeated Passage passages = 8;                 // (v2.18.8)
+  IndexWaitResult indexing = 9;                  // (v2.18.8)
 }
 
 // --- Find Duplicates ---
@@ -1647,4 +1713,182 @@ message SearchAdvisorResponse {
   repeated string reasons = 9;
   // What would stop the recommendation working.
   repeated string warnings = 10;
+}
+
+// ---- v2.18.8: shared search shapes ----
+
+// One metadata condition (SRCH-017). Every set field must hold.
+message MetaCondition {
+  repeated string any_of = 1;                    // the "in" operator: any of these values
+  string prefix = 2;
+  string contains = 3;
+  optional string gt = 4;                        // numbers compare as numbers, dates as dates
+  optional string gte = 5;
+  optional string lt = 6;
+  optional string lte = 7;
+  repeated string none_of = 8;                   // the "not" operator: none of these values
+  optional bool exists = 9;                      // the key is (true) or is not (false) set
+}
+
+// At most per_group results per value of key (SRCH-016). key is a metadata
+// key, "document", or for cross-search "collection".
+message GroupBy {
+  string key = 1;
+  int32 per_group = 2;                           // 0 means 1
+}
+
+// A place in a document (AGT-002): the lines, the definition holding them,
+// and their text.
+message Passage {
+  string collection = 1;
+  string key = 2;
+  string lang = 3;
+  string path = 4;
+  int32 start_line = 5;
+  int32 end_line = 6;
+  string symbol = 7;
+  string kind = 8;
+  string content = 9;
+  double score = 10;
+  string source = 11;                            // fts, vector, hybrid, cross, or a symbol relation
+  int32 tokens = 12;
+}
+
+// How long a search waited for queued embeddings (GO-042).
+message IndexWaitResult {
+  int64 waited_ms = 1;
+  bool timed_out = 2;
+}
+
+// ---- v2.18.8: symbols (CODE-008) ----
+
+message CodeSymbolRequest {
+  string collection = 1;
+  string name = 2;
+  repeated string include = 3;                   // relations to return; empty = all
+  int32 limit = 4;                               // passages per relation (default 20, max 200)
+  bool include_content = 5;
+}
+
+message CodeSymbolResponse {
+  string collection = 1;
+  string symbol = 2;
+  repeated Passage definitions = 3;
+  repeated Passage references = 4;
+  repeated Passage callers = 5;
+  repeated Passage callees = 6;
+  repeated Passage tests = 7;
+  repeated Passage siblings = 8;
+  bool truncated = 9;
+}
+
+// ---- v2.18.8: retrieval evaluation (SRCH-019) ----
+
+message EvalQueryProto {
+  string id = 1;
+  string query = 2;
+  repeated string expected_keys = 3;
+  map<string, int32> grades = 4;                 // key -> relevance 0..3
+}
+
+message EvalConfigProto {
+  string name = 1;
+  string search_type = 2;                        // fts, vector, hybrid
+  string algorithm = 3;
+  string vector_algorithm = 4;
+  optional double alpha = 5;
+  string strategy = 6;
+  string retrieval_mode = 7;
+}
+
+message RunEvalRequest {
+  string collection = 1;
+  int32 k = 2;                                   // default 10, max 100
+  repeated EvalConfigProto configs = 3;          // default fts/bm25, hybrid, vector; max 8
+  repeated EvalQueryProto queries = 4;           // inline queries instead of the stored set; max 200
+  bool details = 5;
+}
+
+message EvalQueryResultProto {
+  string id = 1;
+  string query = 2;
+  double recall = 3;
+  double ndcg = 4;
+  double reciprocal_rank = 5;
+  repeated string returned = 6;
+}
+
+message EvalConfigResultProto {
+  string config = 1;
+  double recall_at_k = 2;
+  double ndcg_at_k = 3;
+  double mrr = 4;
+  double p50_ms = 5;
+  double p99_ms = 6;
+  int64 tokens = 7;
+  string error = 8;
+  repeated EvalQueryResultProto per_query = 9;
+}
+
+message RunEvalResponse {
+  string collection = 1;
+  int32 k = 2;
+  int32 queries = 3;
+  repeated EvalConfigResultProto results = 4;
+}
+
+message AddEvalQueryRequest {
+  string collection = 1;
+  EvalQueryProto query = 2;
+}
+
+message ListEvalQueriesRequest {
+  string collection = 1;
+}
+
+message ListEvalQueriesResponse {
+  string collection = 1;
+  repeated EvalQueryProto queries = 2;
+}
+
+message DeleteEvalQueryRequest {
+  string collection = 1;
+  string id = 2;
+}
+
+message DeleteEvalQueryResponse {
+  bool deleted = 1;
+}
+
+// ---- v2.18.8: retrieval gain (AGT-004) ----
+
+message GetGainRequest {
+  string window = 1;                             // "30d" (default) .. "365d"
+  bool daily = 2;
+}
+
+message GainCountersProto {
+  map<string, int64> searches = 1;
+  map<string, int64> algorithms = 2;
+  map<string, int64> fusion = 3;
+  int64 tokens_returned = 4;
+  int64 tokens_avoided = 5;
+  int64 fragment_hits = 6;
+  int64 document_hits = 7;
+}
+
+message GainDayProto {
+  string date = 1;
+  GainCountersProto counters = 2;
+}
+
+message GetGainResponse {
+  int32 window_days = 1;
+  string from_date = 2;
+  string to_date = 3;
+  GainCountersProto totals = 4;
+  int64 total_searches = 5;
+  int64 tokens_without_retrieval = 6;
+  double saved_percent = 7;
+  repeated GainDayProto daily = 8;
 }

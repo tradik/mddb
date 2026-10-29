@@ -58,6 +58,12 @@ const (
 	MDDB_Classify_FullMethodName              = "/mddb.MDDB/Classify"
 	MDDB_SearchAdvisor_FullMethodName         = "/mddb.MDDB/SearchAdvisor"
 	MDDB_GetIndexingStatus_FullMethodName     = "/mddb.MDDB/GetIndexingStatus"
+	MDDB_CodeSymbol_FullMethodName            = "/mddb.MDDB/CodeSymbol"
+	MDDB_RunEval_FullMethodName               = "/mddb.MDDB/RunEval"
+	MDDB_AddEvalQuery_FullMethodName          = "/mddb.MDDB/AddEvalQuery"
+	MDDB_ListEvalQueries_FullMethodName       = "/mddb.MDDB/ListEvalQueries"
+	MDDB_DeleteEvalQuery_FullMethodName       = "/mddb.MDDB/DeleteEvalQuery"
+	MDDB_GetGain_FullMethodName               = "/mddb.MDDB/GetGain"
 	MDDB_DeleteDocument_FullMethodName        = "/mddb.MDDB/DeleteDocument"
 	MDDB_DeleteCollection_FullMethodName      = "/mddb.MDDB/DeleteCollection"
 	MDDB_ListSynonyms_FullMethodName          = "/mddb.MDDB/ListSynonyms"
@@ -181,6 +187,17 @@ type MDDBClient interface {
 	// Queued embedding and metadata work for a collection, or for the server
 	// when collection is empty (GO-042): is what was just written searchable yet?
 	GetIndexingStatus(ctx context.Context, in *IndexingStatusRequest, opts ...grpc.CallOption) (*IndexingStatusResponse, error)
+	// Everything about one symbol in a code collection (CODE-008): its
+	// definitions, references, callers, callees, tests and siblings.
+	CodeSymbol(ctx context.Context, in *CodeSymbolRequest, opts ...grpc.CallOption) (*CodeSymbolResponse, error)
+	// Retrieval evaluation (SRCH-019): score search configurations on the
+	// collection's evaluation set, and manage that set.
+	RunEval(ctx context.Context, in *RunEvalRequest, opts ...grpc.CallOption) (*RunEvalResponse, error)
+	AddEvalQuery(ctx context.Context, in *AddEvalQueryRequest, opts ...grpc.CallOption) (*EvalQueryProto, error)
+	ListEvalQueries(ctx context.Context, in *ListEvalQueriesRequest, opts ...grpc.CallOption) (*ListEvalQueriesResponse, error)
+	DeleteEvalQuery(ctx context.Context, in *DeleteEvalQueryRequest, opts ...grpc.CallOption) (*DeleteEvalQueryResponse, error)
+	// Tokens returned and avoided by retrieval over a window of days (AGT-004).
+	GetGain(ctx context.Context, in *GetGainRequest, opts ...grpc.CallOption) (*GetGainResponse, error)
 	// Delete a single document
 	DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -656,6 +673,66 @@ func (c *mDDBClient) GetIndexingStatus(ctx context.Context, in *IndexingStatusRe
 	return out, nil
 }
 
+func (c *mDDBClient) CodeSymbol(ctx context.Context, in *CodeSymbolRequest, opts ...grpc.CallOption) (*CodeSymbolResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CodeSymbolResponse)
+	err := c.cc.Invoke(ctx, MDDB_CodeSymbol_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) RunEval(ctx context.Context, in *RunEvalRequest, opts ...grpc.CallOption) (*RunEvalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunEvalResponse)
+	err := c.cc.Invoke(ctx, MDDB_RunEval_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) AddEvalQuery(ctx context.Context, in *AddEvalQueryRequest, opts ...grpc.CallOption) (*EvalQueryProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EvalQueryProto)
+	err := c.cc.Invoke(ctx, MDDB_AddEvalQuery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) ListEvalQueries(ctx context.Context, in *ListEvalQueriesRequest, opts ...grpc.CallOption) (*ListEvalQueriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListEvalQueriesResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListEvalQueries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) DeleteEvalQuery(ctx context.Context, in *DeleteEvalQueryRequest, opts ...grpc.CallOption) (*DeleteEvalQueryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteEvalQueryResponse)
+	err := c.cc.Invoke(ctx, MDDB_DeleteEvalQuery_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) GetGain(ctx context.Context, in *GetGainRequest, opts ...grpc.CallOption) (*GetGainResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetGainResponse)
+	err := c.cc.Invoke(ctx, MDDB_GetGain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mDDBClient) DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteDocumentResponse)
@@ -1074,6 +1151,17 @@ type MDDBServer interface {
 	// Queued embedding and metadata work for a collection, or for the server
 	// when collection is empty (GO-042): is what was just written searchable yet?
 	GetIndexingStatus(context.Context, *IndexingStatusRequest) (*IndexingStatusResponse, error)
+	// Everything about one symbol in a code collection (CODE-008): its
+	// definitions, references, callers, callees, tests and siblings.
+	CodeSymbol(context.Context, *CodeSymbolRequest) (*CodeSymbolResponse, error)
+	// Retrieval evaluation (SRCH-019): score search configurations on the
+	// collection's evaluation set, and manage that set.
+	RunEval(context.Context, *RunEvalRequest) (*RunEvalResponse, error)
+	AddEvalQuery(context.Context, *AddEvalQueryRequest) (*EvalQueryProto, error)
+	ListEvalQueries(context.Context, *ListEvalQueriesRequest) (*ListEvalQueriesResponse, error)
+	DeleteEvalQuery(context.Context, *DeleteEvalQueryRequest) (*DeleteEvalQueryResponse, error)
+	// Tokens returned and avoided by retrieval over a window of days (AGT-004).
+	GetGain(context.Context, *GetGainRequest) (*GetGainResponse, error)
 	// Delete a single document
 	DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -1266,6 +1354,24 @@ func (UnimplementedMDDBServer) SearchAdvisor(context.Context, *SearchAdvisorRequ
 }
 func (UnimplementedMDDBServer) GetIndexingStatus(context.Context, *IndexingStatusRequest) (*IndexingStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetIndexingStatus not implemented")
+}
+func (UnimplementedMDDBServer) CodeSymbol(context.Context, *CodeSymbolRequest) (*CodeSymbolResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CodeSymbol not implemented")
+}
+func (UnimplementedMDDBServer) RunEval(context.Context, *RunEvalRequest) (*RunEvalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunEval not implemented")
+}
+func (UnimplementedMDDBServer) AddEvalQuery(context.Context, *AddEvalQueryRequest) (*EvalQueryProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddEvalQuery not implemented")
+}
+func (UnimplementedMDDBServer) ListEvalQueries(context.Context, *ListEvalQueriesRequest) (*ListEvalQueriesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListEvalQueries not implemented")
+}
+func (UnimplementedMDDBServer) DeleteEvalQuery(context.Context, *DeleteEvalQueryRequest) (*DeleteEvalQueryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteEvalQuery not implemented")
+}
+func (UnimplementedMDDBServer) GetGain(context.Context, *GetGainRequest) (*GetGainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetGain not implemented")
 }
 func (UnimplementedMDDBServer) DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteDocument not implemented")
@@ -2082,6 +2188,114 @@ func _MDDB_GetIndexingStatus_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_CodeSymbol_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CodeSymbolRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).CodeSymbol(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_CodeSymbol_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).CodeSymbol(ctx, req.(*CodeSymbolRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_RunEval_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunEvalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).RunEval(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_RunEval_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).RunEval(ctx, req.(*RunEvalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_AddEvalQuery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddEvalQueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).AddEvalQuery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_AddEvalQuery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).AddEvalQuery(ctx, req.(*AddEvalQueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_ListEvalQueries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListEvalQueriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListEvalQueries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListEvalQueries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListEvalQueries(ctx, req.(*ListEvalQueriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_DeleteEvalQuery_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteEvalQueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).DeleteEvalQuery(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_DeleteEvalQuery_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).DeleteEvalQuery(ctx, req.(*DeleteEvalQueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_GetGain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).GetGain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_GetGain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).GetGain(ctx, req.(*GetGainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MDDB_DeleteDocument_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteDocumentRequest)
 	if err := dec(in); err != nil {
@@ -2834,6 +3048,30 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetIndexingStatus",
 			Handler:    _MDDB_GetIndexingStatus_Handler,
+		},
+		{
+			MethodName: "CodeSymbol",
+			Handler:    _MDDB_CodeSymbol_Handler,
+		},
+		{
+			MethodName: "RunEval",
+			Handler:    _MDDB_RunEval_Handler,
+		},
+		{
+			MethodName: "AddEvalQuery",
+			Handler:    _MDDB_AddEvalQuery_Handler,
+		},
+		{
+			MethodName: "ListEvalQueries",
+			Handler:    _MDDB_ListEvalQueries_Handler,
+		},
+		{
+			MethodName: "DeleteEvalQuery",
+			Handler:    _MDDB_DeleteEvalQuery_Handler,
+		},
+		{
+			MethodName: "GetGain",
+			Handler:    _MDDB_GetGain_Handler,
 		},
 		{
 			MethodName: "DeleteDocument",

@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (72 implemented)
+### Available RPCs (78 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -119,6 +119,12 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `VectorStats` | `VectorStatsRequest` → `VectorStatsResponse` |
 | | `SearchAdvisor` | `SearchAdvisorRequest` → `SearchAdvisorResponse` |
 | | `GetIndexingStatus` | `IndexingStatusRequest` → `IndexingStatusResponse` (v2.18.8: queued embeddings and metadata updates — is what was just written searchable yet?) |
+| | `RunEval` | `RunEvalRequest` → `RunEvalResponse` (v2.18.8: recall@k, nDCG@k, MRR, latency and tokens per search configuration) |
+| | `AddEvalQuery` | `AddEvalQueryRequest` → `EvalQueryProto` (v2.18.8) |
+| | `ListEvalQueries` | `ListEvalQueriesRequest` → `ListEvalQueriesResponse` (v2.18.8) |
+| | `DeleteEvalQuery` | `DeleteEvalQueryRequest` → `DeleteEvalQueryResponse` (v2.18.8) |
+| | `GetGain` | `GetGainRequest` → `GetGainResponse` (v2.18.8: tokens returned and avoided over a window of days) |
+| **Code** | `CodeSymbol` | `CodeSymbolRequest` → `CodeSymbolResponse` (v2.18.8: definitions, references, callers, callees, tests and siblings of a symbol) |
 | **Geo** | `GeoSearch` | `GeoSearchRequest` → `GeoSearchResponse` |
 | | `GeoWithin` | `GeoWithinRequest` → `GeoWithinResponse` |
 | | `GeoReindex` | `GeoReindexRequest` → `GeoReindexResponse` |
@@ -179,9 +185,36 @@ when `collection` is empty (GO-042), as `GET /v1/indexing-status` does.
 (10), the collection's default result grouping (SRCH-016), and `format` (11,
 AGT-002). `Document.revision` (9) and `UpdateDocumentRequest.expected_revision`
 (10) make updates conditional (INT-021): a stale revision is `ABORTED`.
-`CodeConfigProto.role` (2) marks reference collections (AGT-003). All are
-additive: clients built against an older proto keep working. `Search` also
+`CodeConfigProto.role` (2) marks reference collections (AGT-003). `Search` also
 finds documents again — its index walk cut document IDs wrongly.
+
+**The search RPCs run the shared search code.** `FTS`, `VectorSearch`,
+`HybridSearch` and `CrossSearch` used to be separate copies of the search,
+and every feature had to be added to them a third time. In 2.18.8 they call
+the code that REST and MCP use. They take the same options:
+
+| Field | On | Meaning |
+|---|---|---|
+| `filter` (`map<string, MetaCondition>`) | `Search`, `FTS`, `VectorSearch`, `HybridSearch`, `CrossSearch` | Operators `any_of` (REST `in`), `prefix`, `contains`, `gt`/`gte`/`lt`/`lte`, `none_of` (REST `not`), `exists`; ANDed with `filter_meta` (SRCH-017) |
+| `group_by` (`GroupBy`) | `FTS`, `VectorSearch`, `HybridSearch`, `CrossSearch` | At most `per_group` results per metadata value, document or collection; results carry `group` and `group_rank` (SRCH-016) |
+| `format`, `passage_lines` | the same four | `"passages"` returns `repeated Passage passages`: a path, lines, the enclosing symbol and the text (AGT-002) |
+| `wait_for_index_ms`, `wait_for_keys`, `read_level` | `VectorSearch`, `HybridSearch`, `CrossSearch` | Wait for queued embeddings; the response carries `indexing` (GO-042) |
+| `retrieval_mode`, `window_size` | `VectorSearch` | `chunk` and `window` modes; results carry `chunk_text`, `start_line`, `end_line` |
+| `search_type` | `CrossSearch` | `vector` (default), `fts` or `hybrid`; targets may be `role:reference` (AGT-003) |
+
+`any_of` and `none_of` are named for the REST `in` and `not`, which are
+keywords in Python. Behaviour now matches REST and MCP. The collection's
+context budget applies, and so do curation rules on hybrid search, which MCP
+did not apply before either. Errors map as follows. A vector index still
+loading is `UNAVAILABLE`. No embedding provider is `FAILED_PRECONDITION`. A
+cross-search source document without a vector is `NOT_FOUND`. An invalid
+option is `INVALID_ARGUMENT`.
+
+The new RPCs `CodeSymbol`, `RunEval`, `AddEvalQuery`, `ListEvalQueries`,
+`DeleteEvalQuery` and `GetGain` match `GET /v1/symbol`, `POST /v1/eval`,
+`/v1/eval-queries` and `GET /v1/gain`.
+
+All of this is additive. Clients built against an older proto keep working.
 
 ### New in v2.9.12
 

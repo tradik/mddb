@@ -345,7 +345,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 		// The shared index walk (SRCH-017). The copy that stood here cut the
 		// document ID out of the key as one "|"-separated part, but an ID is
 		// "<collection>|<key>|<lang>", so it never matched a document.
-		if f := filterMetaAsFilter(filterMeta); len(f) > 0 {
+		if f := mergeFilters(filterMeta, metaFilterFromProto(req.Filter)); len(f) > 0 {
 			docIDs = sortedIDs(metaFilterIDs(tx, req.Collection, f))
 		} else {
 			docIDs = sortedIDs(collectionDocIDs(tx, req.Collection))

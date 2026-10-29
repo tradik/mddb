@@ -154,6 +154,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **gRPC search runs the shared search code.** `FTS`, `VectorSearch`,
+  `HybridSearch` and `CrossSearch` were separate copies of the search, so
+  gRPC lacked this release's features. They now call the code REST and MCP
+  use, and take `filter`, `group_by`, `format: passages`, the index waits,
+  `retrieval_mode` and, on `CrossSearch`, `search_type`. New RPCs:
+  `CodeSymbol`, `RunEval`, `AddEvalQuery`, `ListEvalQueries`,
+  `DeleteEvalQuery` and `GetGain`. All proto changes are additive. The
+  context budget and, on hybrid search, curation rules now apply over gRPC
+  as over REST.
+- **MCP hybrid search applies curation rules** (pin and hide), as REST
+  always did. It also takes `fieldWeights` and `lang`. MCP cross-search
+  takes `queryVector` and uses the shared rule for a vector index that is
+  still loading.
+
 - **Agent instructions no longer say a document is searchable as soon as the
   write returns.** That holds for full-text search; semantic search waits for
   the embedding. AGENTS.md and the generated skill and rules say how to wait.

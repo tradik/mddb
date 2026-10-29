@@ -422,27 +422,24 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	if algo == "" {
 		algo = "flat"
 	}
-	searcher, ok2 := s.VectorSearchers[algo]
-	if !ok2 {
-		return nil, fmt.Errorf("unknown algorithm: %s", algo)
-	}
-	if !searcher.IsReady() {
-		searcher = s.VectorSearchers["flat"]
-		algo = "flat"
-	}
-	if !searcher.IsReady() {
-		return nil, fmt.Errorf("vector index not ready")
+	// The readiness rule every vector path shares: algo, else flat, else
+	// "loading" (which gRPC reports as Unavailable).
+	searcher, algo, err := s.readySearcher(req.SourceCollection, algo)
+	if err != nil {
+		return nil, err
 	}
 
 	// Resolve query vector
 	var queryVector []float32
-	if req.SourceDocID != "" {
+	if len(req.QueryVector) > 0 {
+		queryVector = req.QueryVector
+	} else if req.SourceDocID != "" {
 		if req.SourceCollection == "" {
 			return nil, fmt.Errorf("sourceCollection required when using sourceDocID")
 		}
 		rec, err := s.VectorStore.Get(req.SourceCollection, req.SourceDocID)
 		if err != nil || rec == nil {
-			return nil, fmt.Errorf("source document has no embedding: %s/%s", req.SourceCollection, req.SourceDocID)
+			return nil, fmt.Errorf("%w: %s/%s", errSourceNoEmbedding, req.SourceCollection, req.SourceDocID)
 		}
 		queryVector = rec.Vector
 	} else if req.Query != "" && s.Embedding != nil {
@@ -451,10 +448,12 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		var err error
 		queryVector, err = s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
 		if err != nil {
-			return nil, fmt.Errorf("embedding failed: %w", err)
+			return nil, fmt.Errorf("%w: %w", errEmbedQuery, err)
 		}
+	} else if req.Query != "" {
+		return nil, errNoEmbeddingProvider
 	} else {
-		return nil, fmt.Errorf("one of query or sourceDocID is required")
+		return nil, fmt.Errorf("one of query, queryVector or sourceDocID is required")
 	}
 
 	topK := req.TopK

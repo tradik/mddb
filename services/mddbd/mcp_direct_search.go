@@ -59,10 +59,10 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		var err error
 		queryVector, err = s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
 		if err != nil {
-			return nil, fmt.Errorf("failed to embed query: %w", err)
+			return nil, fmt.Errorf("%w: %w", errEmbedQuery, err)
 		}
 	} else {
-		return nil, errors.New("no embedding provider configured and no queryVector provided")
+		return nil, fmt.Errorf("%w and no queryVector provided", errNoEmbeddingProvider)
 	}
 
 	// RAG-001: request > collection profile > historical default.
@@ -528,6 +528,8 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		Boost:           req.Boost,
 		Sort:            req.Sort,
 		Oversample:      req.Oversample,
+		FieldWeights:    req.FieldWeights,
+		Lang:            req.Lang,
 		IncludeContent:  true,
 	}
 
@@ -564,6 +566,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 			Rank:          item.Rank,
 			Group:         item.Group,
 			GroupRank:     item.GroupRank,
+			Pinned:        item.Pinned,
 			// The full-text half already finds documents still waiting
 			// for their embedding; say which ones they are (GO-042).
 			PendingEmbedding: c.server.pendingEmbedding(req.Collection, item.Document.ID),
@@ -660,6 +663,12 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 	}
 
 	items := s.loadHybridDocs(httpReq.Collection, merged, true)
+	// Curation rules (pin and hide) apply to every hybrid search, as they do
+	// over REST; the MCP and gRPC paths used to differ here.
+	items = s.applyCurationHybrid(httpReq.Collection, httpReq.Query, items)
+	if len(items) > mergeTopK {
+		items = items[:mergeTopK]
+	}
 	items = groupHybridItems(httpReq.Collection, items, httpReq.GroupBy, httpReq.TopK)
 	return items, httpReq, nil
 }

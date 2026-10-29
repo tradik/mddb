@@ -448,6 +448,9 @@ type MCPHybridSearchRequest struct {
 	Filter          MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	Boost           map[string]float64  `json:"boost,omitempty"`
 	Sort            string              `json:"sort,omitempty"` // "combined" (default) or "distance"
+	// FieldWeights and Lang tune the full-text half, as on REST and gRPC.
+	FieldWeights map[string]float64 `json:"fieldWeights,omitempty"`
+	Lang         string             `json:"lang,omitempty"`
 	// Oversample is the recall/latency knob (SRCH-005): candidates asked of
 	// the index per requested result, before deduplication, merging or
 	// rescoring trims them. 1.0-10.0; 0 = use the collection profile, then
@@ -474,6 +477,8 @@ type MCPHybridSearchResult struct {
 	// PendingEmbedding is true for a document whose embedding is still queued:
 	// found by its text, not yet by its meaning (GO-042).
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
+	// Pinned is set on a result a curation rule placed.
+	Pinned bool `json:"pinned,omitempty"`
 }
 
 // MCPHybridSearchResponse represents hybrid search results.
@@ -754,6 +759,7 @@ type MCPCrossSearchRequest struct {
 	SourceCollection  string              `json:"sourceCollection"`
 	SourceDocID       string              `json:"sourceDocID"`
 	Query             string              `json:"query"`
+	QueryVector       []float32           `json:"queryVector,omitempty"` // a pre-computed vector instead of query
 	TargetCollections []string            `json:"targetCollections"`
 	TopK              int                 `json:"topK"`
 	Threshold         float64             `json:"threshold"`
