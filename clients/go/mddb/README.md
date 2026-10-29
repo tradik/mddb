@@ -109,7 +109,7 @@ for {
 ## API surface
 
 - **Documents:** `Add`, `Get`, `Search`, `SetTTL`, `ImportURL` → typed `Document`/`[]Document`.
-- **Bulk:** `Ingest` (`IngestRequest` with `IngestOptions{SkipEmbeddings, SkipFTS, SkipWebhooks, SkipDuplicates, AutoConfigureCollection, SaveRevision, Profile, TextOnly}`) → `IngestResponse`; `DeleteBatch` → `DeleteBatchResponse`; `Aggregate` (facets, date histograms) → `AggregateResponse`.
+- **Bulk:** `Ingest` (`IngestRequest` with `IngestOptions{SkipEmbeddings, SkipFTS, SkipWebhooks, SkipDuplicates, AutoConfigureCollection, SaveRevision, Profile, TextOnly}`) → `IngestResponse`; an `IngestDocument` may carry a file in `Content` with its `Format` (pdf, docx, html, ...) for the server to convert (v2.18.9+); `DeleteBatch` → `DeleteBatchResponse`; `Aggregate` (facets, date histograms) → `AggregateResponse`.
 - **Search (typed):** `SearchFTS` → `FTSResponse`, `SearchVectors` → `VectorSearchResponse`, `SearchHybrid` → `HybridSearchResponse`, `CodeGraph` → `CodeGraph`.
 - **Vectors (typed):** `GetVectorStats` → `VectorStats`, `ReindexVectors` (with `Force`) → `VectorReindexResponse`.
 - **Search (raw JSON, kept for compatibility):** `FTS`, `VectorSearch`, `VectorStats`, `VectorReindex`.

@@ -885,6 +885,10 @@ type MCPIngestDocument struct {
 	ScrapedAt          int64               `json:"scraped_at,omitempty"`
 	Scraper            string              `json:"scraper,omitempty"`
 	TTL                int64               `json:"ttl,omitempty"`
+	// Format and Content carry a file to convert instead of Markdown
+	// (AGT-001); see IngestDocumentHTTP.
+	Format  string `json:"format,omitempty"`
+	Content []byte `json:"content_base64,omitempty"`
 }
 
 // MCPIngestOptions represents options for ingest operation.
@@ -895,6 +899,7 @@ type MCPIngestOptions struct {
 	SkipWebhooks            bool `json:"skip_webhooks,omitempty"`
 	AutoConfigureCollection bool `json:"auto_configure_collection,omitempty"`
 	SaveRevision            bool `json:"save_revision,omitempty"`
+	TextOnly                bool `json:"text_only,omitempty"` // RAG-004, for converted documents
 }
 
 // MCPIngestRequest represents request to ingest multiple documents.

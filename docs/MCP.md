@@ -568,8 +568,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `set_ttl_where` | (v2.18.8) Set the time to live (`ttl` seconds, 0 removes it) of every document a filter matches. |
 | `get_meta_keys` | List all unique metadata keys and their values for a collection. |
 | `get_checksum` | Get a CRC32 checksum for a collection that changes when documents are modified. |
-| `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. |
-| `upload_file` | Upload a file and convert it to markdown. |
+| `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. Since v2.18.9 a document may carry a file (`format`, `content_base64`) that the server converts, and options take `text_only`. |
+| `upload_file` | Upload a file and convert it to markdown. Since v2.18.9: `text_only`. |
 
 ### Search
 

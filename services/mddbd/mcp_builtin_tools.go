@@ -1098,8 +1098,10 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 								"scraped_at":          map[string]interface{}{"type": "integer", "description": "Unix timestamp of when content was collected"},
 								"scraper":             map[string]interface{}{"type": "string", "description": "Source identifier"},
 								"ttl":                 map[string]interface{}{"type": "integer", "description": "Time-to-live in seconds"},
+								"format":              map[string]interface{}{"type": "string", "description": "Convert the document from this format (pdf, docx, odt, rtf, html, tex, ...); default: the key's extension"},
+								"content_base64":      map[string]interface{}{"type": "string", "description": "The file to convert, base64-encoded; replaces content_md"},
 							},
-							"required": []string{"lang", "content_md"},
+							"required": []string{"lang"},
 						},
 					},
 					"options": map[string]interface{}{
@@ -1112,6 +1114,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 							"skip_webhooks":             map[string]interface{}{"type": "boolean", "description": "Skip webhook firing"},
 							"auto_configure_collection": map[string]interface{}{"type": "boolean", "description": "Auto-set collection type to 'scraping'"},
 							"save_revision":             map[string]interface{}{"type": "boolean", "description": "Save revision history for each document"},
+							"text_only":                 map[string]interface{}{"type": "boolean", "description": "Converted html, docx and odt keep their text and drop their structure (faster, more tolerant)"},
 						},
 					},
 				},
@@ -1122,7 +1125,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 		// --- File Upload ---
 		{
 			Name:        "upload_file",
-			Description: "Upload a file and convert it to markdown. Supports md, txt, html, pdf, and docx formats. Plain text and markdown files are stored as-is; other formats are auto-converted to markdown. File content is passed as base64-encoded string.",
+			Description: "Upload a file and convert it to markdown. Supports md, txt, html, pdf, docx, odt, rtf, tex, yaml and log formats. Plain text and markdown files are stored as-is; other formats are auto-converted to markdown. File content is passed as base64-encoded string.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -1133,6 +1136,7 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"lang":       map[string]interface{}{"type": "string", "description": "Language code (e.g. en_US, pl_PL)"},
 					"meta":       map[string]interface{}{"type": "object", "description": "Metadata key-value pairs"},
 					"ttl":        map[string]interface{}{"type": "integer", "description": "Time-to-live in seconds (0 = no expiry)"},
+					"text_only":  map[string]interface{}{"type": "boolean", "description": "html, docx and odt keep their text and drop their structure (faster, more tolerant)"},
 				},
 				"required": []string{"collection", "filename", "content", "lang"},
 			},

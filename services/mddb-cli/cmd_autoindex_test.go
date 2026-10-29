@@ -293,7 +293,7 @@ func TestAutoindex_Helpers(t *testing.T) {
 	if !matchAny([]string{"*.go"}, "a/b.go") || !matchAny([]string{"a/**"}, "a/b/c") || matchAny([]string{"x"}, "y") {
 		t.Fatal("matchAny")
 	}
-	if !isBinary(filepath.Join(t.TempDir(), "missing")) {
+	if _, binary := sniffFile(filepath.Join(t.TempDir(), "missing")); !binary {
 		t.Fatal("an unreadable file is treated as binary")
 	}
 	c := classifier{include: []string{"*.go"}, maxSize: 10}

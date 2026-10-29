@@ -23,6 +23,11 @@ type IngestDocument struct {
 	ScrapedAt          int64               `json:"scrapedAt,omitempty"`
 	Scraper            string              `json:"scraper,omitempty"`
 	TTL                int64               `json:"ttl,omitempty"` // seconds; 0 = no expiry
+	// Format and Content send a file for the server to convert to Markdown
+	// (v2.18.9+), with the converters /v1/upload uses. Content travels as
+	// base64; Format ("pdf", "docx", "html", ...) defaults to Key's extension.
+	Format  string `json:"format,omitempty"`
+	Content []byte `json:"contentBase64,omitempty"`
 }
 
 // IngestOptions turns optional ingest steps off. Profile names a preset of

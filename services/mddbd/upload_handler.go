@@ -200,75 +200,12 @@ func (s *Server) processUploadedFile(fh *multipart.FileHeader, collection, lang,
 		return nil, fmt.Errorf("file %q exceeds max size (%d bytes)", fh.Filename, maxSize)
 	}
 
-	ext := strings.ToLower(path.Ext(fh.Filename))
-	format := strings.TrimPrefix(ext, ".")
-	if format == "htm" {
-		format = "html"
+	format := formatFromFilename(fh.Filename)
+	conv, err := convertToMarkdown(format, data, textOnly)
+	if err != nil {
+		return nil, err
 	}
-
-	// Convert to markdown based on format
-	var contentMD string
-	var converted bool
-
-	switch format {
-	case "md", "markdown", "txt", "text", "":
-		// Already markdown / plain text — store as-is
-		contentMD = string(data)
-	case "yaml", "yml", "log", "lex":
-		// Text-based formats — wrap in code block for structure
-		contentMD = "```" + format + "\n" + string(data) + "\n```"
-		converted = true
-	case "tex", "latex":
-		contentMD = texToMarkdown(data)
-		converted = true
-	case "html":
-		// RAG-004: text-only keeps the words and drops the shape, which is
-		// both faster and far more tolerant of malformed markup.
-		if textOnly {
-			contentMD = htmlToText(data)
-		} else {
-			contentMD = htmlToMarkdown(data)
-		}
-		converted = true
-	case "pdf":
-		// No text-only variant: pdfToMarkdown already extracts raw text from
-		// content streams and builds no structure, so a second name for it
-		// would promise a speedup that does not exist.
-		contentMD, err = pdfToMarkdown(data)
-		if err != nil {
-			return nil, fmt.Errorf("pdf conversion: %w", err)
-		}
-		converted = true
-	case "docx":
-		if textOnly {
-			contentMD, err = docxToText(data)
-		} else {
-			contentMD, err = docxToMarkdown(data)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("docx conversion: %w", err)
-		}
-		converted = true
-	case "odt":
-		if textOnly {
-			contentMD, err = odtToText(data)
-		} else {
-			contentMD, err = odtToMarkdown(data)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("odt conversion: %w", err)
-		}
-		converted = true
-	case "rtf":
-		// No text-only variant, for the same reason as pdf: RTF control words
-		// carry no structure worth rebuilding, so rtfToMarkdown already
-		// returns plain text and a second name would promise a speedup that
-		// does not exist.
-		contentMD = rtfToMarkdown(data)
-		converted = true
-	default:
-		return nil, fmt.Errorf("unsupported file format: %s (supported: md, txt, html, pdf, docx, odt, rtf, yaml, log, lex, tex)", format)
-	}
+	contentMD, converted := conv.Markdown, conv.Converted
 
 	// Extract frontmatter for md/txt files
 	if !converted {

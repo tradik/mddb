@@ -514,6 +514,7 @@ func (c *DirectClient) Ingest(ctx context.Context, req *MCPIngestRequest) (*MCPI
 		SkipWebhooks:            req.Options.SkipWebhooks,
 		AutoConfigureCollection: req.Options.AutoConfigureCollection,
 		SaveRevision:            req.Options.SaveRevision,
+		TextOnly:                req.Options.TextOnly,
 	}
 
 	resp, err := c.server.ingestDocuments(ctx, req.Collection, docs, opts)

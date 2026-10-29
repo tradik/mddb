@@ -107,8 +107,11 @@ Index every text file under a directory into one collection (v2.18.8).
 [\fIOPTIONS\fR] [\fIPATH\fR]
 .PP
 In a git repository the files are those git tracks or would track; elsewhere
-all files except build, dependency and cache directories. Binary files and
-files over the size limit are skipped. Each document is keyed by its path and
+all files except build, dependency and cache directories. Files the server
+converts \(em PDF, DOCX, ODT and RTF, recognised by content, and HTML and TeX,
+by extension \(em are sent as files and stored as Markdown (v2.18.9); the
+report lists each with its format. Other binary files and files over the size
+limit are skipped. Each document is keyed by its path and
 carries meta path, extension, kind, language, size, modified, and gitCommit
 and gitBranch in a repository. Unchanged files are not rewritten. The search
 advisor then stores a retrieval profile for the collection.

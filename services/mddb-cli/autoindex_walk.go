@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"io"
 	"io/fs"
 	"os"
 	"path"
@@ -28,7 +26,7 @@ var defaultExcludedDirs = map[string]bool{
 // docExtensions are prose: stored as kind "doc".
 var docExtensions = map[string]bool{".md": true, ".markdown": true, ".mdx": true}
 
-// sniffBytes is how much of a file is read to decide whether it is text.
+// sniffBytes is how much of a file is read to decide what it is.
 const sniffBytes = 8 << 10
 
 // autoFile is one file to index.
@@ -39,6 +37,9 @@ type autoFile struct {
 	modified string
 	Kind     string `json:"kind,omitempty"`
 	Language string `json:"language,omitempty"`
+	// Format is the format the server converts the file from (pdf, docx,
+	// html, ...); empty for a file stored as the text it is.
+	Format string `json:"format,omitempty"`
 }
 
 // autoSkip is a file left out, and why.
@@ -88,13 +89,17 @@ func (c classifier) classify(root, rel string) (*autoFile, *autoSkip) {
 		return nil, &autoSkip{rel, "not a regular file"}
 	case info.Size() > c.maxSize:
 		return nil, &autoSkip{rel, "larger than --max-file-size"}
-	case isBinary(abs):
+	}
+	format, binary := sniffFile(abs)
+	if binary {
 		return nil, &autoSkip{rel, "binary"}
 	}
-	f := &autoFile{Rel: rel, abs: abs, Size: info.Size(), modified: info.ModTime().UTC().Format(time.RFC3339)}
+	f := &autoFile{Rel: rel, abs: abs, Size: info.Size(), modified: info.ModTime().UTC().Format(time.RFC3339), Format: format}
 	ext := strings.ToLower(path.Ext(rel))
 	switch {
-	case docExtensions[ext]:
+	case format != "", docExtensions[ext]:
+		// A converted file is prose once the server has made Markdown of
+		// it, whatever the code table says about its extension.
 		f.Kind = "doc"
 	case c.extensions == nil:
 		// Without the server's table the server classifies on read, from
@@ -105,22 +110,6 @@ func (c classifier) classify(root, rel string) (*autoFile, *autoSkip) {
 		f.Kind = "text"
 	}
 	return f, nil
-}
-
-// isBinary sniffs a file: a NUL byte in the first 8 KiB means binary. The
-// extension is not trusted — a .txt can be a dump and a script can have none.
-func isBinary(abs string) bool {
-	f, err := os.Open(abs) // #nosec G304 -- a file under the directory the user asked to index
-	if err != nil {
-		return true
-	}
-	defer func() { _ = f.Close() }()
-	buf := make([]byte, sniffBytes)
-	n, err := io.ReadFull(f, buf)
-	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
-		return true
-	}
-	return bytes.IndexByte(buf[:n], 0) >= 0
 }
 
 // walkFiles lists the files under root outside a git repository, skipping

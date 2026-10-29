@@ -9754,8 +9754,12 @@ type IngestDocument struct {
 	ScrapedAt          int64                  `protobuf:"varint,7,opt,name=scraped_at,json=scrapedAt,proto3" json:"scraped_at,omitempty"`                            // Unix timestamp of when content was collected
 	Scraper            string                 `protobuf:"bytes,8,opt,name=scraper,proto3" json:"scraper,omitempty"`                                                  // Source identifier (e.g. scraper name)
 	Ttl                int64                  `protobuf:"varint,9,opt,name=ttl,proto3" json:"ttl,omitempty"`                                                         // Optional TTL in seconds
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// A file for the server to convert to Markdown (AGT-001), through the same
+	// converters /v1/upload uses. Without content, content_md is the file.
+	Format        string `protobuf:"bytes,10,opt,name=format,proto3" json:"format,omitempty"`   // pdf, docx, html, ...; empty: the key's extension
+	Content       []byte `protobuf:"bytes,11,opt,name=content,proto3" json:"content,omitempty"` // The file's bytes
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *IngestDocument) Reset() {
@@ -9849,6 +9853,20 @@ func (x *IngestDocument) GetTtl() int64 {
 		return x.Ttl
 	}
 	return 0
+}
+
+func (x *IngestDocument) GetFormat() string {
+	if x != nil {
+		return x.Format
+	}
+	return ""
+}
+
+func (x *IngestDocument) GetContent() []byte {
+	if x != nil {
+		return x.Content
+	}
+	return nil
 }
 
 type IngestOptions struct {
@@ -16377,7 +16395,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x0esimilar_groups\x18\b \x03(\v2\x19.mddb.DuplicateGroupProtoR\rsimilarGroups\x12)\n" +
 	"\x10exact_duplicates\x18\t \x01(\x05R\x0fexactDuplicates\x12#\n" +
 	"\rsimilar_pairs\x18\n" +
-	" \x01(\x05R\fsimilarPairs\"\xe2\x02\n" +
+	" \x01(\x05R\fsimilarPairs\"\x94\x03\n" +
 	"\x0eIngestDocument\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
@@ -16389,7 +16407,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"scraped_at\x18\a \x01(\x03R\tscrapedAt\x12\x18\n" +
 	"\ascraper\x18\b \x01(\tR\ascraper\x12\x10\n" +
-	"\x03ttl\x18\t \x01(\x03R\x03ttl\x1aI\n" +
+	"\x03ttl\x18\t \x01(\x03R\x03ttl\x12\x16\n" +
+	"\x06format\x18\n" +
+	" \x01(\tR\x06format\x12\x18\n" +
+	"\acontent\x18\v \x01(\fR\acontent\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"\x82\x02\n" +

@@ -227,7 +227,9 @@ Add multiple documents to a collection in a single request. Uses the optimized b
 - `documents` (required): Array of documents to add
   - `key` (required): Document key
   - `lang` (required): Language code
-  - `contentMd` (required): Markdown content
+  - `contentMd` (required unless `contentBase64` is given): Markdown content
+  - `format` (optional, v2.18.9+): convert the document from this format (`html`, `pdf`, `docx`, `odt`, `rtf`, `tex`, `yaml`, `log`, ... — see the format table under `/v1/upload`). Empty means the key's extension. Without `contentBase64`, `contentMd` is the file's text (HTML sent as a string)
+  - `contentBase64` (optional, v2.18.9+): the file to convert, base64-encoded. It goes through the same converters as `/v1/upload`; the stored document is the Markdown, with `meta.sourceFormat` set. With `skipDuplicates` the converted Markdown is compared, so an unchanged file is skipped. A format with no converter fails that document (`unsupported format: bin`), not the batch
   - `meta` (optional): Metadata key-value pairs
   - `saveRevision` (optional): Whether to save a revision for this document
 
@@ -340,7 +342,7 @@ Bulk ingest endpoint with advanced features for scraping pipelines and data impo
   - `autoConfigureCollection` (optional): Auto-configure collection as "scraping" type if it doesn't exist
   - `saveRevision` (optional): Save revision history for all documents in this batch
   - `profile` (optional, v2.12.0+): `default` or `fast` — see below
-  - `textOnly` (optional, v2.12.0+): Extract plain text from html/docx/odt instead of rebuilding Markdown structure. Implied by `profile: fast`.
+  - `textOnly` (optional, v2.12.0+): Extract plain text from html/docx/odt instead of rebuilding Markdown structure. Implied by `profile: fast`. Applies to documents sent with `format`/`contentBase64`.
 
 **Response**:
 ```json
@@ -441,6 +443,11 @@ Upload files via multipart/form-data. Files are auto-converted to Markdown and s
 - `meta` (optional): JSON-encoded metadata map, e.g. `{"category":["docs"]}`
 - `ttl` (optional): Time-to-live in seconds (0 = no expiry)
 - `maxSize` (optional): Per-file size limit in bytes (default: 10MB, max: 100MB)
+- `profile` / `textOnly` (optional): as for `/v1/ingest`
+
+Upload, `/v1/ingest` with `contentBase64`, and the MCP tools `upload_file`
+and `ingest_documents` share one conversion path (v2.18.9+), so a format
+converts the same way whichever door it comes through.
 
 ### Document keys are case-insensitive
 
@@ -560,7 +567,7 @@ curl -X POST http://localhost:11023/v1/upload \
   -F "maxSize=52428800"
 ```
 
-**MCP Tool**: `upload_file` — accepts base64-encoded file content with filename for format detection.
+**MCP Tool**: `upload_file` — accepts base64-encoded file content with filename for format detection, and `text_only` (v2.18.9+). `ingest_documents` takes `format` and `content_base64` per document and `text_only` in its options.
 
 ---
 

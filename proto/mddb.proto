@@ -1397,6 +1397,10 @@ message IngestDocument {
   int64 scraped_at = 7;                   // Unix timestamp of when content was collected
   string scraper = 8;                     // Source identifier (e.g. scraper name)
   int64 ttl = 9;                          // Optional TTL in seconds
+  // A file for the server to convert to Markdown (AGT-001), through the same
+  // converters /v1/upload uses. Without content, content_md is the file.
+  string format = 10;                     // pdf, docx, html, ...; empty: the key's extension
+  bytes content = 11;                     // The file's bytes
 }
 
 message IngestOptions {

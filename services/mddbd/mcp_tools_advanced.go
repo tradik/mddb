@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"path"
-	"strings"
 
 	json "mddb/internal/jsonx"
 )
@@ -242,6 +240,15 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 		if ef, ok := docMap["extract_frontmatter"].(bool); ok {
 			docs[i].ExtractFrontmatter = ef
 		}
+		// AGT-001: a file to convert rather than Markdown to store.
+		docs[i].Format = mcpGetString(docMap, "format")
+		if b64 := mcpGetString(docMap, "content_base64"); b64 != "" {
+			data, err := mcpDecodeBase64(b64)
+			if err != nil {
+				return "", fmt.Errorf("document at index %d: %w", i, err)
+			}
+			docs[i].Content = data
+		}
 	}
 
 	var opts MCPIngestOptions
@@ -264,6 +271,7 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 		if v, ok := optsRaw["save_revision"].(bool); ok {
 			opts.SaveRevision = v
 		}
+		opts.TextOnly = mcpGetBool(optsRaw, "text_only")
 	}
 
 	resp, err := s.client.Ingest(ctx, &MCPIngestRequest{
@@ -279,6 +287,22 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 	return string(data), nil
 }
 
+// mcpDecodeBase64 decodes file content an agent sent as base64: standard,
+// URL-safe or unpadded, since LLM clients emit all three.
+func mcpDecodeBase64(content string) ([]byte, error) {
+	data, err := base64.StdEncoding.DecodeString(content)
+	if err != nil {
+		data, err = base64.URLEncoding.DecodeString(content)
+	}
+	if err != nil {
+		data, err = base64.RawStdEncoding.DecodeString(content)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("invalid base64 content: %w", err)
+	}
+	return data, nil
+}
+
 func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]interface{}) (string, error) {
 	collection := mcpGetString(args, "collection")
 	filename := mcpGetString(args, "filename")
@@ -292,67 +316,19 @@ func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]inte
 		return "", fmt.Errorf("missing required fields: collection, filename, content, lang")
 	}
 
-	// Decode base64 content
-	data, err := base64.StdEncoding.DecodeString(contentB64)
+	data, err := mcpDecodeBase64(contentB64)
 	if err != nil {
-		// Try URL-safe base64
-		data, err = base64.URLEncoding.DecodeString(contentB64)
-		if err != nil {
-			// Try raw (no padding)
-			data, err = base64.RawStdEncoding.DecodeString(contentB64)
-			if err != nil {
-				return "", fmt.Errorf("invalid base64 content: %w", err)
-			}
-		}
+		return "", err
 	}
 
-	// Determine format from filename extension
-	ext := strings.ToLower(path.Ext(filename))
-	format := strings.TrimPrefix(ext, ".")
-	if format == "htm" {
-		format = "html"
+	// One conversion path for every surface (AGT-001); text_only is the
+	// RAG-004 option upload and ingest already had.
+	format := formatFromFilename(filename)
+	conv, err := convertToMarkdown(format, data, mcpGetBool(args, "text_only"))
+	if err != nil {
+		return "", err
 	}
-
-	// Convert to markdown
-	var contentMD string
-	var converted bool
-
-	switch format {
-	case "md", "markdown", "txt", "text", "":
-		contentMD = string(data)
-	case "yaml", "yml", "log", "lex":
-		contentMD = "```" + format + "\n" + string(data) + "\n```"
-		converted = true
-	case "tex", "latex":
-		contentMD = texToMarkdown(data)
-		converted = true
-	case "html":
-		contentMD = htmlToMarkdown(data)
-		converted = true
-	case "pdf":
-		contentMD, err = pdfToMarkdown(data)
-		if err != nil {
-			return "", fmt.Errorf("pdf conversion: %w", err)
-		}
-		converted = true
-	case "docx":
-		contentMD, err = docxToMarkdown(data)
-		if err != nil {
-			return "", fmt.Errorf("docx conversion: %w", err)
-		}
-		converted = true
-	case "odt":
-		contentMD, err = odtToMarkdown(data)
-		if err != nil {
-			return "", fmt.Errorf("odt conversion: %w", err)
-		}
-		converted = true
-	case "rtf":
-		contentMD = rtfToMarkdown(data)
-		converted = true
-	default:
-		return "", fmt.Errorf("unsupported format: %s (supported: md, txt, html, pdf, docx, odt, rtf, yaml, log, lex, tex)", format)
-	}
+	contentMD, converted := conv.Markdown, conv.Converted
 
 	// Extract frontmatter for md/txt. meta is never nil (mcpGetMetaMap always
 	// returns a map); explicitly passed keys win over frontmatter.

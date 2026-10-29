@@ -7379,9 +7379,13 @@ components:
 
     IngestDocument:
       type: object
+      description: >
+        A document to store. Send Markdown in `contentMd`, or (v2.18.9+) a file
+        in `contentBase64` with its `format`: the server converts it with the
+        same converters `/v1/upload` uses and stores the Markdown, with
+        `meta.sourceFormat` set to the format.
       required:
         - lang
-        - contentMd
       properties:
         url:
           type: string
@@ -7427,6 +7431,21 @@ components:
           format: int64
           description: Time-to-live in seconds
           example: 86400
+        format:
+          type: string
+          description: >
+            (v2.18.9+) Convert the document from this format: html, pdf, docx,
+            odt, rtf, tex, yaml, log. Empty means the key's extension. Without
+            `contentBase64`, `contentMd` is taken as the file's text (HTML sent
+            as a string, say).
+          example: pdf
+        contentBase64:
+          type: string
+          format: byte
+          description: >
+            (v2.18.9+) The file to convert, base64-encoded. With
+            `skipDuplicates`, the converted Markdown is what is compared, so an
+            unchanged file is skipped.
 
     IngestOptions:
       type: object

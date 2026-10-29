@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -54,7 +55,16 @@ type autoindexReport struct {
 	Plan        []autoFile `json:"plan,omitempty"`
 	ToPrune     []string   `json:"toPrune,omitempty"`
 	Skipped     []autoSkip `json:"skipped,omitempty"`
-	Errors      []string   `json:"errors,omitempty"`
+	// Converted lists the files the server converted to Markdown, with the
+	// format each was converted from.
+	Converted []autoConverted `json:"converted,omitempty"`
+	Errors    []string        `json:"errors,omitempty"`
+}
+
+// autoConverted is a file sent for conversion, and its format.
+type autoConverted struct {
+	Rel    string `json:"path"`
+	Format string `json:"format"`
 }
 
 func newAutoindexCmd() *cobra.Command {
@@ -66,7 +76,8 @@ func newAutoindexCmd() *cobra.Command {
 
 In a git repository the files are the ones git tracks or would track; elsewhere
 everything except node_modules, target, dist, build, vendor and similar. Binary
-files are skipped by content. Each document gets meta path, extension, kind,
+files are skipped by content, except PDF, DOCX, ODT and RTF, which the server
+converts to Markdown, as it does HTML and TeX. Each document gets meta path, extension, kind,
 language, size and modified (and gitCommit, gitBranch in a repository); the
 server extracts symbols. A second run only rewrites files whose content changed.`,
 		Args: cobra.MaximumNArgs(1),
@@ -217,17 +228,34 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 			rep.Errors = append(rep.Errors, f.Rel+": "+err.Error())
 			continue
 		}
-		if len(batch) > 0 && (len(batch) >= autoindexBatchDocs || size+len(content) > autoindexBatchBytes) {
+		if len(batch) > 0 && (len(batch) >= autoindexBatchDocs || size+wireSize(f, content) > autoindexBatchBytes) {
 			flush()
 		}
 		meta := fileMeta(f, rep.Git)
 		for k, v := range o.extraMeta {
 			meta[k] = v
 		}
-		batch = append(batch, mddb.IngestDocument{Key: f.Rel, Lang: o.lang, ContentMD: string(content), Meta: meta})
-		size += len(content)
+		doc := mddb.IngestDocument{Key: f.Rel, Lang: o.lang, Meta: meta}
+		if f.Format != "" {
+			// The server converts it, with the converters /v1/upload uses.
+			doc.Format, doc.Content = f.Format, content
+			rep.Converted = append(rep.Converted, autoConverted{f.Rel, f.Format})
+		} else {
+			doc.ContentMD = string(content)
+		}
+		batch = append(batch, doc)
+		size += wireSize(f, content)
 	}
 	flush()
+}
+
+// wireSize is what a file adds to a batch: its bytes, or their base64 when
+// it is sent for conversion.
+func wireSize(f autoFile, content []byte) int {
+	if f.Format != "" {
+		return base64.StdEncoding.EncodedLen(len(content))
+	}
+	return len(content)
 }
 
 func printAutoindex(rep *autoindexReport, start time.Time) error {
@@ -242,7 +270,7 @@ func printAutoindex(rep *autoindexReport, start time.Time) error {
 		fmt.Printf("Dry run: %d files (%.1f MB) would go to collection %q; %d skipped; %d would be pruned\n",
 			rep.Files, float64(rep.Bytes)/1e6, rep.Collection, len(rep.Skipped), len(rep.ToPrune))
 		for _, f := range rep.Plan {
-			fmt.Printf("  + %s (%s %s)\n", f.Rel, f.Kind, f.Language)
+			fmt.Printf("  + %s (%s %s%s)\n", f.Rel, f.Kind, f.Language, f.Format)
 		}
 		for _, s := range rep.Skipped {
 			fmt.Printf("  - %s: %s\n", s.Rel, s.Reason)
@@ -255,6 +283,9 @@ func printAutoindex(rep *autoindexReport, start time.Time) error {
 	fmt.Printf("✓ %s: %d files (%.1f MB) — %d added, %d updated, %d unchanged, %d failed, %d pruned, %d skipped in %dms\n",
 		rep.Collection, rep.Files, float64(rep.Bytes)/1e6, rep.Added, rep.Updated, rep.Unchanged, rep.Failed,
 		rep.Pruned, len(rep.Skipped), rep.DurationMs)
+	for _, c := range rep.Converted {
+		fmt.Printf("  ~ %s: converted from %s\n", c.Rel, c.Format)
+	}
 	for _, e := range rep.Errors {
 		fmt.Println("  !", e)
 	}

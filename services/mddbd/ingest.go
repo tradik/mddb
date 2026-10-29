@@ -37,6 +37,13 @@ type IngestDocumentHTTP struct {
 	ScrapedAt          int64               `json:"scrapedAt,omitempty"`
 	Scraper            string              `json:"scraper,omitempty"`
 	TTL                int64               `json:"ttl,omitempty"`
+	// Format and Content carry a file the server converts to Markdown
+	// (AGT-001), through the same converters /v1/upload uses. Content is the
+	// file's bytes (base64 in JSON); Format is its format ("pdf", "docx",
+	// "html", ...) and, when empty, comes from the key's extension. A
+	// document with neither stores ContentMD as before.
+	Format  string `json:"format,omitempty"`
+	Content []byte `json:"contentBase64,omitempty"`
 }
 
 // IngestOptionsHTTP controls optional behavior during ingestion.
@@ -153,14 +160,14 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 
 	// Phase 1: Pre-process documents (key derivation, frontmatter, meta injection)
 	convert := s.Tracer.Stage(ctx, spanIngestConvert) // OPS-024
-	protoDocs, skippedIdx, errs, sanitized := s.preProcessIngest(collection, docs, opts)
+	protoDocs, ttls, skipped, errs, sanitized := s.preProcessIngest(collection, docs, opts)
 	convert.SetString("mddb.collection", collection)
 	convert.SetInt("mddb.documents", len(protoDocs))
 	convert.End()
 
 	resp := &IngestResponseHTTP{
 		Collection: collection,
-		Skipped:    len(skippedIdx),
+		Skipped:    skipped,
 		Failed:     len(errs),
 		Errors:     errs,
 		Profile:    profile.Name,
@@ -194,8 +201,8 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 	resp.Failed += int(batchResp.Failed)
 	resp.Errors = append(resp.Errors, batchResp.Errors...)
 
-	// Phase 3: Apply TTL from original docs to processed docs
-	s.applyIngestTTLs(collection, docs, processed, skippedIdx)
+	// Phase 3: Apply the TTLs the documents asked for
+	s.applyIngestTTLs(collection, ttls, processed)
 
 	// Phase 4: Post-commit hooks
 	s.firePostBatchHooks(collection, processed, postBatchOptions{
@@ -213,19 +220,16 @@ func (s *Server) ingestDocuments(ctx context.Context, collection string, docs []
 }
 
 // preProcessIngest transforms IngestDocumentHTTP into proto.BatchDocument,
-// applying URL key derivation, frontmatter extraction, metadata injection,
-// and optional deduplication.
-func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ([]*proto.BatchDocument, map[int]bool, []string, int) {
+// applying URL key derivation, file conversion, frontmatter extraction,
+// metadata injection, and optional deduplication. It returns the documents to
+// write, the TTL each written document asks for (by document ID), how many
+// were skipped as unchanged, the per-document errors, and how many had text
+// sanitised.
+func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, opts IngestOptionsHTTP) ([]*proto.BatchDocument, map[string]int64, int, []string, int) {
 	var protoDocs []*proto.BatchDocument
 	var errs []string
 	var sanitized int
-	skippedIdx := make(map[int]bool)
-
-	// Build dedup map if needed
-	var existingHashes map[string]uint32
-	if opts.SkipDuplicates {
-		existingHashes = s.buildContentHashMap(collection, docs)
-	}
+	ttls := make(map[string]int64)
 
 	for i, d := range docs {
 		// Derive key from URL if not provided
@@ -248,6 +252,22 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 			meta = make(map[string][]string)
 		}
 
+		// AGT-001: a file goes through the converters /v1/upload uses, so
+		// a PDF sent by `mddb-cli autoindex` is stored as its text, not
+		// refused as binary or indexed as bytes.
+		converted := false
+		if len(d.Content) > 0 || d.Format != "" {
+			conv, format, err := convertIngestFile(d, key, opts.TextOnly)
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("doc[%d] (%s): %s", i, key, err.Error()))
+				continue
+			}
+			content, converted = conv.Markdown, conv.Converted
+			if converted {
+				meta["sourceFormat"] = []string{format}
+			}
+		}
+
 		// GO-036: drop bytes protobuf cannot store, and count it. Sanitising
 		// here rather than refusing, because one badly encoded page must not
 		// abort an import of the other twenty thousand — but the response says
@@ -258,8 +278,8 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 			sanitized++
 		}
 
-		// Extract frontmatter
-		if d.ExtractFrontmatter && content != "" {
+		// Extract frontmatter; a converted file has none of its own.
+		if d.ExtractFrontmatter && !converted && content != "" {
 			fmMeta, body := parseFrontmatter(content)
 			if fmMeta != nil {
 				// Frontmatter as base, request meta overrides
@@ -283,18 +303,9 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 			meta["scraper"] = []string{d.Scraper}
 		}
 
-		// Deduplication check
-		if opts.SkipDuplicates && existingHashes != nil {
-			docID := genID(collection, key, d.Lang)
-			if existingHash, found := existingHashes[docID]; found {
-				newHash := crc32.ChecksumIEEE([]byte(content))
-				if newHash == existingHash {
-					skippedIdx[i] = true
-					continue
-				}
-			}
+		if d.TTL > 0 {
+			ttls[genID(collection, key, d.Lang)] = d.TTL
 		}
-
 		protoDocs = append(protoDocs, &proto.BatchDocument{
 			Key:          key,
 			Lang:         d.Lang,
@@ -304,11 +315,54 @@ func (s *Server) preProcessIngest(collection string, docs []IngestDocumentHTTP, 
 		})
 	}
 
-	return protoDocs, skippedIdx, errs, sanitized
+	skipped := 0
+	if opts.SkipDuplicates {
+		protoDocs, skipped = s.dropUnchanged(collection, protoDocs)
+	}
+	return protoDocs, ttls, skipped, errs, sanitized
 }
 
-// buildContentHashMap builds a map of docID → CRC32 content hash for existing docs.
-func (s *Server) buildContentHashMap(collection string, docs []IngestDocumentHTTP) map[string]uint32 {
+// convertIngestFile converts an ingest document that carries a file. The
+// format comes from the document, or from its key's extension; the bytes are
+// Content, or ContentMD when a caller sent text with a format to convert it
+// from (HTML as a string, say).
+func convertIngestFile(d IngestDocumentHTTP, key string, textOnly bool) (conversion, string, error) {
+	format := normalizeFormat(d.Format)
+	if format == "" {
+		format = formatFromFilename(key)
+	}
+	data := d.Content
+	if len(data) == 0 {
+		data = []byte(d.ContentMD)
+	}
+	conv, err := convertToMarkdown(format, data, textOnly)
+	return conv, format, err
+}
+
+// dropUnchanged removes the documents whose stored content is the same as
+// the new content, and returns how many it removed.
+//
+// The comparison runs after conversion, on the Markdown that would be stored,
+// so an unchanged file converts to the same text and is skipped: the
+// converters are deterministic, which is what keeps a second autoindex run
+// cheap.
+func (s *Server) dropUnchanged(collection string, protoDocs []*proto.BatchDocument) ([]*proto.BatchDocument, int) {
+	existing := s.buildContentHashMap(collection, protoDocs)
+	kept := protoDocs[:0]
+	skipped := 0
+	for _, d := range protoDocs {
+		if h, found := existing[genID(collection, d.Key, d.Lang)]; found && h == crc32.ChecksumIEEE([]byte(d.ContentMd)) {
+			skipped++
+			continue
+		}
+		kept = append(kept, d)
+	}
+	return kept, skipped
+}
+
+// buildContentHashMap builds a map of docID → CRC32 content hash for the
+// stored documents among docs.
+func (s *Server) buildContentHashMap(collection string, docs []*proto.BatchDocument) map[string]uint32 {
 	hashes := make(map[string]uint32)
 
 	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
@@ -316,56 +370,35 @@ func (s *Server) buildContentHashMap(collection string, docs []IngestDocumentHTT
 		if bDocs == nil {
 			return nil
 		}
-
 		for _, d := range docs {
-			key := d.Key
-			if key == "" && d.URL != "" {
-				key = deriveKeyFromURL(d.URL)
-			}
-			if key == "" || d.Lang == "" {
-				continue
-			}
-
-			docID := genID(collection, key, d.Lang)
-			docKey := storage.DocKey(collection, docID)
-			if v := bDocs.Get(docKey); v != nil {
-				existing, err := unmarshalDoc(v)
-				if err == nil {
+			docID := genID(collection, d.Key, d.Lang)
+			if v := bDocs.Get(storage.DocKey(collection, docID)); v != nil {
+				if existing, err := unmarshalDoc(v); err == nil {
 					hashes[docID] = crc32.ChecksumIEEE([]byte(existing.ContentMD))
 				}
 			}
 		}
-
 		return nil
 	})
 
 	return hashes
 }
 
-// applyIngestTTLs sets TTL for documents that had TTL specified in the ingest request.
-func (s *Server) applyIngestTTLs(collection string, docs []IngestDocumentHTTP, processed []*ProcessedDoc, skippedIdx map[int]bool) {
-	if s.TTLManager == nil {
+// applyIngestTTLs sets the TTL each written document asked for.
+//
+// Keyed by document ID, not by position: a skipped or failed document used
+// to shift every later TTL onto the wrong document.
+func (s *Server) applyIngestTTLs(collection string, ttls map[string]int64, processed []*ProcessedDoc) {
+	if s.TTLManager == nil || len(ttls) == 0 {
 		return
 	}
-
-	// Map processed docs back to original indices to find TTL values
-	procIdx := 0
-	for i, d := range docs {
-		if skippedIdx[i] {
+	for _, p := range processed {
+		if p == nil || p.Error != nil {
 			continue
 		}
-		if d.Key == "" && d.URL != "" {
-			d.Key = deriveKeyFromURL(d.URL)
+		if ttl := ttls[p.DocID]; ttl > 0 {
+			_ = s.TTLManager.Set(collection, p.DocID, time.Now().Unix()+ttl)
 		}
-		if d.Key == "" || d.Lang == "" {
-			continue
-		}
-
-		if procIdx < len(processed) && processed[procIdx] != nil && processed[procIdx].Error == nil && d.TTL > 0 {
-			expiresAt := time.Now().Unix() + d.TTL
-			_ = s.TTLManager.Set(collection, processed[procIdx].DocID, expiresAt)
-		}
-		procIdx++
 	}
 }
 
@@ -387,6 +420,8 @@ func (s *Server) ingestDocumentsFromProto(ctx context.Context, req *proto.Ingest
 			ScrapedAt:          d.ScrapedAt,
 			Scraper:            d.Scraper,
 			TTL:                d.Ttl,
+			Format:             d.Format,
+			Content:            d.Content,
 		}
 	}
 

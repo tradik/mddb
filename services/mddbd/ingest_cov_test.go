@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -87,22 +88,24 @@ func TestIngestCov_PreProcessingAndHooks(t *testing.T) {
 func TestIngestCov_ContentHashMapAndTTLs(t *testing.T) {
 	s := ingestCovServer(t)
 	addTestDoc(t, s, "h", "k", "en", "hello", nil)
-	hashes := s.buildContentHashMap("h", []IngestDocumentHTTP{
-		{Key: "k", Lang: "en"}, {URL: "https://x.test/k", Lang: "en"}, {Key: "", Lang: "en"}, {Key: "k"}, {Key: "absent", Lang: "en"},
+	hashes := s.buildContentHashMap("h", []*proto.BatchDocument{
+		{Key: "k", Lang: "en"}, {Key: "absent", Lang: "en"},
 	})
 	if len(hashes) != 1 {
 		t.Fatalf("hashes: %v", hashes)
 	}
-	if got := s.buildContentHashMap("never-written", []IngestDocumentHTTP{{Key: "k", Lang: "en"}}); len(got) != 0 {
+	if got := s.buildContentHashMap("never-written", []*proto.BatchDocument{{Key: "k", Lang: "en"}}); len(got) != 0 {
 		t.Fatalf("hashes of an empty collection: %v", got)
 	}
 
-	// TTLs map back over skipped and keyless entries; no manager, nothing.
-	docs := []IngestDocumentHTTP{{Key: "skip", Lang: "en", TTL: 5}, {URL: "https://x.test/u", Lang: "en", TTL: 5}, {Key: "nolang"}, {Key: "k", Lang: "en", TTL: 0}}
-	processed := []*ProcessedDoc{{DocID: genID("h", "u", "en")}, {DocID: "k"}}
-	s.applyIngestTTLs("h", docs, processed, map[int]bool{0: true})
+	// TTLs go to the document they were asked for, by ID: failed, missing
+	// and zero-TTL entries are passed over; no manager, nothing.
+	id := genID("h", "k", "en")
+	ttls := map[string]int64{id: 60, "other": 0}
+	processed := []*ProcessedDoc{nil, {DocID: "failed", Error: errors.New("no")}, {DocID: "other"}, {DocID: id}}
+	s.applyIngestTTLs("h", ttls, processed)
 	s.TTLManager = nil
-	s.applyIngestTTLs("h", docs, processed, nil)
+	s.applyIngestTTLs("h", ttls, processed)
 }
 
 func TestIngestCov_FromProtoAndBack(t *testing.T) {
