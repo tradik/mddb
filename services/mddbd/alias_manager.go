@@ -52,13 +52,13 @@ func (a *AliasManager) SetBinlog(bl *binlog.Binlog) { a.binlog = bl }
 
 func (a *AliasManager) handle() *bolt.DB { return boltx.Current(a.db, a.follow) }
 
-// LoadAll reads every alias into memory.
+// LoadAll creates the bucket when missing and reads every alias into memory.
 func (a *AliasManager) LoadAll() error {
 	m := map[string]string{}
-	err := a.handle().View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketAliases)
-		if b == nil {
-			return nil
+	err := a.handle().Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists(bucketAliases)
+		if err != nil {
+			return err
 		}
 		return b.ForEach(func(k, v []byte) error {
 			m[string(k)] = string(v)
@@ -151,11 +151,7 @@ func (a *AliasManager) set(alias, collection string, exists func(string) bool) e
 		return fmt.Errorf("%q is a collection; an alias cannot take its name", alias)
 	}
 	if err := a.handle().Update(func(tx *bolt.Tx) error {
-		b, err := tx.CreateBucketIfNotExists(bucketAliases)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(alias), []byte(collection))
+		return tx.Bucket(bucketAliases).Put([]byte(alias), []byte(collection))
 	}); err != nil {
 		return err
 	}
@@ -175,10 +171,7 @@ func (a *AliasManager) remove(alias string) error {
 		return errAliasNotFound
 	}
 	if err := a.handle().Update(func(tx *bolt.Tx) error {
-		if b := tx.Bucket(bucketAliases); b != nil {
-			return b.Delete([]byte(alias))
-		}
-		return nil
+		return tx.Bucket(bucketAliases).Delete([]byte(alias))
 	}); err != nil {
 		return err
 	}

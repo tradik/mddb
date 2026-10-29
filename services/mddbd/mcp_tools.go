@@ -154,6 +154,12 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolRunEval(ctx, args)
 	case "get_gain":
 		return s.toolGetGain(ctx, args)
+	case "delete_where":
+		return s.toolWhere(ctx, WhereDelete, args)
+	case "update_where":
+		return s.toolWhere(ctx, WhereUpdate, args)
+	case "set_ttl_where":
+		return s.toolWhere(ctx, WhereSetTTL, args)
 	case "get_indexing_status":
 		return s.toolGetIndexingStatus(ctx, args)
 	case "classify_document":

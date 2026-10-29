@@ -64,6 +64,9 @@ const (
 	MDDB_ListEvalQueries_FullMethodName       = "/mddb.MDDB/ListEvalQueries"
 	MDDB_DeleteEvalQuery_FullMethodName       = "/mddb.MDDB/DeleteEvalQuery"
 	MDDB_GetGain_FullMethodName               = "/mddb.MDDB/GetGain"
+	MDDB_DeleteWhere_FullMethodName           = "/mddb.MDDB/DeleteWhere"
+	MDDB_UpdateWhere_FullMethodName           = "/mddb.MDDB/UpdateWhere"
+	MDDB_SetTTLWhere_FullMethodName           = "/mddb.MDDB/SetTTLWhere"
 	MDDB_DeleteDocument_FullMethodName        = "/mddb.MDDB/DeleteDocument"
 	MDDB_DeleteCollection_FullMethodName      = "/mddb.MDDB/DeleteCollection"
 	MDDB_ListSynonyms_FullMethodName          = "/mddb.MDDB/ListSynonyms"
@@ -198,6 +201,11 @@ type MDDBClient interface {
 	DeleteEvalQuery(ctx context.Context, in *DeleteEvalQueryRequest, opts ...grpc.CallOption) (*DeleteEvalQueryResponse, error)
 	// Tokens returned and avoided by retrieval over a window of days (AGT-004).
 	GetGain(ctx context.Context, in *GetGainRequest, opts ...grpc.CallOption) (*GetGainResponse, error)
+	// Delete, merge metadata into, or set the TTL of every document a metadata
+	// filter matches (GO-045). Use dry_run first.
+	DeleteWhere(ctx context.Context, in *WhereRequest, opts ...grpc.CallOption) (*WhereResponse, error)
+	UpdateWhere(ctx context.Context, in *WhereRequest, opts ...grpc.CallOption) (*WhereResponse, error)
+	SetTTLWhere(ctx context.Context, in *WhereRequest, opts ...grpc.CallOption) (*WhereResponse, error)
 	// Delete a single document
 	DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -733,6 +741,36 @@ func (c *mDDBClient) GetGain(ctx context.Context, in *GetGainRequest, opts ...gr
 	return out, nil
 }
 
+func (c *mDDBClient) DeleteWhere(ctx context.Context, in *WhereRequest, opts ...grpc.CallOption) (*WhereResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WhereResponse)
+	err := c.cc.Invoke(ctx, MDDB_DeleteWhere_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) UpdateWhere(ctx context.Context, in *WhereRequest, opts ...grpc.CallOption) (*WhereResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WhereResponse)
+	err := c.cc.Invoke(ctx, MDDB_UpdateWhere_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) SetTTLWhere(ctx context.Context, in *WhereRequest, opts ...grpc.CallOption) (*WhereResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WhereResponse)
+	err := c.cc.Invoke(ctx, MDDB_SetTTLWhere_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mDDBClient) DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteDocumentResponse)
@@ -1162,6 +1200,11 @@ type MDDBServer interface {
 	DeleteEvalQuery(context.Context, *DeleteEvalQueryRequest) (*DeleteEvalQueryResponse, error)
 	// Tokens returned and avoided by retrieval over a window of days (AGT-004).
 	GetGain(context.Context, *GetGainRequest) (*GetGainResponse, error)
+	// Delete, merge metadata into, or set the TTL of every document a metadata
+	// filter matches (GO-045). Use dry_run first.
+	DeleteWhere(context.Context, *WhereRequest) (*WhereResponse, error)
+	UpdateWhere(context.Context, *WhereRequest) (*WhereResponse, error)
+	SetTTLWhere(context.Context, *WhereRequest) (*WhereResponse, error)
 	// Delete a single document
 	DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -1372,6 +1415,15 @@ func (UnimplementedMDDBServer) DeleteEvalQuery(context.Context, *DeleteEvalQuery
 }
 func (UnimplementedMDDBServer) GetGain(context.Context, *GetGainRequest) (*GetGainResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetGain not implemented")
+}
+func (UnimplementedMDDBServer) DeleteWhere(context.Context, *WhereRequest) (*WhereResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteWhere not implemented")
+}
+func (UnimplementedMDDBServer) UpdateWhere(context.Context, *WhereRequest) (*WhereResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateWhere not implemented")
+}
+func (UnimplementedMDDBServer) SetTTLWhere(context.Context, *WhereRequest) (*WhereResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetTTLWhere not implemented")
 }
 func (UnimplementedMDDBServer) DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteDocument not implemented")
@@ -2296,6 +2348,60 @@ func _MDDB_GetGain_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_DeleteWhere_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WhereRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).DeleteWhere(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_DeleteWhere_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).DeleteWhere(ctx, req.(*WhereRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_UpdateWhere_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WhereRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).UpdateWhere(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_UpdateWhere_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).UpdateWhere(ctx, req.(*WhereRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_SetTTLWhere_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WhereRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).SetTTLWhere(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_SetTTLWhere_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).SetTTLWhere(ctx, req.(*WhereRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MDDB_DeleteDocument_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteDocumentRequest)
 	if err := dec(in); err != nil {
@@ -3072,6 +3178,18 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetGain",
 			Handler:    _MDDB_GetGain_Handler,
+		},
+		{
+			MethodName: "DeleteWhere",
+			Handler:    _MDDB_DeleteWhere_Handler,
+		},
+		{
+			MethodName: "UpdateWhere",
+			Handler:    _MDDB_UpdateWhere_Handler,
+		},
+		{
+			MethodName: "SetTTLWhere",
+			Handler:    _MDDB_SetTTLWhere_Handler,
 		},
 		{
 			MethodName: "DeleteDocument",

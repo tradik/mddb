@@ -21,6 +21,9 @@ import (
 func aliasServer(t *testing.T) (*Server, func()) {
 	s, cleanup := newHandlerTestServer(t)
 	s.Aliases = NewAliasManager(s.DB)
+	if err := s.Aliases.LoadAll(); err != nil {
+		t.Fatal(err)
+	}
 	addTestDoc(t, s, "docs-v1", "a", "en", "release notes version one", map[string][]string{"v": {"1"}})
 	addTestDoc(t, s, "docs-v2", "a", "en", "release notes version two", map[string][]string{"v": {"2"}})
 	addTestDoc(t, s, "docs-v2", "b", "en", "more release notes", map[string][]string{"v": {"2"}})
@@ -62,6 +65,9 @@ func TestAlias_APIAndValidation(t *testing.T) {
 	if rec := aliasREST(s, http.MethodPut, "/v1/aliases/docs-v2", `{"collection":"docs-v1"}`); rec.Code != 400 ||
 		!strings.Contains(rec.Body.String(), "is a collection") {
 		t.Fatalf("alias over a collection: %d %s", rec.Code, rec.Body.String())
+	}
+	if s.SetAlias("a|b", "docs-v1") == nil {
+		t.Fatal("bad name through set")
 	}
 	for _, bad := range []string{"", "a|b", "a b", "*", "role:x", strings.Repeat("x", 129)} {
 		if validAliasName(bad) == nil {

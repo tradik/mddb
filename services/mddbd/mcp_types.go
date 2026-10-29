@@ -953,6 +953,8 @@ type MCPClient interface {
 	RunEval(ctx context.Context, req EvalRequest) (*EvalResult, error)
 	// Gain reports tokens returned and avoided by retrieval (AGT-004).
 	Gain(ctx context.Context, window string, daily bool) (*GainReport, error)
+	// Where deletes, updates or sets TTL by metadata filter (GO-045).
+	Where(ctx context.Context, op WhereOp, req WhereRequest) (*WhereResult, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)
 	// Synonyms
 	ListSynonyms(ctx context.Context, collection string) (*MCPSynonymListResponse, error)

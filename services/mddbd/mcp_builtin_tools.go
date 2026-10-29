@@ -15,7 +15,8 @@ func mcpBuiltinTools() []MCPTool {
 	t = append(t, mcpBuiltinToolsAdvanced()...)
 	t = append(t, mcpReferenceTools()...)
 	t = append(t, mcpEvalTools()...)
-	return append(t, mcpGainTool())
+	t = append(t, mcpGainTool())
+	return append(t, mcpWhereTools()...)
 }
 
 // mcpBuiltinToolsCore lists the core document / search / index / webhook /

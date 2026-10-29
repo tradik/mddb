@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
@@ -49,11 +48,11 @@ func (s *Server) putAlias(w http.ResponseWriter, r *http.Request, name string) {
 		bad(w, err)
 		return
 	}
-	if !s.permitted(w, r, req.Collection, PermWrite) {
-		return
-	}
-	if old := s.Aliases.Resolve(name); old != name && !s.permitted(w, r, old, PermWrite) {
-		return
+	// Write on the new target, and on the old one when the alias moves.
+	for _, c := range []string{req.Collection, s.Aliases.Resolve(name)} {
+		if c != name && !s.permitted(w, r, c, PermWrite) {
+			return
+		}
 	}
 	if err := s.SetAlias(name, req.Collection); err != nil {
 		bad(w, err)
@@ -72,10 +71,6 @@ func (s *Server) deleteAlias(w http.ResponseWriter, r *http.Request, name string
 		return
 	}
 	if err := s.DeleteAlias(name); err != nil {
-		if errors.Is(err, errAliasNotFound) {
-			http.Error(w, `{"error":"alias not found"}`, http.StatusNotFound)
-			return
-		}
 		bad(w, err)
 		return
 	}

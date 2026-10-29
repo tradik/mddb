@@ -2342,6 +2342,37 @@ Delete multiple documents in a single request.
 
 ---
 
+### POST /v1/documents:deleteWhere, :updateWhere, :setTTLWhere
+
+Act on every document a metadata filter matches (v2.18.8, GO-045). The
+alternative is listing keys and sending them back in batches, with a race
+between the list and the write.
+
+```bash
+# first, what would go
+curl -X POST "http://localhost:11023/v1/documents:deleteWhere" -d '{
+  "collection": "repo", "filter": {"gitCommit": {"not": ["9f2c1e0"]}}, "dryRun": true
+}'
+# {"matched": 42, "affected": 42, "sample": ["src/old.go", "..."], "dryRun": true}
+```
+
+| Field | Meaning |
+|---|---|
+| `collection` | Required |
+| `filter`, `filterMeta` | The documents to act on. At least one is required: there is no "every document" by filter |
+| `limit` | Documents affected by this call, default 1000, max 10000 |
+| `cursor` | `nextCursor` of the previous call, to continue without repeats |
+| `dryRun` | Report `matched`, `affected` and a `sample` of keys, and change nothing. A read-only server answers it |
+| `meta` | `:updateWhere`: merged into each document. Its keys replace the document's values for those keys. Content is not changed |
+| `ttl` | `:setTTLWhere`: seconds from now; `0` removes the expiry |
+
+Each document goes through the normal single-document write: revisions,
+full-text and vector indexes, webhooks and the binlog. There is no shortcut
+around it. A document that fails, for example on its schema, is listed in
+`errors` and the rest continue. The MCP tools are `delete_where`
+(destructive), `update_where` and `set_ttl_where`. The gRPC calls are
+`DeleteWhere`, `UpdateWhere` and `SetTTLWhere`.
+
 ### POST /v1/delete-collection
 
 Delete all documents in a collection.

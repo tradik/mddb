@@ -5291,6 +5291,83 @@ paths:
         "403":
           description: Forbidden, or read-only mode
 
+  /v1/documents:deleteWhere:
+    post:
+      tags: [Documents]
+      summary: Delete every document a metadata filter matches
+      description: |
+        GO-045, v2.18.8. Each document goes through the single-document
+        delete. Use dryRun first. At most `limit` per call; continue with
+        `cursor`.
+      operationId: deleteWhere
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhereRequest"
+      responses:
+        "200":
+          description: What matched and what was affected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhereResult"
+        "400":
+          description: No filter, bad limit, or invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden, or read-only mode (a dry run is allowed)
+
+  /v1/documents:updateWhere:
+    post:
+      tags: [Documents]
+      summary: Merge metadata into every document a filter matches
+      operationId: updateWhere
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhereRequest"
+      responses:
+        "200":
+          description: What matched and what was affected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhereResult"
+        "400":
+          description: No filter, no meta, or invalid request
+        "403":
+          description: Forbidden, or read-only mode (a dry run is allowed)
+
+  /v1/documents:setTTLWhere:
+    post:
+      tags: [Documents]
+      summary: Set the time to live of every document a filter matches
+      operationId: setTTLWhere
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WhereRequest"
+      responses:
+        "200":
+          description: What matched and what was affected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhereResult"
+        "400":
+          description: No filter, no ttl, or invalid request
+        "403":
+          description: Forbidden, or read-only mode (a dry run is allowed)
+
   /v1/gain:
     get:
       tags:
@@ -9022,6 +9099,59 @@ components:
           $ref: "#/components/schemas/RetrievalProfile"
         measured:
           $ref: "#/components/schemas/EvalResult"
+
+    WhereRequest:
+      type: object
+      required: [collection]
+      properties:
+        collection:
+          type: string
+        filter:
+          $ref: "#/components/schemas/MetaFilter"
+        filterMeta:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        limit:
+          type: integer
+          default: 1000
+          maximum: 10000
+        cursor:
+          type: string
+        dryRun:
+          type: boolean
+        meta:
+          type: object
+          description: updateWhere only; merged into each document's metadata
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        ttl:
+          type: integer
+          description: setTTLWhere only; seconds from now, 0 removes the expiry
+
+    WhereResult:
+      type: object
+      properties:
+        matched:
+          type: integer
+        affected:
+          type: integer
+        sample:
+          type: array
+          items:
+            type: string
+        nextCursor:
+          type: string
+        dryRun:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
 
     Alias:
       type: object

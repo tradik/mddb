@@ -141,6 +141,12 @@ service MDDB {
   // Tokens returned and avoided by retrieval over a window of days (AGT-004).
   rpc GetGain(GetGainRequest) returns (GetGainResponse);
 
+  // Delete, merge metadata into, or set the TTL of every document a metadata
+  // filter matches (GO-045). Use dry_run first.
+  rpc DeleteWhere(WhereRequest) returns (WhereResponse);
+  rpc UpdateWhere(WhereRequest) returns (WhereResponse);
+  rpc SetTTLWhere(WhereRequest) returns (WhereResponse);
+
   // Delete a single document
   rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
 
@@ -1899,4 +1905,26 @@ message GetGainResponse {
   int64 tokens_without_retrieval = 6;
   double saved_percent = 7;
   repeated GainDayProto daily = 8;
+}
+
+// ---- v2.18.8: operations by metadata filter (GO-045) ----
+
+message WhereRequest {
+  string collection = 1;
+  map<string, MetaValues> filter_meta = 2;
+  map<string, MetaCondition> filter = 3;
+  int32 limit = 4;                               // documents affected by this call; default 1000, max 10000
+  string cursor = 5;                             // next_cursor of the previous call
+  bool dry_run = 6;                              // report, change nothing
+  map<string, MetaValues> meta = 7;              // UpdateWhere: merged into each document's metadata
+  optional int64 ttl = 8;                        // SetTTLWhere: seconds from now; 0 removes the expiry
+}
+
+message WhereResponse {
+  int32 matched = 1;
+  int32 affected = 2;
+  repeated string sample = 3;
+  string next_cursor = 4;
+  bool dry_run = 5;
+  repeated string errors = 6;
 }

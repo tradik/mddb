@@ -89,10 +89,6 @@ func (s *Server) resolveAliasBody(r *http.Request) {
 		restore(raw)
 		return
 	}
-	out, err := json.Marshal(body)
-	if err != nil {
-		restore(raw)
-		return
-	}
+	out, _ := json.Marshal(body) // it decoded, so it encodes
 	restore(out)
 }

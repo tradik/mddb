@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (78 implemented)
+### Available RPCs (81 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -104,6 +104,9 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `UpdateBatch` | `UpdateBatchRequest` → `UpdateBatchResponse` |
 | | `DeleteDocument` | `DeleteDocumentRequest` → `DeleteDocumentResponse` |
 | | `DeleteBatch` | `DeleteBatchRequest` → `DeleteBatchResponse` |
+| | `DeleteWhere` | `WhereRequest` → `WhereResponse` (v2.18.8: by metadata filter, with `dry_run`) |
+| | `UpdateWhere` | `WhereRequest` → `WhereResponse` (v2.18.8) |
+| | `SetTTLWhere` | `WhereRequest` → `WhereResponse` (v2.18.8) |
 | | `DeleteCollection` | `DeleteCollectionRequest` → `DeleteCollectionResponse` |
 | | `Get` | `GetRequest` → `Document` |
 | | `GetDocumentMeta` | `GetDocumentMetaRequest` → `GetDocumentMetaResponse` |
@@ -210,6 +213,10 @@ did not apply before either. Errors map as follows. A vector index still
 loading is `UNAVAILABLE`. No embedding provider is `FAILED_PRECONDITION`. A
 cross-search source document without a vector is `NOT_FOUND`. An invalid
 option is `INVALID_ARGUMENT`.
+
+`DeleteWhere`, `UpdateWhere` and `SetTTLWhere` (GO-045) act on every
+document a metadata filter matches. They share one `WhereRequest`: `filter`,
+`filter_meta`, `limit`, `cursor`, `dry_run`, `meta` and `ttl`.
 
 The new RPCs `CodeSymbol`, `RunEval`, `AddEvalQuery`, `ListEvalQueries`,
 `DeleteEvalQuery` and `GetGain` match `GET /v1/symbol`, `POST /v1/eval`,

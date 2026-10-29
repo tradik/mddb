@@ -178,7 +178,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 90 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 93 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 
 ### API Key Authentication
@@ -455,7 +455,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
 |---|---|
 | `search` | `search_documents`, `aggregate`, `semantic_search`, `full_text_search`, `hybrid_search`, `cross_search`, `autocomplete`, `fts_languages`, `search_advisor`, `get_indexing_status`, `run_eval`, `add_eval_query`, `get_gain`, `find_duplicates`, `classify_document`, `get_meta_keys` |
 | `code` | `code_graph`, `code_symbol`, `reference_search`, `reference_symbol`, `reference_examples`, `reference_dependencies` |
-| `documents` | `add_document`, `update_document`, `delete_document`, `get_document_meta`, `set_ttl`, `add_documents_batch`, `delete_documents_batch`, `export_documents`, `list_revisions`, `restore_revision` |
+| `documents` | `add_document`, `update_document`, `delete_document`, `get_document_meta`, `set_ttl`, `add_documents_batch`, `delete_documents_batch`, `export_documents`, `list_revisions`, `restore_revision`, `delete_where`, `update_where`, `set_ttl_where` |
 | `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*` |
 | `memory` | `memory_*` |
 | `schema` | `set_schema`, `get_schema`, `delete_schema`, `list_schemas`, `validate_document` |
@@ -503,7 +503,7 @@ handle the gap, cheapest first:
 
 ## Built-in Tool Catalog
 
-All 90 built-in tools, grouped by area. Tool inputs are self-describing via
+All 93 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -520,6 +520,9 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `validate_document` | Validate document metadata against collection schema without adding the document. |
 | `add_documents_batch` | Add multiple documents to a collection in a single batch operation. |
 | `delete_documents_batch` | Delete multiple documents from a collection in a single batch operation. |
+| `delete_where` | (v2.18.8) Delete every document a metadata `filter`/`filter_meta` matches, through the normal delete. Destructive: run with `dry_run` first. `limit` (default 1000) and `cursor` page through large sets. |
+| `update_where` | (v2.18.8) Merge `meta` into every document a filter matches; content is untouched. |
+| `set_ttl_where` | (v2.18.8) Set the time to live (`ttl` seconds, 0 removes it) of every document a filter matches. |
 | `get_meta_keys` | List all unique metadata keys and their values for a collection. |
 | `get_checksum` | Get a CRC32 checksum for a collection that changes when documents are modified. |
 | `ingest_documents` | Bulk ingest documents with URL-based key derivation, YAML frontmatter extraction, content deduplication, and automatic metadata injection. |

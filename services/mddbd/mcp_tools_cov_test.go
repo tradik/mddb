@@ -478,6 +478,9 @@ func (c *covBAllErrClient) RunEval(context.Context, EvalRequest) (*EvalResult, e
 func (c *covBAllErrClient) Gain(context.Context, string, bool) (*GainReport, error) {
 	return nil, errCovBClient
 }
+func (c *covBAllErrClient) Where(context.Context, WhereOp, WhereRequest) (*WhereResult, error) {
+	return nil, errCovBClient
+}
 
 // TestCovBDispatchReachesEveryBuiltinTool sends every advertised built-in
 // tool through mcpCallTool. None may fall through to "unknown tool": that

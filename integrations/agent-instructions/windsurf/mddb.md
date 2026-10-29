@@ -124,6 +124,10 @@ Record decisions and constraints, not transcripts.
 
 ## Writing
 
+- To delete, retag or expire many documents, use `delete_where`,
+  `update_where` or `set_ttl_where` with a metadata filter. Run them with
+  `dry_run: true` first and check `matched` and `sample` before the real
+  call. Don't list keys and delete them one by one.
 - To make a repository or folder searchable, run `mddb-cli autoindex <dir>`
   rather than adding files one by one: it sets path, kind and language, lets
   the server extract symbols, and skips what has not changed.

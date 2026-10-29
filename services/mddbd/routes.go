@@ -110,6 +110,10 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	// GO-044: collection aliases.
 	mux.HandleFunc("/v1/aliases", s.handleAliases)
 	mux.HandleFunc("/v1/aliases/", s.handleAliases)
+	// GO-045: delete, update metadata and set TTL by metadata filter.
+	mux.HandleFunc("/v1/documents:deleteWhere", s.handleWhere)
+	mux.HandleFunc("/v1/documents:updateWhere", s.handleWhere)
+	mux.HandleFunc("/v1/documents:setTTLWhere", s.handleWhere)
 	mux.HandleFunc("/v1/collection-configs", s.handleCollectionConfigList)
 	mux.HandleFunc("/v1/curation", s.handleCuration)
 	mux.HandleFunc("/v1/events", s.handleSSE)

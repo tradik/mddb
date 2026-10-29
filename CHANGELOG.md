@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Delete, update and set TTL by metadata filter (GO-045).**
+  - **Endpoints.** `POST /v1/documents:deleteWhere`, `:updateWhere` (merges
+    metadata) and `:setTTLWhere`.
+  - **Other surfaces.** The MCP tools `delete_where`, `update_where` and
+    `set_ttl_where`, and the gRPC calls `DeleteWhere`, `UpdateWhere` and
+    `SetTTLWhere`.
+  - **What a call takes.** `filter` or `filterMeta`, a `limit` with a
+    `cursor` to continue, and `dryRun`. A read-only server answers a dry run.
+  - **How it writes.** Every document goes through the normal
+    single-document write.
+
 - **Collection aliases (GO-044).**
   - **What an alias is.** A stable name for a collection: `PUT`,
     `GET` and `DELETE /v1/aliases`.
