@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Hybrid search returned tied results in a different order on every call.**
+  Fused results came out of a map and were sorted by score alone. Under RRF,
+  ties are common: a document at rank r in one list ties with a document at
+  rank r in the other. When the `topK` cut fell inside a tie, even which
+  documents were returned changed between identical requests. Equal scores
+  are now ordered by document ID, in both RRF and alpha fusion. This covers
+  single-collection and cross-collection hybrid search.
+
 - **Changelog links in the 2.17 and 2.18.8 blog posts returned 404.** They
   pointed at `blob/2.17.0` and `blob/2.18.8`, but those releases are tagged
   `v2.17.0` and `v2.18.8`.

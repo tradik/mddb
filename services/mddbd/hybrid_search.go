@@ -666,14 +666,26 @@ func mergeAlpha(ftsResults []fts.FTSResult, vectorResults []vector.VectorResult,
 		})
 	}
 
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].CombinedScore > results[j].CombinedScore
-	})
+	sortByCombinedScore(results)
 
 	if topK > 0 && len(results) > topK {
 		results = results[:topK]
 	}
 	return results
+}
+
+// sortByCombinedScore orders fused results best first, and equal scores by
+// document ID. The results come out of a map, so without the second key ties
+// (common under RRF, where ranks add up to the same sum) came back in a
+// different order on every call — and a topK cut inside a tie kept different
+// documents each time.
+func sortByCombinedScore(results []HybridSearchResultItem) {
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].CombinedScore != results[j].CombinedScore {
+			return results[i].CombinedScore > results[j].CombinedScore
+		}
+		return results[i].Document.ID < results[j].Document.ID
+	})
 }
 
 // mergeRRF combines FTS and vector results using Reciprocal Rank Fusion.
@@ -719,9 +731,7 @@ func mergeRRF(ftsResults []fts.FTSResult, vectorResults []vector.VectorResult, r
 		})
 	}
 
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].CombinedScore > results[j].CombinedScore
-	})
+	sortByCombinedScore(results)
 
 	if topK > 0 && len(results) > topK {
 		results = results[:topK]
