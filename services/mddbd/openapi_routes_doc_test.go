@@ -17,8 +17,10 @@ import (
 var (
 	// mux.HandleFunc("/v1/...", ...) — the literal route patterns in routes.go.
 	routeRe = regexp.MustCompile(`mux\.HandleFunc\("(/v1/[^"]*)"`)
-	// Top-level "  /path:" entries under openapi.yaml's paths: section.
-	specPathRe = regexp.MustCompile(`(?m)^  (/v1/[^:]*):`)
+	// Top-level "  /path:" entries under openapi.yaml's paths: section. A
+	// path may itself contain ':' (/v1/documents:deleteWhere), so the key
+	// runs to the colon that ends the line.
+	specPathRe = regexp.MustCompile(`(?m)^  (/v1/\S*):\s*$`)
 )
 
 // routesExemptFromSpec are served but deliberately absent from the spec.
