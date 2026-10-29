@@ -209,36 +209,3 @@ func TestCompactOnUnknownCollectionIsSafe(t *testing.T) {
 		t.Errorf("DeletedSince on an unknown collection = %d, want 0", got)
 	}
 }
-
-// bruteForceLocked is the answer when the graph cannot be searched; it has to
-// respect topK, the threshold and the allowed set.
-func TestBruteForceFallback(t *testing.T) {
-	idx, _ := compactTestIndex(t, 40, 0)
-	q := query32(6)
-
-	idx.mu.RLock()
-	all := idx.bruteForceLocked("c", q, 5, 0, CosineSimilarity, nil)
-	filtered := idx.bruteForceLocked("c", q, 5, 0, CosineSimilarity, map[string]bool{"doc-00001": true})
-	thresholded := idx.bruteForceLocked("c", q, 40, 1.1, CosineSimilarity, nil)
-	missing := idx.bruteForceLocked("absent", q, 5, 0, CosineSimilarity, nil)
-	idx.mu.RUnlock()
-
-	if len(all) != 5 {
-		t.Errorf("expected topK=5 results, got %d", len(all))
-	}
-	for i := 1; i < len(all); i++ {
-		if all[i-1].Score < all[i].Score {
-			t.Errorf("results are not sorted by descending score: %v", all)
-			break
-		}
-	}
-	if len(filtered) != 1 || filtered[0].DocID != "doc-00001" {
-		t.Errorf("the allowed set was not respected: %v", filtered)
-	}
-	if len(thresholded) != 0 {
-		t.Errorf("a threshold above any possible score should exclude everything, got %d", len(thresholded))
-	}
-	if missing != nil {
-		t.Errorf("an unknown collection should yield nothing, got %v", missing)
-	}
-}

@@ -42,7 +42,8 @@ type config struct {
 	Parallel   int // add-batch requests in flight
 	RareEvery  int // one document in RareEvery carries slice=rare: the selective filter
 	Timeout    time.Duration
-	Keep       bool // leave the collections behind
+	Keep       bool     // leave the collections behind
+	Indexes    []string // searched by name, besides auto
 	PollPeriod time.Duration
 }
 
@@ -76,6 +77,7 @@ func parseFlags(fs *flag.FlagSet, args []string) (config, string, error) {
 	fs.DurationVar(&cfg.Timeout, "timeout", 30*time.Minute, "per request, and for the embeddings to drain")
 	fs.BoolVar(&cfg.Keep, "keep", false, "keep the collections after measuring")
 	sizes := fs.String("sizes", "2000,200000,2000000", "collection sizes, comma separated")
+	indexes := fs.String("indexes", defaultIndexes, "indexes searched by name besides auto, comma separated")
 	embedAddr := fs.String("embed-addr", "127.0.0.1:11098", "address to serve embeddings on")
 	if err := fs.Parse(args); err != nil {
 		return cfg, "", err
@@ -86,6 +88,11 @@ func parseFlags(fs *flag.FlagSet, args []string) (config, string, error) {
 			return cfg, "", fmt.Errorf("size %q: want a whole number of at least -topics (%d)", s, cfg.Topics)
 		}
 		cfg.Sizes = append(cfg.Sizes, n)
+	}
+	for _, name := range strings.Split(*indexes, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			cfg.Indexes = append(cfg.Indexes, name)
+		}
 	}
 	return cfg, *embedAddr, nil
 }

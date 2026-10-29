@@ -21,13 +21,17 @@ type VectorResult struct {
 type VectorIndex struct {
 	mu          sync.RWMutex
 	collections map[string]map[string][]float32 // collection -> key -> vector
-	ready       atomic.Bool
+	// chunkKeys: collection -> document -> its chunk keys, so the prefilter
+	// reaches a chunked document's vectors without a scan (vector_prefilter.go).
+	chunkKeys map[string]map[string][]string
+	ready     atomic.Bool
 }
 
 // NewVectorIndex creates a new empty vector index.
 func NewVectorIndex() *VectorIndex {
 	return &VectorIndex{
 		collections: make(map[string]map[string][]float32),
+		chunkKeys:   make(map[string]map[string][]string),
 	}
 }
 
@@ -54,6 +58,9 @@ func (vi *VectorIndex) Add(collection, docID string, vector []float32) error {
 
 	if vi.collections[collection] == nil {
 		vi.collections[collection] = make(map[string][]float32)
+	}
+	if _, exists := vi.collections[collection][docID]; !exists {
+		vi.noteKeyLocked(collection, docID)
 	}
 	vi.collections[collection][docID] = vector
 	return nil
@@ -102,7 +109,10 @@ func (vi *VectorIndex) Remove(collection, docID string) {
 	defer vi.mu.Unlock()
 
 	if coll, ok := vi.collections[collection]; ok {
-		delete(coll, docID)
+		if _, exists := coll[docID]; exists {
+			delete(coll, docID)
+			vi.forgetKeyLocked(collection, docID)
+		}
 	}
 }
 
@@ -181,42 +191,24 @@ func (vi *VectorIndex) SearchWithFilter(collection string, query []float32, topK
 		metric = CosineSimilarity
 	}
 
-	filter := func(docID string) bool {
+	// An allowed set smaller than the collection is visited directly: the
+	// cost follows what the filter admits, not the collection (SRCH-013).
+	if len(allowedDocIDs) < len(coll) {
+		defer vi.mu.RUnlock()
+		return vi.searchAdmittedLocked(collection, coll, allowedDocIDs, query, topK, threshold, metric)
+	}
+	if prefilterVisited != nil {
+		prefilterVisited(len(coll))
+	}
+
+	// A filter admitting at least as many documents as the collection holds:
+	// one pass over the collection, snapshotted under the lock and scored
+	// without it. parallelScore runs a small one on a single goroutine.
+	entries := snapshotMap(coll)
+	vi.mu.RUnlock()
+	return parallelScore(entries, query, topK, threshold, metric, func(docID string) bool {
 		return allowedDocIDs[BaseDocID(docID)]
-	}
-
-	// Parallel path for large collections: snapshot under lock, score without it.
-	if len(coll) >= parallelSearchConfig.MinSize() {
-		entries := snapshotMap(coll)
-		vi.mu.RUnlock()
-		return parallelScore(entries, query, topK, threshold, metric, filter)
-	}
-
-	// Sequential path for small collections — scoring runs under the read lock.
-	defer vi.mu.RUnlock()
-	results := make([]VectorResult, 0, min(len(allowedDocIDs), len(coll)))
-	for docID, vec := range coll {
-		if !filter(docID) {
-			continue
-		}
-		if len(vec) != len(query) {
-			continue // another embedding model's vector; see sameDimension
-		}
-		score := metric(query, vec)
-		if float64(score) >= threshold {
-			results = append(results, VectorResult{DocID: docID, Score: score})
-		}
-	}
-
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].Score > results[j].Score
 	})
-
-	if len(results) > topK {
-		results = results[:topK]
-	}
-
-	return results
 }
 
 // CollectionSize returns the number of vectors in a collection.

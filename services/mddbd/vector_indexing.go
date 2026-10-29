@@ -113,7 +113,7 @@ func (s *Server) startEmbeddingWorker(provider embedding.Provider) {
 func newVectorSearchers(flat *vector.VectorIndex, quantized *vector.QuantizedVectorIndex, bqRerank int) map[string]vector.VectorSearcher {
 	return map[string]vector.VectorSearcher{
 		"flat": flat,
-		"hnsw": vector.NewHNSWIndex(16, 200, 100),
+		"hnsw": vector.NewHNSWIndex(vector.DefaultHNSWM, vector.DefaultHNSWEfConstruction, vector.DefaultHNSWEfSearch),
 		"ivf":  vector.NewIVFIndex(10, 20),
 		"pq":   vector.NewPQIndex(8, 256, 20),
 		"opq":  vector.NewOPQIndex(8, 256, 20, 5),

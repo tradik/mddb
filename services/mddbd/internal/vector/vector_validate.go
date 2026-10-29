@@ -8,8 +8,9 @@ import (
 // What an index will refuse, and why it has to refuse it (#252).
 //
 // A vector the index cannot compare with its neighbours is not a slow vector,
-// it is a trap. `coder/hnsw` computes the distance between the incoming node
-// and the graph's entry point, and a length mismatch panics inside the library:
+// it is a trap. `coder/hnsw`, the HNSW graph until 2.18.9, computed the
+// distance between the incoming node and the graph's entry point, and a length
+// mismatch panicked inside the library:
 //
 //	embedding dimension mismatch: 0 != 3
 //

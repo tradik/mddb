@@ -666,13 +666,30 @@ Approximate nearest neighbor search using a multi-layer graph structure. Each la
 
 | Property | Value |
 |----------|-------|
-| Accuracy | ~95-99% recall |
+| Accuracy | recall@10 1.000 at 20k and 200k vectors (32 dimensions), 0.98–0.99 at 200k (128 dimensions), on the planner benchmark |
 | Speed | O(log n) |
 | Memory | Vectors + graph edges (~2x flat) |
 | Build time | O(n log n) |
-| Parameters | M=16, efSearch=100 |
+| Parameters | M=16 (32 links on layer 0), efConstruction=200, efSearch=64 (raised to the number of candidates asked for) |
 
 **When to use:** Best general-purpose algorithm for medium to large collections (10K-1M documents). Excellent speed/accuracy trade-off.
+
+> **The graph was replaced in v2.18.9 (SRCH-013).** Before, HNSW ran on
+> `github.com/coder/hnsw`, and its recall@10 on the planner benchmark was 0.86
+> at 2k vectors, 0.83 at 200k and 0.66 at 2M, varying by up to 0.13 between
+> two loads of the same data. The library kept each node's M *closest*
+> candidates as neighbours. Documents that arrive topic by topic then link only
+> within their own topic, and a search that enters the wrong topic cannot get
+> out. It also kept M links on layer 0 rather than 2M, ignored
+> `efConstruction`, and drew levels from the clock. The graph is now part of
+> MDDB (`internal/vector/vector_hnsw_graph.go`). It uses the paper's
+> neighbour-selection heuristic, 2M links on layer 0 and a real
+> `efConstruction`, and draws levels from a fixed seed. It measures recall@10
+> of 1.000 at 20k and 200k and is faster per query; see
+> [Vector query planner](BENCHMARK.md#vector-query-planner-v2189). The graph
+> orders by cosine distance whatever `metric` the search scores with, as
+> before. For normalised embeddings, cosine, dot product and euclidean rank
+> alike.
 
 ### IVF (Inverted File Index)
 
@@ -805,7 +822,7 @@ Extreme compression by converting each float32 dimension to a single bit (1 if p
 | Algorithm | Accuracy | Speed | Memory | Best For |
 |-----------|----------|-------|--------|----------|
 | Flat | Exact | Slow | 1x | < 10K docs |
-| HNSW | ~97% | Fast | ~2x | 10K-1M docs |
+| HNSW | ~98–100% (measured, v2.18.9) | Fast | ~2x | 10K-1M docs |
 | IVF | ~94% | Medium | ~1.1x | 100K+ docs |
 | PQ | ~90% | Fast | ~0.03x | 500K+ docs, low memory |
 | OPQ | ~93% | Fast | ~0.03x | 500K+ docs, higher recall than PQ |
@@ -845,12 +862,32 @@ collection the filter admits, and the request:
 | More than 1,000,000 vectors | `ivf` |
 | Vectors over 256 MB / 1 GB at float32 | `sq` / `sq4`, then `bq`, if built |
 | A filter that admits under 5% of the collection | `flat` over the admitted documents only (`prefilter: true`) |
+| A filter that admits 5% to a third, where `hnsw` would answer (v2.18.9) | a trained `ivf`, else `flat` over the admitted documents only (`prefilter: true`) |
 | Collection configured for quantization or disk-only vectors | its `quantized` index |
 | `latencyTargetMs` of 10 or less on 10,000+ vectors | `bq`, `sq4` or `sq`, if built |
 
 - **Nothing is built on the query path.** IVF, PQ, OPQ, SQ and SQ4 must be
   trained first. If the index the table names is not trained yet, the planner
-  takes the best index that is, and finally `flat`. The reason says so.
+  takes the best index that is: `hnsw`, then a trained `ivf`, and finally
+  `flat`. The reason says so.
+- **The prefilter costs what the filter admits (v2.18.9).** It looks up the
+  admitted documents' vectors and scores those alone. Until v2.18.9 it walked
+  the whole collection and dropped what the filter refused, so a 2% filter on
+  2M vectors took 79 ms. HNSW filters after its search and takes 3× the
+  candidates it is asked for. A filter admitting under a third leaves it short,
+  and it then scores the whole collection: 27–46 ms at 200k for filters of 2%
+  to 25%. Under `auto`, such a filter goes to a trained `ivf` when `hnsw`
+  would answer: 2.4 ms at 10% and 5.2 ms at 25%, where the prefilter took 4.9
+  and 9.6 ms. Without a trained `ivf` it goes to the prefilter. Under 5% the
+  prefilter is kept even over a trained `ivf`: at 2% `ivf` was 0.2 ms faster
+  at 200k vectors, but at 20k it found 0.77 of the exact top 10.
+- **Large collections with real embeddings get a quantized index, for
+  memory.** At 64 dimensions or more, a few million vectors pass 256 MB of
+  float32 and `auto` asks for `sq`, or `sq4` above 1 GB, if trained. On the
+  planner benchmark both keep recall@10 at 1.000, at 32 and 128 dimensions.
+  Neither is fast: at 200k vectors and 128 dimensions they took 71–73 ms,
+  where flat took 7.8 ms and `hnsw` 0.6 ms. Choose them to fit in RAM, not to
+  go faster.
 - **A filtered index search does not quietly come back short.** An index
   searches first and filters after, so a filter can leave 3 results for
   `topK: 10`. When that happens under `auto`, the planner scans further. IVF
@@ -894,8 +931,9 @@ target under `plan.collections`. Without `explain` the response has no
   `cross_search`), gRPC and GraphQL `vectorSearch`, where `plan` is a
   `SearchPlan` ([GRAPHQL.md](GRAPHQL.md#vector-search-semantic-search)).
 
-Measured before and after at 2k, 200k and 2M vectors (recall@10, p50/p99,
-what `auto` picked, and a filter admitting 2%): see
+Measured at 2k, 200k and 2M vectors, then at 20k and 200k after the HNSW,
+prefilter and threshold fixes (recall@10, p50/p99, what `auto` picked, and
+filters admitting 2%, 10% and 25%): see
 [Vector query planner](BENCHMARK.md#vector-query-planner-v2189) in
 docs/BENCHMARK.md. The bench is `tools/bench/planner`.
 

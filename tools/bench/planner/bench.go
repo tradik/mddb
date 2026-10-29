@@ -18,11 +18,20 @@ type search struct {
 	Filtered  bool   // with the selective filter (slice=rare)
 }
 
-// searches is what every size runs: flat (the default before SRCH-013), the
-// indexes auto chooses between, and auto, unfiltered and filtered.
-var searches = []search{
-	{"flat", false}, {"hnsw", false}, {"ivf", false}, {"auto", false},
-	{"flat", true}, {"hnsw", true}, {"ivf", true}, {"auto", true},
+// defaultIndexes are the indexes every size is searched with by name: flat
+// (the default before SRCH-013) and the ones auto chooses between by size.
+const defaultIndexes = "flat,hnsw,ivf"
+
+// searches is what every size runs: each named index, then auto, unfiltered
+// and then filtered.
+func searches(indexes []string) []search {
+	var out []search
+	for _, filtered := range []bool{false, true} {
+		for _, name := range append(indexes[:len(indexes):len(indexes)], "auto") {
+			out = append(out, search{name, filtered})
+		}
+	}
+	return out
 }
 
 // searchResult is one search over every query.
@@ -68,7 +77,7 @@ func measureSize(client *http.Client, cfg config, c *corpus, log io.Writer) (siz
 			truths[filtered] = append(truths[filtered], c.truth(q, filtered))
 		}
 	}
-	for _, s := range searches {
+	for _, s := range searches(cfg.Indexes) {
 		res, err := measure(client, cfg, c, s, truths[s.Filtered])
 		if err != nil {
 			return r, fmt.Errorf("%s: %w", s.Algorithm, err)

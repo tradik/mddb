@@ -139,7 +139,7 @@ func (f *fakeMDDB) corpus(n int) *corpus {
 func smallConfig(url string) config {
 	return config{URL: url, Collection: "c", Seed: 1, Dims: 8, Topics: 4, Queries: 6, Warmup: 2,
 		Sizes: []int{40, 82}, Batch: 7, Parallel: 3, RareEvery: 10, Timeout: 5 * time.Second,
-		PollPeriod: time.Millisecond}
+		Indexes: []string{"flat", "hnsw", "ivf"}, PollPeriod: time.Millisecond}
 }
 
 // rowFor finds a report row by its first three cells.

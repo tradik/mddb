@@ -110,23 +110,20 @@ func TestEachCollectionHasItsOwnDimension(t *testing.T) {
 	}
 }
 
-// The library can still panic on its own account, and the recovery has to hold
-// when it does. Reached directly, because the vectors that used to reach it
-// through Add are now refused before they get there.
-func TestAGraphPanicIsRecoveredAndReported(t *testing.T) {
+// The node that used to panic inside coder/hnsw's Add — one the graph cannot
+// compare with its entry point — is merely far from everything in the graph
+// that replaced it (SRCH-013), and the nodes after it still link and are found.
+// Add refuses it before it gets here; this is the graph's own guarantee.
+func TestAMismatchedNodeCannotPanicTheGraph(t *testing.T) {
 	idx := NewHNSWIndex(16, 0, 100)
 	if err := idx.Add("c", "a", []float32{1, 2, 3}); err != nil {
 		t.Fatal(err)
 	}
 	g := idx.graphs["c"]
-
-	// A node the graph cannot compare with its entry point — the panic that
-	// used to fire inside Add.
-	if panicked := addToGraph(g, "short", []float32{1, 2}); panicked == nil {
-		t.Fatal("the library did not panic on a mismatched node; the recovery is untested")
-	}
-	if panicked := addToGraph(g, "b", []float32{4, 5, 6}); panicked != nil {
-		t.Errorf("a good node panicked after the recovered one: %v", panicked)
+	g.Add("short", []float32{1, 2})
+	g.Add("b", []float32{4, 5, 6})
+	if hits := g.Search([]float32{4, 5, 6}, 1); len(hits) != 1 || hits[0].Key != "b" {
+		t.Errorf("search after a mismatched node = %v, want b", hits)
 	}
 }
 

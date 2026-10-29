@@ -3,7 +3,6 @@ package vector
 import (
 	"os"
 	"runtime"
-	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -31,21 +30,25 @@ var parallelSearchConfig parallelConfig
 const maxParallelWorkers = 256
 
 func init() {
-	workers := min(runtime.NumCPU(), 16)
-	if v := os.Getenv("MDDB_VECTOR_PARALLEL_WORKERS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= maxParallelWorkers {
-			workers = n
-		}
-	}
+	workers, minSize := parallelSettings(os.Getenv)
 	parallelSearchConfig.workers.Store(int32(workers)) // #nosec G115 -- bounded by maxParallelWorkers
-
-	minSize := 2048
-	if v := os.Getenv("MDDB_VECTOR_PARALLEL_MIN_SIZE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= (1<<30) {
-			minSize = n
-		}
-	}
 	parallelSearchConfig.minSize.Store(int32(minSize)) // #nosec G115 -- bounded by 1<<30
+}
+
+// parallelSettings reads MDDB_VECTOR_PARALLEL_WORKERS and
+// MDDB_VECTOR_PARALLEL_MIN_SIZE through getenv, keeping the defaults for a
+// value that is missing, not a number, or out of range.
+func parallelSettings(getenv func(string) string) (workers, minSize int) {
+	return envInt(getenv("MDDB_VECTOR_PARALLEL_WORKERS"), min(runtime.NumCPU(), 16), maxParallelWorkers),
+		envInt(getenv("MDDB_VECTOR_PARALLEL_MIN_SIZE"), 2048, 1<<30)
+}
+
+// envInt is v as a number in 1..limit, or def.
+func envInt(v string, def, limit int) int {
+	if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= limit {
+		return n
+	}
+	return def
 }
 
 // vectorEntry is a snapshot of a map entry for parallel processing.
@@ -86,24 +89,11 @@ func parallelScore(
 	cfgWorkers := parallelSearchConfig.Workers()
 	cfgMinSize := parallelSearchConfig.MinSize()
 	maxWorkers := (n + cfgMinSize - 1) / cfgMinSize
-	workers := min(cfgWorkers, maxWorkers)
-	if workers < 1 {
-		workers = 1
-	}
+	workers := max(1, min(cfgWorkers, maxWorkers))
 
 	// Single worker: skip goroutine overhead
 	if workers == 1 {
-		results := scoreRange(entries, 0, n, query, topK, threshold, metric, filter)
-		sort.Slice(results, func(i, j int) bool {
-			if results[i].Score != results[j].Score {
-				return results[i].Score > results[j].Score
-			}
-			return results[i].DocID < results[j].DocID
-		})
-		if len(results) > topK {
-			results = results[:topK]
-		}
-		return results
+		return mergeTop([][]VectorResult{scoreRange(entries, 0, n, query, topK, threshold, metric, filter)}, topK)
 	}
 
 	chunkSize := (n + workers - 1) / workers
@@ -132,32 +122,11 @@ func parallelScore(
 	}
 
 	wg.Wait()
-
-	// Merge partial results
-	total := 0
-	for _, p := range partials {
-		total += len(p)
-	}
-	merged := make([]VectorResult, 0, total)
-	for _, p := range partials {
-		merged = append(merged, p...)
-	}
-
-	// Sort by score descending, docID ascending (tiebreaker for determinism)
-	sort.Slice(merged, func(i, j int) bool {
-		if merged[i].Score != merged[j].Score {
-			return merged[i].Score > merged[j].Score
-		}
-		return merged[i].DocID < merged[j].DocID
-	})
-
-	if len(merged) > topK {
-		merged = merged[:topK]
-	}
-	return merged
+	return mergeTop(partials, topK)
 }
 
-// scoreRange scores entries[start:end] sequentially, returning filtered results.
+// scoreRange scores entries[start:end] sequentially, returning the topK best
+// that pass the filter and the threshold, unsorted; topK <= 0 returns them all.
 func scoreRange(
 	entries []vectorEntry,
 	start, end int,
@@ -167,18 +136,13 @@ func scoreRange(
 	metric SimilarityFunc,
 	filter func(string) bool,
 ) []VectorResult {
-	// GO-018: an empty or inverted range (start >= end) must not reach
-	// make(): min(end-start, topK*2) would be negative and panic with
-	// "makeslice: cap out of range". This happens when the worker split
-	// hands a later worker a start index past n.
+	// GO-018: an empty or inverted range (start >= end) happens when the
+	// worker split hands a later worker a start index past n; it has nothing
+	// to score.
 	if start >= end {
 		return nil
 	}
-	capHint := end - start
-	if topK > 0 && topK*2 < capHint {
-		capHint = topK * 2
-	}
-	results := make([]VectorResult, 0, capHint)
+	best := newTopK(topK)
 	for i := start; i < end; i++ {
 		e := &entries[i]
 		if filter != nil && !filter(e.docID) {
@@ -189,8 +153,8 @@ func scoreRange(
 		}
 		score := metric(query, e.vector)
 		if float64(score) >= threshold {
-			results = append(results, VectorResult{DocID: e.docID, Score: score})
+			best.add(VectorResult{DocID: e.docID, Score: score})
 		}
 	}
-	return results
+	return best.results()
 }

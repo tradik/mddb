@@ -16,6 +16,7 @@ func (vi *VectorIndex) DropCollection(collection string) {
 	vi.mu.Lock()
 	defer vi.mu.Unlock()
 	delete(vi.collections, collection)
+	delete(vi.chunkKeys, collection)
 }
 
 // DropCollection removes a collection's graph, vectors and bookkeeping.

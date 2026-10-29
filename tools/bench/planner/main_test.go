@@ -37,7 +37,7 @@ func TestServeAndRun_MeasuresEverySize(t *testing.T) {
 	if row := rowFor(report, "40", "none", "`hnsw`"); !strings.Contains(row, "| hnsw | 1.000 |") {
 		t.Fatal(row)
 	}
-	perSize := 1 + len(searches)*(cfg.Queries+cfg.Warmup)
+	perSize := 1 + len(searches(cfg.Indexes))*(cfg.Queries+cfg.Warmup)
 	if len(f.searched) != 2*perSize || f.searched[0] != (search{"ivf", false}) {
 		t.Fatalf("searches: %d, first %+v", len(f.searched), f.searched[0])
 	}
@@ -106,8 +106,9 @@ func TestServeAndRun_Failures(t *testing.T) {
 
 func TestParseFlags(t *testing.T) {
 	cfg, addr, err := parseFlags(flag.NewFlagSet("p", flag.ContinueOnError),
-		[]string{"-sizes", "2000, 200000", "-dims", "64", "-embed-addr", "127.0.0.1:9", "-keep"})
-	if err != nil || addr != "127.0.0.1:9" || cfg.Dims != 64 || !cfg.Keep || len(cfg.Sizes) != 2 || cfg.Sizes[1] != 200000 {
+		[]string{"-sizes", "2000, 200000", "-dims", "64", "-embed-addr", "127.0.0.1:9", "-keep", "-indexes", "sq, ,sq4"})
+	if err != nil || addr != "127.0.0.1:9" || cfg.Dims != 64 || !cfg.Keep || len(cfg.Sizes) != 2 || cfg.Sizes[1] != 200000 ||
+		strings.Join(cfg.Indexes, ",") != "sq,sq4" {
 		t.Fatalf("%v %q %+v", err, addr, cfg)
 	}
 	for _, bad := range [][]string{{"-sizes", "2k"}, {"-sizes", "50"}, {"-nope"}} {
@@ -165,7 +166,7 @@ func TestMain_FromFlags(t *testing.T) {
 	os.Args = []string{"planner", "-url", srv.URL, "-embed-addr", "127.0.0.1:0", "-dims", "8", "-topics", "4",
 		"-sizes", "40", "-queries", "3", "-warmup", "1", "-batch", "16"}
 	main()
-	if code != 0 || len(f.searched) != 1+len(searches)*4 {
+	if code != 0 || len(f.searched) != 1+len(searches(strings.Split(defaultIndexes, ",")))*4 {
 		t.Fatalf("exit %d, searches %d", code, len(f.searched))
 	}
 

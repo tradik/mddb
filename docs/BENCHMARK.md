@@ -443,6 +443,14 @@ admits 2% of the collection. Recall@10 is scored against the exact top 10,
 computed by the bench itself. "Ran" is the plan's `algorithm` from
 `explain: true`.
 
+The first run found three problems, fixed in the same release: HNSW recall
+was low and unstable, the exact prefilter scanned the whole collection, and
+the planner's thresholds were not backed by numbers. The tables marked
+"before the fixes" are that first run. The ones after them are the same bench
+against the fixed server.
+
+### Before the fixes
+
 Measured 2026-10-29 on an AMD Ryzen 9 7950X (WSL2, 32 GB), against a server
 built from this release, with its database on disk. Latency is measured by
 the client over HTTP. The corpus has 32 dimensions and 100 topics, and each
@@ -489,37 +497,187 @@ cd tools/bench && go run ./planner -url http://localhost:11023 -sizes 2000,20000
 | 2,000,000 | 2% | `ivf` | ivf | 1.000 | 10.24 | 57.48 |
 | 2,000,000 | 2% | **`auto`** | **flat + prefilter** | 1.000 | 79.34 | 834.01 |
 
-- **`auto` picks flat, hnsw and ivf at 2k, 200k and 2M.** With the 2%
-  filter it takes the exact prefilter path at every size. The planner adds
-  nothing measurable: `auto` matches the index it chose to within a tenth of
-  a millisecond.
-- **At 2M, `auto` is 17× faster than the old default at the median and 40×
-  at p99, with the same recall.** Flat takes 245 ms at p50 and 979 ms at
-  p99. IVF takes 14 ms and 24 ms.
-- **HNSW recall is low on this corpus: 0.86, 0.83 and 0.66.** IVF holds
-  1.000 from 200k up and is faster at 200k (1.65 ms against 2.64 ms at p50).
-  So `auto` at 200k gives up 17% of recall for nothing. The HNSW graph also
-  varies between loads: 0.70 to 0.83 at 200k over three loads, and 0.86 to
-  1.00 at 2k. `searchThresholds` is unchanged in this release. Where recall
-  matters and an IVF index is trained, name `ivf` rather than `auto`.
-- **The prefilter beats HNSW plus a post-filter by 6× (200k) and 8×
-  (2M), but loses to a trained IVF.** IVF filtered is 1.06 ms at 200k and
-  10 ms at 2M. The prefilter is 6.1 ms and 79 ms, with a p99 of 834 ms at
-  2M. The flat filtered search scores every vector in the collection and
-  then filters. It does not visit only the admitted documents, so its cost
-  grows with the collection, not with the filter.
-- **2M → ivf holds at 32 dimensions only.** At 2M vectors the tier also
-  checks the float32 size. At 64 dimensions or more, 2M vectors exceed
-  256 MB and the planner asks for `sq` (`sq4` above 1 GB). The table test
-  `TestPlanVector_ChoosesBySizeFilterAndWhatIsBuilt` in
-  `services/mddbd/search_planner_test.go` covers 2M →
-  ivf at 8 dimensions.
-- **Training is the cost `auto` will not pay.** IVF takes 58 s to train at
-  200k and 10 minutes at 2M. Without a trained IVF, `auto` at 2M falls back
-  to HNSW and says so in `reasons`.
-- **The corpus is synthetic.** It has 100 Gaussian clusters at 32
-  dimensions. Read the recall columns as a comparison between the indexes,
-  not as what a real embedding model will get.
+What that run showed: HNSW recall of 0.86, 0.83 and 0.66, varying between
+loads (0.70 to 0.83 at 200k over three loads); a prefilter that cost what the
+collection cost (79 ms at p50 and 834 ms at p99 at 2M for a 2% filter); and
+`auto` choosing HNSW at 200k, giving up 17% of recall against a faster IVF.
+
+The same bench against the same release before the fixes, repeated at 20k
+and 200k in the session that measured the fixes below. HNSW recall was 0.884
+and 0.740 this time:
+
+| Vectors | Filter | algorithm | Ran (explain) | recall@10 | p50 ms | p99 ms |
+|---------|--------|-----------|---------------|-----------|--------|--------|
+| 20,000 | none | `flat` | flat | 1.000 | 2.08 | 7.59 |
+| 20,000 | none | `hnsw` | hnsw | 0.884 | 1.33 | 3.40 |
+| 20,000 | none | `ivf` | ivf | 1.000 | 0.49 | 0.75 |
+| 20,000 | none | **`auto`** | **hnsw** | 0.884 | 1.38 | 3.90 |
+| 20,000 | 2% | `flat` | flat | 1.000 | 0.92 | 5.33 |
+| 20,000 | 2% | `hnsw` | hnsw | 1.000 | 2.20 | 6.49 |
+| 20,000 | 2% | `ivf` | ivf | 0.792 | 0.39 | 0.79 |
+| 20,000 | 2% | **`auto`** | **flat + prefilter** | 1.000 | 0.92 | 5.57 |
+| 200,000 | none | `flat` | flat | 1.000 | 19.92 | 50.44 |
+| 200,000 | none | `hnsw` | hnsw | 0.740 | 2.18 | 2.65 |
+| 200,000 | none | `ivf` | ivf | 1.000 | 1.42 | 2.08 |
+| 200,000 | none | **`auto`** | **hnsw** | 0.740 | 2.20 | 9.11 |
+| 200,000 | 2% | `flat` | flat | 1.000 | 5.89 | 45.48 |
+| 200,000 | 2% | `hnsw` | hnsw | 1.000 | 28.42 | 35.00 |
+| 200,000 | 2% | `ivf` | ivf | 1.000 | 0.99 | 1.32 |
+| 200,000 | 2% | **`auto`** | **flat + prefilter** | 1.000 | 5.48 | 31.31 |
+
+Loading took 18 s at 20k and 322 s at 200k; HNSW is built as vectors arrive.
+
+### After the fixes
+
+Same machine, settings and command, against the fixed server. 2M was not
+re-run: it takes about two hours. `-rare-every 10` and `-rare-every 4` make
+the filter admit 10% and 25%, and `-indexes` adds `sq` and `sq4` to the
+indexes searched by name:
+
+```bash
+cd tools/bench && go run ./planner -url http://localhost:11023 -sizes 20000,200000
+cd tools/bench && go run ./planner -url http://localhost:11023 -sizes 20000,200000 -rare-every 10
+cd tools/bench && go run ./planner -url http://localhost:11023 -sizes 200000 -dims 128 -indexes flat,hnsw,ivf,sq,sq4
+```
+
+Loading took 5 s at 20k and 53–59 s at 200k (322 s before), at 32
+dimensions; 64–66 s at 200k and 128 dimensions. Training IVF took 1.6 s and
+54 s, and 97–105 s at 128 dimensions.
+
+| Vectors | Filter | algorithm | Ran (explain) | recall@10 | p50 ms | p99 ms |
+|---------|--------|-----------|---------------|-----------|--------|--------|
+| 20,000 | none | `flat` | flat | 1.000 | 0.75 | 3.97 |
+| 20,000 | none | `hnsw` | hnsw | 1.000 | 0.35 | 0.68 |
+| 20,000 | none | `ivf` | ivf | 1.000 | 0.55 | 0.83 |
+| 20,000 | none | **`auto`** | **hnsw** | 1.000 | 0.40 | 0.55 |
+| 20,000 | 2% | `flat` | flat | 1.000 | 0.41 | 0.99 |
+| 20,000 | 2% | `hnsw` | hnsw | 1.000 | 1.15 | 1.35 |
+| 20,000 | 2% | `ivf` | ivf | 0.773 | 0.37 | 0.74 |
+| 20,000 | 2% | **`auto`** | **flat + prefilter** | 1.000 | 0.43 | 1.20 |
+| 20,000 | 10% | `flat` | flat | 1.000 | 0.72 | 1.79 |
+| 20,000 | 10% | `hnsw` | hnsw | 1.000 | 1.39 | 3.37 |
+| 20,000 | 10% | `ivf` | ivf | 1.000 | 0.53 | 1.15 |
+| 20,000 | 10% | **`auto`** | **ivf** | 1.000 | 0.51 | 1.03 |
+| 20,000 | 25% | `flat` | flat | 1.000 | 1.03 | 2.65 |
+| 20,000 | 25% | `hnsw` | hnsw | 1.000 | 2.15 | 4.52 |
+| 20,000 | 25% | `ivf` | ivf | 1.000 | 0.81 | 1.81 |
+| 20,000 | 25% | **`auto`** | **ivf** | 1.000 | 0.79 | 1.93 |
+| 200,000 | none | `flat` | flat | 1.000 | 5.15 | 23.00 |
+| 200,000 | none | `hnsw` | hnsw | 1.000 | 0.46 | 0.72 |
+| 200,000 | none | `ivf` | ivf | 1.000 | 1.59 | 2.82 |
+| 200,000 | none | **`auto`** | **hnsw** | 1.000 | 0.52 | 0.70 |
+| 200,000 | 2% | `flat` | flat | 1.000 | 1.33 | 2.35 |
+| 200,000 | 2% | `hnsw` | hnsw | 1.000 | 27.19 | 34.20 |
+| 200,000 | 2% | `ivf` | ivf | 1.000 | 0.93 | 1.18 |
+| 200,000 | 2% | **`auto`** | **flat + prefilter** | 1.000 | 1.14 | 1.78 |
+| 200,000 | 10% | `flat` | flat | 1.000 | 4.87 | 9.40 |
+| 200,000 | 10% | `hnsw` | hnsw | 1.000 | 36.17 | 42.70 |
+| 200,000 | 10% | `ivf` | ivf | 1.000 | 2.42 | 7.39 |
+| 200,000 | 10% | **`auto`** | **ivf** | 1.000 | 2.52 | 6.40 |
+| 200,000 | 25% | `flat` | flat | 1.000 | 9.62 | 19.83 |
+| 200,000 | 25% | `hnsw` | hnsw | 1.000 | 46.36 | 58.93 |
+| 200,000 | 25% | `ivf` | ivf | 1.000 | 5.16 | 12.71 |
+| 200,000 | 25% | **`auto`** | **ivf** | 1.000 | 5.31 | 12.68 |
+
+At 128 dimensions, 200k vectors (102 MB of float32, under the 256 MB at which
+the planner asks for `sq`). `sq` and `sq4` are named to measure them; they
+were trained by their first search, in the warmup:
+
+| Vectors | Filter | algorithm | Ran (explain) | recall@10 | p50 ms | p99 ms |
+|---------|--------|-----------|---------------|-----------|--------|--------|
+| 200,000 | none | `flat` | flat | 1.000 | 7.80 | 24.44 |
+| 200,000 | none | `hnsw` | hnsw | 0.981 | 0.60 | 0.78 |
+| 200,000 | none | `ivf` | ivf | 1.000 | 1.98 | 2.99 |
+| 200,000 | none | `sq` | sq | 1.000 | 71.13 | 80.27 |
+| 200,000 | none | `sq4` | sq4 | 1.000 | 73.35 | 86.45 |
+| 200,000 | none | **`auto`** | **hnsw** | 0.981 | 0.55 | 0.77 |
+| 200,000 | 2% | `flat` | flat | 1.000 | 1.16 | 1.78 |
+| 200,000 | 2% | `hnsw` | hnsw | 1.000 | 28.96 | 41.75 |
+| 200,000 | 2% | `ivf` | ivf | 1.000 | 1.24 | 4.44 |
+| 200,000 | 2% | `sq` | sq | 1.000 | 20.04 | 28.85 |
+| 200,000 | 2% | `sq4` | sq4 | 1.000 | 19.82 | 38.50 |
+| 200,000 | 2% | **`auto`** | **flat + prefilter** | 1.000 | 1.14 | 1.56 |
+
+A second load at 128 dimensions measured HNSW at 0.990. At 32 dimensions
+`sq` and `sq4` also held 1.000 (40 and 42 ms at 200k, unfiltered).
+
+### The HNSW graph alone
+
+In-process, without the server: the 20k corpus inserted topic by topic, as
+the bench stores it, and shuffled. 100 queries, built with `-tags noasm`:
+
+| Graph | M | ef (construction / search) | Order | recall@10 | build | per query |
+|-------|---|----------------------------|-------|-----------|-------|-----------|
+| `coder/hnsw` | 16 | 100 / 100 | by topic | 0.939 | 10.9 s | 702 µs |
+| `coder/hnsw` | 16 | 100 / 100 | shuffled | 1.000 | 12.9 s | 734 µs |
+| `coder/hnsw` | 16 | 200 / 200 | by topic | 0.972 | 22.2 s | 1,410 µs |
+| `coder/hnsw` | 32 | 100 / 100 | by topic | 0.998 | 19.4 s | 1,197 µs |
+| MDDB, v2.18.9 | 16 | 200 / 100 | by topic | 1.000 | 2.0 s | 98 µs |
+| MDDB, v2.18.9 | 16 | 200 / 50 | by topic | 1.000 | 2.1 s | 44 µs |
+| MDDB, v2.18.9 | 16 | 200 / 100 | shuffled | 1.000 | 2.4 s | 79 µs |
+
+At 200k the MDDB graph measured 1.000 at efSearch 100, 0.997–0.998 at 50 and
+1.000 at efConstruction 100 / efSearch 64, in either order. The library gave
+the construction search the search beam, so its two ef columns are one
+number.
+
+### Findings
+
+- **HNSW recall was the library's, and the graph is replaced.**
+  `coder/hnsw` kept each node's M nearest candidates as neighbours, without
+  the paper's diversity heuristic. The bench stores documents topic by topic,
+  so each topic's edges to the others were the first evicted, and a search
+  that entered the wrong topic could not leave it. Shuffling the same
+  documents gave the library 1.000 (table above). Its layer 0 also kept M
+  links rather than 2M, its construction ignored `efConstruction` (the
+  reason `NewHNSWIndex` dropped its second argument), and both its entry
+  point and its levels were random per load, hence 0.70–0.88 between loads.
+  Metric, `ef < k`, tombstones and chunk keys were checked and were not the
+  cause: the graph orders by cosine as the default metric does, a search's
+  beam is never below k, and both the 20k and 200k corpora are unchunked with
+  nothing deleted. MDDB now has its own graph
+  (`internal/vector/vector_hnsw_graph.go`): heuristic neighbour selection,
+  2M links on layer 0, a real `efConstruction` (200), `efSearch` 64, and
+  levels from a fixed seed. Recall@10 is 1.000 at 20k and 200k and
+  0.981–0.990 at 128 dimensions. It is 3–5× faster per query than before (0.46
+  against 2.18 ms at 200k), and loading 200k takes 53 s instead of 322 s.
+- **`auto` keeps HNSW for 10k–1M vectors.** The fixed graph beats a trained
+  IVF on both recall and latency: 0.35 against 0.55 ms at 20k and 0.46
+  against 1.59 ms at 200k, at 1.000 each. Before the fix, `auto` at 200k gave
+  0.740–0.827. If HNSW holds nothing for a collection, the planner now falls
+  back to a trained IVF before flat.
+- **The prefilter costs what the filter admits.** It looks up the admitted
+  documents' vectors, in parallel, rather than scanning the collection. At
+  200k and 2% it fell from 5.5–6.1 ms to 1.1 ms at p50, and from 31–35 ms to
+  1.8 ms at p99. It is still exact. Flat search also keeps its top k in a
+  bounded heap rather than sorting every score: 20 ms → 5 ms at 200k.
+- **Under 5%, the prefilter; from 5% to a third, a trained IVF.** At 2% a
+  trained IVF was 0.2 ms faster at 200k (0.93 against 1.14 ms), but at 20k it
+  found 0.773 of the exact top 10. The prefilter is exact, so `auto` keeps
+  it. From 10% up, IVF wins at 1.000: 2.4 against 4.9 ms at 10%, 5.2 against
+  9.6 ms at 25%. HNSW filters after its search and takes 3× the candidates
+  it is asked for. A filter under a third leaves it short, and it then scores
+  the whole collection: 27, 36 and 46 ms at 2, 10 and 25%. So `auto` sends
+  such a filter to a trained IVF, or to the prefilter when there is none.
+  Above a third, HNSW post-filters as before.
+- **Quantized indexes are a memory choice, not a speed one.** At float32
+  sizes over 256 MB (`sq`) and 1 GB (`sq4`), which 2M vectors reach from 64
+  dimensions up, the planner asks for a quantized index, by design. On this
+  corpus `sq` and `sq4` keep recall@10 at 1.000 at 32 and 128 dimensions.
+  They are the slowest indexes measured: 71–73 ms at 200k and 128
+  dimensions, against 7.8 ms for flat and 0.6 ms for HNSW. They score every
+  vector and sort all the scores before reranking. 2M vectors at 32
+  dimensions are 244 MiB, just under the threshold, so they stay on `ivf`, as
+  the 2M table shows.
+- **Training is the cost `auto` will not pay.** IVF takes 54 s to train at
+  200k (97–105 s at 128 dimensions) and 10 minutes at 2M. Without a trained
+  IVF, `auto` at 2M falls back to HNSW and says so in `reasons`.
+- **2M after the fixes is not measured.** The planner still sends more than
+  1M vectors to IVF. The fixed graph may now beat IVF there, as it does at
+  200k, but that run takes about two hours.
+- **The corpus is synthetic.** It has 100 Gaussian clusters. Read the recall
+  columns as a comparison between the indexes, not as what a real embedding
+  model will get.
 
 ---
 

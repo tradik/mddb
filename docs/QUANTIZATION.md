@@ -174,7 +174,7 @@ Two independent mechanisms share the "quantization" vocabulary:
   [`auto`: the server chooses](SEARCH.md#auto-the-server-chooses-v2189).
 
 Index tuning parameters are currently fixed at sensible defaults (HNSW
-`M=16`, `efConstruction=200`, `efSearch=100`; IVF `nProbe=10`; PQ
+`M=16`, `efConstruction=200`, `efSearch=64`; IVF `nProbe=10`; PQ
 `nSubspaces=8`, `codebookSize=256`; OPQ `opqIter=5`). The one runtime knob is
 `MDDB_VECTOR_BQ_RERANK_FACTOR` for the binary-quantized index — see
 [config.md](config.md).

@@ -12,8 +12,13 @@ status: publish
 **Tool:** [Trivy](https://trivy.dev/) — filesystem license scanner  
 **Scan command:** `trivy fs --scanners license .`  
 **Amended:** 2026-08-24 — `github.com/google/renameio` removed from
-`services/mddbd` (WIN-003); see the footnote on `github.com/coder/hnsw`. This is
+`services/mddbd` (WIN-003), through a fork of `github.com/coder/hnsw`. This is
 a targeted correction, not a re-scan: every other row is still as of the scan date.
+**Amended:** 2026-10-29 — `github.com/coder/hnsw` (CC0-1.0) and the fork it
+was replaced with are removed from `services/mddbd`, and with them
+`github.com/chewxy/math32`, `github.com/viterin/partial`, `github.com/viterin/vek`
+and `golang.org/x/exp`, which only it required. The HNSW graph is now written in
+the module (SRCH-013, `internal/vector/vector_hnsw_graph.go`).
 **Amended:** 2026-10-29 — the XLSX, ODS, CSV, PPTX, ODP, EPUB, EML and MBOX
 converters (GO-046, v2.18.9) add **no dependency**. They are written on the
 standard library (`archive/zip`, `encoding/xml`, `encoding/csv`, `net/mail`,
@@ -28,7 +33,7 @@ writing, styling and encrypted workbooks the server never uses.
 
 ## Executive Summary
 
-Scanned **4 targets** (Go modules + npm packages) with a total of **275 dependencies**.
+Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependencies**.
 
 | Metric | Value |
 |--------|-------|
@@ -296,7 +301,7 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **275 dependen
 
 ### services/mddbd/go.mod
 
-**35 dependencies**
+**30 dependencies**
 
 | Package | License | Severity | Category |
 |---------|---------|----------|----------|
@@ -304,8 +309,6 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **275 dependen
 | github.com/agnivade/levenshtein | MIT | LOW | notice |
 | github.com/bits-and-blooms/bitset | BSD-3-Clause | LOW | notice |
 | github.com/bits-and-blooms/bloom/v3 | BSD-2-Clause | LOW | notice |
-| github.com/chewxy/math32 | BSD-2-Clause | LOW | notice |
-| github.com/coder/hnsw [^hnsw-fork] | CC0-1.0 | LOW | unencumbered |
 | github.com/go-viper/mapstructure/v2 | MIT | LOW | notice |
 | github.com/goccy/go-json | MIT | LOW | notice |
 | github.com/golang-jwt/jwt/v5 | MIT | LOW | notice |
@@ -321,11 +324,8 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **275 dependen
 | github.com/robfig/cron/v3 | MIT | LOW | notice |
 | github.com/sosodev/duration | MIT | LOW | notice |
 | github.com/vektah/gqlparser/v2 | MIT | LOW | notice |
-| github.com/viterin/partial | MIT | LOW | notice |
-| github.com/viterin/vek | MIT | LOW | notice |
 | go.etcd.io/bbolt | MIT | LOW | notice |
 | golang.org/x/crypto | BSD-3-Clause | LOW | notice |
-| golang.org/x/exp | BSD-3-Clause | LOW | notice |
 | golang.org/x/net | BSD-3-Clause | LOW | notice |
 | golang.org/x/sync | BSD-3-Clause | LOW | notice |
 | golang.org/x/sys | BSD-3-Clause | LOW | notice |
@@ -335,16 +335,6 @@ Scanned **4 targets** (Go modules + npm packages) with a total of **275 dependen
 | google.golang.org/protobuf | BSD-3-Clause | LOW | notice |
 | gopkg.in/yaml.v3 | Apache-2.0 | LOW | notice |
 | gopkg.in/yaml.v3 | MIT | LOW | notice |
-
-
-[^hnsw-fork]: Resolved through a `replace` in `services/mddbd/go.mod` onto
-`github.com/tradik/hnsw`, a fork holding one commit: the one sent upstream as
-[coder/hnsw#24](https://github.com/coder/hnsw/pull/24). The licence is
-unchanged — CC0-1.0 is a public-domain dedication, so the fork carries no
-additional obligation. That commit is also what removed
-`github.com/google/renameio` (Apache-2.0) from this module: it was reachable
-only from the one hnsw function the patch rewrites, and it has no Windows
-build. The `replace` is temporary and tracked for removal once upstream merges.
 
 ### test/go.mod
 
