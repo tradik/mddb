@@ -297,7 +297,8 @@ func TestCrossSearchItems_FilterAndTruncation(t *testing.T) {
 	doc, _ := s.loadDocByRef("notes", "n1", "en")
 	_ = s.VectorIndex.Add("notes", doc.ID, []float32{1, 0, 0})
 	// A vector whose document is gone is skipped, not returned empty.
-	_ = s.VectorIndex.Add("notes", "notes|ghost|en", []float32{1, 0, 0})
+	// Ranked last, so it is reached only when the whole list is loaded.
+	_ = s.VectorIndex.Add("notes", "notes|ghost|en", []float32{0.5, 0.5, 0})
 
 	p := crossSearchParams{
 		Searcher: s.VectorSearchers["flat"], QueryVector: []float32{1, 0, 0},

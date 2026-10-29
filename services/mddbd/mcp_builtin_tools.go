@@ -109,6 +109,9 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"filter_meta":     map[string]interface{}{"type": "object", "description": "Optional metadata filter to combine with semantic search"},
 					"filter":          mcpFilterSchema,
 					"group_by":        mcpGroupBySchema,
+					"read_level":      mcpReadLevelSchema,
+					"wait_for_index":  mcpWaitForIndexSchema,
+					"wait_for_keys":   mcpWaitForKeysSchema,
 					"algorithm":       map[string]interface{}{"type": "string", "description": "Vector search algorithm: flat (exact, default), hnsw (approximate), ivf (clustered), pq (compressed)"},
 					"distance_metric": map[string]interface{}{"type": "string", "description": "Distance metric: cosine (default), dot_product, euclidean"},
 					"retrieval_mode":  map[string]interface{}{"type": "string", "description": "Result granularity: parent (default, one result per document), chunk (matching passage with chunkIndex/chunkText), window (passage plus neighboring chunks)"},
@@ -465,6 +468,20 @@ func mcpBuiltinToolsCore() []MCPTool {
 			},
 		},
 		{
+			Name: "get_indexing_status",
+			Description: "Is what was just written searchable yet? Reports queued embeddings " +
+				"(pendingEmbeddings, failedEmbeddings, progress, oldestPendingAt) and queued metadata " +
+				"updates for one collection, or for the server without one. A document is found by " +
+				"full_text_search as soon as its write returns, and by semantic_search once its " +
+				"embedding is done — to wait for that, pass wait_for_keys to the search instead of polling.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"collection": map[string]interface{}{"type": "string", "description": "Collection; omit for the whole server"},
+				},
+			},
+		},
+		{
 			Name: "code_graph",
 			Description: "Code connection graph. Answers what a document depends on and what depends on it: " +
 				"which stylesheet declares a selector a template applies, which pages load a script, " +
@@ -606,6 +623,9 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"filter_meta":      map[string]interface{}{"type": "object", "description": "Metadata filter"},
 					"filter":           mcpFilterSchema,
 					"group_by":         mcpGroupBySchema,
+					"read_level":       mcpReadLevelSchema,
+					"wait_for_index":   mcpWaitForIndexSchema,
+					"wait_for_keys":    mcpWaitForKeysSchema,
 					"boost":            map[string]interface{}{"type": "object", "description": "Per-query score multiplier keyed by \"metaKey:metaValue\" (e.g. {\"tag:featured\":5.0,\"status:archived\":-2.0}). Positive boosts, negative demotes; combined multiplicatively."},
 					"sort":             map[string]interface{}{"type": "string", "description": "Result ordering: \"combined\" (default, by fused score) or \"distance\" (by proximity ascending — requires a geo filter on the HTTP path)"},
 					"facet_by":         map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "(v2.9.14+) Metadata keys to aggregate into response.facets."},
@@ -989,6 +1009,9 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					"filter_meta":        map[string]interface{}{"type": "object", "description": "Metadata equality filter applied in every target collection"},
 					"filter":             mcpFilterSchema,
 					"group_by":           mcpGroupBySchema,
+					"read_level":         mcpReadLevelSchema,
+					"wait_for_index":     mcpWaitForIndexSchema,
+					"wait_for_keys":      mcpWaitForKeysSchema,
 				},
 				"required": []string{"target_collections"},
 			},
@@ -1264,3 +1287,20 @@ var mcpGroupBySchema = map[string]interface{}{
 	},
 	"required": []string{"key"},
 }
+
+// Read-your-writes arguments of the vector-backed search tools (GO-042).
+var (
+	mcpReadLevelSchema = map[string]interface{}{
+		"type": "string", "enum": []string{ReadLevelIndexed, ReadLevelIndexedPlusPending},
+		"description": "indexedPlusPending also returns documents whose embedding is still queued, " +
+			"found by their text and marked pendingEmbedding (semantic_search; hybrid_search already includes them)",
+	}
+	mcpWaitForIndexSchema = map[string]interface{}{
+		"type": "integer", "minimum": 0, "maximum": 30000,
+		"description": "Wait up to this many ms for queued embeddings before searching; the response says indexing.timedOut if they did not finish",
+	}
+	mcpWaitForKeysSchema = map[string]interface{}{
+		"type": "array", "items": map[string]interface{}{"type": "string"},
+		"description": "With wait_for_index: wait only for these document keys, e.g. the one just added",
+	}
+)

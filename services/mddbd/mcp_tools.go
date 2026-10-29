@@ -133,6 +133,8 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolCodeGraph(ctx, args)
 	case "search_advisor":
 		return s.toolSearchAdvisor(ctx, args)
+	case "get_indexing_status":
+		return s.toolGetIndexingStatus(ctx, args)
 	case "classify_document":
 		return s.toolClassifyDocument(ctx, args)
 	case "delete_collection":
@@ -373,6 +375,19 @@ func mcpGetGroupBy(m map[string]interface{}) (*GroupBy, error) {
 		g.PerGroup = mcpGetInt(raw, "perGroup")
 	}
 	return g, g.Validate()
+}
+
+// mcpGetIndexWait reads read_level, wait_for_index and wait_for_keys (GO-042).
+func mcpGetIndexWait(m map[string]interface{}) IndexWait {
+	w := IndexWait{ReadLevel: mcpGetString(m, "read_level"), WaitForIndex: mcpGetInt(m, "wait_for_index")}
+	if keys, ok := m["wait_for_keys"].([]interface{}); ok {
+		for _, k := range keys {
+			if s, ok := k.(string); ok {
+				w.WaitForKeys = append(w.WaitForKeys, s)
+			}
+		}
+	}
+	return w
 }
 
 // mcpGetFloat64Map reads a JSON object of numeric values into a float64 map.

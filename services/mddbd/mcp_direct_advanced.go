@@ -384,6 +384,9 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	if err := req.GroupBy.Validate(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateIndexWait(); err != nil {
+		return nil, err
+	}
 
 	// Select algorithm
 	algo := req.Algorithm
@@ -440,6 +443,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	// request parameter and the default apply.
 	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
+	waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
 	items := s.crossSearchItems(crossSearchParams{
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
@@ -455,6 +459,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		TargetCollections: req.TargetCollections,
 		Algorithm:         algo,
 		DistanceMetric:    metricName,
+		Indexing:          waited,
 	}, nil
 }
 

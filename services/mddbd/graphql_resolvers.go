@@ -427,3 +427,50 @@ func groupByFromGQL(in *gql.GroupByInput) *GroupBy {
 	}
 	return &GroupBy{Key: in.Key, PerGroup: derefInt(in.PerGroup, 0)}
 }
+
+// IndexingStatus reports queued indexing work (GO-042).
+func (a *GraphQLAdapter) IndexingStatus(ctx context.Context, collection *string) (*gql.IndexingStatus, error) {
+	if _, err := a.requireAuthenticated(ctx); err != nil {
+		return nil, err
+	}
+	coll := derefString(collection)
+	scope := coll
+	if scope == "" {
+		scope = "*"
+	}
+	if err := a.CheckPermission(ctx, scope, int(PermRead)); err != nil {
+		return nil, err
+	}
+	st, err := a.mcp.IndexingStatus(ctx, coll)
+	if err != nil {
+		return nil, err
+	}
+	out := &gql.IndexingStatus{
+		PendingEmbeddings:   st.PendingEmbeddings,
+		FailedEmbeddings:    clampUint(st.FailedEmbeddings),
+		CompletedEmbeddings: clampUint(st.CompletedEmbeddings),
+		PendingMetadata:     st.PendingMetadata,
+		Progress:            st.Progress,
+		Indexed:             st.Indexed,
+	}
+	if st.OldestPendingAt != nil {
+		at := st.OldestPendingAt.Unix()
+		out.OldestPendingAt = &at
+	}
+	if st.Collection != "" {
+		out.Collection = &st.Collection
+	}
+	if st.Provider != "" {
+		out.Provider = &st.Provider
+	}
+	return out, nil
+}
+
+// clampUint fits a counter into GraphQL's Int, saturating rather than wrapping.
+func clampUint(n uint64) int {
+	const maxInt = int(^uint(0) >> 1)
+	if n > uint64(maxInt) {
+		return maxInt
+	}
+	return int(n)
+}

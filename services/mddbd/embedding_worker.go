@@ -7,6 +7,7 @@ import (
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	"mddb/internal/metrics"
+	"mddb/internal/pending"
 	vec "mddb/internal/vector"
 	"strings"
 	"sync"
@@ -56,6 +57,11 @@ type EmbeddingWorker struct {
 	// rather than a mystery.
 	dropped atomic.Uint64
 
+	// pending tracks jobs from Enqueue to the end of processing, per
+	// collection and per document, so a search can report or wait for them
+	// (GO-042). The channel alone knows only its global length.
+	pending *pending.Tracker
+
 	// indexer receives every chunk the worker embeds, and drops the chunks a
 	// shrunken document no longer has. The server sets it to all of its
 	// indexes; left alone it is the flat index, which is what tests of the
@@ -103,6 +109,7 @@ func NewEmbeddingWorker(provider embedding.Provider, store *vec.VectorStore, ind
 		chunkEnabled: envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true",
 		enqueueWait:  embeddingEnqueueWait(),
 		indexer:      flatIndexer{index},
+		pending:      pending.New(),
 	}
 }
 
@@ -165,6 +172,9 @@ func (w *EmbeddingWorker) Stop() {
 // full. Returns false only when the job was abandoned, which the caller is
 // expected to report rather than ignore (#232).
 func (w *EmbeddingWorker) Enqueue(job EmbeddingJob) bool {
+	// Counted before the send, so a worker that finishes first cannot record
+	// the end of a job the tracker has not seen start.
+	w.pending.Add(job.Collection, job.DocID)
 	// Fast path: room now, which is every write on an idle server.
 	select {
 	case w.jobs <- job:
@@ -190,6 +200,7 @@ func (w *EmbeddingWorker) Enqueue(job EmbeddingJob) bool {
 
 // dropJob records an abandoned job and always reports failure.
 func (w *EmbeddingWorker) dropJob(job EmbeddingJob) bool {
+	w.pending.Done(job.Collection, job.DocID, true)
 	w.dropped.Add(1)
 	if w.metrics != nil {
 		w.metrics.IncOp("embedding", "dropped")
@@ -210,24 +221,36 @@ func (w *EmbeddingWorker) worker(id int) {
 			for {
 				select {
 				case job := <-w.jobs:
-					w.processJob(job)
+					w.run(job)
 				default:
 					return
 				}
 			}
 		case job := <-w.jobs:
-			w.processJob(job)
+			w.run(job)
 		}
 	}
 }
 
-func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
+// run processes one job and records its end with the tracker.
+func (w *EmbeddingWorker) run(job EmbeddingJob) {
+	ok := w.processJob(job)
+	w.pending.Done(job.Collection, job.DocID, !ok)
+}
+
+// Pending is the worker's in-flight job tracker (GO-042).
+func (w *EmbeddingWorker) Pending() *pending.Tracker { return w.pending }
+
+// processJob embeds one document. It reports false when the document was left
+// without the vectors it should have: the provider failed or storing failed.
+// Nothing to do — unchanged content, no chunks, a deleted document — is true.
+func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 	contentHash := vec.ContentHash(job.ContentMD)
 
 	// Check if content already has a matching embedding
 	existing, err := w.vectorStore.Get(job.Collection, job.DocID)
 	if err == nil && existing != nil && existing.ContentHash == contentHash {
-		return // embedding is up-to-date
+		return true // embedding is up-to-date
 	}
 
 	// Split into chunks if enabled
@@ -243,7 +266,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	}
 
 	if len(chunks) == 0 {
-		return
+		return true
 	}
 
 	// RAG-003: reuse the vectors of chunks whose text did not change.
@@ -288,7 +311,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 			if w.metrics != nil {
 				w.metrics.IncOp("embedding", "error")
 			}
-			return
+			return false
 		}
 
 		chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{
@@ -310,14 +333,14 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	if checker, ok := w.indexer.(documentChecker); ok && !checker.DocumentExists(job.Collection, job.DocID) {
 		slog.Debug("document deleted while it was being embedded; vectors discarded",
 			"collection", job.Collection, "docID", job.DocID)
-		return
+		return true
 	}
 
 	// Store all chunks in BoltDB
 	noteEmbeddingProvenance(w.vectorStore, job.Collection, w.provider)
 	if err := w.vectorStore.PutChunks(job.Collection, job.DocID, chunkEmbeddings, w.provider.Model(), contentHash); err != nil {
 		slog.Error("failed to store embedding", "collection", job.Collection, "docID", job.DocID, "err", err)
-		return
+		return false
 	}
 
 	// Update the in-memory indexes — all of them, through the indexer. Which
@@ -345,4 +368,5 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) {
 	if w.metrics != nil {
 		w.metrics.IncOp("embedding", "completed")
 	}
+	return true
 }

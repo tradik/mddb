@@ -229,6 +229,7 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		return "", groupErr
 	}
 	req.GroupBy = groupBy
+	req.IndexWait = mcpGetIndexWait(args)
 	if mmr, ok := args["mmr"].(bool); ok {
 		req.MMR = mmr
 	}
@@ -419,6 +420,7 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		return "", groupErr
 	}
 	req.GroupBy = groupBy
+	req.IndexWait = mcpGetIndexWait(args)
 	if alpha, ok := args["alpha"].(float64); ok {
 		req.Alpha = alpha
 	}
@@ -646,6 +648,16 @@ func (s *MCPToolServer) toolSearchAdvisor(ctx context.Context, args map[string]i
 		return "", err
 	}
 
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return string(data), nil
+}
+
+// toolGetIndexingStatus answers "is it searchable yet?" (GO-042).
+func (s *MCPToolServer) toolGetIndexingStatus(ctx context.Context, args map[string]interface{}) (string, error) {
+	resp, err := s.client.IndexingStatus(ctx, mcpGetString(args, "collection"))
+	if err != nil {
+		return "", err
+	}
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil
 }

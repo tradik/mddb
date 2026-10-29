@@ -6,6 +6,7 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"log/slog"
 	"mddb/internal/binlog"
+	"mddb/internal/pending"
 	"mddb/internal/storage"
 	"sync"
 )
@@ -48,6 +49,10 @@ type IndexQueue struct {
 	failed    uint64
 	fallbacks uint64 // jobs processed synchronously because the queue was full
 	mu        sync.RWMutex
+	// pending tracks queued jobs per collection and document (GO-042), so the
+	// indexing status can say which collection is behind, not only that the
+	// queue is non-empty.
+	pending *pending.Tracker
 }
 
 // NewIndexQueue creates a new index queue
@@ -64,6 +69,7 @@ func NewIndexQueue(store Store, workers int) *IndexQueue {
 		workers: workers,
 		ctx:     ctx,
 		cancel:  cancel,
+		pending: pending.New(),
 	}
 
 	// Start workers
@@ -99,10 +105,13 @@ func (iq *IndexQueue) Enqueue(job *IndexJob) error {
 	if iq.ctx.Err() != nil {
 		return ErrQueueClosed
 	}
+	iq.pending.Add(job.Collection, job.DocID)
 	select {
 	case iq.queue <- job:
 		return nil
 	default:
+		// Indexed inline below: not pending once Enqueue returns.
+		iq.pending.Done(job.Collection, job.DocID, false)
 		// Queue full — index inline so the job is never lost.
 		iq.mu.Lock()
 		iq.fallbacks++
@@ -127,7 +136,9 @@ func (iq *IndexQueue) worker(id int) {
 	for {
 		select {
 		case job := <-iq.queue:
-			if err := iq.processJob(job); err != nil {
+			err := iq.processJob(job)
+			iq.pending.Done(job.Collection, job.DocID, err != nil)
+			if err != nil {
 				slog.Warn("Worker failed to index doc", "id", id, "docID", job.DocID, "err", err)
 				iq.mu.Lock()
 				iq.failed++
@@ -200,3 +211,6 @@ func (iq *IndexQueue) Stats() (processed, failed, fallbacks uint64, queueLen int
 	defer iq.mu.RUnlock()
 	return iq.processed, iq.failed, iq.fallbacks, len(iq.queue)
 }
+
+// Pending is the queue's in-flight job tracker (GO-042).
+func (iq *IndexQueue) Pending() *pending.Tracker { return iq.pending }

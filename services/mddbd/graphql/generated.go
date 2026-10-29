@@ -140,6 +140,18 @@ type ComplexityRoot struct {
 		Write      func(childComplexity int) int
 	}
 
+	IndexingStatus struct {
+		Collection          func(childComplexity int) int
+		CompletedEmbeddings func(childComplexity int) int
+		FailedEmbeddings    func(childComplexity int) int
+		Indexed             func(childComplexity int) int
+		OldestPendingAt     func(childComplexity int) int
+		PendingEmbeddings   func(childComplexity int) int
+		PendingMetadata     func(childComplexity int) int
+		Progress            func(childComplexity int) int
+		Provider            func(childComplexity int) int
+	}
+
 	IngestResult struct {
 		Added      func(childComplexity int) int
 		Collection func(childComplexity int) int
@@ -188,6 +200,7 @@ type ComplexityRoot struct {
 		Fts              func(childComplexity int, input FTSInput) int
 		GroupPermissions func(childComplexity int, groupName string) int
 		Groups           func(childComplexity int) int
+		IndexingStatus   func(childComplexity int, collection *string) int
 		Me               func(childComplexity int) int
 		Schema           func(childComplexity int, collection string) int
 		Schemas          func(childComplexity int) int
@@ -308,6 +321,7 @@ type QueryResolver interface {
 	Search(ctx context.Context, input SearchInput) (*DocumentConnection, error)
 	VectorSearch(ctx context.Context, input VectorSearchInput) (*VectorSearchResponse, error)
 	VectorStats(ctx context.Context) (*VectorStats, error)
+	IndexingStatus(ctx context.Context, collection *string) (*IndexingStatus, error)
 	Fts(ctx context.Context, input FTSInput) (*FTSResponse, error)
 	CodeGraph(ctx context.Context, input CodeGraphInput) (*CodeGraph, error)
 	Stats(ctx context.Context) (*Stats, error)
@@ -713,6 +727,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.GroupPermission.Write(childComplexity), true
 
+	case "IndexingStatus.collection":
+		if e.ComplexityRoot.IndexingStatus.Collection == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.Collection(childComplexity), true
+	case "IndexingStatus.completedEmbeddings":
+		if e.ComplexityRoot.IndexingStatus.CompletedEmbeddings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.CompletedEmbeddings(childComplexity), true
+	case "IndexingStatus.failedEmbeddings":
+		if e.ComplexityRoot.IndexingStatus.FailedEmbeddings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.FailedEmbeddings(childComplexity), true
+	case "IndexingStatus.indexed":
+		if e.ComplexityRoot.IndexingStatus.Indexed == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.Indexed(childComplexity), true
+	case "IndexingStatus.oldestPendingAt":
+		if e.ComplexityRoot.IndexingStatus.OldestPendingAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.OldestPendingAt(childComplexity), true
+	case "IndexingStatus.pendingEmbeddings":
+		if e.ComplexityRoot.IndexingStatus.PendingEmbeddings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.PendingEmbeddings(childComplexity), true
+	case "IndexingStatus.pendingMetadata":
+		if e.ComplexityRoot.IndexingStatus.PendingMetadata == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.PendingMetadata(childComplexity), true
+	case "IndexingStatus.progress":
+		if e.ComplexityRoot.IndexingStatus.Progress == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.Progress(childComplexity), true
+	case "IndexingStatus.provider":
+		if e.ComplexityRoot.IndexingStatus.Provider == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.Provider(childComplexity), true
+
 	case "IngestResult.added":
 		if e.ComplexityRoot.IngestResult.Added == nil {
 			break
@@ -1074,6 +1143,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Groups(childComplexity), true
+	case "Query.indexingStatus":
+		if e.ComplexityRoot.Query.IndexingStatus == nil {
+			break
+		}
+
+		args, err := ec.field_Query_indexingStatus_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.IndexingStatus(childComplexity, args["collection"].(*string)), true
 
 	case "Query.me":
 		if e.ComplexityRoot.Query.Me == nil {
@@ -1758,6 +1838,30 @@ func (ec *executionContext) childFields_GroupPermission(ctx context.Context, fie
 		return ec.fieldContext_GroupPermission_admin(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type GroupPermission", field.Name)
+}
+
+func (ec *executionContext) childFields_IndexingStatus(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "collection":
+		return ec.fieldContext_IndexingStatus_collection(ctx, field)
+	case "pendingEmbeddings":
+		return ec.fieldContext_IndexingStatus_pendingEmbeddings(ctx, field)
+	case "failedEmbeddings":
+		return ec.fieldContext_IndexingStatus_failedEmbeddings(ctx, field)
+	case "completedEmbeddings":
+		return ec.fieldContext_IndexingStatus_completedEmbeddings(ctx, field)
+	case "pendingMetadata":
+		return ec.fieldContext_IndexingStatus_pendingMetadata(ctx, field)
+	case "progress":
+		return ec.fieldContext_IndexingStatus_progress(ctx, field)
+	case "oldestPendingAt":
+		return ec.fieldContext_IndexingStatus_oldestPendingAt(ctx, field)
+	case "provider":
+		return ec.fieldContext_IndexingStatus_provider(ctx, field)
+	case "indexed":
+		return ec.fieldContext_IndexingStatus_indexed(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type IndexingStatus", field.Name)
 }
 
 func (ec *executionContext) childFields_IngestResult(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2623,6 +2727,20 @@ func (ec *executionContext) field_Query_groupPermissions_args(ctx context.Contex
 		return nil, err
 	}
 	args["groupName"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_indexingStatus_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "collection",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["collection"] = arg0
 	return args, nil
 }
 
@@ -4197,6 +4315,213 @@ func (ec *executionContext) _GroupPermission_admin(ctx context.Context, field gr
 }
 func (ec *executionContext) fieldContext_GroupPermission_admin(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("GroupPermission", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _IndexingStatus_collection(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_collection(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Collection, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_collection(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "String")
+}
+
+func (ec *executionContext) _IndexingStatus_pendingEmbeddings(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_pendingEmbeddings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PendingEmbeddings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_pendingEmbeddings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Int")
+}
+
+func (ec *executionContext) _IndexingStatus_failedEmbeddings(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_failedEmbeddings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.FailedEmbeddings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_failedEmbeddings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Int")
+}
+
+func (ec *executionContext) _IndexingStatus_completedEmbeddings(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_completedEmbeddings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.CompletedEmbeddings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_completedEmbeddings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Int")
+}
+
+func (ec *executionContext) _IndexingStatus_pendingMetadata(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_pendingMetadata(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.PendingMetadata, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_pendingMetadata(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Int")
+}
+
+func (ec *executionContext) _IndexingStatus_progress(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_progress(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Progress, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v float64) graphql.Marshaler {
+			return ec.marshalNFloat2float64(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_progress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Float")
+}
+
+func (ec *executionContext) _IndexingStatus_oldestPendingAt(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_oldestPendingAt(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.OldestPendingAt, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int64) graphql.Marshaler {
+			return ec.marshalOTime2ᚖint64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_oldestPendingAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Time")
+}
+
+func (ec *executionContext) _IndexingStatus_provider(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_provider(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Provider, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_provider(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "String")
+}
+
+func (ec *executionContext) _IndexingStatus_indexed(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_indexed(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Indexed, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_indexed(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "Boolean")
 }
 
 func (ec *executionContext) _IngestResult_added(ctx context.Context, field graphql.CollectedField, obj *IngestResult) (ret graphql.Marshaler) {
@@ -6025,6 +6350,63 @@ func (ec *executionContext) fieldContext_Query_vectorStats(_ context.Context, fi
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_VectorStats(ctx, field)
 		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_indexingStatus(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_indexingStatus(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().IndexingStatus(ctx, fc.Args["collection"].(*string))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *IndexingStatus
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *IndexingStatus) graphql.Marshaler {
+			return ec.marshalOIndexingStatus2ᚖmddbᚋgraphqlᚐIndexingStatus(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_indexingStatus(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_IndexingStatus(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_indexingStatus_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -10701,6 +11083,79 @@ func (ec *executionContext) _GroupPermission(ctx context.Context, sel ast.Select
 	return out
 }
 
+var indexingStatusImplementors = []string{"IndexingStatus"}
+
+func (ec *executionContext) _IndexingStatus(ctx context.Context, sel ast.SelectionSet, obj *IndexingStatus) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, indexingStatusImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("IndexingStatus")
+		case "collection":
+			out.Values[i] = ec._IndexingStatus_collection(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "pendingEmbeddings":
+			out.Values[i] = ec._IndexingStatus_pendingEmbeddings(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "failedEmbeddings":
+			out.Values[i] = ec._IndexingStatus_failedEmbeddings(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "completedEmbeddings":
+			out.Values[i] = ec._IndexingStatus_completedEmbeddings(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pendingMetadata":
+			out.Values[i] = ec._IndexingStatus_pendingMetadata(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "progress":
+			out.Values[i] = ec._IndexingStatus_progress(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "oldestPendingAt":
+			out.Values[i] = ec._IndexingStatus_oldestPendingAt(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "provider":
+			out.Values[i] = ec._IndexingStatus_provider(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "indexed":
+			out.Values[i] = ec._IndexingStatus_indexed(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var ingestResultImplementors = []string{"IngestResult"}
 
 func (ec *executionContext) _IngestResult(ctx context.Context, sel ast.SelectionSet, obj *IngestResult) graphql.Marshaler {
@@ -11044,6 +11499,12 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				true, false,
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_vectorStats(ctx, field)
+				})
+		case "indexingStatus":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_indexingStatus(ctx, field)
 				})
 		case "fts":
 			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
@@ -12888,6 +13349,13 @@ func (ec *executionContext) unmarshalOGroupByInput2ᚖmddbᚋgraphqlᚐGroupByIn
 	}
 	res, err := ec.unmarshalInputGroupByInput(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOIndexingStatus2ᚖmddbᚋgraphqlᚐIndexingStatus(ctx context.Context, sel ast.SelectionSet, v *IndexingStatus) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._IndexingStatus(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOIngestOptionsInput2ᚖmddbᚋgraphqlᚐIngestOptionsInput(ctx context.Context, v any) (*IngestOptionsInput, error) {

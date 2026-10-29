@@ -942,6 +942,33 @@ curl -X POST http://localhost:11023/v1/vector-search \
   applies across chunks, in `parent` mode across documents.
 - Also available on the `semantic_search` MCP tool (`mmr`, `mmr_lambda`).
 
+## Searching What You Just Wrote (v2.18.8+)
+
+A write returns once the document, its full text and its metadata are
+committed, so a full-text search finds it at once. Its embedding is computed
+afterwards by the embedding worker, so a vector search finds it only when that
+job finishes — usually well under a second, longer under a bulk import or a
+slow provider.
+
+| Need | Use |
+|---|---|
+| Search right after a write and include the new document | `waitForIndex: 5000, waitForKeys: ["<key>"]` on `/v1/vector-search`, `/v1/hybrid-search` or `/v1/cross-search` |
+| Never miss a document, even one still queued | `readLevel: "indexedPlusPending"` on `/v1/vector-search` |
+| Know how far behind a collection is | `GET /v1/indexing-status?collection=<c>` |
+| Be told when it has caught up | SSE event `collection.indexed` |
+
+- `waitForIndex` waits at most 30 s. Running out of time is not an error: the
+  search runs and `indexing.timedOut` says the newest documents may be
+  missing.
+- `readLevel: "indexedPlusPending"` appends documents whose embedding is still
+  queued and whose text matches the query, after the ranked results, marked
+  `pendingEmbedding: true`. They have no vector score.
+- Hybrid search has always found queued documents through its full-text half;
+  since v2.18.8 such results are marked `pendingEmbedding: true` too.
+- `failedEmbeddings` counts documents left without vectors by a provider
+  failure or a full queue. They stay unsearchable by meaning until
+  `/v1/vector-reindex`.
+
 ## Grouping Results (v2.18.8+)
 
 Parent mode already keeps one hit per document. `groupBy` is the general

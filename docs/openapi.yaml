@@ -418,11 +418,15 @@ paths:
               $ref: "#/components/schemas/AddRequest"
       responses:
         "200":
-          description: Document added/updated successfully
+          description: |
+            Document added/updated successfully. Since v2.18.8 the document
+            carries `indexing` when the write queued an embedding (GO-042):
+            the document is searchable by text now, by meaning once the job
+            finishes.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Document"
+                $ref: "#/components/schemas/AddResponse"
         "400":
           description: Invalid request
           content:
@@ -5040,6 +5044,46 @@ paths:
                   id:
                     type: string
 
+  /v1/indexing-status:
+    get:
+      tags:
+        - Search
+      summary: Is what was just written searchable yet?
+      description: |
+        Queued embedding and metadata work for one collection, or for the
+        whole server without `collection` (GO-042, v2.18.8). Counters come
+        from the queues, never from a scan. A write returns once its full
+        text and metadata are indexed; its embedding follows from a
+        background worker, so a semantic search sees the document only when
+        `pendingEmbeddings` reaches 0. To wait for that inside a search, pass
+        `waitForIndex` / `waitForKeys`; to be told, listen for the SSE event
+        `collection.indexed`.
+
+        Also available as the `get_indexing_status` MCP tool, the
+        `GetIndexingStatus` gRPC call and the GraphQL `indexingStatus` query.
+      operationId: getIndexingStatus
+      parameters:
+        - name: collection
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Indexing status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndexingStatus"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "405":
+          description: Method not allowed
+
   /v1/search-advisor:
     get:
       tags:
@@ -6054,6 +6098,35 @@ paths:
 
 components:
   schemas:
+    IndexingStatus:
+      type: object
+      description: Queued indexing work (GO-042). Counters are since server start.
+      properties:
+        collection: { type: string, description: Empty for the server-wide aggregate. }
+        pendingEmbeddings: { type: integer, description: Embedding jobs queued or running. }
+        failedEmbeddings: { type: integer, description: Jobs that left a document without vectors (provider failure or a full queue); reindex to recover. }
+        completedEmbeddings: { type: integer }
+        pendingMetadata: { type: integer, description: Queued metadata-index updates from batch updates. Single writes never appear here. }
+        progress: { type: number, description: 'completed / (completed + pending); 1 when nothing is pending.' }
+        oldestPendingAt: { type: string, format: date-time }
+        provider: { type: string, description: Embedding model; absent when none is configured. }
+        indexed: { type: boolean, description: Nothing pending — a search sees every document written so far. }
+    IndexWaitResult:
+      type: object
+      properties:
+        waitedMs: { type: integer }
+        timedOut: { type: boolean, description: The wait ran out before the work drained; results may miss the newest documents. }
+    WriteIndexing:
+      type: object
+      properties:
+        embeddingQueued: { type: boolean, description: 'The write queued an embedding: searchable by text now, by meaning when it finishes.' }
+    AddResponse:
+      allOf:
+        - $ref: '#/components/schemas/Document'
+        - type: object
+          properties:
+            indexing:
+              $ref: '#/components/schemas/WriteIndexing'
     GroupBy:
       type: object
       description: |
@@ -7009,6 +7082,8 @@ components:
         totalMetaIndices:
           type: integer
           example: 84
+        indexing:
+          $ref: '#/components/schemas/IndexingStatus'
         statsComputedAt:
           type: string
           format: date-time
@@ -7047,6 +7122,22 @@ components:
       required:
         - collection
       properties:
+        readLevel:
+          type: string
+          enum: [ indexed, indexedPlusPending ]
+          description: |
+            `indexedPlusPending` also returns documents whose embedding is still
+            queued, found by their text and marked `pendingEmbedding` (vector
+            search; hybrid search already includes them). GO-042.
+        waitForIndex:
+          type: integer
+          minimum: 0
+          maximum: 30000
+          description: Wait up to this many ms for queued embeddings before searching; running out of time is not an error (`indexing.timedOut`).
+        waitForKeys:
+          type: array
+          items: { type: string }
+          description: With waitForIndex, wait only for these document keys.
         groupBy:
           $ref: '#/components/schemas/GroupBy'
         oversample:
@@ -7169,6 +7260,8 @@ components:
     VectorSearchResponse:
       type: object
       properties:
+        indexing:
+          $ref: '#/components/schemas/IndexWaitResult'
         results:
           type: array
           items:
@@ -7199,6 +7292,9 @@ components:
     VectorSearchResultItem:
       type: object
       properties:
+        pendingEmbedding:
+          type: boolean
+          description: The document's embedding is still queued; it was found by its text (GO-042).
         group:
           type: string
           description: Group this result counted against (only with groupBy, SRCH-016).
@@ -8003,6 +8099,22 @@ components:
         - collection
         - query
       properties:
+        readLevel:
+          type: string
+          enum: [ indexed, indexedPlusPending ]
+          description: |
+            `indexedPlusPending` also returns documents whose embedding is still
+            queued, found by their text and marked `pendingEmbedding` (vector
+            search; hybrid search already includes them). GO-042.
+        waitForIndex:
+          type: integer
+          minimum: 0
+          maximum: 30000
+          description: Wait up to this many ms for queued embeddings before searching; running out of time is not an error (`indexing.timedOut`).
+        waitForKeys:
+          type: array
+          items: { type: string }
+          description: With waitForIndex, wait only for these document keys.
         groupBy:
           $ref: '#/components/schemas/GroupBy'
         oversample:
@@ -8191,6 +8303,8 @@ components:
     HybridSearchResponse:
       type: object
       properties:
+        indexing:
+          $ref: '#/components/schemas/IndexWaitResult'
         results:
           type: array
           items:
@@ -8231,6 +8345,9 @@ components:
     HybridSearchResultItem:
       type: object
       properties:
+        pendingEmbedding:
+          type: boolean
+          description: The document's embedding is still queued; it was found by its text (GO-042).
         group:
           type: string
           description: Group this result counted against (only with groupBy, SRCH-016).
@@ -9855,6 +9972,15 @@ components:
     CrossSearchRequest:
       type: object
       properties:
+        waitForIndex:
+          type: integer
+          minimum: 0
+          maximum: 30000
+          description: Wait up to this many ms for queued embeddings before searching; running out of time is not an error (`indexing.timedOut`).
+        waitForKeys:
+          type: array
+          items: { type: string }
+          description: With waitForIndex, wait only for these document keys.
         groupBy:
           $ref: '#/components/schemas/GroupBy'
         oversample:
@@ -9930,6 +10056,8 @@ components:
     CrossSearchResponse:
       type: object
       properties:
+        indexing:
+          $ref: '#/components/schemas/IndexWaitResult'
         results:
           type: array
           items:

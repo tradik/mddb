@@ -385,6 +385,9 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		StatsComputedAt string `json:"statsComputedAt,omitempty"`
 		StatsAgeSeconds int    `json:"statsAgeSeconds"`
 		StatsPending    bool   `json:"statsPending,omitempty"` // no snapshot yet; ask again shortly
+		// Indexing is queued embedding and metadata work across the server
+		// (GO-042). Omitted for tenant users: it counts every collection.
+		Indexing *IndexingStatus `json:"indexing,omitempty"`
 	}
 
 	stats := Stats{
@@ -432,6 +435,10 @@ func (s *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 			Fallbacks: fallbacks,
 			QueueLen:  queueLen,
 		}
+	}
+	if tenant == "" {
+		ix := s.IndexingStatus("")
+		stats.Indexing = &ix
 	}
 
 	ok(w, stats)

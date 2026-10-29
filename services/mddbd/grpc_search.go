@@ -830,3 +830,32 @@ func clampInt32(n int) int32 {
 	}
 	return int32(n)
 }
+
+// GetIndexingStatus reports queued indexing work (GO-042), as
+// GET /v1/indexing-status does over REST.
+func (g *GRPCServer) GetIndexingStatus(ctx context.Context, req *proto.IndexingStatusRequest) (*proto.IndexingStatusResponse, error) {
+	scope := req.GetCollection()
+	if scope == "" {
+		scope = "*"
+	}
+	if g.server.AuthManager != nil {
+		if err := g.server.AuthManager.CheckPermission(ctx, scope, PermRead); err != nil {
+			return nil, status.Error(codes.PermissionDenied, "forbidden")
+		}
+	}
+	st := g.server.IndexingStatus(req.GetCollection())
+	resp := &proto.IndexingStatusResponse{
+		Collection:          st.Collection,
+		PendingEmbeddings:   clampInt32(st.PendingEmbeddings),
+		FailedEmbeddings:    st.FailedEmbeddings,
+		CompletedEmbeddings: st.CompletedEmbeddings,
+		PendingMetadata:     clampInt32(st.PendingMetadata),
+		Progress:            st.Progress,
+		Provider:            st.Provider,
+		Indexed:             st.Indexed,
+	}
+	if st.OldestPendingAt != nil {
+		resp.OldestPendingAt = st.OldestPendingAt.Unix()
+	}
+	return resp, nil
+}

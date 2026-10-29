@@ -59,6 +59,19 @@ type VectorSearchResult {
   groupRank: Int
 }
 
+"Queued indexing work (GO-042); fields match GET /v1/indexing-status."
+type IndexingStatus {
+  collection: String
+  pendingEmbeddings: Int!
+  failedEmbeddings: Int!
+  completedEmbeddings: Int!
+  pendingMetadata: Int!
+  progress: Float!
+  oldestPendingAt: Time
+  provider: String
+  indexed: Boolean!
+}
+
 type VectorSearchResponse {
   results: [VectorSearchResult!]!
   total: Int!
@@ -352,6 +365,8 @@ type Query {
   # Vector search
   vectorSearch(input: VectorSearchInput!): VectorSearchResponse @auth
   vectorStats: VectorStats @auth
+  # Queued embedding and metadata work (GO-042); omit collection for the server.
+  indexingStatus(collection: String): IndexingStatus @auth
 
   # Full-text search
   fts(input: FTSInput!): FTSResponse @auth

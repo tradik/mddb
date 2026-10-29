@@ -40,6 +40,8 @@ type VectorSearchRequest struct {
 	// 1.0-10.0; 0 = use the collection profile, then the default.
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+
+	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -58,6 +60,9 @@ type VectorSearchResultItem struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// PendingEmbedding is true for a document whose embedding is still queued:
+	// found by its text, not yet by its meaning (GO-042).
+	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
 }
 
 // VectorSearchResponseHTTP represents the response from vector search.
@@ -76,6 +81,8 @@ type VectorSearchResponseHTTP struct {
 	// edge that justifies each (SRCH-006). Present only in that mode: a
 	// document that matched nothing needs to say why it is here.
 	GraphExpansions []GraphExpansion `json:"graphExpansions,omitempty"`
+	// Indexing reports the wait when the request set waitForIndex (GO-042).
+	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -198,6 +205,12 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidateIndexWait(); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	// GO-042: wait for this collection's queued embeddings before searching.
+	waited := s.waitForIndex(r.Context(), req.Collection, req.IndexWait)
 	// RAG-008: request, then collection profile, then default — the same
 	// precedence ResolveTopK applies. The resolved value is what gets
 	// validated: an invalid explicit mode passes through Resolve unchanged and
@@ -347,6 +360,16 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		return nil
 	})
 
+	// GO-042: documents still waiting for their embedding, found by text.
+	if req.ReadLevel == ReadLevelIndexedPlusPending {
+		for _, doc := range pendingDocsFor(s, req.Collection, req.Query, req.FilterMeta, req.Filter, topK, items, func(it VectorSearchResultItem) string { return it.Document.ID }) {
+			if !req.IncludeContent {
+				doc.ContentMD = ""
+			}
+			items = append(items, VectorSearchResultItem{Document: doc, Rank: len(items) + 1, PendingEmbedding: true})
+		}
+	}
+
 	// RAG-001: cap the total context this collection hands back. In chunk and
 	// window modes the passage is what the caller receives, so that is what
 	// counts against the budget — charging the whole parent document would
@@ -375,6 +398,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		DistanceMetric:   metricName,
 		ContextTruncated: contextTruncated,
 		GraphExpansions:  expansions,
+		Indexing:         waited,
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()

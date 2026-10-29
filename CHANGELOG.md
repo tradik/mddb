@@ -32,8 +32,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`group_by_key`, `group_by_per_group`). Parent-mode deduplication now runs
   through the same code, and REST and MCP share one implementation of vector
   and cross-collection search instead of a copy each.
+- **Indexing status and read-your-writes (GO-042).** A write returns before
+  its embedding is computed, so an agent that added a document and searched
+  for it by meaning found nothing, and could neither see why nor wait.
+  `GET /v1/indexing-status` (and the `get_indexing_status` MCP tool, gRPC
+  `GetIndexingStatus`, GraphQL `indexingStatus`, and `indexing` in
+  `/v1/stats`) reports queued and failed embeddings, progress and the oldest
+  queued job per collection, from counters kept by the queues. Vector, hybrid
+  and cross-collection search take `waitForIndex` and `waitForKeys` and
+  report `indexing.timedOut` instead of failing; vector search takes
+  `readLevel: "indexedPlusPending"` to add still-queued documents that match
+  by text. Such results are marked `pendingEmbedding`. `POST /v1/add` and
+  `add_document` report `indexing.embeddingQueued`, and the SSE event
+  `collection.indexed` fires when a collection's queue drains.
 
 ### Changed
+
+- **Agent instructions no longer say a document is searchable as soon as the
+  write returns.** That holds for full-text search; semantic search waits for
+  the embedding. AGENTS.md and the generated skill and rules say how to wait.
 
 - **`rangeMeta` on `/v1/fts` reads the metadata index.** A range on a
   metadata key used to load every matching document to compare its first

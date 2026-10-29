@@ -61,6 +61,12 @@ type HybridSearchRequest struct {
 	// the default.
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+	IndexWait
+
+	// onlyIDs restricts the full-text half to these documents. Internal:
+	// used to find matches among documents still waiting for their
+	// embedding (GO-042).
+	onlyIDs map[string]bool
 }
 
 // HybridGeoFilter restricts hybrid search to docs within radius of a point.
@@ -87,6 +93,9 @@ type HybridSearchResultItem struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// PendingEmbedding is true for a document whose embedding is still queued:
+	// found by its text, not yet by its meaning (GO-042).
+	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
 }
 
 // HybridSearchResponse represents the response from hybrid search.
@@ -110,6 +119,8 @@ type HybridSearchResponse struct {
 	ContextTruncated bool         `json:"contextTruncated,omitempty"`
 	Stats            *SearchStats `json:"searchStats,omitempty"`
 	Facets           FacetResult  `json:"facets,omitempty"` // populated when request.facetBy is set (v2.9.14+)
+	// Indexing reports the wait when the request set waitForIndex (GO-042).
+	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 }
 
 // handleHybridSearch handles POST /v1/hybrid-search
@@ -135,6 +146,11 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidateIndexWait(); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	waited := s.waitForIndex(r.Context(), req.Collection, req.IndexWait)
 
 	// Defaults. RAG-001 inserts the collection profile between the request
 	// and each historical default, so a collection without one is unchanged.
@@ -318,6 +334,9 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	items = s.applyCurationHybrid(req.Collection, req.Query, items)
 	items = groupHybridItems(req.Collection, items, req.GroupBy, req.TopK)
+	for i := range items {
+		items[i].PendingEmbedding = s.pendingEmbedding(req.Collection, items[i].Document.ID)
+	}
 	if req.TopK > 0 && len(items) > req.TopK {
 		items = items[:req.TopK]
 	}
@@ -334,6 +353,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		FTSAlgorithm:    req.Algorithm,
 		VectorAlgorithm: req.VectorAlgorithm,
 		DistanceMetric:  distMetric,
+		Indexing:        waited,
 	}
 	if req.Strategy == "alpha" {
 		resp.Alpha = alpha
@@ -396,6 +416,16 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 	var allowed map[string]bool
 	if ids, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
 		allowed = ids
+		if len(allowed) == 0 {
+			return nil, nil
+		}
+	}
+	if req.onlyIDs != nil {
+		if allowed == nil {
+			allowed = req.onlyIDs
+		} else {
+			allowed = intersectSets(allowed, req.onlyIDs)
+		}
 		if len(allowed) == 0 {
 			return nil, nil
 		}

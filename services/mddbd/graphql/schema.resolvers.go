@@ -174,6 +174,11 @@ func (r *queryResolver) VectorStats(ctx context.Context) (*VectorStats, error) {
 	return r.server.VectorStats(ctx)
 }
 
+// IndexingStatus is the resolver for the indexingStatus field.
+func (r *queryResolver) IndexingStatus(ctx context.Context, collection *string) (*IndexingStatus, error) {
+	return r.server.IndexingStatus(ctx, collection)
+}
+
 // Fts is the resolver for the fts field.
 func (r *queryResolver) Fts(ctx context.Context, input FTSInput) (*FTSResponse, error) {
 	return r.server.FullTextSearch(ctx, input)

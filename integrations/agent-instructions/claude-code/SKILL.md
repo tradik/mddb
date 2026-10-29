@@ -99,5 +99,8 @@ Record decisions and constraints, not transcripts.
   and wait rather than poll.
 - Metadata is flat: `map[string][]string`. Nested structure does not survive —
   JSON-encode it into a single value if you must keep it.
-- Indexing follows the write in the same transaction, so a document is
-  searchable as soon as the write returns.
+- Full-text and metadata indexing follow the write before it returns, so
+  `full_text_search` finds a document at once. Its embedding is computed in
+  the background: to find it with `semantic_search` straight after writing,
+  pass `wait_for_index: 5000, wait_for_keys: ["<key>"]`, or check
+  `get_indexing_status`.

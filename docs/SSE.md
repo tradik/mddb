@@ -50,6 +50,16 @@ of polling its status endpoint:
 | `job.failed` | Every document failed |
 | `job.cancelled` | The job was cancelled before or during processing |
 
+…and one for indexing (v2.18.8, GO-042):
+
+| Event | Trigger |
+|-------|---------|
+| `collection.indexed` | Every embedding queued for the collection has finished — what a semantic search can see now matches what was written |
+
+It has the document-event shape with empty `key` and `lang`, and honours the
+`?collection=` filter, so a client that just imported into one collection can
+wait for that collection alone.
+
 Job events carry the same record `GET /v1/bulk/jobs/{id}` returns, under a
 `job` key, so a client reads counters from one shape either way.
 

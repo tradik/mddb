@@ -50,7 +50,7 @@ func (s *Server) handleAdd(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
-	ok(w, saved)
+	ok(w, AddResponse{Doc: saved, Indexing: s.writeIndexing(saved)})
 }
 
 func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {

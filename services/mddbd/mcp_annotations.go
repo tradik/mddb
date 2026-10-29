@@ -45,6 +45,7 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	// Measures and recommends; changes nothing. Applying the recommendation is
 	// a separate, explicit write through /v1/collection-config.
 	"search_advisor":          readOnly(),
+	"get_indexing_status":     readOnly(),
 	"vector_stats":            readOnly(),
 	"fts_languages":           readOnly(),
 	"list_webhooks":           readOnly(),

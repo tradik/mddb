@@ -178,7 +178,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 81 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 82 built-in tools (only custom tools exposed) |
 
 ### API Key Authentication
 
@@ -428,9 +428,27 @@ key — one passage per file instead of five from the same one:
 Each result reports its `group` and `groupRank`. See
 [Grouping Results](SEARCH.md#grouping-results-v2188).
 
+## Searching What You Just Wrote (v2.18.8+)
+
+A write returns once the document's full text and metadata are indexed, so
+`full_text_search` finds it at once. Its embedding is computed afterwards by a
+background worker, so `semantic_search` finds it a moment later. Three ways to
+handle the gap, cheapest first:
+
+1. Pass `wait_for_index` (ms, up to 30000) and `wait_for_keys` with the keys
+   you just wrote to `semantic_search`, `hybrid_search` or `cross_search`. The
+   search starts as soon as those embeddings land; if they do not land in time
+   it runs anyway and reports `indexing.timedOut`.
+2. Pass `read_level: "indexedPlusPending"` to `semantic_search` to also get
+   still-queued documents that match by text, marked `pendingEmbedding`.
+   `hybrid_search` always includes them and marks them the same way.
+3. Call `get_indexing_status` to see the queue.
+
+`add_document` reports `indexing.embeddingQueued` when it queued an embedding.
+
 ## Built-in Tool Catalog
 
-All 81 built-in tools, grouped by area. Tool inputs are self-describing via
+All 82 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -457,8 +475,9 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | Tool | Description |
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
-| `semantic_search` | Search documents by meaning using semantic similarity. |
-| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter`, the operator filter described below. |
+| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. |
+| `get_indexing_status` | (v2.18.8) Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
+| `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
 | `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. |

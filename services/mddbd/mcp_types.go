@@ -18,6 +18,9 @@ type MCPDocument struct {
 	ContentMD string              `json:"content_md"`
 	AddedAt   time.Time           `json:"added_at"`
 	UpdatedAt time.Time           `json:"updated_at"`
+	// Indexing is set on a write: what indexing the document still waits
+	// for (GO-042).
+	Indexing *WriteIndexing `json:"indexing,omitempty"`
 }
 
 // MCPHealth represents server health status.
@@ -228,6 +231,8 @@ type MCPVectorSearchRequest struct {
 	// the default.
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+
+	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -246,6 +251,9 @@ type MCPVectorSearchResult struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// PendingEmbedding is true for a document whose embedding is still queued:
+	// found by its text, not yet by its meaning (GO-042).
+	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
 }
 
 // MCPVectorSearchResponse represents vector search results.
@@ -264,6 +272,8 @@ type MCPVectorSearchResponse struct {
 	// present only when one is configured. Returned with the results so an
 	// agent gets it in the same round trip that fetched what to say.
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
+	// Indexing reports the wait when the request set waitForIndex (GO-042).
+	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 }
 
 // MCPVectorReindexRequest represents a reindex request.
@@ -423,6 +433,8 @@ type MCPHybridSearchRequest struct {
 	// the default.
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+
+	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -437,6 +449,9 @@ type MCPHybridSearchResult struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// PendingEmbedding is true for a document whose embedding is still queued:
+	// found by its text, not yet by its meaning (GO-042).
+	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
 }
 
 // MCPHybridSearchResponse represents hybrid search results.
@@ -455,6 +470,8 @@ type MCPHybridSearchResponse struct {
 	// present only when one is configured. Returned with the results so an
 	// agent gets it in the same round trip that fetched what to say.
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
+	// Indexing reports the wait when the request set waitForIndex (GO-042).
+	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 }
 
 // MCPGeoSearchRequest represents a geo radius search.
@@ -721,6 +738,8 @@ type MCPCrossSearchRequest struct {
 	// Oversample is the recall/latency knob (SRCH-005).
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+
+	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
 }
 
 // MCPCrossSearchResponse is the response for cross_search.
@@ -732,6 +751,8 @@ type MCPCrossSearchResponse struct {
 	TargetCollections []string                `json:"targetCollections"`
 	Algorithm         string                  `json:"algorithm"`
 	DistanceMetric    string                  `json:"distanceMetric"`
+	// Indexing reports the wait when the request set waitForIndex (GO-042).
+	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 }
 
 // --- Find Duplicates MCP Types ---
@@ -877,6 +898,8 @@ type MCPClient interface {
 	// (SRCH-010), so an agent picks an algorithm from evidence rather than
 	// from the names.
 	SearchAdvisor(ctx context.Context, collection string) (*SearchRecommendation, error)
+	// IndexingStatus reports queued embedding and metadata work (GO-042).
+	IndexingStatus(ctx context.Context, collection string) (*IndexingStatus, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)
 	// Synonyms
 	ListSynonyms(ctx context.Context, collection string) (*MCPSynonymListResponse, error)

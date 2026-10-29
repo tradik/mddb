@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (66 implemented)
+### Available RPCs (72 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -117,6 +117,8 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | **Vector / Semantic** | `VectorSearch` | `VectorSearchRequest` → `VectorSearchResponse` |
 | | `VectorReindex` | `VectorReindexRequest` → `VectorReindexResponse` |
 | | `VectorStats` | `VectorStatsRequest` → `VectorStatsResponse` |
+| | `SearchAdvisor` | `SearchAdvisorRequest` → `SearchAdvisorResponse` |
+| | `GetIndexingStatus` | `IndexingStatusRequest` → `IndexingStatusResponse` (v2.18.8: queued embeddings and metadata updates — is what was just written searchable yet?) |
 | **Geo** | `GeoSearch` | `GeoSearchRequest` → `GeoSearchResponse` |
 | | `GeoWithin` | `GeoWithinRequest` → `GeoWithinResponse` |
 | | `GeoReindex` | `GeoReindexRequest` → `GeoReindexResponse` |
@@ -168,6 +170,14 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/follower replication — see [Replication Service](#replication-service).
 
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
+
+### New in v2.18.8
+
+`GetIndexingStatus` reports queued work for a collection, or for the server
+when `collection` is empty (GO-042), as `GET /v1/indexing-status` does.
+`RetrievalProfileProto` gained `group_by_key` (9) and `group_by_per_group`
+(10), the collection's default result grouping (SRCH-016). Both are additive:
+clients built against an older proto keep working.
 
 ### New in v2.9.12
 

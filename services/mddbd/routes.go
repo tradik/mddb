@@ -97,6 +97,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	// SRCH-010: "how should I search this collection?" — measured from the
 	// collection rather than guessed from the algorithm names.
 	mux.HandleFunc("/v1/search-advisor", s.handleSearchAdvisor)
+	// GO-042: is what I just wrote searchable yet?
+	mux.HandleFunc("/v1/indexing-status", s.handleIndexingStatus)
 	mux.HandleFunc("/v1/collection-config", s.handleCollectionConfig)
 	mux.HandleFunc("/v1/collection-configs", s.handleCollectionConfigList)
 	mux.HandleFunc("/v1/curation", s.handleCuration)

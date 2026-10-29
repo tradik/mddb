@@ -83,6 +83,9 @@ func (s *stubServer) VectorSearch(_ context.Context, _ VectorSearchInput) (*Vect
 func (s *stubServer) VectorStats(_ context.Context) (*VectorStats, error) {
 	return nil, errors.New("not implemented")
 }
+func (s *stubServer) IndexingStatus(_ context.Context, _ *string) (*IndexingStatus, error) {
+	return nil, errors.New("not implemented")
+}
 func (s *stubServer) VectorReindex(_ context.Context, _ string, _ *bool) (*VectorStats, error) {
 	return nil, errors.New("not implemented")
 }

@@ -37,6 +37,7 @@ status: publish
   - [GET /v1/backup](#get-v1backup)
   - [POST /v1/restore](#post-v1restore)
   - [POST /v1/truncate](#post-v1truncate)
+  - [GET /v1/indexing-status](#get-v1indexing-status)
   - [GET /v1/stats](#get-v1stats)
   - [POST /v1/schema/set](#post-v1schemaset)
   - [POST /v1/schema/get](#post-v1schemaget)
@@ -1531,6 +1532,40 @@ the full breakdown. Turn
 full-text indexing off for a collection that does not need it with
 `"fts": {"enabled": false}` in its [collection config](#get-v1collection-config),
 then `POST /v1/fts-reindex` to remove its postings.
+
+### GET /v1/indexing-status
+
+Is what was just written searchable yet? (v2.18.8, GO-042.) Queued embedding
+and metadata work for one collection, or for the whole server without
+`collection`. A write returns once its full text and metadata are indexed; the
+embedding follows from a background worker, so a semantic search sees the
+document once `pendingEmbeddings` reaches 0.
+
+```bash
+curl "http://localhost:11023/v1/indexing-status?collection=notes"
+```
+
+```json
+{
+  "collection": "notes",
+  "pendingEmbeddings": 3,
+  "failedEmbeddings": 0,
+  "completedEmbeddings": 120,
+  "pendingMetadata": 0,
+  "progress": 0.975,
+  "oldestPendingAt": "2026-10-29T09:12:03Z",
+  "provider": "text-embedding-3-small",
+  "indexed": false
+}
+```
+
+To wait inside a search instead of polling, `/v1/vector-search`,
+`/v1/hybrid-search` and `/v1/cross-search` take `waitForIndex` (ms, max 30000)
+and `waitForKeys`; the response then carries `indexing: {waitedMs, timedOut}`.
+`/v1/vector-search` also takes `readLevel: "indexedPlusPending"`, which adds
+still-queued documents that match by text, marked `pendingEmbedding`. The SSE
+event `collection.indexed` fires when a collection's queue drains, and
+`/v1/stats` includes the server-wide figures under `indexing`.
 
 ### GET /v1/stats
 

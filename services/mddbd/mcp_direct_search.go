@@ -19,6 +19,10 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if err := req.GroupBy.Validate(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateIndexWait(); err != nil {
+		return nil, err
+	}
+	waited := s.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	if req.Collection == "" {
 		return nil, errors.New("missing collection")
@@ -164,10 +168,21 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		return nil
 	})
 
+	if req.ReadLevel == ReadLevelIndexedPlusPending {
+		for _, doc := range pendingDocsFor(s, req.Collection, req.Query, req.FilterMeta, req.Filter, topK, items,
+			func(it MCPVectorSearchResult) string { return it.Document.ID }) {
+			if !req.IncludeContent {
+				doc.ContentMD = ""
+			}
+			items = append(items, MCPVectorSearchResult{Document: docToMCPDocument(doc), Rank: len(items) + 1, PendingEmbedding: true})
+		}
+	}
+
 	resp := &MCPVectorSearchResponse{
 		Results:   items,
 		Total:     len(items),
 		Algorithm: algo,
+		Indexing:  waited,
 		// RAG-002: the collection's formatting instruction travels with the
 		// results, so an agent does not need a second call to learn how this
 		// collection wants its answers shaped.
@@ -446,6 +461,10 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if err := req.GroupBy.Validate(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateIndexWait(); err != nil {
+		return nil, err
+	}
+	waited := c.server.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	httpReq := HybridSearchRequest{
 		Collection:      req.Collection,
@@ -528,6 +547,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		DistanceMetric:  distMetric,
 		Results:         make([]MCPHybridSearchResult, 0, len(items)),
 		ResponsePrompt:  c.server.ResponsePrompt(httpReq.Collection, httpReq.Query),
+		Indexing:        waited,
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{
@@ -539,6 +559,9 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 			Rank:          item.Rank,
 			Group:         item.Group,
 			GroupRank:     item.GroupRank,
+			// The full-text half already finds documents still waiting
+			// for their embedding; say which ones they are (GO-042).
+			PendingEmbedding: c.server.pendingEmbedding(req.Collection, item.Document.ID),
 		})
 	}
 	// RAG-001: cap what this collection hands back. The MCP paths resolved
@@ -551,6 +574,13 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	resp.Total = len(resp.Results)
 
 	return resp, nil
+}
+
+// IndexingStatus reports queued indexing work for a collection, or for the
+// whole server when collection is "" (GO-042).
+func (c *DirectClient) IndexingStatus(ctx context.Context, collection string) (*IndexingStatus, error) {
+	st := c.server.IndexingStatus(collection)
+	return &st, nil
 }
 
 // SearchAdvisor measures a collection and recommends how to search it

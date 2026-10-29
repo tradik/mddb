@@ -123,6 +123,10 @@ service MDDB {
   // already existed, and the Python client speaks gRPC.
   rpc SearchAdvisor(SearchAdvisorRequest) returns (SearchAdvisorResponse);
 
+  // Queued embedding and metadata work for a collection, or for the server
+  // when collection is empty (GO-042): is what was just written searchable yet?
+  rpc GetIndexingStatus(IndexingStatusRequest) returns (IndexingStatusResponse);
+
   // Delete a single document
   rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
 
@@ -1581,6 +1585,23 @@ message DeleteCurationRuleResponse {
 // SearchAdvisorRequest asks how a collection should be searched (SRCH-010).
 message SearchAdvisorRequest {
   string collection = 1;
+}
+
+// GO-042: indexing status. Field meanings match GET /v1/indexing-status.
+message IndexingStatusRequest {
+  string collection = 1; // empty = whole server
+}
+
+message IndexingStatusResponse {
+  string collection = 1;
+  int32 pending_embeddings = 2;
+  uint64 failed_embeddings = 3;
+  uint64 completed_embeddings = 4;
+  int32 pending_metadata = 5;
+  double progress = 6;                // completed / (completed + pending); 1 when nothing is pending
+  int64 oldest_pending_at = 7;        // unix seconds; 0 when nothing is pending
+  string provider = 8;                // embedding model; empty when none
+  bool indexed = 9;                   // nothing pending
 }
 
 // CollectionProfile is what the advisor measured.

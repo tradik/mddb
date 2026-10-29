@@ -182,6 +182,18 @@ query {
 }
 ```
 
+### Indexing Status
+
+`indexingStatus(collection: String)` (v2.18.8) reports queued embeddings and
+metadata updates — whether what was just written is searchable yet. Omit
+`collection` for the whole server. Fields match
+[`GET /v1/indexing-status`](API.md#get-v1indexing-status); `oldestPendingAt`
+is a unix timestamp.
+
+```graphql
+query { indexingStatus(collection: "notes") { pendingEmbeddings progress indexed } }
+```
+
 ### Search Documents
 
 ```graphql

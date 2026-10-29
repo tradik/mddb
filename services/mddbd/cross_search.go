@@ -33,6 +33,8 @@ type CrossSearchRequest struct {
 	// the default.
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
+
+	IndexWait // readLevel, waitForIndex, waitForKeys (GO-042)
 }
 
 // CrossSearchResultItem represents a single cross-collection search result.
@@ -57,6 +59,8 @@ type CrossSearchResponse struct {
 	Algorithm         string                  `json:"algorithm"`
 	DistanceMetric    string                  `json:"distanceMetric"`
 	Stats             *SearchStats            `json:"searchStats,omitempty"`
+	// Indexing reports the wait when the request set waitForIndex (GO-042).
+	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 }
 
 // handleCrossSearch handles POST /v1/cross-search
@@ -78,6 +82,10 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.GroupBy.Validate(); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	if err := req.ValidateIndexWait(); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -160,6 +168,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	// default apply.
 	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
+	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
 	items := s.crossSearchItems(crossSearchParams{
 		Searcher: searcher, QueryVector: queryVector, Targets: req.TargetCollections,
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
@@ -180,6 +189,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		TargetCollections: req.TargetCollections,
 		Algorithm:         algo,
 		DistanceMetric:    metricName,
+		Indexing:          waited,
 	}
 
 	if searchStatsEnabled() {

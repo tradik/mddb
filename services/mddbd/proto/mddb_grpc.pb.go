@@ -57,6 +57,7 @@ const (
 	MDDB_GetDocumentMeta_FullMethodName       = "/mddb.MDDB/GetDocumentMeta"
 	MDDB_Classify_FullMethodName              = "/mddb.MDDB/Classify"
 	MDDB_SearchAdvisor_FullMethodName         = "/mddb.MDDB/SearchAdvisor"
+	MDDB_GetIndexingStatus_FullMethodName     = "/mddb.MDDB/GetIndexingStatus"
 	MDDB_DeleteDocument_FullMethodName        = "/mddb.MDDB/DeleteDocument"
 	MDDB_DeleteCollection_FullMethodName      = "/mddb.MDDB/DeleteCollection"
 	MDDB_ListSynonyms_FullMethodName          = "/mddb.MDDB/ListSynonyms"
@@ -177,6 +178,9 @@ type MDDBClient interface {
 	// the names. Added for gRPC parity: the HTTP endpoint and the MCP tool
 	// already existed, and the Python client speaks gRPC.
 	SearchAdvisor(ctx context.Context, in *SearchAdvisorRequest, opts ...grpc.CallOption) (*SearchAdvisorResponse, error)
+	// Queued embedding and metadata work for a collection, or for the server
+	// when collection is empty (GO-042): is what was just written searchable yet?
+	GetIndexingStatus(ctx context.Context, in *IndexingStatusRequest, opts ...grpc.CallOption) (*IndexingStatusResponse, error)
 	// Delete a single document
 	DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -642,6 +646,16 @@ func (c *mDDBClient) SearchAdvisor(ctx context.Context, in *SearchAdvisorRequest
 	return out, nil
 }
 
+func (c *mDDBClient) GetIndexingStatus(ctx context.Context, in *IndexingStatusRequest, opts ...grpc.CallOption) (*IndexingStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IndexingStatusResponse)
+	err := c.cc.Invoke(ctx, MDDB_GetIndexingStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mDDBClient) DeleteDocument(ctx context.Context, in *DeleteDocumentRequest, opts ...grpc.CallOption) (*DeleteDocumentResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DeleteDocumentResponse)
@@ -1057,6 +1071,9 @@ type MDDBServer interface {
 	// the names. Added for gRPC parity: the HTTP endpoint and the MCP tool
 	// already existed, and the Python client speaks gRPC.
 	SearchAdvisor(context.Context, *SearchAdvisorRequest) (*SearchAdvisorResponse, error)
+	// Queued embedding and metadata work for a collection, or for the server
+	// when collection is empty (GO-042): is what was just written searchable yet?
+	GetIndexingStatus(context.Context, *IndexingStatusRequest) (*IndexingStatusResponse, error)
 	// Delete a single document
 	DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error)
 	// Delete an entire collection
@@ -1246,6 +1263,9 @@ func (UnimplementedMDDBServer) Classify(context.Context, *ClassifyRequest) (*Cla
 }
 func (UnimplementedMDDBServer) SearchAdvisor(context.Context, *SearchAdvisorRequest) (*SearchAdvisorResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SearchAdvisor not implemented")
+}
+func (UnimplementedMDDBServer) GetIndexingStatus(context.Context, *IndexingStatusRequest) (*IndexingStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetIndexingStatus not implemented")
 }
 func (UnimplementedMDDBServer) DeleteDocument(context.Context, *DeleteDocumentRequest) (*DeleteDocumentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteDocument not implemented")
@@ -2044,6 +2064,24 @@ func _MDDB_SearchAdvisor_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_GetIndexingStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IndexingStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).GetIndexingStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_GetIndexingStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).GetIndexingStatus(ctx, req.(*IndexingStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MDDB_DeleteDocument_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteDocumentRequest)
 	if err := dec(in); err != nil {
@@ -2792,6 +2830,10 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SearchAdvisor",
 			Handler:    _MDDB_SearchAdvisor_Handler,
+		},
+		{
+			MethodName: "GetIndexingStatus",
+			Handler:    _MDDB_GetIndexingStatus_Handler,
 		},
 		{
 			MethodName: "DeleteDocument",

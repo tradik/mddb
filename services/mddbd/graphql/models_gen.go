@@ -171,6 +171,19 @@ type GroupPermission struct {
 	Admin      bool   `json:"admin"`
 }
 
+// Queued indexing work (GO-042); fields match GET /v1/indexing-status.
+type IndexingStatus struct {
+	Collection          *string `json:"collection,omitempty"`
+	PendingEmbeddings   int     `json:"pendingEmbeddings"`
+	FailedEmbeddings    int     `json:"failedEmbeddings"`
+	CompletedEmbeddings int     `json:"completedEmbeddings"`
+	PendingMetadata     int     `json:"pendingMetadata"`
+	Progress            float64 `json:"progress"`
+	OldestPendingAt     *int64  `json:"oldestPendingAt,omitempty"`
+	Provider            *string `json:"provider,omitempty"`
+	Indexed             bool    `json:"indexed"`
+}
+
 type IngestDocumentInput struct {
 	URL                *string      `json:"url,omitempty"`
 	Key                *string      `json:"key,omitempty"`

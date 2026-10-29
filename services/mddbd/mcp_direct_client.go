@@ -74,6 +74,7 @@ func (c *DirectClient) Add(ctx context.Context, req *MCPAddRequest) (*MCPDocumen
 		return nil, err
 	}
 	doc := docToMCPDocument(saved)
+	doc.Indexing = c.server.writeIndexing(saved)
 	return &doc, nil
 }
 
