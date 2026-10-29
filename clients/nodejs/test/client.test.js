@@ -181,7 +181,7 @@ describe('MddbClient', () => {
   test('waitForReady resolves against a live server', async () => {
     const client = new MddbClient(address);
     try {
-      await client.waitForReady(3000);
+      await assert.doesNotReject(() => client.waitForReady(3000));
     } finally {
       client.close();
     }

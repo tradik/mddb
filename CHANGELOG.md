@@ -289,6 +289,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SonarCloud blockers on main.**
+  - **Panel endpoint suites.** Two of them declared their tests through a
+    helper in another file, so the analysis saw files with no tests. Each
+    file now declares its own `test.each`, and the helper checks one row.
+  - **Node.js client.** A `waitForReady` test had no assertion; it now
+    asserts the call does not reject.
+  - **Smaller findings.** A named constant for repeated literals in
+    `check-docs-links.py`, explicit default branches in
+    `check-source-encoding.sh`, and `dataset` instead of `getAttribute` in
+    the chat widget.
 - **OPQ panicked on vectors under 8 dimensions (#364).** Training clamps the
   subspace count to the dimension. A vector added after training was then
   encoded with the configured count, past the trained codebooks. Encoding now

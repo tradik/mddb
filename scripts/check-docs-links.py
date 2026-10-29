@@ -86,19 +86,23 @@ def resolve(root: str, page: str, url: str) -> str:
     return os.path.normpath(os.path.join(os.path.dirname(page), url))
 
 
+HTML_SUFFIX = ".html"
+INDEX_PAGE = "index.html"
+
+
 def redirect_target(root: str, page: str, url: str) -> str | None:
     """The URL Pages would 308 to, or None when it serves the link directly."""
     target = resolve(root, page, url)
     if not within_root(root, target):
         return None
 
-    if url.endswith(".html") and os.path.isfile(target):
-        if os.path.basename(url) == "index.html":
-            return url[: -len("index.html")] or "/"
-        return url[: -len(".html")]
+    if url.endswith(HTML_SUFFIX) and os.path.isfile(target):
+        if os.path.basename(url) == INDEX_PAGE:
+            return url[: -len(INDEX_PAGE)] or "/"
+        return url[: -len(HTML_SUFFIX)]
     if os.path.isfile(target):
         return None
-    if os.path.isfile(os.path.join(target, "index.html")) and not url.endswith("/"):
+    if os.path.isfile(os.path.join(target, INDEX_PAGE)) and not url.endswith("/"):
         return url + "/"
     return None
 
@@ -106,7 +110,7 @@ def redirect_target(root: str, page: str, url: str) -> str | None:
 def iter_pages(root: str):
     for dirpath, _dirnames, filenames in os.walk(root):
         for name in filenames:
-            if name.endswith(".html"):
+            if name.endswith(HTML_SUFFIX):
                 yield os.path.join(dirpath, name)
 
 

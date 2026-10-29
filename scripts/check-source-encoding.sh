@@ -36,8 +36,8 @@ is_binary_path() {
 		*.zip | *.gz | *.tgz | *.xz | *.bz2 | *.7z | *.br | \
 		*.wasm | *.so | *.dylib | *.dll | *.exe | *.bin | *.db | *.jar | \
 		*.mp3 | *.mp4 | *.webm | *.ogg | *.wav) return 0 ;;
+	*) return 1 ;;
 	esac
-	return 1
 }
 
 # bom_name prints a human name for the BOM a file starts with, or nothing.
@@ -50,6 +50,7 @@ bom_name() {
 	feff*) echo "UTF-16 BE" ;;
 	fffe*) echo "UTF-16 LE" ;;
 	efbbbf*) echo "UTF-8 with BOM" ;;
+	*) ;; # no BOM: print nothing
 	esac
 }
 

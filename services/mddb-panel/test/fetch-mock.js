@@ -1,6 +1,6 @@
 // Shared helpers for the mddb-client suites: a stubbed global `fetch` and a
 // readable view of the request the client sent.
-import { vi, test, expect } from 'vitest';
+import { vi, expect } from 'vitest';
 
 /** A real fetch Response carrying `body` as JSON. */
 export function jsonResponse(body, init = {}) {
@@ -38,19 +38,19 @@ export function lastRequest(fetchMock) {
 }
 
 /**
- * Table-driven check of client methods. Each row is
+ * One row of a table-driven check of client methods. A row is
  *   [label, (client) => client.method(...), url, method, body?]
- * and asserts the URL (with query string), HTTP method and JSON body sent,
- * and that the parsed response comes back. `body` undefined means none sent.
+ * and this asserts the URL (with query string), HTTP method and JSON body
+ * sent, and that the parsed response comes back. `body` undefined means none
+ * sent. The suites call it from their own `test.each`, so each file declares
+ * its tests where a reader (and SonarCloud) looks for them.
  */
-export function expectEndpoints(client, rows) {
-  test.each(rows)('%s', async (_label, call, url, method, body) => {
-    const fetchMock = stubFetch(jsonResponse({ result: 'ok' }));
-    await expect(call(client)).resolves.toEqual({ result: 'ok' });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const req = lastRequest(fetchMock);
-    expect(req.url).toBe(url);
-    expect(req.method).toBe(method);
-    expect(req.body).toEqual(body);
-  });
+export async function expectEndpoint(client, call, url, method, body) {
+  const fetchMock = stubFetch(jsonResponse({ result: 'ok' }));
+  await expect(call(client)).resolves.toEqual({ result: 'ok' });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const req = lastRequest(fetchMock);
+  expect(req.url).toBe(url);
+  expect(req.method).toBe(method);
+  expect(req.body).toEqual(body);
 }

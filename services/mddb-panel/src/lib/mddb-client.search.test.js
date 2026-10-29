@@ -1,8 +1,8 @@
 // mddb-client: documents, search (vector, geo, full-text, hybrid), synonyms,
 // stop words and webhooks. Each row asserts the URL, query string, method and
 // JSON body one call sends — defaults included, optional fields omitted.
-import { describe, vi } from 'vitest';
-import { expectEndpoints } from '../../test/fetch-mock.js';
+import { describe, test, vi } from 'vitest';
+import { expectEndpoint } from '../../test/fetch-mock.js';
 
 vi.mock('./auth', () => ({ authManager: { getToken: () => null } }));
 
@@ -13,7 +13,7 @@ const GET = 'GET';
 const DELETE = 'DELETE';
 
 describe('documents', () => {
-  expectEndpoints(client, [
+  test.each([
     ['getStats', (c) => c.getStats(), '/v1/stats', GET],
     ['getReplicationStatus', (c) => c.getReplicationStatus(), '/v1/replication/status', GET],
     ['getDocument defaults env', (c) => c.getDocument({ collection: 'c', key: 'k', lang: 'en' }), '/v1/get', POST, { collection: 'c', key: 'k', lang: 'en', env: {} }],
@@ -35,11 +35,11 @@ describe('documents', () => {
     ['getRevisions', (c) => c.getRevisions({ collection: 'c', key: 'k', lang: 'en' }), '/v1/revisions', POST, { collection: 'c', key: 'k', lang: 'en' }],
     ['restoreRevision', (c) => c.restoreRevision({ collection: 'c', key: 'k', lang: 'en', timestamp: 7 }), '/v1/revisions/restore', POST, { collection: 'c', key: 'k', lang: 'en', timestamp: 7 }],
     ['classify', (c) => c.classify({ collection: 'c', key: 'k', lang: 'en', labels: ['a'], topK: 2, multi: true, threshold: 0.3 }), '/v1/classify', POST, { collection: 'c', key: 'k', lang: 'en', labels: ['a'], topK: 2, multi: true, threshold: 0.3 }],
-  ]);
+  ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
 
 describe('vector and geo', () => {
-  expectEndpoints(client, [
+  test.each([
     ['vectorSearch defaults', (c) => c.vectorSearch({ collection: 'c', query: 'q' }), '/v1/vector-search', POST, { collection: 'c', query: 'q', topK: 5, threshold: 0, filterMeta: {}, includeContent: false, algorithm: 'flat', distanceMetric: 'cosine' }],
     ['vectorReindex', (c) => c.vectorReindex({ collection: 'c' }), '/v1/vector-reindex', POST, { collection: 'c', force: false }],
     ['vectorStats', (c) => c.vectorStats(), '/v1/vector-stats', GET],
@@ -54,13 +54,13 @@ describe('vector and geo', () => {
     ['geoEncode defaults precision', (c) => c.geoEncode({ lat: 1, lng: 2 }), '/v1/geo-encode', POST, { lat: 1, lng: 2, precision: 12 }],
     ['geoDecode', (c) => c.geoDecode({ geohash: 'u4pr' }), '/v1/geo-decode', POST, { geohash: 'u4pr' }],
     ['geoReindex without arguments', (c) => c.geoReindex(), '/v1/geo-reindex', POST, { collection: '', loadPostcodes: [] }],
-  ]);
+  ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
 
 describe('full-text and hybrid', () => {
   const ftsBase = { collection: 'c', query: 'q', limit: 50, algorithm: 'tfidf', fuzzy: 0, disableStem: false, disableSynonyms: false };
   const hybridBase = { collection: 'c', query: 'q', topK: 10, algorithm: 'bm25', vectorAlgorithm: 'flat', alpha: 0.5, strategy: 'alpha', rrfK: 60, fuzzy: 0, threshold: 0, filterMeta: {}, includeContent: false, distanceMetric: 'cosine' };
-  expectEndpoints(client, [
+  test.each([
     ['ftsSearch omits every optional field', (c) => c.ftsSearch({ collection: 'c', query: 'q', filterMeta: null, rangeMeta: [], boost: {} }), '/v1/fts', POST, ftsBase],
     ['ftsSearch proximity, filters, bm25f weights, highlight options', (c) => c.ftsSearch({
       collection: 'c', query: 'q', algorithm: 'bm25f', mode: 'proximity', distance: 3, fieldWeights: { title: 2 },
@@ -84,11 +84,11 @@ describe('full-text and hybrid', () => {
     ['searchAdvisor apply', (c) => c.searchAdvisor('c', { apply: true }), '/v1/search-advisor?collection=c&apply=true', GET],
     ['codeGraph defaults', (c) => c.codeGraph({ collection: 'c', key: 'k' }), '/v1/code-graph?collection=c&key=k&direction=both&depth=1&maxDegree=100', GET],
     ['codeGraph with lines', (c) => c.codeGraph({ collection: 'c', key: 'k', direction: 'in', depth: 2, maxDegree: 5, lines: true }), '/v1/code-graph?collection=c&key=k&direction=in&depth=2&maxDegree=5&lines=true', GET],
-  ]);
+  ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
 
 describe('synonyms, stop words, webhooks', () => {
-  expectEndpoints(client, [
+  test.each([
     ['listSynonyms', (c) => c.listSynonyms('a/b'), '/v1/synonyms?collection=a%2Fb', GET],
     ['setSynonym', (c) => c.setSynonym({ collection: 'c', term: 't', synonyms: ['s'] }), '/v1/synonyms', POST, { collection: 'c', term: 't', synonyms: ['s'] }],
     ['deleteSynonym', (c) => c.deleteSynonym({ collection: 'c', term: 't' }), '/v1/synonyms', DELETE, { collection: 'c', term: 't' }],
@@ -100,5 +100,5 @@ describe('synonyms, stop words, webhooks', () => {
     ['registerWebhook per collection', (c) => c.registerWebhook({ url: 'u', events: ['add'], collection: 'c' }), '/v1/webhooks', POST, { url: 'u', events: ['add'], collection: 'c' }],
     ['listWebhooks', (c) => c.listWebhooks(), '/v1/webhooks', GET],
     ['deleteWebhook', (c) => c.deleteWebhook('w1'), '/v1/webhooks/delete', POST, { id: 'w1' }],
-  ]);
+  ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });

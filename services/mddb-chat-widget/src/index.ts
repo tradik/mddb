@@ -14,7 +14,7 @@ function init(): void {
   // FE-006: validate the WebSocket endpoint before connecting. Reject anything
   // that isn't wss:// (or ws:// to localhost for dev) so the chat session can't
   // be redirected to an attacker host or sent in plaintext on a public page.
-  const server = validateServerUrl(script.getAttribute('data-server') ?? '');
+  const server = validateServerUrl(script.dataset.server ?? '');
   if (!server) {
     console.error(
       '[mddb-chat] data-server must be an absolute wss:// URL (ws:// is allowed only for localhost)',
@@ -22,14 +22,14 @@ function init(): void {
     return;
   }
 
-  const sessionTtlAttr = script.getAttribute('data-session-ttl');
+  const sessionTtlAttr = script.dataset.sessionTtl;
   const options: WidgetOptions = {
     server,
-    scenario: script.getAttribute('data-scenario') || 'assistant',
-    theme: (script.getAttribute('data-theme') as 'light' | 'dark') || 'light',
-    accent: script.getAttribute('data-accent') || undefined,
+    scenario: script.dataset.scenario || 'assistant',
+    theme: (script.dataset.theme as 'light' | 'dark') || 'light',
+    accent: script.dataset.accent || undefined,
     position:
-      (script.getAttribute('data-position') as 'bottom-right' | 'bottom-left') ||
+      (script.dataset.position as 'bottom-right' | 'bottom-left') ||
       'bottom-right',
     sessionTtlHours: sessionTtlAttr ? parseInt(sessionTtlAttr, 10) : undefined,
   };
