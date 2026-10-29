@@ -11,7 +11,11 @@ import (
 
 	gql "mddb/graphql"
 	json "mddb/internal/jsonx"
+	"mddb/internal/schema"
+	"mddb/internal/storage"
 	proto "mddb/proto"
+
+	bolt "go.etcd.io/bbolt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -224,5 +228,59 @@ func TestGRPCSearch_FindsDocuments(t *testing.T) {
 		FilterMeta: map[string]*proto.MetaValues{"dir": {Values: []string{"/b"}}}})
 	if err != nil || len(one.Documents) != 1 || one.Documents[0].Key != "b/y.md" {
 		t.Fatalf("filtered: %v %+v", err, one)
+	}
+}
+
+// The refusals updateDocument shares across transports: a schema violation,
+// an expired document, a corrupt one; and history trimmed to MaxRevisions.
+func TestUpdate_RefusalsAndRetention(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	s.SchemaManager = schema.NewSchemaManager(s.DB)
+	if err := s.SchemaManager.EnsureBucket(); err != nil {
+		t.Fatal(err)
+	}
+	addTestDoc(t, s, "fs", "a.md", "en", "x", map[string][]string{"author": {"ann"}})
+	if err := s.SchemaManager.Set("fs", `{"required":["author"]}`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.updateDocument("fs", "a.md", "en", DocPatch{HasMeta: true, Meta: map[string][]string{"tag": {"x"}}}); err == nil {
+		t.Fatal("schema violation must be refused")
+	}
+
+	// Revisions are trimmed to the collection's MaxRevisions.
+	if err := s.CollectionManager.Set("fs", &CollectionConfig{MaxRevisions: 1}); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 3 {
+		c := "v" + itoa(i)
+		if _, err := s.updateDocument("fs", "a.md", "en", DocPatch{Content: &c}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// An expired document is not there to update.
+	doc := addTestDoc(t, s, "fs", "old.md", "en", "x", map[string][]string{"author": {"ann"}})
+	doc.ExpiresAt = 1
+	buf, _ := json.Marshal(doc)
+	_ = s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("fs", doc.ID), buf) })
+	c := "y"
+	if _, err := s.updateDocument("fs", "old.md", "en", DocPatch{Content: &c}); !errors.Is(err, errDocNotFound) {
+		t.Fatalf("expired: %v", err)
+	}
+	// A metadata value too long for an index key fails the update and leaves
+	// the stored document as it was (the transaction rolls back).
+	addTestDoc(t, s, "big", "b.md", "en", "x", nil)
+	if _, err := s.updateDocument("big", "b.md", "en", DocPatch{HasMeta: true,
+		Meta: map[string][]string{"k": {strings.Repeat("v", 40000)}}}); err == nil {
+		t.Fatal("an oversized index key must fail")
+	}
+	if cur, _ := s.loadDocByRef("big", "b.md", "en"); len(cur.Meta) != 0 {
+		t.Fatal("rolled back")
+	}
+	// A document that no longer decodes is not found either.
+	_ = s.DB.Update(func(tx *bolt.Tx) error { return tx.Bucket([]byte("docs")).Put(storage.DocKey("fs", doc.ID), []byte("{")) })
+	if _, err := s.updateDocument("fs", "old.md", "en", DocPatch{Content: &c}); !errors.Is(err, errDocNotFound) {
+		t.Fatalf("corrupt: %v", err)
 	}
 }
