@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A metadata-only update left full-text search on the old metadata
+  (#362).** `PATCH /v1/update`, gRPC `UpdateDocument` and MCP
+  `update_document` re-indexed FTS only when the content changed. Every
+  meta key is a BM25F field (`meta.<key>`), so the old values stayed
+  searchable and the new ones were not. A metadata change now re-indexes
+  the document.
+
 - **Data race between router wiring and the vector index reload after a
   restore (#359).** In the per-collection layout, the first use of the
   collection files after a restore, or at startup, sets every component's
@@ -85,6 +92,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Document summaries as a second representation (RAG-009).** A document
+  can carry a summary, written by its client, in the metadata key
+  `summary`. MDDB never generates one and has no LLM in the server.
+  - **How it is indexed.** The summary is embedded as its own vector, kept
+    apart from chunk vectors (`vsum|` keys, its own in-memory index). It is
+    also weighted as the BM25F field `meta.summary`.
+  - **Profile settings.** `retrieval.summaryMode` (`off` by default,
+    `blend`, `expand`) and `retrieval.summaryWeight` (default 2.0).
+    - `blend` scores a document by the better of its best chunk and its
+      summary, so a general question finds a document no chunk answers.
+    - `expand` also brings a summary hit's best chunks (up to 3, fewer
+      under `contextTokenBudget`), as passages with
+      `format: "passages"`.
+  - **Where it applies.** Vector search over REST, MCP, gRPC and GraphQL,
+    and the vector half of hybrid search. With `off`, results are
+    byte-for-byte unchanged.
+  - **Lifecycle.**
+    - A summary is embedded only when its text changes, and spends the
+      collection's embedding budget: a job waits instead of failing when
+      the budget is spent.
+    - It is removed with the summary, the document or the collection.
+    - It is re-embedded by a forced reindex, replicated, and loaded at
+      startup and after restore.
+  - **Advisor and evaluation.** The search advisor reports
+    `summaryDocuments` and `summaryRatio`, and recommends `blend` when at
+    least half the documents have a summary. Evaluation configurations take
+    `summaryMode`, so the modes can be measured.
+  - **New gRPC fields.** `RetrievalProfileProto.summary_mode` and
+    `summary_weight`, `EvalConfigProto.summary_mode`,
+    `CollectionProfile.summary_documents` and `summary_ratio`,
+    `SearchAdvisorResponse.summary_mode`.
+  - **Not covered.** Cross-collection vector search does not apply
+    `summaryMode`, because cross search has no single collection profile.
+    Cross-collection hybrid search does apply it.
 - **The server chooses the vector index: `algorithm: "auto"` (SRCH-013).**
   - **Where.** `algorithm` on `/v1/vector-search` and `/v1/cross-search`,
     `vectorAlgorithm` on `/v1/hybrid-search`, the same on the MCP tools and

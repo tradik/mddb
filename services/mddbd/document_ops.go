@@ -415,9 +415,10 @@ func (s *Server) invalidateDocReadCaches(collection, key, lang string) {
 // FTS/geo reindexing, webhooks and metrics entirely, so a gRPC Get served the
 // pre-update document for up to the cache TTL and FTS kept matching the old
 // content. One pipeline, like runPostWriteHooks for Add (GO-001), keeps the
-// transports from drifting again. contentChanged is also true when only the
-// summary changed (RAG-009): both re-embed and re-index the document.
-func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.Doc, contentChanged, ttlChanged bool) {
+// transports from drifting again. contentChanged re-embeds the document; it
+// is also true when only the summary changed (RAG-009). textChanged re-indexes
+// FTS, for new content or new metadata.
+func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.Doc, contentChanged, textChanged, ttlChanged bool) {
 	s.invalidateDocReadCaches(collection, key, lang)
 
 	if contentChanged && s.EmbeddingWorker != nil && saved.ContentMD != "" {
@@ -443,7 +444,9 @@ func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.
 		}
 	}
 
-	if contentChanged {
+	// Content or metadata: a metadata-only PATCH used to leave the BM25F
+	// meta.* fields stale.
+	if textChanged {
 		_ = s.indexDocumentFTS(collection, &saved)
 	}
 
