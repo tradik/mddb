@@ -748,6 +748,9 @@ type MCPSetCollectionConfigRequest struct {
 	// mention them, and are then left as stored (RAG-001, RAG-002).
 	Retrieval      *RetrievalProfileDef `json:"retrieval,omitempty"`
 	ResponsePrompt string               `json:"responsePrompt,omitempty"`
+	// Quota is nil when not sent and the stored one is kept; an empty quota
+	// removes it (GO-043).
+	Quota *CollectionQuota `json:"quota,omitempty"`
 }
 
 // MCPCollectionConfigListResponse is the response for list_collection_configs.

@@ -122,11 +122,14 @@ func (s *Server) processBatchWithDocs(ctx context.Context, collection string, pr
 		// FinalBatchProcessor: single read tx → parallel marshal → single write tx
 		existingMap := s.finalBatchProcessor.batchReadAll(collection, protoDocs)
 		all := s.finalBatchProcessor.parallelMarshal(ctx, collection, protoDocs, existingMap, now)
-		resp, processed = s.finalBatchProcessor.commitBatch(collection, all, now)
+		resp, processed, err = s.finalBatchProcessor.commitBatch(collection, all, now)
 	} else {
 		bp := NewBatchProcessor(s, 8)
 		all := bp.parallelProcess(ctx, collection, protoDocs, now)
-		resp, processed = bp.commitBatch(collection, all, now)
+		resp, processed, err = bp.commitBatch(collection, all, now)
+	}
+	if err != nil {
+		return nil, nil, err // a quota refusal (GO-043)
 	}
 
 	if resp.Failed == safeInt32(len(protoDocs)) && len(resp.Errors) > 0 {

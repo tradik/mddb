@@ -105,6 +105,12 @@ func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]s
 		cachedBuf = buf
 		docKey := storage.DocKey(collection, docID)
 
+		// GO-043: quotas and the disk reserve, before anything is written —
+		// an external backend included.
+		if err := s.checkWriteQuota(tx, collection, oneQuotaWrite(docKey, buf)); err != nil {
+			return err
+		}
+
 		// GO-021: an external backend receives the payload before this
 		// transaction commits, so a crash in between leaves an unreferenced
 		// object rather than an index entry pointing at nothing. The bucket

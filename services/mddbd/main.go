@@ -133,6 +133,8 @@ type Server struct {
 	AutomationLogStore *automationlog.Store     // Automation execution logs
 	CronScheduler      *CronScheduler           // Cron scheduler for automation
 	CollectionManager  *CollectionManager       // Per-collection attributes (type, description, icon, etc.)
+	quotaOnce          sync.Once                // GO-043: builds quota on first use (see quotas())
+	quota              *quotaState              // GO-043: disk reserve, vector RAM limit, usage cache, embedding budget
 	// Backends routes document payloads to a per-collection storage backend
 	// (GO-021). nil until InitStorageBackends runs; a nil registry means every
 	// collection uses BoltDB, which is what the server did before.

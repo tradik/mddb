@@ -95,6 +95,7 @@ func (x serverIndexes) Remove(collection, chunkKey string) {
 func (s *Server) startEmbeddingWorker(provider embedding.Provider) {
 	s.EmbeddingWorker = NewEmbeddingWorker(provider, s.VectorStore, s.VectorIndex, EmbeddingQueueSize())
 	s.EmbeddingWorker.SetIndexer(serverIndexes{s})
+	s.EmbeddingWorker.budget = s.quotas().budget // GO-043
 	// GO-042: tell listeners when a collection's embeddings have caught up,
 	// so a client can wait for an event instead of polling the status.
 	s.EmbeddingWorker.Pending().OnDrained(s.announceIndexed)

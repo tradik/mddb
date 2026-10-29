@@ -74,6 +74,18 @@ type DBStats struct {
 	Collections  map[string]CollectionStats
 	WebhookCount int
 	SchemaCount  int
+	// Fullness is each collection quota's use, 0-1 (GO-043).
+	Fullness []FullnessGauge
+	// EmbeddingBudgetUsed is the share of today's embedding budget each
+	// collection with one has spent, 0-1 (GO-043).
+	EmbeddingBudgetUsed map[string]float64
+}
+
+// FullnessGauge is the share of one collection quota in use.
+type FullnessGauge struct {
+	Collection string
+	Resource   string // documents, bytes, vectors
+	Value      float64
 }
 
 // CollectionStats holds per-collection counts.
@@ -351,6 +363,7 @@ func (m *Metrics) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	buf.WriteString("\n")
+	writeQuotaGauges(&buf, ds)
 
 	// --- Vector search status ---
 	writef(&buf, "# HELP mddb_vector_index_ready Whether the vector index is loaded (1=ready, 0=loading).\n")
@@ -480,6 +493,32 @@ func (m *Metrics) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---- helpers ----------------------------------------------------------------
+
+// writeQuotaGauges writes the quota gauges (GO-043). Both are absent on a
+// server without quotas rather than a page of zeros.
+func writeQuotaGauges(buf *strings.Builder, ds DBStats) {
+	if len(ds.Fullness) > 0 {
+		writef(buf, "# HELP mddb_collection_fullness Share of a collection quota in use (0-1; above 1 when a limit was lowered below current use).\n")
+		writef(buf, "# TYPE mddb_collection_fullness gauge\n")
+		for _, g := range ds.Fullness {
+			writef(buf, "mddb_collection_fullness{collection=%q,resource=%q} %g\n", g.Collection, g.Resource, g.Value)
+		}
+		buf.WriteString("\n")
+	}
+	if len(ds.EmbeddingBudgetUsed) > 0 {
+		names := make([]string, 0, len(ds.EmbeddingBudgetUsed))
+		for name := range ds.EmbeddingBudgetUsed {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		writef(buf, "# HELP mddb_embedding_budget_used Share of today's (UTC) embedding budget a collection has spent (0-1).\n")
+		writef(buf, "# TYPE mddb_embedding_budget_used gauge\n")
+		for _, name := range names {
+			writef(buf, "mddb_embedding_budget_used{collection=%q} %g\n", name, ds.EmbeddingBudgetUsed[name])
+		}
+		buf.WriteString("\n")
+	}
+}
 
 func writef(b *strings.Builder, format string, args ...any) {
 	fmt.Fprintf(b, format, args...)

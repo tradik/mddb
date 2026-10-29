@@ -48,7 +48,10 @@ func (fbp *FinalBatchProcessor) ProcessBatch(ctx context.Context, collection str
 	processed := fbp.parallelMarshal(ctx, collection, batchDocs, existingMap, now)
 
 	// Phase 3: Single write transaction
-	resp, committed := fbp.commitBatch(collection, processed, now)
+	resp, committed, err := fbp.commitBatch(collection, processed, now)
+	if err != nil {
+		return nil, err
+	}
 
 	// Phase 4: post-commit side-effect pipeline (GO-001) — FTS, geo, webhooks,
 	// SSE, temporal, embedding. The extreme path skipped these entirely, so
@@ -114,12 +117,14 @@ func (fbp *FinalBatchProcessor) parallelMarshal(ctx context.Context, collection 
 			defer wg.Done()
 
 			for idx := range jobs {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					processed[idx] = fbp.processDocumentFast(collection, batchDocs[idx], existingMap, now)
+				// A cancelled request still gets an answer for every
+				// document, as in BatchProcessor.parallelProcess: returning
+				// here left nil slots that commitBatch dereferenced.
+				if err := ctx.Err(); err != nil {
+					processed[idx] = &ProcessedDoc{Doc: storage.Doc{Key: batchDocs[idx].Key}, Error: err}
+					continue
 				}
+				processed[idx] = fbp.processDocumentFast(collection, batchDocs[idx], existingMap, now)
 			}
 		}()
 	}
@@ -194,8 +199,9 @@ func (fbp *FinalBatchProcessor) processDocumentFast(collection string, batchDoc 
 	return result
 }
 
-// commitBatch commits with optimized key building
-func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*ProcessedDoc, now int64) (*proto.AddBatchResponse, []*ProcessedDoc) {
+// commitBatch commits with optimized key building. Its error is a quota
+// refusal of the whole batch (GO-043), as in BatchProcessor.commitBatch.
+func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*ProcessedDoc, now int64) (*proto.AddBatchResponse, []*ProcessedDoc, error) {
 	resp := &proto.AddBatchResponse{}
 	committed := make([]*ProcessedDoc, 0, len(processed))
 
@@ -208,6 +214,9 @@ func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*Proc
 	var bo binlog.BinlogOps
 
 	err := fbp.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
+		if err := fbp.server.checkWriteQuota(tx, collection, docQuotaWrites(collection, processed)); err != nil {
+			return err
+		}
 		bDocs := tx.Bucket(fbp.server.BucketNames.Docs)
 		bIdx := tx.Bucket(fbp.server.BucketNames.IdxMeta)
 		bRev := tx.Bucket(fbp.server.BucketNames.Rev)
@@ -331,11 +340,14 @@ func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*Proc
 		return nil
 	})
 
+	if qe := asQuotaError(err); qe != nil {
+		return nil, nil, qe
+	}
 	if err != nil {
 		resp.Failed = safeInt32(len(processed))
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
-		return resp, nil
+		return resp, nil, nil
 	}
 
-	return resp, committed
+	return resp, committed, nil
 }

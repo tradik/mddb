@@ -19,6 +19,7 @@ Complete reference for all MDDB configuration parameters.
 - [MCP (Model Context Protocol)](#mcp-model-context-protocol)
 - [HTTP/3 (QUIC)](#http3-quic)
 - [Authentication](#authentication)
+- [Quotas and Reserves](#quotas-and-reserves-v2189)
 - [Embedding / Vector Search](#embedding--vector-search)
 - [Vector Index](#vector-index)
 - [Full-Text Search (FTS)](#full-text-search-fts)
@@ -183,6 +184,7 @@ Security and operational incidents are delivered through the existing `/v1/webho
 | `ops.panic_recovered` | An HTTP handler panicked and was recovered by the middleware | `{method, path, panic, ip}` |
 | `ops.disk_usage_high` | DB filesystem used-% ≥ threshold | `{path, usedBytes, totalBytes, usedPct, thresholdPct}` |
 | `backup.failed` | A scheduled backup failed (2.18.9, [BACKUP.md](BACKUP.md#scheduled-backups)) | `{ruleId, ruleName, target, backup, error}` |
+| `quota.exceeded` | (v2.18.9+) A write or embedding refused by a collection quota, the disk reserve or the vector RAM limit; at most once a minute per collection and resource. Collection-scoped webhooks receive their collection's events | `{error, code, collection, resource, limit, used, retryAfterSeconds?}` |
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
@@ -635,6 +637,22 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
+## Quotas and Reserves (v2.18.9+)
+
+Server-wide limits that protect the node, next to the per-collection `quota`
+([MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189)). Both are off by default.
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_DISK_RESERVE_BYTES` | `0` (off) | int64 | Document writes on every surface are refused with `507 Insufficient Storage` (gRPC `RESOURCE_EXHAUSTED`) while the filesystem holding the database has less than this available to the server. Reads, deletes and backups keep working. A filesystem that cannot be measured does not block writes |
+| `MDDB_VECTOR_RAM_LIMIT_BYTES` | `0` (off) | int64 | Once the in-memory flat vector index holds this much (vectors x dimensions x 4 bytes), writes that would add vectors to RAM — new or growing documents in a collection that is not `diskOnlyVectors`, with an embedding provider configured — are refused with `507`, resource `vectorRam`. Disk-only collections keep accepting writes. Map overhead and the other ANN indexes' own copies are not counted, so leave headroom |
+
+Each refusal is counted in `mddb_operations_total{operation="quota_exceeded",label="<resource>"}`,
+logged, and sent as a `quota.exceeded` webhook (at most once a minute per
+collection and resource).
+
+---
+
 ## Per-Collection Configuration (v2.9.14+ additions)
 
 Per-collection attributes are persisted via `PUT /v1/collection-config` (REST), `SetCollectionConfig` (gRPC), the `set_collection_config` MCP tool, or the Admin Panel — **not** via env vars. The settings below extend what has been configurable since earlier versions.
@@ -648,6 +666,7 @@ Per-collection attributes are persisted via `PUT /v1/collection-config` (REST), 
 | `spellLang` | `""` | string | Override spell-correction language for this collection |
 | `quantization` | `"float32"` | string | Vector quantization level: `float32`, `int8`, or `int4` |
 | `storageBackend` | `"boltdb"` | string | `boltdb`, `memory`, or `s3` |
+| `quota` | none | object | (v2.18.9+) `{maxDocuments, maxBytes, maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`, `0` = no limit. Omitted keeps the stored quota, `{}` removes it; changing it needs a global admin when auth is on. See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189) |
 
 **Example — set a 20-revision cap:**
 ```bash

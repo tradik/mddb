@@ -318,7 +318,7 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 		// as a pattern rather than one error at a time.
 		h.logToClient(ctx, MCPLogError, "tools/call", name+": "+err.Error())
 
-		return map[string]interface{}{
+		res := map[string]interface{}{
 			"content": []map[string]interface{}{
 				{
 					"type": "text",
@@ -327,6 +327,12 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 			},
 			"isError": true,
 		}
+		// GO-043: a quota refusal also says so as data, so an agent can
+		// tell a full collection (507) or a spent budget (429) from a fault.
+		if detail := mcpQuotaContent(err); detail != nil {
+			res["structuredContent"] = detail
+		}
+		return res
 	}
 
 	return map[string]interface{}{

@@ -104,7 +104,7 @@ func TestCovHBatchUpdateClosedDatabase(t *testing.T) {
 	updated := bu.parallelProcess(context.Background(), "c", []*proto.UpdateDocument{covHUpdateDoc("a", "y", nil, false)}, 1)
 	closeStorage(t, s, "c")
 
-	resp := bu.commitUpdate("c", updated, 1)
+	resp, _ := bu.commitUpdate("c", updated, 1)
 	if resp.Updated != 0 || resp.Failed != 1 || !covHErrorsMention(resp.Errors, "transaction error") {
 		t.Fatalf("closed database: %+v", resp)
 	}

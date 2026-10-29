@@ -397,6 +397,16 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	if err := cfg.Code.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+	// GO-043: nil leaves the stored quota alone; a change needs a global admin.
+	if quota := quotaFromProto(req.Quota); quota != nil {
+		if err := g.server.checkQuotaChange(ctx, req.Collection, quota); err != nil {
+			if errors.Is(err, errQuotaAdminOnly) {
+				return nil, status.Error(codes.PermissionDenied, err.Error())
+			}
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		cfg.Quota = quota
+	}
 
 	// RAG-001: a nil retrieval block means "not sent", which leaves any
 	// profile configured over REST in place.

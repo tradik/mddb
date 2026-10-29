@@ -206,6 +206,23 @@ func (vi *VectorIndex) CollectionSize(collection string) int {
 	return len(vi.collections[collection])
 }
 
+// MemoryBytes estimates the RAM the index's vectors take: per collection,
+// vectors x dimensions x 4 bytes (GO-043). Map and key overhead are not
+// counted, nor are the other indexes' own copies.
+func (vi *VectorIndex) MemoryBytes() int64 {
+	vi.mu.RLock()
+	defer vi.mu.RUnlock()
+
+	var total int64
+	for _, coll := range vi.collections {
+		for _, v := range coll {
+			total += int64(len(coll)) * int64(len(v)) * 4
+			break // every vector of a collection has the same dimensions
+		}
+	}
+	return total
+}
+
 // Collections returns all collection names that have vectors.
 func (vi *VectorIndex) Collections() []string {
 	vi.mu.RLock()

@@ -43,6 +43,9 @@ func (s *Server) newGraphQLHandler() http.Handler {
 	// GO-044: aliases become collections before any resolver reads them.
 	srv.AroundFields(s.aliasFieldMiddleware)
 
+	// GO-043: a quota refusal carries its detail in the error's extensions.
+	srv.SetErrorPresenter(graphQLErrorPresenter)
+
 	// Recovery handler for panics
 	srv.SetRecoverFunc(func(ctx context.Context, err interface{}) error {
 		slog.Warn("GraphQL panic recovered", "err", err)

@@ -72,6 +72,10 @@ type CollectionConfig struct {
 	// only through /v1/eval-queries; Set keeps the stored set when a config
 	// is rewritten without one. See eval_set.go.
 	EvalSet []EvalQuery `json:"evalSet,omitempty"`
+	// Quota caps the collection's documents, bytes, vectors and daily
+	// embedding use (GO-043). nil = unlimited. Kept by Set when a config is
+	// written without one; an empty quota removes it. See quota.go.
+	Quota *CollectionQuota `json:"quota,omitempty"`
 }
 
 // CodeConfigDef configures how source documents in a collection are read.
@@ -209,6 +213,12 @@ func (cm *CollectionManager) Get(collection string) (*CollectionConfig, bool) {
 func (cm *CollectionManager) Set(collection string, cfg *CollectionConfig) error {
 	if stored, found := cm.Get(collection); found {
 		cfg.EvalSet = stored.EvalSet
+		if cfg.Quota == nil {
+			cfg.Quota = stored.Quota
+		}
+	}
+	if cfg.Quota.isZero() {
+		cfg.Quota = nil
 	}
 	return cm.put(collection, cfg)
 }
@@ -301,6 +311,7 @@ type SetCollectionConfigRequest struct {
 	Code            *CodeConfigDef         `json:"code,omitempty"`            // source-code settings, e.g. include paths (#319)
 	Embedding       *EmbeddingChunkingDef  `json:"embedding,omitempty"`       // chunk size and mode for embeddings (#325)
 	FTS             *CollectionFTSDef      `json:"fts,omitempty"`             // full-text indexing on or off (#335)
+	Quota           *CollectionQuota       `json:"quota,omitempty"`           // limits (GO-043); omitted keeps the stored quota, {} removes it
 	// Temporal tracking and spell correction. These live in CollectionConfig
 	// and are read on every request, but were missing here — so the panel's
 	// toggles sent values the handler ignored, and every config save silently
@@ -437,6 +448,16 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		bad(w, err)
 		return
 	}
+	// GO-043: a quota is a limit on the caller, so only a global admin may
+	// change one.
+	if err := s.checkQuotaChange(r.Context(), req.Collection, req.Quota); err != nil {
+		if errors.Is(err, errQuotaAdminOnly) {
+			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+			return
+		}
+		bad(w, err)
+		return
+	}
 
 	cfg := &CollectionConfig{
 		Type:            req.Type,
@@ -460,6 +481,7 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		Code:            req.Code,
 		Embedding:       req.Embedding,
 		FTS:             req.FTS,
+		Quota:           req.Quota,
 	}
 	// GO-035: a client that read this config back saw masked credentials, so
 	// an empty one means "unchanged", not "remove it". Runs before the backend

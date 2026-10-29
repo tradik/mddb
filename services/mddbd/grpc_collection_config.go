@@ -122,6 +122,28 @@ func collectionConfigToProto(cfg *CollectionConfig) *proto.CollectionConfigProto
 		Code:            codeConfigToProto(cfg.Code),
 		Embedding:       chunkingToProto(cfg.Embedding),
 		Fts:             ftsToProto(cfg.FTS),
+		Quota:           quotaToProto(cfg.Quota),
+	}
+}
+
+// quotaToProto and quotaFromProto carry CollectionQuota (GO-043).
+func quotaToProto(q *CollectionQuota) *proto.CollectionQuotaProto {
+	if q == nil {
+		return nil
+	}
+	return &proto.CollectionQuotaProto{
+		MaxDocuments: q.MaxDocuments, MaxBytes: q.MaxBytes, MaxVectors: q.MaxVectors,
+		EmbeddingCallsPerDay: q.EmbeddingCallsPerDay, EmbeddingTokensPerDay: q.EmbeddingTokensPerDay,
+	}
+}
+
+func quotaFromProto(in *proto.CollectionQuotaProto) *CollectionQuota {
+	if in == nil {
+		return nil
+	}
+	return &CollectionQuota{
+		MaxDocuments: in.GetMaxDocuments(), MaxBytes: in.GetMaxBytes(), MaxVectors: in.GetMaxVectors(),
+		EmbeddingCallsPerDay: in.GetEmbeddingCallsPerDay(), EmbeddingTokensPerDay: in.GetEmbeddingTokensPerDay(),
 	}
 }
 

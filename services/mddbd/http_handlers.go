@@ -375,6 +375,12 @@ func ok(w http.ResponseWriter, v any) {
 	_, _ = w.Write(b) // #nosec G705 -- response write to http.ResponseWriter
 }
 func bad(w http.ResponseWriter, err error) {
+	// GO-043: a quota refusal is 507 or 429 wherever it surfaces, so every
+	// handler that reports a write failure here maps it without knowing
+	// about quotas.
+	if writeQuotaError(w, err) {
+		return
+	}
 	// DOC-018: a request for something that does not exist is not a bad
 	// request; the body keeps its shape.
 	if errors.Is(err, errNotFound) {

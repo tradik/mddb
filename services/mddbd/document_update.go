@@ -130,6 +130,9 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 			return err
 		}
 		docKey := storage.DocKey(collection, doc.ID)
+		if err := s.checkWriteQuota(tx, collection, oneQuotaWrite(docKey, buf)); err != nil { // GO-043
+			return err
+		}
 		if err := bDocs.Put(docKey, buf); err != nil {
 			return err
 		}

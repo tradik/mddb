@@ -161,7 +161,7 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	// stays coherent without re-marshaling here.
 	saved, _, err := g.server.addDocument(req.Collection, req.Key, req.Lang, meta, req.ContentMd, req.Ttl, req.SaveRevision)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err) // GO-043: quota → RESOURCE_EXHAUSTED
 	}
 
 	return withRevision(docToProto(&saved), docRevision(&saved)), nil
@@ -200,7 +200,7 @@ func (g *GRPCServer) AddBatch(ctx context.Context, req *proto.AddBatchRequest) (
 	}
 
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err)
 	}
 
 	return resp, nil
@@ -228,7 +228,7 @@ func (g *GRPCServer) Ingest(ctx context.Context, req *proto.IngestRequest) (*pro
 
 	resp, err := g.server.ingestDocumentsFromProto(ctx, req)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err)
 	}
 
 	return protoFromIngestResponse(resp), nil

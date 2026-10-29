@@ -103,6 +103,7 @@ func (a *serverMetricsStats) DBStats() metrics.DBStats {
 	if a.s.SchemaManager != nil {
 		ds.SchemaCount = len(a.s.SchemaManager.List())
 	}
+	ds.Fullness, ds.EmbeddingBudgetUsed = a.s.quotaGauges() // GO-043
 
 	a.cachedDB = &ds
 	a.cacheStamp = time.Now()

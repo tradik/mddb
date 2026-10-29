@@ -80,7 +80,7 @@ func (g *GRPCServer) VectorReindex(ctx context.Context, req *proto.VectorReindex
 	// vector instead of chunks and never touched the in-memory indexes.
 	res, err := g.server.reindexVectors(ctx, req.Collection, req.Force, nil)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err) // embedding budget → RESOURCE_EXHAUSTED
 	}
 	return &proto.VectorReindexResponse{
 		Embedded: safeInt32(res.Embedded),
@@ -210,7 +210,7 @@ func (g *GRPCServer) UpdateBatch(ctx context.Context, req *proto.UpdateBatchRequ
 
 	resp, err := g.batchUpdater.ProcessBatchUpdate(ctx, req.Collection, req.Documents)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err) // GO-043: quota → RESOURCE_EXHAUSTED
 	}
 
 	return resp, nil
@@ -257,7 +257,7 @@ func (g *GRPCServer) ImportURL(ctx context.Context, req *proto.ImportURLRequest)
 
 	saved, _, err := g.server.addDocument(req.Collection, key, req.Lang, mergedMeta, body, req.Ttl, true)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, grpcError(codes.Internal, err)
 	}
 
 	return docToProto(&saved), nil

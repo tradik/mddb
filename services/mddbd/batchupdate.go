@@ -58,9 +58,7 @@ func (bu *BatchUpdater) ProcessBatchUpdate(ctx context.Context, collection strin
 	updated := bu.parallelProcess(ctx, collection, updateDocs, now)
 
 	// Phase 2: Single transaction commit
-	resp := bu.commitUpdate(collection, updated, now)
-
-	return resp, nil
+	return bu.commitUpdate(collection, updated, now)
 }
 
 // parallelProcess processes updates in parallel
@@ -193,8 +191,10 @@ func (bu *BatchUpdater) processDocument(collection string, updateDoc *proto.Upda
 	return result
 }
 
-// commitUpdate commits all updates in a single transaction
-func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, now int64) *proto.UpdateBatchResponse {
+// commitUpdate commits all updates in a single transaction. Its error is a
+// quota refusal of the whole batch (GO-043); any other failure is reported per
+// document in the response.
+func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, now int64) (*proto.UpdateBatchResponse, error) {
 	resp := &proto.UpdateBatchResponse{}
 
 	var bo binlog.BinlogOps
@@ -204,6 +204,9 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 	var indexJobs []*indexqueue.IndexJob
 	// Single transaction for all updates
 	err := bu.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
+		if err := bu.server.checkWriteQuota(tx, collection, updateQuotaWrites(collection, updated)); err != nil {
+			return err
+		}
 		bDocs := tx.Bucket(bu.server.BucketNames.Docs)
 		bRev := tx.Bucket(bu.server.BucketNames.Rev)
 		failed := func(u *UpdatedDoc, err error) {
@@ -259,10 +262,13 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 		return nil
 	})
 
+	if qe := asQuotaError(err); qe != nil {
+		return nil, qe
+	}
 	if err != nil {
 		resp.Failed++
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
-		return resp
+		return resp, nil
 	}
 	bo.FlushTo(bu.server.Binlog)
 
@@ -278,5 +284,5 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 		}
 	}
 
-	return resp
+	return resp, nil
 }

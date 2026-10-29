@@ -266,7 +266,7 @@ func (g *GRPCServer) UpdateDocument(ctx context.Context, req *proto.UpdateDocume
 	case errors.As(err, &conflict):
 		return nil, status.Error(codes.Aborted, conflict.Error())
 	case err != nil:
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, grpcError(codes.InvalidArgument, err) // GO-043: quota → RESOURCE_EXHAUSTED
 	}
 	return withRevision(docToProto(&saved), docRevision(&saved)), nil
 }

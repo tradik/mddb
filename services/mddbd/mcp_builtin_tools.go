@@ -949,6 +949,17 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 							"chunk_mode": map[string]interface{}{"type": "string", "enum": []string{"", "code", "prose"}, "description": "code = split at function/declaration boundaries, prose = paragraphs; empty = per document kind"},
 						},
 					},
+					"quota": map[string]interface{}{
+						"type":        "object",
+						"description": "(v2.18.9+) Limits for this collection; 0 = no limit, an empty object removes the quota. Writes past a storage limit are refused (507); a spent daily embedding budget leaves documents pending until midnight UTC and refuses vector_reindex (429). Changing it needs a global admin when auth is on.",
+						"properties": map[string]interface{}{
+							"max_documents":            map[string]interface{}{"type": "integer", "description": "Documents the collection may hold"},
+							"max_bytes":                map[string]interface{}{"type": "integer", "description": "Stored bytes of its documents"},
+							"max_vectors":              map[string]interface{}{"type": "integer", "description": "Chunk vectors it may hold"},
+							"embedding_calls_per_day":  map[string]interface{}{"type": "integer", "description": "Embedding provider calls per UTC day"},
+							"embedding_tokens_per_day": map[string]interface{}{"type": "integer", "description": "Estimated tokens (characters / 4) embedded per UTC day"},
+						},
+					},
 				},
 				"required": []string{"collection"},
 			},

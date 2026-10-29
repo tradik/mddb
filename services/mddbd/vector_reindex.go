@@ -81,7 +81,18 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 	res.Total = len(docs)
 	res.Errors = []string{}
 
+	budget := s.quotas().budget
 	for i, d := range docs {
+		// GO-043: a reindex exists to spend embedding calls, so a spent
+		// budget refuses it (429) rather than parking it; one that runs out
+		// part way stops and says how much is left.
+		if err := budget.check(collection); err != nil {
+			if i == 0 {
+				return res, err
+			}
+			res.Errors = append(res.Errors, fmt.Sprintf("embedding budget exhausted: %d documents not reindexed until it resets", len(docs)-i))
+			break
+		}
 		s.reindexOne(ctx, collection, d.ID, d.ContentMD, d.Mode, force, chunkEnabled, chunkSize, qt, diskOnly, &res)
 		if progress != nil {
 			progress(i+1, res)
@@ -135,6 +146,7 @@ func (s *Server) reindexOne(ctx context.Context, collection, docID, content stri
 		ectx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		vector, err := s.Embedding.Embed(ectx, chunk, embedding.RoleDocument)
 		cancel()
+		s.quotas().budget.spend(collection, chunk)
 		if err != nil {
 			res.Failed++
 			res.Errors = append(res.Errors, fmt.Sprintf("%s chunk %d: %s", docID, i, err.Error()))

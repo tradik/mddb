@@ -147,6 +147,23 @@ Alert when a nightly backup is late: `time() - mddb_backup_last_success_timestam
 
 Database metrics are cached for 15 seconds to avoid excessive BoltDB scans.
 
+### Quotas (v2.18.9+)
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `mddb_collection_fullness` | gauge | `collection`, `resource` | Share of a collection quota in use, 0–1 (above 1 when a limit was lowered below current use). `resource` is `documents`, `bytes` or `vectors`; only limits that are set are reported |
+| `mddb_embedding_budget_used` | gauge | `collection` | Share of today's (UTC) embedding budget spent — the larger of the call and token shares |
+| `mddb_operations_total{operation="quota_exceeded"}` | counter | `label` (resource) | Writes or embeddings refused by a quota, `diskReserve` or `vectorRam` |
+
+Both gauges are absent on a server without quotas, and share the 15-second
+cache above. Alert before a tenant hits the wall:
+
+```promql
+max by (collection, resource) (mddb_collection_fullness) > 0.9
+```
+
+See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189).
+
 ### Retrieval gain (v2.18.8+)
 
 | Metric | Type | Labels | Description |

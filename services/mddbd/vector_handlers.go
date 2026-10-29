@@ -482,6 +482,12 @@ func (s *Server) handleVectorReindex(w http.ResponseWriter, r *http.Request) {
 	}
 	// #347: a large reindex outlasts any sensible request; run it as a job.
 	if req.Async {
+		// GO-043: refused up front, as the synchronous form is, rather than
+		// accepted as a job that fails at once.
+		if err := s.quotas().budget.check(req.Collection); err != nil {
+			bad(w, err)
+			return
+		}
 		job, err := s.startReindexJob(req.Collection, req.Force)
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Location", "/v1/vector-reindex/jobs/"+job.ID)

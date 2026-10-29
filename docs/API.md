@@ -2751,6 +2751,37 @@ Set or update collection configuration including storage backend.
 | `trackHot` | boolean | No | Maintain a hot-documents leaderboard |
 | `spellCorrect` | boolean | No | Auto-correct FTS queries using the spell checker |
 | `spellLang` | string | No | Override language for spell correction |
+| `quota` | object | No | (v2.18.9+) `{maxDocuments, maxBytes, maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`; `0` = no limit. Omitted keeps the stored quota, `{}` removes it. Changing it needs a global admin when auth is on (`403` otherwise) — see below |
+
+##### Quotas (v2.18.9+)
+
+Writes that would take a collection past `maxDocuments`, `maxBytes` or
+`maxVectors` — on any endpoint: `add`, `update`, `add-batch`, `ingest`,
+`upload` (one file; a multi-file upload lists the refusal per file), `import-url` — answer **`507 Insufficient Storage`**, and nothing
+is written (a batch is refused whole). The same `507` comes from the
+server-wide `MDDB_DISK_RESERVE_BYTES` and `MDDB_VECTOR_RAM_LIMIT_BYTES`
+([config.md](config.md#quotas-and-reserves-v2189)):
+
+```json
+{
+  "error": "quota exceeded: documents of collection \"acme/notes\" is 10000, limit 10000 (507)",
+  "code": "QUOTA_EXCEEDED",
+  "status": 507,
+  "collection": "acme/notes",
+  "resource": "documents",
+  "limit": 10000,
+  "used": 10000
+}
+```
+
+`resource` is one of `documents`, `bytes`, `vectors`, `diskReserve`,
+`vectorRam`, `embeddingCalls`, `embeddingTokens`. A spent embedding budget
+never refuses a document — its embedding waits, pending — but
+`POST /v1/vector-reindex` answers **`429 Too Many Requests`** with
+`Retry-After` (seconds to midnight UTC) and `retryAfterSeconds` in the body.
+gRPC answers `RESOURCE_EXHAUSTED` for both; MCP returns the object as the
+tool error's `structuredContent`; GraphQL puts it in the error's
+`extensions`. See [MULTI_TENANCY.md](MULTI_TENANCY.md#quotas-v2189).
 
 ##### Storage backends (v2.12.0+)
 

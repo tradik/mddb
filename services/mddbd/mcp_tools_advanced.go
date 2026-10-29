@@ -70,6 +70,15 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 			ChunkMode: mcpGetString(emb, "chunk_mode"),
 		}
 	}
+	if q, ok := args["quota"].(map[string]interface{}); ok {
+		req.Quota = &CollectionQuota{
+			MaxDocuments:          int64(mcpGetInt(q, "max_documents")),
+			MaxBytes:              int64(mcpGetInt(q, "max_bytes")),
+			MaxVectors:            int64(mcpGetInt(q, "max_vectors")),
+			EmbeddingCallsPerDay:  int64(mcpGetInt(q, "embedding_calls_per_day")),
+			EmbeddingTokensPerDay: int64(mcpGetInt(q, "embedding_tokens_per_day")),
+		}
+	}
 	if err := s.client.SetCollectionConfig(ctx, req); err != nil {
 		return "", err
 	}

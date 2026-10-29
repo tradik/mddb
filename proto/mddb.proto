@@ -1144,6 +1144,16 @@ message CollectionConfigProto {
   CodeConfigProto code = 19;                     // (v2.18.0+) source-code settings (#319)
   EmbeddingChunkingProto embedding = 20;         // (v2.18.1+) chunking for embeddings (#325)
   CollectionFTSProto fts = 21;                   // (v2.18.2+) full-text indexing on or off (#335)
+  CollectionQuotaProto quota = 22;               // (v2.18.9+) limits (GO-043); unset = unlimited
+}
+
+// CollectionQuotaProto mirrors CollectionQuota (GO-043). 0 = no limit.
+message CollectionQuotaProto {
+  int64 max_documents = 1;                       // documents the collection may hold
+  int64 max_bytes = 2;                           // stored bytes of its documents
+  int64 max_vectors = 3;                         // chunk vectors it may hold
+  int64 embedding_calls_per_day = 4;             // embedding provider calls per UTC day
+  int64 embedding_tokens_per_day = 5;            // estimated tokens (chars/4) embedded per UTC day
 }
 
 message GetCollectionConfigRequest {
@@ -1187,6 +1197,9 @@ message SetCollectionConfigRequest {
   CodeConfigProto code = 20;                     // (v2.18.0+) nil leaves the stored settings alone
   EmbeddingChunkingProto embedding = 21;         // (v2.18.1+) nil leaves the stored chunking alone (#325)
   CollectionFTSProto fts = 22;                   // (v2.18.2+) nil leaves the stored setting alone (#335)
+  // (v2.18.9+, GO-043) nil leaves the stored quota alone; an all-zero quota
+  // removes it. Changing it needs a global admin when auth is on.
+  CollectionQuotaProto quota = 23;
 }
 
 message SetCollectionConfigResponse {

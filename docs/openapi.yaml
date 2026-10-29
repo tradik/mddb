@@ -434,6 +434,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RevisionConflict"
+        "507":
+          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
         "400":
           description: Invalid request
           content:
@@ -469,6 +475,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AddBatchResponse"
+        "507":
+          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
         "400":
           description: Invalid request
           content:
@@ -612,6 +624,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IngestResponse"
+        "507":
+          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
         "400":
           description: Invalid request
           content:
@@ -1411,6 +1429,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VectorReindexResponse"
+        "429":
+          description: (v2.18.9+) The collection has spent today's embedding budget; retry after Retry-After seconds (GO-043)
+          headers:
+            Retry-After:
+              description: Seconds until the budget resets at midnight UTC
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
         "400":
           description: Invalid request
           content:
@@ -4180,6 +4209,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AddResponse"
+        "507":
+          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuotaExceeded"
         "400":
           description: Missing required fields or no fields to update
         "404":
@@ -5744,6 +5779,8 @@ paths:
                   $ref: "#/components/schemas/EmbeddingChunking"
                 fts:
                   $ref: "#/components/schemas/CollectionFTS"
+                quota:
+                  $ref: "#/components/schemas/CollectionQuota"
                 trackAccess:
                   type: boolean
                   description: Record per-read access events for temporal analytics
@@ -6596,6 +6633,30 @@ paths:
 
 components:
   schemas:
+    CollectionQuota:
+      type: object
+      description: |
+        (v2.18.9+, GO-043) Limits for one collection; 0 or absent = no limit.
+        On a write, an omitted quota keeps the stored one and `{}` removes it;
+        changing it needs a global admin when auth is on (403 otherwise).
+      properties:
+        maxDocuments: { type: integer, format: int64, minimum: 0, description: Documents the collection may hold }
+        maxBytes: { type: integer, format: int64, minimum: 0, description: Stored bytes of its documents (revisions and indexes not counted) }
+        maxVectors: { type: integer, format: int64, minimum: 0, description: Chunk vectors it may hold }
+        embeddingCallsPerDay: { type: integer, format: int64, minimum: 0, description: Embedding provider calls per UTC day; over it documents wait as pending }
+        embeddingTokensPerDay: { type: integer, format: int64, minimum: 0, description: Estimated tokens (characters / 4) embedded per UTC day }
+    QuotaExceeded:
+      type: object
+      description: (v2.18.9+, GO-043) A write or reindex refused by a quota.
+      properties:
+        error: { type: string }
+        code: { type: string, enum: [QUOTA_EXCEEDED] }
+        status: { type: integer, enum: [429, 507] }
+        collection: { type: string, description: Empty for the server-wide limits }
+        resource: { type: string, enum: [documents, bytes, vectors, diskReserve, vectorRam, embeddingCalls, embeddingTokens] }
+        limit: { type: integer, format: int64 }
+        used: { type: integer, format: int64, description: Current use; for diskReserve, the bytes available }
+        retryAfterSeconds: { type: integer, description: Embedding budget only }
     RevisionConflict:
       type: object
       properties:
@@ -8499,9 +8560,11 @@ components:
             enum: [ doc.added, doc.updated, doc.deleted,
               security.auth_failure_burst, security.rate_limit_exceeded,
               ops.replication_lag_high, ops.panic_recovered,
-              ops.disk_usage_high, backup.failed ]
-          description: Event types to listen for. `backup.failed` (2.18.9)
-            fires when a scheduled backup fails.
+              ops.disk_usage_high, backup.failed, quota.exceeded ]
+          description: Event types to listen for. In 2.18.9, `backup.failed`
+            fires when a scheduled backup fails, and `quota.exceeded` when a
+            write or embedding is refused by a collection quota, the disk
+            reserve or the vector RAM limit.
           example: [ doc.added, doc.updated ]
         collection:
           type: string
@@ -8531,9 +8594,11 @@ components:
             enum: [ doc.added, doc.updated, doc.deleted,
               security.auth_failure_burst, security.rate_limit_exceeded,
               ops.replication_lag_high, ops.panic_recovered,
-              ops.disk_usage_high, backup.failed ]
-          description: Event types to listen for. `backup.failed` (2.18.9)
-            fires when a scheduled backup fails.
+              ops.disk_usage_high, backup.failed, quota.exceeded ]
+          description: Event types to listen for. In 2.18.9, `backup.failed`
+            fires when a scheduled backup fails, and `quota.exceeded` when a
+            write or embedding is refused by a collection quota, the disk
+            reserve or the vector RAM limit.
           example: [ doc.added, doc.updated ]
         collection:
           type: string
@@ -10767,6 +10832,8 @@ components:
           $ref: "#/components/schemas/CollectionFTS"
         wordpress:
           $ref: "#/components/schemas/WordPressTargetConfig"
+        quota:
+          $ref: "#/components/schemas/CollectionQuota"
         evalSet:
           type: array
           readOnly: true

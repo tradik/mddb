@@ -54,7 +54,10 @@ func (bp *BatchProcessor) ProcessBatch(ctx context.Context, collection string, b
 	processed := bp.parallelProcess(ctx, collection, batchDocs, now)
 
 	// Phase 2: Single transaction commit
-	resp, committed := bp.commitBatch(collection, processed, now)
+	resp, committed, err := bp.commitBatch(collection, processed, now)
+	if err != nil {
+		return nil, err
+	}
 
 	// Phase 3: post-commit side-effect pipeline (GO-001) — FTS, geo, webhooks,
 	// SSE, temporal, embedding. Previously batch gRPC writes skipped all of
@@ -191,8 +194,10 @@ func (bp *BatchProcessor) processDocument(collection string, batchDoc *proto.Bat
 
 // commitBatch commits all processed documents in a single transaction and
 // returns the response plus the docs that were durably committed (so the
-// caller can run the shared post-write pipeline on exactly those).
-func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedDoc, now int64) (*proto.AddBatchResponse, []*ProcessedDoc) {
+// caller can run the shared post-write pipeline on exactly those). The error
+// is a quota refusal (GO-043), which refuses the whole batch; any other
+// failure is reported per document in the response.
+func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedDoc, now int64) (*proto.AddBatchResponse, []*ProcessedDoc, error) {
 	resp := &proto.AddBatchResponse{}
 	committed := make([]*ProcessedDoc, 0, len(processed))
 
@@ -203,6 +208,9 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 	var bo binlog.BinlogOps
 	// Single transaction for all documents
 	err := bp.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
+		if err := bp.server.checkWriteQuota(tx, collection, docQuotaWrites(collection, processed)); err != nil {
+			return err
+		}
 		for _, p := range processed {
 			if p.Error == nil {
 				p.Error = bp.server.writeBatchDoc(tx, &bo, collection, p, now)
@@ -222,15 +230,18 @@ func (bp *BatchProcessor) commitBatch(collection string, processed []*ProcessedD
 		return nil
 	})
 
+	if qe := asQuotaError(err); qe != nil {
+		return nil, nil, qe
+	}
 	if err != nil {
 		resp.Failed = safeInt32(len(processed))
 		resp.Errors = append(resp.Errors, fmt.Sprintf("transaction error: %v", err))
 		// The transaction rolled back — nothing was actually committed.
-		return resp, nil
+		return resp, nil, nil
 	}
 	bo.FlushTo(bp.server.Binlog)
 
-	return resp, committed
+	return resp, committed, nil
 }
 
 // writeBatchDoc stores one prepared document inside the batch transaction: the

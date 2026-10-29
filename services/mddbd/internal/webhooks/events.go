@@ -8,6 +8,9 @@ const (
 	EventReplicationLagHigh = "ops.replication_lag_high"
 	EventPanicRecovered     = "ops.panic_recovered"
 	EventDiskUsageHigh      = "ops.disk_usage_high"
-	// EventBackupFailed: a scheduled backup (OPS-023) did not complete.
+	// EventBackupFailed is a scheduled backup (OPS-023) that did not complete.
 	EventBackupFailed = "backup.failed"
+	// EventQuotaExceeded is a write or embedding refused by a collection
+	// quota, the disk reserve or the vector RAM limit (GO-043).
+	EventQuotaExceeded = "quota.exceeded"
 )

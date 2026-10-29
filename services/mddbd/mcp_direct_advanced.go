@@ -274,6 +274,12 @@ func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetColle
 		cfg.ResponsePrompt = req.ResponsePrompt
 	}
 
+	// GO-043: a change needs a global admin; nil keeps the stored quota.
+	if err := c.server.checkQuotaChange(ctx, req.Collection, req.Quota); err != nil {
+		return err
+	}
+	cfg.Quota = req.Quota
+
 	// GO-035: an agent that read this config back saw masked credentials, so
 	// an empty one means "unchanged".
 	if stored, found := c.server.CollectionManager.Get(req.Collection); found {

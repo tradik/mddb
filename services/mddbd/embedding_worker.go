@@ -67,7 +67,25 @@ type EmbeddingWorker struct {
 	// indexes; left alone it is the flat index, which is what tests of the
 	// worker in isolation want.
 	indexer chunkIndexer
+
+	// budget is the server's per-collection embedding budget (GO-043); nil
+	// when nothing set it, which is every worker built outside a server.
+	// Jobs of a collection that spent its budget are parked here, still
+	// pending, until releaseParked finds room for them.
+	budget    *embeddingBudget
+	parkMu    sync.Mutex
+	parked    []EmbeddingJob
+	parkTimer *time.Timer
 }
+
+// jobOutcome is what processing a job came to.
+type jobOutcome int
+
+const (
+	jobDone   jobOutcome = iota // embedded, or nothing to embed
+	jobFailed                   // left without the vectors it should have
+	jobParked                   // waiting for the collection's embedding budget
+)
 
 // chunkIndexer is where freshly embedded chunks go.
 // documentChecker is implemented by an indexer that can tell whether a
@@ -166,6 +184,13 @@ func (w *EmbeddingWorker) Start(workers int) {
 func (w *EmbeddingWorker) Stop() {
 	close(w.stopCh)
 	w.wg.Wait()
+	// Parked jobs are abandoned with the worker; nothing should wake for them.
+	w.parkMu.Lock()
+	if w.parkTimer != nil {
+		w.parkTimer.Stop()
+		w.parkTimer = nil
+	}
+	w.parkMu.Unlock()
 }
 
 // Enqueue adds an embedding job to the queue, waiting for room if the queue is
@@ -232,30 +257,78 @@ func (w *EmbeddingWorker) worker(id int) {
 	}
 }
 
-// run processes one job and records its end with the tracker.
+// run processes one job and records its end with the tracker. A parked job
+// has not ended: it stays pending until it is run again.
 func (w *EmbeddingWorker) run(job EmbeddingJob) {
-	ok := w.processJob(job)
-	w.pending.Done(job.Collection, job.DocID, !ok)
+	switch w.processJob(job) {
+	case jobParked:
+		w.park(job)
+	case jobFailed:
+		w.pending.Done(job.Collection, job.DocID, true)
+	default:
+		w.pending.Done(job.Collection, job.DocID, false)
+	}
+}
+
+// park holds a job until its collection's budget allows it, and makes sure
+// something will look at it again.
+func (w *EmbeddingWorker) park(job EmbeddingJob) {
+	w.parkMu.Lock()
+	defer w.parkMu.Unlock()
+	w.parked = append(w.parked, job)
+	if w.parkTimer == nil {
+		w.parkTimer = time.AfterFunc(w.budget.nextCheck(), w.releaseParked)
+	}
+}
+
+// releaseParked puts the parked jobs whose collections have budget again back
+// on the queue, and schedules another look for the rest: at midnight UTC, or
+// sooner, so a raised quota does not wait for it.
+func (w *EmbeddingWorker) releaseParked() {
+	w.parkMu.Lock()
+	var ready, still []EmbeddingJob
+	for _, job := range w.parked {
+		if w.budget.exhausted(job.Collection) == nil {
+			ready = append(ready, job)
+		} else {
+			still = append(still, job)
+		}
+	}
+	w.parked = still
+	w.parkTimer = nil
+	if len(still) > 0 {
+		w.parkTimer = time.AfterFunc(w.budget.nextCheck(), w.releaseParked)
+	}
+	w.parkMu.Unlock()
+	for _, job := range ready {
+		select {
+		case w.jobs <- job:
+		case <-w.stopCh:
+			return
+		}
+	}
 }
 
 // Pending is the worker's in-flight job tracker (GO-042).
 func (w *EmbeddingWorker) Pending() *pending.Tracker { return w.pending }
 
-// processJob embeds one document. It reports false when the document was left
-// without the vectors it should have: the provider failed or storing failed.
-// Nothing to do — unchanged content, no chunks, a deleted document — is true.
+// processJob embeds one document. It reports jobFailed when the document was
+// left without the vectors it should have: the provider failed or storing
+// failed. Nothing to do — unchanged content, no chunks, a deleted document —
+// is jobDone. jobParked means the collection has spent its embedding budget
+// and no provider call was made.
 // embeddingRetryDelay is the backoff unit between embedding attempts: the
 // worker waits one unit after the first failure, two after the second. A
 // variable only so tests of the failure path need not wait six seconds.
 var embeddingRetryDelay = time.Second
 
-func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
+func (w *EmbeddingWorker) processJob(job EmbeddingJob) jobOutcome {
 	contentHash := vec.ContentHash(job.ContentMD)
 
 	// Check if content already has a matching embedding
 	existing, err := w.vectorStore.Get(job.Collection, job.DocID)
 	if err == nil && existing != nil && existing.ContentHash == contentHash {
-		return true // embedding is up-to-date
+		return jobDone // embedding is up-to-date
 	}
 
 	// Split into chunks if enabled
@@ -271,7 +344,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 	}
 
 	if len(chunks) == 0 {
-		return true
+		return jobDone
 	}
 
 	// RAG-003: reuse the vectors of chunks whose text did not change.
@@ -286,6 +359,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 	// Generate embedding for each chunk
 	var chunkEmbeddings []vec.ChunkEmbedding
 	var reusedCount int
+	admitted := false
 	for i, chunk := range chunks {
 		chunkHash := vec.ContentHash(chunk)
 		if cached, ok := reusable[chunkHash]; ok {
@@ -298,12 +372,24 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 			continue
 		}
 
+		// GO-043: the budget is asked once, before the document's first
+		// provider call; a document that starts is finished.
+		if !admitted && w.budget != nil {
+			if w.budget.check(job.Collection) != nil {
+				return jobParked
+			}
+			admitted = true
+		}
+
 		var vector []float32
 		var embedErr error
 		for attempt := 0; attempt < 3; attempt++ {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			vector, embedErr = w.provider.Embed(ctx, chunk, embedding.RoleDocument)
 			cancel()
+			if w.budget != nil {
+				w.budget.spend(job.Collection, chunk)
+			}
 			if embedErr == nil {
 				break
 			}
@@ -316,7 +402,7 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 			if w.metrics != nil {
 				w.metrics.IncOp("embedding", "error")
 			}
-			return false
+			return jobFailed
 		}
 
 		chunkEmbeddings = append(chunkEmbeddings, vec.ChunkEmbedding{
@@ -338,14 +424,14 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 	if checker, ok := w.indexer.(documentChecker); ok && !checker.DocumentExists(job.Collection, job.DocID) {
 		slog.Debug("document deleted while it was being embedded; vectors discarded",
 			"collection", job.Collection, "docID", job.DocID)
-		return true
+		return jobDone
 	}
 
 	// Store all chunks in BoltDB
 	noteEmbeddingProvenance(w.vectorStore, job.Collection, w.provider)
 	if err := w.vectorStore.PutChunks(job.Collection, job.DocID, chunkEmbeddings, w.provider.Model(), contentHash); err != nil {
 		slog.Error("failed to store embedding", "collection", job.Collection, "docID", job.DocID, "err", err)
-		return false
+		return jobFailed
 	}
 
 	// Update the in-memory indexes — all of them, through the indexer. Which
@@ -373,5 +459,5 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) bool {
 	if w.metrics != nil {
 		w.metrics.IncOp("embedding", "completed")
 	}
-	return true
+	return jobDone
 }

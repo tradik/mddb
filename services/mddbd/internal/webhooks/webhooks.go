@@ -131,6 +131,7 @@ func (wm *WebhookManager) Register(url string, events []string, collection strin
 		EventPanicRecovered:     true,
 		EventDiskUsageHigh:      true,
 		EventBackupFailed:       true,
+		EventQuotaExceeded:      true,
 	}
 	for _, e := range events {
 		if !validEvents[e] {
@@ -210,6 +211,12 @@ func (wm *WebhookManager) Fire(event, collection, key, lang string, doc *storage
 // ops incident detectors where the event body is not a storage.Doc.
 func (wm *WebhookManager) FireEvent(event string, detail map[string]interface{}) {
 	wm.fire(event, "", "", "", nil, detail)
+}
+
+// FireCollectionEvent is FireEvent for an event about one collection, so a
+// webhook registered for that collection receives it.
+func (wm *WebhookManager) FireCollectionEvent(event, collection string, detail map[string]interface{}) {
+	wm.fire(event, collection, "", "", nil, detail)
 }
 
 func (wm *WebhookManager) fire(event, collection, key, lang string, doc *storage.Doc, detail map[string]interface{}) {
