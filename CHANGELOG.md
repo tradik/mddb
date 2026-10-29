@@ -138,6 +138,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bugs found while raising test coverage to 97% per file.**
+  - **A cancelled gRPC `AddBatch` crashed the server.** It hit a nil
+    document. Each document is now reported as failed.
+  - **A batch document whose metadata index failed was counted twice,** as
+    both failed and added, and its write hooks still ran. It is now counted
+    once, as failed.
+  - **Batch errors did not say which document they were about.** They now
+    name its key.
+  - **A batch now trims revisions to `MaxRevisions`** in the same code as
+    single writes.
+  - **`memory_summarize` crashed on a short session ID.** This affected both
+    MCP and `POST /v1/memory/summarize`, on any session ID shorter than eight
+    characters, which MCP `memory_add_message` accepts.
+  - **`POST /v1/mcp/keys` crashed when the keys bucket was missing,** for
+    example after a restore.
+  - **Panel API client:** passing your own headers dropped `Content-Type`.
+    `backup()` sent no session token and did not encode the file name.
+    User, group, embedding-config and automation names were not encoded in
+    URLs.
+
 - **The server build no longer passes a flag that did nothing (OPS-022).**
   `release.yml`, the snap job and `make build` passed `-X main.Version` to
   `mddbd`, which has no such variable, only the constant `VERSION`. The flag

@@ -654,7 +654,7 @@ func (s *Server) handleMemorySummarize(w http.ResponseWriter, r *http.Request) {
 
 	// Build summary from messages
 	var sb strings.Builder
-	fmt.Fprintf(&sb, "# Session Summary: %s\n\n", req.SessionID[:8])
+	fmt.Fprintf(&sb, "# Session Summary: %s\n\n", shortSessionID(req.SessionID))
 	fmt.Fprintf(&sb, "Messages: %d\n\n", len(messages))
 	sb.WriteString("## Conversation\n\n")
 
@@ -910,4 +910,14 @@ func (s *Server) countSessionMessages(sessionID string) int {
 		return nil
 	})
 	return count
+}
+
+// shortSessionID is the first eight characters of a session id, for a
+// summary heading. A caller may choose its own, shorter id; slicing [:8]
+// unconditionally panicked on one (REST and MCP summarize alike).
+func shortSessionID(id string) string {
+	if len(id) > 8 {
+		return id[:8]
+	}
+	return id
 }
