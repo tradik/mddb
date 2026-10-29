@@ -42,6 +42,10 @@ func (h *MCPHandler) handleModern(ctx context.Context, req map[string]interface{
 	// named none receives no notifications/message, which is the spec's rule
 	// and not a default we chose.
 	ctx = withMCPLogPolicy(ctx, mcpRequestLogPolicy(meta))
+	// A stateless request is asked for confirmation by its own result
+	// (MCP-004), never through a channel some earlier handshake set up: the
+	// confirmer comes from this request's _meta, or there is none.
+	ctx = withMCPConfirmer(ctx, mcpModernConfirmer(req))
 
 	result, errObj := h.dispatchModern(ctx, method, req)
 	if errObj != nil {

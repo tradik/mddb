@@ -27,11 +27,10 @@ const (
 	// the body, and the two must not be able to say different things.
 	mcpErrHeaderMismatch = -32020
 	// mcpErrMissingClientCapability reports that serving the request needs a
-	// capability the client did not declare for it. MDDB never emits it —
-	// every tool answers out of the database, so no request of ours needs
-	// anything from the client — but the code is named here because the
-	// transport has to map it to a status when it is read from elsewhere, and
-	// because the number is spoken for either way.
+	// capability the client did not declare for it. MDDB emits it only under
+	// MDDB_MCP_CONFIRM_DESTRUCTIVE=require, for a destructive tool called by a
+	// client that did not declare elicitation and so cannot be asked to
+	// confirm it (MCP-004).
 	mcpErrMissingClientCapability = -32021
 	// mcpErrUnsupportedProtocolVersion reports a revision this build does not
 	// answer for, and names the ones it does so the client can retry.

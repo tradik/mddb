@@ -84,21 +84,6 @@ func TestCovDHandlerToolsListCursor(t *testing.T) {
 	}
 }
 
-func TestCovDHandleJSONWithNotifier(t *testing.T) {
-	h := covDHandler()
-	if _, err := h.HandleJSONWithNotifier([]byte("{bad"), nil); err == nil {
-		t.Error("malformed JSON must fail")
-	}
-	resp, err := h.HandleJSONWithNotifier([]byte(`{"jsonrpc":"2.0","method":"notifications/initialized"}`), nil)
-	if err != nil || resp != nil {
-		t.Errorf("notification = %s, %v; want no response", resp, err)
-	}
-	resp, err = h.HandleJSONWithNotifier([]byte(`{"jsonrpc":"2.0","id":7,"method":"ping"}`), func(map[string]interface{}) {})
-	if err != nil || !strings.Contains(string(resp), `"id":7`) || !strings.Contains(string(resp), `"result":{}`) {
-		t.Errorf("ping = %s, %v", resp, err)
-	}
-}
-
 func TestCovDStdioNotifier(t *testing.T) {
 	var out bytes.Buffer
 	notify := mcpStdioNotifier(&out)

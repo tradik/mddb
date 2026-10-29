@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"log/slog"
@@ -296,6 +297,20 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 	ts := &MCPToolServer{client: h.client, customTools: h.customTools, globalMode: h.globalMode, mode: h.mode}
 	start := time.Now()
 	result, err := ts.mcpCallTool(ctx, name, args)
+
+	// MCP-004: two answers of the confirmation gate are not tool failures. A
+	// call waiting for the human's answer returns the interim result that
+	// asks for it, and a call refused because the client cannot be asked is
+	// a protocol error naming the capability it lacks.
+	var waiting *mcpInputRequiredError
+	if errors.As(err, &waiting) {
+		return waiting.result()
+	}
+	var unavailable *mcpConfirmUnavailableError
+	if errors.As(err, &unavailable) {
+		return map[string]interface{}{"error": unavailable.rpcError()}
+	}
+
 	h.observer.observe(ctx, name, args, result, err, time.Since(start))
 	if err != nil {
 		// The client sees the failure in the result either way; this is the
@@ -408,22 +423,6 @@ func (h *MCPHandler) handleSetLogLevel(req map[string]interface{}) map[string]in
 	return map[string]interface{}{}
 }
 
-// HandleJSONWithNotifier is HandleJSON for a transport that can deliver
-// notifications while the request is still running.
-func (h *MCPHandler) HandleJSONWithNotifier(reqJSON []byte, notify func(map[string]interface{})) ([]byte, error) {
-	var req map[string]interface{}
-	if err := json.Unmarshal(reqJSON, &req); err != nil {
-		return nil, err
-	}
-
-	resp := h.HandleWithNotifier(req, notify)
-	if resp == nil {
-		// Notification — no response
-		return nil, nil
-	}
-	return json.Marshal(resp)
-}
-
 // runMCPStdio runs the MCP stdio loop on the Server.
 func (s *Server) runMCPStdio() {
 	log.SetOutput(os.Stderr) // MCP uses stdout for protocol
@@ -433,42 +432,90 @@ func (s *Server) runMCPStdio() {
 // serveMCPStdio is the stdio loop on an arbitrary reader and writer: one
 // JSON-RPC message per line in, one response per line out. runMCPStdio binds
 // it to the process's stdin and stdout; tests drive it with buffers.
+//
+// Lines are read on their own goroutine and served one at a time on this one.
+// The split exists for MCP-004: a destructive tool may wait, mid-call, for the
+// client's response to an elicitation/create, and that response arrives on
+// stdin like everything else — the reader routes it to the waiting call
+// instead of queueing it behind the call that is waiting for it.
 func (s *Server) serveMCPStdio(in io.Reader, out io.Writer) {
 	customTools := loadMCPCustomTools()
 	client := NewDirectClient(s)
 	handler := NewMCPHandlerWithConfig(client, customTools, s.MCPInfo, s.MCPInstructions, s.Mode, s.Config.MCP.Mode).WithMetrics(s.Metrics)
 
-	scanner := bufio.NewScanner(in)
-	scanner.Buffer(make([]byte, 0, 4*1024*1024), 4*1024*1024) // 4MB buffer
+	pending := newMCPPendingRequests()
+	requests := make(chan map[string]interface{}, 64)
+	go readMCPStdio(in, requests, pending)
 
-	// GO-021: stdio can deliver notifications mid-request because the loop
-	// handles one request at a time on one goroutine — anything written during
-	// Handle is already ordered before the response that follows it.
+	// GO-021: stdio can deliver notifications mid-request because requests
+	// are handled one at a time on this goroutine — anything written during
+	// a request is already ordered before the response that follows it.
 	notify := mcpStdioNotifier(out)
 
+	// One process serves one client, so what its handshake declared holds
+	// for every handshake-era request after it.
+	var confirmer mcpConfirmer
+	for req := range requests {
+		if method, _ := req["method"].(string); method == "initialize" && !mcpIsModernRequest(method, req) {
+			confirmer = nil
+			if mcpDeclaresElicitation(mcpParams(req)["capabilities"]) {
+				confirmer = &mcpRequestConfirmer{send: mcpStdioSender(out), pending: pending}
+			}
+		}
+
+		resp := handler.HandleWithNotifierContext(withMCPConfirmer(context.Background(), confirmer), req, notify)
+		if resp == nil {
+			// Notification — no response to send
+			continue
+		}
+		_ = mcpStdioSender(out)(resp)
+	}
+}
+
+// readMCPStdio reads one JSON-RPC message per line. A response to a request
+// the server sent goes to whoever is waiting for it; everything else is queued
+// for the serving loop. When input ends, every wait ends with it and the queue
+// is closed, which ends the loop.
+func readMCPStdio(in io.Reader, requests chan<- map[string]interface{}, pending *mcpPendingRequests) {
+	defer close(requests)
+	defer pending.closeAll()
+
+	scanner := bufio.NewScanner(in)
+	scanner.Buffer(make([]byte, 0, 4*1024*1024), 4*1024*1024) // 4MB buffer
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
 			continue
 		}
-
-		resp, err := handler.HandleJSONWithNotifier(line, notify)
-		if err != nil {
+		var msg map[string]interface{}
+		if err := json.Unmarshal(line, &msg); err != nil {
 			slog.Warn("MCP handler error", "err", err)
 			continue
 		}
-
-		if resp == nil {
-			// Notification — no response to send
+		if mcpIsResponse(msg) {
+			pending.deliver(msg)
 			continue
 		}
-
-		_, _ = out.Write(resp)
-		_, _ = out.Write([]byte("\n"))
+		requests <- msg
 	}
-
 	if err := scanner.Err(); err != nil {
 		slog.Warn("MCP stdio scanner error", "err", err)
+	}
+}
+
+// mcpStdioSender writes one message to stdout as a line of JSON: responses,
+// and the server's own requests. Called only from the serving loop, like
+// every other write to out. A message that cannot be encoded is reported to
+// the caller and nothing is written.
+func mcpStdioSender(out io.Writer) func(map[string]interface{}) error {
+	return func(msg map[string]interface{}) error {
+		data, err := json.Marshal(msg)
+		if err != nil {
+			slog.Warn("MCP message could not be encoded", "err", err)
+			return err
+		}
+		_, err = out.Write(append(data, '\n'))
+		return err
 	}
 }
 

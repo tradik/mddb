@@ -82,12 +82,53 @@ notifications at all, which is what replaced `logging/setLevel`.
 }
 ```
 
-`resultType` is `"complete"` on every result MDDB returns. The other value the
+`resultType` is `"complete"` on every finished result. The other value the
 revision defines, `"input_required"`, belongs to
 [multi round-trip requests](https://modelcontextprotocol.io/specification/2026-07-28/basic/patterns/mrtr):
 a server that needs sampling, elicitation or a root list from the client
-returns one instead of issuing its own request. MDDB never asks the client for
-anything — every tool answers out of the database — so it never returns one.
+returns one instead of issuing its own request. MDDB returns one in exactly one
+case, described next.
+
+### Asking the client: multi round-trip requests
+
+With `MDDB_MCP_CONFIRM_DESTRUCTIVE=elicit` or `require`
+([details](MCP.md#confirming-destructive-tools-v2189)), a `tools/call` of a
+destructive tool from a client whose `clientCapabilities` declare
+`elicitation` is answered with an `InputRequiredResult` instead of running:
+
+```json
+{
+  "resultType": "input_required",
+  "inputRequests": {
+    "confirm": {
+      "method": "elicitation/create",
+      "params": {"message": "…", "requestedSchema": {"type": "object", "properties": {"confirm": {"type": "boolean"}}, "required": ["confirm"]}}
+    }
+  },
+  "requestState": "9f2c…",
+  "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "mddbd", "version": "…"}}
+}
+```
+
+The client puts the question to its user and sends the same `tools/call` again
+— a new request with its own id — adding the answer and the echoed state to
+`params`:
+
+```json
+"params": {
+  "name": "delete_collection",
+  "arguments": {"collection": "docs"},
+  "inputResponses": {"confirm": {"action": "accept", "content": {"confirm": true, "collection": "docs"}}},
+  "requestState": "9f2c…",
+  "_meta": {…}
+}
+```
+
+Nothing is held between the two requests. `requestState` is a hash of the tool
+and its arguments: an answer arriving with a different state is not an answer
+to this call, and the question is asked again. A client that did not declare
+`elicitation` is never sent an `InputRequiredResult`; under `require` it gets
+`-32021`.
 
 ### server/discover
 
@@ -193,7 +234,7 @@ closed to new codes, `-32020`…`-32099` belongs to the specification.
 | Code | Name | When |
 |---|---|---|
 | `-32020` | `HeaderMismatch` | a mirrored header disagrees with the body, or is missing |
-| `-32021` | `MissingRequiredClientCapability` | never emitted by MDDB — no request of ours needs the client |
+| `-32021` | `MissingRequiredClientCapability` | `MDDB_MCP_CONFIRM_DESTRUCTIVE=require` and a destructive tool called by a client that did not declare `elicitation`; `data.requiredCapabilities` names it. Emitted in both revisions |
 | `-32022` | `UnsupportedProtocolVersion` | the declared revision is not served; `data.supported` names what is |
 | `-32602` | `Invalid params` | a required `_meta` field is missing; also "resource not found" |
 | `-32002` | *(2025-11-25 only)* | "resource not found" for handshake clients; forbidden in 2026-07-28 |
@@ -210,6 +251,12 @@ Unchanged. `initialize` negotiates as it always did, sessions are minted and
 echoed, `GET /mcp` opens a stream, `DELETE /mcp` ends a session, `ping` and
 `logging/setLevel` work, and results carry no `resultType`, `ttlMs` or
 `_meta`.
+
+A handshake client that declared `elicitation` in `initialize` is asked to
+confirm a destructive tool the 2025-11-25 way, when the operator enabled it:
+the server sends `elicitation/create` mid-call — on stdout for stdio, as an SSE
+stream answering the `tools/call` POST over Streamable HTTP — and waits for the
+client's response ([details](MCP.md#confirming-destructive-tools-v2189)).
 
 `initialize` only ever answers with a revision that *has* a handshake. A client
 that sends `initialize` asking for 2026-07-28 is answered with 2025-11-25

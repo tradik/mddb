@@ -180,6 +180,7 @@ curl -X POST http://localhost:9000/mcp \
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 93 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
+| `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 
 ### API Key Authentication
 
@@ -701,11 +702,68 @@ docker run -d \
   tradik/mddb:latest
 ```
 
+## Confirming Destructive Tools (v2.18.9+)
+
+`destructiveHint` is advice to the client, and a client may ignore it. With
+`MDDB_MCP_CONFIRM_DESTRUCTIVE` set, MDDB asks for itself: before a destructive
+tool runs, it sends the client an elicitation, which the client shows its user
+as a question. Nothing happens unless the answer is yes.
+
+| Value | Client declared `elicitation` | Client did not |
+|---|---|---|
+| `off` (default) | runs as before | runs as before |
+| `elicit` | asked first | runs as before |
+| `require` | asked first | refused with `-32021` (`MissingRequiredClientCapability`, `data.requiredCapabilities.elicitation`) |
+
+**Gated tools** are the built-in tools annotated destructive and not
+idempotent: `delete_collection`, `delete_documents_batch`, `delete_where`,
+`truncate_revisions` and `restore_backup`. Deleting one named object
+(`delete_document`, `delete_schema`, …) is not gated. The read-only mode check
+comes first: a read-only server refuses these tools without asking.
+
+**The question** asks for `confirm: true`. `delete_collection` also asks for
+the collection's name to be typed, so a yes clicked out of habit is not enough:
+
+```json
+{
+  "message": "An MCP client asked MDDB to run delete_collection with {\"collection\":\"docs\"}. This cannot be undone. Allow it?",
+  "requestedSchema": {
+    "type": "object",
+    "properties": {
+      "confirm": {"type": "boolean", "title": "Allow delete_collection"},
+      "collection": {"type": "string", "title": "Collection name"}
+    },
+    "required": ["confirm", "collection"]
+  }
+}
+```
+
+Declining, cancelling, a wrong name, an error from the client, the client going
+away, or no answer within 5 minutes all refuse the call with a tool error that
+ends "nothing was changed".
+
+**How it is asked** depends on the request's protocol revision:
+
+| Revision | Mechanism |
+|---|---|
+| 2026-07-28 | The call returns an `InputRequiredResult` (`resultType: "input_required"`) whose `inputRequests.confirm` is the `elicitation/create` request, plus a `requestState`. The client asks its user and repeats the same call with `inputResponses.confirm` and the echoed `requestState`. The state is a hash of the tool and its arguments, so an answer cannot be reused for a different call. See [MCP-REVISIONS.md](MCP-REVISIONS.md#asking-the-client-multi-round-trip-requests). |
+| 2025-11-25 over stdio | MDDB writes an `elicitation/create` request to stdout mid-call and waits for the client's response on stdin. |
+| 2025-11-25 over Streamable HTTP | The `tools/call` POST is answered as an SSE stream: first the `elicitation/create` request, then — after the client POSTs its response to `/mcp` with the same `Mcp-Session-Id` (answered `202`) — the tool's result. Without a question the response stays plain JSON. |
+| The SSE transport (`/sse`) and the REST `/mcp/tools/call` | Cannot ask: served as a client without `elicitation`. |
+
+Whether a handshake client can be asked is read from the `capabilities` it sent
+in `initialize`; a stateless client declares it per request in
+`io.modelcontextprotocol/clientCapabilities`.
+
+The default stays `off` throughout 2.18.x and 2.19.x so existing deployments see
+no change; `elicit` is the intended future default.
+
 ## Protocol Features
 
 | Feature | Description |
 |---------|-------------|
 | **Tool Annotations** | `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` on all tools |
+| **Elicitation** (v2.18.9+) | Destructive tools ask the user to confirm when `MDDB_MCP_CONFIRM_DESTRUCTIVE` is set — `InputRequiredResult` for 2026-07-28, `elicitation/create` for 2025-11-25. See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 | **Structured Output** | `outputSchema` on 9 key tools for client-side validation |
 | **5 Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |

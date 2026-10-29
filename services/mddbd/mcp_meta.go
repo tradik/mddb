@@ -36,13 +36,13 @@ const (
 )
 
 // mcpResultTypeComplete marks an ordinary, finished result.
-//
-// The other value the spec defines, "input_required", belongs to multi
-// round-trip requests: a server that needs sampling, elicitation or a root
-// list from the client returns one instead of issuing its own request. MDDB
-// asks the client for nothing — every tool answers from the database — so
-// every result it produces is complete. See docs/MCP.md.
 const mcpResultTypeComplete = "complete"
+
+// mcpResultTypeInputRequired marks a multi round-trip request's interim
+// result: the server needs something from the client — for MDDB, only a
+// human's confirmation of a destructive tool (MCP-004, mcp_confirm.go) — and
+// the client repeats the request with the answer. See docs/MCP-REVISIONS.md.
+const mcpResultTypeInputRequired = "input_required"
 
 // mcpModernMethods are the methods that exist only in the stateless era, so
 // receiving one is itself proof of which era the client is in — a legacy
@@ -124,7 +124,11 @@ func (h *MCPHandler) mcpCompleteResult(method string, result map[string]interfac
 	if result == nil {
 		result = map[string]interface{}{}
 	}
-	result["resultType"] = mcpResultTypeComplete
+	// A result that already says input_required is an interim answer and
+	// keeps saying so; everything else is complete.
+	if result["resultType"] != mcpResultTypeInputRequired {
+		result["resultType"] = mcpResultTypeComplete
+	}
 
 	meta, _ := result["_meta"].(map[string]interface{})
 	if meta == nil {

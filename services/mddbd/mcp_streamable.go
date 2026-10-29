@@ -35,6 +35,11 @@ type MCPStreamableTransport struct {
 	mu      sync.RWMutex
 	// sessions tracks active session SSE channels for server-initiated messages
 	sessions map[string]*streamableSession
+	// elicit and pending carry MCP-004's confirmation questions: which
+	// sessions can be asked, and the questions still waiting for an answer
+	// (mcp_streamable_elicit.go).
+	elicit  mcpElicitSessions
+	pending *mcpPendingRequests
 }
 
 type streamableSession struct {
@@ -47,6 +52,7 @@ func NewMCPStreamableTransport(handler *MCPHandler) *MCPStreamableTransport {
 	return &MCPStreamableTransport{
 		handler:  handler,
 		sessions: make(map[string]*streamableSession),
+		pending:  newMCPPendingRequests(),
 	}
 }
 
@@ -110,6 +116,15 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	// MCP-004: a client's answer to a question the server asked on another
+	// request's stream. It is routed to the call waiting for it; the POST
+	// that carried it gets no body, as for a notification.
+	if !modern && mcpIsResponse(req) {
+		t.pending.deliver(req)
+		w.WriteHeader(http.StatusAccepted)
+		return
+	}
+
 	// Handle notifications (no id) — return 202 Accepted
 	if _, hasID := req["id"]; !hasID {
 		// notifications/initialized, notifications/cancelled, etc. The
@@ -140,24 +155,43 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 	// session is known here and nowhere else, which is why the delivery
 	// function is supplied by the transport rather than held by the handler.
 	sessionForProgress := r.Header.Get("Mcp-Session-Id")
-	resp := t.handler.HandleWithNotifierContext(withMCPCaller(r.Context(), r), req, func(n map[string]interface{}) {
-		if sessionForProgress != "" {
-			t.SendNotification(sessionForProgress, n)
-		}
-	})
 
 	// Sessions belong to the handshake era. 2026-07-28 removed them outright,
 	// and the rule for a server that still serves both is to neither mint nor
 	// echo one for a stateless request: a client that received an
 	// Mcp-Session-Id would have every reason to send it back, and the whole
 	// point of the revision is that nothing is remembered between requests.
+	// Set before the handler runs: a confirmation question (MCP-004) can
+	// start the response before the handler returns.
+	ctx := withMCPCaller(r.Context(), r)
+	var stream *mcpPostStream
 	if !modern {
 		if method == "initialize" {
 			sessionID := generateStreamableSessionID()
 			w.Header().Set("MCP-Session-Id", sessionID)
+			if mcpDeclaresElicitation(mcpParams(req)["capabilities"]) {
+				t.elicit.add(sessionID)
+			}
 		} else if sid := r.Header.Get("MCP-Session-Id"); sid != "" {
 			w.Header().Set("MCP-Session-Id", sid)
 		}
+		var confirmer mcpConfirmer
+		if stream, confirmer = t.legacyConfirmer(w, method, sessionForProgress); confirmer != nil {
+			ctx = withMCPConfirmer(ctx, confirmer)
+		}
+	}
+
+	resp := t.handler.HandleWithNotifierContext(ctx, req, func(n map[string]interface{}) {
+		if sessionForProgress != "" {
+			t.SendNotification(sessionForProgress, n)
+		}
+	})
+
+	// A response whose request asked the client something mid-call is already
+	// a stream, and ends as the stream's last message.
+	if stream != nil && stream.started {
+		_ = stream.send(resp)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -298,6 +332,7 @@ func (t *MCPStreamableTransport) handleDelete(w http.ResponseWriter, r *http.Req
 		delete(t.sessions, sessionID)
 	}
 	t.mu.Unlock()
+	t.elicit.remove(sessionID)
 
 	slog.Info("MCP Streamable HTTP session terminated", "sessionID", sessionID) // #nosec G706
 	w.WriteHeader(http.StatusNoContent)

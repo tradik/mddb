@@ -98,6 +98,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_MCP_BUILTIN_TOOLS` | `true` | bool | — | Set to `false` to expose only custom YAML tools |
 | `MDDB_MCP_TOOLSETS` | `all` | list | `search`, `code`, `documents`, `ingest`, `memory`, `schema`, `admin`, `geo`, `automation`, `webhooks`, `wordpress`, `all` | Built-in tool groups to expose (v2.18.8, MCP-003); tools outside them are neither listed nor callable |
 | `MDDB_MCP_MODE` | `"wr"` | string | — | MCP access mode: `"read"`, `"write"`, or `"wr"` |
+| `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `"off"` | string | — | Ask the user through MCP elicitation before a destructive tool (`delete_collection`, `delete_documents_batch`, `delete_where`, `truncate_revisions`, `restore_backup`) runs (v2.18.9). `"off"`: never ask. `"elicit"`: ask clients that declared elicitation, serve others as before. `"require"`: also refuse clients that cannot be asked (`-32021`). An unknown value is logged and treated as `"off"`. See [MCP.md](MCP.md#confirming-destructive-tools-v2189) |
 | `MDDB_MCP_PROTOCOL_VERSION` | `""` | string | — | Pin the MCP spec revision, disabling negotiation. Empty means negotiate and default to the newest revision this build implements. An unknown value stops the server at startup. |
 
 ### MCP API Key Authentication

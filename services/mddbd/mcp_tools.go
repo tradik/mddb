@@ -54,6 +54,12 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 			return "", fmt.Errorf("tool %q: %w", name, err)
 		}
 	}
+	// MCP-004: the one confirmation gate. A destructive tool asks the human
+	// behind the client before anything happens, when the operator enabled it
+	// and the client can be asked (mcp_confirm.go).
+	if err := confirmDestructive(ctx, name, args); err != nil {
+		return "", err
+	}
 
 	switch name {
 	case "add_document":
