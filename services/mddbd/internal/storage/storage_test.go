@@ -36,6 +36,12 @@ func TestKeyBuilders(t *testing.T) {
 	}{
 		{"DocKey", DocKey("blog", "d1"), "doc|blog|d1"},
 		{"ByKeyKey", ByKeyKey("blog", "home", "en"), "bykey|blog|home|en"},
+		// DOC-017: key and language as the identifier has them; the
+		// collection, which is case-sensitive, as written.
+		{"ByKeyKey normalises", ByKeyKey("Blog", "Home/README.md", "EN"), "bykey|Blog|home/readme.md|en"},
+		{"AppendByKeyKey", AppendByKeyKey([]byte("reused"), "c", "K", "L"), "reusedbykey|c|k|l"},
+		{"ByKeyCollectionPrefix", ByKeyCollectionPrefix("Blog"), "bykey|Blog|"},
+		{"ByKeyPathPrefix", ByKeyPathPrefix("Blog", "Docs/"), "bykey|Blog|docs/"},
 		{"RevPrefix", RevPrefix("blog", "d1"), "rev|blog|d1|"},
 		{"MetaKeyPrefix", MetaKeyPrefix("blog", "author", "alice"), "meta|blog|author|alice|"},
 	}

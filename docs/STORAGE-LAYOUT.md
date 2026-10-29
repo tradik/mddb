@@ -81,13 +81,68 @@ the other. Stop writes during the backup if the collections must agree to the
 transaction.
 
 A restore puts the collection files in place first, then the main file, and
-puts the old collection files back if the main file fails. A backup taken in
+puts the old collection files back if the main file fails. A backup from an
+older release is migrated as it is installed ([Schema version](#schema-version));
+the backup itself is copied, never changed. A backup taken in
 the single-file layout has no `.d` directory and is refused in the
 per-collection layout: restore it with the single layout, then split.
 
 `-verify-db`, `-repair-db` and `-compact-db` take one file. Every file in
 `mddb.db.d/` is an ordinary bbolt file and can be checked, repaired or
 compacted on its own.
+
+## Schema version
+
+Since 2.18.9 every file — the main file and, in this layout, each collection
+file — records the version of the on-disk format it holds: bucket
+`schema_version`, key `version`, eight big-endian bytes. A file without it
+is version 0, written by an earlier release.
+
+| Version | Release | Change |
+|---|---|---|
+| 1 | 2.18.9 | Key-index entries (`bykey`) store the key and language with ASCII letters in lower case, as the document identifier does (DOC-017). Spellings of one key that differ only in case are merged into one entry. |
+
+When a file is behind, the server brings it up to date **before it reads or
+writes it**:
+
+- at startup, before any listener opens (the main file), and as each
+  collection file is opened, in parallel;
+- when a restore installs a backup, and when a follower installs a
+  replication snapshot — before the server serves from the new file.
+
+A collection file the server creates starts unstamped and is stamped the
+next time it is opened; for a file this release wrote that costs one read of
+its key index and rewrites nothing. `-split-collections` and
+`-merge-collections` copy entries as they find them, so they may be run on a
+file not yet migrated: the files they write are migrated when the server
+next opens them.
+
+**Crash safety.** A step commits its work in chunks of 10 000 entries and
+the version is recorded only after the last one. A step interrupted part-way
+runs again at the next start; entries it already rewrote are left as they
+are. When two spellings meet, the entry pointing at a document that exists
+wins; when both or neither do, the one already in lower case stays. No entry
+is dropped unless another one for the same key survives.
+
+**Time.** A file already at the current version costs one read
+transaction. The first start of 2.18.9 on an older file reads its key index
+once — seconds for millions of documents. If that start follows a crash and
+the freelist is being rebuilt in the background
+([STORAGE-TUNING.md](STORAGE-TUNING.md)), the migration waits for the
+rebuild, once.
+
+**Going back.** An older release ignores the version and looks keys up as
+written, so after 2.18.9 has migrated a file, 2.18.8 finds documents whose
+key or language has upper-case letters only by the lower-case spelling. To
+downgrade, restore a backup taken before the upgrade. A file whose version
+is newer than the running build is opened as it is, with a warning, and not
+rewritten.
+
+**Replication.** Each server migrates its own files. A follower applying
+entries from a leader on an older release stores key-index entries in the
+new form. Upgrade the followers before the leader: a follower on an older
+release receiving the leader's new entries finds those documents only by
+their lower-case spelling.
 
 ## Limits
 

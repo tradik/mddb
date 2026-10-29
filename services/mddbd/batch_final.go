@@ -248,13 +248,7 @@ func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*Proc
 			}
 
 			// Build bykey index
-			byKeyBuf = byKeyBuf[:0]
-			byKeyBuf = append(byKeyBuf, "bykey|"...)
-			byKeyBuf = append(byKeyBuf, collection...)
-			byKeyBuf = append(byKeyBuf, '|')
-			byKeyBuf = append(byKeyBuf, p.Doc.Key...)
-			byKeyBuf = append(byKeyBuf, '|')
-			byKeyBuf = append(byKeyBuf, p.Doc.Lang...)
+			byKeyBuf = storage.AppendByKeyKey(byKeyBuf[:0], collection, p.Doc.Key, p.Doc.Lang)
 
 			if err := bByK.Put(byKeyBuf, []byte(p.DocID)); err != nil {
 				resp.Failed++

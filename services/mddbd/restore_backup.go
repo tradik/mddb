@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"mddb/internal/migrate"
 	"mddb/internal/vector"
 )
 
@@ -92,6 +93,12 @@ func (s *Server) swapDatabase(source string, install func(dst string) error) err
 	reopen := func() error {
 		db, err := openBolt(s.Path, boltOptionsFor(s.Path))
 		if err != nil {
+			return err
+		}
+		// DOC-017: a backup or a snapshot from an older release is brought
+		// to this build's schema before the server serves from it.
+		if err := migrate.Run(db); err != nil {
+			_ = db.Close()
 			return err
 		}
 		s.DB = db

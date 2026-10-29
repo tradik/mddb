@@ -150,6 +150,14 @@ damage, and the server keeps serving the database it had. The same check
 applies to the snapshot a follower receives from its leader
 ([REPLICATION.md](REPLICATION.md)).
 
+A backup written by an older release is brought to this release's on-disk
+format as it is installed, before the server serves from it
+([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version)). The backup file
+itself is copied, never changed, so it can still be restored into the
+release that wrote it. A database migrated by 2.18.9 is not fully readable by
+2.18.8 (keys written with upper-case letters are found only by their
+lower-case spelling): to go back, restore a backup taken before the upgrade.
+
 Before 2.15.4 the check was only a read-only open. That open skips the
 freelist walk, which is where a damaged file fails, so a damaged backup passed
 it. The failure came later, after the live database had been moved aside, and

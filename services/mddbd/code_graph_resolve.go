@@ -70,14 +70,13 @@ func (s *Server) lookupByKeyTx(tx *bolt.Tx, collection, key string) *codeDocRef 
 	if bByK == nil || bDocs == nil {
 		return nil
 	}
-	prefix := []byte("bykey|" + collection + "|" + key + "|")
+	prefix := storage.ByKeyPathPrefix(collection, key+"|")
 	c := bByK.Cursor()
 	for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-		raw := bDocs.Get(storage.DocKey(collection, string(v)))
-		if raw == nil {
-			continue
-		}
-		doc, err := loadDoc(raw)
+		// An entry whose document is gone reads as empty, which loadDoc
+		// refuses like a document that no longer decodes: either way the
+		// next language is tried.
+		doc, err := loadDoc(bDocs.Get(storage.DocKey(collection, string(v))))
 		if err != nil {
 			continue
 		}
@@ -257,12 +256,8 @@ func (r *edgeResolver) load(docID string) *codeDocRef {
 	if d, ok := r.cache[docID]; ok {
 		return d
 	}
-	raw := r.bDocs.Get(storage.DocKey(r.req.Collection, docID))
-	if raw == nil {
-		r.cache[docID] = nil
-		return nil
-	}
-	doc, err := loadDoc(raw)
+	// A missing document reads as empty, which loadDoc refuses.
+	doc, err := loadDoc(r.bDocs.Get(storage.DocKey(r.req.Collection, docID)))
 	if err != nil {
 		r.cache[docID] = nil
 		return nil

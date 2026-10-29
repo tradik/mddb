@@ -55,8 +55,10 @@ mddb.db
 │   └── meta|{collection}|{key}|{value}|{docID} → 1
 ├── rev/           # Revision history
 │   └── rev|{collection}|{docID}|{timestamp} → JSON
-└── bykey/         # Key-to-ID mapping
-    └── bykey|{collection}|{key}|{lang} → docID
+├── bykey/         # Key-to-ID mapping
+│   └── bykey|{collection}|{key}|{lang} → docID   (key, lang: ASCII lower case)
+└── schema_version/ # On-disk format version of this file
+    └── version → uint64, big-endian
 ```
 
 **Foundational buckets** (the four every collection always uses):
@@ -64,7 +66,9 @@ mddb.db
 1. **`docs`** — latest document version. Key: `doc|{collection}|{docID}`. Value: protobuf-encoded `Doc` (compressed via the configured codec).
 2. **`idxmeta`** — metadata index for fast filter pre-pruning. Key: `meta|{collection}|{metaKey}|{metaValue}|{docID}`. Value: existence marker. Enables prefix scans.
 3. **`rev`** — revision history. Key: `rev|{collection}|{docID}|{timestamp}`. Value: encoded document snapshot, sorted by timestamp.
-4. **`bykey`** — key/lang → docID lookup. Key: `bykey|{collection}|{key}|{lang}`.
+4. **`bykey`** — key/lang → docID lookup. Key: `bykey|{collection}|{key}|{lang}`, with the key and language normalised as the docID is (ASCII letters in lower case; the collection as written), so any spelling of a key finds its document (v2.18.9, DOC-017).
+
+Every file also records its on-disk format in `schema_version`; the server migrates an older file before it reads or writes it — see [STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version).
 
 Subsystems add their own buckets on top: `vectors`, `vector_meta` (vector store), `fts_*` (full-text inverted index, stop words, synonyms, BM25 stats), `geo` (R-tree + geohash), `webhooks`, `schemas`, `auth_users` / `auth_apikeys` / `auth_perms` / `auth_groups`, `automation`, `automation_log`, `binlog` (replication), `mcp_apikeys`, `memory_*` (RAG sessions), and `ttl_*`. Each is initialised by its owning module's `EnsureBucket()` call at startup.
 

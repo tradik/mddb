@@ -199,7 +199,7 @@ func keyMatcher(collection string, keys []string) func(string) bool {
 	}
 	prefixes := make([]string, len(keys))
 	for i, k := range keys {
-		prefixes[i] = collection + "|" + normalizeDocumentKey(k) + "|"
+		prefixes[i] = collection + "|" + storage.NormalizeKey(k) + "|"
 	}
 	return func(docID string) bool {
 		for _, p := range prefixes {

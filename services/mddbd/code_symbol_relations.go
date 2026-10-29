@@ -207,9 +207,9 @@ func (s *Server) symbolSiblings(req SymbolRequest, defs []*sourceText) []Passage
 // eachSourceInDir visits the code documents directly in dir (not below it),
 // in key order, until visit returns false.
 func (s *Server) eachSourceInDir(collection, dir string, visit func(*sourceText) bool) {
-	prefix := "bykey|" + collection + "|"
+	prefix := string(storage.ByKeyCollectionPrefix(collection))
 	if dir != "." && dir != "" {
-		prefix += dir + "/"
+		prefix = string(storage.ByKeyPathPrefix(collection, dir+"/"))
 	}
 	seen := 0
 	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {

@@ -11,8 +11,8 @@ import (
 	"mddb/internal/storage"
 )
 
-// DOC-016: document identifiers are case-insensitive and the key index is not.
-// These tests pin what that costs and what is done about it.
+// DOC-016 / DOC-017: document identifiers and the key index are both
+// case-insensitive; these tests pin that they agree.
 
 func TestKeysDifferingOnlyInCaseNameOneDocument(t *testing.T) {
 	// The premise everything else here follows from.
@@ -99,23 +99,42 @@ func TestKeysCollideOnCase(t *testing.T) {
 	}
 }
 
-func TestByKeyVariants(t *testing.T) {
-	// Requested and stored agree: one entry, no speculative second delete.
-	one := byKeyVariants("c", "readme.md", "readme.md", "en")
-	if len(one) != 1 {
-		t.Errorf("got %d variants, want 1", len(one))
+// DOC-017: any spelling reads the document a different spelling wrote.
+func TestAnySpellingFindsTheDocument(t *testing.T) {
+	s, cleanup := newTestServerForCollectionConfig(t)
+	defer cleanup()
+
+	if _, _, err := s.addDocument("c", "README.md", "EN", nil, "upper", 0, false); err != nil {
+		t.Fatal(err)
 	}
-	// Unknown stored key (document was not found): still one.
-	if got := byKeyVariants("c", "readme.md", "", "en"); len(got) != 1 {
-		t.Errorf("got %d variants for an unknown stored key, want 1", len(got))
+	client := &DirectClient{server: s}
+	for _, key := range []string{"readme.md", "README.md", "ReadMe.MD"} {
+		doc, err := client.Get(context.Background(), &MCPGetRequest{Collection: "c", Key: key, Lang: "en"})
+		if err != nil || doc.ContentMD != "upper" {
+			t.Errorf("reading %q: doc=%+v err=%v", key, doc, err)
+		}
 	}
-	// Written as one spelling, deleted as another: both entries have to go.
-	two := byKeyVariants("c", "readme.md", "README.md", "en")
-	if len(two) != 2 {
-		t.Fatalf("got %d variants, want 2", len(two))
+}
+
+// DOC-017: one index entry per document, whatever spellings were written,
+// and a delete under any spelling leaves none behind.
+func TestOneIndexEntryPerDocumentAcrossSpellings(t *testing.T) {
+	s, cleanup := newTestServerForCollectionConfig(t)
+	defer cleanup()
+
+	for _, key := range []string{"README.md", "readme.md", "ReadMe.md"} {
+		if _, _, err := s.addDocument("c", key, "en", nil, "content of "+key, 0, false); err != nil {
+			t.Fatalf("write %s: %v", key, err)
+		}
 	}
-	if string(two[0]) == string(two[1]) {
-		t.Error("the two variants are the same key")
+	if got := countByKeyEntries(t, s, "c"); got != 1 {
+		t.Fatalf("three spellings left %d index entries, want 1", got)
+	}
+	if err := s.deleteDocumentInternal("c", "readme.MD", "en"); err != nil {
+		t.Fatal(err)
+	}
+	if got := countByKeyEntries(t, s, "c"); got != 0 {
+		t.Fatalf("%d index entries survived the document", got)
 	}
 }
 
@@ -124,14 +143,13 @@ func TestDeletingACollectionLeavesNoOrphanedKeyEntries(t *testing.T) {
 	s, cleanup := newTestServerForCollectionConfig(t)
 	defer cleanup()
 
-	// Both spellings: one document, two index entries.
-	for _, key := range []string{"README.md", "readme.md"} {
+	for _, key := range []string{"README.md", "install.md"} {
 		if _, _, err := s.addDocument("c", key, "en", nil, "content of "+key, 0, false); err != nil {
 			t.Fatalf("write %s: %v", key, err)
 		}
 	}
 	if before := countByKeyEntries(t, s, "c"); before != 2 {
-		t.Fatalf("expected two index entries for one document, got %d", before)
+		t.Fatalf("expected one index entry per document, got %d", before)
 	}
 
 	client := &DirectClient{server: s}
@@ -152,7 +170,7 @@ func countByKeyEntries(t *testing.T, s *Server, collection string) int {
 		if bucket == nil {
 			return nil
 		}
-		prefix := []byte("bykey|" + collection + "|")
+		prefix := storage.ByKeyCollectionPrefix(collection)
 		cursor := bucket.Cursor()
 		for k, _ := cursor.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = cursor.Next() {
 			n++
@@ -201,10 +219,12 @@ func TestNormalizeDocumentKeyMatchesGenID(t *testing.T) {
 	// If genID's normalisation ever changes, this is the test that says the
 	// helper beside it was not updated.
 	for _, key := range []string{"README.md", "Path/To/File.MD", "already-lower"} {
-		normalized := normalizeDocumentKey(key)
+		normalized := storage.NormalizeKey(key)
 		if genID("c", key, "en") != genID("c", normalized, "en") {
 			t.Errorf("%q normalises to %q, which genID does not agree with", key, normalized)
 		}
 	}
-	_ = storage.ByKeyKey
+	if got, want := string(storage.ByKeyKey("c", "Path/To/File.MD", "EN")), "bykey|c|"+strings.TrimPrefix(genID("c", "Path/To/File.MD", "EN"), "c|"); got != want {
+		t.Errorf("the index key %q and the identifier disagree (%q)", got, want)
+	}
 }

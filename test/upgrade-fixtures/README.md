@@ -19,6 +19,8 @@ the property that stays true while compatibility quietly breaks.
 | Fixture | Written by | Contains |
 |---|---|---|
 | `v2.11.4.db.gz` | mddbd v2.11.4 | 4 documents in `upgrade-fixture`: three prose, one CSS with `kind: code`; metadata on every one; revisions; FTS index |
+| `v2.18.8.db.gz` | mddbd v2.18.8, single-file layout | Key-index entries as 2.18.8 stored them (DOC-017): `README.md` then `readme.md` in `docs` (one document, two entries), `Guide/Intro.MD` in language `EN`, `plain.md`, `TODO.md` in `Notes`, and `Gone.md` deleted as `gone.md` (its entry left behind) |
+| `v2.18.8-per-collection/` | mddbd v2.18.8, `MDDB_STORAGE_LAYOUT=per-collection` | The same documents: `mddb.db.gz` and one gzipped file per collection under `mddb.db.d/` |
 
 Stored gzipped because BoltDB pre-allocates its file — 16.8 MB of mostly zeros
 becomes 20 KB.

@@ -20,6 +20,7 @@ import (
 	"mddb/internal/indexqueue"
 	"mddb/internal/logging"
 	"mddb/internal/metrics"
+	"mddb/internal/migrate"
 	"mddb/internal/schema"
 	"mddb/internal/spell"
 	"mddb/internal/temporal"
@@ -480,6 +481,12 @@ func openServerDatabase(clock *startupClock, dbPath string) (*bolt.DB, *backgrou
 	if err != nil {
 		fatal("startup step failed", "step", "bolt.Open", "err", err,
 			"remedy", "if the file is damaged: mddbd -verify-db FILE, then mddbd -repair-db FILE -repair-to NEWFILE (docs/BACKUP.md)")
+	}
+	// DOC-017: the file is brought to this build's schema before anything
+	// reads or writes it.
+	clock.begin("migrating storage schema")
+	if err := migrate.Run(db); err != nil {
+		fatal("startup step failed", "step", "schema migration", "err", err, "remedy", "docs/STORAGE-LAYOUT.md#schema-version")
 	}
 	return db, freelistLoad
 }

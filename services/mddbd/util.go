@@ -16,6 +16,9 @@ func env(k, def string) string {
 	}
 	return def
 }
+
+// genID builds a document identifier from its parts, each normalised by
+// storage.NormalizeKey — the rule the key index shares (DOC-017).
 func genID(parts ...string) string {
 	// Optimized ID generation without string allocations
 	totalLen := 0
@@ -28,13 +31,7 @@ func genID(parts ...string) string {
 
 	buf := make([]byte, 0, totalLen)
 	for i, part := range parts {
-		for j := 0; j < len(part); j++ {
-			c := part[j]
-			if c >= 'A' && c <= 'Z' {
-				c += 'a' - 'A'
-			}
-			buf = append(buf, c)
-		}
+		buf = storage.AppendNormalized(buf, part)
 		if i < len(parts)-1 {
 			buf = append(buf, '|')
 		}

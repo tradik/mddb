@@ -423,6 +423,7 @@ The admin panel includes a **Cluster** tab (under Administration) that shows:
 - **No automatic failover**: Promoting a follower to leader requires manual reconfiguration.
 - **Binlog retention**: If the leader's binlog is rotated before a follower catches up, a full snapshot re-sync is required.
 - **gRPC only**: Replication uses gRPC (port 11024). Both leader and follower must have gRPC ports accessible.
+- **Upgrade followers first** across an on-disk format change: each server migrates its own files at startup, and a follower applies key-index entries from an older leader in the new form, but a follower on an older release does not understand the new form ([STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version)).
 
 ## Examples
 

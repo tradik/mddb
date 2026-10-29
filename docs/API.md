@@ -444,7 +444,8 @@ Upload files via multipart/form-data. Files are auto-converted to Markdown and s
 
 ### Document keys are case-insensitive
 
-A document's identity is built by lowercasing the collection, key and language,
+A document's identity is built by lowercasing (ASCII letters of) the
+collection, key and language,
 so **`README.md`, `readme.md` and `ReadMe.md` are one document**. This is
 deliberate and suits URL-shaped keys, but it has consequences worth stating
 plainly, because none of them announce themselves:
@@ -458,10 +459,17 @@ plainly, because none of them announce themselves:
   `README` and `readme`, `Dockerfile` and `dockerfile` are distinct files on a
   case-sensitive filesystem and one document here.
 
-The **key index**, unlike the identifier, stores the key exactly as written. So
-a document written as `README.md` is fetched by that spelling; fetching
-`readme.md` finds it only if that spelling was also written at some point.
-Aligning the two is an on-disk format change and is tracked separately.
+Since v2.18.9 the **key index** follows the same rule as the identifier: the
+key and language are stored with ASCII letters in lower case. A document
+written as `README.md` is found as `readme.md`, `ReadMe.MD` or any other
+spelling, and it has one index entry however many spellings were written.
+Only ASCII letters fold: `Ż` and `ż` stay distinct, in the identifier as in
+the index. Collection names are case-sensitive — `Blog` and `blog` are two
+collections.
+
+A database written by an earlier release stored the key as written; it is
+migrated when v2.18.9 first opens it (see
+[STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#schema-version)).
 
 **Format Conversion**:
 | Format | Extension | Conversion |

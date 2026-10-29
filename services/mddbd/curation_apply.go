@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+
 	"mddb/internal/storage"
 
 	bolt "go.etcd.io/bbolt"
@@ -215,9 +217,9 @@ func resolvePinnedDoc(bDocs, bByK *bolt.Bucket, collection string, p pinResolved
 		}
 		docID = string(v)
 	} else {
-		prefix := []byte("bykey|" + collection + "|" + p.Key + "|")
+		prefix := storage.ByKeyPathPrefix(collection, p.Key+"|")
 		c := bByK.Cursor()
-		for k, v := c.Seek(prefix); k != nil && hasBytePrefix(k, prefix); k, v = c.Next() {
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
 			docID = string(v)
 			break
 		}
@@ -237,18 +239,6 @@ func resolvePinnedDoc(bDocs, bByK *bolt.Bucket, collection string, p pinResolved
 		return storage.Doc{}, false
 	}
 	return *docPtr, true
-}
-
-func hasBytePrefix(s, prefix []byte) bool {
-	if len(s) < len(prefix) {
-		return false
-	}
-	for i, b := range prefix {
-		if s[i] != b {
-			return false
-		}
-	}
-	return true
 }
 
 // splicePinnedFTS merges base (organic) with pinned results. Positive

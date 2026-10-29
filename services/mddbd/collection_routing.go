@@ -24,6 +24,13 @@ func (s *Server) collectionStore() *collectionFiles {
 	defer s.collMu.Unlock()
 	if s.collFiles == nil {
 		cf, err := openCollectionFiles(collectionDir(s.Path), collectionFileOptions)
+		if err == nil {
+			// DOC-017: every file is at this build's schema before any
+			// of them is handed out.
+			if err = migrateCollectionFiles(cf); err != nil {
+				cf.closeAll()
+			}
+		}
 		if err != nil {
 			slog.Error("opening per-collection files failed", "err", err)
 			return nil

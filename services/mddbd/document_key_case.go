@@ -12,55 +12,25 @@ import (
 	"mddb/internal/storage"
 )
 
-// Document keys and letter case (DOC-016).
+// Document keys and letter case (DOC-016, DOC-017).
 //
 // `genID` lowercases ASCII when it builds a document's identifier, so
 // `README.md`, `readme.md` and `ReadMe.md` are one document. That is
 // deliberate and reasonable for URL-shaped keys.
 //
-// The `bykey` index does not: it stores the key exactly as written. The two
-// halves therefore answer "does case matter?" differently, and the gap shows
-// up twice:
+// Since DOC-017 the `bykey` index follows the same rule: storage.ByKeyKey
+// normalises the key and the language, and the schema migration
+// (internal/migrate) rewrote the entries older releases stored as written.
+// Any spelling therefore finds the document, and a document has one index
+// entry however many spellings were used.
 //
-//   - **Writing both variants** leaves one document holding whichever content
-//     arrived last, reachable under either spelling, with no sign that a write
-//     replaced another. This is the one that loses data.
-//   - **Deleting** removes the document and the one index entry named in the
-//     request, leaving the other pointing at a document that is gone.
-//
-// Aligning the index with the identifier would fix both by construction, and
-// it is not what this change does: the index key is on-disk format, there is no
-// migration machinery in the tree, and rewriting the format without one is the
-// upgrade failure this project explicitly does not ship. See DOC-017.
-//
-// What is done here: the write path reports collisions instead of absorbing
-// them, and the delete path clears the spelling the caller used *and* the one
-// the document was stored under, which is the pair that actually occurs.
-
-// normalizeDocumentKey returns the form a key is identified by.
-//
-// Kept next to the code that depends on the rule rather than inlined, so a
-// change to genID's normalisation has one obvious place to be mirrored.
-func normalizeDocumentKey(key string) string {
-	return strings.ToLower(key)
-}
+// What stays here is the write path's report: a batch that carries two
+// spellings of one key writes one document, the last one winning, and the
+// response says so instead of absorbing it silently.
 
 // keysCollideOnCase reports whether two distinct keys name one document.
 func keysCollideOnCase(a, b string) bool {
-	return a != b && normalizeDocumentKey(a) == normalizeDocumentKey(b)
-}
-
-// byKeyVariants lists the index entries that may point at one document.
-//
-// `requested` is the spelling in the request; `stored` is the spelling on the
-// document itself. They differ exactly when a document was written under one
-// spelling and addressed under another, which is the case worth clearing.
-func byKeyVariants(collection, requested, stored, lang string) [][]byte {
-	primary := storage.ByKeyKey(collection, requested, lang)
-	if stored == "" || stored == requested {
-		return [][]byte{primary}
-	}
-	return [][]byte{primary, storage.ByKeyKey(collection, stored, lang)}
+	return a != b && storage.NormalizeKey(a) == storage.NormalizeKey(b)
 }
 
 // findCaseCollisions groups input keys that differ only in letter case.
@@ -72,7 +42,7 @@ func findCaseCollisions(keys []string) [][]string {
 	byNormalized := make(map[string][]string, len(keys))
 
 	for _, key := range keys {
-		normalized := normalizeDocumentKey(key)
+		normalized := storage.NormalizeKey(key)
 		if _, seen := byNormalized[normalized]; !seen {
 			order = append(order, normalized)
 		}
@@ -146,7 +116,7 @@ func deleteCollectionByKeyEntries(bucket *bolt.Bucket, collection string, bo *bi
 	if bucket == nil {
 		return nil
 	}
-	prefix := []byte("bykey|" + collection + "|")
+	prefix := storage.ByKeyCollectionPrefix(collection)
 
 	// Collected first: deleting through a cursor mid-iteration is not
 	// something bbolt guarantees.

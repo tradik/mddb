@@ -34,6 +34,9 @@ var upgradeFixtures = []struct {
 	documents  int
 }{
 	{version: "v2.11.4", collection: "upgrade-fixture", documents: 4},
+	// DOC-017: keys and a language in mixed case, one key written in two
+	// spellings, and an index entry a delete left behind.
+	{version: "v2.18.8", collection: "docs", documents: 3},
 }
 
 func TestOpensFixturesFromOlderReleases(t *testing.T) {
@@ -120,23 +123,31 @@ func TestFixtureContentIsUnchanged(t *testing.T) {
 
 func unpackFixture(t *testing.T, version string) string {
 	t.Helper()
+	// Copied to a temp file: the test must not modify the fixture, and
+	// bolt.Open takes a write lock.
+	dst := filepath.Join(t.TempDir(), version+".db")
+	gunzipFixture(t, version+".db.gz", dst)
+	return dst
+}
 
-	src := filepath.Join("..", "..", "test", "upgrade-fixtures", version+".db.gz")
+// gunzipFixture unpacks the fixture at rel (relative to test/upgrade-fixtures)
+// to dst.
+func gunzipFixture(t *testing.T, rel, dst string) {
+	t.Helper()
+
+	src := filepath.Join("..", "..", "test", "upgrade-fixtures", filepath.FromSlash(rel))
 	f, err := os.Open(src) // #nosec G304 -- fixture path built from a fixed table
 	if err != nil {
-		t.Fatalf("fixture for %s is missing: %v", version, err)
+		t.Fatalf("fixture %s is missing: %v", rel, err)
 	}
 	defer func() { _ = f.Close() }()
 
 	zr, err := gzip.NewReader(f)
 	if err != nil {
-		t.Fatalf("fixture for %s is not readable: %v", version, err)
+		t.Fatalf("fixture %s is not readable: %v", rel, err)
 	}
 	defer func() { _ = zr.Close() }()
 
-	// Copied to a temp file: the test must not modify the fixture, and
-	// bolt.Open takes a write lock.
-	dst := filepath.Join(t.TempDir(), version+".db")
 	out, err := os.Create(dst) // #nosec G304 -- inside t.TempDir()
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +159,6 @@ func unpackFixture(t *testing.T, version string) string {
 	if err := out.Close(); err != nil {
 		t.Fatal(err)
 	}
-	return dst
 }
 
 func readFixtureDocs(t *testing.T, db *bolt.DB, collection string) []*storage.Doc {

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
+	"mddb/internal/storage"
 	"mddb/internal/vector"
 	"strings"
 	"sync/atomic"
@@ -88,13 +89,19 @@ func (ra *ReplicationApplier) applyGroup(target string, everywhere bool, group [
 			if err != nil {
 				return err
 			}
+			key := entry.Key
+			if entry.BucketName == "bykey" {
+				// DOC-017: a leader on an older release sends key-index
+				// entries as written; they land in this build's form.
+				key, _ = storage.NormalizeByKeyEntry(key)
+			}
 			switch entry.Type {
 			case binlog.BinlogPut:
-				if err := bucket.Put(entry.Key, entry.Value); err != nil {
+				if err := bucket.Put(key, entry.Value); err != nil {
 					return err
 				}
 			case binlog.BinlogDelete:
-				if err := bucket.Delete(entry.Key); err != nil {
+				if err := bucket.Delete(key); err != nil {
 					return err
 				}
 			}
