@@ -26,7 +26,7 @@ type VectorSearchRequest struct {
 	FilterMeta     map[string][]string `json:"filterMeta"`
 	Filter         MetaFilter          `json:"filter,omitempty"` // operator filter (SRCH-017): prefix, contains, gt/gte/lt/lte, not, exists; ANDed with filterMeta
 	IncludeContent bool                `json:"includeContent"`
-	Algorithm      string              `json:"algorithm"`      // "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
+	Algorithm      string              `json:"algorithm"`      // "flat" (default), "auto" (SRCH-013), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	DistanceMetric string              `json:"distanceMetric"` // "cosine" (default), "dot_product", "euclidean"
 	RetrievalMode  string              `json:"retrievalMode"`  // "parent" (default), "chunk", "window", "graph"
 	// GraphExpand tunes retrievalMode "graph" (SRCH-006). Ignored in the other
@@ -43,6 +43,7 @@ type VectorSearchRequest struct {
 
 	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions // format, passageLines (AGT-002)
+	PlanOptions    // explain, latencyTargetMs (SRCH-013)
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -86,6 +87,9 @@ type VectorSearchResponseHTTP struct {
 	GraphExpansions []GraphExpansion `json:"graphExpansions,omitempty"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Plan is how the search ran and why, when the request set explain
+	// (SRCH-013).
+	Plan *SearchPlan `json:"plan,omitempty"`
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -216,6 +220,10 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidatePlanOptions(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
 	if err := req.ValidatePassageOptions(); err != nil {
 		unprocessable(w, err)
@@ -237,22 +245,25 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Select algorithm
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "flat"
-	}
+	// RAG-001: request > collection profile > this path's historical default.
+	topK := s.ResolveTopK(req.Collection, req.TopK, 5)
+	// Oversample for chunk deduplication: search for more results, then
+	// deduplicate. SRCH-005 makes the multiplier a request parameter — it was
+	// the fixed `topK * 3` here and in four other places.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
+	allowedIDs, filtered := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
 
-	// Auto-select quantized searcher if collection has quantization configured
-	if algo == "flat" && s.QuantizedVecIndex != nil && s.QuantizedVecIndex.HasCollection(req.Collection) {
-		algo = "quantized"
-	}
-
-	searcher, algo, err := s.readySearcher(req.Collection, algo)
+	// SRCH-013: the named algorithm, the profile's, flat — or the planner's
+	// choice for "auto". A quantized collection is searched in its own index
+	// when the request leaves the algorithm at flat.
+	ps, err := s.planSearch(planRequest{Collection: req.Collection, Algorithm: s.ResolveVectorAlgorithm(req.Collection, req.Algorithm),
+		QuantizedDefault: true, Filtered: filtered, Allowed: allowedIDs, SearchTopK: searchTopK,
+		Dimensions: len(req.QueryVector), LatencyTargetMs: req.LatencyTargetMs})
 	if err != nil {
-		s.writeVectorUnavailable(w, err, "flat, hnsw, ivf, pq, quantized")
+		s.writeVectorUnavailable(w, err, "auto, flat, hnsw, ivf, pq, quantized")
 		return
 	}
+	searcher, algo := ps.Searcher, ps.Algorithm
 
 	// Get query vector
 	var queryVector []float32
@@ -272,9 +283,6 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// RAG-001: request > collection profile > this path's historical default.
-	topK := s.ResolveTopK(req.Collection, req.TopK, 5)
-
 	// Resolve distance metric
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
@@ -282,27 +290,18 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		metricName = "cosine"
 	}
 
-	// Oversample for chunk deduplication: search for more results, then
-	// deduplicate. SRCH-005 makes the multiplier a request parameter — it was
-	// the fixed `topK * 3` here and in four other places.
-	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
-
 	// Search: with or without metadata filter
-	var results []vec.VectorResult
-	if allowedIDs, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
-		if len(allowedIDs) == 0 {
-			ok(w, VectorSearchResponseHTTP{
-				Results:        []VectorSearchResultItem{},
-				Total:          0,
-				Algorithm:      algo,
-				DistanceMetric: metricName,
-			})
-			return
-		}
-		results = searcher.SearchWithFilter(req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, metric)
-	} else {
-		results = searcher.Search(req.Collection, queryVector, searchTopK, req.Threshold, metric)
+	if filtered && len(allowedIDs) == 0 {
+		ok(w, VectorSearchResponseHTTP{
+			Results:        []VectorSearchResultItem{},
+			Total:          0,
+			Algorithm:      algo,
+			DistanceMetric: metricName,
+			Plan:           req.explained(ps.Plan),
+		})
+		return
 	}
+	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
 
 	// Parent mode (default): one result per document, best chunk wins.
 	// Chunk/window modes keep individual chunk hits so the exact matching
@@ -442,6 +441,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		ContextTruncated: contextTruncated,
 		GraphExpansions:  expansions,
 		Indexing:         waited,
+		Plan:             req.explained(ps.Plan),
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()

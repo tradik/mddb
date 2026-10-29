@@ -135,6 +135,7 @@ func (s *MCPToolServer) toolCrossSearch(ctx context.Context, args map[string]int
 		return "", fmt.Errorf("target_collections is required")
 	}
 	req.PassageOptions = mcpGetPassageOptions(args)
+	req.PlanOptions = mcpGetPlanOptions(args)
 	resp, err := s.client.CrossSearch(ctx, req)
 	if err != nil {
 		return "", err

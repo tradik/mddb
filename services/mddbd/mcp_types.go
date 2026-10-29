@@ -245,6 +245,7 @@ type MCPVectorSearchRequest struct {
 
 	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions // format, passageLines (AGT-002)
+	PlanOptions    // explain, latencyTargetMs (SRCH-013)
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -288,6 +289,9 @@ type MCPVectorSearchResponse struct {
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Plan is how the vector search ran and why, when the request set explain
+	// (SRCH-013).
+	Plan *SearchPlan `json:"plan,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
 	Passages *PassagesResponse `json:"-"`
@@ -464,6 +468,7 @@ type MCPHybridSearchRequest struct {
 
 	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions // format, passageLines (AGT-002)
+	PlanOptions    // explain, latencyTargetMs (SRCH-013)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.
@@ -503,6 +508,9 @@ type MCPHybridSearchResponse struct {
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Plan is how the vector search ran and why, when the request set explain
+	// (SRCH-013).
+	Plan *SearchPlan `json:"plan,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
 	Passages *PassagesResponse `json:"-"`
@@ -781,6 +789,7 @@ type MCPCrossSearchRequest struct {
 
 	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions // format, passageLines (AGT-002)
+	PlanOptions    // explain, latencyTargetMs (SRCH-013)
 	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
 	// include "role:reference" for every reference collection.
 	SearchType string `json:"searchType,omitempty"`
@@ -797,6 +806,9 @@ type MCPCrossSearchResponse struct {
 	DistanceMetric    string                  `json:"distanceMetric"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Plan is how the vector search ran and why, when the request set explain
+	// (SRCH-013).
+	Plan *SearchPlan `json:"plan,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
 	Passages *PassagesResponse `json:"-"`

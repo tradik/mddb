@@ -7849,9 +7849,14 @@ components:
           example: false
         algorithm:
           type: string
-          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq, quantized ]
+          enum: [ flat, auto, hnsw, ivf, pq, opq, sq, sq4, bq, quantized ]
           description: |
-            Search algorithm to use (default "flat").
+            Search algorithm to use (default "flat", or the collection
+            profile's `retrieval.vectorAlgorithm`).
+            - **auto** (v2.18.9+): the query planner chooses per query from the
+              collection size, the indexes already built and the filter's
+              selectivity; it never builds an index on the query path. See
+              SEARCH.md#auto-the-server-chooses-v2189.
             - **flat**: Exact brute-force cosine similarity (most accurate, slower for large datasets)
             - **hnsw**: Hierarchical Navigable Small World graph (fast approximate, best general-purpose)
             - **ivf**: Inverted File Index with k-means clustering (good for large datasets)
@@ -7909,10 +7914,57 @@ components:
           maximum: 1
           default: 0.5
           example: 0.5
+        explain:
+          $ref: '#/components/schemas/PlanExplain'
+        latencyTargetMs:
+          $ref: '#/components/schemas/PlanLatencyTarget'
+
+    PlanExplain:
+      type: boolean
+      default: false
+      description: (v2.18.9+, SRCH-013) Add `plan` to the response — the vector index that answered and why.
+
+    PlanLatencyTarget:
+      type: integer
+      minimum: 0
+      maximum: 60000
+      description: >-
+        (v2.18.9+, SRCH-013) Latency goal in ms for algorithm `auto`; 10 or
+        less favours a quantized index (bq, sq4, sq) on 10,000+ vectors.
+        Out of range returns 422.
+
+    SearchPlan:
+      type: object
+      description: How a vector search ran and why (v2.18.9+, SRCH-013). Present only when the request set `explain`.
+      properties:
+        algorithm:
+          type: string
+          description: The index that answered; `auto` for a cross search, whose targets are planned one by one.
+          example: flat
+        prefilter:
+          type: boolean
+          description: The filter was applied first and the admitted documents scanned exactly.
+        candidates:
+          type: integer
+          description: Hits asked of the index, topK × oversample.
+          example: 15
+        iterativeScan:
+          type: boolean
+          description: A filtered index search came back short of topK and the scan continued further into the index.
+        reasons:
+          type: array
+          items: { type: string }
+        collections:
+          type: object
+          description: Cross search with `auto`, one plan per target collection.
+          additionalProperties:
+            $ref: '#/components/schemas/SearchPlan'
 
     VectorSearchResponse:
       type: object
       properties:
+        plan:
+          $ref: '#/components/schemas/SearchPlan'
         indexing:
           $ref: '#/components/schemas/IndexWaitResult'
         results:
@@ -8841,10 +8893,18 @@ components:
           example: bm25
         vectorAlgorithm:
           type: string
-          enum: [ flat, hnsw, ivf, pq, opq, sq, sq4, bq ]
-          description: Vector search algorithm (default "flat")
+          enum: [ flat, auto, hnsw, ivf, pq, opq, sq, sq4, bq ]
+          description: >-
+            Vector search algorithm (default "flat", or the collection
+            profile's `retrieval.vectorAlgorithm`). `auto` (v2.18.9+) lets the
+            query planner choose; the response's vectorAlgorithm then names
+            the index it chose.
           default: flat
           example: flat
+        explain:
+          $ref: '#/components/schemas/PlanExplain'
+        latencyTargetMs:
+          $ref: '#/components/schemas/PlanLatencyTarget'
         signals:
           $ref: "#/components/schemas/FusionSignals"
         strategy:
@@ -9006,6 +9066,8 @@ components:
     HybridSearchResponse:
       type: object
       properties:
+        plan:
+          $ref: '#/components/schemas/SearchPlan'
         indexing:
           $ref: '#/components/schemas/IndexWaitResult'
         results:
@@ -9482,6 +9544,13 @@ components:
             when nothing is embedded. False for the `lexical` provider, and the
             advisor then recommends keyword search unless the collection's own
             evaluation set measures hybrid better.
+        builtIndexes:
+          type: array
+          items: { type: string }
+          description: >-
+            (v2.18.9+, SRCH-013) Vector indexes that can answer for the
+            collection now, without building. With more than one, the advisor
+            puts vectorAlgorithm auto in the recommended profile.
 
     FusionSignals:
       type: object
@@ -10621,6 +10690,13 @@ components:
           description: '`passages` returns path + lines + enclosing definition + text per hit instead of documents (AGT-002, v2.18.8); the response is a PassagesResponse.'
         groupBy:
           $ref: '#/components/schemas/GroupBy'
+        vectorAlgorithm:
+          type: string
+          enum: [ auto, flat, hnsw, ivf, pq, opq, sq, sq4, bq ]
+          description: >-
+            (v2.18.9+, SRCH-013) The collection's default vector index for
+            vector, hybrid and MCP searches that name none; `auto` lets the
+            query planner choose per query. Unset = flat.
         defaultSearchType:
           type: string
           enum: [ fts, vector, hybrid ]
@@ -11095,10 +11171,17 @@ components:
           example: 0.5
         algorithm:
           type: string
-          description: Vector search algorithm
-          enum: [ flat, hnsw, ivf, pq, opq, sq, bq ]
+          description: >-
+            Vector search algorithm. `auto` (v2.18.9+) plans each target
+            collection on its own; the response then reports `auto` and, with
+            explain, one plan per target under plan.collections.
+          enum: [ flat, auto, hnsw, ivf, pq, opq, sq, sq4, bq ]
           default: flat
           example: flat
+        explain:
+          $ref: '#/components/schemas/PlanExplain'
+        latencyTargetMs:
+          $ref: '#/components/schemas/PlanLatencyTarget'
         distanceMetric:
           type: string
           description: Distance metric for similarity computation
@@ -11123,6 +11206,8 @@ components:
     CrossSearchResponse:
       type: object
       properties:
+        plan:
+          $ref: '#/components/schemas/SearchPlan'
         indexing:
           $ref: '#/components/schemas/IndexWaitResult'
         results:

@@ -430,6 +430,27 @@ key — one passage per file instead of five from the same one:
 Each result reports its `group` and `groupRank`. See
 [Grouping Results](SEARCH.md#grouping-results-v2188).
 
+## Letting the Server Choose the Index (v2.18.9+)
+
+`semantic_search` and `cross_search` take `algorithm: "auto"`, and
+`hybrid_search` takes `vector_algorithm: "auto"`. With it, the query planner
+chooses the vector index for each query. It goes by the collection size, the
+indexes already built and how much of the collection the filter admits.
+`explain: true` adds a `plan` to the response: the index used, whether the
+filter was applied first, and why. `latency_target_ms` is optional; 10 or
+less favours a quantized index on a large collection.
+
+```json
+{"name": "semantic_search", "arguments": {
+  "collection": "repo", "query": "retry with backoff", "algorithm": "auto",
+  "filter": {"path": {"prefix": "internal/net/"}}, "explain": true
+}}
+```
+
+Send `auto` rather than guessing an index. Without `algorithm`, the search is
+flat, as before. The table behind the choice is in
+[`auto`: the server chooses](SEARCH.md#auto-the-server-chooses-v2189).
+
 ## Passages for Code (v2.18.8+)
 
 `search_documents`, `full_text_search`, `semantic_search`, `hybrid_search` and
@@ -534,7 +555,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | Tool | Description |
 |------|-------------|
 | `aggregate` | Compute metadata facets (value counts) and date histograms over a collection, with optional metadata pre-filtering. |
-| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. |
+| `semantic_search` | Search documents by meaning using semantic similarity. Since v2.18.8: `filter`, `group_by`, and `read_level` / `wait_for_index` / `wait_for_keys` to see documents whose embedding is still queued. Since v2.18.9: `algorithm: "auto"`, `explain`, `latency_target_ms`. |
 | `get_indexing_status` | (v2.18.8) Is what was just written searchable yet? Queued and failed embeddings, progress and the oldest queued job, for a collection or the server. Read-only. |
 | `run_eval` | (v2.18.8) Measure search configurations on the collection's evaluation set: recall@k, nDCG@k, MRR, p50/p99 latency and tokens per configuration. Read-only. See [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188). |
 | `get_gain` | (v2.18.8) What retrieval saved over a window of days: searches by type and algorithm, tokens returned and tokens avoided by passages and chunks. Counts only. Read-only. |
@@ -542,8 +563,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `full_text_search` | Search documents by text content using full-text search with term matching and relevance scoring. Since v2.18.1 it runs the same search as `POST /v1/fts` and takes `filter_meta`, `disable_stem`, `disable_synonyms`, `mode`, `distance` and `facet_by` (the last was in the schema before and ignored). Since v2.18.8 it also takes `filter` and `group_by` (see [Narrowing a Search](#narrowing-a-search-v2188)). |
 | `autocomplete` | Prefix autocomplete — returns top-N terms starting with the query, ranked by document frequency. |
 | `classify_document` | Zero-shot document classification. |
-| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. |
-| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. |
+| `hybrid_search` | Combined sparse (FTS) + dense (vector) search with alpha blending or Reciprocal Rank Fusion. Since v2.18.9: `vector_algorithm: "auto"`, `explain`, `latency_target_ms`. |
+| `cross_search` | Search across multiple collections using a source document's embedding or a text query. Since v2.18.8 `search_type` is `vector`, `fts` or `hybrid`, and `role:reference` in `target_collections` means every reference collection. Since v2.18.9: `algorithm: "auto"` plans each target; `explain`, `latency_target_ms`. |
 | `find_duplicates` | Find duplicate and similar documents within a collection. |
 
 ### Geo

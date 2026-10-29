@@ -380,6 +380,9 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	if err := validCrossSearchType(req.SearchType); err != nil {
 		return nil, err
 	}
+	if err := req.ValidatePlanOptions(); err != nil {
+		return nil, err
+	}
 	req.TargetCollections = s.expandTargets(req.TargetCollections)
 	if len(req.TargetCollections) == 0 {
 		return nil, fmt.Errorf("no collection matches target_collections")
@@ -401,14 +404,15 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 			Algorithm: req.SearchType, Indexing: waited}, nil
 	}
 
-	// Select algorithm
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "flat"
-	}
+	topK := crossTopK(req.TopK)
+	// Oversample per collection for better merging (SRCH-005). No single
+	// collection profile can own the factor across targets, so only the
+	// request parameter and the default apply.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 	// The readiness rule every vector path shares: algo, else flat, else
-	// "loading" (which gRPC reports as Unavailable).
-	searcher, algo, err := s.readySearcher(req.SourceCollection, algo)
+	// "loading" (which gRPC reports as Unavailable). SRCH-013: "auto" plans
+	// each target.
+	searcher, algo, plan, err := s.crossSearcher(req.SourceCollection, req.Algorithm, searchTopK)
 	if err != nil {
 		return nil, err
 	}
@@ -440,20 +444,11 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		return nil, fmt.Errorf("one of query, queryVector or sourceDocID is required")
 	}
 
-	topK := req.TopK
-	if topK <= 0 {
-		topK = 10
-	}
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
 	if metricName == "" {
 		metricName = "cosine"
 	}
-
-	// Oversample per collection for better merging (SRCH-005). No single
-	// collection profile can own the factor across targets, so only the
-	// request parameter and the default apply.
-	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
 	waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
 	items := s.crossSearchItems(crossSearchParams{
@@ -461,6 +456,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
+		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs,
 	})
 	s.countCross(algo, items, req.wantsPassages())
 
@@ -477,6 +473,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		Algorithm:         algo,
 		DistanceMetric:    metricName,
 		Indexing:          waited,
+		Plan:              req.explained(plan),
 	}, nil
 }
 

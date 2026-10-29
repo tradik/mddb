@@ -741,6 +741,9 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `threshold` (optional): Minimum similarity score 0.0-1.0 (default: 0.0)
 - `filterMeta` (optional): Metadata pre-filter (same logic as `/v1/search`)
 - `includeContent` (optional): Include `contentMd` in results (default: false)
+- `algorithm` (optional): `flat` (default), `auto`, `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`. With `auto` (v2.18.9+) the query planner chooses per query; the collection profile's `retrieval.vectorAlgorithm` applies when the request names none ([SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189))
+- `explain` (optional, v2.18.9+): Add `plan` to the response — the index that answered, `prefilter`, `candidates`, `iterativeScan` and the reasons
+- `latencyTargetMs` (optional, v2.18.9+): Latency goal for `auto`, 0–60000; 10 or less favours a quantized index on 10,000+ vectors
 
 \* Either `query` or `queryVector` is required.
 
@@ -789,6 +792,8 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `total`: Number of results returned
 - `model`: Embedding model used
 - `dimensions`: Vector dimensionality
+- `algorithm`: The index that answered
+- `plan` (with `explain`, v2.18.9+): `{algorithm, prefilter, candidates, iterativeScan, reasons}`
 
 **How It Works**:
 1. When a document is added via `/v1/add`, its content is automatically embedded in the background
@@ -2434,7 +2439,9 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
 | `query` | string | | **Required.** Search query |
 | `topK` | integer | `10` | Max results |
 | `algorithm` | string | `"bm25"` | FTS algorithm: `bm25`, `bm25f` |
-| `vectorAlgorithm` | string | `"flat"` | Vector algorithm: `flat`, `hnsw`, `ivf`, `pq`, `sq` |
+| `vectorAlgorithm` | string | `"flat"` | Vector algorithm: `flat`, `auto` (v2.18.9+, the query planner chooses), `hnsw`, `ivf`, `pq`, `opq`, `sq`, `sq4`, `bq`; the profile's `retrieval.vectorAlgorithm` applies when unset |
+| `explain` | boolean | `false` | (v2.18.9+) Add `plan` — the vector half's index and why — to the response |
+| `latencyTargetMs` | integer | `0` | (v2.18.9+) Latency goal for `auto`, 0–60000 |
 | `alpha` | number | `0.5` | Weight blending (0=FTS only, 1=vector only) |
 | `strategy` | string | `"alpha"` | Fusion strategy: `alpha` or `rrf` |
 | `rrfK` | integer | `60` | RRF parameter k |
@@ -2506,7 +2513,9 @@ Alternative source modes (use one):
 | `targetCollections` | string[] | all | Collections to search |
 | `topK` | integer | `10` | Max results |
 | `threshold` | number | `0.0` | Min similarity |
-| `algorithm` | string | `"flat"` | Vector algorithm |
+| `algorithm` | string | `"flat"` | Vector algorithm; `auto` (v2.18.9+) plans each target collection and reports `"algorithm": "auto"` |
+| `explain` | boolean | `false` | (v2.18.9+) Add `plan` to the response; with `auto`, one plan per target under `plan.collections` |
+| `latencyTargetMs` | integer | `0` | (v2.18.9+) Latency goal for `auto`, 0–60000 |
 | `distanceMetric` | string | `"cosine"` | Distance metric |
 | `filterMeta` | object | | Metadata filter |
 | `filter` | object | | Operator filter applied in every target collection (v2.18.8+) |

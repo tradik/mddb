@@ -168,6 +168,10 @@ Two independent mechanisms share the "quantization" vocabulary:
   SQ/BQ are themselves compression-based indexes; HNSW and IVF are
   graph/cluster-based approximate indexes. See
   [SEARCH.md](SEARCH.md#vector-search) for per-algorithm characteristics.
+  `algorithm: "auto"` (v2.18.9+) chooses among them per query. On a quantized
+  or disk-only collection it searches the `quantized` index. When float32
+  vectors would exceed 256 MB or 1 GB, it picks `sq` or `sq4` if trained. See
+  [`auto`: the server chooses](SEARCH.md#auto-the-server-chooses-v2189).
 
 Index tuning parameters are currently fixed at sensible defaults (HNSW
 `M=16`, `efConstruction=200`, `efSearch=100`; IVF `nProbe=10`; PQ

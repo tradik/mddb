@@ -26,6 +26,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if err := req.ValidatePassageOptions(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidatePlanOptions(); err != nil {
+		return nil, err
+	}
 	includeContent := req.IncludeContent || req.wantsPassages()
 	waited := s.waitForIndex(ctx, req.Collection, req.IndexWait)
 
@@ -36,19 +39,22 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		return nil, errors.New("either query or queryVector is required")
 	}
 
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "flat"
-	}
-	// Auto-select quantized searcher if collection has quantization configured
-	// (disk-only collections exist ONLY in the quantized index).
-	if algo == "flat" && s.QuantizedVecIndex != nil && s.QuantizedVecIndex.HasCollection(req.Collection) {
-		algo = "quantized"
-	}
-	searcher, algo, err := s.readySearcher(req.Collection, algo)
+	// RAG-001: request > collection profile > historical default.
+	topK := c.server.ResolveTopK(req.Collection, req.TopK, 5)
+	// Oversample for chunk deduplication (SRCH-005).
+	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
+	allowedIDs, filtered := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
+
+	// SRCH-013: the named algorithm, the profile's, flat — or the planner's
+	// choice for "auto". Disk-only collections exist ONLY in the quantized
+	// index, which a flat request is routed to.
+	ps, err := s.planSearch(planRequest{Collection: req.Collection, Algorithm: s.ResolveVectorAlgorithm(req.Collection, req.Algorithm),
+		QuantizedDefault: true, Filtered: filtered, Allowed: allowedIDs, SearchTopK: searchTopK,
+		Dimensions: len(req.QueryVector), LatencyTargetMs: req.LatencyTargetMs})
 	if err != nil {
 		return nil, err
 	}
+	algo := ps.Algorithm
 
 	var queryVector []float32
 	if len(req.QueryVector) > 0 {
@@ -65,39 +71,29 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		return nil, fmt.Errorf("%w and no queryVector provided", errNoEmbeddingProvider)
 	}
 
-	// RAG-001: request > collection profile > historical default.
-	topK := c.server.ResolveTopK(req.Collection, req.TopK, 5)
-
-	// Oversample for chunk deduplication (SRCH-005).
-	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
-
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
 	if metricName == "" {
 		metricName = "cosine"
 	}
 
-	var results []vec.VectorResult
-	if allowedIDs, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
-		if len(allowedIDs) == 0 {
-			resp := &MCPVectorSearchResponse{
-				Results:        []MCPVectorSearchResult{},
-				Algorithm:      algo,
-				DistanceMetric: metricName,
-				// Included even with no results: a field that appears only
-				// sometimes is a field agents handle inconsistently.
-				ResponsePrompt: s.ResponsePrompt(req.Collection, req.Query),
-			}
-			if s.Embedding != nil {
-				resp.Model = s.Embedding.Model()
-				resp.Dimensions = s.Embedding.Dimensions()
-			}
-			return resp, nil
+	if filtered && len(allowedIDs) == 0 {
+		resp := &MCPVectorSearchResponse{
+			Results:        []MCPVectorSearchResult{},
+			Algorithm:      algo,
+			DistanceMetric: metricName,
+			// Included even with no results: a field that appears only
+			// sometimes is a field agents handle inconsistently.
+			ResponsePrompt: s.ResponsePrompt(req.Collection, req.Query),
+			Plan:           req.explained(ps.Plan),
 		}
-		results = searcher.SearchWithFilter(req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, metric)
-	} else {
-		results = searcher.Search(req.Collection, queryVector, searchTopK, req.Threshold, metric)
+		if s.Embedding != nil {
+			resp.Model = s.Embedding.Model()
+			resp.Dimensions = s.Embedding.Dimensions()
+		}
+		return resp, nil
 	}
+	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
 
 	// Parent mode (default): dedupe chunks to their parent document.
 	// Chunk/window modes keep chunk hits and return the matching passage.
@@ -211,6 +207,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		Total:     len(items),
 		Algorithm: algo,
 		Indexing:  waited,
+		Plan:      req.explained(ps.Plan),
 		// RAG-002: the collection's formatting instruction travels with the
 		// results, so an agent does not need a second call to learn how this
 		// collection wants its answers shaped.
@@ -470,6 +467,9 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if err := req.ValidatePassageOptions(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidatePlanOptions(); err != nil {
+		return nil, err
+	}
 	waited := c.server.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	httpReq := HybridSearchRequest{
@@ -495,6 +495,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		BM25K1:          req.BM25K1,
 		BM25B:           req.BM25B,
 		IncludeContent:  true,
+		PlanOptions:     req.PlanOptions,
 	}
 
 	items, httpReq, err := c.server.hybridItems(ctx, httpReq)
@@ -514,11 +515,12 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	resp := &MCPHybridSearchResponse{
 		Strategy:        httpReq.Strategy,
 		FTSAlgorithm:    httpReq.Algorithm,
-		VectorAlgorithm: httpReq.VectorAlgorithm,
+		VectorAlgorithm: ranVectorAlgorithm(httpReq.VectorAlgorithm, httpReq.plan),
 		DistanceMetric:  distMetric,
 		Results:         make([]MCPHybridSearchResult, 0, len(items)),
 		ResponsePrompt:  c.server.ResponsePrompt(httpReq.Collection, httpReq.Query),
 		Indexing:        waited,
+		Plan:            req.explained(httpReq.plan),
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{
@@ -586,11 +588,13 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 		return nil, httpReq, err
 	}
 
-	// Run vector
-	vectorResults, err := s.runVectorSearch(ctx, httpReq)
+	// Run vector. SRCH-013: request, then collection profile, then flat.
+	httpReq.VectorAlgorithm = s.ResolveVectorAlgorithm(httpReq.Collection, httpReq.VectorAlgorithm)
+	vectorResults, plan, err := s.vectorHalf(ctx, httpReq)
 	if err != nil {
 		return nil, httpReq, err
 	}
+	httpReq.plan = plan
 
 	// Defaults. RAG-001: request > collection profile > historical default.
 	httpReq.TopK = s.ResolveTopK(httpReq.Collection, httpReq.TopK, 10)

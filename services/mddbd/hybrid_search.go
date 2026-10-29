@@ -24,7 +24,7 @@ type HybridSearchRequest struct {
 	Query           string `json:"query"`
 	TopK            int    `json:"topK"`
 	Algorithm       string `json:"algorithm"`       // FTS algorithm: "bm25" (default), "bm25f"
-	VectorAlgorithm string `json:"vectorAlgorithm"` // vector algorithm: "flat" (default), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
+	VectorAlgorithm string `json:"vectorAlgorithm"` // vector algorithm: "flat" (default), "auto" (SRCH-013), "hnsw", "ivf", "pq", "opq", "sq", "sq4", "bq"
 	// Alpha weights vector against keyword: 0 = keyword only, 1 = semantic
 	// only. Default 0.5.
 	//
@@ -67,11 +67,15 @@ type HybridSearchRequest struct {
 	GroupBy        *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 	PassageOptions          // format, passageLines (AGT-002)
 	IndexWait
+	PlanOptions // explain, latencyTargetMs (SRCH-013), for the vector half
 
 	// onlyIDs restricts the full-text half to these documents. Internal:
 	// used to find matches among documents still waiting for their
 	// embedding (GO-042).
 	onlyIDs map[string]bool
+	// plan is the vector half's plan, set by hybridItems for the response
+	// to report (SRCH-013).
+	plan *SearchPlan
 }
 
 // HybridGeoFilter restricts hybrid search to docs within radius of a point.
@@ -126,6 +130,9 @@ type HybridSearchResponse struct {
 	Facets           FacetResult  `json:"facets,omitempty"` // populated when request.facetBy is set (v2.9.14+)
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Plan is how the vector search ran and why, when the request set explain
+	// (SRCH-013).
+	Plan *SearchPlan `json:"plan,omitempty"`
 }
 
 // handleHybridSearch handles POST /v1/hybrid-search
@@ -160,6 +167,10 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidatePlanOptions(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	waited := s.waitForIndex(r.Context(), req.Collection, req.IndexWait)
 
 	// Defaults. RAG-001 inserts the collection profile between the request
@@ -168,7 +179,8 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	if req.Algorithm == "" {
 		req.Algorithm = "bm25"
 	}
-	if req.VectorAlgorithm == "" {
+	// SRCH-013: request, then collection profile, then flat.
+	if req.VectorAlgorithm = s.ResolveVectorAlgorithm(req.Collection, req.VectorAlgorithm); req.VectorAlgorithm == "" {
 		req.VectorAlgorithm = "flat"
 	}
 	req.Strategy = s.ResolveHybridStrategy(req.Collection, req.Strategy, "alpha")
@@ -269,7 +281,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ---- Step 2: Run vector search ----
-	vectorResults, err := s.runVectorSearch(r.Context(), req)
+	vectorResults, plan, err := s.vectorHalf(r.Context(), req)
 	if err != nil {
 		bad(w, fmt.Errorf("vector search failed: %w", err))
 		return
@@ -366,9 +378,10 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		Total:           len(items),
 		Strategy:        req.Strategy,
 		FTSAlgorithm:    req.Algorithm,
-		VectorAlgorithm: req.VectorAlgorithm,
+		VectorAlgorithm: ranVectorAlgorithm(req.VectorAlgorithm, plan),
 		DistanceMetric:  distMetric,
 		Indexing:        waited,
+		Plan:            req.explained(plan),
 	}
 	if req.Strategy == "alpha" {
 		resp.Alpha = alpha
@@ -513,44 +526,54 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 	return results, nil
 }
 
-// runVectorSearch executes the vector portion of hybrid search.
+// runVectorSearch executes the vector portion of hybrid search, for callers
+// that report no plan (automation triggers).
 func (s *Server) runVectorSearch(ctx context.Context, req HybridSearchRequest) ([]vector.VectorResult, error) {
+	results, _, err := s.vectorHalf(ctx, req)
+	return results, err
+}
+
+// vectorHalf executes the vector portion of hybrid search and returns its
+// plan (SRCH-013) — nil when the vector half did not run.
+func (s *Server) vectorHalf(ctx context.Context, req HybridSearchRequest) ([]vector.VectorResult, *SearchPlan, error) {
 	if s.Embedding == nil || len(s.VectorSearchers) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	algo := req.VectorAlgorithm
-	if _, ok := s.VectorSearchers[algo]; !ok {
+	if _, ok := s.VectorSearchers[algo]; !ok && algo != AlgorithmAuto {
 		algo = "flat"
 	}
-	searcher, _, err := s.readySearcher(req.Collection, algo)
+	searchTopK := OversampledTopK(req.TopK, s.ResolveOversample(req.Collection, req.Oversample), 20)
+	allowedIDs, filtered := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
+	ps, err := s.planSearch(planRequest{Collection: req.Collection, Algorithm: algo, Filtered: filtered,
+		Allowed: allowedIDs, SearchTopK: searchTopK, LatencyTargetMs: req.LatencyTargetMs})
 	if err != nil {
-		return nil, nil // the full-text half still answers (#346: per collection now)
+		return nil, nil, nil // the full-text half still answers (#346: per collection now)
 	}
 
 	embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	queryVector, err := s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
 	if err != nil {
-		return nil, fmt.Errorf("embedding failed: %w", err)
+		return nil, nil, fmt.Errorf("embedding failed: %w", err)
 	}
-
-	searchTopK := OversampledTopK(req.TopK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 
 	metric := vector.ResolveSimilarity(req.DistanceMetric)
-
-	var results []vector.VectorResult
-	if allowedIDs, active := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter); active {
-		if len(allowedIDs) == 0 {
-			return nil, nil
-		}
-		results = searcher.SearchWithFilter(req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, metric)
-	} else {
-		results = searcher.Search(req.Collection, queryVector, searchTopK, req.Threshold, metric)
+	if filtered && len(allowedIDs) == 0 {
+		return nil, ps.Plan, nil
 	}
+	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
+	return vector.DeduplicateChunkResults(results), ps.Plan, nil
+}
 
-	results = vector.DeduplicateChunkResults(results)
-	return results, nil
+// ranVectorAlgorithm is the vector algorithm a hybrid response reports: the
+// planner's choice for "auto", otherwise what was requested, as before.
+func ranVectorAlgorithm(requested string, plan *SearchPlan) string {
+	if requested == AlgorithmAuto && plan != nil {
+		return plan.Algorithm
+	}
+	return requested
 }
 
 // mergeAlpha combines FTS and vector results using alpha blending.

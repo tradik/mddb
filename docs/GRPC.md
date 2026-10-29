@@ -180,6 +180,26 @@ A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/f
 
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
 
+### New in v2.18.9
+
+The query planner (SRCH-013) is available over gRPC. `VectorSearch` and
+`CrossSearch` take `algorithm: "auto"`; `HybridSearch` takes
+`vector_algorithm: "auto"`. All three requests gained `explain` and
+`latency_target_ms`:
+
+| Field | Number on `VectorSearchRequest` / `HybridSearchRequest` / `CrossSearchRequest` | Meaning |
+|---|---|---|
+| `explain` | 19 / 28 / 20 | Return `plan` with the response |
+| `latency_target_ms` | 20 / 29 / 21 | Latency goal for `auto`, 0–60000 ms |
+
+The responses carry `SearchPlan plan`: field 9 on `VectorSearchResponse`, 10
+on the other two. A plan has `algorithm`, `prefilter`, `candidates`,
+`iterative_scan`, `reasons` and, for cross search, one `SearchPlan` per
+target in `collections`. `RetrievalProfileProto.vector_algorithm` (14) stores
+a collection's default, for example `"auto"`. The table the planner decides by
+is in [SEARCH.md](SEARCH.md#auto-the-server-chooses-v2189). All of this is
+additive.
+
 ### New in v2.18.8
 
 `GetIndexingStatus` reports queued work for a collection, or for the server

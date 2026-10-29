@@ -89,6 +89,9 @@ type RetrievalProfileDef struct {
 	// 0 is a meaningful b (no length normalisation).
 	BM25K1 *float64 `json:"bm25K1,omitempty"`
 	BM25B  *float64 `json:"bm25B,omitempty"`
+	// VectorAlgorithm is the collection's default vector index (SRCH-013):
+	// "auto" lets the query planner choose per query. Empty = flat.
+	VectorAlgorithm string `json:"vectorAlgorithm,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -128,6 +131,9 @@ func (p *RetrievalProfileDef) Validate() error {
 	}
 	if err := ValidateOversample(p.Oversample); err != nil {
 		return fmt.Errorf("invalid retrieval.%w", err)
+	}
+	if !validVectorAlgorithm(p.VectorAlgorithm) {
+		return fmt.Errorf("invalid retrieval.vectorAlgorithm %q: %w", p.VectorAlgorithm, errInvalidVectorAlgorithm)
 	}
 	if err := p.GroupBy.Validate(); err != nil {
 		return fmt.Errorf("invalid retrieval.%w", err)
@@ -271,6 +277,7 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		Format:             p.Format,
 		BM25K1:             p.Bm25K1,
 		BM25B:              p.Bm25B,
+		VectorAlgorithm:    p.VectorAlgorithm,
 	}
 }
 
@@ -302,6 +309,7 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		Format:             p.Format,
 		Bm25K1:             p.BM25K1,
 		Bm25B:              p.BM25B,
+		VectorAlgorithm:    p.VectorAlgorithm,
 	}
 }
 

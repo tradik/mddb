@@ -36,6 +36,7 @@ type CrossSearchRequest struct {
 
 	IndexWait      // readLevel, waitForIndex, waitForKeys (GO-042)
 	PassageOptions // format, passageLines (AGT-002)
+	PlanOptions    // explain, latencyTargetMs (SRCH-013)
 	// SearchType is "vector" (default), "fts" or "hybrid" (AGT-003). Targets may
 	// include "role:reference" for every reference collection.
 	SearchType string `json:"searchType,omitempty"`
@@ -65,6 +66,9 @@ type CrossSearchResponse struct {
 	Stats             *SearchStats            `json:"searchStats,omitempty"`
 	// Indexing reports the wait when the request set waitForIndex (GO-042).
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
+	// Plan is how the vector search ran and why, when the request set explain
+	// (SRCH-013).
+	Plan *SearchPlan `json:"plan,omitempty"`
 }
 
 // handleCrossSearch handles POST /v1/cross-search
@@ -111,6 +115,10 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidatePlanOptions(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	if req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocID == "" {
 		bad(w, errors.New("one of query, queryVector, or sourceDocID is required"))
 		return
@@ -137,14 +145,17 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Select algorithm
-	algo := req.Algorithm
-	if algo == "" {
-		algo = "flat"
-	}
-	searcher, algo, err := s.readySearcher(req.SourceCollection, algo)
+	topK := crossTopK(req.TopK)
+	// Oversample per collection for better merging (SRCH-005). Resolved
+	// against no collection: a cross-collection search has no single profile
+	// that could own the factor, so only the request parameter and the
+	// default apply.
+	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
+
+	// Select algorithm (SRCH-013: "auto" plans each target).
+	searcher, algo, plan, err := s.crossSearcher(req.SourceCollection, req.Algorithm, searchTopK)
 	if err != nil {
-		s.writeVectorUnavailable(w, err, "flat, hnsw, ivf, pq, quantized")
+		s.writeVectorUnavailable(w, err, "auto, flat, hnsw, ivf, pq, quantized")
 		return
 	}
 
@@ -178,22 +189,11 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	topK := req.TopK
-	if topK <= 0 {
-		topK = 10
-	}
-
 	metric := vector.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
 	if metricName == "" {
 		metricName = "cosine"
 	}
-
-	// Oversample per collection for better merging (SRCH-005). Resolved
-	// against no collection: a cross-collection search has no single profile
-	// that could own the factor, so only the request parameter and the
-	// default apply.
-	searchTopK := OversampledTopK(topK, s.ResolveOversample("", req.Oversample), 20)
 
 	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
 	items := s.crossSearchItems(crossSearchParams{
@@ -201,6 +201,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Metric: metric,
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
+		Plan:           plan, LatencyTargetMs: req.LatencyTargetMs,
 	})
 
 	// Track operation
@@ -222,6 +223,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		Algorithm:         algo,
 		DistanceMetric:    metricName,
 		Indexing:          waited,
+		Plan:              req.explained(plan),
 	}
 
 	if searchStatsEnabled() {

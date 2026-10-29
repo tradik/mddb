@@ -38,12 +38,14 @@ func (g *GRPCServer) VectorSearch(ctx context.Context, req *proto.VectorSearchRe
 		WindowSize: int(req.WindowSize), Oversample: req.Oversample, GroupBy: groupByOf(req.GroupBy),
 		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
 		PassageOptions: passageOptions(req.Format, req.PassageLines),
+		PlanOptions:    planOptions(req.Explain, req.LatencyTargetMs),
 	})
 	if err != nil {
 		return nil, searchStatus(err)
 	}
 	resp := &proto.VectorSearchResponse{Total: safeInt32(res.Total), Model: res.Model, Dimensions: safeInt32(res.Dimensions),
-		Algorithm: res.Algorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated}
+		Algorithm: res.Algorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated,
+		Plan: planToProto(res.Plan)}
 	if res.Passages != nil {
 		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
 		return resp, nil
@@ -421,12 +423,14 @@ func (g *GRPCServer) HybridSearch(ctx context.Context, req *proto.HybridSearchRe
 		GroupBy:        groupByOf(req.GroupBy),
 		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
 		PassageOptions: passageOptions(req.Format, req.PassageLines),
+		PlanOptions:    planOptions(req.Explain, req.LatencyTargetMs),
 	})
 	if err != nil {
 		return nil, searchStatus(err)
 	}
 	resp := &proto.HybridSearchResponse{Total: safeInt32(res.Total), Strategy: res.Strategy, FtsAlgorithm: res.FTSAlgorithm,
-		VectorAlgorithm: res.VectorAlgorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated}
+		VectorAlgorithm: res.VectorAlgorithm, Indexing: indexWaitToProto(res.Indexing), ContextTruncated: res.ContextTruncated,
+		Plan: planToProto(res.Plan)}
 	if res.Passages != nil {
 		resp.Passages, resp.Total, resp.Indexing = passagesOf(res.Passages), safeInt32(res.Passages.Total), indexWaitToProto(res.Passages.Indexing)
 		return resp, nil

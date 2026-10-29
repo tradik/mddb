@@ -21,6 +21,30 @@ type crossSearchParams struct {
 	Filter         MetaFilter
 	GroupBy        *GroupBy
 	IncludeContent bool
+	// Plan is the search's plan (SRCH-013). For algorithm "auto" each target
+	// is planned on its own and its plan recorded under Plan.Collections.
+	Plan            *SearchPlan
+	LatencyTargetMs int
+}
+
+// crossSearcher resolves a cross search's searcher and plan (SRCH-013): the
+// named algorithm, checked against the source collection as before, or for
+// "auto" flat as the fallback with each target planned in crossSearchItems.
+func (s *Server) crossSearcher(source, requested string, searchTopK int) (vec.VectorSearcher, string, *SearchPlan, error) {
+	algo := requested
+	if algo == "" || algo == AlgorithmAuto {
+		algo = "flat"
+	}
+	searcher, ran, err := s.readySearcher(source, algo)
+	if err != nil {
+		return nil, ran, nil, err
+	}
+	if requested != AlgorithmAuto {
+		return searcher, ran, explicitPlan(ran, requested, searchTopK), nil
+	}
+	plan := &SearchPlan{Algorithm: AlgorithmAuto, Candidates: searchTopK, Collections: map[string]*SearchPlan{}}
+	plan.reason("auto: each target collection is planned on its own; see collections")
+	return searcher, AlgorithmAuto, plan, nil
 }
 
 type crossCandidate struct {
@@ -33,15 +57,21 @@ type crossCandidate struct {
 func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 	var cands []crossCandidate
 	for _, coll := range p.Targets {
-		var results []vec.VectorResult
-		if allowedIDs, active := s.allowedDocIDs(coll, p.FilterMeta, p.Filter); active {
-			if len(allowedIDs) == 0 {
-				continue
-			}
-			results = p.Searcher.SearchWithFilter(coll, p.QueryVector, p.SearchTopK, p.Threshold, allowedIDs, p.Metric)
-		} else {
-			results = p.Searcher.Search(coll, p.QueryVector, p.SearchTopK, p.Threshold, p.Metric)
+		allowedIDs, active := s.allowedDocIDs(coll, p.FilterMeta, p.Filter)
+		if active && len(allowedIDs) == 0 {
+			continue
 		}
+		ps := plannedSearch{Searcher: p.Searcher}
+		if p.Plan != nil && p.Plan.Algorithm == AlgorithmAuto {
+			// A target the planner cannot serve yet keeps the fallback.
+			if planned, err := s.planSearch(planRequest{Collection: coll, Algorithm: AlgorithmAuto, Filtered: active,
+				Allowed: allowedIDs, SearchTopK: p.SearchTopK, Dimensions: len(p.QueryVector),
+				LatencyTargetMs: p.LatencyTargetMs}); err == nil {
+				ps = planned
+				p.Plan.Collections[coll] = planned.Plan
+			}
+		}
+		results := s.runPlanned(ps, coll, p.QueryVector, p.SearchTopK, p.Threshold, allowedIDs, active, p.Metric)
 		for _, vr := range vec.DeduplicateChunkResults(results) {
 			cands = append(cands, crossCandidate{collection: coll, result: vr})
 		}

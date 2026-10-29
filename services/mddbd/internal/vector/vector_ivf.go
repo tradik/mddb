@@ -199,6 +199,13 @@ func (idx *IVFIndex) Search(collection string, query []float32, topK int, thresh
 // SearchWithFilter implements the VectorSearcher interface.
 // Uses goroutine parallelism when probed clusters contain enough vectors.
 func (idx *IVFIndex) SearchWithFilter(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc) []VectorResult {
+	return idx.SearchWithFilterWiden(collection, query, topK, threshold, allowed, metric, 1)
+}
+
+// SearchWithFilterWiden implements Widener: a filtered search that probes
+// widen times as many clusters as the index's nProbe, for a filter whose
+// matches the nearest clusters do not hold enough of (SRCH-013).
+func (idx *IVFIndex) SearchWithFilterWiden(collection string, query []float32, topK int, threshold float64, allowed map[string]bool, metric SimilarityFunc, widen int) []VectorResult {
 	idx.autoTrain(collection)
 	idx.mu.RLock()
 	defer idx.mu.RUnlock()
@@ -214,7 +221,7 @@ func (idx *IVFIndex) SearchWithFilter(collection string, query []float32, topK i
 		metric = CosineSimilarity
 	}
 
-	probeIndices := nearestNCentroids(query, c.centroids, idx.nProbe)
+	probeIndices := nearestNCentroids(query, c.centroids, idx.nProbe*max(widen, 1))
 
 	filter := func(docID string) bool {
 		return allowed[BaseDocID(docID)]
@@ -249,9 +256,6 @@ func (idx *IVFIndex) searchClusters(c *ivfCollection, query []float32, topK int,
 				local := make([]VectorResult, 0, len(cluster))
 				for docID, vec := range cluster {
 					if filter != nil && !filter(docID) {
-						continue
-					}
-					if len(vec) != len(query) {
 						continue
 					}
 					if len(vec) != len(query) {

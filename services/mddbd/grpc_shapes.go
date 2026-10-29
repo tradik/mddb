@@ -52,6 +52,28 @@ func indexWait(ms int32, keys []string, level string) IndexWait {
 	return IndexWait{WaitForIndex: int(ms), WaitForKeys: keys, ReadLevel: level}
 }
 
+// planOptions converts a request's explain and latency target (SRCH-013).
+func planOptions(explain bool, latencyTargetMs int32) PlanOptions {
+	return PlanOptions{Explain: explain, LatencyTargetMs: int(latencyTargetMs)}
+}
+
+// planToProto converts a search plan for the wire; nil for nil, so a
+// response without explain carries no plan.
+func planToProto(p *SearchPlan) *proto.SearchPlan {
+	if p == nil {
+		return nil
+	}
+	out := &proto.SearchPlan{Algorithm: p.Algorithm, Prefilter: p.Prefilter, Candidates: safeInt32(p.Candidates),
+		IterativeScan: p.IterativeScan, Reasons: p.Reasons}
+	if len(p.Collections) > 0 {
+		out.Collections = make(map[string]*proto.SearchPlan, len(p.Collections))
+		for coll, cp := range p.Collections {
+			out.Collections[coll] = planToProto(cp)
+		}
+	}
+	return out
+}
+
 func indexWaitToProto(w *IndexWaitResult) *proto.IndexWaitResult {
 	if w == nil {
 		return nil

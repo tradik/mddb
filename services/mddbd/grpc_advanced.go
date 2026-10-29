@@ -484,6 +484,7 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 		IncludeContent: req.IncludeContent, GroupBy: groupByOf(req.GroupBy), SearchType: req.SearchType,
 		IndexWait:      indexWait(req.WaitForIndexMs, req.WaitForKeys, req.ReadLevel),
 		PassageOptions: passageOptions(req.Format, req.PassageLines),
+		PlanOptions:    planOptions(req.Explain, req.LatencyTargetMs),
 	})
 	if err != nil {
 		return nil, searchStatus(err)
@@ -494,7 +495,7 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 	}
 	resp := &proto.CrossSearchResponse{Total: safeInt32(res.Total), SourceCollection: res.SourceCollection,
 		SourceDocId: res.SourceDocID, TargetCollections: res.TargetCollections, Algorithm: res.Algorithm,
-		DistanceMetric: res.DistanceMetric, Indexing: indexWaitToProto(res.Indexing)}
+		DistanceMetric: res.DistanceMetric, Indexing: indexWaitToProto(res.Indexing), Plan: planToProto(res.Plan)}
 	for _, it := range res.Results {
 		d := it.Document
 		resp.Results = append(resp.Results, &proto.CrossSearchResultItem{Collection: it.Collection, Document: docToProto(&d),

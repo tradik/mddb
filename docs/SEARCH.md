@@ -831,6 +831,63 @@ Need guaranteed exact results?
   → Always use Flat regardless of size
 ```
 
+### `auto`: the server chooses (v2.18.9+)
+
+You don't have to pick an index. Send `"algorithm": "auto"` (hybrid search:
+`"vectorAlgorithm": "auto"`) and the query planner decides for each query.
+It looks at the collection size, the indexes already built, how much of the
+collection the filter admits, and the request:
+
+| Input | Decision |
+|-------|----------|
+| Fewer than 10,000 vectors | `flat` |
+| 10,000 to 1,000,000 vectors | `hnsw` |
+| More than 1,000,000 vectors | `ivf` |
+| Vectors over 256 MB / 1 GB at float32 | `sq` / `sq4`, then `bq`, if built |
+| A filter that admits under 5% of the collection | `flat` over the admitted documents only (`prefilter: true`) |
+| Collection configured for quantization or disk-only vectors | its `quantized` index |
+| `latencyTargetMs` of 10 or less on 10,000+ vectors | `bq`, `sq4` or `sq`, if built |
+
+- **Nothing is built on the query path.** IVF, PQ, OPQ, SQ and SQ4 must be
+  trained first. If the index the table names is not trained yet, the planner
+  takes the best index that is, and finally `flat`. The reason says so.
+- **A filtered index search does not quietly come back short.** An index
+  searches first and filters after, so a filter can leave 3 results for
+  `topK: 10`. When that happens under `auto`, the planner scans further. IVF
+  probes more clusters; other indexes are asked for more candidates. It stops
+  at 8× the default. The plan then shows `iterativeScan: true`.
+- **No `algorithm` means `flat`, exactly as before.** `auto` is opt-in, on
+  the request or in the collection profile (`retrieval.vectorAlgorithm:
+  "auto"`). The request wins over the profile.
+- **One table.** The search advisor (`GET /v1/search-advisor`) decides from
+  the same thresholds. It recommends `vectorAlgorithm: "auto"` in the profile
+  when the collection has more than one index built.
+
+Add `"explain": true` to see the plan:
+
+```bash
+curl -X POST http://localhost:11023/v1/vector-search \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "kb", "query": "rotate the signing key", "algorithm": "auto",
+       "filterMeta": {"team": ["security"]}, "explain": true}'
+```
+
+```json
+"plan": {
+  "algorithm": "flat",
+  "prefilter": true,
+  "candidates": 15,
+  "reasons": [
+    "flat with a prefilter: the filter admits 312 documents of 48210 vectors (0.6%, under 5%), so scanning exactly what it admits beats an index search whose hits it would mostly discard"
+  ]
+}
+```
+
+`candidates` is `topK × oversample`. Cross-collection search plans each
+target on its own: the response has `"algorithm": "auto"` and one plan per
+target under `plan.collections`. Without `explain` the response has no
+`plan`. Agents should send `auto` rather than guess an index.
+
 ### API Examples
 
 ```bash

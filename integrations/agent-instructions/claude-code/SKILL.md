@@ -39,6 +39,11 @@ Do you know words that appear in the text?
   narrow a set, not to find text.
 - **`aggregate`** — counts and groupings. Never fetch documents to count them.
 
+Do not guess a vector index. Pass `algorithm: "auto"` to `semantic_search` and
+`cross_search`, or `vector_algorithm: "auto"` to `hybrid_search`. The server
+then picks one per query, from the collection size, the indexes already built
+and how much your filter admits. Add `explain: true` once to see why.
+
 When a search keeps missing what it should find, measure instead of guessing.
 Record the question and the document that answers it with `add_eval_query`,
 then compare configurations with `run_eval`.

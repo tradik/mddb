@@ -81,6 +81,10 @@ type CollectionProfile struct {
 	// EstimatedVectorBytes is what the vectors occupy at float32 — the number
 	// that decides whether a quantized index is worth the recall it costs.
 	EstimatedVectorBytes int64 `json:"estimatedVectorBytes,omitempty"`
+	// BuiltIndexes names the vector indexes that can answer for the
+	// collection now, without building (SRCH-013). More than one is what
+	// makes algorithm "auto" worth having.
+	BuiltIndexes []string `json:"builtIndexes,omitempty"`
 
 	// Sampled reports how many documents were actually read. A recommendation
 	// from a sample should say so.
@@ -126,6 +130,10 @@ type SearchRecommendation struct {
 	// Measured is the evaluation-set run behind the choice, when the
 	// collection has a set (SRCH-019).
 	Measured *EvalResult `json:"measured,omitempty"`
+
+	// autoVector: the profile should leave the index to the query planner
+	// (SRCH-013).
+	autoVector bool
 }
 
 // advisorSampleLimit is how many documents the profile reads.
@@ -264,6 +272,10 @@ func (s *Server) profileVectors(collection string, p *CollectionProfile) {
 	if p.VectorDimensions > 0 {
 		p.EstimatedVectorBytes = int64(p.EmbeddedDocuments) * int64(p.VectorDimensions) * 4
 	}
+	for name := range s.planInput(planRequest{Collection: collection}).Built {
+		p.BuiltIndexes = append(p.BuiltIndexes, name)
+	}
+	sort.Strings(p.BuiltIndexes)
 }
 
 // buildRecommendation turns measurements into advice.
@@ -333,30 +345,18 @@ func buildRecommendation(p *CollectionProfile, embeddingConfigured bool) *Search
 	}
 
 	// --- vector index ---
+	// The thresholds are the query planner's (SRCH-013), so the advice and
+	// what algorithm "auto" picks cannot disagree.
 
 	if embedded && r.SearchType != "fts" {
-		const gib = 1 << 30
-		switch {
-		case p.EstimatedVectorBytes > gib:
-			r.VectorAlgorithm = "sq4"
+		algo, why := vectorTier(p.EmbeddedDocuments, p.EstimatedVectorBytes)
+		r.VectorAlgorithm = algo
+		r.Reasons = append(r.Reasons, fmt.Sprintf("%s for the vector index: %s.", algo, why))
+		if len(p.BuiltIndexes) > 1 {
+			r.autoVector = true
 			r.Reasons = append(r.Reasons, fmt.Sprintf(
-				"sq4 for the vector index: %.1f GB of float32 vectors will not sit in RAM comfortably, and sq4 holds 99.5%% of int8's recall at half its size.",
-				float64(p.EstimatedVectorBytes)/gib))
-		case p.EstimatedVectorBytes > 256<<20:
-			r.VectorAlgorithm = "sq"
-			r.Reasons = append(r.Reasons, fmt.Sprintf(
-				"sq for the vector index: %.0f MB of vectors is enough to be worth quantizing, and int8 is effectively lossless.",
-				float64(p.EstimatedVectorBytes)/(1<<20)))
-		case p.EmbeddedDocuments > 50000:
-			r.VectorAlgorithm = "hnsw"
-			r.Reasons = append(r.Reasons, fmt.Sprintf(
-				"hnsw for the vector index: at %d vectors an exact scan starts costing more than the recall it buys.",
-				p.EmbeddedDocuments))
-		default:
-			r.VectorAlgorithm = "flat"
-			r.Reasons = append(r.Reasons, fmt.Sprintf(
-				"flat for the vector index: %d vectors is small enough that exact search is both fastest and most accurate.",
-				p.EmbeddedDocuments))
+				"vectorAlgorithm auto in the profile: %d indexes are built for this collection (%s), so the query planner can choose per query — the index above for a plain query, an exact scan for a selective filter.",
+				len(p.BuiltIndexes), strings.Join(p.BuiltIndexes, ", ")))
 		}
 	}
 
@@ -438,6 +438,9 @@ func (r *SearchRecommendation) toProfile() *RetrievalProfileDef {
 		p.HybridStrategy = r.HybridStrategy
 		p.HybridAlpha = r.HybridAlpha
 		p.HybridAlphaSet = true
+	}
+	if r.autoVector {
+		p.VectorAlgorithm = AlgorithmAuto
 	}
 	return p
 }
