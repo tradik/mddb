@@ -339,18 +339,15 @@ func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]inte
 		return "", fmt.Errorf("unsupported format: %s (supported: md, txt, html, pdf, docx, odt, rtf, yaml, log, lex, tex)", format)
 	}
 
-	// Extract frontmatter for md/txt
+	// Extract frontmatter for md/txt. meta is never nil (mcpGetMetaMap always
+	// returns a map); explicitly passed keys win over frontmatter.
 	if !converted {
 		fmMeta, body := parseFrontmatter(contentMD)
 		if fmMeta != nil {
 			contentMD = body
-			if meta == nil {
-				meta = fmMeta
-			} else {
-				for k, v := range fmMeta {
-					if _, exists := meta[k]; !exists {
-						meta[k] = v
-					}
+			for k, v := range fmMeta {
+				if _, exists := meta[k]; !exists {
+					meta[k] = v
 				}
 			}
 		}
@@ -365,9 +362,6 @@ func (s *MCPToolServer) toolUploadFile(ctx context.Context, args map[string]inte
 	}
 
 	// Add upload metadata
-	if meta == nil {
-		meta = make(map[string][]string)
-	}
 	meta["upload_format"] = []string{format}
 	meta["upload_filename"] = []string{filename}
 	if converted {

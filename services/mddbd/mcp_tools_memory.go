@@ -305,8 +305,14 @@ func (s *MCPToolServer) toolMemorySummarize(ctx context.Context, args map[string
 		return "", fmt.Errorf("no messages found for session %s", sessionID)
 	}
 
-	// Build summary
-	summary := fmt.Sprintf("# Session Summary: %s\n\nMessages: %d\n\n## Conversation\n\n", sessionID[:8], resp.Total)
+	// Build summary. The heading shows at most the first eight characters of
+	// the id; slicing [:8] unconditionally panicked on a shorter, caller-chosen
+	// session_id.
+	shortID := sessionID
+	if len(shortID) > 8 {
+		shortID = shortID[:8]
+	}
+	summary := fmt.Sprintf("# Session Summary: %s\n\nMessages: %d\n\n## Conversation\n\n", shortID, resp.Total)
 	for _, msg := range resp.Documents {
 		role := metaFirst(msg.Meta, "role")
 		content := msg.ContentMD
