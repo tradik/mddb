@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -308,7 +309,11 @@ func TestCovJProcessUploadedFileOpenAndReadErrors(t *testing.T) {
 		t.Errorf("open: %v", err)
 	}
 
-	// A temp file replaced by a directory opens but cannot be read.
+	// A temp file replaced by a directory opens but cannot be read. The
+	// multipart spool follows TMPDIR, which Go on Windows does not read.
+	if runtime.GOOS == "windows" {
+		return
+	}
 	tmp := t.TempDir()
 	t.Setenv("TMPDIR", tmp)
 	fh := covJFileHeader(t, "b.md", []byte("on disk"), 1)

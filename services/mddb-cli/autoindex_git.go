@@ -28,10 +28,17 @@ type gitInfo struct {
 
 // runGit runs git in dir and returns its standard output.
 func runGit(dir string, args ...string) ([]byte, error) {
+	// git is resolved to an absolute path first: LookPath refuses one found
+	// through a relative PATH entry, so a git planted in the working
+	// directory is never run (Sonar go:S4036).
+	git, err := exec.LookPath("git")
+	if err != nil {
+		return nil, err
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), gitTimeout)
 	defer cancel()
 	// #nosec G204 -- fixed git subcommands; dir is the directory the user asked to index
-	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", dir}, args...)...)
+	cmd := exec.CommandContext(ctx, git, append([]string{"-C", dir}, args...)...)
 	return cmd.Output()
 }
 

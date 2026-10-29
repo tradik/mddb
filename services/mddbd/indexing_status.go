@@ -238,7 +238,8 @@ func (s *Server) pendingMatches(collection, query string, filterMeta map[string]
 		Collection: collection, Query: query, TopK: limit,
 		FilterMeta: filterMeta, Filter: filter, onlyIDs: only,
 	})
-	ids := make([]string, 0, min(len(results), limit))
+	// Sized by what was found, never by the caller's limit (CodeQL).
+	ids := make([]string, 0, len(results))
 	for _, r := range results {
 		if len(ids) == limit {
 			break

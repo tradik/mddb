@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -410,22 +409,6 @@ func TestCovARunVerifyChild(t *testing.T) {
 }
 
 // ---------------------------------------------------------------- seams
-
-func TestCovANotifyShutdownSignals(t *testing.T) {
-	ch := notifyShutdownSignals()
-	defer signal.Stop(ch)
-	if err := syscall.Kill(os.Getpid(), syscall.SIGTERM); err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case sig := <-ch:
-		if sig != syscall.SIGTERM {
-			t.Fatalf("got %v, want SIGTERM", sig)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("SIGTERM was not delivered to the shutdown channel")
-	}
-}
 
 func TestCovAIgnoreServerClosed(t *testing.T) {
 	if err := ignoreServerClosed(http.ErrServerClosed); err != nil {

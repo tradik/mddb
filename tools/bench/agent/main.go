@@ -68,7 +68,7 @@ func tokens(n int) int { return (n + 3) / 4 }
 // of a git checkout, else every file outside VCS and dependency directories.
 // Large and binary files are skipped when read.
 func textFiles(root string) ([]string, error) {
-	if out, err := exec.Command("git", "-C", root, "ls-files").Output(); err == nil && len(out) > 0 { //nolint:gosec // G204: fixed command, root is the user's
+	if out, err := exec.Command("git", "-C", root, "ls-files").Output(); err == nil && len(out) > 0 { // #nosec G204 -- fixed command and arguments; root is the tree the user pointed at
 		return strings.Split(strings.TrimSpace(string(out)), "\n"), nil
 	}
 	var out []string
@@ -95,7 +95,7 @@ func textFiles(root string) ([]string, error) {
 }
 
 func readText(root, rel string) ([]byte, bool) {
-	b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))) //nolint:gosec // G304: the benchmark reads the tree it was pointed at
+	b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel))) // #nosec G304 -- the benchmark reads the tree it was pointed at
 	if err != nil || bytes.IndexByte(b[:min(len(b), 8000)], 0) >= 0 {
 		return nil, false
 	}
@@ -190,7 +190,7 @@ func mddbPath(client *http.Client, url, collection, search string, topK int, t t
 }
 
 func loadTasks(path string) ([]task, error) {
-	b, err := os.ReadFile(path) //nolint:gosec // G304: the user names the file
+	b, err := os.ReadFile(path) // #nosec G304 -- the user names the file
 	if err != nil {
 		return nil, err
 	}

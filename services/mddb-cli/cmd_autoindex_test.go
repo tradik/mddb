@@ -351,3 +351,14 @@ func TestAutoindex_KeepsExistingIncludePaths(t *testing.T) {
 		t.Fatal("include paths the operator set must be kept")
 	}
 }
+
+// Without git on PATH there is no repository to describe, and no error.
+func TestAutoindex_NoGitOnPath(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	if _, err := runGit(t.TempDir(), "status"); err == nil {
+		t.Fatal("git found on an empty PATH")
+	}
+	if detectGit(t.TempDir()) != nil {
+		t.Fatal("no git, no repository")
+	}
+}

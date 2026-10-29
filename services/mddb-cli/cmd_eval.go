@@ -134,7 +134,7 @@ func parseEvalConfigs(specs []string) ([]map[string]any, error) {
 
 // readEvalQueries accepts a bare array or an object with "queries".
 func readEvalQueries(path string) ([]any, error) {
-	data, err := os.ReadFile(path) //nolint:gosec // G304: the user names the file
+	data, err := os.ReadFile(path) // #nosec G304 -- the user names the file
 	if err != nil {
 		return nil, err
 	}

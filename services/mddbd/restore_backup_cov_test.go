@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -16,6 +17,9 @@ func covKSkipAsRoot(t *testing.T) {
 	t.Helper()
 	if os.Geteuid() == 0 {
 		t.Skip("file permissions do not stop root")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("mode 0 does not stop opening a file on Windows")
 	}
 }
 
