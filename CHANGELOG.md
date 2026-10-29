@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A float32 vector record whose model name is 2 bytes long was read as
+  quantized (#361).** Such a record starts with the byte `2`, the same as
+  the quantized format's version byte. `Get`, index loading and chunk reuse
+  then failed on it with "truncated record" or skipped it. A record is now
+  read as quantized only if it does not decode as a float32 record.
+
 - **A document key finds its document under any spelling (DOC-017).** The
   identifier has always been case-insensitive, but the key index stored the
   key as written. So `README.md` was not found as `readme.md`, and writing
@@ -47,6 +53,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The server chooses the vector index: `algorithm: "auto"` (SRCH-013).**
+  - **Where.** `algorithm` on `/v1/vector-search` and `/v1/cross-search`,
+    `vectorAlgorithm` on `/v1/hybrid-search`, the same on the MCP tools and
+    gRPC, and `retrieval.vectorAlgorithm` in the collection profile.
+  - **What the planner looks at.** A query planner picks the index per
+    query. It goes by:
+    - collection size: flat under 10k vectors, hnsw up to 1M, ivf above;
+    - the memory the vectors take (sq/sq4);
+    - a quantized or disk-only configuration;
+    - the indexes already built;
+    - the filter: one that admits under 5% of documents is answered by an
+      exact scan of what it admits.
+  - **Never on the query path.** It never builds an index while answering a
+    query. When a filtered index search comes back short, the scan widens,
+    up to 8× its default.
+  - **Explain.** `explain: true` returns the plan and its reasons.
+    `latencyTargetMs` is an optional latency goal.
+  - **Advisor.** The search advisor now uses the same thresholds and
+    recommends `auto` when several indexes are built.
+  - **Default unchanged.** Without `algorithm`, search is flat exactly as
+    before.
+- **Relevance feedback (SRCH-015).** Vector, hybrid and cross search, the
+  `semantic_search`, `hybrid_search` and `cross_search` tools, and gRPC take
+  `positive` and `negative` examples, as document keys or vectors.
+  - **Modes.** `feedbackMode: "query"` (the default) moves the query vector
+    with Rocchio (1 / 0.75 / 0.25, overridable with `rocchio`). `"rescore"`
+    re-ranks the candidates by similarity to the examples, weighted by
+    `feedbackWeight`. Hybrid search corrects only its vector half.
+  - **Explain.** With `explain`, `plan.feedback` shows the correction.
+  - **Results.** On the synthetic benchmark in docs/BENCHMARK.md, one round
+    raises recall@10 from about 0.31 to about 0.49. That corpus is built so
+    feedback helps; a real model gains less.
+  - **Default unchanged.** Without examples, search is as before.
 - **Per-collection quotas, disk reserve and embedding budget (GO-043).** A
   collection's config can carry `quota: {maxDocuments, maxBytes,
   maxVectors, embeddingCallsPerDay, embeddingTokensPerDay}`.
