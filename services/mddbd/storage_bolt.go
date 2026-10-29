@@ -24,15 +24,15 @@ import (
 // storage format.
 type BoltBackend struct {
 	db      *bolt.DB
-	router  boltx.Router // #336: which file holds a collection; nil means db
+	router  boltx.RouterSlot // #336: which file holds a collection; nil means db
 	buckets BucketNames
 }
 
 // SetRouter makes it read and write each collection in the file the router
 // names (#336). Without one, everything goes to the db it was built on.
-func (b *BoltBackend) SetRouter(r boltx.Router) { b.router = r }
+func (b *BoltBackend) SetRouter(r boltx.Router) { b.router.Set(r) }
 
-func (b *BoltBackend) rt() boltx.Router { return boltx.Or(b.router, b.db) }
+func (b *BoltBackend) rt() boltx.Router { return b.router.Get(b.db) }
 
 // NewBoltBackend wraps an open database as the default storage backend.
 func NewBoltBackend(db *bolt.DB, buckets BucketNames) *BoltBackend {

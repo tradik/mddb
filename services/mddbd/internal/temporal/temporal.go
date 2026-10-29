@@ -51,7 +51,7 @@ type temporalJob struct {
 // TemporalManager tracks document lifecycle events and hot-doc leaderboards.
 type TemporalManager struct {
 	db     *bolt.DB
-	router boltx.Router // #336: which file holds a collection; nil means db
+	router boltx.RouterSlot // #336: which file holds a collection; nil means db
 	ch     chan temporalJob
 	done   chan struct{}
 	once   sync.Once
@@ -61,9 +61,9 @@ type TemporalManager struct {
 
 // SetRouter makes it read and write each collection in the file the router
 // names (#336). Without one, everything goes to the db it was built on.
-func (tm *TemporalManager) SetRouter(r boltx.Router) { tm.router = r }
+func (tm *TemporalManager) SetRouter(r boltx.Router) { tm.router.Set(r) }
 
-func (tm *TemporalManager) rt() boltx.Router { return boltx.Or(tm.router, tm.db) }
+func (tm *TemporalManager) rt() boltx.Router { return tm.router.Get(tm.db) }
 
 // NewTemporalManager creates a TemporalManager backed by the given BoltDB.
 func NewTemporalManager(db *bolt.DB) *TemporalManager {

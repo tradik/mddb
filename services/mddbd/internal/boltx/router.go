@@ -1,6 +1,10 @@
 package boltx
 
-import bolt "go.etcd.io/bbolt"
+import (
+	"sync/atomic"
+
+	bolt "go.etcd.io/bbolt"
+)
 
 // Router says which bbolt file holds a collection's data (#336). With one
 // file per collection, the components that store collection data — full-text
@@ -63,6 +67,24 @@ func Or(r Router, db *bolt.DB) Router {
 		return r
 	}
 	return Single{DB: db}
+}
+
+// RouterSlot holds a component's router so it can be set while the
+// component is in use (#359): after a restore the server wires its routers
+// again as it reopens the collection files, while the vector index reload
+// and request handlers already read them. The zero value holds no router.
+type RouterSlot struct{ p atomic.Pointer[Router] }
+
+// Set stores r; nil goes back to the component's own file.
+func (s *RouterSlot) Set(r Router) { s.p.Store(&r) }
+
+// Get is the stored router, or a Single on db when there is none (see Or).
+func (s *RouterSlot) Get(db *bolt.DB) Router {
+	var r Router
+	if p := s.p.Load(); p != nil {
+		r = *p
+	}
+	return Or(r, db)
 }
 
 // ViewOneOrAll is View for a named collection and ViewAll for "", the

@@ -29,7 +29,7 @@ var (
 // FTSIndex provides full-text search using an inverted index in BoltDB.
 type FTSIndex struct {
 	db              *bolt.DB
-	router          boltx.Router // #336: which file holds a collection; nil means db
+	router          *boltx.RouterSlot // #336: which file holds a collection; shared with every QueryView
 	stopWords       map[string]bool
 	binlog          *binlog.Binlog
 	stemmer         Stemmer
@@ -109,20 +109,16 @@ type fieldTermEntry struct {
 func NewFTSIndex(db *bolt.DB) *FTSIndex {
 	return &FTSIndex{
 		db:        db,
+		router:    new(boltx.RouterSlot),
 		stopWords: defaultStopWords,
 	}
 }
 
 // SetRouter makes the index read and write each collection in the file the
 // router names (#336). Without one, everything goes to the db it was built on.
-func (f *FTSIndex) SetRouter(r boltx.Router) { f.router = r }
+func (f *FTSIndex) SetRouter(r boltx.Router) { f.router.Set(r) }
 
-func (f *FTSIndex) rt() boltx.Router {
-	if f.router != nil {
-		return f.router
-	}
-	return boltx.Single{DB: f.db}
-}
+func (f *FTSIndex) rt() boltx.Router { return f.router.Get(f.db) }
 
 // view and update run a transaction on the file holding collection.
 func (f *FTSIndex) view(collection string, fn func(*bolt.Tx) error) error {

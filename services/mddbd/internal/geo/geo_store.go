@@ -21,15 +21,15 @@ var geoBucketName = []byte("geo")
 // in-memory R-tree from BoltDB at startup. Mirrors VectorStore.
 type GeoStore struct {
 	db     *bolt.DB
-	router boltx.Router // #336: which file holds a collection; nil means db
+	router boltx.RouterSlot // #336: which file holds a collection; nil means db
 	binlog *binlog.Binlog
 }
 
 // SetRouter makes it read and write each collection in the file the router
 // names (#336). Without one, everything goes to the db it was built on.
-func (gs *GeoStore) SetRouter(r boltx.Router) { gs.router = r }
+func (gs *GeoStore) SetRouter(r boltx.Router) { gs.router.Set(r) }
 
-func (gs *GeoStore) rt() boltx.Router { return boltx.Or(gs.router, gs.db) }
+func (gs *GeoStore) rt() boltx.Router { return gs.router.Get(gs.db) }
 
 // NewGeoStore creates a new geo store backed by BoltDB.
 func NewGeoStore(db *bolt.DB) *GeoStore {

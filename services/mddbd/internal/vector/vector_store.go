@@ -44,7 +44,7 @@ type EmbeddingRecord struct {
 // VectorStore handles persistence of embedding vectors in BoltDB.
 type VectorStore struct {
 	db         *bolt.DB
-	router     boltx.Router // #336: which file holds a collection; nil means db
+	router     boltx.RouterSlot // #336: which file holds a collection; nil means db
 	bucketName []byte
 	binlog     *binlog.Binlog
 
@@ -56,9 +56,9 @@ type VectorStore struct {
 
 // SetRouter makes it read and write each collection in the file the router
 // names (#336). Without one, everything goes to the db it was built on.
-func (vs *VectorStore) SetRouter(r boltx.Router) { vs.router = r }
+func (vs *VectorStore) SetRouter(r boltx.Router) { vs.router.Set(r) }
 
-func (vs *VectorStore) rt() boltx.Router { return boltx.Or(vs.router, vs.db) }
+func (vs *VectorStore) rt() boltx.Router { return vs.router.Get(vs.db) }
 
 // NewVectorStore creates a new vector store backed by BoltDB.
 func NewVectorStore(db *bolt.DB) *VectorStore {

@@ -34,7 +34,7 @@ type Reaper interface {
 // TTLManager handles document time-to-live expiry.
 type TTLManager struct {
 	db     *bolt.DB
-	router boltx.Router // #336: which file holds a collection; nil means db
+	router boltx.RouterSlot // #336: which file holds a collection; nil means db
 	reaper Reaper
 	stopCh chan struct{}
 	binlog *binlog.Binlog
@@ -42,9 +42,9 @@ type TTLManager struct {
 
 // SetRouter makes it read and write each collection in the file the router
 // names (#336). Without one, everything goes to the db it was built on.
-func (t *TTLManager) SetRouter(r boltx.Router) { t.router = r }
+func (t *TTLManager) SetRouter(r boltx.Router) { t.router.Set(r) }
 
-func (t *TTLManager) rt() boltx.Router { return boltx.Or(t.router, t.db) }
+func (t *TTLManager) rt() boltx.Router { return t.router.Get(t.db) }
 
 // SetBinlog sets the binlog for replication logging.
 func (t *TTLManager) SetBinlog(bl *binlog.Binlog) {
