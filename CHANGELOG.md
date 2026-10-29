@@ -202,6 +202,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `AddSynonym` with a blank term, `AddStopwords` with only blank words, and
     `Classify` with more than 100 labels. They now return
     `INVALID_ARGUMENT`.
+  - **A boolean query starting with `NOT` lost its operators.** The clauses
+    after it were joined with the wrong operator, so `NOT java python OR
+    ruby` behaved like an AND.
   - **gRPC `Search` returned expired documents.** REST, MCP and gRPC now run
     one metadata search. REST and MCP each had their own copy before.
   - **Panel API client:** passing your own headers dropped `Content-Type`.
