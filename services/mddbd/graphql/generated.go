@@ -85,6 +85,18 @@ type ComplexityRoot struct {
 		Language func(childComplexity int) int
 	}
 
+	CodeSymbol struct {
+		Callees     func(childComplexity int) int
+		Callers     func(childComplexity int) int
+		Collection  func(childComplexity int) int
+		Definitions func(childComplexity int) int
+		References  func(childComplexity int) int
+		Siblings    func(childComplexity int) int
+		Symbol      func(childComplexity int) int
+		Tests       func(childComplexity int) int
+		Truncated   func(childComplexity int) int
+	}
+
 	CollectionStats struct {
 		DocumentCount  func(childComplexity int) int
 		MetaIndexCount func(childComplexity int) int
@@ -194,8 +206,28 @@ type ComplexityRoot struct {
 		StartCursor     func(childComplexity int) int
 	}
 
+	Passage struct {
+		Collection func(childComplexity int) int
+		Content    func(childComplexity int) int
+		Key        func(childComplexity int) int
+		Kind       func(childComplexity int) int
+		Lang       func(childComplexity int) int
+		Lines      func(childComplexity int) int
+		Path       func(childComplexity int) int
+		Score      func(childComplexity int) int
+		Source     func(childComplexity int) int
+		Symbol     func(childComplexity int) int
+		Tokens     func(childComplexity int) int
+	}
+
+	PassageLines struct {
+		End   func(childComplexity int) int
+		Start func(childComplexity int) int
+	}
+
 	Query struct {
 		CodeGraph        func(childComplexity int, input CodeGraphInput) int
+		CodeSymbol       func(childComplexity int, input CodeSymbolInput) int
 		Document         func(childComplexity int, collection string, key string, lang string, env map[string]any) int
 		Fts              func(childComplexity int, input FTSInput) int
 		GroupPermissions func(childComplexity int, groupName string) int
@@ -324,6 +356,7 @@ type QueryResolver interface {
 	IndexingStatus(ctx context.Context, collection *string) (*IndexingStatus, error)
 	Fts(ctx context.Context, input FTSInput) (*FTSResponse, error)
 	CodeGraph(ctx context.Context, input CodeGraphInput) (*CodeGraph, error)
+	CodeSymbol(ctx context.Context, input CodeSymbolInput) (*CodeSymbol, error)
 	Stats(ctx context.Context) (*Stats, error)
 	Webhooks(ctx context.Context, collection *string) ([]*Webhook, error)
 	Schema(ctx context.Context, collection string) (*Schema, error)
@@ -532,6 +565,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CodeGraphNode.Language(childComplexity), true
+
+	case "CodeSymbol.callees":
+		if e.ComplexityRoot.CodeSymbol.Callees == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Callees(childComplexity), true
+	case "CodeSymbol.callers":
+		if e.ComplexityRoot.CodeSymbol.Callers == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Callers(childComplexity), true
+	case "CodeSymbol.collection":
+		if e.ComplexityRoot.CodeSymbol.Collection == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Collection(childComplexity), true
+	case "CodeSymbol.definitions":
+		if e.ComplexityRoot.CodeSymbol.Definitions == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Definitions(childComplexity), true
+	case "CodeSymbol.references":
+		if e.ComplexityRoot.CodeSymbol.References == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.References(childComplexity), true
+	case "CodeSymbol.siblings":
+		if e.ComplexityRoot.CodeSymbol.Siblings == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Siblings(childComplexity), true
+	case "CodeSymbol.symbol":
+		if e.ComplexityRoot.CodeSymbol.Symbol == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Symbol(childComplexity), true
+	case "CodeSymbol.tests":
+		if e.ComplexityRoot.CodeSymbol.Tests == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Tests(childComplexity), true
+	case "CodeSymbol.truncated":
+		if e.ComplexityRoot.CodeSymbol.Truncated == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Truncated(childComplexity), true
 
 	case "CollectionStats.documentCount":
 		if e.ComplexityRoot.CollectionStats.DocumentCount == nil {
@@ -1093,6 +1181,86 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.PageInfo.StartCursor(childComplexity), true
 
+	case "Passage.collection":
+		if e.ComplexityRoot.Passage.Collection == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Collection(childComplexity), true
+	case "Passage.content":
+		if e.ComplexityRoot.Passage.Content == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Content(childComplexity), true
+	case "Passage.key":
+		if e.ComplexityRoot.Passage.Key == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Key(childComplexity), true
+	case "Passage.kind":
+		if e.ComplexityRoot.Passage.Kind == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Kind(childComplexity), true
+	case "Passage.lang":
+		if e.ComplexityRoot.Passage.Lang == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Lang(childComplexity), true
+	case "Passage.lines":
+		if e.ComplexityRoot.Passage.Lines == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Lines(childComplexity), true
+	case "Passage.path":
+		if e.ComplexityRoot.Passage.Path == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Path(childComplexity), true
+	case "Passage.score":
+		if e.ComplexityRoot.Passage.Score == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Score(childComplexity), true
+	case "Passage.source":
+		if e.ComplexityRoot.Passage.Source == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Source(childComplexity), true
+	case "Passage.symbol":
+		if e.ComplexityRoot.Passage.Symbol == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Symbol(childComplexity), true
+	case "Passage.tokens":
+		if e.ComplexityRoot.Passage.Tokens == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Tokens(childComplexity), true
+
+	case "PassageLines.end":
+		if e.ComplexityRoot.PassageLines.End == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageLines.End(childComplexity), true
+	case "PassageLines.start":
+		if e.ComplexityRoot.PassageLines.Start == nil {
+			break
+		}
+
+		return e.ComplexityRoot.PassageLines.Start(childComplexity), true
+
 	case "Query.codeGraph":
 		if e.ComplexityRoot.Query.CodeGraph == nil {
 			break
@@ -1104,6 +1272,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.CodeGraph(childComplexity, args["input"].(CodeGraphInput)), true
+	case "Query.codeSymbol":
+		if e.ComplexityRoot.Query.CodeSymbol == nil {
+			break
+		}
+
+		args, err := ec.field_Query_codeSymbol_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Query.CodeSymbol(childComplexity, args["input"].(CodeSymbolInput)), true
 	case "Query.document":
 		if e.ComplexityRoot.Query.Document == nil {
 			break
@@ -1527,6 +1706,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			graphql.NewInputUnmarshaler("AddBatchDocumentInput", ec.unmarshalInputAddBatchDocumentInput),
 			graphql.NewInputUnmarshaler("AddDocumentInput", ec.unmarshalInputAddDocumentInput),
 			graphql.NewInputUnmarshaler("CodeGraphInput", ec.unmarshalInputCodeGraphInput),
+			graphql.NewInputUnmarshaler("CodeSymbolInput", ec.unmarshalInputCodeSymbolInput),
 			graphql.NewInputUnmarshaler("CreateAPIKeyInput", ec.unmarshalInputCreateAPIKeyInput),
 			graphql.NewInputUnmarshaler("CreateGroupInput", ec.unmarshalInputCreateGroupInput),
 			graphql.NewInputUnmarshaler("FTSInput", ec.unmarshalInputFTSInput),
@@ -1730,6 +1910,30 @@ func (ec *executionContext) childFields_CodeGraphNode(ctx context.Context, field
 	return nil, fmt.Errorf("no field named %q was found under type CodeGraphNode", field.Name)
 }
 
+func (ec *executionContext) childFields_CodeSymbol(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "collection":
+		return ec.fieldContext_CodeSymbol_collection(ctx, field)
+	case "symbol":
+		return ec.fieldContext_CodeSymbol_symbol(ctx, field)
+	case "definitions":
+		return ec.fieldContext_CodeSymbol_definitions(ctx, field)
+	case "references":
+		return ec.fieldContext_CodeSymbol_references(ctx, field)
+	case "callers":
+		return ec.fieldContext_CodeSymbol_callers(ctx, field)
+	case "callees":
+		return ec.fieldContext_CodeSymbol_callees(ctx, field)
+	case "tests":
+		return ec.fieldContext_CodeSymbol_tests(ctx, field)
+	case "siblings":
+		return ec.fieldContext_CodeSymbol_siblings(ctx, field)
+	case "truncated":
+		return ec.fieldContext_CodeSymbol_truncated(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type CodeSymbol", field.Name)
+}
+
 func (ec *executionContext) childFields_CollectionStats(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "name":
@@ -1896,6 +2100,44 @@ func (ec *executionContext) childFields_PageInfo(ctx context.Context, field grap
 		return ec.fieldContext_PageInfo_endCursor(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type PageInfo", field.Name)
+}
+
+func (ec *executionContext) childFields_Passage(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "collection":
+		return ec.fieldContext_Passage_collection(ctx, field)
+	case "key":
+		return ec.fieldContext_Passage_key(ctx, field)
+	case "lang":
+		return ec.fieldContext_Passage_lang(ctx, field)
+	case "path":
+		return ec.fieldContext_Passage_path(ctx, field)
+	case "lines":
+		return ec.fieldContext_Passage_lines(ctx, field)
+	case "symbol":
+		return ec.fieldContext_Passage_symbol(ctx, field)
+	case "kind":
+		return ec.fieldContext_Passage_kind(ctx, field)
+	case "content":
+		return ec.fieldContext_Passage_content(ctx, field)
+	case "score":
+		return ec.fieldContext_Passage_score(ctx, field)
+	case "source":
+		return ec.fieldContext_Passage_source(ctx, field)
+	case "tokens":
+		return ec.fieldContext_Passage_tokens(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type Passage", field.Name)
+}
+
+func (ec *executionContext) childFields_PassageLines(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "start":
+		return ec.fieldContext_PassageLines_start(ctx, field)
+	case "end":
+		return ec.fieldContext_PassageLines_end(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type PassageLines", field.Name)
 }
 
 func (ec *executionContext) childFields_Schema(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -2656,6 +2898,20 @@ func (ec *executionContext) field_Query_codeGraph_args(ctx context.Context, rawA
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
 		func(ctx context.Context, v any) (CodeGraphInput, error) {
 			return ec.unmarshalNCodeGraphInput2mddbᚋgraphqlᚐCodeGraphInput(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_codeSymbol_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "input",
+		func(ctx context.Context, v any) (CodeSymbolInput, error) {
+			return ec.unmarshalNCodeSymbolInput2mddbᚋgraphqlᚐCodeSymbolInput(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -3557,6 +3813,267 @@ func (ec *executionContext) _CodeGraphNode_depth(ctx context.Context, field grap
 }
 func (ec *executionContext) fieldContext_CodeGraphNode_depth(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("CodeGraphNode", field, false, false, "Int")
+}
+
+func (ec *executionContext) _CodeSymbol_collection(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_collection(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Collection, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_collection(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "String")
+}
+
+func (ec *executionContext) _CodeSymbol_symbol(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_symbol(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Symbol, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_symbol(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "String")
+}
+
+func (ec *executionContext) _CodeSymbol_definitions(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_definitions(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Definitions, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_definitions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_references(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_references(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.References, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_references(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_callers(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_callers(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Callers, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_callers(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_callees(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_callees(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Callees, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_callees(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_tests(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_tests(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Tests, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_tests(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_siblings(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_siblings(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Siblings, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_siblings(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_truncated(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_truncated(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Truncated, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_truncated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "Boolean")
 }
 
 func (ec *executionContext) _CollectionStats_name(ctx context.Context, field graphql.CollectedField, obj *CollectionStats) (ret graphql.Marshaler) {
@@ -6138,6 +6655,314 @@ func (ec *executionContext) fieldContext_PageInfo_endCursor(_ context.Context, f
 	return graphql.NewScalarFieldContext("PageInfo", field, false, false, "String")
 }
 
+func (ec *executionContext) _Passage_collection(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_collection(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Collection, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_collection(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_key(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_key(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Key, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_key(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_lang(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_lang(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Lang, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_lang(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_path(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_path(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Path, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_path(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_lines(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_lines(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Lines, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *PassageLines) graphql.Marshaler {
+			return ec.marshalNPassageLines2ᚖmddbᚋgraphqlᚐPassageLines(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_lines(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Passage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_PassageLines(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Passage_symbol(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_symbol(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Symbol, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_symbol(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_kind(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_kind(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Kind, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_kind(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_content(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_content(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Content, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_content(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_score(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_score(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Score, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *float64) graphql.Marshaler {
+			return ec.marshalOFloat2ᚖfloat64(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_score(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "Float")
+}
+
+func (ec *executionContext) _Passage_source(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_source(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Source, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_source(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_tokens(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_tokens(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Tokens, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_tokens(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "Int")
+}
+
+func (ec *executionContext) _PassageLines_start(ctx context.Context, field graphql.CollectedField, obj *PassageLines) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageLines_start(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Start, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageLines_start(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageLines", field, false, false, "Int")
+}
+
+func (ec *executionContext) _PassageLines_end(ctx context.Context, field graphql.CollectedField, obj *PassageLines) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_PassageLines_end(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.End, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_PassageLines_end(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("PassageLines", field, false, false, "Int")
+}
+
 func (ec *executionContext) _Query_document(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6519,6 +7344,63 @@ func (ec *executionContext) fieldContext_Query_codeGraph(ctx context.Context, fi
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_codeGraph_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_codeSymbol(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Query_codeSymbol(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().CodeSymbol(ctx, fc.Args["input"].(CodeSymbolInput))
+		},
+		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
+			directive0 := next
+
+			directive1 := func(ctx context.Context) (any, error) {
+				if ec.Directives.Auth == nil {
+					var zeroVal *CodeSymbol
+					return zeroVal, errors.New("directive auth is not implemented")
+				}
+				return ec.Directives.Auth(ctx, nil, directive0)
+			}
+
+			next = directive1
+			return next
+		},
+		func(ctx context.Context, selections ast.SelectionSet, v *CodeSymbol) graphql.Marshaler {
+			return ec.marshalOCodeSymbol2ᚖmddbᚋgraphqlᚐCodeSymbol(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Query_codeSymbol(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_CodeSymbol(ctx, field)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_codeSymbol_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9445,6 +10327,76 @@ func UnmarshalCodeGraphInput(ctx context.Context, raw any) (CodeGraphInput, erro
 	return out, err
 }
 
+func (ec *executionContext) unmarshalInputCodeSymbolInput(ctx context.Context, obj any) (CodeSymbolInput, error) {
+	var it CodeSymbolInput
+	if obj == nil {
+		return it, nil
+	}
+
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"collection", "name", "include", "limit", "includeContent"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "collection":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("collection"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Collection = data
+		case "name":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("name"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Name = data
+		case "include":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("include"))
+			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Include = data
+		case "limit":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("limit"))
+			data, err := ec.unmarshalOInt2ᚖint(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Limit = data
+		case "includeContent":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("includeContent"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IncludeContent = data
+		}
+	}
+	return it, nil
+}
+
+// UnmarshalCodeSymbolInput unmarshals raw into the CodeSymbolInput input type, using the
+// unmarshaler bound to ctx's request. Call it from a resolver to decode an input
+// object that was not passed as a field argument.
+//
+// ctx must come from a gqlgen request; outside one there is no unmarshaler to use
+// and the returned error says so.
+func UnmarshalCodeSymbolInput(ctx context.Context, raw any) (CodeSymbolInput, error) {
+	var out CodeSymbolInput
+	err := graphql.UnmarshalNamedInputFromContext(ctx, "CodeSymbolInput", raw, &out)
+	return out, err
+}
+
 func (ec *executionContext) unmarshalInputCreateAPIKeyInput(ctx context.Context, obj any) (CreateAPIKeyInput, error) {
 	var it CreateAPIKeyInput
 	if obj == nil {
@@ -10704,6 +11656,79 @@ func (ec *executionContext) _CodeGraphNode(ctx context.Context, sel ast.Selectio
 	return out
 }
 
+var codeSymbolImplementors = []string{"CodeSymbol"}
+
+func (ec *executionContext) _CodeSymbol(ctx context.Context, sel ast.SelectionSet, obj *CodeSymbol) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, codeSymbolImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CodeSymbol")
+		case "collection":
+			out.Values[i] = ec._CodeSymbol_collection(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "symbol":
+			out.Values[i] = ec._CodeSymbol_symbol(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "definitions":
+			out.Values[i] = ec._CodeSymbol_definitions(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "references":
+			out.Values[i] = ec._CodeSymbol_references(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "callers":
+			out.Values[i] = ec._CodeSymbol_callers(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "callees":
+			out.Values[i] = ec._CodeSymbol_callees(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "tests":
+			out.Values[i] = ec._CodeSymbol_tests(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "siblings":
+			out.Values[i] = ec._CodeSymbol_siblings(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "truncated":
+			out.Values[i] = ec._CodeSymbol_truncated(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var collectionStatsImplementors = []string{"CollectionStats"}
 
 func (ec *executionContext) _CollectionStats(ctx context.Context, sel ast.SelectionSet, obj *CollectionStats) graphql.Marshaler {
@@ -11457,6 +12482,127 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 	return out
 }
 
+var passageImplementors = []string{"Passage"}
+
+func (ec *executionContext) _Passage(ctx context.Context, sel ast.SelectionSet, obj *Passage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, passageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Passage")
+		case "collection":
+			out.Values[i] = ec._Passage_collection(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "key":
+			out.Values[i] = ec._Passage_key(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lang":
+			out.Values[i] = ec._Passage_lang(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "path":
+			out.Values[i] = ec._Passage_path(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "lines":
+			out.Values[i] = ec._Passage_lines(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "symbol":
+			out.Values[i] = ec._Passage_symbol(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "kind":
+			out.Values[i] = ec._Passage_kind(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "content":
+			out.Values[i] = ec._Passage_content(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "score":
+			out.Values[i] = ec._Passage_score(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "source":
+			out.Values[i] = ec._Passage_source(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "tokens":
+			out.Values[i] = ec._Passage_tokens(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var passageLinesImplementors = []string{"PassageLines"}
+
+func (ec *executionContext) _PassageLines(ctx context.Context, sel ast.SelectionSet, obj *PassageLines) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, passageLinesImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("PassageLines")
+		case "start":
+			out.Values[i] = ec._PassageLines_start(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "end":
+			out.Values[i] = ec._PassageLines_end(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -11517,6 +12663,12 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				true, false,
 				func(ctx context.Context) graphql.Marshaler {
 					return ec._Query_codeGraph(ctx, field)
+				})
+		case "codeSymbol":
+			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
+				true, false,
+				func(ctx context.Context) graphql.Marshaler {
+					return ec._Query_codeSymbol(ctx, field)
 				})
 		case "stats":
 			out.ResolveRootConcurrently(innerCtx, ec.OperationContext, i,
@@ -12580,6 +13732,11 @@ func (ec *executionContext) marshalNCodeGraphNode2ᚖmddbᚋgraphqlᚐCodeGraphN
 	return ec._CodeGraphNode(ctx, sel, v)
 }
 
+func (ec *executionContext) unmarshalNCodeSymbolInput2mddbᚋgraphqlᚐCodeSymbolInput(ctx context.Context, v any) (CodeSymbolInput, error) {
+	res, err := ec.unmarshalInputCodeSymbolInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNCollectionStats2ᚕᚖmddbᚋgraphqlᚐCollectionStatsᚄ(ctx context.Context, sel ast.SelectionSet, v []*CollectionStats) graphql.Marshaler {
 	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
 		fc := graphql.GetFieldContext(ctx)
@@ -12835,6 +13992,38 @@ func (ec *executionContext) marshalNPageInfo2ᚖmddbᚋgraphqlᚐPageInfo(ctx co
 		return graphql.Null
 	}
 	return ec._PageInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx context.Context, sel ast.SelectionSet, v []*Passage) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNPassage2ᚖmddbᚋgraphqlᚐPassage(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNPassage2ᚖmddbᚋgraphqlᚐPassage(ctx context.Context, sel ast.SelectionSet, v *Passage) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "Passage!")
+		return graphql.Null
+	}
+	return ec._Passage(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPassageLines2ᚖmddbᚋgraphqlᚐPassageLines(ctx context.Context, sel ast.SelectionSet, v *PassageLines) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "PassageLines!")
+		return graphql.Null
+	}
+	return ec._PassageLines(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNRegisterWebhookInput2mddbᚋgraphqlᚐRegisterWebhookInput(ctx context.Context, v any) (RegisterWebhookInput, error) {
@@ -13268,6 +14457,13 @@ func (ec *executionContext) marshalOCodeGraph2ᚖmddbᚋgraphqlᚐCodeGraph(ctx 
 		return graphql.Null
 	}
 	return ec._CodeGraph(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOCodeSymbol2ᚖmddbᚋgraphqlᚐCodeSymbol(ctx context.Context, sel ast.SelectionSet, v *CodeSymbol) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._CodeSymbol(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalODocument2ᚖmddbᚋgraphqlᚐDocument(ctx context.Context, sel ast.SelectionSet, v *Document) graphql.Marshaler {

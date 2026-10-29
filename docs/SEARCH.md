@@ -1367,6 +1367,12 @@ and cannot tell whether the search is working.
 | `graphDecay` | 0.5 | Fraction of the source's score a neighbour inherits per hop |
 | `graphMaxNeighbours` | 10 | Stops a hub document flooding the answer |
 | `graphDirection` | `both` | `in` = what depends on this, `out` = what it depends on |
+| `graphKinds` | — | (v2.18.8) Expand by symbol relation instead: `callers`, `callees`, `tests`, `siblings` (code in the same directory). Each expansion reports its `kind`. Unknown values are a 422 |
+
+With `graphKinds` the question changes from "what is connected" to "what do I
+need next to change this": `["tests", "callers"]` adds the tests that call a
+matching function and the code that calls it. Without it expansion behaves as
+before.
 
 Neighbours are appended rather than merged into the ranking: a document that
 matched the query and one merely adjacent to a match are different kinds of

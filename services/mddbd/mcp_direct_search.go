@@ -576,6 +576,11 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	return resp, nil
 }
 
+// CodeSymbol looks a symbol up (CODE-008).
+func (c *DirectClient) CodeSymbol(ctx context.Context, req *SymbolRequest) (*SymbolResult, error) {
+	return c.server.LookupSymbol(*req)
+}
+
 // IndexingStatus reports queued indexing work for a collection, or for the
 // whole server when collection is "" (GO-042).
 func (c *DirectClient) IndexingStatus(ctx context.Context, collection string) (*IndexingStatus, error) {

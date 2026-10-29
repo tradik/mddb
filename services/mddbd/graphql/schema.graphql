@@ -59,6 +59,49 @@ type VectorSearchResult {
   groupRank: Int
 }
 
+"A 1-based, inclusive line range."
+type PassageLines {
+  start: Int!
+  end: Int!
+}
+
+"A place in a document: file, lines, the definition holding them, and optionally the text (AGT-002)."
+type Passage {
+  collection: String!
+  key: String!
+  lang: String
+  path: String!
+  lines: PassageLines!
+  symbol: String
+  kind: String
+  content: String
+  score: Float
+  source: String
+  tokens: Int!
+}
+
+input CodeSymbolInput {
+  collection: String!
+  name: String!
+  "definitions, references, callers, callees, tests, siblings; default all"
+  include: [String!]
+  limit: Int
+  includeContent: Boolean
+}
+
+"Everything about one symbol (CODE-008); each relation is a list of passages."
+type CodeSymbol {
+  collection: String!
+  symbol: String!
+  definitions: [Passage!]!
+  references: [Passage!]!
+  callers: [Passage!]!
+  callees: [Passage!]!
+  tests: [Passage!]!
+  siblings: [Passage!]!
+  truncated: Boolean!
+}
+
 "Queued indexing work (GO-042); fields match GET /v1/indexing-status."
 type IndexingStatus {
   collection: String
@@ -378,6 +421,8 @@ type Query {
   # collection through would change a type every query returns. A Query field
   # matches how `fts` and `vectorSearch` already take their scope.
   codeGraph(input: CodeGraphInput!): CodeGraph @auth
+  # Where a symbol is defined and used, as passages (CODE-008).
+  codeSymbol(input: CodeSymbolInput!): CodeSymbol @auth
 
   # Stats
   stats: Stats @auth

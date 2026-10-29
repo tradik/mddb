@@ -33,6 +33,18 @@ var (
 // scrub removes comments, keeping newlines, and with blank set replaces each
 // string literal by "0" as well.
 func scrub(src string, sx syntax, blank bool) string {
+	return scrubMode(src, sx, blank, false)
+}
+
+// scrubLines is scrub with literals blanked but their newlines kept, so every
+// line of the result is the same line of the source (CODE-008 spans). Plain
+// scrub folds a multi-line literal into one "0", which the symbol extractors
+// do not mind and a line number does.
+func scrubLines(src string, sx syntax) string {
+	return scrubMode(src, sx, true, true)
+}
+
+func scrubMode(src string, sx syntax, blank, keepLines bool) string {
 	var b strings.Builder
 	b.Grow(len(src))
 	for i := 0; i < len(src); {
@@ -45,6 +57,9 @@ func scrub(src string, sx syntax, blank bool) string {
 		if end, ok := sx.literal(src, i); ok {
 			if blank {
 				b.WriteByte('0')
+				if keepLines {
+					b.WriteString(strings.Repeat("\n", strings.Count(src[i:end], "\n")))
+				}
 			} else {
 				b.WriteString(src[i:end])
 			}

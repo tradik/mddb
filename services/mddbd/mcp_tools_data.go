@@ -661,3 +661,26 @@ func (s *MCPToolServer) toolGetIndexingStatus(ctx context.Context, args map[stri
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil
 }
+
+// toolCodeSymbol answers where a symbol is defined and used (CODE-008).
+func (s *MCPToolServer) toolCodeSymbol(ctx context.Context, args map[string]interface{}) (string, error) {
+	req := &SymbolRequest{
+		Collection:     mcpGetString(args, "collection"),
+		Name:           mcpGetString(args, "name"),
+		Limit:          mcpGetInt(args, "limit"),
+		IncludeContent: mcpGetBool(args, "include_content"),
+	}
+	if inc, ok := args["include"].([]interface{}); ok {
+		for _, v := range inc {
+			if str, ok := v.(string); ok {
+				req.Include = append(req.Include, str)
+			}
+		}
+	}
+	resp, err := s.client.CodeSymbol(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return string(data), nil
+}

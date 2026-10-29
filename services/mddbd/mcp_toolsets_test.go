@@ -134,10 +134,10 @@ func TestToolsets_PerKey(t *testing.T) {
 	if n := len(list("static-full")); n != len(mcpBuiltinTools()) {
 		t.Fatalf("full key lists %d", n)
 	}
-	if got := list("static-code"); len(got) != len(mcpToolsets[ToolsetSearch])+1 {
+	if got := list("static-code"); len(got) != len(mcpToolsets[ToolsetSearch])+len(mcpToolsets[ToolsetCode]) {
 		t.Fatalf("search|code key lists %v", got)
 	}
-	if got := list(stored); len(got) != 1 || got[0] != "code_graph" {
+	if got := list(stored); len(got) != len(mcpToolsets[ToolsetCode]) || got[0] != "code_graph" {
 		t.Fatalf("stored code key lists %v", got)
 	}
 	if got := list("static-bad"); len(got) != 0 {
@@ -170,7 +170,7 @@ func TestToolsets_PerKey(t *testing.T) {
 		t.Fatalf("list: %+v", keys)
 	}
 	// Cached lookups keep the toolsets.
-	if got := list(stored); len(got) != 1 {
+	if got := list(stored); len(got) != len(mcpToolsets[ToolsetCode]) {
 		t.Fatalf("cached key lists %v", got)
 	}
 }

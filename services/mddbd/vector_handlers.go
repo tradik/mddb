@@ -209,6 +209,10 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.GraphExpand.ValidateKinds(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	// GO-042: wait for this collection's queued embeddings before searching.
 	waited := s.waitForIndex(r.Context(), req.Collection, req.IndexWait)
 	// RAG-008: request, then collection profile, then default — the same

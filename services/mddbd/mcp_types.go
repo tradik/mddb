@@ -898,6 +898,8 @@ type MCPClient interface {
 	// (SRCH-010), so an agent picks an algorithm from evidence rather than
 	// from the names.
 	SearchAdvisor(ctx context.Context, collection string) (*SearchRecommendation, error)
+	// CodeSymbol answers where a symbol is defined and used (CODE-008).
+	CodeSymbol(ctx context.Context, req *SymbolRequest) (*SymbolResult, error)
 	// IndexingStatus reports queued embedding and metadata work (GO-042).
 	IndexingStatus(ctx context.Context, collection string) (*IndexingStatus, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)

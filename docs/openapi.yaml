@@ -3798,6 +3798,79 @@ paths:
                   hasMore:
                     type: boolean
 
+  /v1/symbol:
+    get:
+      tags:
+        - Search
+      summary: Where a symbol is defined, used, called and tested
+      description: |
+        Definitions with their span, references with the definition each sits
+        in, callers, callees, tests and siblings of one symbol, as passages
+        (CODE-008, v2.18.8). Candidates come from the metadata index
+        (`defines`/`uses`) and the full-text index; spans are computed from the
+        documents at query time, so nothing is stored. Also the `code_symbol`
+        MCP tool and the `codeSymbol` GraphQL query. POST takes the same
+        fields as a JSON body.
+      operationId: getSymbol
+      parameters:
+        - name: collection
+          in: query
+          required: true
+          schema: { type: string }
+        - name: name
+          in: query
+          required: true
+          schema: { type: string }
+          example: SearchHybrid
+        - name: include
+          in: query
+          required: false
+          description: Comma-separated relations; default all.
+          schema: { type: string, example: 'definitions,callers,tests' }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 20, maximum: 200 }
+        - name: includeContent
+          in: query
+          required: false
+          schema: { type: boolean, default: false }
+      responses:
+        "200":
+          description: The symbol's relations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SymbolResult"
+        "400":
+          description: Missing collection or name, or an unreadable body
+        "403":
+          description: Forbidden
+        "422":
+          description: Unknown relation in include
+    post:
+      tags:
+        - Search
+      summary: Symbol lookup (JSON body)
+      operationId: postSymbol
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SymbolRequest"
+      responses:
+        "200":
+          description: The symbol's relations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SymbolResult"
+        "400":
+          description: Missing collection or name, or an unreadable body
+        "422":
+          description: Unknown relation in include
+
   /v1/code-graph:
     get:
       tags:
@@ -6112,6 +6185,65 @@ paths:
 
 components:
   schemas:
+    Passage:
+      type: object
+      description: |
+        A place in a document (AGT-002, CODE-008): file, inclusive 1-based
+        line range, the innermost definition holding the first line, and
+        optionally the text.
+      required: [ collection, key, path, lines, tokens ]
+      properties:
+        collection: { type: string }
+        key: { type: string }
+        lang: { type: string }
+        path: { type: string, description: 'meta.path, or the key when there is none.' }
+        lines:
+          type: object
+          required: [ start, end ]
+          properties:
+            start: { type: integer }
+            end: { type: integer }
+        symbol: { type: string, description: The innermost definition holding the first line. }
+        kind: { type: string, description: 'The definition kind when the passage is one: function, method, type, class, rule…' }
+        content: { type: string }
+        score: { type: number }
+        source: { type: string, description: 'fts, vector, hybrid, cross, or a symbol relation.' }
+        tokens: { type: integer, description: Estimated tokens of content. }
+    SymbolRequest:
+      type: object
+      required: [ collection, name ]
+      properties:
+        collection: { type: string }
+        name: { type: string }
+        include:
+          type: array
+          items: { type: string, enum: [ definitions, references, callers, callees, tests, siblings ] }
+        limit: { type: integer, default: 20, maximum: 200 }
+        includeContent: { type: boolean }
+    SymbolResult:
+      type: object
+      properties:
+        collection: { type: string }
+        symbol: { type: string }
+        definitions: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        references: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        callers: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        callees: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        tests: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        siblings: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        truncated: { type: boolean }
+    GraphExpandOptions:
+      type: object
+      description: Tunes retrievalMode "graph" (SRCH-006; graphKinds CODE-008).
+      properties:
+        graphDepth: { type: integer, default: 1, maximum: 3 }
+        graphDecay: { type: number, default: 0.5 }
+        graphMaxNeighbours: { type: integer, default: 10 }
+        graphDirection: { type: string, enum: [ in, out, both ], default: both }
+        graphKinds:
+          type: array
+          items: { type: string, enum: [ callers, callees, tests, siblings ] }
+          description: Expand by symbol relation instead of following graphDirection.
     IndexingStatus:
       type: object
       description: Queued indexing work (GO-042). Counters are since server start.
@@ -7140,6 +7272,8 @@ components:
       required:
         - collection
       properties:
+        graphExpand:
+          $ref: '#/components/schemas/GraphExpandOptions'
         readLevel:
           type: string
           enum: [ indexed, indexedPlusPending ]

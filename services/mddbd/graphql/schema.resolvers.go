@@ -189,6 +189,11 @@ func (r *queryResolver) CodeGraph(ctx context.Context, input CodeGraphInput) (*C
 	return r.server.CodeGraph(ctx, input)
 }
 
+// CodeSymbol is the resolver for the codeSymbol field.
+func (r *queryResolver) CodeSymbol(ctx context.Context, input CodeSymbolInput) (*CodeSymbol, error) {
+	return r.server.CodeSymbol(ctx, input)
+}
+
 // Stats is the resolver for the stats field.
 func (r *queryResolver) Stats(ctx context.Context) (*Stats, error) {
 	return r.server.GetStats(ctx)

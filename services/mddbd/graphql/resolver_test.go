@@ -86,6 +86,9 @@ func (s *stubServer) VectorStats(_ context.Context) (*VectorStats, error) {
 func (s *stubServer) IndexingStatus(_ context.Context, _ *string) (*IndexingStatus, error) {
 	return nil, errors.New("not implemented")
 }
+func (s *stubServer) CodeSymbol(_ context.Context, _ CodeSymbolInput) (*CodeSymbol, error) {
+	return nil, errors.New("not implemented")
+}
 func (s *stubServer) VectorReindex(_ context.Context, _ string, _ *bool) (*VectorStats, error) {
 	return nil, errors.New("not implemented")
 }

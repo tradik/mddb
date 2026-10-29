@@ -54,6 +54,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `key:name:search|code` in `MDDB_MCP_API_KEYS`). A tool outside the caller's
   toolsets is not listed and calling it returns `-32601`. With `search,code`
   the `tools/list` schemas shrink from about 17 200 tokens to about 6 600.
+- **Symbol lookup and definition spans (CODE-008).** Symbols were names in
+  meta with no lines, so "where is this defined and who calls it" took a
+  search and a file read per candidate. `GET /v1/symbol` (MCP `code_symbol`,
+  GraphQL `codeSymbol`) returns a symbol's definitions with their span,
+  references with the definition each sits in, callers, callees, tests and
+  siblings, as path + line passages. Spans come from scanners for Go, Rust,
+  Java, C, C++, JavaScript, TypeScript, PHP, Python, Ruby, CSS, Terraform and
+  assembly, computed at query time — no new index to keep in step. Uses the
+  extractor cannot see, such as `x.Method()`, are found through the
+  full-text index. Graph retrieval takes `graphKinds` (`callers`, `callees`,
+  `tests`, `siblings`) to expand by those relations.
 
 ### Changed
 

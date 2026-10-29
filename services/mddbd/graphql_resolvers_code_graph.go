@@ -83,3 +83,47 @@ func optString(s string) *string {
 	}
 	return &s
 }
+
+// CodeSymbol answers where a symbol is defined and used (CODE-008).
+func (a *GraphQLAdapter) CodeSymbol(ctx context.Context, input gql.CodeSymbolInput) (*gql.CodeSymbol, error) {
+	if _, err := a.requireAuthenticated(ctx); err != nil {
+		return nil, err
+	}
+	if err := a.CheckPermission(ctx, input.Collection, int(PermRead)); err != nil {
+		return nil, err
+	}
+	res, err := a.mcp.CodeSymbol(ctx, &SymbolRequest{
+		Collection: input.Collection, Name: input.Name, Include: input.Include,
+		Limit: derefInt(input.Limit, 0), IncludeContent: derefBool(input.IncludeContent, false),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &gql.CodeSymbol{
+		Collection: res.Collection, Symbol: res.Symbol, Truncated: res.Truncated,
+		Definitions: passagesToGQL(res.Definitions), References: passagesToGQL(res.References),
+		Callers: passagesToGQL(res.Callers), Callees: passagesToGQL(res.Callees),
+		Tests: passagesToGQL(res.Tests), Siblings: passagesToGQL(res.Siblings),
+	}, nil
+}
+
+// passagesToGQL converts passages for GraphQL; optional fields become nil
+// rather than empty strings, so "absent" reads as absent.
+func passagesToGQL(in []Passage) []*gql.Passage {
+	out := make([]*gql.Passage, 0, len(in))
+	for i := range in {
+		p := in[i]
+		g := &gql.Passage{
+			Collection: p.Collection, Key: p.Key, Path: p.Path, Tokens: p.Tokens,
+			Lines: &gql.PassageLines{Start: p.Lines.Start, End: p.Lines.End},
+			Lang:  optString(p.Lang), Symbol: optString(p.Symbol), Kind: optString(p.Kind),
+			Content: optString(p.Content), Source: optString(p.Source),
+		}
+		if p.Score != 0 {
+			score := p.Score
+			g.Score = &score
+		}
+		out = append(out, g)
+	}
+	return out
+}

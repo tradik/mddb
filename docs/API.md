@@ -4140,6 +4140,64 @@ The same traversal is available through all three surfaces — `GET`/`POST
 `codeGraph` GraphQL query — and a test pins that they agree, so they cannot
 drift apart in what the graph says.
 
+### One symbol, everywhere it matters (v2.18.8+)
+
+`GET /v1/symbol?collection=<c>&name=<symbol>` (or `POST` with the same fields
+as JSON) answers what an agent asks before changing a function, a type or a
+selector: where it is defined, where it is used and from inside which
+definition, what it calls, which tests touch it and what lives next to it.
+Every entry is a passage — path, line range, the definition holding it — so the
+answer is a list of places to read, not documents to read through.
+
+```bash
+curl -s "$MDDB/v1/symbol?collection=repo&name=SearchHybrid&include=definitions,callers,tests"
+```
+
+```json
+{
+  "collection": "repo",
+  "symbol": "SearchHybrid",
+  "definitions": [{"path": "internal/search/query.go", "lines": {"start": 4, "end": 7},
+                   "symbol": "SearchHybrid", "kind": "function", "source": "definitions", ...}],
+  "callers": [{"path": "cmd/tool.go", "lines": {"start": 3, "end": 5}, "symbol": "run", ...}],
+  "tests": [{"path": "internal/search/query_test.go", "lines": {"start": 4, "end": 4},
+             "symbol": "TestSearchHybrid", "content": "SearchHybrid(\"x\")", ...}]
+}
+```
+
+| Relation | Derived from |
+|---|---|
+| `definitions` | Documents whose `defines` holds the name; the span from the definition's first line to the brace, dedent or `end` that closes it |
+| `references` | Every line using the name in code (comments and prose excluded), with the definition it sits in as `symbol`; for a function or method only lines that call it |
+| `callers` | The definitions holding the references — callers found without a call parser |
+| `callees` | Names called inside the definition's span, at their own definitions |
+| `tests` | References in test files (`_test.go`, `test_*.py`, `*.spec.ts`, `*Test.java`, `_spec.rb`, `tests/` …) |
+| `siblings` | Other top-level definitions in the same directory |
+
+`include` limits the relations, `limit` caps each one (default 20, max 200;
+`truncated` says one was cut), and `includeContent=true` adds the text of
+definitions, callers and callees — references always carry their line.
+Candidates come from the metadata index (`defines`, `uses`) and, for uses the
+extractor cannot see such as `x.Method()`, from the full-text index; spans are
+computed from the documents at query time, so nothing is stored and a reindex
+cannot make the answer drift. The same lookup is the `code_symbol` MCP tool
+(read-only, toolset `code`) and the `codeSymbol` GraphQL query.
+
+Spans by language:
+
+| Language | Span ends at | Kinds |
+|---|---|---|
+| Go, Rust, Java, C, C++, JavaScript, TypeScript, PHP | the brace closing the body; a declaration without one spans its line | function, method, type, class, impl, macro |
+| Python | where indentation returns to the definition's level | function, class |
+| Ruby | the matching `end` | method, class |
+| CSS, SCSS, Sass, Less | the rule's closing brace | rule |
+| Terraform | the block's closing brace | block |
+| Assembly | the line before the next label | label |
+| HTML, YAML | no spans; a definition is placed on the line it first appears | — |
+
+Interfaces and traits ("implementations") are left out on purpose: telling an
+implementation from a namesake needs type information a scanner does not have.
+
 ### Why the tokeniser differs
 
 The prose tokeniser stems (`classes` → `class`), drops stop words (`for`, `if`,

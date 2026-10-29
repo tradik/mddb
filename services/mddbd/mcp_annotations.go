@@ -46,6 +46,7 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	// a separate, explicit write through /v1/collection-config.
 	"search_advisor":          readOnly(),
 	"get_indexing_status":     readOnly(),
+	"code_symbol":             readOnly(),
 	"vector_stats":            readOnly(),
 	"fts_languages":           readOnly(),
 	"list_webhooks":           readOnly(),

@@ -31,6 +31,14 @@ Do you know words that appear in the text?
   narrow a set, not to find text.
 - **`aggregate`** — counts and groupings. Never fetch documents to count them.
 
+## Before changing code
+
+Ask `code_symbol` about the function, type or selector first: one call returns
+where it is defined (path and lines), every place it is used and from inside
+which definition, what it calls and which tests touch it. Read those passages,
+not the files around them. `code_graph` answers the file-level question —
+which documents depend on which.
+
 ## Asking for less
 
 These matter more than tool choice. Measured on this engine: the same

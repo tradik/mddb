@@ -44,6 +44,7 @@ type ServerInterface interface {
 	VectorSearch(ctx context.Context, input VectorSearchInput) (*VectorSearchResponse, error)
 	VectorStats(ctx context.Context) (*VectorStats, error)
 	IndexingStatus(ctx context.Context, collection *string) (*IndexingStatus, error)
+	CodeSymbol(ctx context.Context, input CodeSymbolInput) (*CodeSymbol, error)
 	VectorReindex(ctx context.Context, collection string, force *bool) (*VectorStats, error)
 	FullTextSearch(ctx context.Context, input FTSInput) (*FTSResponse, error)
 	CodeGraph(ctx context.Context, input CodeGraphInput) (*CodeGraph, error)

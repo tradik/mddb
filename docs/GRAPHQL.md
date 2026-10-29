@@ -194,6 +194,22 @@ is a unix timestamp.
 query { indexingStatus(collection: "notes") { pendingEmbeddings progress indexed } }
 ```
 
+### Code Symbol
+
+`codeSymbol(input: CodeSymbolInput!)` (v2.18.8) returns where a symbol is
+defined and used, each relation a list of `Passage` (path, `lines { start end }`,
+the enclosing `symbol`, optional `content`). See
+[API.md — One symbol, everywhere it matters](API.md#one-symbol-everywhere-it-matters-v2188).
+
+```graphql
+query {
+  codeSymbol(input: { collection: "repo", name: "SearchHybrid", include: ["definitions", "tests"] }) {
+    definitions { path lines { start end } kind }
+    tests { path lines { start } symbol content }
+  }
+}
+```
+
 ### Search Documents
 
 ```graphql

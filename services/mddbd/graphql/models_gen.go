@@ -92,6 +92,28 @@ type CodeGraphNode struct {
 	Depth    int     `json:"depth"`
 }
 
+// Everything about one symbol (CODE-008); each relation is a list of passages.
+type CodeSymbol struct {
+	Collection  string     `json:"collection"`
+	Symbol      string     `json:"symbol"`
+	Definitions []*Passage `json:"definitions"`
+	References  []*Passage `json:"references"`
+	Callers     []*Passage `json:"callers"`
+	Callees     []*Passage `json:"callees"`
+	Tests       []*Passage `json:"tests"`
+	Siblings    []*Passage `json:"siblings"`
+	Truncated   bool       `json:"truncated"`
+}
+
+type CodeSymbolInput struct {
+	Collection string `json:"collection"`
+	Name       string `json:"name"`
+	// definitions, references, callers, callees, tests, siblings; default all
+	Include        []string `json:"include,omitempty"`
+	Limit          *int     `json:"limit,omitempty"`
+	IncludeContent *bool    `json:"includeContent,omitempty"`
+}
+
 type CollectionStats struct {
 	Name           string `json:"name"`
 	DocumentCount  int    `json:"documentCount"`
@@ -228,6 +250,27 @@ type PageInfo struct {
 	HasPreviousPage bool    `json:"hasPreviousPage"`
 	StartCursor     *string `json:"startCursor,omitempty"`
 	EndCursor       *string `json:"endCursor,omitempty"`
+}
+
+// A place in a document: file, lines, the definition holding them, and optionally the text (AGT-002).
+type Passage struct {
+	Collection string        `json:"collection"`
+	Key        string        `json:"key"`
+	Lang       *string       `json:"lang,omitempty"`
+	Path       string        `json:"path"`
+	Lines      *PassageLines `json:"lines"`
+	Symbol     *string       `json:"symbol,omitempty"`
+	Kind       *string       `json:"kind,omitempty"`
+	Content    *string       `json:"content,omitempty"`
+	Score      *float64      `json:"score,omitempty"`
+	Source     *string       `json:"source,omitempty"`
+	Tokens     int           `json:"tokens"`
+}
+
+// A 1-based, inclusive line range.
+type PassageLines struct {
+	Start int `json:"start"`
+	End   int `json:"end"`
 }
 
 type Query struct {

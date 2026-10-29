@@ -482,6 +482,26 @@ func mcpBuiltinToolsCore() []MCPTool {
 			},
 		},
 		{
+			Name: "code_symbol",
+			Description: "Everything about one symbol (function, type, class, CSS selector, Terraform resource) in a " +
+				"code collection, as path + line passages: definitions (with the span start-end), references " +
+				"(each use, with the definition it sits in), callers, callees, tests that touch it and siblings " +
+				"(other definitions in the same directory). Use it before changing a symbol instead of " +
+				"searching for its name and reading files.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"collection": map[string]interface{}{"type": "string"},
+					"name":       map[string]interface{}{"type": "string", "description": "Symbol name as written: SearchHybrid, .hero-banner, aws_instance.web"},
+					"include": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string",
+						"enum": allRelations}, "description": "Relations to return; default all"},
+					"limit":           map[string]interface{}{"type": "integer", "description": "Passages per relation (default 20, max 200)"},
+					"include_content": map[string]interface{}{"type": "boolean", "description": "Add the text of definitions, callers and callees (references always carry their line)"},
+				},
+				"required": []string{"collection", "name"},
+			},
+		},
+		{
 			Name: "code_graph",
 			Description: "Code connection graph. Answers what a document depends on and what depends on it: " +
 				"which stylesheet declares a selector a template applies, which pages load a script, " +

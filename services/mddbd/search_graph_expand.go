@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"math"
+	"path"
 	"sort"
+	"strings"
 )
 
 // Graph-expanded retrieval (SRCH-006).
@@ -62,6 +65,25 @@ type GraphExpandOptions struct {
 	// Direction selects which edges to follow: "in" (what depends on this),
 	// "out" (what this depends on) or "both". Defaults to "both".
 	Direction string `json:"graphDirection,omitempty"`
+	// Kinds switches expansion to symbol relations (CODE-008): "callers"
+	// (documents using what a result defines), "callees" (documents defining
+	// what it uses), "tests" (callers that are test files) and "siblings"
+	// (code in the same directory). Each expansion reports its kind. Empty
+	// keeps the document-graph expansion, following Direction.
+	Kinds []string `json:"graphKinds,omitempty"`
+}
+
+// Symbol-relation expansion kinds (CODE-008).
+var graphKinds = []string{RelCallers, RelCallees, RelTests, RelSiblings}
+
+// ValidateKinds rejects an expansion kind that does not exist.
+func (o GraphExpandOptions) ValidateKinds() error {
+	for _, k := range o.Kinds {
+		if !containsString(graphKinds, k) {
+			return fmt.Errorf("unknown graphKinds value %q (known: %s)", k, strings.Join(graphKinds, ", "))
+		}
+	}
+	return nil
 }
 
 // Defaults fills what the caller left unset and clamps what it set too high.
@@ -123,11 +145,6 @@ func (s *Server) expandByGraph(collection string, seeds []graphSeed, opts GraphE
 		return nil
 	}
 
-	direction, err := ParseGraphDirection(opts.Direction)
-	if err != nil {
-		direction = GraphBoth
-	}
-
 	seedKeys := make(map[string]bool, len(seeds))
 	for _, seed := range seeds {
 		seedKeys[seed.Key] = true
@@ -138,65 +155,27 @@ func (s *Server) expandByGraph(collection string, seeds []graphSeed, opts GraphE
 	// inherited score is evidence, and two weak pieces of evidence are not
 	// one strong one.
 	best := make(map[string]GraphExpansion)
+	keep := func(c GraphExpansion) {
+		if existing, seen := best[c.Key]; !seen || existing.Score < c.Score {
+			best[c.Key] = c
+		}
+	}
 
 	for _, seed := range seeds {
-		result, err := s.CodeGraph(GraphRequest{
-			Collection: collection,
-			Key:        seed.Key,
-			Direction:  direction,
-			Depth:      opts.Depth,
-			MaxDegree:  opts.MaxNeighbours,
-		})
-		if err != nil || result == nil {
-			// A seed with no graph entry is not an error: most collections are
-			// prose and have no edges at all, and expansion should then simply
-			// add nothing.
+		if len(opts.Kinds) == 0 {
+			direction, err := ParseGraphDirection(opts.Direction)
+			if err != nil {
+				direction = GraphBoth
+			}
+			for _, c := range s.graphNeighbours(collection, seed, direction, opts, seedKeys, nil) {
+				keep(c)
+			}
 			continue
 		}
-
-		depthOf := make(map[string]int, len(result.Nodes))
-		for _, n := range result.Nodes {
-			depthOf[n.Key] = n.Depth
-		}
-
-		added := 0
-		for _, edge := range result.Edges {
-			neighbour := edge.To
-			if neighbour == seed.Key {
-				neighbour = edge.From
+		for _, kind := range opts.Kinds {
+			for _, c := range s.symbolNeighbours(collection, seed, kind, opts, seedKeys) {
+				keep(c)
 			}
-			if neighbour == seed.Key || seedKeys[neighbour] {
-				continue
-			}
-
-			depth := depthOf[neighbour]
-			if depth <= 0 {
-				depth = 1
-			}
-			if depth > opts.Depth {
-				continue
-			}
-
-			score := seed.Score * math.Pow(opts.Decay, float64(depth))
-			candidate := GraphExpansion{
-				Key:     neighbour,
-				FromKey: seed.Key,
-				Symbol:  edge.Symbol,
-				Kind:    string(edge.Kind),
-				Depth:   depth,
-				Score:   score,
-			}
-
-			if existing, seen := best[neighbour]; seen && existing.Score >= score {
-				continue
-			}
-			if !seenBefore(best, neighbour) {
-				added++
-				if added > opts.MaxNeighbours {
-					break
-				}
-			}
-			best[neighbour] = candidate
 		}
 	}
 
@@ -215,9 +194,87 @@ func (s *Server) expandByGraph(collection string, seeds []graphSeed, opts GraphE
 	return out
 }
 
-func seenBefore(m map[string]GraphExpansion, key string) bool {
-	_, ok := m[key]
-	return ok
+// graphNeighbours walks the document graph from one seed in one direction,
+// keeping the neighbours accept allows (nil accepts all), at most
+// MaxNeighbours of them.
+func (s *Server) graphNeighbours(collection string, seed graphSeed, direction GraphDirection, opts GraphExpandOptions,
+	seedKeys map[string]bool, accept func(string) bool) []GraphExpansion {
+	result, err := s.CodeGraph(GraphRequest{
+		Collection: collection,
+		Key:        seed.Key,
+		Direction:  direction,
+		Depth:      opts.Depth,
+		MaxDegree:  opts.MaxNeighbours,
+	})
+	if err != nil || result == nil {
+		// A seed with no graph entry is not an error: most collections are
+		// prose and have no edges at all, and expansion should then simply
+		// add nothing.
+		return nil
+	}
+
+	depthOf := make(map[string]int, len(result.Nodes))
+	for _, n := range result.Nodes {
+		depthOf[n.Key] = n.Depth
+	}
+
+	found := map[string]GraphExpansion{}
+	var order []string
+	for _, edge := range result.Edges {
+		neighbour := edge.To
+		if neighbour == seed.Key {
+			neighbour = edge.From
+		}
+		if neighbour == seed.Key || seedKeys[neighbour] || (accept != nil && !accept(neighbour)) {
+			continue
+		}
+		depth := max(depthOf[neighbour], 1)
+		if depth > opts.Depth {
+			continue
+		}
+		c := GraphExpansion{
+			Key: neighbour, FromKey: seed.Key, Symbol: edge.Symbol, Kind: string(edge.Kind),
+			Depth: depth, Score: seed.Score * math.Pow(opts.Decay, float64(depth)),
+		}
+		if existing, seen := found[neighbour]; seen && existing.Score >= c.Score {
+			continue
+		} else if !seen {
+			if len(order) >= opts.MaxNeighbours {
+				break
+			}
+			order = append(order, neighbour)
+		}
+		found[neighbour] = c
+	}
+	out := make([]GraphExpansion, 0, len(order))
+	for _, k := range order {
+		out = append(out, found[k])
+	}
+	return out
+}
+
+// symbolNeighbours expands one seed by one symbol relation (CODE-008).
+func (s *Server) symbolNeighbours(collection string, seed graphSeed, kind string, opts GraphExpandOptions, seedKeys map[string]bool) []GraphExpansion {
+	var out []GraphExpansion
+	switch kind {
+	case RelCallers:
+		out = s.graphNeighbours(collection, seed, GraphIn, opts, seedKeys, nil)
+	case RelCallees:
+		out = s.graphNeighbours(collection, seed, GraphOut, opts, seedKeys, nil)
+	case RelTests:
+		out = s.graphNeighbours(collection, seed, GraphIn, opts, seedKeys, isTestPath)
+	case RelSiblings:
+		s.eachSourceInDir(collection, path.Dir(seed.Key), func(st *sourceText) bool {
+			if st.doc.Key != seed.Key && !seedKeys[st.doc.Key] {
+				out = append(out, GraphExpansion{Key: st.doc.Key, FromKey: seed.Key, Depth: 1, Score: seed.Score * opts.Decay})
+			}
+			return len(out) < opts.MaxNeighbours
+		})
+	}
+	for i := range out {
+		out[i].Kind = kind
+	}
+	return out
 }
 
 // appendGraphNeighbours expands a result set and returns both the explanations

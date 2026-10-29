@@ -129,6 +129,8 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolUpdateDocument(ctx, args)
 	case "get_document_meta":
 		return s.toolGetDocumentMeta(ctx, args)
+	case "code_symbol":
+		return s.toolCodeSymbol(ctx, args)
 	case "code_graph":
 		return s.toolCodeGraph(ctx, args)
 	case "search_advisor":
