@@ -262,6 +262,13 @@ admit. It is free, diffable, reviewable, and every developer already knows it.
 | Human review of changes | revisions, no diff UI | pull requests, the best in the world |
 | Cost | a process | nothing |
 
+For an agent finding code, the difference is measurable. On 15 find-the-code
+tasks over the MDDB repository, vector passages reached the same 13 answers
+as grep followed by reading files. They used 0.6× the tokens of grep's best
+case and about 3% of its typical case, in one call per task. The method and
+every number are in
+[BENCHMARK.md](BENCHMARK.md#finding-code-grep-and-read-vs-mddb-passages-v2188).
+
 **Choose Git when** the content is authored by developers, changes go through
 review, and search means `grep`. Use both when content is authored in Git and
 *served* by something that can rank it — that is what

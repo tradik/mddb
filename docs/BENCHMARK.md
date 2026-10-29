@@ -162,6 +162,67 @@ when recall@10 drops under 0.7 or nDCG@10 under 0.65. The test server there
 scores 0.750 and 0.683, because it does not use a default server's
 configuration.
 
+## Finding code: grep and read vs MDDB passages (v2.18.8)
+
+An agent asked to change something first has to find it. This compares the
+two ways it can, on the MDDB repository itself. The comparison counts tokens
+and tool calls. It does not measure answer quality.
+
+The 15 tasks are in
+[`tools/bench/evalsets/agent-tasks.json`](../tools/bench/evalsets/agent-tasks.json).
+Each has a question, the term an agent would grep for first, and the file
+that holds the code.
+
+- **grep + read (best)** greps the tracked files, which is what ripgrep
+  searches. Output is capped at 250 lines, as agent grep tools cap it. Then
+  it reads only the answer file. This is a lower bound, because it assumes
+  the agent picks the right file first.
+- **grep + read (typical)** greps the same way, then reads the matching
+  files with the most matches first until it reaches the answer.
+- **mddb** makes one search that returns passages (`format: passages`,
+  5 results). The answer counts as found when a passage comes from the
+  answer file.
+
+Measured 2026-10-29 on this release. The collection was made with
+`mddb-cli autoindex .` from the repository root: 1491 files, 14.5 MB.
+Embeddings came from `nomic-embed-text` through Ollama. Tokens are bytes
+divided by 4.
+
+```bash
+cd tools/bench
+go run ./agent -url http://localhost:11023 -collection mddb -root ../.. \
+  -tasks evalsets/agent-tasks.json -search vector
+```
+
+| Route | Tokens, 15 tasks | Tool calls | Answer reached |
+|---|---|---|---|
+| grep + read (best) | 139,959 | 28 | 13/15 |
+| grep + read (typical) | 2,769,973 | 133 | 13/15 |
+| mddb vector, passages | 84,977 | 15 | 13/15 |
+| mddb hybrid, passages | 41,666 | 15 | 10/15 |
+| mddb fts, passages | 56,284 | 15 | 6/15 |
+
+- **Vector passages match grep on answers found.** They use 0.6× the tokens
+  of grep's best case and about 3% of its typical case. They take one call
+  per task. Grep takes two in its best case and up to 33 in its typical
+  case.
+- **Grep's typical case is expensive because common terms match widely.**
+  "revision" matches about 160 tracked files, so reading the most-matched
+  files first takes 21 reads before the answer.
+- **Full-text passages miss most of these questions.** The questions are
+  phrased as a person asks them, and the code does not use the same words.
+  One question starts with `--fail-below`, which the full-text parser reads
+  as an exclusion, so it returns nothing.
+- **Hybrid sits between the two here.** On this set it is pulled down by the
+  full-text half. Run `mddb-cli eval` on your own questions before picking
+  one, as shown in
+  [Measuring Instead of Guessing](SEARCH.md#measuring-instead-of-guessing-v2188).
+- **Two tasks defeat grep.** For "include paths" and "cross-collection text
+  search", the first term an agent would try is not in the answer file.
+
+The tool prints per-task rows as well, and `-json` writes them for further
+processing.
+
 ---
 
 # Insert Throughput Benchmark

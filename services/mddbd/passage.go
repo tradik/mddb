@@ -43,6 +43,9 @@ type Passage struct {
 	Source string `json:"source,omitempty"`
 	// Tokens estimates Content's size with the context budget's estimator.
 	Tokens int `json:"tokens"`
+	// docTokens is the whole document's estimate, for the gain counters
+	// (AGT-004): what the caller would have read without the passage.
+	docTokens int
 }
 
 // docPath is where a document came from: meta.path, else its key.
@@ -89,7 +92,7 @@ func (st *sourceText) enclosing(line int) *codeintel.Span {
 func (st *sourceText) passage(collection string, start, end int, source string, withContent bool) Passage {
 	p := Passage{
 		Collection: collection, Key: st.doc.Key, Lang: st.doc.Lang, Path: docPath(st.doc),
-		Lines: PassageLines{Start: start, End: end}, Source: source,
+		Lines: PassageLines{Start: start, End: end}, Source: source, docTokens: approxTokens(st.doc.ContentMD),
 	}
 	if sp := st.enclosing(start); sp != nil {
 		p.Symbol = sp.Symbol

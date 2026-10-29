@@ -220,6 +220,8 @@ type MCPTruncateResponse struct {
 
 // MCPVectorSearchRequest represents vector/semantic search request.
 type MCPVectorSearchRequest struct {
+	// noGain keeps a measurement (SRCH-019 eval) out of the gain report.
+	noGain         bool
 	Collection     string              `json:"collection"`
 	Query          string              `json:"query"`
 	QueryVector    []float32           `json:"queryVector,omitempty"`
@@ -264,6 +266,8 @@ type MCPVectorSearchResult struct {
 	// PendingEmbedding is true for a document whose embedding is still queued:
 	// found by its text, not yet by its meaning (GO-042).
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
+	// docTokens is the whole document's size in chunk modes (AGT-004).
+	docTokens int
 }
 
 // MCPVectorSearchResponse represents vector search results.
@@ -937,6 +941,8 @@ type MCPClient interface {
 	// AddEvalQuery and RunEval keep and run an evaluation set (SRCH-019).
 	AddEvalQuery(ctx context.Context, collection string, q EvalQuery) (EvalQuery, error)
 	RunEval(ctx context.Context, req EvalRequest) (*EvalResult, error)
+	// Gain reports tokens returned and avoided by retrieval (AGT-004).
+	Gain(ctx context.Context, window string, daily bool) (*GainReport, error)
 	Classify(ctx context.Context, req *MCPClassifyRequest) (*MCPClassifyResponse, error)
 	// Synonyms
 	ListSynonyms(ctx context.Context, collection string) (*MCPSynonymListResponse, error)

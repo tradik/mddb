@@ -61,6 +61,8 @@ type VectorSearchResultItem struct {
 	// the group this result counted against and its 1-based place in it.
 	Group     string `json:"group,omitempty"`
 	GroupRank int    `json:"groupRank,omitempty"`
+	// docTokens is the whole document's size in chunk modes (AGT-004).
+	docTokens int
 	// PendingEmbedding is true for a document whose embedding is still queued:
 	// found by its text, not yet by its meaning (GO-042).
 	PendingEmbedding bool `json:"pendingEmbedding,omitempty"`
@@ -335,6 +337,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	if s.Metrics != nil {
 		s.Metrics.IncOp("vector_search", algo)
 	}
+	s.Gain.Search(gainKind{Type: SearchTypeVector, Algorithm: algo}) // AGT-004
 
 	// Load full documents for results
 	items := make([]VectorSearchResultItem, 0, len(results))
@@ -367,6 +370,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 				item.ChunkText, item.StartLine, item.EndLine =
 					chunkPassageWithLinesSize(doc.ContentMD, chunkIndex, windowSize,
 						s.chunkModeFor(req.Collection, &doc), s.chunkSizeFor(req.Collection))
+				item.docTokens = approxTokens(doc.ContentMD)
 			}
 			if !includeContent {
 				doc.ContentMD = ""
@@ -401,6 +405,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 				}
 				return approxTokens(it.Document.ContentMD)
 			})
+		countHits(s, items, func(it VectorSearchResultItem) gainSize {
+			return chunkHit(it.ChunkText, it.Document.ContentMD, it.docTokens)
+		})
 	}
 
 	// SRCH-006: reach documents the query matches on no term, by following the

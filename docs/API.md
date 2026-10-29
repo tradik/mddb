@@ -1567,6 +1567,37 @@ still-queued documents that match by text, marked `pendingEmbedding`. The SSE
 event `collection.indexed` fires when a collection's queue drains, and
 `/v1/stats` includes the server-wide figures under `indexing`.
 
+### GET /v1/gain
+
+What retrieval saved its callers over a window of days, for the whole
+server (v2.18.8, AGT-004). It reports searches by type, algorithm and hybrid
+fusion, and tokens returned. It also reports tokens avoided, meaning whole
+documents minus the passages or chunks returned instead. Read-only. The
+definitions are in [TELEMETRY.md](TELEMETRY.md#retrieval-gain-v2188).
+
+```bash
+curl "http://localhost:11023/v1/gain?window=30d"
+```
+
+```json
+{
+  "windowDays": 30, "from": "2026-09-30", "to": "2026-10-29",
+  "totals": {
+    "searches": {"vector": 7410, "hybrid": 5822, "fts": 5160},
+    "algorithms": {"hnsw": 9120, "bm25": 5160, "flat": 2140},
+    "fusion": {"rrf": 2560, "alpha": 3262},
+    "tokensReturned": 21700000, "tokensAvoided": 160700000,
+    "fragmentHits": 68102, "documentHits": 14922
+  },
+  "totalSearches": 18392,
+  "tokensWithoutRetrieval": 182400000,
+  "savedPercent": 88.1
+}
+```
+
+`window` accepts `7d`, `30` and so on, up to `365d`, and defaults to `30d`.
+`daily=true` adds a per-day breakdown under `daily`.
+
 ### POST /v1/eval
 
 Measure retrieval on the collection's own questions (v2.18.8, SRCH-019). An

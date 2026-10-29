@@ -16,6 +16,9 @@ func (stubStats) EmbeddingQueueSize() (int, bool) { return 3, true }
 func (stubStats) EmbeddingCacheStats() (uint64, uint64, int, bool) {
 	return 42, 7, 12, true
 }
+func (stubStats) RetrievalGain() (RetrievalGainView, bool) {
+	return RetrievalGainView{TokensReturned: 100, TokensAvoided: 900, FragmentHits: 3, DocumentHits: 1}, true
+}
 func (stubStats) ReplicationRole() string { return "leader" }
 func (stubStats) BinlogStats() (BinlogStatsView, bool) {
 	return BinlogStatsView{CurrentLSN: 5, FileSize: 100, OldestLSN: 1, Subscribers: 2}, true
@@ -47,6 +50,8 @@ func TestHandleMetricsOutput(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
+		"mddb_retrieval_tokens_avoided_total 900",
+		`mddb_retrieval_hits_total{shape="passage"} 3`,
 		"mddb_info{mode=\"rw\"}", "mddb_uptime_seconds",
 		`mddb_http_requests_total{method="POST",path="/v1/add",status="200"} 1`,
 		"mddb_http_request_duration_seconds_bucket", "mddb_http_request_duration_seconds_sum",

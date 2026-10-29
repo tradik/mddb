@@ -110,6 +110,7 @@ type Server struct {
 	WebhookManager     *webhooks.WebhookManager // Webhook subscriptions and delivery
 	SchemaManager      *schema.SchemaManager    // Per-collection metadata schema validation
 	Metrics            *metrics.Metrics         // Prometheus-compatible telemetry
+	Gain               *GainRecorder            // AGT-004: tokens returned and avoided, per day
 	AuthManager        *AuthManager             // Authentication and authorization
 	AuditManager       *audit.AuditManager      // Audit log (ISO 27001 A.8.15, SOC 2 CC7.2)
 	RateLimiter        *RateLimiter             // Cross-transport rate limiter (ISO 27001 A.5.30, SOC 2 CC6.6)
@@ -553,6 +554,10 @@ func main() {
 	}
 	s.TTLManager.StartCleanup(30 * time.Second)
 	slog.Info("TTL manager started (cleanup every 30s)")
+
+	// AGT-004: what retrieval saved its callers, counted per day.
+	s.Gain = NewGainRecorder(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
+	s.Gain.Start()
 
 	// Configure compression
 	compression.ConfigureCompression(srvCfg.Compression.Enabled, srvCfg.Compression.SmallThreshold, srvCfg.Compression.MediumThreshold)

@@ -49,6 +49,14 @@ type StatsProvider interface {
 	// has committed since it was created. Read live, not from the DBStats
 	// cache: its rate per request is the point of it (#306).
 	DBWriteTransactions() uint64
+	// RetrievalGain is what searches returned and saved since the process
+	// started (AGT-004); present is false when the counters are off.
+	RetrievalGain() (g RetrievalGainView, present bool)
+}
+
+// RetrievalGainView is the retrieval-gain counters since process start.
+type RetrievalGainView struct {
+	TokensReturned, TokensAvoided, FragmentHits, DocumentHits int64
 }
 
 // BinlogStatsView mirrors the binlog statistics needed for replication metrics.
@@ -379,6 +387,21 @@ func (m *Metrics) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 		writef(&buf, "# HELP mddb_embedding_cache_size Embeddings currently held in cache.\n")
 		writef(&buf, "# TYPE mddb_embedding_cache_size gauge\n")
 		writef(&buf, "mddb_embedding_cache_size %d\n\n", size)
+	}
+
+	if g, ok := m.stats.RetrievalGain(); ok {
+		writef(&buf, "# HELP mddb_retrieval_tokens_returned_total Estimated tokens returned by searches.\n")
+		writef(&buf, "# TYPE mddb_retrieval_tokens_returned_total counter\n")
+		writef(&buf, "mddb_retrieval_tokens_returned_total %d\n\n", g.TokensReturned)
+
+		writef(&buf, "# HELP mddb_retrieval_tokens_avoided_total Estimated tokens saved by returning passages or chunks instead of whole documents.\n")
+		writef(&buf, "# TYPE mddb_retrieval_tokens_avoided_total counter\n")
+		writef(&buf, "mddb_retrieval_tokens_avoided_total %d\n\n", g.TokensAvoided)
+
+		writef(&buf, "# HELP mddb_retrieval_hits_total Search hits by shape: a passage or chunk, or a whole document.\n")
+		writef(&buf, "# TYPE mddb_retrieval_hits_total counter\n")
+		writef(&buf, "mddb_retrieval_hits_total{shape=\"passage\"} %d\n", g.FragmentHits)
+		writef(&buf, "mddb_retrieval_hits_total{shape=\"document\"} %d\n\n", g.DocumentHits)
 	}
 
 	// --- Webhooks & schemas ---

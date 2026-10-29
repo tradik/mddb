@@ -869,6 +869,11 @@ class MDDBClient {
     return this.request(`/search-advisor?${params.toString()}`);
   }
 
+  // AGT-004: tokens returned and avoided by retrieval over a window of days.
+  async getGain({ window = '30d' } = {}) {
+    return this.request(`/gain?${new URLSearchParams({ window }).toString()}`);
+  }
+
   // CODE-005: what depends on this document, and what it depends on.
   async codeGraph({ collection, key, direction = 'both', depth = 1, maxDegree = 100, lines = false }) {
     const params = new URLSearchParams({ collection, key, direction, depth: String(depth), maxDegree: String(maxDegree) });

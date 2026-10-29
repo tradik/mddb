@@ -87,6 +87,17 @@ exits non-zero when any configuration scores under a threshold, which makes
 it a CI gate. See
 [docs/SEARCH.md](../../docs/SEARCH.md#measuring-instead-of-guessing-v2188).
 
+#### gain - What retrieval saved
+
+```bash
+mddb-cli gain [--window 30d]
+```
+
+Prints, for the whole server, the searches by type and algorithm, the
+tokens returned, and the tokens saved by passages and chunks compared with
+whole documents. Token counts are estimates. The definitions are in
+[docs/TELEMETRY.md](../../docs/TELEMETRY.md#retrieval-gain-v2188).
+
 #### autoindex - Index a directory or repository
 
 ```bash

@@ -150,6 +150,7 @@ func (s *Server) respondCrossText(w http.ResponseWriter, r *http.Request, req Cr
 	if s.Metrics != nil {
 		s.Metrics.IncOp("cross_search", req.SearchType)
 	}
+	s.countCross("", items, req.wantsPassages())
 	if req.wantsPassages() {
 		ok(w, s.crossPassages(req.Query, items, req.PassageOptions, waited))
 		return

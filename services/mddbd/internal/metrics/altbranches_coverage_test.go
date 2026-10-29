@@ -18,6 +18,7 @@ func (altStats) EmbeddingQueueSize() (int, bool) { return 0, false }
 // Caching disabled: the metric must be absent, not a zero that reads as
 // "the cache never hits".
 func (altStats) EmbeddingCacheStats() (uint64, uint64, int, bool) { return 0, 0, 0, false }
+func (altStats) RetrievalGain() (RetrievalGainView, bool)         { return RetrievalGainView{}, false }
 func (s altStats) ReplicationRole() string                        { return s.role }
 func (altStats) BinlogStats() (BinlogStatsView, bool)             { return BinlogStatsView{}, false }
 func (altStats) DBStats() DBStats                                 { return DBStats{} }

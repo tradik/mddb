@@ -207,6 +207,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	if s.Metrics != nil {
 		s.Metrics.IncOp("cross_search", algo)
 	}
+	s.countCross(algo, items, req.wantsPassages())
 	if req.wantsPassages() {
 		ok(w, s.crossPassages(req.Query, items, req.PassageOptions, waited))
 		return

@@ -85,12 +85,16 @@ func (s *Server) ResolveFormat(collection string, o PassageOptions) PassageOptio
 }
 
 // finishPassages applies the collection's context budget to passages, which
-// is what the caller receives in this format, and wraps them.
+// is what the caller receives in this format, and wraps them. Every passage
+// response passes here, so this is where passages are counted (AGT-004).
 func (s *Server) finishPassages(collection string, passages []Passage, indexing *IndexWaitResult) PassagesResponse {
 	if passages == nil {
 		passages = []Passage{}
 	}
 	passages, truncated := applyContextBudget(s, collection, passages, func(p Passage) int { return p.Tokens })
+	if s.Gain != nil {
+		s.Gain.Hits(passageHits(passages))
+	}
 	return PassagesResponse{Passages: passages, Total: len(passages), ContextTruncated: truncated, Indexing: indexing}
 }
 

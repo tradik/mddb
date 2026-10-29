@@ -52,6 +52,14 @@ func (a *serverMetricsStats) EmbeddingCacheStats() (uint64, uint64, int, bool) {
 
 func (a *serverMetricsStats) ReplicationRole() string { return a.s.ReplicationRole }
 
+// RetrievalGain reports the gain counters since start (AGT-004).
+func (a *serverMetricsStats) RetrievalGain() (metrics.RetrievalGainView, bool) {
+	if a.s.Gain == nil {
+		return metrics.RetrievalGainView{}, false
+	}
+	return a.s.Gain.Lifetime(), true
+}
+
 func (a *serverMetricsStats) BinlogStats() (metrics.BinlogStatsView, bool) {
 	if a.s.Binlog == nil {
 		return metrics.BinlogStatsView{}, false

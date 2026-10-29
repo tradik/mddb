@@ -147,6 +147,8 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolAddEvalQuery(ctx, args)
 	case "run_eval":
 		return s.toolRunEval(ctx, args)
+	case "get_gain":
+		return s.toolGetGain(ctx, args)
 	case "get_indexing_status":
 		return s.toolGetIndexingStatus(ctx, args)
 	case "classify_document":

@@ -1,0 +1,20 @@
+{
+  "description": "Find-the-code tasks on the MDDB repository for the agent benchmark (AGT-004). question is what the agent is asked; grep is the term an agent would search for first; answer is the file that holds the code to change. Run against a collection made with `mddb-cli autoindex` from the repository root.",
+  "tasks": [
+    {"id": "revision", "question": "where is the document revision token computed for conditional writes", "grep": "revision", "answer": "services/mddbd/document_update.go"},
+    {"id": "meta-entry", "question": "how is a metadata index entry split into key, value and document id", "grep": "meta|", "answer": "services/mddbd/meta_filter_index.go"},
+    {"id": "hit-line", "question": "how does a passage pick the line where the query terms meet", "grep": "hitLine", "answer": "services/mddbd/retrieval_passages.go"},
+    {"id": "budget", "question": "where are results cut to fit the context token budget", "grep": "budget", "answer": "services/mddbd/retrieval_budget.go"},
+    {"id": "include-paths", "question": "autoindex sets include paths for C headers in the collection config", "grep": "includePaths", "answer": "services/mddb-cli/autoindex_sync.go"},
+    {"id": "shutdown", "question": "in what order does the server shut its components down", "grep": "shutdown", "answer": "services/mddbd/shutdown.go"},
+    {"id": "freelist", "question": "where is the bbolt freelist persisted on close", "grep": "freelist", "answer": "services/mddbd/storage_open.go"},
+    {"id": "alpha", "question": "default alpha weight of hybrid search fusion", "grep": "alpha", "answer": "services/mddbd/hybrid_search.go"},
+    {"id": "ndcg", "question": "how is nDCG computed for an evaluation query", "grep": "ndcg", "answer": "services/mddbd/eval.go"},
+    {"id": "group-top", "question": "generic helper that keeps the top k items per group", "grep": "GroupTop", "answer": "services/mddbd/internal/sliceutil/sliceutil.go"},
+    {"id": "license", "question": "how does reference add detect the licence of a cloned repository", "grep": "license", "answer": "services/mddb-cli/reference_ops.go"},
+    {"id": "ready-searcher", "question": "fall back to the flat vector index while another index is loading", "grep": "loading", "answer": "services/mddbd/vector_load.go"},
+    {"id": "cross-text", "question": "cross-collection full-text search fused with reciprocal rank fusion", "grep": "rrf", "answer": "services/mddbd/cross_search_text.go"},
+    {"id": "toolsets", "question": "which MCP tools a request may see given its API key toolsets", "grep": "toolsets", "answer": "services/mddbd/mcp_custom_tools.go"},
+    {"id": "fail-below", "question": "parse the --fail-below thresholds of mddb-cli eval", "grep": "fail-below", "answer": "services/mddb-cli/cmd_eval.go"}
+  ]
+}

@@ -6,7 +6,7 @@ import (
 	json "mddb/internal/jsonx"
 )
 
-// Evaluation tools (SRCH-019): an agent records the queries it cares about
+// Evaluation and gain tools (SRCH-019, AGT-004): an agent records the queries it cares about
 // with the documents that answer them, then measures search configurations
 // on them instead of guessing which one is better.
 
@@ -103,4 +103,40 @@ func (c *DirectClient) AddEvalQuery(ctx context.Context, collection string, q Ev
 // RunEval runs the evaluation (SRCH-019).
 func (c *DirectClient) RunEval(ctx context.Context, req EvalRequest) (*EvalResult, error) {
 	return c.server.RunEval(ctx, req)
+}
+
+// mcpGainTool reports what retrieval saved (AGT-004).
+func mcpGainTool() MCPTool {
+	return MCPTool{
+		Name: "get_gain",
+		Description: "What retrieval saved over a window of days, server-wide: searches by type and algorithm, " +
+			"tokens returned, tokens avoided (whole documents minus the passages or chunks returned instead) and the " +
+			"share saved. Counts only, no queries or keys. Read-only.",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"window": map[string]interface{}{"type": "string", "description": "Days, e.g. 7d or 30d (default 30d, max 365d)"},
+				"daily":  map[string]interface{}{"type": "boolean", "description": "Add a per-day breakdown"},
+			},
+		},
+	}
+}
+
+// toolGetGain returns the gain report.
+func (s *MCPToolServer) toolGetGain(ctx context.Context, args map[string]interface{}) (string, error) {
+	rep, err := s.client.Gain(ctx, mcpGetString(args, "window"), mcpGetBool(args, "daily"))
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.MarshalIndent(rep, "", "  ")
+	return string(data), nil
+}
+
+// Gain reports retrieval gain over a window (AGT-004).
+func (c *DirectClient) Gain(ctx context.Context, window string, daily bool) (*GainReport, error) {
+	days, err := parseGainWindow(window)
+	if err != nil {
+		return nil, err
+	}
+	return c.server.Gain.Report(days, daily)
 }

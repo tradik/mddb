@@ -5214,6 +5214,57 @@ paths:
         "405":
           description: Method not allowed
 
+  /v1/gain:
+    get:
+      tags:
+        - Search
+      summary: What retrieval saved over a window of days
+      description: |
+        Server-wide counts over a window of days (AGT-004, v2.18.8). They
+        cover searches by type, algorithm and hybrid fusion, tokens returned,
+        and tokens avoided. Tokens avoided are whole documents minus the
+        passages or chunks returned instead. Counts only: no query text,
+        keys or collection names. Kept per day in the database, so restarts
+        do not reset them. Definitions are in docs/TELEMETRY.md. Also the
+        `get_gain` MCP tool.
+      operationId: getGain
+      parameters:
+        - name: window
+          in: query
+          required: false
+          schema:
+            type: string
+            default: 30d
+          description: Days, as 7d or 7, from 1 to 365.
+        - name: daily
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: Add a per-day breakdown.
+      responses:
+        "200":
+          description: The report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GainReport"
+        "400":
+          description: Invalid window
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "405":
+          description: Method not allowed
+
   /v1/eval:
     post:
       tags:
@@ -8874,6 +8925,62 @@ components:
           $ref: "#/components/schemas/RetrievalProfile"
         measured:
           $ref: "#/components/schemas/EvalResult"
+
+    GainCounters:
+      type: object
+      properties:
+        searches:
+          type: object
+          description: Searches by type (fts, vector, hybrid, cross).
+          additionalProperties:
+            type: integer
+        algorithms:
+          type: object
+          additionalProperties:
+            type: integer
+        fusion:
+          type: object
+          additionalProperties:
+            type: integer
+        tokensReturned:
+          type: integer
+        tokensAvoided:
+          type: integer
+        fragmentHits:
+          type: integer
+        documentHits:
+          type: integer
+
+    GainReport:
+      type: object
+      properties:
+        windowDays:
+          type: integer
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        totals:
+          $ref: "#/components/schemas/GainCounters"
+        totalSearches:
+          type: integer
+        tokensWithoutRetrieval:
+          type: integer
+          description: tokensReturned + tokensAvoided — the same hits as whole documents.
+        savedPercent:
+          type: number
+        daily:
+          type: array
+          items:
+            allOf:
+              - $ref: "#/components/schemas/GainCounters"
+              - type: object
+                properties:
+                  date:
+                    type: string
+                    format: date
 
     EvalQuery:
       type: object

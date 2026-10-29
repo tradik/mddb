@@ -135,6 +135,36 @@ The names behind the misses are in the log, not the metric — see
 
 Database metrics are cached for 15 seconds to avoid excessive BoltDB scans.
 
+### Retrieval gain (v2.18.8+)
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `mddb_retrieval_tokens_returned_total` | counter | -- | Estimated tokens searches returned |
+| `mddb_retrieval_tokens_avoided_total` | counter | -- | Estimated tokens saved by returning passages or chunks instead of whole documents |
+| `mddb_retrieval_hits_total` | counter | `shape` (`passage`, `document`) | Search hits by what was returned |
+
+These count since the process started. The same counts are kept per day in
+the database, so `GET /v1/gain`, the MCP tool `get_gain` and `mddb-cli gain`
+report a window of days across restarts. Searches per algorithm are the
+existing `mddb_operations_total` series.
+
+**Definitions.** These numbers are only worth what their definitions are,
+so here they are.
+
+- **tokensReturned** is the estimated size of what a search handed back. It
+  uses 4 bytes per token, the same estimate the context budget uses.
+- **tokensAvoided** applies only to a hit returned as a passage, chunk or
+  window. It is the hit's whole document minus what was returned. The
+  baseline is reading the document the hit came from, never the whole
+  collection, so the number is conservative. Several passages from one
+  document count that document once.
+- **fragmentHits** and **documentHits** count hits returned as a fragment
+  and as a whole document.
+
+The counters hold counts only: no query text, no keys, no collection names.
+They are written once a minute and at shutdown. Cached full-text responses
+and evaluation runs (`POST /v1/eval`) are not counted.
+
 ### Vector Search
 
 | Metric | Type | Labels | Description |

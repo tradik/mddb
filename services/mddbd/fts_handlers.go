@@ -46,7 +46,8 @@ type FTSSearchRequest struct {
 	// query and filters, before pagination, and also fills `matched`.
 	FacetScope string `json:"facetScope,omitempty"`
 	// skipContextBudget lets a caller apply the collection's context budget
-	// itself — MCP does, after dropping bodies the agent did not ask for.
+	// itself — MCP does, after dropping bodies the agent did not ask for. Such
+	// a caller also counts the search for the gain report (AGT-004).
 	skipContextBudget bool
 	// CacheTTL opts this request into the search-result cache for the given
 	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
@@ -356,6 +357,10 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	if s.Metrics != nil {
 		s.Metrics.IncOp("fts_search", mode+"/"+algo)
 	}
+	// AGT-004: a caller that finishes the response itself counts it too.
+	if !req.skipContextBudget {
+		s.Gain.Search(gainKind{Type: SearchTypeFTS, Algorithm: algo})
+	}
 
 	// Apply metadata filter to results
 	if allowed != nil {
@@ -467,6 +472,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 		resp.Results, contextTruncated = applyContextBudget(s, req.Collection, resp.Results,
 			func(r FTSResultWithDoc) int { return approxTokens(r.Document.ContentMD) })
 		resp.ContextTruncated = contextTruncated
+		countHits(s, resp.Results, func(r FTSResultWithDoc) gainSize { return wholeDoc(r.Document.ContentMD) })
 	}
 
 	resp.Total = len(resp.Results)

@@ -31,7 +31,10 @@ func (toolLogStubStats) VectorIndexReady() bool                           { retu
 func (toolLogStubStats) EmbeddingConfigured() bool                        { return false }
 func (toolLogStubStats) EmbeddingQueueSize() (int, bool)                  { return 0, false }
 func (toolLogStubStats) EmbeddingCacheStats() (uint64, uint64, int, bool) { return 0, 0, 0, false }
-func (toolLogStubStats) ReplicationRole() string                          { return "" }
+func (toolLogStubStats) RetrievalGain() (metrics.RetrievalGainView, bool) {
+	return metrics.RetrievalGainView{}, false
+}
+func (toolLogStubStats) ReplicationRole() string { return "" }
 func (toolLogStubStats) BinlogStats() (metrics.BinlogStatsView, bool) {
 	return metrics.BinlogStatsView{}, false
 }

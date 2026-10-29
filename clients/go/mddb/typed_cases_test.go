@@ -47,6 +47,38 @@ func typedCases() []typedCase {
 			},
 		},
 		{
+			name: "Eval",
+			call: func(ctx context.Context, c *Client) (any, error) {
+				return c.Eval(ctx, map[string]any{"collection": "docs"})
+			},
+			method: "POST", path: "/v1/eval",
+			wantBody: `"collection":"docs"`,
+			respBody: `{"k":10,"results":[]}`,
+			check: func(t *testing.T, got any) {
+				if !strings.Contains(string(got.(json.RawMessage)), `"k":10`) {
+					t.Errorf("Eval = %s", got)
+				}
+			},
+		},
+		{
+			name:   "Gain",
+			call:   func(ctx context.Context, c *Client) (any, error) { return c.Gain(ctx, "7d", true) },
+			method: "GET", path: "/v1/gain?daily=true&window=7d",
+			respBody: `{"windowDays":7}`,
+			check: func(t *testing.T, got any) {
+				if !strings.Contains(string(got.(json.RawMessage)), `"windowDays":7`) {
+					t.Errorf("Gain = %s", got)
+				}
+			},
+		},
+		{
+			name:   "GainDefault",
+			call:   func(ctx context.Context, c *Client) (any, error) { return c.Gain(ctx, "", false) },
+			method: "GET", path: "/v1/gain",
+			respBody: `{"windowDays":30}`,
+			check:    func(t *testing.T, got any) {},
+		},
+		{
 			name: "Ingest",
 			call: func(ctx context.Context, c *Client) (any, error) {
 				return c.Ingest(ctx, IngestRequest{Collection: "blog",

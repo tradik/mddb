@@ -69,6 +69,16 @@ under each configuration: fts/ALGORITHM, vector[/INDEX] or hybrid. It prints
 recall@k, nDCG@k, MRR, p50/p99 latency and returned tokens. With
 \fB\-\-fail\-below\fR (metrics recall, ndcg, mrr; @N sets k) it exits non-zero
 when any configuration scores under a threshold or fails to run.
+.SS gain
+Show what retrieval saved (v2.18.8).
+.PP
+.B mddb-cli gain
+[\fB\-\-window\fR \fIDAYS\fRd]
+.PP
+Reports, for the whole server over the window (default 30d, max 365d), the
+searches by type and algorithm, the estimated tokens returned, and the tokens
+avoided. Tokens avoided are whole documents minus the passages and chunks
+returned instead.
 .SS autoindex
 Index every text file under a directory into one collection (v2.18.8).
 .PP

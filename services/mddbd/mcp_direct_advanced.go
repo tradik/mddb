@@ -408,6 +408,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		items := s.crossTextItems(ctx, crossTextParams{SearchType: req.SearchType, Query: req.Query,
 			Targets: req.TargetCollections, TopK: crossTopK(req.TopK), FilterMeta: req.FilterMeta, Filter: req.Filter,
 			GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
+		s.countCross("", items, req.wantsPassages())
 		if req.wantsPassages() {
 			p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
 			return &MCPCrossSearchResponse{Passages: &p}, nil
@@ -478,6 +479,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 		FilterMeta: req.FilterMeta, Filter: req.Filter, GroupBy: req.GroupBy,
 		IncludeContent: req.IncludeContent || req.wantsPassages(),
 	})
+	s.countCross(algo, items, req.wantsPassages())
 
 	if req.wantsPassages() {
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)

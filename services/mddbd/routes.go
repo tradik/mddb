@@ -105,6 +105,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	// SRCH-019: measure retrieval on the collection's own evaluation set.
 	mux.HandleFunc("/v1/eval", s.withSearchLimit(s.handleEval))
 	mux.HandleFunc("/v1/eval-queries", s.handleEvalQueries)
+	// AGT-004: tokens returned and avoided by retrieval, per day.
+	mux.HandleFunc("/v1/gain", s.handleGain)
 	mux.HandleFunc("/v1/collection-configs", s.handleCollectionConfigList)
 	mux.HandleFunc("/v1/curation", s.handleCuration)
 	mux.HandleFunc("/v1/events", s.handleSSE)

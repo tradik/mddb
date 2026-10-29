@@ -137,6 +137,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		}
 	}
 
+	if !req.noGain {
+		s.Gain.Search(gainKind{Type: SearchTypeVector, Algorithm: algo}) // AGT-004
+	}
 	items := make([]MCPVectorSearchResult, 0, len(results))
 	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
@@ -167,6 +170,7 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 				item.ChunkText, item.StartLine, item.EndLine =
 					chunkPassageWithLinesSize(doc.ContentMD, chunkIndex, windowSize,
 						c.server.chunkModeFor(req.Collection, &doc), c.server.chunkSizeFor(req.Collection))
+				item.docTokens = approxTokens(doc.ContentMD)
 			}
 			if !includeContent {
 				doc.ContentMD = ""
@@ -224,6 +228,11 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	resp.Results, resp.ContextTruncated = applyContextBudget(s, req.Collection, resp.Results,
 		func(r MCPVectorSearchResult) int { return approxTokens(r.Document.ContentMD) })
 	resp.Total = len(resp.Results)
+	if !req.noGain {
+		countHits(s, resp.Results, func(r MCPVectorSearchResult) gainSize {
+			return chunkHit(r.ChunkText, r.Document.ContentMD, r.docTokens)
+		})
+	}
 
 	return resp, nil
 }
@@ -404,6 +413,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		return nil, err
 	}
 
+	c.server.Gain.Search(gainKind{Type: SearchTypeFTS, Algorithm: full.Algorithm}) // AGT-004
 	if full.passages != nil {
 		return &MCPFTSSearchResponse{Passages: full.passages, Algorithm: full.Algorithm}, nil
 	}
@@ -434,6 +444,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 	// after bodies the agent did not ask for have been dropped.
 	resp.Results, resp.ContextTruncated = applyContextBudget(c.server, req.Collection, resp.Results,
 		func(r MCPFTSResult) int { return approxTokens(r.Document.ContentMD) })
+	countHits(c.server, resp.Results, func(r MCPFTSResult) gainSize { return wholeDoc(r.Document.ContentMD) })
 
 	resp.Total = len(resp.Results)
 	return resp, nil
@@ -524,6 +535,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if err != nil {
 		return nil, err
 	}
+	c.server.Gain.Search(gainKind{Type: SearchTypeHybrid, Algorithm: httpReq.VectorAlgorithm, Fusion: httpReq.Strategy}) // AGT-004
 	if req.wantsPassages() {
 		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited)
 		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy}, nil
@@ -563,6 +575,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	// prompt, was the one path that never had it applied.
 	resp.Results, resp.ContextTruncated = applyContextBudget(c.server, req.Collection, resp.Results,
 		func(r MCPHybridSearchResult) int { return approxTokens(r.Document.ContentMD) })
+	countHits(c.server, resp.Results, func(r MCPHybridSearchResult) gainSize { return wholeDoc(r.Document.ContentMD) })
 
 	resp.Total = len(resp.Results)
 

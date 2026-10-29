@@ -47,6 +47,7 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"search_advisor":          readOnly(),
 	"get_indexing_status":     readOnly(),
 	"run_eval":                readOnly(),
+	"get_gain":                readOnly(),
 	"add_eval_query":          writeIdempotent(),
 	"code_symbol":             readOnly(),
 	"reference_search":        readOnly(),

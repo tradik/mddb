@@ -17,6 +17,7 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 🔐 **Encryption Panel** (2.9.16+) - At-rest key posture, per-collection coverage (primary / legacy / plaintext), rotation job table, and a one-click "Start rotation" control
 - 📜 **Audit Log Panel** - Stream `GET /v1/audit` with actor / action / result / time filters and a visible dropped-buffer counter
 - 🪝 **Webhooks Panel** - Register, list, and delete webhooks with one-click subscription to incident events
+- 📉 **Retrieval Gain** (2.18.8+) - On the System page: searches, tokens returned and tokens saved by passages over the last 30 days, from `GET /v1/gain`
 
 ## Screenshots
 

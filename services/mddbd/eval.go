@@ -200,7 +200,7 @@ func (s *Server) evalSearch(ctx context.Context, collection string, k int, c Eva
 		}
 	case SearchTypeVector:
 		resp, err := NewDirectClient(s).VectorSearch(ctx, &MCPVectorSearchRequest{Collection: collection, Query: query, TopK: k,
-			Algorithm: c.VectorAlgorithm, RetrievalMode: c.RetrievalMode, IncludeContent: true})
+			Algorithm: c.VectorAlgorithm, RetrievalMode: c.RetrievalMode, IncludeContent: true, noGain: true})
 		if err != nil {
 			return nil, 0, err
 		}

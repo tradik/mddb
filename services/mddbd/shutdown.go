@@ -71,6 +71,13 @@ func (s *Server) shutdownSteps() []shutdownStep {
 	//    The freelist (#333), after the last queued write: stored once, the
 	//    next start reads it rather than walking the file. Commits after
 	//    this one store it too.
+	//    The gain counters (AGT-004) write their last minute of counts.
+	add("gain", s.Gain != nil && s.DB != nil, func() {
+		if err := s.Gain.Stop(); err != nil {
+			slog.Warn("gain counters not stored", "err", err)
+		}
+	})
+
 	add("freelist", s.DB != nil, func() {
 		if err := persistFreelist(s.DB); err != nil {
 			slog.Warn("the next start will walk the database", "err", err)

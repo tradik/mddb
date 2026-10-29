@@ -199,6 +199,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		bad(w, fmt.Errorf("unknown strategy: %s, available: alpha, rrf", req.Strategy))
 		return
 	}
+	s.Gain.Search(gainKind{Type: SearchTypeHybrid, Algorithm: req.VectorAlgorithm, Fusion: req.Strategy}) // AGT-004
 
 	// Normalize + validate sort mode. "distance" only makes sense when the
 	// request also carries a geo filter (otherwise every result's
@@ -356,6 +357,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	// so the budget trims the tail of an already-ranked list.
 	items, contextTruncated := applyContextBudget(s, req.Collection, items,
 		func(it HybridSearchResultItem) int { return approxTokens(it.Document.ContentMD) })
+	countHits(s, items, func(it HybridSearchResultItem) gainSize { return wholeDoc(it.Document.ContentMD) })
 
 	resp := HybridSearchResponse{
 		Results:         items,

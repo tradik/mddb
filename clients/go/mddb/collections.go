@@ -69,3 +69,21 @@ func (c *Client) SearchAdvisor(ctx context.Context, collection string, apply boo
 func (c *Client) Eval(ctx context.Context, req any) (json.RawMessage, error) {
 	return c.Do(ctx, "POST", "/v1/eval", req)
 }
+
+// Gain reports what retrieval saved over a window such as "30d" (AGT-004):
+// searches by type and algorithm, tokens returned and avoided. daily adds a
+// per-day breakdown. The report is returned as the server sends it.
+func (c *Client) Gain(ctx context.Context, window string, daily bool) (json.RawMessage, error) {
+	q := url.Values{}
+	if window != "" {
+		q.Set("window", window)
+	}
+	if daily {
+		q.Set("daily", "true")
+	}
+	path := "/v1/gain"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	return c.Do(ctx, "GET", path, nil)
+}

@@ -118,6 +118,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the MDDB docs ships in `tools/bench/evalsets/docs.json`, and its results
   are in `docs/BENCHMARK.md`. A Go test runs that set with BM25 on every
   build.
+- **Retrieval gain (AGT-004).** MDDB had a context budget but did not count
+  what it returned or saved. Searches now count tokens returned and tokens
+  avoided, meaning whole documents minus the passages or chunks returned
+  instead. They also count searches by type, algorithm and fusion. The
+  counts are kept per day in the database and survive restarts. They are
+  reported by `GET /v1/gain`, the MCP tool `get_gain`, `mddb-cli gain`, a
+  card on the panel's System page, and three Prometheus counters. Counts
+  only: no queries or keys. `tools/bench/agent` compares grep-and-read with
+  MDDB passages on 15 find-the-code tasks over this repository. Vector
+  passages found the same 13 answers as grep with 0.6× the tokens of grep's
+  best case, in one call per task (`docs/BENCHMARK.md`).
 
 ### Fixed
 
