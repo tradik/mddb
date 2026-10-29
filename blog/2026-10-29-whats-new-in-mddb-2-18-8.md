@@ -6,7 +6,7 @@ type: post
 date: 2026-10-29
 tags: [release, agents, search, mcp, retrieval]
 excerpt: "MDDB 2.18.8 is about agents that work on code: passages instead of files, a repository indexed in one command, reference code to learn from, edits that cannot overwrite each other, and numbers for what search is worth."
-description: "MDDB 2.18.8: passages instead of files, a repository indexed in one command, safe concurrent edits, and measured search quality."
+description: "MDDB 2.18.8: passages instead of files, a repository indexed in one command, safe concurrent edits, aliases, and measured search quality."
 ---
 
 MDDB 2.18.8 is for agents that work on code. An agent that edits a project
@@ -143,9 +143,43 @@ are phrased the way people ask, and the code uses other words. That is the
 kind of thing an evaluation set on your own questions will show you.
 [The benchmark](/docs/benchmark/) has the method and every number.
 
+## Aliases and bulk changes
+
+An alias is a stable name for a collection. Build `docs-v2` with a new
+embedding model, then run `mddb-cli reindex-swap docs --into docs-v2`. It
+copies the documents, waits until they are indexed, and moves `docs` to the
+new collection in one step. The old collection stays, so a rollback is one
+command.
+
+`delete_where`, `update_where` and `set_ttl_where` act on every document a
+metadata filter matches. Each document goes through the normal write path,
+and a dry run shows first what would change.
+
+## gRPC catches up
+
+The gRPC search calls were separate copies of the search code, and they had
+fallen behind REST and MCP. They now call the same code, so gRPC gets
+filters, grouping, passages, read-your-writes, symbol lookup, evaluation and
+gain as well.
+
+## Fixes worth knowing about
+
+- **Two writes in the same second no longer lose a revision**
+  ([#358](https://github.com/tradik/mddb/issues/358)).
+- **Raising test coverage to 97% for every file this release touched found
+  several crashes.** A cancelled gRPC batch, a short memory session ID, a
+  missing MCP-keys bucket, and startup with automations disabled could all
+  crash the server.
+
 ## Upgrading
 
 Nothing to migrate. All new fields are optional, and a write without
-`expectedRevision` behaves as before. Download 2.18.8 from
+`expectedRevision` behaves as before.
+
+One status code changes. A request for a document or revision that doesn't
+exist now answers **404 instead of 400**, with the same JSON body. A client
+that checks for 400 to detect a missing document has to check for 404.
+
+Download 2.18.8 from
 [GitHub releases](https://github.com/tradik/mddb/releases), or run
 `mddb-cli self-update`.
