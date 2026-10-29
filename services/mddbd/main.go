@@ -153,6 +153,8 @@ type Server struct {
 	collMu          sync.Mutex                // #336: guards collFiles
 	collFiles       *collectionFiles          // #336: per-collection files, nil in the single-file layout
 	vectorLoad      vectorLoadRef             // #346: the vector index load in progress
+	summaryOnce     sync.Once                 // RAG-009: builds summaryIdx on first use
+	summaryIdx      *summaryIndex             // RAG-009: the summary vectors, apart from every chunk index
 	reindexJobs     reindexJobs               // #347: background vector reindexes
 	walks           walkCache                 // #349: results of whole-database walks (stats, vector-stats, storage)
 	dbProbe         dbProbe                   // #350: the /health transaction in flight

@@ -121,6 +121,7 @@ func (s *Server) loadVectorIndex() {
 	defer load.finish()
 
 	totalLoaded := 0
+	s.summaries().reset() // RAG-009: reloaded per collection below
 	for _, collection := range load.order() {
 		count := counts[collection]
 		load.begin(collection)
@@ -164,6 +165,7 @@ func (s *Server) loadVectorIndex() {
 		if diskOnly {
 			collVecs = nil // nothing to train float32 indexes with
 		}
+		s.loadSummaryVectors(collection, diskOnly) // RAG-009
 
 		// Trigger training for trainable indexes (IVF, PQ)
 		for _, searcher := range s.VectorSearchers {
@@ -326,6 +328,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
 	}
 	results = s.rescoreFeedback(fb, req.Collection, results, metric) // SRCH-015, rescore mode
+	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, ""),
+		Query: queryVector, SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Allowed: allowedIDs,
+		Filtered: filtered, Metric: metric}, results, ps.Plan) // RAG-009
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
 	var bestChunk map[string]int
@@ -441,7 +446,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 				best = -1
 			}
 			hits = append(hits, passageSource{doc: it.Document, score: float64(it.Score), chunkText: it.ChunkText,
-				startLine: it.StartLine, endLine: it.EndLine, bestChunk: best, terms: terms})
+				startLine: it.StartLine, endLine: it.EndLine, bestChunk: best, terms: terms,
+				chunks: ps.Plan.expandedChunks(it.Document.ID)})
 		}
 		ok(w, s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited))
 		return

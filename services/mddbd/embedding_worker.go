@@ -27,6 +27,9 @@ type EmbeddingJob struct {
 	ChunkMode ChunkMode
 	// ChunkSize is the collection's chunk size (#325); 0 uses the worker's.
 	ChunkSize int
+	// Summary is the document's client-written summary (RAG-009), embedded
+	// as a vector of its own after the chunks; "" removes one it had.
+	Summary string
 }
 
 // EmbeddingWorker processes embedding jobs asynchronously.
@@ -323,6 +326,14 @@ func (w *EmbeddingWorker) Pending() *pending.Tracker { return w.pending }
 var embeddingRetryDelay = time.Second
 
 func (w *EmbeddingWorker) processJob(job EmbeddingJob) jobOutcome {
+	if out := w.processChunks(job); out != jobDone {
+		return out
+	}
+	return w.processSummary(job) // RAG-009, summary_embed.go
+}
+
+// processChunks embeds the document's chunks: processJob without the summary.
+func (w *EmbeddingWorker) processChunks(job EmbeddingJob) jobOutcome {
 	contentHash := vec.ContentHash(job.ContentMD)
 
 	// Check if content already has a matching embedding

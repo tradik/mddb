@@ -165,4 +165,5 @@ func (s *Server) dropCollectionVectors(collection string) {
 	if s.VectorIndex != nil {
 		s.VectorIndex.DropCollection(collection)
 	}
+	s.summaries().drop(collection) // RAG-009; DeleteCollection removed the stored ones
 }

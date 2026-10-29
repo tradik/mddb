@@ -2899,6 +2899,8 @@ curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d 
 | `oversample` | number | 1.0–10.0. Candidates fetched per requested result before deduplication or merging — see [SEARCH.md](SEARCH.md#oversampling-v2120) for measured effect |
 | `contextTokenBudget` | integer | Cap on total returned context, in tokens |
 | `groupBy` | object | Default result grouping, e.g. `{"key": "path", "perGroup": 1}` for one passage per file (v2.18.8+); a request's own `groupBy` wins |
+| `summaryMode` | string | `off` (default) \| `blend` \| `expand`: what the documents' client-written summaries (metadata key `summary`) do on vector and hybrid search (v2.18.9+) — see [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189) |
+| `summaryWeight` | number | 0–10. BM25F weight of `meta.summary` while `summaryMode` is not `off`; unset = 2.0 (v2.18.9+) |
 
 **The context budget drops results, it does not truncate them.** Half a document
 still costs tokens and no longer says anything reliable, so the budget trims the

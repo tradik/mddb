@@ -491,6 +491,8 @@ func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisor
 			TypeTokenRatio:       p.TypeTokenRatio,
 			CodeDocuments:        clampInt32(p.CodeDocuments),
 			EstimatedVectorBytes: p.EstimatedVectorBytes,
+			SummaryDocuments:     clampInt32(p.SummaryDocuments),
+			SummaryRatio:         p.SummaryRatio,
 		},
 		SearchType:      rec.SearchType,
 		FtsAlgorithm:    rec.FTSAlgorithm,
@@ -499,6 +501,7 @@ func (g *GRPCServer) SearchAdvisor(ctx context.Context, req *proto.SearchAdvisor
 		HybridAlpha:     rec.HybridAlpha,
 		RetrievalMode:   rec.RetrievalMode,
 		TopK:            clampInt32(rec.TopK),
+		SummaryMode:     rec.SummaryMode,
 		Reasons:         rec.Reasons,
 		Warnings:        rec.Warnings,
 	}, nil

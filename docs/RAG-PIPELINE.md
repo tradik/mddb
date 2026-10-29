@@ -595,6 +595,49 @@ def hybrid_search(query: str, top_k: int = 5) -> list:
     return merged[:top_k]
 ```
 
+## Summaries for General Questions (v2.18.9+)
+
+Chunks answer specific questions. Questions like "what is this document
+about" or "what are the main risks" match a summary better than any single
+chunk. Returning the whole parent document instead costs far more tokens.
+
+**Your pipeline writes the summary; MDDB does not.** There is no LLM in the
+server. Store the summary in the document's metadata key `summary`. You can
+do this when you import the document, or later with an LLM of your own:
+
+```python
+# After import: summarise with your LLM, write the summary back.
+summary = my_llm.summarise(doc["contentMd"])           # your call, your model
+requests.patch("http://localhost:11023/v1/update", json={
+    "collection": "blog", "key": doc["key"], "lang": "en",
+    "meta": {**doc["meta"], "summary": [summary]},
+})
+```
+
+An automation webhook that calls your LLM and writes the result back with
+`PATCH /v1/update` does the same thing without a script.
+
+Then switch summaries on for the collection:
+
+```bash
+curl -X PUT http://localhost:11023/v1/collection-config \
+  -d '{"collection": "blog", "retrieval": {"summaryMode": "expand", "contextTokenBudget": 4000}}'
+```
+
+- `blend`: a document ranks by the better of its best chunk and its summary.
+  A general question finds the document even when no chunk answers it.
+- `expand`: a summary hit also returns the document's best chunks (up to 3,
+  fewer if `contextTokenBudget` cannot hold them). With `format: "passages"`,
+  the prompt gets the passages that support the summary, not the whole
+  document.
+
+MDDB embeds the summary separately from the chunks. It embeds it again only
+when the text changes, and it counts against the collection's embedding
+budget. `summaryMode: "off"` (the default) returns exactly what a search
+returned before. Run `POST /v1/eval` with configurations that differ only in
+`summaryMode` to see whether summaries raise recall on your own questions.
+For the full reference, see [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189).
+
 ## Production Tips
 
 1. **Embedding provider**: OpenAI `text-embedding-3-small` gives the best price/quality ratio. For local/free use Ollama with `nomic-embed-text`.

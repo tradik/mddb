@@ -201,6 +201,7 @@ func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew b
 			ContentMD:  saved.ContentMD,
 			ChunkMode:  s.chunkModeFor(collection, &saved),
 			ChunkSize:  s.chunkSizeFor(collection),
+			Summary:    documentSummary(&saved), // RAG-009
 		})
 	}
 
@@ -334,7 +335,9 @@ func (s *Server) deleteDocumentInternal(collection, key, lang string) error {
 		return err
 	}
 
-	// Clean up vector embedding (legacy key + all chunk keys)
+	// Clean up vector embedding (legacy key + all chunk keys), and the
+	// summary vector (RAG-009).
+	s.dropDocumentSummary(collection, docID)
 	if s.VectorStore != nil {
 		_ = s.VectorStore.Delete(collection, docID)
 		for _, searcher := range s.VectorSearchers {
@@ -412,7 +415,8 @@ func (s *Server) invalidateDocReadCaches(collection, key, lang string) {
 // FTS/geo reindexing, webhooks and metrics entirely, so a gRPC Get served the
 // pre-update document for up to the cache TTL and FTS kept matching the old
 // content. One pipeline, like runPostWriteHooks for Add (GO-001), keeps the
-// transports from drifting again.
+// transports from drifting again. contentChanged is also true when only the
+// summary changed (RAG-009): both re-embed and re-index the document.
 func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.Doc, contentChanged, ttlChanged bool) {
 	s.invalidateDocReadCaches(collection, key, lang)
 
@@ -427,6 +431,7 @@ func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.
 			ContentMD:  saved.ContentMD,
 			ChunkMode:  s.chunkModeFor(collection, &saved),
 			ChunkSize:  s.chunkSizeFor(collection),
+			Summary:    documentSummary(&saved), // RAG-009
 		})
 	}
 

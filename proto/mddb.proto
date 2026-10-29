@@ -1122,6 +1122,8 @@ message RetrievalProfileProto {
   optional double bm25_k1 = 12;     // (SRCH-018) BM25 term-frequency saturation, 0-3; unset = 1.2
   optional double bm25_b = 13;      // (SRCH-018) BM25 length normalisation, 0-1; unset = 0.75
   string vector_algorithm = 14;     // (SRCH-013) default vector index; "auto" = the query planner chooses
+  string summary_mode = 15;         // (RAG-009) client-written summaries on a search: off (default), blend, expand
+  optional double summary_weight = 16; // (RAG-009) BM25F weight of meta.summary when summary_mode is not off, 0-10; unset = 2.0
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.
@@ -1784,6 +1786,8 @@ message CollectionProfile {
   double type_token_ratio = 10;
   int32 code_documents = 11;
   int64 estimated_vector_bytes = 12;
+  int32 summary_documents = 13;     // (RAG-009) sampled documents carrying a client-written summary
+  double summary_ratio = 14;        // (RAG-009) their share of the sample, 0-1
 }
 
 // SearchAdvisorResponse is the advice, with the reasons for it.
@@ -1796,6 +1800,7 @@ message SearchAdvisorResponse {
   double hybrid_alpha = 6;
   string retrieval_mode = 7;
   int32 top_k = 8;
+  string summary_mode = 11;         // (RAG-009) blend when most documents carry a summary; empty otherwise
   // One line per decision, in plain language. A recommendation nobody can
   // argue with is one nobody should follow.
   repeated string reasons = 9;
@@ -1889,6 +1894,7 @@ message EvalConfigProto {
   string retrieval_mode = 7;
   optional double bm25_k1 = 8;                   // (SRCH-018) BM25 parameters to try on fts and hybrid
   optional double bm25_b = 9;
+  string summary_mode = 10;                      // (RAG-009) off, blend or expand; empty = the collection profile's
 }
 
 message RunEvalRequest {

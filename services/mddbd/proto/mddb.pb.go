@@ -7556,6 +7556,8 @@ type RetrievalProfileProto struct {
 	Bm25K1             *float64 `protobuf:"fixed64,12,opt,name=bm25_k1,json=bm25K1,proto3,oneof" json:"bm25_k1,omitempty"`                               // (SRCH-018) BM25 term-frequency saturation, 0-3; unset = 1.2
 	Bm25B              *float64 `protobuf:"fixed64,13,opt,name=bm25_b,json=bm25B,proto3,oneof" json:"bm25_b,omitempty"`                                  // (SRCH-018) BM25 length normalisation, 0-1; unset = 0.75
 	VectorAlgorithm    string   `protobuf:"bytes,14,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"`            // (SRCH-013) default vector index; "auto" = the query planner chooses
+	SummaryMode        string   `protobuf:"bytes,15,opt,name=summary_mode,json=summaryMode,proto3" json:"summary_mode,omitempty"`                        // (RAG-009) client-written summaries on a search: off (default), blend, expand
+	SummaryWeight      *float64 `protobuf:"fixed64,16,opt,name=summary_weight,json=summaryWeight,proto3,oneof" json:"summary_weight,omitempty"`          // (RAG-009) BM25F weight of meta.summary when summary_mode is not off, 0-10; unset = 2.0
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -7686,6 +7688,20 @@ func (x *RetrievalProfileProto) GetVectorAlgorithm() string {
 		return x.VectorAlgorithm
 	}
 	return ""
+}
+
+func (x *RetrievalProfileProto) GetSummaryMode() string {
+	if x != nil {
+		return x.SummaryMode
+	}
+	return ""
+}
+
+func (x *RetrievalProfileProto) GetSummaryWeight() float64 {
+	if x != nil && x.SummaryWeight != nil {
+		return *x.SummaryWeight
+	}
+	return 0
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.
@@ -13164,6 +13180,8 @@ type CollectionProfile struct {
 	TypeTokenRatio       float64 `protobuf:"fixed64,10,opt,name=type_token_ratio,json=typeTokenRatio,proto3" json:"type_token_ratio,omitempty"`
 	CodeDocuments        int32   `protobuf:"varint,11,opt,name=code_documents,json=codeDocuments,proto3" json:"code_documents,omitempty"`
 	EstimatedVectorBytes int64   `protobuf:"varint,12,opt,name=estimated_vector_bytes,json=estimatedVectorBytes,proto3" json:"estimated_vector_bytes,omitempty"`
+	SummaryDocuments     int32   `protobuf:"varint,13,opt,name=summary_documents,json=summaryDocuments,proto3" json:"summary_documents,omitempty"` // (RAG-009) sampled documents carrying a client-written summary
+	SummaryRatio         float64 `protobuf:"fixed64,14,opt,name=summary_ratio,json=summaryRatio,proto3" json:"summary_ratio,omitempty"`            // (RAG-009) their share of the sample, 0-1
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -13282,6 +13300,20 @@ func (x *CollectionProfile) GetEstimatedVectorBytes() int64 {
 	return 0
 }
 
+func (x *CollectionProfile) GetSummaryDocuments() int32 {
+	if x != nil {
+		return x.SummaryDocuments
+	}
+	return 0
+}
+
+func (x *CollectionProfile) GetSummaryRatio() float64 {
+	if x != nil {
+		return x.SummaryRatio
+	}
+	return 0
+}
+
 // SearchAdvisorResponse is the advice, with the reasons for it.
 type SearchAdvisorResponse struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
@@ -13293,6 +13325,7 @@ type SearchAdvisorResponse struct {
 	HybridAlpha     float64                `protobuf:"fixed64,6,opt,name=hybrid_alpha,json=hybridAlpha,proto3" json:"hybrid_alpha,omitempty"`
 	RetrievalMode   string                 `protobuf:"bytes,7,opt,name=retrieval_mode,json=retrievalMode,proto3" json:"retrieval_mode,omitempty"`
 	TopK            int32                  `protobuf:"varint,8,opt,name=top_k,json=topK,proto3" json:"top_k,omitempty"`
+	SummaryMode     string                 `protobuf:"bytes,11,opt,name=summary_mode,json=summaryMode,proto3" json:"summary_mode,omitempty"` // (RAG-009) blend when most documents carry a summary; empty otherwise
 	// One line per decision, in plain language. A recommendation nobody can
 	// argue with is one nobody should follow.
 	Reasons []string `protobuf:"bytes,9,rep,name=reasons,proto3" json:"reasons,omitempty"`
@@ -13386,6 +13419,13 @@ func (x *SearchAdvisorResponse) GetTopK() int32 {
 		return x.TopK
 	}
 	return 0
+}
+
+func (x *SearchAdvisorResponse) GetSummaryMode() string {
+	if x != nil {
+		return x.SummaryMode
+	}
+	return ""
 }
 
 func (x *SearchAdvisorResponse) GetReasons() []string {
@@ -14015,6 +14055,7 @@ type EvalConfigProto struct {
 	RetrievalMode   string                 `protobuf:"bytes,7,opt,name=retrieval_mode,json=retrievalMode,proto3" json:"retrieval_mode,omitempty"`
 	Bm25K1          *float64               `protobuf:"fixed64,8,opt,name=bm25_k1,json=bm25K1,proto3,oneof" json:"bm25_k1,omitempty"` // (SRCH-018) BM25 parameters to try on fts and hybrid
 	Bm25B           *float64               `protobuf:"fixed64,9,opt,name=bm25_b,json=bm25B,proto3,oneof" json:"bm25_b,omitempty"`
+	SummaryMode     string                 `protobuf:"bytes,10,opt,name=summary_mode,json=summaryMode,proto3" json:"summary_mode,omitempty"` // (RAG-009) off, blend or expand; empty = the collection profile's
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -14110,6 +14151,13 @@ func (x *EvalConfigProto) GetBm25B() float64 {
 		return *x.Bm25B
 	}
 	return 0
+}
+
+func (x *EvalConfigProto) GetSummaryMode() string {
+	if x != nil {
+		return x.SummaryMode
+	}
+	return ""
 }
 
 type RunEvalRequest struct {
@@ -15959,7 +16007,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1f\n" +
 	"\vnext_cursor\x18\x03 \x01(\tR\n" +
 	"nextCursor\x12\x19\n" +
-	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\xae\x04\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\x90\x05\n" +
 	"\x15RetrievalProfileProto\x12.\n" +
 	"\x13default_search_type\x18\x01 \x01(\tR\x11defaultSearchType\x12\x13\n" +
 	"\x05top_k\x18\x02 \x01(\x05R\x04topK\x12%\n" +
@@ -15978,10 +16026,13 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06format\x18\v \x01(\tR\x06format\x12\x1c\n" +
 	"\abm25_k1\x18\f \x01(\x01H\x00R\x06bm25K1\x88\x01\x01\x12\x1a\n" +
 	"\x06bm25_b\x18\r \x01(\x01H\x01R\x05bm25B\x88\x01\x01\x12)\n" +
-	"\x10vector_algorithm\x18\x0e \x01(\tR\x0fvectorAlgorithmB\n" +
+	"\x10vector_algorithm\x18\x0e \x01(\tR\x0fvectorAlgorithm\x12!\n" +
+	"\fsummary_mode\x18\x0f \x01(\tR\vsummaryMode\x12*\n" +
+	"\x0esummary_weight\x18\x10 \x01(\x01H\x02R\rsummaryWeight\x88\x01\x01B\n" +
 	"\n" +
 	"\b_bm25_k1B\t\n" +
-	"\a_bm25_b\"\xf5\x01\n" +
+	"\a_bm25_bB\x11\n" +
+	"\x0f_summary_weight\"\xf5\x01\n" +
 	"\x12StorageConfigProto\x12\x1a\n" +
 	"\bendpoint\x18\x01 \x01(\tR\bendpoint\x12\x16\n" +
 	"\x06bucket\x18\x02 \x01(\tR\x06bucket\x12\x16\n" +
@@ -16542,7 +16593,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\bprogress\x18\x06 \x01(\x01R\bprogress\x12*\n" +
 	"\x11oldest_pending_at\x18\a \x01(\x03R\x0foldestPendingAt\x12\x1a\n" +
 	"\bprovider\x18\b \x01(\tR\bprovider\x12\x18\n" +
-	"\aindexed\x18\t \x01(\bR\aindexed\"\xf6\x03\n" +
+	"\aindexed\x18\t \x01(\bR\aindexed\"\xc8\x04\n" +
 	"\x11CollectionProfile\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -16558,7 +16609,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\x10type_token_ratio\x18\n" +
 	" \x01(\x01R\x0etypeTokenRatio\x12%\n" +
 	"\x0ecode_documents\x18\v \x01(\x05R\rcodeDocuments\x124\n" +
-	"\x16estimated_vector_bytes\x18\f \x01(\x03R\x14estimatedVectorBytes\"\xf9\x02\n" +
+	"\x16estimated_vector_bytes\x18\f \x01(\x03R\x14estimatedVectorBytes\x12+\n" +
+	"\x11summary_documents\x18\r \x01(\x05R\x10summaryDocuments\x12#\n" +
+	"\rsummary_ratio\x18\x0e \x01(\x01R\fsummaryRatio\"\x9c\x03\n" +
 	"\x15SearchAdvisorResponse\x121\n" +
 	"\aprofile\x18\x01 \x01(\v2\x17.mddb.CollectionProfileR\aprofile\x12\x1f\n" +
 	"\vsearch_type\x18\x02 \x01(\tR\n" +
@@ -16568,7 +16621,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\x0fhybrid_strategy\x18\x05 \x01(\tR\x0ehybridStrategy\x12!\n" +
 	"\fhybrid_alpha\x18\x06 \x01(\x01R\vhybridAlpha\x12%\n" +
 	"\x0eretrieval_mode\x18\a \x01(\tR\rretrievalMode\x12\x13\n" +
-	"\x05top_k\x18\b \x01(\x05R\x04topK\x12\x18\n" +
+	"\x05top_k\x18\b \x01(\x05R\x04topK\x12!\n" +
+	"\fsummary_mode\x18\v \x01(\tR\vsummaryMode\x12\x18\n" +
 	"\areasons\x18\t \x03(\tR\areasons\x12\x1a\n" +
 	"\bwarnings\x18\n" +
 	" \x03(\tR\bwarnings\"\x91\x02\n" +
@@ -16639,7 +16693,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06grades\x18\x04 \x03(\v2 .mddb.EvalQueryProto.GradesEntryR\x06grades\x1a9\n" +
 	"\vGradesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xc8\x02\n" +
+	"\x05value\x18\x02 \x01(\x05R\x05value:\x028\x01\"\xeb\x02\n" +
 	"\x0fEvalConfigProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
 	"\vsearch_type\x18\x02 \x01(\tR\n" +
@@ -16650,7 +16704,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\bstrategy\x18\x06 \x01(\tR\bstrategy\x12%\n" +
 	"\x0eretrieval_mode\x18\a \x01(\tR\rretrievalMode\x12\x1c\n" +
 	"\abm25_k1\x18\b \x01(\x01H\x01R\x06bm25K1\x88\x01\x01\x12\x1a\n" +
-	"\x06bm25_b\x18\t \x01(\x01H\x02R\x05bm25B\x88\x01\x01B\b\n" +
+	"\x06bm25_b\x18\t \x01(\x01H\x02R\x05bm25B\x88\x01\x01\x12!\n" +
+	"\fsummary_mode\x18\n" +
+	" \x01(\tR\vsummaryModeB\b\n" +
 	"\x06_alphaB\n" +
 	"\n" +
 	"\b_bm25_k1B\t\n" +

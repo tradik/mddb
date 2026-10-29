@@ -92,6 +92,14 @@ type RetrievalProfileDef struct {
 	// VectorAlgorithm is the collection's default vector index (SRCH-013):
 	// "auto" lets the query planner choose per query. Empty = flat.
 	VectorAlgorithm string `json:"vectorAlgorithm,omitempty"`
+	// SummaryMode is what the documents' client-written summaries do on a
+	// search (RAG-009): "off" (or empty) ignores them, "blend" scores a
+	// document by the better of its best chunk and its summary, "expand"
+	// blends and brings a summary hit's best chunks along as passages.
+	SummaryMode string `json:"summaryMode,omitempty"`
+	// SummaryWeight is the BM25F weight of the meta.summary field while
+	// SummaryMode is not off; nil = 2.0.
+	SummaryWeight *float64 `json:"summaryWeight,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -136,6 +144,9 @@ func (p *RetrievalProfileDef) Validate() error {
 		return fmt.Errorf("invalid retrieval.vectorAlgorithm %q: %w", p.VectorAlgorithm, errInvalidVectorAlgorithm)
 	}
 	if err := p.GroupBy.Validate(); err != nil {
+		return fmt.Errorf("invalid retrieval.%w", err)
+	}
+	if err := validateSummarySettings(p.SummaryMode, p.SummaryWeight); err != nil {
 		return fmt.Errorf("invalid retrieval.%w", err)
 	}
 	if err := (PassageOptions{Format: p.Format}).ValidatePassageOptions(); err != nil {
@@ -278,6 +289,8 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		BM25K1:             p.Bm25K1,
 		BM25B:              p.Bm25B,
 		VectorAlgorithm:    p.VectorAlgorithm,
+		SummaryMode:        p.SummaryMode,
+		SummaryWeight:      p.SummaryWeight,
 	}
 }
 
@@ -310,6 +323,8 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		Bm25K1:             p.BM25K1,
 		Bm25B:              p.BM25B,
 		VectorAlgorithm:    p.VectorAlgorithm,
+		SummaryMode:        p.SummaryMode,
+		SummaryWeight:      p.SummaryWeight,
 	}
 }
 

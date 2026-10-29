@@ -68,11 +68,13 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 		// worker did, or stored chunk indices stop pointing at the passages
 		// they named (CODE-003).
 		Mode ChunkMode
+		// Summary is re-embedded with the chunks (RAG-009).
+		Summary string
 	}
 	var docs []docEntry
 	if err := s.DBScanC(collection, s.BucketNames.Docs, []byte("doc|"+collection+"|"), func(_, v []byte) bool {
 		if d, err := loadDoc(v); err == nil {
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(collection, d)})
+			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(collection, d), Summary: documentSummary(d)})
 		}
 		return true
 	}); err != nil {
@@ -94,6 +96,7 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 			break
 		}
 		s.reindexOne(ctx, collection, d.ID, d.ContentMD, d.Mode, force, chunkEnabled, chunkSize, qt, diskOnly, &res)
+		s.reindexSummary(ctx, collection, d.ID, d.Summary, force, &res)
 		if progress != nil {
 			progress(i+1, res)
 		}

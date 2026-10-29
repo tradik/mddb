@@ -189,6 +189,12 @@ func passageOfChunk(collection string, doc *storage.Doc, text string, startLine,
 	return p
 }
 
+// passageOfChunkIndex cuts chunk i of a document, as the collection chunks it.
+func (s *Server) passageOfChunkIndex(collection string, doc *storage.Doc, i int, score float64, source string) Passage {
+	text, start, end := chunkPassageWithLinesSize(doc.ContentMD, i, 0, s.chunkModeFor(collection, doc), s.chunkSizeFor(collection))
+	return passageOfChunk(collection, doc, text, start, end, score, source)
+}
+
 // queryTerms are the words of a query, for locating it in a document that
 // was found by its vector.
 func queryTerms(query string) []string {
@@ -204,12 +210,15 @@ func queryTerms(query string) []string {
 // passageSource is one search hit, whatever the surface, as passage building
 // needs it. Surfaces map their own result types onto it.
 type passageSource struct {
-	doc        storage.Doc
-	score      float64
-	chunkText  string // set when the search already cut a chunk or window
-	startLine  int
-	endLine    int
-	bestChunk  int // parent-mode vector hit: its best chunk; -1 when unknown
+	doc       storage.Doc
+	score     float64
+	chunkText string // set when the search already cut a chunk or window
+	startLine int
+	endLine   int
+	bestChunk int // parent-mode vector hit: its best chunk; -1 when unknown
+	// chunks are summaryMode expand's chunks for a document its summary
+	// matched (RAG-009): one passage each, in place of the one best chunk.
+	chunks     []int
 	highlights []fts.Highlight
 	terms      []string
 }
@@ -222,10 +231,12 @@ func (s *Server) buildPassages(collection string, hits []passageSource, opts Pas
 		switch {
 		case h.chunkText != "":
 			out = append(out, passageOfChunk(collection, &h.doc, h.chunkText, h.startLine, h.endLine, h.score, source))
+		case len(h.chunks) > 0:
+			for _, c := range h.chunks {
+				out = append(out, s.passageOfChunkIndex(collection, &h.doc, c, h.score, source))
+			}
 		case h.bestChunk >= 0:
-			text, start, end := chunkPassageWithLinesSize(h.doc.ContentMD, h.bestChunk, 0,
-				s.chunkModeFor(collection, &h.doc), s.chunkSizeFor(collection))
-			out = append(out, passageOfChunk(collection, &h.doc, text, start, end, h.score, source))
+			out = append(out, s.passageOfChunkIndex(collection, &h.doc, h.bestChunk, h.score, source))
 		default:
 			out = append(out, passageAtHit(collection, &h.doc, h.terms, h.highlights, opts, h.score, source))
 		}
@@ -253,7 +264,7 @@ func mcpPassagesJSON(p *PassagesResponse) string {
 // hybridPassages builds passages from hybrid results, located by the terms
 // the full-text half matched, or by the query's words for a result only the
 // vector half found. Shared by REST and MCP hybrid search.
-func (s *Server) hybridPassages(collection, query string, items []HybridSearchResultItem, opts PassageOptions, indexing *IndexWaitResult) PassagesResponse {
+func (s *Server) hybridPassages(collection, query string, items []HybridSearchResultItem, opts PassageOptions, indexing *IndexWaitResult, plan *SearchPlan) PassagesResponse {
 	words := queryTerms(query)
 	hits := make([]passageSource, 0, len(items))
 	for _, it := range items {
@@ -261,7 +272,8 @@ func (s *Server) hybridPassages(collection, query string, items []HybridSearchRe
 		if len(terms) == 0 {
 			terms = words
 		}
-		hits = append(hits, passageSource{doc: it.Document, score: it.CombinedScore, bestChunk: -1, terms: terms})
+		hits = append(hits, passageSource{doc: it.Document, score: it.CombinedScore, bestChunk: -1, terms: terms,
+			chunks: plan.expandedChunks(it.Document.ID)})
 	}
 	return s.finishPassages(collection, s.buildPassages(collection, hits, opts, "hybrid"), indexing)
 }

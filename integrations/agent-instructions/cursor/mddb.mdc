@@ -150,6 +150,14 @@ Record decisions and constraints, not transcripts.
 - When several agents may edit the same document, pass the `revision` you read
   as `expected_revision` to `update_document`. A conflict means someone else
   wrote first: read again and redo the change, never retry blindly.
+- **You write the summary; MDDB does not.** To make a document findable by
+  general questions ("what is this about", "what are the main risks"), put a
+  short summary in its metadata key `summary` when you write the document or
+  later with `update_document`. The server embeds it on its own and searches
+  it when the collection's `retrieval.summaryMode` is `blend` or `expand`. It
+  never generates a summary. When you change the content, update the summary
+  too, or remove it: a stale summary keeps answering questions the content no
+  longer supports.
 - Metadata is flat: `map[string][]string`. Nested structure does not survive —
   JSON-encode it into a single value if you must keep it.
 - Full-text and metadata indexing follow the write before it returns, so

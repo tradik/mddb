@@ -221,7 +221,10 @@ type MCPTruncateResponse struct {
 // MCPVectorSearchRequest represents vector/semantic search request.
 type MCPVectorSearchRequest struct {
 	// noGain keeps a measurement (SRCH-019 eval) out of the gain report.
-	noGain         bool
+	noGain bool
+	// summaryMode overrides the collection's summaryMode (RAG-009) for an
+	// evaluation config; "" = the profile's.
+	summaryMode    string
 	Collection     string              `json:"collection"`
 	Query          string              `json:"query"`
 	QueryVector    []float32           `json:"queryVector,omitempty"`

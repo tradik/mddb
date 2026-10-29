@@ -212,6 +212,22 @@ With `explain`, `SearchPlan.feedback` (7, `FeedbackApplied`) reports the
 correction. An example that names nothing usable is `INVALID_ARGUMENT`. All
 of this is additive.
 
+Summaries (RAG-009) need no new request field. A document carries its
+client-written summary in the metadata key `summary`. The collection profile
+decides what searches do with it, and `VectorSearch` and `HybridSearch`
+follow it:
+
+| Field | Message | Meaning |
+|---|---|---|
+| `summary_mode` (15) | `RetrievalProfileProto` | `off` (default), `blend` or `expand`; see [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189) |
+| `summary_weight` (16, `optional double`) | `RetrievalProfileProto` | BM25F weight of `meta.summary` while summaries are on, 0–10; unset = 2.0 |
+| `summary_mode` (10) | `EvalConfigProto` | Measure a mode with `RunEval`; empty = the profile's |
+| `summary_documents` (13), `summary_ratio` (14) | `CollectionProfile` | Sampled documents with a summary, and their share |
+| `summary_mode` (11) | `SearchAdvisorResponse` | `blend` when at least half the sampled documents have a summary |
+
+With `expand` and `format: "passages"`, a summary hit returns one passage per
+chunk it brought in. All of this is additive.
+
 ### New in v2.18.8
 
 `GetIndexingStatus` reports queued work for a collection, or for the server

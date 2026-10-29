@@ -10,10 +10,11 @@ import (
 )
 
 // DeleteCollection removes every stored vector of a collection — chunked and
-// legacy records alike — and records each deletion in the binlog so that
-// followers drop them too (#331). It returns how many records it removed.
+// legacy records alike, and the summary vectors (RAG-009) — and records each
+// deletion in the binlog so that followers drop them too (#331). It returns
+// how many records it removed.
 func (vs *VectorStore) DeleteCollection(collection string) (int, error) {
-	prefix := []byte("vec|" + collection + "|")
+	prefixes := [][]byte{[]byte("vec|" + collection + "|"), SummaryKey(collection, "")}
 	var bo binlog.BinlogOps
 	removed := 0
 	err := boltx.Update(vs.rt(), collection, func(tx *bolt.Tx) error {
@@ -24,8 +25,10 @@ func (vs *VectorStore) DeleteCollection(collection string) (int, error) {
 		// Collected first: deleting under a live cursor skips keys.
 		var keys [][]byte
 		c := b.Cursor()
-		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-			keys = append(keys, append([]byte(nil), k...))
+		for _, prefix := range prefixes {
+			for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+				keys = append(keys, append([]byte(nil), k...))
+			}
 		}
 		for _, k := range keys {
 			if err := b.Delete(k); err != nil {

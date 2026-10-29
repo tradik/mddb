@@ -78,6 +78,12 @@ type CollectionProfile struct {
 	// what makes the connection graph and `retrievalMode: "graph"` useful.
 	CodeDocuments int `json:"codeDocuments"`
 
+	// SummaryDocuments is how many sampled documents carry a summary their
+	// client wrote (RAG-009), and SummaryRatio their share of the sample:
+	// what decides whether summaryMode can help at all.
+	SummaryDocuments int     `json:"summaryDocuments"`
+	SummaryRatio     float64 `json:"summaryRatio"`
+
 	// EstimatedVectorBytes is what the vectors occupy at float32 — the number
 	// that decides whether a quantized index is worth the recall it costs.
 	EstimatedVectorBytes int64 `json:"estimatedVectorBytes,omitempty"`
@@ -116,6 +122,8 @@ type SearchRecommendation struct {
 	Signals *FusionSignals `json:"signals,omitempty"`
 	// TopK is a starting point, not a rule.
 	TopK int `json:"topK,omitempty"`
+	// SummaryMode is "blend" when most documents carry a summary (RAG-009).
+	SummaryMode string `json:"summaryMode,omitempty"`
 
 	// Reasons explains every choice above, one line each. This is the part
 	// worth reading: a recommendation nobody can argue with is a
@@ -219,6 +227,9 @@ func (s *Server) profileCollection(collection string) (*CollectionProfile, error
 			if len(doc.Meta["defines"]) > 0 || len(doc.Meta["uses"]) > 0 || len(doc.Meta["imports"]) > 0 {
 				p.CodeDocuments++
 			}
+			if documentSummary(doc) != "" {
+				p.SummaryDocuments++
+			}
 		}
 		return nil
 	})
@@ -245,6 +256,7 @@ func (s *Server) profileCollection(collection string) (*CollectionProfile, error
 	}
 	if p.Sampled > 0 {
 		p.TermsPerDocument = float64(len(terms)) / float64(p.Sampled)
+		p.SummaryRatio = float64(p.SummaryDocuments) / float64(p.Sampled)
 	}
 
 	s.profileVectors(collection, p)
@@ -413,6 +425,10 @@ func buildRecommendation(p *CollectionProfile, embeddingConfigured bool) *Search
 		r.TopK = 10
 	}
 
+	// --- summaries (RAG-009) ---
+
+	adviseSummaries(r, p)
+
 	// --- signals ---
 
 	if r.SearchType == "hybrid" && p.Documents > 100 {
@@ -442,7 +458,35 @@ func (r *SearchRecommendation) toProfile() *RetrievalProfileDef {
 	if r.autoVector {
 		p.VectorAlgorithm = AlgorithmAuto
 	}
+	p.SummaryMode = r.SummaryMode
 	return p
+}
+
+// summaryAdviceRatio is the share of documents with a summary from which
+// summaryMode blend is advised: below it, most documents could only be found
+// by their chunks, and blending would rank the few with a summary first.
+const summaryAdviceRatio = 0.5
+
+// adviseSummaries reports the share of documents with a summary, and advises
+// blend when most have one and there are vectors to search them with.
+func adviseSummaries(r *SearchRecommendation, p *CollectionProfile) {
+	switch {
+	case p.SummaryDocuments == 0:
+		return
+	case r.SearchType == "fts":
+		r.Reasons = append(r.Reasons, fmt.Sprintf(
+			"%.0f%% of documents carry a summary; with algorithm bm25f and summaryMode blend, keyword search weighs it as the meta.summary field.",
+			p.SummaryRatio*100))
+	case p.SummaryRatio >= summaryAdviceRatio:
+		r.SummaryMode = SummaryModeBlend
+		r.Reasons = append(r.Reasons, fmt.Sprintf(
+			"summaryMode blend: %.0f%% of documents carry a summary, so a general question about a document can match its summary when no chunk answers it. Measure blend against expand with run_eval.",
+			p.SummaryRatio*100))
+	default:
+		r.Reasons = append(r.Reasons, fmt.Sprintf(
+			"summaryMode left off: only %.0f%% of documents carry a summary, and blending would favour those few over the rest.",
+			p.SummaryRatio*100))
+	}
 }
 
 // storage.Doc is referenced through loadDoc; the import keeps the dependency

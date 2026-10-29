@@ -126,6 +126,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
 	}
 	results = s.rescoreFeedback(fb, req.Collection, results, metric) // SRCH-015, rescore mode
+	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, req.summaryMode),
+		Query: queryVector, SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Allowed: allowedIDs,
+		Filtered: filtered, Metric: metric}, results, ps.Plan) // RAG-009
 
 	chunkMode := mode == RetrievalModeChunk || mode == RetrievalModeWindow
 	var bestChunk map[string]int
@@ -207,7 +210,8 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 				best = -1
 			}
 			hits = append(hits, passageSource{doc: mcpDocumentToDoc(it.Document), score: float64(it.Score),
-				chunkText: it.ChunkText, startLine: it.StartLine, endLine: it.EndLine, bestChunk: best, terms: terms})
+				chunkText: it.ChunkText, startLine: it.StartLine, endLine: it.EndLine, bestChunk: best, terms: terms,
+				chunks: ps.Plan.expandedChunks(it.Document.ID)})
 		}
 		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited)
 		return &MCPVectorSearchResponse{Passages: &p, Algorithm: algo}, nil
@@ -519,7 +523,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	}
 	c.server.Gain.Search(gainKind{Type: SearchTypeHybrid, Algorithm: httpReq.VectorAlgorithm, Fusion: httpReq.Strategy}) // AGT-004
 	if req.wantsPassages() {
-		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited)
+		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, httpReq.plan)
 		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy}, nil
 	}
 

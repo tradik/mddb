@@ -332,7 +332,7 @@ where:
 | `meta.category` | 2.0 |
 | `meta.description` | 1.5 |
 
-Custom weights can be passed per-query via `fieldWeights`. Fields not in the weights map are ignored.
+Custom weights can be passed per-query via `fieldWeights`. Fields not in the weights map are ignored. While the collection's `retrieval.summaryMode` is not `off`, `meta.summary` is added with `retrieval.summaryWeight` (default 2.0); see [Summaries](#summaries--a-second-representation-v2189).
 
 **When to use:** When documents have structured metadata (title, tags, etc.) and you want title matches to rank higher than body-only matches. Best for content management, documentation, and knowledge bases.
 
@@ -1061,6 +1061,77 @@ curl -X POST http://localhost:11023/v1/vector-search \
 Measured in [BENCHMARK.md](BENCHMARK.md#relevance-feedback-v2189): one round
 of feedback raises recall@10 from 0.31 to 0.49–0.50 on a corpus built so
 that the query is ambiguous.
+
+### Summaries — a Second Representation (v2.18.9+)
+
+A question like "what are the main risks here" matches the language of a
+summary, not of any single chunk. A document can carry a summary in its
+metadata key `summary`. **The client writes the summary**: by hand, with
+`PATCH /v1/update`, from an automation that calls its own LLM, or in an
+ingest batch. MDDB never generates one and has no LLM in the server.
+
+```bash
+curl -X POST http://localhost:11023/v1/add \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "kb", "key": "plant-log", "lang": "en",
+       "meta": {"summary": ["Main hazards: leaks, pressure and the maintenance backlog."]},
+       "contentMd": "Pump seal on line four was replaced..."}'
+```
+
+The summary is embedded as one vector of its own and indexed as the BM25F
+field `meta.summary`. The collection profile decides what it does on a
+search:
+
+```bash
+curl -X PUT http://localhost:11023/v1/collection-config \
+  -d '{"collection": "kb", "retrieval": {"summaryMode": "blend", "summaryWeight": 2.0}}'
+```
+
+| `retrieval.summaryMode` | What a search does |
+|---|---|
+| `off` (default) | Ignores summaries. Results are byte-for-byte what they were before v2.18.9. |
+| `blend` | A document scores the better of its best chunk and its summary. A document that only its summary matched comes back with its best chunk for the query. |
+| `expand` | Like `blend`, and a summary hit also brings the document's best *n* chunks, ranked against the query, at the summary's score. With `format: "passages"` each chunk is a passage, and in `chunk` mode each chunk is a result. *n* is 3, or fewer when `contextTokenBudget` cannot hold *n* chunks for each of `topK` results (never fewer than 1). |
+
+- **Every vector surface does the same thing.** Vector search (REST, MCP
+  `semantic_search`, gRPC `VectorSearch`, GraphQL) and the vector half of
+  hybrid search share one implementation. With `explain: true`, the plan
+  says how many documents their summaries matched.
+- **The keyword side.** While `summaryMode` is not `off`, BM25F (`bm25f`, in
+  full-text and hybrid search) adds `meta.summary` with `summaryWeight`
+  (default 2.0, range 0–10) to the field weights. A request that names
+  `meta.summary` in `fieldWeights` keeps its own weight; `0` turns it off for
+  that query.
+- **Embedding.** The worker embeds the summary after the chunks, and only
+  when its text changed. Like a chunk, the summary is reused by its hash
+  (RAG-003). It spends the collection's daily embedding budget (GO-043). When
+  the budget is spent, the job waits in the queue; it does not fail. Changing
+  only the summary re-embeds the summary and re-indexes the document for
+  full-text search. Removing the summary, deleting the document or deleting
+  the collection removes the vector. `POST /v1/vector-reindex` with `force`
+  re-embeds summaries too.
+- **Kept apart from chunks.** Summary vectors are stored in the `vectors`
+  bucket under their own key prefix (`vsum|`). They are not chunks. They do
+  not count in `embedded_documents`, `total_chunks` or `quota.maxVectors`, and
+  no `algorithm` searches them. A disk-only collection keeps them quantized
+  in RAM and rescores the candidates from disk, as it does for its chunks.
+  They replicate, back up and move to per-collection files with the rest of
+  the collection.
+- **No summaries cost nothing.** For a collection without them, a search adds
+  one map lookup and a write adds none.
+
+The search advisor reports `summaryDocuments` and `summaryRatio`, the share of
+sampled documents that have a summary. When at least half have one, it
+recommends `summaryMode: "blend"`. To measure whether `blend` or `expand`
+helps on your own queries, give `run_eval` (`POST /v1/eval`) configurations
+that differ only in `summaryMode`:
+
+```bash
+curl -X POST http://localhost:11023/v1/eval -d '{"collection": "kb", "configs": [
+  {"searchType": "vector"},
+  {"searchType": "vector", "summaryMode": "blend"},
+  {"searchType": "vector", "summaryMode": "expand"}]}'
+```
 
 ## Passages — What an Agent Gets (v2.18.8+)
 

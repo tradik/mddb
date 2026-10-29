@@ -107,6 +107,7 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 	now := time.Now().Unix()
 	var saved storage.Doc
 	var bo binlog.BinlogOps
+	summaryChanged := false // RAG-009: a new summary is embedded and indexed like new content
 	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs, bIdx, bByK := tx.Bucket([]byte("docs")), tx.Bucket([]byte("idxmeta")), tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
@@ -124,6 +125,7 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 			return err
 		}
 		doc := applyPatch(*existing, p, now)
+		summaryChanged = documentSummary(existing) != documentSummary(&doc)
 		EnrichCodeSymbolsWith(&doc, s.codeIncludePaths(collection))
 		buf, err := marshalAndEncrypt(&doc, collection)
 		if err != nil {
@@ -149,7 +151,7 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 		return storage.Doc{}, err
 	}
 	bo.FlushTo(s.Binlog)
-	s.runPostUpdateHooks(collection, key, lang, saved, p.Content != nil, p.TTL != nil)
+	s.runPostUpdateHooks(collection, key, lang, saved, p.Content != nil || summaryChanged, p.TTL != nil)
 	return saved, nil
 }
 

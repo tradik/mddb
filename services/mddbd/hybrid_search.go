@@ -77,6 +77,9 @@ type HybridSearchRequest struct {
 	// plan is the vector half's plan, set by hybridItems for the response
 	// to report (SRCH-013).
 	plan *SearchPlan
+	// summaryMode overrides the collection's summaryMode (RAG-009) for an
+	// evaluation config; "" = the profile's.
+	summaryMode string
 }
 
 // HybridGeoFilter restricts hybrid search to docs within radius of a point.
@@ -372,7 +375,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.wantsPassages() {
-		ok(w, s.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited))
+		ok(w, s.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, plan))
 		return
 	}
 
@@ -489,10 +492,12 @@ func (s *Server) runFTSSearch(req HybridSearchRequest) ([]fts.FTSResult, error) 
 
 	switch req.Algorithm {
 	case "bm25f":
+		// RAG-009: meta.summary joins the fields while summaries are on.
+		weights := s.summaryFieldWeights(req.Collection, s.ResolveSummaryMode(req.Collection, req.summaryMode), req.FieldWeights)
 		if req.Fuzzy > 0 {
-			results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, candidates, req.Fuzzy, req.FieldWeights, bm25)
+			results, err = idx.SearchBM25FFuzzy(req.Collection, tokens, candidates, req.Fuzzy, weights, bm25)
 		} else {
-			results, err = idx.SearchBM25F(req.Collection, tokens, candidates, req.FieldWeights, bm25)
+			results, err = idx.SearchBM25F(req.Collection, tokens, candidates, weights, bm25)
 		}
 	case "bm25":
 		if req.Fuzzy > 0 {
@@ -582,6 +587,9 @@ func (s *Server) vectorHalf(ctx context.Context, req HybridSearchRequest) ([]vec
 	}
 	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
 	results = s.rescoreFeedback(fb, req.Collection, results, metric)
+	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, req.summaryMode),
+		Query: queryVector, SearchTopK: searchTopK, TopK: req.TopK, Threshold: req.Threshold, Allowed: allowedIDs,
+		Filtered: filtered, Metric: metric}, results, ps.Plan) // RAG-009
 	return vector.DeduplicateChunkResults(results), ps.Plan, nil
 }
 

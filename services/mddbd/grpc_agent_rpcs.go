@@ -71,7 +71,7 @@ func (g *GRPCServer) RunEval(ctx context.Context, req *proto.RunEvalRequest) (*p
 	for _, c := range req.Configs {
 		er.Configs = append(er.Configs, EvalConfig{Name: c.Name, SearchType: c.SearchType, Algorithm: c.Algorithm,
 			VectorAlgorithm: c.VectorAlgorithm, Alpha: c.Alpha, Strategy: c.Strategy, RetrievalMode: c.RetrievalMode,
-			BM25K1: c.Bm25K1, BM25B: c.Bm25B})
+			BM25K1: c.Bm25K1, BM25B: c.Bm25B, SummaryMode: c.SummaryMode})
 	}
 	for _, q := range req.Queries {
 		er.Queries = append(er.Queries, evalQueryFromProto(q))

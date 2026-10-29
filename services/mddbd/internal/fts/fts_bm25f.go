@@ -3,6 +3,7 @@ package fts
 import (
 	"bytes"
 	"encoding/binary"
+	"maps"
 	"math"
 	"mddb/internal/sliceutil"
 	"sort"
@@ -79,6 +80,10 @@ func (f *FTSIndex) SearchBM25FFuzzy(collection string, tokens map[string]int, li
 	}
 	return rankBM25F(scores, limit), nil
 }
+
+// DefaultBM25FWeights returns a copy of the weights BM25F uses when a search
+// names none, for a caller that adds a field to them (RAG-009: meta.summary).
+func DefaultBM25FWeights() map[string]float64 { return maps.Clone(defaultBM25FWeights) }
 
 func bm25fWeights(fieldWeights map[string]float64) map[string]float64 {
 	if len(fieldWeights) > 0 {

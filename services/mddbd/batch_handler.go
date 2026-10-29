@@ -167,6 +167,7 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 				ContentMD:  p.Doc.ContentMD,
 				ChunkMode:  s.chunkModeFor(collection, &p.Doc),
 				ChunkSize:  s.chunkSizeFor(collection),
+				Summary:    documentSummary(&p.Doc), // RAG-009
 			}) {
 				embeddingDropped++
 			}

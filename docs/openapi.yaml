@@ -9316,6 +9316,10 @@ components:
           enum: [ parent, chunk, window, graph ]
         topK:
           type: integer
+        summaryMode:
+          type: string
+          enum: [ blend ]
+          description: (v2.18.9+, RAG-009) `blend` when at least half the sampled documents carry a summary; absent otherwise.
         signals:
           $ref: "#/components/schemas/FusionSignals"
         reasons:
@@ -9500,6 +9504,10 @@ components:
           description: BM25 parameters to try (SRCH-018)
         bm25B:
           type: number
+        summaryMode:
+          type: string
+          enum: [ "off", blend, expand ]
+          description: (v2.18.9+, RAG-009) Measure summaries; unset = the collection profile's.
 
     EvalRequest:
       type: object
@@ -9635,6 +9643,12 @@ components:
             (v2.18.9+, SRCH-013) Vector indexes that can answer for the
             collection now, without building. With more than one, the advisor
             puts vectorAlgorithm auto in the recommended profile.
+        summaryDocuments:
+          type: integer
+          description: (v2.18.9+, RAG-009) Sampled documents that carry a client-written summary.
+        summaryRatio:
+          type: number
+          description: (v2.18.9+, RAG-009) Their share of the sample, 0-1.
 
     FusionSignals:
       type: object
@@ -10841,6 +10855,24 @@ components:
           minimum: 0
           maximum: 1
           description: (v2.18.8, SRCH-018) The collection's BM25 b; unset = 0.75.
+        summaryMode:
+          type: string
+          enum: [ "off", blend, expand ]
+          description: >-
+            (v2.18.9+, RAG-009) What the documents' client-written summaries
+            (metadata key `summary`; MDDB never writes one) do on vector and
+            hybrid search. `off` (default) ignores them; results are what they
+            were before. `blend` scores a document by the better of its best
+            chunk and its summary. `expand` blends and adds a summary hit's best
+            chunks (up to 3, fewer under contextTokenBudget), one passage each
+            with format passages.
+        summaryWeight:
+          type: number
+          minimum: 0
+          maximum: 10
+          description: >-
+            (v2.18.9+, RAG-009) BM25F weight of the meta.summary field while
+            summaryMode is not off. Unset = 2.0.
       example:
         defaultSearchType: hybrid
         topK: 40

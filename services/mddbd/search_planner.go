@@ -126,6 +126,9 @@ type SearchPlan struct {
 
 	// mayIterate: the planner allows the iterative scan for this search.
 	mayIterate bool
+	// summaryChunks: summaryMode expand's chunks per document a summary
+	// matched, which its passages are cut from (RAG-009).
+	summaryChunks map[string][]int
 }
 
 // reason appends one line of explanation.

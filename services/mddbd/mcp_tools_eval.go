@@ -20,6 +20,8 @@ func mcpEvalTools() []MCPTool {
 		"alpha":           map[string]interface{}{"type": "number", "description": "Hybrid weight of the vector half"},
 		"strategy":        map[string]interface{}{"type": "string", "description": "Hybrid fusion: alpha or rrf"},
 		"retrievalMode":   map[string]interface{}{"type": "string"},
+		"summaryMode": map[string]interface{}{"type": "string", "enum": []string{"off", "blend", "expand"},
+			"description": "(v2.18.9) Measure client-written summaries; default the collection profile's"},
 	}}
 	return []MCPTool{
 		{

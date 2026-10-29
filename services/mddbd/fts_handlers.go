@@ -54,6 +54,9 @@ type FTSSearchRequest struct {
 	// itself — MCP does, after dropping bodies the agent did not ask for. Such
 	// a caller also counts the search for the gain report (AGT-004).
 	skipContextBudget bool
+	// summaryMode overrides the collection's summaryMode (RAG-009) for an
+	// evaluation config; "" = the profile's.
+	summaryMode string
 	// CacheTTL opts this request into the search-result cache for the given
 	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
 	// caller that says nothing keeps today's behaviour and today's freshness.
@@ -178,6 +181,9 @@ func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
 	var err error
 	if req.bm25, err = s.ResolveBM25(req.Collection, req.BM25K1, req.BM25B); err != nil {
 		return err
+	}
+	if req.Algorithm == "bm25f" { // RAG-009: meta.summary joins the fields while summaries are on
+		req.FieldWeights = s.summaryFieldWeights(req.Collection, s.ResolveSummaryMode(req.Collection, req.summaryMode), req.FieldWeights)
 	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
 	return req.ValidatePassageOptions()

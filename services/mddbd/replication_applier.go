@@ -174,6 +174,11 @@ func (ra *ReplicationApplier) applyVector(entry *binlog.BinlogEntry) {
 	if ra.server.VectorIndex == nil {
 		return
 	}
+	// RAG-009: a summary vector goes to the summary index, never a chunk one.
+	if vector.IsSummaryKey(entry.Key) {
+		ra.server.applyReplicatedSummary(entry)
+		return
+	}
 
 	// Parse key: vec|collection|docID
 	parts := vector.SplitKey(entry.Key)
