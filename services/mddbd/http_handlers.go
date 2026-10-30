@@ -381,6 +381,10 @@ func bad(w http.ResponseWriter, err error) {
 	if writeQuotaError(w, err) {
 		return
 	}
+	// AGT-005: a write to a read-only collection is 403 wherever it surfaces.
+	if writeReadOnlyError(w, err) {
+		return
+	}
 	// DOC-018: a request for something that does not exist is not a bad
 	// request; the body keeps its shape.
 	if errors.Is(err, errNotFound) {

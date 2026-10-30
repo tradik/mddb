@@ -76,6 +76,13 @@ type CollectionConfig struct {
 	// embedding use (GO-043). nil = unlimited. Kept by Set when a config is
 	// written without one; an empty quota removes it. See quota.go.
 	Quota *CollectionQuota `json:"quota,omitempty"`
+	// ReadOnly refuses every write to the collection's data (AGT-005). Only
+	// a corpus pack install sets it; Set keeps the stored value, so no
+	// config write can clear it. See collection_readonly.go.
+	ReadOnly bool `json:"readOnly,omitempty"`
+	// Corpus describes the corpus pack the collection was installed from
+	// (AGT-005), nil for any other collection. Kept by Set like ReadOnly.
+	Corpus *CorpusInfo `json:"corpus,omitempty"`
 }
 
 // CodeConfigDef configures how source documents in a collection are read.
@@ -209,10 +216,13 @@ func (cm *CollectionManager) Get(collection string) (*CollectionConfig, bool) {
 }
 
 // Set stores or updates the config for a collection. The evaluation set is
-// not part of a config write: the stored one is kept (SRCH-019).
+// not part of a config write: the stored one is kept (SRCH-019), and so are
+// the read-only flag and the corpus pack it came from (AGT-005).
 func (cm *CollectionManager) Set(collection string, cfg *CollectionConfig) error {
+	cfg.ReadOnly, cfg.Corpus = false, nil
 	if stored, found := cm.Get(collection); found {
 		cfg.EvalSet = stored.EvalSet
+		cfg.ReadOnly, cfg.Corpus = stored.ReadOnly, stored.Corpus
 		if cfg.Quota == nil {
 			cfg.Quota = stored.Quota
 		}
@@ -527,6 +537,13 @@ func (s *Server) handleCollectionConfigDelete(w http.ResponseWriter, r *http.Req
 			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
 			return
 		}
+	}
+
+	// AGT-005: a pack's config is what keeps it read-only; deleting it would
+	// open the pack to writes. `corpus remove` deletes both together.
+	if err := s.checkCollectionWritable(collection); err != nil {
+		bad(w, err)
+		return
 	}
 
 	if s.Metrics != nil {

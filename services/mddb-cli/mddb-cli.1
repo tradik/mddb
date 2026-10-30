@@ -93,6 +93,30 @@ Stable names for collections (v2.18.8).
 .PP
 An alias is accepted wherever a collection name is, on every surface. Moving
 it is atomic: a request sees the old collection or the new one.
+.SS corpus
+Corpus packs: read-only collections built once and installed anywhere (v2.18.10).
+.PP
+.B mddb-cli corpus build
+\fICOLLECTION\fR \fB\-\-license\fR \fILICENSE\fR [\fB\-\-version\fR \fIV\fR]
+[\fB\-\-description\fR \fITEXT\fR] [\fB\-\-source\fR \fILICENSE\fR=\fIREPO\fR[@\fICOMMIT\fR]]... [\fB\-o\fR \fIFILE\fR]
+.br
+.B mddb-cli corpus install
+\fIFILE\fR|\fIhttps://URL\fR [\fB\-\-sha256\fR \fISUM\fR]
+.br
+.B mddb-cli corpus list
+.br
+.B mddb-cli corpus remove
+\fINAME\fR
+.PP
+\fBbuild\fR saves a consistent snapshot of the collection \(em documents,
+full-text index, vectors, geo points \(em with a manifest naming its sources
+and licences; it refuses without \fB\-\-license\fR. \fBinstall\fR uploads a
+pack (downloading it first over https when given a URL) and the server
+installs it, read-only, under the collection name in its manifest, without a
+restart. A pack whose vectors were made by another embedding model is
+installed with its vectors disabled: hybrid search on it uses full text only.
+\fBremove\fR deletes an installed pack. Writes to an installed pack are
+refused with 403. See docs/CORPUS-PACKS.md.
 .SS reindex-swap
 .B mddb-cli reindex-swap
 \fIALIAS\fR \fB\-\-into\fR \fICOLLECTION\fR [\fB\-\-timeout\fR \fIDURATION\fR]

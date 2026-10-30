@@ -230,6 +230,30 @@ func (cf *collectionFiles) getOrCreate(collection string) (*bolt.DB, error) {
 	return db, nil
 }
 
+// attach makes the bbolt file at src a collection's file and opens it,
+// without a restart (AGT-005: installing a corpus pack). src is renamed into
+// place, so it must be on the file system of the collection directory. The
+// collection must not have a file yet; detaching is remove. The caller has
+// checked the file and given it every collection bucket.
+func (cf *collectionFiles) attach(collection, src string) error {
+	cf.mu.Lock()
+	defer cf.mu.Unlock()
+	path := filepath.Join(cf.dir, collectionFileName(collection))
+	if _, err := os.Lstat(path); cf.dbs[collection] != nil || err == nil {
+		return fmt.Errorf("collection %q already has a file", collection)
+	}
+	if err := collRename(src, path); err != nil {
+		return err
+	}
+	db, err := openCollectionFile(path, cf.opts(path))
+	if err != nil {
+		_ = os.Remove(path)
+		return err
+	}
+	cf.dbs[collection] = db
+	return nil
+}
+
 // remove closes a collection's file and deletes it.
 func (cf *collectionFiles) remove(collection string) error {
 	cf.mu.Lock()

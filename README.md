@@ -377,6 +377,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Multi-language** - Same key, multiple languages
 - ✅ **Schema Validation** - JSON Schema validation per collection
 - ✅ **Per-Collection Storage Backends** - Choose BoltDB (default), in-memory (ephemeral), or S3/MinIO per collection
+- ✅ **Corpus Packs** - Build a collection once (documents, full-text index, vectors) and install it read-only on any server with `mddb-cli corpus install`, no re-embedding or reindexing; licences mandatory (v2.18.10)
 
 ### APIs & Protocols
 - ✅ **HTTP/JSON REST** - Easy debugging, extensive docs
@@ -606,6 +607,10 @@ mddb-cli get blog hello en_US
 mddb-cli search blog -f "tags=tutorial"
 mddb-cli fts blog --query="getting started"
 mddb-cli stats
+
+# Share a collection as a read-only corpus pack
+mddb-cli corpus build blog --license CC-BY-4.0 --version 1.0
+mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 ```
 
 **[API reference](docs/API.md)** | **[Use case examples](docs/USE_CASES.md)** | **[Client libraries](docs/EXAMPLES.md)**
@@ -652,6 +657,7 @@ mddb-cli stats
 - **[Deployment](docs/DEPLOYMENT.md)** - Production setup
 - **[Storage Tuning](docs/STORAGE-TUNING.md)** - Disks, filesystems, WSL2, macOS, FreeBSD, ZFS; fast restarts of large databases
 - **[Storage Layout](docs/STORAGE-LAYOUT.md)** - One file, or one file per collection (`MDDB_STORAGE_LAYOUT`)
+- **[Corpus Packs](docs/CORPUS-PACKS.md)** - Portable read-only collections: `mddb-cli corpus build` / `install` / `list` / `remove`
 - **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana, OpenTelemetry traces over OTLP (`MDDB_OTEL_ENDPOINT`)
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes
 - **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured

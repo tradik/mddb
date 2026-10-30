@@ -334,7 +334,7 @@ func (fbp *FinalBatchProcessor) commitBatch(collection string, processed []*Proc
 		return nil
 	})
 
-	if qe := asQuotaError(err); qe != nil {
+	if qe := wholeBatchRefusal(err); qe != nil { // GO-043, AGT-005
 		return nil, nil, qe
 	}
 	if err != nil {

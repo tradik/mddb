@@ -172,6 +172,8 @@ func TestWriteRoutesAreGuardedInReadOnlyMode(t *testing.T) {
 		"/v1/ingest",
 		"/v1/set-ttl",
 		"/v1/import-url",
+		"/v1/corpus/install", // AGT-005
+		"/v1/corpus/remove",
 	}
 
 	for _, path := range writePaths {

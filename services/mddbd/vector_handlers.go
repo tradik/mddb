@@ -135,61 +135,11 @@ func (s *Server) loadVectorIndex() {
 	s.summaries().reset()  // RAG-009: reloaded per collection below
 	s.imageIndex().reset() // RAG-010: likewise
 	for _, collection := range load.order() {
-		count := counts[collection]
 		load.begin(collection)
-		records, err := s.VectorStore.LoadCollection(collection)
-		if err != nil {
-			slog.Error("failed to load vectors for collection", "collection", collection, "err", err)
-			load.finishCollection(collection) // searchable, with what it has: nothing
-			continue
+		if s.loadCollectionVectors(collection, load) {
+			totalLoaded += counts[collection]
 		}
-
-		// Collect vectors for trainable indexes
-		collVecs := make(map[string][]float32, len(records))
-
-		// Disk-only collections keep RAM quantized-only: full-precision
-		// vectors are never loaded into the float32 searchers.
-		diskOnly := s.collectionDiskOnly(collection)
-
-		refused, sinceReport := 0, 0
-		for docID, rec := range records {
-			if sinceReport++; sinceReport == 1000 {
-				load.add(sinceReport)
-				sinceReport = 0
-			}
-			// docID may be "id" or "id#0", "id#1", etc.
-			if err := s.indexChunk(collection, docID, rec.Vector, diskOnly); err != nil {
-				// A store written by 2.15.0 or earlier can hold vectors a
-				// provider returned empty (#252). Loading one used to poison
-				// the whole graph — and map order is random, so whether it did
-				// changed from one restart to the next. Refused now, and
-				// counted so the operator is told to reindex.
-				refused++
-				continue
-			}
-			collVecs[docID] = rec.Vector
-		}
-		if refused > 0 {
-			slog.Warn("stored vectors the index cannot hold were skipped; reindex the collection to replace them",
-				"collection", collection, "skipped", refused, "loaded", len(records)-refused,
-				"remedy", "POST /v1/vector-reindex")
-		}
-		if diskOnly {
-			collVecs = nil // nothing to train float32 indexes with
-		}
-		s.loadSummaryVectors(collection, diskOnly) // RAG-009
-		s.loadImageVectors(collection, diskOnly)   // RAG-010
-
-		// Trigger training for trainable indexes (IVF, PQ)
-		for _, searcher := range s.VectorSearchers {
-			if trainer, ok := searcher.(vec.Trainable); ok {
-				vec.TrainSafely(trainer, collection, collVecs)
-			}
-		}
-
-		load.add(sinceReport)
-		load.finishCollection(collection)
-		totalLoaded += count
+		load.finishCollection(collection) // searchable, with what it has
 	}
 
 	// Mark all searchers as ready
@@ -199,6 +149,70 @@ func (s *Server) loadVectorIndex() {
 	slog.Info("vector index loaded",
 		"documents", totalLoaded, "collections", len(counts), "elapsed", time.Since(start),
 		"algorithms", "flat, hnsw, ivf, pq")
+}
+
+// loadCollectionVectors puts one collection's stored vectors into every
+// in-memory index and trains the trainable ones; it reports whether it
+// loaded them. The startup load runs it per collection, and installing a
+// corpus pack (AGT-005) for the collection installed. A collection whose
+// vectors are disabled — a pack embedded by another model — is skipped.
+func (s *Server) loadCollectionVectors(collection string, load *vectorLoadState) bool {
+	if s.collectionVectorsDisabled(collection) {
+		slog.Warn("not loading the vectors of a corpus pack made with another embedding model; its hybrid search uses full text only",
+			"collection", collection)
+		return false
+	}
+	records, err := s.VectorStore.LoadCollection(collection)
+	if err != nil {
+		slog.Error("failed to load vectors for collection", "collection", collection, "err", err)
+		return false
+	}
+
+	// Collect vectors for trainable indexes
+	collVecs := make(map[string][]float32, len(records))
+
+	// Disk-only collections keep RAM quantized-only: full-precision
+	// vectors are never loaded into the float32 searchers.
+	diskOnly := s.collectionDiskOnly(collection)
+
+	refused, sinceReport := 0, 0
+	for docID, rec := range records {
+		if sinceReport++; sinceReport == 1000 {
+			load.add(sinceReport)
+			sinceReport = 0
+		}
+		// docID may be "id" or "id#0", "id#1", etc.
+		if err := s.indexChunk(collection, docID, rec.Vector, diskOnly); err != nil {
+			// A store written by 2.15.0 or earlier can hold vectors a
+			// provider returned empty (#252). Loading one used to poison
+			// the whole graph — and map order is random, so whether it did
+			// changed from one restart to the next. Refused now, and
+			// counted so the operator is told to reindex.
+			refused++
+			continue
+		}
+		collVecs[docID] = rec.Vector
+	}
+	if refused > 0 {
+		slog.Warn("stored vectors the index cannot hold were skipped; reindex the collection to replace them",
+			"collection", collection, "skipped", refused, "loaded", len(records)-refused,
+			"remedy", "POST /v1/vector-reindex")
+	}
+	if diskOnly {
+		collVecs = nil // nothing to train float32 indexes with
+	}
+	s.loadSummaryVectors(collection, diskOnly) // RAG-009
+	s.loadImageVectors(collection, diskOnly)   // RAG-010
+
+	// Trigger training for trainable indexes (IVF, PQ)
+	for _, searcher := range s.VectorSearchers {
+		if trainer, ok := searcher.(vec.Trainable); ok {
+			vec.TrainSafely(trainer, collection, collVecs)
+		}
+	}
+
+	load.add(sinceReport)
+	return true
 }
 
 // handleVectorSearch handles POST /v1/vector-search

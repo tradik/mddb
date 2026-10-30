@@ -120,6 +120,9 @@ func grpcError(code codes.Code, err error) error {
 	if asQuotaError(err) != nil {
 		code = codes.ResourceExhausted
 	}
+	if asReadOnlyError(err) != nil { // AGT-005
+		code = codes.PermissionDenied
+	}
 	return status.Error(code, err.Error())
 }
 
@@ -128,11 +131,11 @@ func grpcError(code codes.Code, err error) error {
 // from a broken request.
 func graphQLErrorPresenter(ctx context.Context, err error) *gqlerror.Error {
 	gerr := graphql.DefaultErrorPresenter(ctx, err)
-	if qe := asQuotaError(err); qe != nil {
+	if detail := mcpQuotaContent(err); detail != nil {
 		if gerr.Extensions == nil {
 			gerr.Extensions = map[string]any{}
 		}
-		for k, v := range qe.detail() {
+		for k, v := range detail {
 			gerr.Extensions[k] = v
 		}
 	}
@@ -140,10 +143,14 @@ func graphQLErrorPresenter(ctx context.Context, err error) *gqlerror.Error {
 }
 
 // mcpQuotaContent is the structured content of a failed tool call refused by
-// a quota, nil for any other failure.
+// a quota or by a read-only collection (AGT-005), nil for any other failure.
+// The GraphQL presenter puts the same detail in an error's extensions.
 func mcpQuotaContent(err error) map[string]any {
 	if qe := asQuotaError(err); qe != nil {
 		return qe.detail()
+	}
+	if re := asReadOnlyError(err); re != nil {
+		return re.detail()
 	}
 	return nil
 }

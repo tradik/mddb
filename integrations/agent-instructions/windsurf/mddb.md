@@ -77,6 +77,11 @@ where something is defined. Each answer names the licence in
 `meta.license` — learn from the approach; copy code only when that licence
 allows it, and say which licence applies.
 
+Documentation of a library, an RFC or a specification may already exist as a
+corpus pack (`mddb-cli corpus list`): an installed pack is a read-only
+collection, searched like any other. Writes to it are refused with
+`READ_ONLY`; put your own notes in another collection.
+
 ## Before changing code
 
 Ask `code_symbol` about the function, type or selector first: one call returns

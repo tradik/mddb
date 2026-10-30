@@ -153,6 +153,25 @@ rule since 2.18.9: the key and language with ASCII letters in lower case, the
 collection as written (#360). No release has written key-index objects to a
 bucket, so a bucket has nothing to migrate and is never rewritten.
 
+## Corpus packs
+
+A corpus pack ([CORPUS-PACKS.md](CORPUS-PACKS.md), since 2.18.10) carries one
+collection as the file this layout keeps for it: every collection bucket,
+only that collection's keys, stamped with its schema version. Both layouts
+build and install packs, with the server running:
+
+| | `single` | `per-collection` |
+|---|---|---|
+| Build | the collection's keys are copied out of the shared file in one read transaction | the collection's file is copied through a read transaction, as a backup copies it |
+| Install | the pack's keys are copied into the shared file | the pack's file is renamed into `mddb.db.d/` and opened |
+| Remove | the keys are deleted; their pages are freed inside the file, which keeps its size | the file is closed and deleted: the space is back at once |
+
+The install writes the collection's config first, read-only, so no write
+reaches the collection while its data is being put in place; a failure
+takes the config back. A collection of the same name that already holds
+data — a document in the single layout, a file in this one — is not
+overwritten.
+
 ## Limits
 
 - **Replication snapshots** stream one file, so a leader in this layout

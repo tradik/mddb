@@ -213,9 +213,16 @@ func (s *Server) rebuildInMemoryState() {
 		}
 	}
 
-	// Drop every read cache in place — same objects (and their cleanup
-	// goroutines), contents cleared. A cache that outlives its database is
-	// how GO-002 happened.
+	s.clearReadCaches()
+
+	slog.Info("in-memory state rebuilt after database swap")
+}
+
+// clearReadCaches drops every read cache in place — same objects (and their
+// cleanup goroutines), contents cleared. A cache that outlives its database
+// is how GO-002 happened; one that outlives a corpus pack install or removal
+// (AGT-005) answers from before it.
+func (s *Server) clearReadCaches() {
 	if s.Cache != nil {
 		s.Cache.Clear()
 	}
@@ -223,8 +230,6 @@ func (s *Server) rebuildInMemoryState() {
 		s.LockFreeCache.Clear()
 	}
 	s.SearchCache.Clear()
-
-	slog.Info("in-memory state rebuilt after database swap")
 }
 
 // reloadIf calls load when ok, for managers that may not exist.

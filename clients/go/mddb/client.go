@@ -142,11 +142,7 @@ func (c *Client) send(ctx context.Context, method, path string, body any) (int, 
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if c.apiKey != "" {
-		req.Header.Set("X-API-Key", c.apiKey)
-	} else if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
+	c.authorize(req)
 
 	resp, err := c.httpc.Do(req)
 	if err != nil {
@@ -159,6 +155,44 @@ func (c *Client) send(ctx context.Context, method, path string, body any) (int, 
 		return 0, nil, err
 	}
 	return resp.StatusCode, respBody, nil
+}
+
+// authorize sets the request's credentials: the API key, or else the token.
+func (c *Client) authorize(req *http.Request) {
+	if c.apiKey != "" {
+		req.Header.Set("X-API-Key", c.apiKey)
+	} else if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+}
+
+// DoStream issues a request whose body is body, sent as it is read, with
+// Content-Type contentType (none when empty), and returns the response body
+// unread. It is for transfers too large to hold in memory — corpus packs
+// (AGT-005) are gigabytes. The caller closes the body. A status >= 400 is an
+// *APIError carrying the body, which is then read and closed here.
+//
+// No default timeout applies: a transfer of that size has no sensible fixed
+// bound, so the context alone limits the call.
+func (c *Client) DoStream(ctx context.Context, method, path, contentType string, body io.Reader) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	if err != nil {
+		return nil, err
+	}
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	c.authorize(req)
+	resp, err := c.httpc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		defer func() { _ = resp.Body.Close() }()
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		return nil, &APIError{StatusCode: resp.StatusCode, Body: string(msg)}
+	}
+	return resp.Body, nil
 }
 
 // doJSON issues a request and unmarshals the response body into out (when non-nil).

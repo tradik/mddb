@@ -5963,6 +5963,176 @@ paths:
                     description: Total number of configured collections
                     example: 3
 
+  /v1/corpus:
+    get:
+      tags:
+        - Collection Config
+      summary: List installed corpus packs
+      description: The collections installed from corpus packs (AGT-005), with what each pack's manifest said.
+      operationId: listCorpusPacks
+      responses:
+        "200":
+          description: Installed packs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packs:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        collection:
+                          type: string
+                        readOnly:
+                          type: boolean
+                        corpus:
+                          $ref: "#/components/schemas/CorpusInfo"
+                  total:
+                    type: integer
+        "403":
+          description: No read permission
+
+  /v1/corpus/build:
+    post:
+      tags:
+        - Collection Config
+      summary: Build a corpus pack of a collection
+      description: >
+        Takes a consistent snapshot of the collection — documents, full-text
+        index, vectors, geo points — and streams it as a tar.zst pack with
+        manifest.json and collection.db (AGT-005, docs/CORPUS-PACKS.md).
+        Refused without a licence, for an encrypted collection and for one whose
+        documents live in S3 or memory. Requires the admin permission.
+      operationId: buildCorpusPack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CorpusBuildRequest"
+      responses:
+        "200":
+          description: The pack
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="kubernetes-docs-1.31.mddbpack"
+            X-Mddb-Pack-Docs:
+              schema:
+                type: integer
+          content:
+            application/zstd:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: No licence, an invalid name, or a collection that cannot be packed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required
+        "404":
+          description: The collection has no documents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/corpus/install:
+    post:
+      tags:
+        - Collection Config
+      summary: Install a corpus pack
+      description: >
+        Installs an uploaded pack as a read-only collection, without a restart,
+        re-embedding or reindexing. The pack is an upload, never a path or a URL
+        for the server to fetch. A pack whose vectors were made by another model
+        than the server's is installed with vectorsDisabled and a warning: hybrid
+        search on it answers from full text. Requires the admin permission;
+        refused in read-only mode.
+      operationId: installCorpusPack
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [pack]
+              properties:
+                pack:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CorpusInstallResult"
+        "400":
+          description: >
+            Not a pack, a manifest without a licence, a checksum that does not
+            match, a newer storage format, or a collection.db holding keys of
+            another collection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Admin access required, or read-only mode
+        "409":
+          description: A collection of that name already holds data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/corpus/remove:
+    post:
+      tags:
+        - Collection Config
+      summary: Remove an installed corpus pack
+      description: Deletes the pack's collection — data, file and config. Requires the admin permission.
+      operationId: removeCorpusPack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: removed
+                  name:
+                    type: string
+                  deleted:
+                    type: integer
+        "403":
+          description: Admin access required, or read-only mode
+        "404":
+          description: No pack of that name is installed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /v1/aggregate:
     post:
       tags:
@@ -11419,6 +11589,118 @@ components:
           description: Evaluation queries (SRCH-019). Changed only through /v1/eval-queries; a PUT keeps the stored set.
           items:
             $ref: "#/components/schemas/EvalQuery"
+        readOnly:
+          type: boolean
+          readOnly: true
+          description: >
+            The collection refuses every write (AGT-005): REST answers 403 with
+            code READ_ONLY, gRPC PERMISSION_DENIED. Set only by installing a
+            corpus pack; a PUT keeps it.
+        corpus:
+          $ref: "#/components/schemas/CorpusInfo"
+
+    CorpusInfo:
+      type: object
+      readOnly: true
+      description: The corpus pack a collection was installed from (AGT-005). See docs/CORPUS-PACKS.md.
+      properties:
+        name:
+          type: string
+          example: kubernetes-docs
+        version:
+          type: string
+          example: "1.31"
+        license:
+          type: string
+          example: CC-BY-4.0
+        mddbVersion:
+          type: string
+          example: 2.18.10
+        docCount:
+          type: integer
+        sha256:
+          type: string
+          description: sha256 of the pack's collection.db
+        installedAt:
+          type: string
+          format: date-time
+        vectorsDisabled:
+          type: boolean
+          description: >
+            The pack's vectors were made by another embedding model than the
+            server's: they are not loaded, and hybrid search on the collection
+            answers from full text only.
+        embedding:
+          $ref: "#/components/schemas/CorpusEmbedding"
+
+    CorpusEmbedding:
+      type: object
+      nullable: true
+      description: How a pack's vectors were made; null for a full-text-only pack.
+      properties:
+        provider:
+          type: string
+          example: openai
+        model:
+          type: string
+          example: text-embedding-3-small
+        dims:
+          type: integer
+          example: 1536
+
+    CorpusSource:
+      type: object
+      required: [repo, license]
+      properties:
+        repo:
+          type: string
+          example: https://github.com/kubernetes/website
+        commit:
+          type: string
+          example: 5f2c1e0
+        license:
+          type: string
+          example: CC-BY-4.0
+
+    CorpusBuildRequest:
+      type: object
+      required: [collection, license]
+      properties:
+        collection:
+          type: string
+          description: The collection to pack; the pack installs under this name.
+        version:
+          type: string
+          example: "1.31"
+        description:
+          type: string
+        license:
+          type: string
+          description: Licence of the pack as a whole. Mandatory — pack only what may be redistributed.
+          example: CC-BY-4.0
+        sources:
+          type: array
+          description: Where the documents came from; each source needs a licence.
+          items:
+            $ref: "#/components/schemas/CorpusSource"
+
+    CorpusInstallResult:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        license:
+          type: string
+        docCount:
+          type: integer
+        vectorsDisabled:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
 
     WordPressTargetConfig:
       type: object

@@ -116,6 +116,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/documents:updateWhere", s.handleWhere)
 	mux.HandleFunc("/v1/documents:setTTLWhere", s.handleWhere)
 	mux.HandleFunc("/v1/collection-configs", s.handleCollectionConfigList)
+	// AGT-005: corpus packs — read-only collections built once, installed anywhere.
+	mux.HandleFunc("/v1/corpus", s.handleCorpusList)
+	mux.HandleFunc("/v1/corpus/build", s.handleCorpusBuild)
+	mux.HandleFunc("/v1/corpus/install", s.guardWrite(s.handleCorpusInstall))
+	mux.HandleFunc("/v1/corpus/remove", s.guardWrite(s.handleCorpusRemove))
 	mux.HandleFunc("/v1/curation", s.handleCuration)
 	mux.HandleFunc("/v1/events", s.handleSSE)
 	// Memory RAG endpoints

@@ -238,6 +238,15 @@ With `MDDB_STORAGE_LAYOUT=per-collection` a backup is the main file plus a
 `.d` directory holding one file per collection, and a restore puts both back.
 See [STORAGE-LAYOUT.md](STORAGE-LAYOUT.md#backup-and-restore).
 
+## A corpus pack is not a backup
+
+A corpus pack (`mddb-cli corpus build`, since 2.18.10) is taken with the same
+consistent copy, but of **one collection**, without any of the server's own
+data, and it is installed **beside** the other collections, read-only, on any
+server — a backup replaces the database it is restored into. Use a backup to
+recover a server and a pack to share a collection between servers. See
+[CORPUS-PACKS.md](CORPUS-PACKS.md#pack-or-backup).
+
 ## Compacting a database
 
 A bbolt file never shrinks: deleting a large collection frees pages for

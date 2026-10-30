@@ -262,7 +262,7 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 		return nil
 	})
 
-	if qe := asQuotaError(err); qe != nil {
+	if qe := wholeBatchRefusal(err); qe != nil { // GO-043, AGT-005
 		return nil, qe
 	}
 	if err != nil {

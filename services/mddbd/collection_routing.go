@@ -73,8 +73,13 @@ func (s *Server) collectionDB(collection string) *bolt.DB {
 	return s.DB
 }
 
-// collectionDBForWrite is the file to write a collection to.
+// collectionDBForWrite is the file to write a collection to. Every write to
+// collection data asks it, in both layouts, so it is also the gate that
+// refuses writes to a read-only collection (AGT-005).
 func (s *Server) collectionDBForWrite(collection string) (*bolt.DB, error) {
+	if err := s.checkCollectionWritable(collection); err != nil {
+		return nil, err
+	}
 	if cf := s.collectionStore(); cf != nil {
 		return cf.getOrCreate(collection)
 	}

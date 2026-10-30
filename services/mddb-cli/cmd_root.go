@@ -59,7 +59,7 @@ It provides an interface similar to mysql-client for managing markdown documents
 		newExportCmd(), newBackupCmd(), newRestoreCmd(), newTruncateCmd(), newStatsCmd(),
 		newWebhookCmd(), newSchemaCmd(), newValidateCmd(),
 		newLoginCmd(), newAPIKeyCmd(),
-		newGraphQLCmd(), newPlaygroundCmd(),
+		newGraphQLCmd(), newPlaygroundCmd(), newCorpusCmd(),
 		newSelfUpdateCmd(),
 	)
 
