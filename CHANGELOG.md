@@ -60,6 +60,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Query-shape counters on every surface (OPS-025).** REST, gRPC, MCP, GraphQL and `/es` count search mode, the algorithm that ran (and what `auto` chose), filter operators, `limitCapped`, `queryDecomposition`, empty results, and for the code graph the requested depth, clamps to depth 3, truncation, requests without a start document and chains of graph calls. In `/metrics` as `mddb_query_shape_*` (including `mddb_query_shape_graph_depth_clamped_total` and the `mddb_query_shape_graph_chain_length` histogram), and in the bundle as `query-shape.json` with the CODE-006/007 gate thresholds computed. Counting is atomic adds with no allocation (15 ns per search).
 - Issue templates: a bug report with a field for the diagnose bundle, and "Code or graph question MDDB did not answer" for `query-shape.json`.
 
+- **Panel: 2.18.9 and 2.18.10 server features.**
+  - System page: corpus packs (list with version, licence, document count, read-only and vectors-disabled markers; install a `.mddbpack`; remove; build and download) and the diagnose bundle (profiles, integrity check, keep names).
+  - Automations: a cron rule calls a webhook, takes a backup (local or S3, retention, collections) or syncs a sitemap, URL list or S3 prefix (prune, limits). A stored S3 secret is kept when the field is left blank. The log shows backup targets, removed backups and sync counts.
+  - Vector, hybrid and cross-collection search: `Auto (server chooses)` index, *Explain plan* (index, filter strategy, candidates, reasons, feedback, query parts), *Split multi-part questions* (`queryDecomposition: "auto"`) and relevance feedback marked on vector results.
+  - A notice when the server capped a result list (`limitCapped`, `X-Limit-Capped`).
+  - Collection settings: vector index, summary mode and weight, `maxTopK`, `fts.excludeMetaKeys` and quota.
+  - Vector Search page: the background index training queue and a per-collection training badge.
+  - Search advisor: recommended summary mode, documents with a summary, "Matches by meaning: No" for the lexical provider.
+  - Users and groups: admin grants are labelled global (`"*"`) or collection-scoped, and the forms say only admin on `"*"` is server-wide.
+
+- `GET /v1/config` reports the search surface, tracing and proxy settings, through the configuration allowlist (OPS-025): `esCompat {enabled, prefix}`, `searchMaxLimit`, `telemetry {enabled, endpoint}` (the collector's scheme and host only) and `clientAddressing {trustedProxies, header, proxyProtocol}` (a count of trusted proxies, never which). The admin panel shows them on the Config and System pages.
+- **Quota usage (GO-043).** `GET /v1/collection-config` returns `usage {documents, bytes, vectors, embeddingCalls, embeddingTokens}` for a collection with a quota — the counts the write gate and the embedding budget check, embedding use counted for today (UTC). gRPC returns the same in `GetCollectionConfigResponse.usage` (`CollectionQuotaUsageProto`). The panel's collection settings draw one bar per limit ("1,234 / 5,000 documents"), each with a text alternative and WCAG 2.2 contrast.
+
 ### Changed
 
 - **Full-text indexing writes only what an update changed (#367).** The index keeps a signature of each document. A resent document, or a TTL-only update, writes nothing; a metadata-only update rewrites only the `meta.<key>` fields that changed and removes the postings of fields that are gone; new content, `lang` or kind still re-indexes the whole document. Every write path gets this: add/upsert, PATCH, batch, ingest, the scheduled sync, gRPC and MCP. Search results do not change: a property test checks after every step that the index is byte-identical to a full rebuild. Adding one meta key to a document of about 300 words now writes 5 keys and 15 pages, where it used to rewrite 306 keys and 576 pages. Documents indexed by earlier versions are re-indexed in full the first time they are written; `POST /v1/fts-reindex` still rebuilds every document.
@@ -69,6 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Seven long functions are split into named helpers with no change in behaviour: the ODS/ODP/DOCX converters, the search advisor's rules, the vector reindex, the MCP POST handler and the upload path (`go:S3776`). DOCX conversion and the advisor rules have their own files. Constants replace duplicated literals for the image MIME types, "automation not initialized" and the restore description (`go:S1192`).
 
 - SonarCloud configuration (`.sonarcloud.properties` and `sonar-project.properties`) excludes generated code (gqlgen `generated.go` / `models_gen.go`, protobuf `*.pb.go`) and the WordPress API test stubs, which must keep WordPress's function names. Ten MEDIUM and ten LOW findings sampled from the new-code period are fixed across the Go server and client, the Node client, the Python LangChain integration, the WordPress plugin and the panel (the audit log keys rows by event, not by position).
+
+- Panel: a 403 says which permission the request needed (a request naming no collection needs `"*"`; server-wide operations need admin on `"*"`); a `READ_ONLY` refusal shows the server's message. A read-only collection is marked in its document list and settings, with Upload and delete off.
+
+- SonarCloud findings on the release's own code: every HIGH (50), MEDIUM (17) and LOW (3) finding of the pull request is fixed. Long functions (the MCP vector search, the Elasticsearch bulk and highlight parsers, query-shape reports, collection-config validation and others) are split into named helpers with no change in behaviour, functions with eight or nine parameters take small structs, and long tests are split into helpers without dropping an assertion. The MCP vector search lives in `mcp_direct_vector.go`.
+- The diagnose bundle's goroutine profile is `goroutines.pprof`, pprof's binary form, like `heap.pprof`; the text dump is gone (SonarCloud `go:S4507`).
 
 ### Fixed
 
@@ -90,6 +108,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deleting a group could panic the server (`slice bounds out of range`) when the next group-permission key was shorter than the deleted group's name plus `|` — for example deleting `longname` while a group `z` held a permission. The prefix check now tests the length first.
 
 - A backup now confines its own target path to `MDDB_BACKUP_DIR` (`safeBackupPath` inside `backupCollections`), and the path guard ends in a Clean-then-prefix check that taint analysis can follow (SonarCloud `gosecurity:S2083`). Traversal inputs (`../`, absolute paths elsewhere, a symlink out of the directory, Windows `..\`) are refused by a test.
+
+- Panel: saving collection settings erased every setting the dialog does not show (`fts`, `code`, `embedding`, `wordpress`, `diskOnlyVectors`, and retrieval `oversample`, `groupBy`, `format`, BM25 and summary settings). It now starts from the stored config.
+- Panel: the automation log read `type` and `httpCode`, which the server never sends; it reads `ruleType` and `httpStatus`.
+- Panel: a vector search started with the Search button, or one that succeeded on retry, stayed on loading. The panel recognised a loading index by a message the server no longer sends; it now uses the 503 answer, and does not retry an index that is still training.
+
+- Panel: the delete button was nested inside the document row's button (invalid HTML, hidden from screen readers); they are separate controls now. Cancel on the vector, hybrid and cross-collection search pages stopped working after one search replaced another still in flight. Create-user, create-group, edit-group and add-permission fields are tied to their labels. The Config page showed empty HTTP and gRPC addresses (it read fields `/v1/config` does not send) and an "Extreme Performance Mode" switch the server never reports.
 
 ### Upgrading
 
