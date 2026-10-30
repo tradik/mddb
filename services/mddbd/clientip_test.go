@@ -248,7 +248,7 @@ func TestGrpcPeerIPUsesTheSameRule(t *testing.T) {
 }
 
 func TestRunServerRejectsBadTrustedProxies(t *testing.T) {
-	withTrustedProxies(t, "")
+	withClientAddressing(t)
 	t.Setenv(trustedProxiesEnv, "10.0.0.0/8, proxy.internal")
 	c := covAExpectFatal(t, func() { runServer(ServerConfig{}) })
 	if c.msg != "startup step failed" || !strings.Contains(c.args, `"proxy.internal"`) || !strings.Contains(c.args, trustedProxiesEnv) {

@@ -914,8 +914,10 @@ export MDDB_RATE_LIMIT_REQUESTS=10
 export MDDB_RATE_LIMIT_WINDOW=60
 export MDDB_RATE_LIMIT_BURST=5
 export MDDB_RATE_LIMIT_BY=ip
-# Behind a reverse proxy only: whose X-Forwarded-For to believe.
+# Behind a reverse proxy only: whose client IP header to believe, and which
+# header it is (X-Forwarded-For by default; CF-Connecting-IP behind cloudflared).
 # export MDDB_TRUSTED_PROXIES=127.0.0.1,10.0.0.0/8
+# export MDDB_CLIENT_IP_HEADER=X-Forwarded-For
 ./mddbd &
 
 # Fire 20 requests back-to-back. The first 10 succeed (+5 burst);

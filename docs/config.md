@@ -351,6 +351,7 @@ No further configuration required — the jail is always on.
 | `MDDB_CORS_ORIGIN` | explicit origin list (not `*`) | A.8.23 / CC6.6 — web-origin segmentation |
 | `MDDB_AUDIT_ENABLED` | `true` | A.8.15 / CC7.2 — audit trail |
 | `MDDB_RATE_LIMIT_ENABLED` | `true` | A.5.30 / CC6.6 — resource-exhaustion protection |
+| `MDDB_TRUSTED_PROXIES` | the proxies' addresses — not `0.0.0.0/0` or `::/0` (unset is fine) | A.8.15 / CC7.2 — an audit IP the client cannot choose |
 
 On a successful production start the server logs:
 
@@ -373,7 +374,9 @@ Shared sliding-window limiter covering both HTTP and gRPC. Separate from the pre
 | `MDDB_RATE_LIMIT_WINDOW` | `60` | int seconds | Window length. |
 | `MDDB_RATE_LIMIT_BURST` | `50` | int | Additional allowance before a client is blocked. Effective ceiling = `REQUESTS + BURST`. |
 | `MDDB_RATE_LIMIT_BY` | `"ip"` | string | `"ip"` (default) or `"user"`. `user` keys on the authenticated username and falls back to IP for anonymous traffic. |
-| `MDDB_TRUSTED_PROXIES` | `""` | list | Comma-separated IPs or CIDR prefixes of reverse proxies whose `X-Forwarded-For` / `X-Real-IP` headers are believed, e.g. `127.0.0.1,10.0.0.0/8,fd00::/8`. Empty (the default) trusts nobody. An entry that is not an IP or prefix stops startup with that entry named. See [Client IP and trusted proxies](#client-ip-and-trusted-proxies). |
+| `MDDB_TRUSTED_PROXIES` | `""` | list | Comma-separated IPs or CIDR prefixes of the reverse proxies and load balancers whose client IP header and PROXY header are believed, e.g. `127.0.0.1,10.0.0.0/8,fd00::/8`. Empty (the default) trusts nobody. An entry that is not an IP or prefix stops startup with that entry named. `0.0.0.0/0` or `::/0` trusts every client again: mddbd warns at startup and `MDDB_PRODUCTION=true` refuses it. See [Client IP and trusted proxies](#client-ip-and-trusted-proxies). |
+| `MDDB_CLIENT_IP_HEADER` | `X-Forwarded-For` | string | v2.18.10+. The header a trusted proxy puts the client address in. `X-Forwarded-For` (with the `X-Real-IP` fallback) and `Forwarded` (RFC 7239) are chains; any other name (`X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`, `X-Cluster-Client-Ip`, `Client-IP`, ...) is one address. gRPC reads the same name in lower case from the metadata. A name that is not a valid HTTP header name stops startup. See [Proxies and load balancers](#proxies-and-load-balancers). |
+| `MDDB_PROXY_PROTOCOL` | `off` | `off`/`on` | v2.18.10+. PROXY protocol v1 and v2 on the HTTP, gRPC and MCP listeners. When `on`, a peer in `MDDB_TRUSTED_PROXIES` **must** send a PROXY header and any other peer **must not**. Any other value stops startup. See [PROXY protocol](#proxy-protocol). |
 
 HTTP responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`; rejected requests get `429 Too Many Requests` with `Retry-After`. gRPC rejects with `codes.ResourceExhausted`. The paths `/health`, `/v1/health`, and `/metrics` are always exempt so monitoring and load-balancer probes never trip the limiter.
 
@@ -381,19 +384,80 @@ HTTP responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-
 
 One rule decides the client IP for the HTTP and gRPC rate limiters, the MCP rate limiter and access log, the HTTP access log (`client` field), the SSE per-IP connection cap, and the audit log (login attempts, writes, incident detection):
 
-1. If the connecting peer (`RemoteAddr`, or the gRPC peer address) is **not** in `MDDB_TRUSTED_PROXIES`, the peer is the client. `X-Forwarded-For` and `X-Real-IP` (gRPC metadata `x-forwarded-for` / `x-real-ip`) are ignored, so a client cannot pick its own rate-limit bucket or audit IP.
-2. If the peer is a trusted proxy, `X-Forwarded-For` is read **right to left**, skipping trusted proxies; the first other address is the client. A hop that is not an IP address ends the walk.
-3. If that finds nothing, `X-Real-IP` is used when it is an IP address, otherwise the peer.
+1. If the connecting peer (`RemoteAddr`, or the gRPC peer address) is **not** in `MDDB_TRUSTED_PROXIES`, the peer is the client. Every client IP header is ignored, so a client cannot pick its own rate-limit bucket or audit IP.
+2. If the peer is a trusted proxy, the header named by `MDDB_CLIENT_IP_HEADER` is read (gRPC: the same name in lower case in the metadata):
+   - **`X-Forwarded-For`** (the default) is read **right to left**, skipping trusted proxies; the first other address is the client. All header lines are joined in order, so a proxy that adds a line (HAProxy) and one that appends to the line (nginx) work the same. A hop that is not an IP address ends the walk. If that finds nothing, `X-Real-IP` is used when it is an IP address.
+   - **`Forwarded`** (RFC 7239) is walked the same way over the `for=` parameter of each element: `for=192.0.2.60`, `for="[2001:db8:cafe::17]:4711"`, `for="198.51.100.4:_port"`. An element with `for=unknown`, an obfuscated node (`for=_hidden`) or no `for=` ends the walk. `X-Real-IP` is not consulted.
+   - **Any other name** (`X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`, `X-Cluster-Client-Ip`, `Client-IP`, ...) holds one address set by the nearest proxy. The last line of that header is used; it must be one IP address (a port is dropped). A list or anything else is ignored.
+3. If the header yields nothing, the peer is the client.
 
 Addresses are canonical: the port is dropped, IPv6 is lower-case and compressed, and IPv4-mapped IPv6 (`::ffff:1.2.3.4`) becomes `1.2.3.4`. A Unix-socket peer keeps its socket name.
 
-**Behind a reverse proxy** (nginx, Traefik, Caddy, a load balancer), list the proxy's address, or else every client looks like the proxy and shares one bucket:
+**Behind a reverse proxy**, list the proxy's address, or else every client looks like the proxy and shares one bucket:
 
 ```bash
 export MDDB_TRUSTED_PROXIES=127.0.0.1,172.16.0.0/12   # the proxy on the host or the Docker network
+export MDDB_CLIENT_IP_HEADER=X-Forwarded-For          # the default; see the table below for your proxy
 ```
 
-The first time forwarding headers arrive from a peer that is not trusted, mddbd logs one warning naming that peer — the sign that `MDDB_TRUSTED_PROXIES` is missing.
+The first time a client IP header arrives from a peer that is not trusted, mddbd logs one warning naming that peer and the header — the sign that `MDDB_TRUSTED_PROXIES` is missing. `0.0.0.0/0` or `::/0` in `MDDB_TRUSTED_PROXIES` makes every client a trusted proxy, which undoes all of the above: mddbd logs a warning at startup, and `MDDB_PRODUCTION=true` refuses to start.
+
+### PROXY protocol
+
+Layer-4 load balancers (HAProxy, AWS NLB, nginx `stream`, Traefik TCP routers) cannot add an HTTP header; they put the client address in a [PROXY protocol](https://www.haproxy.org/download/3.2/doc/proxy-protocol.txt) header in front of the connection instead. `MDDB_PROXY_PROTOCOL=on` reads it, v1 (text) and v2 (binary), on the HTTP API, gRPC and MCP listeners. The header is read below TLS, so it works with `MDDB_TLS_ENABLED=true` and with gRPC TLS. After the header, the connection's peer address is the client it names, and the rule above applies to it: when that address is itself a trusted proxy, the client IP header is read as well.
+
+Who may send a header:
+
+| Connecting peer | Sends a PROXY header | Sends none |
+|-----------------|----------------------|------------|
+| In `MDDB_TRUSTED_PROXIES` | Accepted. A `LOCAL` header (a load balancer's health check) keeps the peer's own address. | **Refused** — the connection is closed. A load balancer that stops sending the header is misconfigured, and guessing would put every client behind it in one bucket. |
+| Not in `MDDB_TRUSTED_PROXIES` | **Refused** — a client cannot choose its own address. | Served, as itself. Direct clients and local health checks keep working. |
+
+A peer has 10 seconds to send its header (like `ReadHeaderTimeout`). The header is read in the connection's own goroutine, never in the accept loop, so a slow peer holds only its own connection. With the switch on and `MDDB_TRUSTED_PROXIES` empty, every header is refused and mddbd warns at startup.
+
+Not covered: HTTP/3 (QUIC is UDP; no PROXY protocol), the Unix-socket listeners (their peers have no IP, so they are never trusted), and the short-lived `/health` listener that answers while the server starts — a load balancer that sends PROXY headers sees it as unhealthy until the server is up, which is what it is.
+
+> **Health checks.** With `MDDB_PROXY_PROTOCOL=on`, a container health check that connects from an address in `MDDB_TRUSTED_PROXIES` (for example `wget http://localhost:11023/health` with `127.0.0.1` trusted) is refused, because it sends no header. Keep the health check's source out of the trusted list: the load balancer's address or subnet, not `127.0.0.1` or the whole Docker network.
+
+### Proxies and load balancers
+
+What each product sends by default and what to set in mddb. Every row was checked against the vendor documentation listed under it (October 2026); what the documentation does not say is marked **not verified**.
+
+| Product | Sends by default | Set in mddb | Proxy side (minimal) |
+|---------|------------------|-------------|----------------------|
+| **nginx** (HTTP)<sup>[1]</sup> | Nothing: only `Host` and `Connection` are set; a client's own `X-Forwarded-For` passes through. | `MDDB_TRUSTED_PROXIES=<nginx address>` | `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (appends `$remote_addr`). Or `proxy_set_header X-Real-IP $remote_addr;` with `MDDB_CLIENT_IP_HEADER=X-Real-IP`. |
+| **nginx** (`stream`)<sup>[2]</sup> | No PROXY header. | `MDDB_PROXY_PROTOCOL=on`, `MDDB_TRUSTED_PROXIES=<nginx address>` | `proxy_protocol on;` sends v1; `proxy_protocol v2;` sends v2 (newer nginx, see the module docs for the version). |
+| **Traefik**<sup>[3][4]</sup> | HTTP: appends the peer to `X-Forwarded-For`; incoming `X-Forwarded-*` are believed only from `entryPoints.<ep>.forwardedHeaders.trustedIPs`. | `MDDB_TRUSTED_PROXIES=<Traefik address>` | Nothing for HTTP. TCP routers: serversTransport `proxyProtocol: { version: 2 }` (version 1 or 2; 2 is the default) plus `MDDB_PROXY_PROTOCOL=on`. PROXY to backends from HTTP routers: **not verified**. |
+| **Caddy**<sup>[5]</sup> | `reverse_proxy` sets or augments `X-Forwarded-For`; incoming values are ignored unless the peer is in Caddy's `trusted_proxies`. | `MDDB_TRUSTED_PROXIES=<Caddy address>` | Nothing for the header. PROXY: `reverse_proxy mddb:11023 { transport http { proxy_protocol v2 } }` plus `MDDB_PROXY_PROTOCOL=on`. |
+| **HAProxy**<sup>[6]</sup> | Nothing. | `MDDB_TRUSTED_PROXIES=<HAProxy address>` | `option forwardfor` (adds an `X-Forwarded-For` line at the end; mddb joins all lines). PROXY: `server mddb 10.0.0.10:11023 send-proxy-v2` (`send-proxy` for v1) plus `MDDB_PROXY_PROTOCOL=on`. |
+| **F5 BIG-IP**<sup>[7][8]</sup> | Nothing: the HTTP profile's **Insert X-Forwarded-For** defaults to Disabled. Whether it appends to a client's header: **not verified**. | `MDDB_TRUSTED_PROXIES=<self IPs / SNAT pool>` | HTTP profile: Insert X-Forwarded-For = Enabled. PROXY: no native setting found (**not verified**); the DevCentral CodeShare "Proxy Protocol Initiator" iRule (community code, v1) sends `PROXY TCP4 ...` on `SERVER_CONNECTED`, plus `MDDB_PROXY_PROTOCOL=on`. |
+| **Citrix NetScaler ADC**<sup>[9][10][11]</sup> | Nothing until Client IP insertion is enabled on the service. The header name is the admin's; with none given (and no global one) it is `client-ip`. Append vs replace: **not verified**. | `MDDB_CLIENT_IP_HEADER=<the name chosen>` (e.g. `Client-IP`), `MDDB_TRUSTED_PROXIES=<SNIP>` | `set service svc_mddb -CIP ENABLED Client-IP`. PROXY: `add netprofile np_mddb -proxyProtocol ENABLED -proxyprotocoltxversion V2`, `set service svc_mddb -netProfile np_mddb`, plus `MDDB_PROXY_PROTOCOL=on`. |
+| **Ivanti / Pulse / Brocade vTM**<sup>[12][13]</sup> | `X-Cluster-Client-Ip` with the client IP (virtual server `add_cluster_ip`, default Yes). `add_x_forwarded_for` defaults to No. Whether a client's own `X-Cluster-Client-Ip` is replaced: **not verified**. | `MDDB_CLIENT_IP_HEADER=X-Cluster-Client-Ip`, `MDDB_TRUSTED_PROXIES=<vTM addresses>` | Nothing (default). vTM's `proxy_protocol` setting only accepts PROXY headers from clients; sending one to a pool is left to TrafficScript, with no documented function: **not verified** — use the header. |
+| **Cloudflare** (proxied DNS)<sup>[14][15][16]</sup> | `CF-Connecting-IP` (one address); `X-Forwarded-For` appended; `True-Client-IP` only with the Enterprise managed transform. | `MDDB_CLIENT_IP_HEADER=CF-Connecting-IP`, `MDDB_TRUSTED_PROXIES=<Cloudflare's published ranges>` | Nothing. |
+| **cloudflared** (Cloudflare Tunnel)<sup>[14][17]</sup> | The origin's peer is the `cloudflared` process; for HTTP the client is in `CF-Connecting-IP`. Non-HTTP (TCP) tunnels carry no client IP. | `MDDB_CLIENT_IP_HEADER=CF-Connecting-IP`, `MDDB_TRUSTED_PROXIES=<cloudflared's address>`: `127.0.0.1` on the same host, or the Docker network (e.g. `172.16.0.0/12`) when cloudflared runs in a container. | Nothing. |
+| **AWS ALB**<sup>[18]</sup> | `X-Forwarded-For` appended (`routing.http.xff_header_processing.mode=append`, the default; `preserve` and `remove` exist). With `routing.http.xff_client_port.enabled` the entry is `ip:port` / `[ipv6]:port`; mddb drops the port. | `MDDB_TRUSTED_PROXIES=<the ALB's subnet CIDRs>` | Nothing (default). |
+| **AWS NLB**<sup>[19]</sup> | Client IP preservation (`preserve_client_ip.enabled`) is on by default for instance targets, off for IP targets with TCP/TLS; with it on, the peer already is the client. | Preservation on: nothing. Otherwise `MDDB_PROXY_PROTOCOL=on`, `MDDB_TRUSTED_PROXIES=<the NLB's subnet CIDRs>` | Target group attribute `proxy_protocol_v2.enabled=true` (v2 only). Health checks carry a header without client data too; mddb accepts it. |
+
+Sources:
+1. nginx `ngx_http_proxy_module` — https://nginx.org/en/docs/http/ngx_http_proxy_module.html
+2. nginx `ngx_stream_proxy_module` — https://nginx.org/en/docs/stream/ngx_stream_proxy_module.html
+3. Traefik entry points (`forwardedHeaders`) — https://doc.traefik.io/traefik/reference/install-configuration/entrypoints/
+4. Traefik TCP serversTransport (`proxyProtocol`) — https://doc.traefik.io/traefik/reference/routing-configuration/tcp/serverstransport/
+5. Caddy `reverse_proxy` — https://caddyserver.com/docs/caddyfile/directives/reverse_proxy
+6. HAProxy 3.2 configuration manual (`option forwardfor`, `send-proxy`, `send-proxy-v2`) — https://www.haproxy.org/download/3.2/doc/configuration.txt
+7. F5 BIG-IP LTM profiles reference (HTTP profile) — https://techdocs.f5.com/kb/en-us/products/big-ip_ltm/manuals/product/ltm-profiles-reference-13-0-0/2.html
+8. F5 DevCentral CodeShare, Proxy Protocol Initiator (community) — https://community.f5.com/kb/codeshare/proxy-protocol-initiator/280541
+9. NetScaler, insert the client IP in the request header — https://docs.netscaler.com/us/en/citrix-adc/current-release/load-balancing/load-balancing-advanced-settings/insert-cip-in-request-hdr.html
+10. NetScaler command reference, `service` — https://developer-docs.netscaler.com/en-us/adc-command-reference-int/current-release/basic/service
+11. NetScaler PROXY protocol — https://docs.netscaler.com/en-us/citrix-adc/current-release/system/proxy-protocol.html
+12. Ivanti vTM 22.x virtual server configuration keys — https://help.ivanti.com/ps/help/en_US/VTM/22.x/config/ps-vtm-config/conf_vservers.htm
+13. Ivanti vTM 22.x PROXY protocol — https://help.ivanti.com/ps/help/en_US/VTM/22.x/userguide/ps-vtm-userguide/proxy_protocol.htm
+14. Cloudflare HTTP request headers — https://developers.cloudflare.com/fundamentals/reference/http-headers/
+15. Cloudflare managed transforms (`True-Client-IP`) — https://developers.cloudflare.com/rules/transform/managed-transforms/reference/
+16. Cloudflare IP ranges — https://www.cloudflare.com/ips/
+17. Cloudflare One connectivity options (what the origin sees behind `cloudflared`) — https://developers.cloudflare.com/cloudflare-one/networks/connectivity-options/
+18. AWS ALB `X-Forwarded` headers — https://docs.aws.amazon.com/elasticloadbalancing/latest/application/x-forwarded-headers.html
+19. AWS NLB target group attributes — https://docs.aws.amazon.com/elasticloadbalancing/latest/network/edit-target-group-attributes.html
 
 ---
 

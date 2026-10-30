@@ -71,6 +71,13 @@ services:
       - MDDB_AUTH_JWT_EXPIRY=${MDDB_AUTH_JWT_EXPIRY:-24h}
       - MDDB_AUTH_ADMIN_USERNAME=${MDDB_AUTH_ADMIN_USERNAME:-admin}
       - MDDB_AUTH_ADMIN_PASSWORD=${MDDB_AUTH_ADMIN_PASSWORD:?set MDDB_AUTH_ADMIN_PASSWORD in .env, see .env.example}
+      # #366: client IP behind a proxy or cloudflared. Empty trusts nobody and
+      # the default header is X-Forwarded-For; behind cloudflared set
+      # MDDB_CLIENT_IP_HEADER=CF-Connecting-IP and MDDB_TRUSTED_PROXIES to the
+      # cloudflared container or this network. See docs/config.md.
+      - MDDB_TRUSTED_PROXIES=${MDDB_TRUSTED_PROXIES:-}
+      - MDDB_CLIENT_IP_HEADER=${MDDB_CLIENT_IP_HEADER:-X-Forwarded-For}
+      - MDDB_PROXY_PROTOCOL=${MDDB_PROXY_PROTOCOL:-off}
       # - MDDB_PANEL_MODE=external  # internal (default, CORS enabled) or external (CORS disabled, panel proxies)
       - TZ=UTC
     networks:

@@ -668,7 +668,7 @@ func TestCovAFatalMCPListenerAddressTaken(t *testing.T) {
 	cfg.MCP.Enabled, cfg.MCP.Addr = true, covABusyAddr(t)
 	s := covAInitServer(t, cfg)
 	c := covAExpectFatal(t, func() { s.startMCPListener("internal", time.Second, time.Second) })
-	if !strings.Contains(c.args, "server.ListenAndServe") {
+	if !strings.Contains(c.args, "MCP listen") {
 		t.Fatalf("fatal = %+v", c)
 	}
 	if s.mcpSSE == nil || s.mcpStreamable == nil {

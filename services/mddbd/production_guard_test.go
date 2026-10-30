@@ -20,6 +20,7 @@ func clearProdEnv(t *testing.T) {
 		"MDDB_CORS_ORIGIN",
 		"MDDB_AUDIT_ENABLED",
 		"MDDB_RATE_LIMIT_ENABLED",
+		trustedProxiesEnv,
 	}
 	for _, v := range vars {
 		t.Setenv(v, "")
@@ -110,6 +111,30 @@ func TestCheckProductionGuards_CORSUnsetFlags(t *testing.T) {
 	missing := CheckProductionGuards()
 	if len(missing) != 1 || missing[0].EnvVar != "MDDB_CORS_ORIGINS" {
 		t.Fatalf("CORS unset (would default to *) must flag: %+v", missing)
+	}
+}
+
+// TestCheckProductionGuards_TrustedProxiesTrustEveryone: a prefix that
+// matches every address flags; a real list, an empty one, or one that does
+// not parse (startup reports that itself) does not (#366).
+func TestCheckProductionGuards_TrustedProxiesTrustEveryone(t *testing.T) {
+	clearProdEnv(t)
+	setAllProdEnv(t)
+	for spec, flagged := range map[string]bool{
+		"0.0.0.0/0":            true,
+		"10.0.0.1, ::/0":       true,
+		"::ffff:0:0/96":        true,
+		"":                     false,
+		"10.0.0.0/8, fd00::/8": false,
+		"0.0.0.0/1":            false,
+		"proxy.internal, ::/0": false,
+	} {
+		t.Setenv(trustedProxiesEnv, spec)
+		missing := CheckProductionGuards()
+		got := len(missing) == 1 && missing[0].EnvVar == trustedProxiesEnv
+		if got != flagged || (!flagged && len(missing) != 0) {
+			t.Errorf("%q: missing = %+v, want flagged=%v", spec, missing, flagged)
+		}
 	}
 }
 

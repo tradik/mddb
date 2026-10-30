@@ -116,6 +116,19 @@ func productionRequirements() []ProductionRequirement {
 			Reason:  "ISO 27001 A.5.30 / SOC 2 CC6.6 — resource-exhaustion protection",
 			Checker: func() bool { return os.Getenv("MDDB_RATE_LIMIT_ENABLED") == "true" },
 		},
+		{
+			// #366: 0.0.0.0/0 or ::/0 makes every client a trusted proxy,
+			// so any client picks its own rate-limit key and audit IP. A
+			// value that does not parse already stops startup, so it is
+			// not reported twice here.
+			EnvVar: trustedProxiesEnv,
+			Want:   "the proxies' addresses (not 0.0.0.0/0 or ::/0)",
+			Reason: "ISO 27001 A.8.15 / SOC 2 CC7.2 — attributable audit trail",
+			Checker: func() bool {
+				list, err := parseTrustedProxies(os.Getenv(trustedProxiesEnv))
+				return err != nil || !trustsEveryone(list)
+			},
+		},
 	}
 }
 

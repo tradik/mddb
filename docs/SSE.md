@@ -135,7 +135,7 @@ SSE enforces per-IP connection limits to prevent resource exhaustion:
 
 When the limit is exceeded, the server returns **429 Too Many Requests**.
 
-The IP is the connecting peer (`RemoteAddr`). `X-Forwarded-For` and `X-Real-IP` are honoured only when that peer is listed in `MDDB_TRUSTED_PROXIES`, with the chain read right to left — the same rule as the rate limiter and the audit log. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
+The IP is the connecting peer (`RemoteAddr`). The client IP header (`MDDB_CLIENT_IP_HEADER`, `X-Forwarded-For` by default) and PROXY protocol headers are honoured only when that peer is listed in `MDDB_TRUSTED_PROXIES`, with chains read right to left — the same rule as the rate limiter and the audit log. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
 
 ## Configuration
 

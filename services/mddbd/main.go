@@ -28,6 +28,7 @@ import (
 	"mddb/internal/ttl"
 	"mddb/internal/vector"
 	"mddb/internal/webhooks"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -357,10 +358,11 @@ func run() int {
 func runServer(srvCfg ServerConfig) int {
 	dbPath := srvCfg.Database.Path
 
-	// #366: forwarding headers count only from these proxies. A bad entry is
-	// a startup error — guessing would silently trust the wrong peers.
-	if err := configureTrustedProxies(os.Getenv(trustedProxiesEnv)); err != nil {
-		fatal("startup step failed", "step", trustedProxiesEnv, "err", err)
+	// #366: client IP headers and PROXY headers count only from these
+	// proxies. A bad value is a startup error — guessing would silently trust
+	// the wrong peers or read the wrong header.
+	if err := configureClientAddressing(os.Getenv); err != nil {
+		fatal("startup step failed", "step", "client address", "err", err)
 	}
 
 	// GO-032: say plainly what durability this data directory can offer before
@@ -1267,9 +1269,11 @@ func (s *Server) serveHTTP(handler http.Handler, readTimeout, writeTimeout time.
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       120 * time.Second,
 	}
-	lis, err := openListener(httpAddr)
+	rawLis, err := openListener(httpAddr)
 	mustStep("openListener", err)
-	defer func() { _ = closeListener(lis, httpAddr) }()
+	defer func() { _ = closeListener(rawLis, httpAddr) }()
+	// #366: the PROXY header comes first on the wire, so it is read below TLS.
+	lis := withProxyProtocol(rawLis)
 	tlsOn := srvCfg.TLS.Enabled && srvCfg.TLS.CertFile != "" && srvCfg.TLS.KeyFile != ""
 	if tlsOn && isUnixAddr(httpAddr) {
 		slog.Info("mddb TLS ignored on UDS listener (filesystem perms authenticate the peer)", "httpAddr", httpAddr)
@@ -1381,7 +1385,9 @@ func (s *Server) serveMCP(mcpSSE *MCPSSETransport, mcpStreamable *MCPStreamableT
 		WriteTimeout:      writeTimeout,
 		IdleTimeout:       120 * time.Second,
 	}
-	mustStep("server.ListenAndServe", ignoreServerClosed(server.ListenAndServe()))
+	lis, err := net.Listen("tcp", srvCfg.MCP.Addr)
+	mustStep("MCP listen", err)
+	mustStep("MCP serve", ignoreServerClosed(server.Serve(withProxyProtocol(lis))))
 }
 
 // startHTTP3Listener serves the API over HTTP/3 in the background when

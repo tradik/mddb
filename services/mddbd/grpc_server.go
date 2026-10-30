@@ -65,14 +65,15 @@ func (g *GRPCServer) isReadOnly() bool {
 
 // startGRPCServer starts the gRPC server on the specified address.
 // addr may be a TCP host:port or a Unix Domain Socket (unix:/path/to/sock) —
-// see openListener in listen_addr.go.
+// see openListener in listen_addr.go. With MDDB_PROXY_PROTOCOL=on the
+// listener reads PROXY headers first (#366), below the gRPC TLS handshake.
 func startGRPCServer(s *Server, addr string, opts ...grpc.ServerOption) error {
 	lis, err := openListener(addr)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = closeListener(lis, addr) }()
-	return newGRPCTransport(s, opts...).Serve(lis)
+	return newGRPCTransport(s, opts...).Serve(withProxyProtocol(lis))
 }
 
 // newGRPCTransport builds the gRPC server with every service registered:

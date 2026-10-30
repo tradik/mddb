@@ -14,12 +14,14 @@ require (
 	github.com/golang/snappy v1.0.0
 	github.com/klauspost/compress v1.20.3
 	github.com/minio/minio-go/v7 v7.4.1
+	github.com/pires/go-proxyproto v0.16.0
 	github.com/quic-go/quic-go v0.64.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/tidwall/rtree v1.11.1
 	github.com/vektah/gqlparser/v2 v2.5.63
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.58.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
 	google.golang.org/grpc v1.84.0
@@ -48,7 +50,6 @@ require (
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect

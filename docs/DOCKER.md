@@ -389,7 +389,9 @@ services:
 
 ### Behind Reverse Proxy
 
-Set `MDDB_TRUSTED_PROXIES` to the proxy's address or its Docker network (e.g. `172.16.0.0/12`). mddbd reads `X-Forwarded-For` / `X-Real-IP` only from those peers; without it the rate limiter, SSE cap and audit log see every client as the proxy. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
+Set `MDDB_TRUSTED_PROXIES` to the proxy's address or its Docker network (e.g. `172.16.0.0/12`). mddbd reads the client IP header only from those peers; without it the rate limiter, SSE cap and audit log see every client as the proxy. The header is `X-Forwarded-For` unless `MDDB_CLIENT_IP_HEADER` names another one (`Forwarded`, `X-Real-IP`, `CF-Connecting-IP`, ...); a layer-4 load balancer that sends PROXY protocol needs `MDDB_PROXY_PROTOCOL=on`. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies) and the per-product table in [config.md#proxies-and-load-balancers](config.md#proxies-and-load-balancers).
+
+**cloudflared in a container:** mddbd's peer is the cloudflared container, and the client is in `CF-Connecting-IP`. Set `MDDB_CLIENT_IP_HEADER=CF-Connecting-IP` and `MDDB_TRUSTED_PROXIES` to the cloudflared container's address or the compose network (both are passed through by `docker-compose.yml` from `.env`). Publish no port: the tunnel reaches mddbd over the network.
 
 #### Nginx
 

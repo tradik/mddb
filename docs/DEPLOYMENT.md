@@ -250,7 +250,7 @@ mddb.example.com {
 
 ### Client IP behind the proxy
 
-mddbd believes `X-Forwarded-For` and `X-Real-IP` only from peers listed in `MDDB_TRUSTED_PROXIES`. With a proxy in front, set it to the proxy's address (`MDDB_TRUSTED_PROXIES=127.0.0.1` for a proxy on the same host, or the Docker network's CIDR), otherwise mddbd's rate limiter, SSE cap and audit log see every client as the proxy. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
+mddbd believes the client IP header only from peers listed in `MDDB_TRUSTED_PROXIES`. With a proxy in front, set it to the proxy's address (`MDDB_TRUSTED_PROXIES=127.0.0.1` for a proxy on the same host, or the Docker network's CIDR), otherwise mddbd's rate limiter, SSE cap and audit log see every client as the proxy. The header is `X-Forwarded-For` by default; `MDDB_CLIENT_IP_HEADER` picks another (`Forwarded`, `X-Real-IP`, `CF-Connecting-IP` behind Cloudflare or cloudflared, `X-Cluster-Client-Ip` behind vTM, the NetScaler admin's header name). Behind a layer-4 load balancer that sends PROXY protocol (HAProxy `send-proxy-v2`, AWS NLB, nginx `stream`), set `MDDB_PROXY_PROTOCOL=on`. Never trust `0.0.0.0/0`. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies) and the per-product table in [config.md#proxies-and-load-balancers](config.md#proxies-and-load-balancers).
 
 ## Persistence Guarantees
 
