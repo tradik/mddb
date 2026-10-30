@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"cmp"
+	"slices"
 	"strings"
 
 	"mddb/internal/storage"
@@ -120,19 +122,17 @@ func facetResultFrom(raw map[string]map[string]int, maxPerKey int) FacetResult {
 	return out
 }
 
-// sortFacetBuckets orders buckets by count desc, then value asc — stable so
-// ties in count don't shuffle between calls.
+// sortFacetBuckets orders buckets by count desc, then value asc. Values are
+// distinct (map keys), so the order is total and the same on every call. It
+// is O(n log n): a key can have as many values as there are documents
+// (facetScope "all" over an id-like field).
 func sortFacetBuckets(buckets []FacetBucket) {
-	// Simple insertion sort — facet cardinality is typically < 100; avoids pulling in sort.Slice for hot paths.
-	for i := 1; i < len(buckets); i++ {
-		cur := buckets[i]
-		j := i - 1
-		for j >= 0 && facetLess(cur, buckets[j]) {
-			buckets[j+1] = buckets[j]
-			j--
+	slices.SortFunc(buckets, func(a, b FacetBucket) int {
+		if c := cmp.Compare(b.Count, a.Count); c != 0 {
+			return c
 		}
-		buckets[j+1] = cur
-	}
+		return strings.Compare(a.Value, b.Value)
+	})
 }
 
 func facetLess(a, b FacetBucket) bool {
