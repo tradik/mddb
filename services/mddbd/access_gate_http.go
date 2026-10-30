@@ -72,11 +72,16 @@ func (s *Server) httpGate(pattern string, next http.Handler) http.Handler {
 // requestCollections reads the collections a request names, from the query
 // string and from a JSON body, which it leaves for the handler to read again.
 // The body is already capped by withMaxBody (MDDB_MAX_BODY_BYTES).
+//
+// The body is read whatever its Content-Type says, as the handlers decode it:
+// `curl -d '{…}'` sends JSON labelled application/x-www-form-urlencoded. Only
+// multipart bodies (file uploads) are left alone; their handlers check the
+// collection themselves.
 func requestCollections(r *http.Request) ([]string, error) {
 	q := r.URL.Query()
 	names := append(append([]string(nil), q["collection"]...), q["collections"]...)
 	ct := r.Header.Get(headerContentType)
-	if r.Body == nil || r.Body == http.NoBody || (ct != "" && !strings.Contains(ct, "json")) {
+	if r.Body == nil || r.Body == http.NoBody || strings.HasPrefix(strings.ToLower(ct), "multipart/") {
 		return names, nil
 	}
 	raw, err := io.ReadAll(r.Body)

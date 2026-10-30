@@ -88,6 +88,15 @@ func TestRequestCollectionsReadsQueryAndBody(t *testing.T) {
 		t.Errorf("a non-JSON body was read: %v", names)
 	}
 
+	// curl -d sends a JSON body as application/x-www-form-urlencoded, and the
+	// handlers decode it as JSON all the same: the gate reads it too, or a
+	// collection-scoped user is refused on their own collection.
+	urlenc := httptest.NewRequest(http.MethodPost, "/v1/x", strings.NewReader(`{"collection":"c"}`))
+	urlenc.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	if names, _ := requestCollections(urlenc); strings.Trim(strings.Join(names, ","), ",") != "c" {
+		t.Errorf("a JSON body sent as form-urlencoded: names = %v, want c", names)
+	}
+
 	broken := httptest.NewRequest(http.MethodPost, "/v1/x", brokenBody{})
 	if _, err := requestCollections(broken); err == nil {
 		t.Error("an unreadable body was accepted")
