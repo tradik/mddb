@@ -3,6 +3,7 @@ package main
 import (
 	"math"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -185,6 +186,38 @@ func TestLandingSizesRenderFromVariables(t *testing.T) {
 	} {
 		if m := re.FindString(readRepoFile(t, path)); m != "" {
 			t.Errorf("%s: hardcodes %q; render {{$.Vars.mddbBinarySize}}, mddbDownloadSize or mddbDockerSize", path, m)
+		}
+	}
+}
+
+// TestNoStaleCountsAnywhereInDocs: the per-page guards above name the pages
+// that must state a count; this one reads every docs page and the README for
+// a stale one. "18 languages" survived in INTEGRATIONS.md after the pages the
+// language guard lists were fixed, because no guard read that page.
+func TestNoStaleCountsAnywhereInDocs(t *testing.T) {
+	reg := fts.NewLangRegistry("en")
+	fts.RegisterDefaultLanguages(reg)
+	claims := []struct {
+		re   *regexp.Regexp
+		want int
+		what string
+	}{
+		{regexp.MustCompile(`(\d+)(?: |-)lang(?:uages|uage)\b`), len(reg.Languages()), "stemming languages"},
+		// The total only: "6 MCP tools (memory_…)" counts a toolset, not all.
+		{regexp.MustCompile(`(\d+)\+? built-in MCP tools|MCP server \((\d+) tools\)`), len(mcpBuiltinTools()), "MCP tools"},
+	}
+	pages, err := filepath.Glob("../../docs/*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range append(pages, "../../README.md") {
+		text := readRepoFile(t, path)
+		for _, c := range claims {
+			for _, m := range c.re.FindAllStringSubmatch(text, -1) {
+				if got := strings.Join(m[1:], ""); got != strconv.Itoa(c.want) {
+					t.Errorf("%s: says %s %s in %q, the code has %d", path, got, c.what, m[0], c.want)
+				}
+			}
 		}
 	}
 }
