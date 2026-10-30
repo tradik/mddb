@@ -225,7 +225,7 @@ and that is exactly what it catches. It does not catch a syscall that compiles
 and returns the wrong thing.
 
 **Windows runs the suite but ships nothing.** As of 2.13 the full test suite runs
-on `windows-latest` on every push, and native `windows/amd64` binaries build from
+on `windows-latest` on every push (in three parallel shards since 2.18.9), and native `windows/amd64` binaries build from
 source with `make build-windows`. There are no Windows release artifacts, and
 Unix domain sockets are refused there by design, because the listener's security model
 is owner-only mode bits, which Windows cannot express. WSL2 remains the route
@@ -358,7 +358,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **File Upload** - Upload PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT, auto-converted to Markdown (single, batch, ingest and `mddb-cli autoindex`; `meta.conversionConfidence` flags scans and broken files)
 - ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext to Markdown conversion, namespace filtering, batch processing
 - ✅ **Vector Search** - Semantic similarity with auto-embeddings (OpenAI, Ollama, Cohere, Voyage), ARM NEON/SME SIMD acceleration
-- ✅ **Query Planner & Relevance Feedback** - `algorithm: "auto"` picks the vector index per query (`explain: true` shows why); `positive`/`negative` examples correct a search with Rocchio or rescoring; client-written document summaries as a second representation (`summaryMode: blend|expand`); images from Markdown and PDF attached to hits (`includeImages`) and searchable by picture with Voyage or Cohere; `queryDecomposition: "auto"` searches a question with several needs clause by clause (v2.18.10) ([guide](docs/SEARCH.md))
+- ✅ **Query Planner & Relevance Feedback** - `algorithm: "auto"` picks the vector index per query (`explain: true` shows why); `positive`/`negative` examples correct a search with Rocchio or rescoring; client-written document summaries as a second representation (`summaryMode: blend|expand`); images from Markdown and PDF attached to hits (`includeImages`) and searchable by picture with Voyage or Cohere; `queryDecomposition: "auto"` searches a question with several needs clause by clause (v2.18.10); after a restart a collection answers with flat and HNSW as soon as its vectors are loaded, while IVF/PQ/OPQ/SQ train in the background and `auto` skips them until they are ready (v2.18.10) ([guide](docs/SEARCH.md))
 - ✅ **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse scoring, 7 search modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy), typo tolerance, metadata pre-filtering, multi-language stemming and stop words (18 languages)
 - ✅ **Hybrid Search** - Sparse (BM25) + dense (vector) fusion with alpha blending or RRF
 - ✅ **Aggregations** - Metadata facets (value counts) and date histograms with optional pre-filtering
