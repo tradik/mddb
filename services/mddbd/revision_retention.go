@@ -27,11 +27,41 @@ func trimRevisions(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string, 
 		return nil
 	}
 
+	return dropOldestRevisions(bRev, bo, collection, docID, keep)
+}
+
+// truncateCollectionRevisions keeps the newest keep revisions of every
+// document in a collection. It is the Truncate operation, shared by the REST
+// handler, the gRPC RPC and the MCP direct client so the three cannot drift:
+// keep 0 drops the whole history, a negative keep deletes nothing (unlike
+// trimRevisions, the write-time cap, where 0 means "no cap"). Every deletion
+// is recorded in bo, when given, for the caller to flush to the binlog after
+// the transaction commits. A document that cannot be decoded fails the whole
+// truncate, so the transaction rolls back rather than half-applying.
+func truncateCollectionRevisions(tx *bolt.Tx, bo *binlog.BinlogOps, collection string, keep int) error {
+	bRev := tx.Bucket([]byte("rev"))
+	prefix := []byte("doc|" + collection + "|")
+	c := tx.Bucket([]byte("docs")).Cursor()
+	for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+		d, err := loadDoc(v)
+		if err != nil {
+			return err
+		}
+		if err := dropOldestRevisions(bRev, bo, collection, d.ID, keep); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// dropOldestRevisions deletes the oldest revisions of one document until at
+// most keep remain; a negative keep deletes nothing. Each deletion is
+// recorded in bo when bo is not nil.
+func dropOldestRevisions(bRev *bolt.Bucket, bo *binlog.BinlogOps, collection, docID string, keep int) error {
 	keys := revisionKeys(bRev, collection, docID)
-	if len(keys) <= keep {
+	if keep < 0 || len(keys) <= keep {
 		return nil
 	}
-
 	for _, delk := range keys[:len(keys)-keep] {
 		if err := bRev.Delete(delk); err != nil {
 			return err

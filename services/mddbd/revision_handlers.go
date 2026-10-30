@@ -75,52 +75,11 @@ func (s *Server) handleRevisions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	docID := genID(req.Collection, req.Key, req.Lang)
-
-	var revisions []RevisionEntry
-	err := s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		if bRev == nil {
-			return nil
-		}
-
-		prefix := storage.RevPrefix(req.Collection, docID)
-		c := bRev.Cursor()
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			// Extract timestamp from key suffix (last part after final |)
-			keyStr := string(k)
-			lastPipe := bytes.LastIndexByte(k, '|')
-			if lastPipe < 0 || lastPipe >= len(k)-1 {
-				continue
-			}
-			tsStr := keyStr[lastPipe+1:]
-			ts, err := strconv.ParseInt(tsStr, 10, 64)
-			if err != nil {
-				continue
-			}
-
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-
-			revisions = append(revisions, RevisionEntry{
-				Timestamp: ts,
-				UpdatedAt: docPtr.UpdatedAt,
-				ContentMD: docPtr.ContentMD,
-				Meta:      docPtr.Meta,
-			})
-		}
-		return nil
-	})
+	revisions, err := s.listRevisions(req.Collection, docID)
 	if err != nil {
 		bad(w, err)
 		return
 	}
-
-	// Sort newest first
-	sort.Slice(revisions, func(i, j int) bool {
-		return revisions[i].Timestamp > revisions[j].Timestamp
-	})
 
 	ok(w, RevisionListResponse{
 		Collection: req.Collection,
@@ -129,6 +88,58 @@ func (s *Server) handleRevisions(w http.ResponseWriter, r *http.Request) {
 		Revisions:  revisions,
 		Total:      len(revisions),
 	})
+}
+
+// listRevisions reads the revision history of a document, newest first. It
+// is the one reader behind REST /v1/revisions, the ListRevisions RPC and the
+// MCP list_revisions tool. A key whose timestamp suffix does not parse, or a
+// revision that cannot be decoded, is skipped.
+func (s *Server) listRevisions(collection, docID string) ([]RevisionEntry, error) {
+	var revisions []RevisionEntry
+	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
+		bRev := tx.Bucket([]byte("rev"))
+		if bRev == nil {
+			return nil
+		}
+		prefix := storage.RevPrefix(collection, docID)
+		c := bRev.Cursor()
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			if entry, ok := revisionEntry(k, v); ok {
+				revisions = append(revisions, entry)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(revisions, func(i, j int) bool {
+		return revisions[i].Timestamp > revisions[j].Timestamp
+	})
+	return revisions, nil
+}
+
+// revisionEntry decodes one stored revision; the timestamp is the key's
+// suffix after the final '|'. ok is false when either part is unreadable.
+func revisionEntry(k, v []byte) (entry RevisionEntry, ok bool) {
+	lastPipe := bytes.LastIndexByte(k, '|')
+	if lastPipe < 0 || lastPipe >= len(k)-1 {
+		return entry, false
+	}
+	ts, err := strconv.ParseInt(string(k[lastPipe+1:]), 10, 64)
+	if err != nil {
+		return entry, false
+	}
+	docPtr, err := loadDoc(v)
+	if err != nil {
+		return entry, false
+	}
+	return RevisionEntry{
+		Timestamp: ts,
+		UpdatedAt: docPtr.UpdatedAt,
+		ContentMD: docPtr.ContentMD,
+		Meta:      docPtr.Meta,
+	}, true
 }
 
 // handleRevisionRestore handles POST /v1/revisions/restore — restore a document to a previous revision.

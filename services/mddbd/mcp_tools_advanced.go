@@ -252,64 +252,17 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 		if !ok {
 			return "", fmt.Errorf("invalid document at index %d", i)
 		}
-		docs[i] = MCPIngestDocument{
-			URL:       mcpGetString(docMap, "url"),
-			Key:       mcpGetString(docMap, "key"),
-			Lang:      mcpGetString(docMap, "lang"),
-			ContentMD: mcpGetString(docMap, "content_md"),
-			Meta:      mcpGetMetaMap(docMap, "meta"),
-			Scraper:   mcpGetString(docMap, "scraper"),
-			ScrapedAt: int64(mcpGetInt(docMap, "scraped_at")),
-			TTL:       int64(mcpGetInt(docMap, "ttl")),
-		}
-		if ef, ok := docMap["extract_frontmatter"].(bool); ok {
-			docs[i].ExtractFrontmatter = ef
-		}
-		// AGT-001: a file to convert rather than Markdown to store.
-		docs[i].Format = mcpGetString(docMap, "format")
-		if b64 := mcpGetString(docMap, "content_base64"); b64 != "" {
-			data, err := mcpDecodeBase64(b64)
-			if err != nil {
-				return "", fmt.Errorf("document at index %d: %w", i, err)
-			}
-			docs[i].Content = data
-		}
-		images, err := mcpGetImageFiles(docMap)
+		doc, err := mcpIngestDocument(docMap)
 		if err != nil {
 			return "", fmt.Errorf("document at index %d: %w", i, err)
 		}
-		docs[i].Images = images
-	}
-
-	var opts MCPIngestOptions
-	if optsRaw, ok := args["options"].(map[string]interface{}); ok {
-		if v, ok := optsRaw["skip_duplicates"].(bool); ok {
-			opts.SkipDuplicates = v
-		}
-		if v, ok := optsRaw["skip_embeddings"].(bool); ok {
-			opts.SkipEmbeddings = v
-		}
-		if v, ok := optsRaw["skip_fts"].(bool); ok {
-			opts.SkipFTS = v
-		}
-		if v, ok := optsRaw["skip_webhooks"].(bool); ok {
-			opts.SkipWebhooks = v
-		}
-		if v, ok := optsRaw["auto_configure_collection"].(bool); ok {
-			opts.AutoConfigureCollection = v
-		}
-		if v, ok := optsRaw["save_revision"].(bool); ok {
-			opts.SaveRevision = v
-		}
-		opts.TextOnly = mcpGetBool(optsRaw, "text_only")
-		opts.ExtractImages = mcpGetBool(optsRaw, "extract_images")
-		opts.FetchRemoteImages = mcpGetBool(optsRaw, "fetch_remote_images")
+		docs[i] = doc
 	}
 
 	resp, err := s.client.Ingest(ctx, &MCPIngestRequest{
 		Collection: collection,
 		Documents:  docs,
-		Options:    opts,
+		Options:    mcpIngestOptions(args),
 	})
 	if err != nil {
 		return "", err
@@ -317,6 +270,65 @@ func (s *MCPToolServer) toolIngest(ctx context.Context, args map[string]interfac
 
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil
+}
+
+// mcpIngestDocument reads one entry of the ingest tool's "documents".
+func mcpIngestDocument(docMap map[string]interface{}) (MCPIngestDocument, error) {
+	doc := MCPIngestDocument{
+		URL:       mcpGetString(docMap, "url"),
+		Key:       mcpGetString(docMap, "key"),
+		Lang:      mcpGetString(docMap, "lang"),
+		ContentMD: mcpGetString(docMap, "content_md"),
+		Meta:      mcpGetMetaMap(docMap, "meta"),
+		Scraper:   mcpGetString(docMap, "scraper"),
+		ScrapedAt: int64(mcpGetInt(docMap, "scraped_at")),
+		TTL:       int64(mcpGetInt(docMap, "ttl")),
+		// AGT-001: a file to convert rather than Markdown to store.
+		Format: mcpGetString(docMap, "format"),
+	}
+	if ef, ok := docMap["extract_frontmatter"].(bool); ok {
+		doc.ExtractFrontmatter = ef
+	}
+	if b64 := mcpGetString(docMap, "content_base64"); b64 != "" {
+		data, err := mcpDecodeBase64(b64)
+		if err != nil {
+			return doc, err
+		}
+		doc.Content = data
+	}
+	images, err := mcpGetImageFiles(docMap)
+	if err != nil {
+		return doc, err
+	}
+	doc.Images = images
+	return doc, nil
+}
+
+// mcpIngestOptions reads the ingest tool's "options". The skip and save
+// switches take only a JSON bool, as they always have; the image switches
+// also accept the spellings mcpGetBool tolerates.
+func mcpIngestOptions(args map[string]interface{}) MCPIngestOptions {
+	var opts MCPIngestOptions
+	optsRaw, ok := args["options"].(map[string]interface{})
+	if !ok {
+		return opts
+	}
+	for key, dst := range map[string]*bool{
+		"skip_duplicates":           &opts.SkipDuplicates,
+		"skip_embeddings":           &opts.SkipEmbeddings,
+		"skip_fts":                  &opts.SkipFTS,
+		"skip_webhooks":             &opts.SkipWebhooks,
+		"auto_configure_collection": &opts.AutoConfigureCollection,
+		"save_revision":             &opts.SaveRevision,
+	} {
+		if v, ok := optsRaw[key].(bool); ok {
+			*dst = v
+		}
+	}
+	opts.TextOnly = mcpGetBool(optsRaw, "text_only")
+	opts.ExtractImages = mcpGetBool(optsRaw, "extract_images")
+	opts.FetchRemoteImages = mcpGetBool(optsRaw, "fetch_remote_images")
+	return opts
 }
 
 // mcpGetImageFiles reads a document's "images": the files its Markdown image

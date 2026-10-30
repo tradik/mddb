@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -128,55 +129,76 @@ type slideParagraph struct {
 // out the placeholders named in skip (slide numbers, dates, footers).
 func pptxParagraphs(raw []byte, skip map[string]bool) ([]slideParagraph, error) {
 	dec := xml.NewDecoder(strings.NewReader(string(raw)))
-	var out []slideParagraph
-	var ph string // the placeholder type of the shape being read
-	var para *strings.Builder
-	inText := false
+	r := pptxParagraphReader{skip: skip}
 	for {
 		tok, err := dec.Token()
 		if errors.Is(err, io.EOF) {
-			return out, nil
+			return r.out, nil
 		}
 		if err != nil {
 			return nil, errors.New("invalid pptx: " + err.Error())
 		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			switch t.Name.Local {
-			case "sp", "graphicFrame":
-				ph = ""
-			case "ph":
-				ph = odfAttr(t, "type")
-				if ph == "" {
-					ph = "body"
-				}
-			case "p":
-				para = &strings.Builder{}
-			case "t":
-				inText = true
-			case "br":
-				if para != nil {
-					para.WriteByte(' ')
-				}
-			}
-		case xml.EndElement:
-			switch t.Name.Local {
-			case "t":
-				inText = false
-			case "p":
-				if para == nil {
-					continue
-				}
-				if text := strings.Join(strings.Fields(para.String()), " "); text != "" && !skip[ph] {
-					out = append(out, slideParagraph{text: text, title: ph == "title" || ph == "ctrTitle"})
-				}
-				para = nil
-			}
-		case xml.CharData:
-			if inText && para != nil {
-				para.Write(t)
-			}
+		r.feed(tok)
+	}
+}
+
+// pptxParagraphReader is the state pptxParagraphs keeps between XML tokens.
+type pptxParagraphReader struct {
+	skip   map[string]bool
+	out    []slideParagraph
+	ph     string           // the placeholder type of the shape being read
+	para   *strings.Builder // the paragraph being read, nil outside a:p
+	inText bool             // inside an a:t run
+}
+
+// feed advances the reader by one XML token.
+func (r *pptxParagraphReader) feed(tok xml.Token) {
+	switch t := tok.(type) {
+	case xml.StartElement:
+		r.start(t)
+	case xml.EndElement:
+		r.end(t)
+	case xml.CharData:
+		if r.inText && r.para != nil {
+			r.para.Write(t)
 		}
+	}
+}
+
+// start handles an opening element: a shape resets the placeholder, a:ph
+// names it (an unnamed one is the body), a:p starts a paragraph, a:t starts
+// text and a:br is a space.
+func (r *pptxParagraphReader) start(t xml.StartElement) {
+	switch t.Name.Local {
+	case "sp", "graphicFrame":
+		r.ph = ""
+	case "ph":
+		r.ph = cmp.Or(odfAttr(t, "type"), "body")
+	case "p":
+		r.para = &strings.Builder{}
+	case "t":
+		r.inText = true
+	case "br":
+		if r.para != nil {
+			r.para.WriteByte(' ')
+		}
+	}
+}
+
+// end handles a closing element: a:t ends text, a:p keeps the paragraph
+// unless it is empty or in a skipped placeholder.
+func (r *pptxParagraphReader) end(t xml.EndElement) {
+	switch t.Name.Local {
+	case "t":
+		r.inText = false
+	case "p":
+		if r.para == nil {
+			return
+		}
+		if text := strings.Join(strings.Fields(r.para.String()), " "); text != "" && !r.skip[r.ph] {
+			r.out = append(r.out, slideParagraph{text: text, title: r.ph == "title" || r.ph == "ctrTitle"})
+		}
+		r.para = nil
 	}
 }
 

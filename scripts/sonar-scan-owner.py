@@ -55,33 +55,49 @@ def unquote(value):
     return value[1:-1] if value[:1] in "'\"" and value[-1:] == value[:1] else value
 
 
+def on_block(lines):
+    """(indent, text) of each line inside the top-level on: block.
+
+    Blank lines and comments are skipped; a line at indent 0 opens or closes
+    the block.
+    """
+    inside = False
+    for raw in lines:
+        line = raw.rstrip("\n")
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent == 0:
+            inside = stripped in ("on:", '"on":', "'on':")
+        elif inside:
+            yield indent, stripped
+
+
+def start_key(spec, stripped):
+    """Record a `key:` line of an event (an inline [a, b] list or the start
+    of a block list) in spec and return the key."""
+    key, _, value = stripped.partition(":")
+    if key == "paths-ignore":
+        raise ValueError("paths-ignore is not supported")
+    value = value.strip()
+    if value.startswith("["):
+        spec[key] = [unquote(v) for v in value.strip("[]").split(",") if v.strip()]
+    else:
+        spec[key] = []
+    return key
+
+
 def triggers(path):
     """{event: {"branches": [...], "paths": [...]}} from a workflow's on: block."""
-    events, event, key, inside = {}, None, None, False
+    events, event, key = {}, None, None
     with open(confined(path), encoding="utf-8") as fh:
-        for raw in fh:
-            line = raw.rstrip("\n")
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            indent = len(line) - len(line.lstrip(" "))
-            if indent == 0:
-                inside = stripped in ("on:", '"on":', "'on':")
-                continue
-            if not inside:
-                continue
+        for indent, stripped in on_block(fh):
             if indent == 2:
                 event = stripped.rstrip(":")
                 events[event] = {}
             elif indent == 4:
-                key, _, value = stripped.partition(":")
-                if key == "paths-ignore":
-                    raise ValueError("paths-ignore is not supported")
-                value = value.strip()
-                if value.startswith("["):
-                    events[event][key] = [unquote(v) for v in value.strip("[]").split(",") if v.strip()]
-                else:
-                    events[event][key] = []
+                key = start_key(events[event], stripped)
             elif stripped.startswith("- ") and event and key:
                 events[event][key].append(unquote(stripped[2:]))
     return events

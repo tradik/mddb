@@ -1,21 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"mddb/internal/embedding"
-	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	proto "mddb/proto"
-	"sort"
-	"strconv"
 	"time"
 
 	json "mddb/internal/jsonx"
-
-	bolt "go.etcd.io/bbolt"
 )
 
 // --- Automation ---
@@ -119,43 +113,10 @@ func (c *DirectClient) ListAutomationLogs(ctx context.Context, limit int, cursor
 
 // ListRevisions returns document revision history via the direct client.
 func (c *DirectClient) ListRevisions(ctx context.Context, collection, key, lang string) (*RevisionListResponse, error) {
-	docID := genID(collection, key, lang)
-	var revisions []RevisionEntry
-	err := c.server.DBViewC(collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		if bRev == nil {
-			return nil
-		}
-		prefix := storage.RevPrefix(collection, docID)
-		cur := bRev.Cursor()
-		for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
-			lastPipe := bytes.LastIndexByte(k, '|')
-			if lastPipe < 0 || lastPipe >= len(k)-1 {
-				continue
-			}
-			ts, err := strconv.ParseInt(string(k[lastPipe+1:]), 10, 64)
-			if err != nil {
-				continue
-			}
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			revisions = append(revisions, RevisionEntry{
-				Timestamp: ts,
-				UpdatedAt: docPtr.UpdatedAt,
-				ContentMD: docPtr.ContentMD,
-				Meta:      docPtr.Meta,
-			})
-		}
-		return nil
-	})
+	revisions, err := c.server.listRevisions(collection, genID(collection, key, lang))
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(revisions, func(i, j int) bool {
-		return revisions[i].Timestamp > revisions[j].Timestamp
-	})
 	return &RevisionListResponse{
 		Collection: collection,
 		Key:        key,
@@ -173,121 +134,6 @@ func (c *DirectClient) RestoreRevision(ctx context.Context, collection, key, lan
 	}
 	mcpDoc := docToMCPDocument(doc)
 	return &mcpDoc, nil
-}
-
-// --- Collection Config ---
-
-// GetCollectionConfig retrieves configuration for a collection via the direct client.
-func (c *DirectClient) GetCollectionConfig(ctx context.Context, collection string) (*MCPCollectionConfigResponse, error) {
-	cfg, found := c.server.CollectionManager.Get(collection)
-	if !found {
-		cfg = &CollectionConfig{Type: "default"}
-	}
-	return &MCPCollectionConfigResponse{
-		Collection: collection,
-		// GO-035: credentials masked. This path answers an LLM, which may
-		// repeat what it is given into a transcript, a log or a reply — the
-		// one audience for which handing over an S3 secret key is least
-		// recoverable.
-		Config:     redactCollectionConfig(cfg),
-		Configured: found,
-	}, nil
-}
-
-// SetCollectionConfig updates configuration for a collection via the direct client.
-func (c *DirectClient) SetCollectionConfig(ctx context.Context, req *MCPSetCollectionConfigRequest) error {
-	if err := validateWordPressTarget(req.WordPress); err != nil {
-		return err
-	}
-	// Merge into the stored config rather than replacing it.
-	//
-	// MCPSetCollectionConfigRequest covers 9 of CollectionConfig's ~18 fields,
-	// and CollectionManager.Set writes whatever struct it is handed. Building
-	// a fresh one erased storageBackend, quantization, spell settings and —
-	// worst — Encrypted, whose false value goes straight into the encryptor,
-	// so an agent updating a description left the next document in an
-	// encrypted collection stored as plaintext. Same defect as the gRPC path
-	// fixed in RAG-001; this is the MCP one.
-	cfg := &CollectionConfig{}
-	if existing, found := c.server.CollectionManager.Get(req.Collection); found && existing != nil {
-		*cfg = *existing
-	}
-	// Only what was sent changes. These six used to be assigned
-	// unconditionally, so an agent setting a description erased the icon,
-	// the colour and the custom meta — and reset maxRevisions to unlimited,
-	// since the tool never sent it — two lines below the comment saying the
-	// config is merged.
-	if req.Type != "" {
-		cfg.Type = req.Type
-	}
-	if req.Description != "" {
-		cfg.Description = req.Description
-	}
-	if req.Icon != "" {
-		cfg.Icon = req.Icon
-	}
-	if req.Color != "" {
-		cfg.Color = req.Color
-	}
-	if req.CustomMeta != nil {
-		cfg.CustomMeta = req.CustomMeta
-	}
-	if req.MaxRevisions != nil {
-		if *req.MaxRevisions < 0 {
-			return errors.New("invalid maxRevisions: must be >= 0 (0 = unlimited)")
-		}
-		cfg.MaxRevisions = *req.MaxRevisions
-	}
-	if req.Code != nil {
-		if err := req.Code.Validate(); err != nil {
-			return err
-		}
-		cfg.Code = req.Code
-	}
-	if req.Embedding != nil {
-		if err := validateChunking(req.Embedding); err != nil {
-			return err
-		}
-		cfg.Embedding = req.Embedding
-	}
-	if req.FTS != nil {
-		cfg.FTS = req.FTS
-	}
-	// GO-035: a nil target means "not sent". Assigning it unconditionally
-	// deleted a configured publishing target whenever an agent touched
-	// anything else — the same shape as the bug the merge above exists to
-	// stop, one line below the comment describing it.
-	if req.WordPress != nil {
-		cfg.WordPress = req.WordPress
-	}
-
-	if req.Retrieval != nil {
-		if err := req.Retrieval.Validate(); err != nil {
-			return err
-		}
-		cfg.Retrieval = req.Retrieval
-	}
-	if req.ResponsePrompt != "" {
-		if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
-			return err
-		}
-		cfg.ResponsePrompt = req.ResponsePrompt
-	}
-
-	// GO-043: a change needs a global admin; nil keeps the stored quota.
-	if err := c.server.checkQuotaChange(ctx, req.Collection, req.Quota); err != nil {
-		return err
-	}
-	cfg.Quota = req.Quota
-
-	// GO-035: an agent that read this config back saw masked credentials, so
-	// an empty one means "unchanged".
-	if stored, found := c.server.CollectionManager.Get(req.Collection); found {
-		carryOverSecrets(cfg, stored)
-	} else {
-		carryOverSecrets(cfg, nil)
-	}
-	return c.server.CollectionManager.Set(req.Collection, cfg)
 }
 
 // ListCurationRules returns all curation rules for a collection (or all collections if empty).

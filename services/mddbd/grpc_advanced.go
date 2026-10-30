@@ -1,14 +1,10 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"mddb/internal/storage"
 	proto "mddb/proto"
-	"sort"
-	"strconv"
-	"strings"
 
 	json "mddb/internal/jsonx"
 
@@ -708,58 +704,37 @@ func (g *GRPCServer) ListRevisions(ctx context.Context, req *proto.ListRevisions
 	}
 
 	docID := genID(req.Collection, req.Key, req.Lang)
-
-	var revisions []*proto.RevisionEntryProto
-	err := g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		if bRev == nil {
-			return nil
-		}
-		prefix := storage.RevPrefix(req.Collection, docID)
-		c := bRev.Cursor()
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			keyStr := string(k)
-			lastPipe := strings.LastIndexByte(keyStr, '|')
-			if lastPipe < 0 || lastPipe >= len(keyStr)-1 {
-				continue
-			}
-			ts, err := strconv.ParseInt(keyStr[lastPipe+1:], 10, 64)
-			if err != nil {
-				continue
-			}
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			protoMeta := make(map[string]*proto.MetaValues)
-			for mk, mv := range docPtr.Meta {
-				protoMeta[mk] = &proto.MetaValues{Values: mv}
-			}
-			revisions = append(revisions, &proto.RevisionEntryProto{
-				Timestamp: ts,
-				UpdatedAt: docPtr.UpdatedAt,
-				ContentMd: docPtr.ContentMD,
-				Meta:      protoMeta,
-			})
-		}
-		return nil
-	})
+	revisions, err := g.server.listRevisions(req.Collection, docID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	// Sort newest first
-	sort.Slice(revisions, func(i, j int) bool {
-		return revisions[i].Timestamp > revisions[j].Timestamp
-	})
 
 	return &proto.ListRevisionsResponse{
 		Collection: req.Collection,
 		Key:        req.Key,
 		Lang:       req.Lang,
-		Revisions:  revisions,
+		Revisions:  revisionsToProto(revisions),
 		Total:      safeInt32(len(revisions)),
 	}, nil
+}
+
+// revisionsToProto converts revisions, newest first as listRevisions returns
+// them, to their wire form. No revisions is a nil slice, as before.
+func revisionsToProto(revisions []RevisionEntry) []*proto.RevisionEntryProto {
+	var out []*proto.RevisionEntryProto
+	for _, r := range revisions {
+		protoMeta := make(map[string]*proto.MetaValues, len(r.Meta))
+		for mk, mv := range r.Meta {
+			protoMeta[mk] = &proto.MetaValues{Values: mv}
+		}
+		out = append(out, &proto.RevisionEntryProto{
+			Timestamp: r.Timestamp,
+			UpdatedAt: r.UpdatedAt,
+			ContentMd: r.ContentMD,
+			Meta:      protoMeta,
+		})
+	}
+	return out
 }
 
 // RestoreRevision implements the RestoreRevision RPC — restore a document from a specific revision.

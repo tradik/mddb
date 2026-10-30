@@ -324,34 +324,45 @@ func parseESAggs(raw json.RawMessage) ([]esTermsAgg, error) {
 	}
 	aggs := make([]esTermsAgg, 0, len(obj))
 	for name, def := range obj {
-		kind, body, err := esSingle(def, "aggs."+name)
+		agg, err := parseESTermsAgg(name, def)
 		if err != nil {
 			return nil, err
-		}
-		if kind != "terms" {
-			return nil, dslErr("aggs."+name+"."+kind, "aggregation is not supported; only terms is")
-		}
-		opts, err := esObject(body, "aggs."+name+".terms")
-		if err != nil {
-			return nil, err
-		}
-		if err := esOnlyKeys("aggs."+name+".terms", opts, "field", "size"); err != nil {
-			return nil, err
-		}
-		agg := esTermsAgg{Name: name, Size: esDefaultAggSize}
-		var field string
-		if json.Unmarshal(opts["field"], &field) != nil {
-			return nil, dslErr("aggs."+name+".terms.field", "must be a field name")
-		}
-		if agg.Field, err = esField("aggs."+name+".terms.field", field); err != nil {
-			return nil, err
-		}
-		if v, ok := opts["size"]; ok {
-			if agg.Size, err = strconv.Atoi(string(v)); err != nil || agg.Size < 1 {
-				return nil, dslErr("aggs."+name+".terms.size", "must be a whole number, 1 or more")
-			}
 		}
 		aggs = append(aggs, agg)
 	}
 	return aggs, nil
+}
+
+// parseESTermsAgg reads one named aggregation, which must be terms with a
+// field and an optional size of 1 or more.
+func parseESTermsAgg(name string, def json.RawMessage) (esTermsAgg, error) {
+	path := "aggs." + name
+	kind, body, err := esSingle(def, path)
+	if err != nil {
+		return esTermsAgg{}, err
+	}
+	if kind != "terms" {
+		return esTermsAgg{}, dslErr(path+"."+kind, "aggregation is not supported; only terms is")
+	}
+	opts, err := esObject(body, path+".terms")
+	if err != nil {
+		return esTermsAgg{}, err
+	}
+	if err := esOnlyKeys(path+".terms", opts, "field", "size"); err != nil {
+		return esTermsAgg{}, err
+	}
+	agg := esTermsAgg{Name: name, Size: esDefaultAggSize}
+	var field string
+	if json.Unmarshal(opts["field"], &field) != nil {
+		return esTermsAgg{}, dslErr(path+".terms.field", "must be a field name")
+	}
+	if agg.Field, err = esField(path+".terms.field", field); err != nil {
+		return esTermsAgg{}, err
+	}
+	if v, ok := opts["size"]; ok {
+		if agg.Size, err = strconv.Atoi(string(v)); err != nil || agg.Size < 1 {
+			return esTermsAgg{}, dslErr(path+".terms.size", "must be a whole number, 1 or more")
+		}
+	}
+	return agg, nil
 }

@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"mddb/internal/binlog"
 	"mddb/internal/cache"
 	"mddb/internal/storage"
 	proto "mddb/proto"
 	"os"
-	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -449,45 +449,14 @@ func (g *GRPCServer) Truncate(ctx context.Context, req *proto.TruncateRequest) (
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
 	}
 
+	var bo binlog.BinlogOps
 	err := g.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket(g.server.BucketNames.Rev)
-		bDocs := tx.Bucket(g.server.BucketNames.Docs)
-
-		// Get all doc IDs in collection
-		var docIDs []string
-		c := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, _ := c.Seek(prefix); k != nil && strings.HasPrefix(string(k), string(prefix)); k, _ = c.Next() {
-			parts := strings.Split(string(k), "|")
-			if len(parts) >= 3 {
-				docIDs = append(docIDs, parts[2])
-			}
-		}
-
-		// For each doc, keep only last N revisions
-		for _, docID := range docIDs {
-			var revKeys []string
-			rc := bRev.Cursor()
-			rprefix := storage.RevPrefix(req.Collection, docID)
-			for k, _ := rc.Seek(rprefix); k != nil && strings.HasPrefix(string(k), string(rprefix)); k, _ = rc.Next() {
-				revKeys = append(revKeys, string(k))
-			}
-
-			// Delete old revisions
-			if len(revKeys) > int(req.KeepRevs) {
-				toDelete := revKeys[:len(revKeys)-int(req.KeepRevs)]
-				for _, k := range toDelete {
-					_ = bRev.Delete([]byte(k))
-				}
-			}
-		}
-
-		return nil
+		return truncateCollectionRevisions(tx, &bo, req.Collection, int(req.KeepRevs))
 	})
-
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	bo.FlushTo(g.server.Binlog)
 
 	return &proto.TruncateResponse{Status: "truncated"}, nil
 }

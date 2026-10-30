@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"mddb/internal/binlog"
 	"mddb/internal/storage"
 	proto "mddb/proto"
 
@@ -402,37 +403,16 @@ func (c *DirectClient) Restore(ctx context.Context, req *MCPRestoreRequest) (*MC
 	return &MCPRestoreResponse{Restored: safeFrom}, nil
 }
 
-// Truncate removes all documents from a collection via the direct client.
+// Truncate keeps the newest KeepRevs revisions of every document in a
+// collection via the direct client (see truncateCollectionRevisions).
 func (c *DirectClient) Truncate(ctx context.Context, req *MCPTruncateRequest) (*MCPTruncateResponse, error) {
+	var bo binlog.BinlogOps
 	err := c.server.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		bDocs := tx.Bucket([]byte("docs"))
-
-		cur := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
-			dPtr, err := loadDoc(v)
-			if err != nil {
-				return err
-			}
-			truncateRevisions(bRev, req.Collection, dPtr.ID, req.KeepRevs)
-		}
-		return nil
+		return truncateCollectionRevisions(tx, &bo, req.Collection, req.KeepRevs)
 	})
 	if err != nil {
 		return nil, err
 	}
+	bo.FlushTo(c.server.Binlog)
 	return &MCPTruncateResponse{Status: "truncated"}, nil
-}
-
-// truncateRevisions deletes all but the newest keep revisions of a document
-// for Truncate: keep 0 drops the whole history, a negative keep deletes none.
-// (trimRevisions, the write-time cap, treats 0 as "no cap".)
-func truncateRevisions(bRev *bolt.Bucket, collection, docID string, keep int) {
-	revKeys := revisionKeys(bRev, collection, docID)
-	if keep >= 0 && len(revKeys) > keep {
-		for _, delk := range revKeys[:len(revKeys)-keep] {
-			_ = bRev.Delete(delk)
-		}
-	}
 }

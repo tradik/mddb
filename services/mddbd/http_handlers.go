@@ -325,41 +325,9 @@ func (s *Server) handleTruncate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var bo binlog.BinlogOps
+	// DropCache is accepted for compatibility; no rendered cache is kept.
 	err := s.DBUpdateC(req.Collection, func(tx *bolt.Tx) error {
-		bRev := tx.Bucket([]byte("rev"))
-		bDocs := tx.Bucket([]byte("docs"))
-
-		// Dla każdego dokumentu w kolekcji: utnij historię do N
-		c := bDocs.Cursor()
-		prefix := []byte("doc|" + req.Collection + "|")
-		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			dPtr, err := loadDoc(v)
-			if err != nil {
-				return err
-			}
-			d := *dPtr
-			// Zbierz revety
-			rc := bRev.Cursor()
-			rp := storage.RevPrefix(req.Collection, d.ID)
-			var revKeys [][]byte
-			for rk, _ := rc.Seek(rp); rk != nil && bytes.HasPrefix(rk, rp); rk, _ = rc.Next() {
-				cp := make([]byte, len(rk))
-				copy(cp, rk)
-				revKeys = append(revKeys, cp)
-			}
-			// jeśli trzeba ciąć
-			if req.KeepRevs >= 0 && len(revKeys) > req.KeepRevs {
-				// posortowane rosnąco po ts dzięki key; usuń najstarsze
-				toDel := revKeys[:len(revKeys)-req.KeepRevs]
-				for _, delk := range toDel {
-					_ = bRev.Delete(delk)
-					bo.Delete("rev", delk)
-				}
-			}
-			// DropCache placeholder — jeśli trzymasz rendery, wyczyść je tutaj
-			_ = req.DropCache
-		}
-		return nil
+		return truncateCollectionRevisions(tx, &bo, req.Collection, req.KeepRevs)
 	})
 	if err == nil {
 		bo.FlushTo(s.Binlog)
