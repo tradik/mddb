@@ -313,3 +313,24 @@ func TestSyncUnreadableDocument(t *testing.T) {
 		t.Errorf("an unreadable document: %+v, %v", out, err)
 	}
 }
+
+// A sync into a read-only collection (an installed corpus pack, AGT-005) is
+// refused by the same write gate as every other write: each page fails and
+// nothing is stored.
+func TestSyncIntoReadOnlyCollectionStoresNothing(t *testing.T) {
+	s := newBackupTestServer(t)
+	if err := s.CollectionManager.put("web", &CollectionConfig{ReadOnly: true, Corpus: &CorpusInfo{Name: "web"}}); err != nil {
+		t.Fatal(err)
+	}
+	site := newFakeSite(t, map[string]string{"/a.html": page("A", "alpha"), "/c": page("C", "gamma")})
+	rule := syncRule(t, s, &SyncAction{Source: SyncSourceSitemap, URL: site.URL + "/sitemap.xml",
+		Collection: "web", Lang: "en"})
+
+	out, _ := runSync(t, s, rule)
+	if out.counts != (automationlog.SyncCounts{Failed: 2}) {
+		t.Fatalf("counts = %+v, want only failures", out.counts)
+	}
+	if _, err := s.loadDocByRef("web", "a", "en"); err == nil {
+		t.Error("a page was stored in the read-only collection")
+	}
+}
