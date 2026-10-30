@@ -111,6 +111,23 @@ class Publisher {
 	 */
 	public function changeStatus( array $payload ) {
 		$status = isset( $payload['status'] ) && is_string( $payload['status'] ) ? $payload['status'] : '';
+		$post   = $this->statusTarget( $payload, $status );
+		if ( is_wp_error( $post ) ) {
+			return $post;
+		}
+		$error = $this->applyStatus( $post, $status, $payload );
+		return is_wp_error( $error ) ? $error : $this->statusResult( (int) $post->ID );
+	}
+
+	/**
+	 * The post a status change applies to, or why there is none: a status
+	 * outside STATUS_STATUSES (400), a post resolvePost() refuses, or no
+	 * matching post at all (404).
+	 *
+	 * @param array<string,mixed> $payload
+	 * @return \WP_Post|\WP_Error
+	 */
+	private function statusTarget( array $payload, string $status ) {
 		if ( ! in_array( $status, self::STATUS_STATUSES, true ) ) {
 			return new \WP_Error(
 				'mddb_publish_bad_status',
@@ -123,17 +140,24 @@ class Publisher {
 			? sanitize_key( $payload['type'] )
 			: 'post';
 		$post = $this->resolvePost( $payload, $type );
-		if ( is_wp_error( $post ) ) {
-			return $post;
+		if ( $post === null ) {
+			$post = new \WP_Error( 'mddb_publish_not_found', 'No matching post found — pass "id" or "type" + "slug".', [ 'status' => 404 ] );
 		}
-		if ( ! $post instanceof \WP_Post ) {
-			return new \WP_Error( 'mddb_publish_not_found', 'No matching post found — pass "id" or "type" + "slug".', [ 'status' => 404 ] );
-		}
-		$postId = (int) $post->ID;
+		return $post;
+	}
 
+	/**
+	 * Move $post to $status. Trash is its own call; any other status first
+	 * restores a trashed post, then updates it with the payload's date.
+	 *
+	 * @param array<string,mixed> $payload
+	 * @return \WP_Error|null Null when the post was moved.
+	 */
+	private function applyStatus( \WP_Post $post, string $status, array $payload ) {
+		$postId = (int) $post->ID;
 		if ( $status === 'trash' ) {
 			wp_trash_post( $postId );
-			return $this->statusResult( $postId );
+			return null;
 		}
 
 		if ( (string) $post->post_status === 'trash' ) {
@@ -153,10 +177,8 @@ class Publisher {
 		$result = wp_update_post( wp_slash( $postarr ), true );
 		if ( is_wp_error( $result ) ) {
 			$result->add_data( [ 'status' => 500 ] );
-			return $result;
 		}
-
-		return $this->statusResult( $postId );
+		return is_wp_error( $result ) ? $result : null;
 	}
 
 	/**

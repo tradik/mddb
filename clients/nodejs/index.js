@@ -14,7 +14,7 @@
  * is usable here the moment the proto carries it.
  */
 
-const path = require('path');
+const path = require('node:path');
 const grpc = require('@grpc/grpc-js');
 const protoLoader = require('@grpc/proto-loader');
 

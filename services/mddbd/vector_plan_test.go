@@ -178,11 +178,12 @@ func TestPlanSearch_QuantizedDefault(t *testing.T) {
 func TestRunPlanned_IterativeScan(t *testing.T) {
 	s := &Server{}
 	allowed := allowedN(10)
+	filtered := indexQuery{Collection: "c", TopK: 8, Allowed: allowed, Filtered: true}
 
 	// A Widener widens its own way until it has topK.
 	w := &widenStub{stubSearcher: stubSearcher{answers: func(int) []vec.VectorResult { return hits(1) }}}
 	plan := &SearchPlan{mayIterate: true}
-	got := s.runPlanned(plannedSearch{Searcher: w, Plan: plan}, "c", nil, 8, 0, allowed, true, nil)
+	got := s.runPlanned(plannedSearch{Searcher: w, Plan: plan}, filtered)
 	if len(got) != 8 || !plan.IterativeScan || len(w.widened) != 2 || w.widened[1] != 4 {
 		t.Fatalf("got %d, plan %+v, widened %v", len(got), plan, w.widened)
 	}
@@ -190,24 +191,24 @@ func TestRunPlanned_IterativeScan(t *testing.T) {
 	// Any other index is asked for more and trimmed back to topK.
 	plain := &stubSearcher{answers: func(k int) []vec.VectorResult { return hits(max(k-25, 0)) }}
 	plan = &SearchPlan{mayIterate: true}
-	if got := s.runPlanned(plannedSearch{Searcher: plain, Plan: plan}, "c", nil, 8, 0, allowed, true, nil); len(got) != 8 || !plan.IterativeScan {
+	if got := s.runPlanned(plannedSearch{Searcher: plain, Plan: plan}, filtered); len(got) != 8 || !plan.IterativeScan {
 		t.Fatalf("got %d, plan %+v", len(got), plan)
 	}
 
 	// The scan stops at MaxWiden and accepts what it found.
 	never := &stubSearcher{answers: func(int) []vec.VectorResult { return hits(2) }}
 	plan = &SearchPlan{mayIterate: true}
-	if got := s.runPlanned(plannedSearch{Searcher: never, Plan: plan}, "c", nil, 8, 0, allowed, true, nil); len(got) != 2 || len(plan.Reasons) != 3 {
+	if got := s.runPlanned(plannedSearch{Searcher: never, Plan: plan}, filtered); len(got) != 2 || len(plan.Reasons) != 3 {
 		t.Fatalf("got %d, reasons %v", len(got), plan.Reasons)
 	}
 
 	// Without the planner's leave, a short answer stands — as before.
 	plan = &SearchPlan{}
-	if got := s.runPlanned(plannedSearch{Searcher: never, Plan: plan}, "c", nil, 8, 0, allowed, true, nil); len(got) != 2 || plan.IterativeScan {
+	if got := s.runPlanned(plannedSearch{Searcher: never, Plan: plan}, filtered); len(got) != 2 || plan.IterativeScan {
 		t.Fatalf("explicit algorithm continued the scan: %+v", plan)
 	}
 	// Unfiltered: one search.
-	if got := s.runPlanned(plannedSearch{Searcher: never}, "c", nil, 8, 0, nil, false, nil); len(got) != 2 {
+	if got := s.runPlanned(plannedSearch{Searcher: never}, indexQuery{Collection: "c", TopK: 8}); len(got) != 2 {
 		t.Fatalf("unfiltered: %d", len(got))
 	}
 }

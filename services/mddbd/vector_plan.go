@@ -143,23 +143,35 @@ func (s *Server) planInput(r planRequest) PlanInput {
 	return in
 }
 
+// indexQuery is one collection's index search: the query vector, how many
+// candidates to keep and how to score them. Allowed is the filter's admitted
+// IDs and is consulted only when Filtered is set.
+type indexQuery struct {
+	Collection string
+	Vector     []float32
+	TopK       int
+	Threshold  float64
+	Allowed    map[string]bool
+	Filtered   bool
+	Metric     vec.SimilarityFunc
+}
+
 // runPlanned searches one collection the way its plan says. A filtered index
 // search that comes back short of what the filter admits is continued —
 // further into the index, up to MaxWiden times its default — instead of
 // quietly returning three results for topK 10 (SRCH-013, iterative scan).
-func (s *Server) runPlanned(ps plannedSearch, collection string, query []float32, topK int, threshold float64,
-	allowed map[string]bool, filtered bool, metric vec.SimilarityFunc) []vec.VectorResult {
-	if !filtered {
-		return ps.Searcher.Search(collection, query, topK, threshold, metric)
+func (s *Server) runPlanned(ps plannedSearch, q indexQuery) []vec.VectorResult {
+	if !q.Filtered {
+		return ps.Searcher.Search(q.Collection, q.Vector, q.TopK, q.Threshold, q.Metric)
 	}
-	results := ps.Searcher.SearchWithFilter(collection, query, topK, threshold, allowed, metric)
+	results := ps.Searcher.SearchWithFilter(q.Collection, q.Vector, q.TopK, q.Threshold, q.Allowed, q.Metric)
 	if ps.Plan == nil || !ps.Plan.mayIterate {
 		return results
 	}
-	want := min(topK, len(allowed))
+	want := min(q.TopK, len(q.Allowed))
 	for widen := 2; len(results) < want && widen <= searchThresholds.MaxWiden; widen *= 2 {
 		got := len(results)
-		results = widenedSearch(ps.Searcher, collection, query, topK, threshold, allowed, metric, widen)
+		results = widenedSearch(ps.Searcher, q, widen)
 		ps.Plan.IterativeScan = true
 		ps.Plan.reason("the filtered index returned %d of %d; the scan continued at %d× its default", got, want, widen)
 	}
@@ -169,14 +181,13 @@ func (s *Server) runPlanned(ps plannedSearch, collection string, query []float32
 // widenedSearch asks an index to look widen times further than it does by
 // default: a Widener widens its own way (IVF probes more clusters), any other
 // index is asked for more candidates and trimmed back to topK.
-func widenedSearch(searcher vec.VectorSearcher, collection string, query []float32, topK int, threshold float64,
-	allowed map[string]bool, metric vec.SimilarityFunc, widen int) []vec.VectorResult {
+func widenedSearch(searcher vec.VectorSearcher, q indexQuery, widen int) []vec.VectorResult {
 	if w, ok := searcher.(vec.Widener); ok {
-		return w.SearchWithFilterWiden(collection, query, topK, threshold, allowed, metric, widen)
+		return w.SearchWithFilterWiden(q.Collection, q.Vector, q.TopK, q.Threshold, q.Allowed, q.Metric, widen)
 	}
-	results := searcher.SearchWithFilter(collection, query, topK*widen, threshold, allowed, metric)
-	if len(results) > topK {
-		results = results[:topK]
+	results := searcher.SearchWithFilter(q.Collection, q.Vector, q.TopK*widen, q.Threshold, q.Allowed, q.Metric)
+	if len(results) > q.TopK {
+		results = results[:q.TopK]
 	}
 	return results
 }

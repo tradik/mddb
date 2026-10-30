@@ -128,7 +128,8 @@ def test_paths_are_checked(fs):
     for result in (backend.read("relative.md"), backend.write("/a/../b", "x"), backend.ls("x"),
                    backend.edit("../x", "a", "b"), backend.glob("*", "rel"), backend.grep("x", "rel"),
                    backend.delete("/a/../../etc")):
-        assert result.error and "path" in result.error
+        assert result.error
+        assert "path" in result.error
 
 
 def test_edit_and_concurrent_edits(fs):

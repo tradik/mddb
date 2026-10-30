@@ -172,7 +172,8 @@ func (s *Server) searchVectorPath(ps plannedSearch, collection string, vectors [
 	allowed map[string]bool, filtered bool, metric vec.SimilarityFunc) ([]vec.VectorResult, map[string][]float32) {
 	var diskVecs map[string][]float32
 	results := searchQueryVectors(vectors, searchTopK, func(v []float32) []vec.VectorResult {
-		found := s.runPlanned(ps, collection, v, searchTopK, threshold, allowed, filtered, metric)
+		found := s.runPlanned(ps, indexQuery{Collection: collection, Vector: v, TopK: searchTopK, Threshold: threshold,
+			Allowed: allowed, Filtered: filtered, Metric: metric})
 		if s.collectionDiskOnly(collection) {
 			var fetched map[string][]float32
 			found, fetched = s.rescoreFromDisk(collection, v, found, metric)

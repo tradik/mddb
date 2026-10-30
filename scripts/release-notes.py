@@ -91,7 +91,7 @@ def declared_version() -> str | None:
     src = ROOT / "services" / "mddbd" / "main.go"
     if not src.exists():
         return None
-    m = re.search(r'^const VERSION = "([0-9]+\.[0-9]+\.[0-9]+)"', src.read_text(encoding="utf-8"), re.M)
+    m = re.search(r'^const VERSION = "(\d+\.\d+\.\d+)"', src.read_text(encoding="utf-8"), re.M)
     return m.group(1) if m else None
 
 

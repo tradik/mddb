@@ -63,24 +63,19 @@ class Client {
 		}
 
 		$code = (int) wp_remote_retrieve_response_code( $response );
+		$ok   = false;
 		if ( in_array( $code, [ 401, 403 ], true ) ) {
-			return [
-				'ok'      => false,
-				'status'  => $code,
-				'message' => __( 'MDDB rejected credentials.', 'mddb-sync' ),
-			];
-		}
-		if ( $code >= 500 ) {
-			return [
-				'ok'      => false,
-				'status'  => $code,
-				'message' => sprintf( /* translators: %d HTTP status */ __( 'MDDB returned status %d.', 'mddb-sync' ), $code ),
-			];
+			$message = __( 'MDDB rejected credentials.', 'mddb-sync' );
+		} elseif ( $code >= 500 ) {
+			$message = sprintf( /* translators: %d HTTP status */ __( 'MDDB returned status %d.', 'mddb-sync' ), $code );
+		} else {
+			$ok      = true;
+			$message = __( 'Connected.', 'mddb-sync' );
 		}
 		return [
-			'ok'      => true,
+			'ok'      => $ok,
 			'status'  => $code,
-			'message' => __( 'Connected.', 'mddb-sync' ),
+			'message' => $message,
 		];
 	}
 

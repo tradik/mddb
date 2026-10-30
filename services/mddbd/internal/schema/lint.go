@@ -114,11 +114,11 @@ func lintValue(key, value string) (MetaWarning, bool) {
 // truncateForMessage keeps a warning readable when the offending value is a
 // whole stringified FAQ.
 func truncateForMessage(s string) string {
-	const max = 80
-	if len(s) <= max {
+	const maxMessageLen = 80
+	if len(s) <= maxMessageLen {
 		return s
 	}
-	return s[:max] + "…"
+	return s[:maxMessageLen] + "…"
 }
 
 // LintMetaStrings returns the warnings as plain sentences, for the transports

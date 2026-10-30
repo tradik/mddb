@@ -192,8 +192,8 @@ export default function AuditLogPanel() {
               </tr>
             </thead>
             <tbody>
-              {events.map((e, idx) => (
-                <AuditRow key={idx} event={e} formatTs={formatTs} />
+              {events.map((e) => (
+                <AuditRow key={auditEventKey(e)} event={e} formatTs={formatTs} />
               ))}
             </tbody>
           </table>
@@ -201,6 +201,14 @@ export default function AuditLogPanel() {
       </div>
     </div>
   );
+}
+
+// auditEventKey identifies an event across reloads: the server stamps each
+// event with a nanosecond timestamp, and the actor and action separate the
+// rare events recorded in the same nanosecond. An array index would hand one
+// event's row to another whenever a filter changes the list.
+function auditEventKey(event) {
+  return `${event.ts}|${event.actor || ''}|${event.action || ''}`;
 }
 
 function AuditRow({ event, formatTs }) {

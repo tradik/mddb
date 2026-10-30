@@ -75,7 +75,8 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 				p.Plan.Collections[coll] = planned.Plan
 			}
 		}
-		results := s.runPlanned(ps, coll, p.QueryVector, p.SearchTopK, p.Threshold, allowedIDs, active, p.Metric)
+		results := s.runPlanned(ps, indexQuery{Collection: coll, Vector: p.QueryVector, TopK: p.SearchTopK,
+			Threshold: p.Threshold, Allowed: allowedIDs, Filtered: active, Metric: p.Metric})
 		results = s.rescoreFeedback(p.Feedback, coll, results, p.Metric)
 		results, summaryPlan := s.crossSummaries(p, coll, ps.Plan, results, allowedIDs, active)
 		for _, vr := range vec.DeduplicateChunkResults(results) {

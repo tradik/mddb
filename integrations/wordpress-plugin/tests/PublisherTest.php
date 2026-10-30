@@ -271,6 +271,31 @@ final class PublisherTest extends TestCase {
 		self::assertSame( 'mddb_publish_not_found', $result->get_error_code() );
 	}
 
+	public function testChangeStatusPassesOnTypeMismatch(): void {
+		Functions\when( 'sanitize_key' )->returnArg();
+		Functions\when( 'get_post' )->justReturn( new WP_Post( [ 'ID' => 5, 'post_type' => 'page' ] ) );
+		$result = $this->publisher()->changeStatus( [ 'id' => 5, 'type' => 'post', 'status' => 'draft' ] );
+		self::assertInstanceOf( WP_Error::class, $result );
+		self::assertSame( 'mddb_publish_type_mismatch', $result->get_error_code() );
+	}
+
+	public function testChangeStatusToFutureRequiresDate(): void {
+		Functions\when( 'get_post' )->justReturn( new WP_Post( [ 'ID' => 5, 'post_type' => 'post' ] ) );
+		Functions\expect( 'wp_update_post' )->never();
+		$result = $this->publisher()->changeStatus( [ 'id' => 5, 'status' => 'future' ] );
+		self::assertInstanceOf( WP_Error::class, $result );
+		self::assertSame( 'mddb_publish_no_date', $result->get_error_code() );
+	}
+
+	public function testChangeStatusUpdateErrorCarriesStatus500(): void {
+		Functions\when( 'get_post' )->justReturn( new WP_Post( [ 'ID' => 5, 'post_type' => 'post' ] ) );
+		Functions\when( 'wp_update_post' )->justReturn( new WP_Error( 'db_error', 'boom' ) );
+		$result = $this->publisher()->changeStatus( [ 'id' => 5, 'status' => 'draft' ] );
+		self::assertInstanceOf( WP_Error::class, $result );
+		self::assertSame( 'db_error', $result->get_error_code() );
+		self::assertSame( [ 'status' => 500 ], $result->get_error_data() );
+	}
+
 	public function testChangeStatusTrashesPost(): void {
 		Functions\when( 'get_post' )->justReturn( new WP_Post( [ 'ID' => 5, 'post_type' => 'post' ] ) );
 		Functions\expect( 'wp_trash_post' )->once()->with( 5 );

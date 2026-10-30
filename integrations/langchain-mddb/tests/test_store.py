@@ -183,7 +183,8 @@ def test_search_without_query_lists_newest_first(mem):
     store.put(("elsewhere",), "x", {"i": 7})
 
     items = store.search(("docs", "u1"))
-    assert [it.key for it in items] == ["k4", "k3", "k2", "k1", "k0"] and items[0].score is None
+    assert [it.key for it in items] == ["k4", "k3", "k2", "k1", "k0"]
+    assert items[0].score is None
     assert [it.key for it in store.search(("docs", "u1"), limit=2, offset=1)] == ["k3", "k2"]
     assert {it.key for it in store.search(("docs",))} == {"k0", "k1", "k2", "k3", "k4", "other"}
     assert len(store.search(())) == 7

@@ -40,20 +40,17 @@ final class Language {
 		};
 
 		$fromWpml = static function () use ( $postId ): string {
-			if ( ! function_exists( 'apply_filters' ) ) {
-				return '';
-			}
-			$postType = get_post_type( $postId );
+			$postType = function_exists( 'apply_filters' ) ? get_post_type( $postId ) : false;
 			if ( ! is_string( $postType ) || $postType === '' ) {
 				return '';
 			}
 			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- third-party WPML filter.
 			$details = apply_filters( 'wpml_post_language_details', null, $postId );
-			if ( is_array( $details ) && isset( $details['locale'] ) && is_string( $details['locale'] ) && $details['locale'] !== '' ) {
-				return self::normalize( $details['locale'] );
-			}
-			if ( is_array( $details ) && isset( $details['language_code'] ) && is_string( $details['language_code'] ) && $details['language_code'] !== '' ) {
-				return self::normalize( $details['language_code'] );
+			$details = is_array( $details ) ? $details : [];
+			foreach ( [ 'locale', 'language_code' ] as $field ) {
+				if ( isset( $details[ $field ] ) && is_string( $details[ $field ] ) && $details[ $field ] !== '' ) {
+					return self::normalize( $details[ $field ] );
+				}
 			}
 			return '';
 		};

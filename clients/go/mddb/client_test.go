@@ -17,16 +17,16 @@ type capture struct {
 	method, path, auth, apiKey, contentType, body string
 }
 
-func newServer(t *testing.T, cap *capture) (*Client, func()) {
+func newServer(t *testing.T, captured *capture) (*Client, func()) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cap.method = r.Method
-		cap.path = r.URL.Path
-		cap.auth = r.Header.Get("Authorization")
-		cap.apiKey = r.Header.Get("X-API-Key")
-		cap.contentType = r.Header.Get("Content-Type")
+		captured.method = r.Method
+		captured.path = r.URL.Path
+		captured.auth = r.Header.Get("Authorization")
+		captured.apiKey = r.Header.Get("X-API-Key")
+		captured.contentType = r.Header.Get("Content-Type")
 		b, _ := readBody(r)
-		cap.body = string(b)
+		captured.body = string(b)
 
 		switch r.URL.Path {
 		case "/v1/add", "/v1/get", "/v1/set-ttl", "/v1/import-url":
@@ -95,10 +95,10 @@ func TestOptions(t *testing.T) {
 }
 
 func TestAPIKeyTakesPrecedenceOverToken(t *testing.T) {
-	cap := &capture{}
+	captured := &capture{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		cap.auth = r.Header.Get("Authorization")
-		cap.apiKey = r.Header.Get("X-API-Key")
+		captured.auth = r.Header.Get("Authorization")
+		captured.apiKey = r.Header.Get("X-API-Key")
 		_, _ = w.Write([]byte(`{}`))
 	}))
 	defer srv.Close()
@@ -107,8 +107,8 @@ func TestAPIKeyTakesPrecedenceOverToken(t *testing.T) {
 	if _, err := c.Do(context.Background(), "GET", "/x", nil); err != nil {
 		t.Fatal(err)
 	}
-	if cap.apiKey != "k" || cap.auth != "" {
-		t.Errorf("expected only X-API-Key; got apiKey=%q auth=%q", cap.apiKey, cap.auth)
+	if captured.apiKey != "k" || captured.auth != "" {
+		t.Errorf("expected only X-API-Key; got apiKey=%q auth=%q", captured.apiKey, captured.auth)
 	}
 
 	// Token-only path.
@@ -116,14 +116,14 @@ func TestAPIKeyTakesPrecedenceOverToken(t *testing.T) {
 	if _, err := c2.Do(context.Background(), "GET", "/x", nil); err != nil {
 		t.Fatal(err)
 	}
-	if cap.auth != "Bearer t" {
-		t.Errorf("token path: auth = %q, want 'Bearer t'", cap.auth)
+	if captured.auth != "Bearer t" {
+		t.Errorf("token path: auth = %q, want 'Bearer t'", captured.auth)
 	}
 }
 
 func TestDoErrorResponse(t *testing.T) {
-	cap := &capture{}
-	c, closeFn := newServer(t, cap)
+	captured := &capture{}
+	c, closeFn := newServer(t, captured)
 	defer closeFn()
 
 	_, err := c.Do(context.Background(), "POST", "/v1/boom", map[string]string{"a": "b"})
@@ -138,8 +138,8 @@ func TestDoErrorResponse(t *testing.T) {
 		t.Errorf("APIError = %+v", apiErr)
 	}
 	// Body was marshalled + content-type set.
-	if cap.contentType != "application/json" || !strings.Contains(cap.body, `"a":"b"`) {
-		t.Errorf("request body/content-type not set: ct=%q body=%q", cap.contentType, cap.body)
+	if captured.contentType != "application/json" || !strings.Contains(captured.body, `"a":"b"`) {
+		t.Errorf("request body/content-type not set: ct=%q body=%q", captured.contentType, captured.body)
 	}
 }
 
@@ -159,8 +159,8 @@ func TestVerboseWritesRequestBody(t *testing.T) {
 }
 
 func TestDocumentMethods(t *testing.T) {
-	cap := &capture{}
-	c, closeFn := newServer(t, cap)
+	captured := &capture{}
+	c, closeFn := newServer(t, captured)
 	defer closeFn()
 	ctx := context.Background()
 
@@ -168,8 +168,8 @@ func TestDocumentMethods(t *testing.T) {
 	if err != nil || doc.ID != "blog|k|en" {
 		t.Fatalf("Add: %+v err=%v", doc, err)
 	}
-	if cap.method != "POST" || cap.path != "/v1/add" {
-		t.Errorf("Add hit %s %s", cap.method, cap.path)
+	if captured.method != "POST" || captured.path != "/v1/add" {
+		t.Errorf("Add hit %s %s", captured.method, captured.path)
 	}
 
 	if _, err := c.Get(ctx, GetRequest{Collection: "blog", Key: "k", Lang: "en"}); err != nil {
@@ -194,8 +194,8 @@ func TestDocumentMethods(t *testing.T) {
 }
 
 func TestSearchAndAdminRawMethods(t *testing.T) {
-	cap := &capture{}
-	c, closeFn := newServer(t, cap)
+	captured := &capture{}
+	c, closeFn := newServer(t, captured)
 	defer closeFn()
 	ctx := context.Background()
 
@@ -225,8 +225,8 @@ func TestSearchAndAdminRawMethods(t *testing.T) {
 		if _, err := tc.fn(); err != nil {
 			t.Errorf("%s: %v", tc.name, err)
 		}
-		if cap.path != tc.path {
-			t.Errorf("%s hit %s, want %s", tc.name, cap.path, tc.path)
+		if captured.path != tc.path {
+			t.Errorf("%s hit %s, want %s", tc.name, captured.path, tc.path)
 		}
 	}
 
@@ -237,8 +237,8 @@ func TestSearchAndAdminRawMethods(t *testing.T) {
 }
 
 func TestWebhookMethods(t *testing.T) {
-	cap := &capture{}
-	c, closeFn := newServer(t, cap)
+	captured := &capture{}
+	c, closeFn := newServer(t, captured)
 	defer closeFn()
 	ctx := context.Background()
 
@@ -259,7 +259,7 @@ func TestWebhookMethods(t *testing.T) {
 	if err := c.DeleteAPIKey(ctx, "k1"); err != nil {
 		t.Fatalf("DeleteAPIKey: %v", err)
 	}
-	if cap.method != "DELETE" || cap.path != "/v1/auth/api-keys/k1" {
-		t.Errorf("DeleteAPIKey hit %s %s", cap.method, cap.path)
+	if captured.method != "DELETE" || captured.path != "/v1/auth/api-keys/k1" {
+		t.Errorf("DeleteAPIKey hit %s %s", captured.method, captured.path)
 	}
 }

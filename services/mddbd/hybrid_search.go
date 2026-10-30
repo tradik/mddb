@@ -622,7 +622,8 @@ func (s *Server) vectorHalf(ctx context.Context, req HybridSearchRequest) ([]vec
 	defer sp.End()
 	sp.SetString("mddb.vector.algorithm", ps.Algorithm)
 	results := searchQueryVectors(vectors, searchTopK, func(v []float32) []vector.VectorResult {
-		return s.runPlanned(ps, req.Collection, v, searchTopK, req.Threshold, allowedIDs, filtered, metric)
+		return s.runPlanned(ps, indexQuery{Collection: req.Collection, Vector: v, TopK: searchTopK, Threshold: req.Threshold,
+			Allowed: allowedIDs, Filtered: filtered, Metric: metric})
 	})
 	results = s.rescoreFeedback(fb, req.Collection, results, metric)
 	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, req.summaryMode),

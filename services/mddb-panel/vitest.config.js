@@ -16,6 +16,7 @@ const coverageFiles = [
   'src/lib/gain-format.js',
   'src/components/GainCard.jsx',
   'src/components/SystemInfo.jsx',
+  'src/components/AuditLogPanel.jsx',
 ];
 
 export default mergeConfig(
