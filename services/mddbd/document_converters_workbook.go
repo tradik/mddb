@@ -209,69 +209,105 @@ type odsCell struct {
 // once.
 func odsSheets(content []byte) ([]sheet, error) {
 	dec := xml.NewDecoder(strings.NewReader(string(content)))
-	var sheets []sheet
-	var row []string
-	rowRepeat := 1
-	var cell *odsCell
-	skip := 0 // depth inside an annotation, whose text is not the cell's
+	r := &odsReader{rowRepeat: 1}
 	for {
 		tok, err := dec.Token()
 		if errors.Is(err, io.EOF) {
-			return sheets, nil
+			return r.sheets, nil
 		}
 		if err != nil {
 			return nil, errors.New("invalid ods: content.xml: " + err.Error())
 		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			if skip > 0 || t.Name.Local == "annotation" {
-				skip++
-				continue
-			}
-			switch t.Name.Local {
-			case "table":
-				sheets = append(sheets, sheet{name: odfAttr(t, "name")})
-			case "table-row":
-				row, rowRepeat = nil, odfRepeat(t, "number-rows-repeated")
-			case "table-cell", "covered-table-cell":
-				cell = &odsCell{repeat: odfRepeat(t, "number-columns-repeated")}
-				switch odfAttr(t, "value-type") {
-				case "date":
-					cell.value = strings.TrimSuffix(odfAttr(t, "date-value"), "T00:00:00")
-				case "time":
-					cell.value = odfDuration(odfAttr(t, "time-value"))
-				}
-			case "p", "h":
-				if cell != nil && cell.text.Len() > 0 {
-					cell.text.WriteByte(' ')
-				}
-			case "s", "tab", "line-break":
-				if cell != nil {
-					cell.text.WriteByte(' ')
-				}
-			}
-		case xml.EndElement:
-			if skip > 0 {
-				skip--
-				continue
-			}
-			switch t.Name.Local {
-			case "table-cell", "covered-table-cell":
-				row = appendRepeated(row, odsCellText(cell), cell.repeat)
-				cell = nil
-			case "table-row":
-				if len(sheets) > 0 {
-					sh := &sheets[len(sheets)-1]
-					for i := 0; i < min(rowRepeat, maxSheetRepeat) && (i == 0 || rowHasText(row)); i++ {
-						sh.rows = append(sh.rows, row)
-					}
-				}
-			}
-		case xml.CharData:
-			if cell != nil && skip == 0 {
-				cell.text.Write(t)
-			}
+		r.token(tok)
+	}
+}
+
+// odsReader is odsSheets' state between tokens: the sheets so far, the row
+// and cell being read, and the depth inside an annotation, whose text is not
+// the cell's.
+type odsReader struct {
+	sheets    []sheet
+	row       []string
+	rowRepeat int
+	cell      *odsCell
+	skip      int
+}
+
+// token feeds one token of content.xml to the reader.
+func (r *odsReader) token(tok xml.Token) {
+	switch t := tok.(type) {
+	case xml.StartElement:
+		r.start(t)
+	case xml.EndElement:
+		r.end(t)
+	case xml.CharData:
+		if r.cell != nil && r.skip == 0 {
+			r.cell.text.Write(t)
 		}
+	}
+}
+
+// start opens a table, row or cell, or adds the space a paragraph break,
+// tab or line break stands for.
+func (r *odsReader) start(t xml.StartElement) {
+	if r.skip > 0 || t.Name.Local == "annotation" {
+		r.skip++
+		return
+	}
+	switch t.Name.Local {
+	case "table":
+		r.sheets = append(r.sheets, sheet{name: odfAttr(t, "name")})
+	case "table-row":
+		r.row, r.rowRepeat = nil, odfRepeat(t, "number-rows-repeated")
+	case "table-cell", "covered-table-cell":
+		r.cell = newODSCell(t)
+	case "p", "h":
+		if r.cell != nil && r.cell.text.Len() > 0 {
+			r.cell.text.WriteByte(' ')
+		}
+	case "s", "tab", "line-break":
+		if r.cell != nil {
+			r.cell.text.WriteByte(' ')
+		}
+	}
+}
+
+// newODSCell is the cell t opens, with its date or time value if it has one.
+func newODSCell(t xml.StartElement) *odsCell {
+	cell := &odsCell{repeat: odfRepeat(t, "number-columns-repeated")}
+	switch odfAttr(t, "value-type") {
+	case "date":
+		cell.value = strings.TrimSuffix(odfAttr(t, "date-value"), "T00:00:00")
+	case "time":
+		cell.value = odfDuration(odfAttr(t, "time-value"))
+	}
+	return cell
+}
+
+// end closes a cell into the row, or a row into the current sheet.
+func (r *odsReader) end(t xml.EndElement) {
+	if r.skip > 0 {
+		r.skip--
+		return
+	}
+	switch t.Name.Local {
+	case "table-cell", "covered-table-cell":
+		r.row = appendRepeated(r.row, odsCellText(r.cell), r.cell.repeat)
+		r.cell = nil
+	case "table-row":
+		r.endRow()
+	}
+}
+
+// endRow adds the finished row to the current sheet, repeated as the row
+// asks — but only once when it is empty, and at most maxSheetRepeat times.
+func (r *odsReader) endRow() {
+	if len(r.sheets) == 0 {
+		return
+	}
+	sh := &r.sheets[len(r.sheets)-1]
+	for i := 0; i < min(r.rowRepeat, maxSheetRepeat) && (i == 0 || rowHasText(r.row)); i++ {
+		sh.rows = append(sh.rows, r.row)
 	}
 }
 

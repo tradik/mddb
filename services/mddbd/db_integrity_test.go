@@ -175,7 +175,7 @@ func TestABackupTakenDuringWritesRestores(t *testing.T) {
 		}
 	}()
 
-	dst := filepath.Join(t.TempDir(), "during.db")
+	dst := filepath.Join(testBackupDir(t), "during.db")
 	err := s.backupTo(dst)
 	stop.Store(true)
 	wg.Wait()
@@ -322,11 +322,11 @@ func TestBackupCanSkipTheCheck(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
 	t.Setenv("MDDB_BACKUP_VERIFY", "false")
-	dst := filepath.Join(t.TempDir(), "fast.db")
+	dst := filepath.Join(testBackupDir(t), "fast.db")
 	if err := s.backupTo(dst); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.backupTo(filepath.Join(t.TempDir(), "no-such-dir", "x.db")); err == nil {
+	if err := s.backupTo(filepath.Join(testBackupDir(t), "no-such-dir", "x.db")); err == nil {
 		t.Error("a backup into a missing directory succeeded")
 	}
 }

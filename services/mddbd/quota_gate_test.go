@@ -49,7 +49,7 @@ func TestDiskReserveRefusesWritesButNotReadsOrBackups(t *testing.T) {
 	if got.Code != http.StatusOK {
 		t.Fatalf("read refused below the reserve: %d %s", got.Code, got.Body.String())
 	}
-	if err := s.backupTo(filepath.Join(t.TempDir(), "backup.db")); err != nil {
+	if err := s.backupTo(filepath.Join(testBackupDir(t), "backup.db")); err != nil {
 		t.Fatalf("backup refused below the reserve: %v", err)
 	}
 

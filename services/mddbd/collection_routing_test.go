@@ -105,7 +105,7 @@ func TestPerCollectionDeleteRemovesTheFile(t *testing.T) {
 func TestPerCollectionBackupAndRestore(t *testing.T) {
 	s := perCollectionServer(t)
 	addTestDoc(t, s, "blog", "a", "en", "kept", nil)
-	backup := filepath.Join(t.TempDir(), "backup.db")
+	backup := filepath.Join(testBackupDir(t), "backup.db")
 	if err := s.backupTo(backup); err != nil {
 		t.Fatal(err)
 	}

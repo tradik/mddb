@@ -31,22 +31,31 @@ import (
 // serving, before a restart finds out. MDDB_BACKUP_VERIFY=false skips the
 // check for databases too large to walk on every backup.
 //
-// dst must be safeBackupPath's output; every caller passes it. The writes
-// below go through an os.Root on dst's directory: the temporary file, the
-// rename and the collection files cannot leave that directory, even through
-// a symlink created in it after safeBackupPath checked the path.
+// dst must lie inside MDDB_BACKUP_DIR. Every caller passes safeBackupPath's
+// output, and backupCollections confines it again itself, so nothing below
+// writes to a path that did not come out of that check. The writes then go
+// through an os.Root on dst's directory: the temporary file, the rename and
+// the collection files cannot leave that directory, even through a symlink
+// created in it after the path was checked.
 func (s *Server) backupTo(dst string) error { return s.backupCollections(dst, nil) }
 
 // backupCollections is backupTo with, in the per-collection layout, only the
 // files of the collections in only copied — every collection when only is
 // nil. A scheduled backup of a few collections (OPS-023) is this.
 func (s *Server) backupCollections(dst string, only []string) error {
-	dir, err := os.OpenRoot(filepath.Dir(dst)) // NOSONAR gosecurity:S2083 -- dst is safeBackupPath's output, confined to the backup directory
+	// Everything below writes to what safeBackupPath returns, on this
+	// function's own data flow (SonarCloud gosecurity:S2083): a path outside
+	// MDDB_BACKUP_DIR is refused here even if a caller forgot to confine it.
+	safeDst, err := safeBackupPath(dst, false)
+	if err != nil {
+		return err
+	}
+	dir, err := os.OpenRoot(filepath.Dir(safeDst))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = dir.Close() }()
-	name := filepath.Base(dst)
+	name := filepath.Base(safeDst)
 	if err := backupFile(s.DB, &s.restoreMu, dir, name); err != nil {
 		return err
 	}
@@ -54,21 +63,27 @@ func (s *Server) backupCollections(dst string, only []string) error {
 	// into "<dst>.d/" under its own name. Every file is a consistent copy;
 	// the files are copied one after another, not at one instant.
 	if cf := s.collectionStore(); cf != nil {
-		sub := filepath.Base(collectionDir(name))
-		_ = dir.Mkdir(sub, 0o700)        // already there is fine; OpenRoot reports anything else
-		subDir, err := dir.OpenRoot(sub) // NOSONAR gosecurity:S2083 -- os.Root: sub is a base name and cannot leave dir
-		if err != nil {
-			return err
+		return s.backupCollectionFiles(cf, dir, filepath.Base(collectionDir(name)), only)
+	}
+	return nil
+}
+
+// backupCollectionFiles copies the collection files in only (every one when
+// only is nil) into the directory sub of dir.
+func (s *Server) backupCollectionFiles(cf *collectionFiles, dir *os.Root, sub string, only []string) error {
+	_ = dir.Mkdir(sub, 0o700)        // already there is fine; OpenRoot reports anything else
+	subDir, err := dir.OpenRoot(sub) // os.Root: sub is a base name of safeDst and cannot leave dir
+	if err != nil {
+		return err
+	}
+	defer func() { _ = subDir.Close() }()
+	for _, c := range cf.names() {
+		db := cf.get(c)
+		if db == nil || (only != nil && !slices.Contains(only, c)) {
+			continue
 		}
-		defer func() { _ = subDir.Close() }()
-		for _, c := range cf.names() {
-			db := cf.get(c)
-			if db == nil || (only != nil && !slices.Contains(only, c)) {
-				continue
-			}
-			if err := backupFile(db, &s.restoreMu, subDir, collectionFileName(c)); err != nil {
-				return fmt.Errorf("collection %q: %w", c, err)
-			}
+		if err := backupFile(db, &s.restoreMu, subDir, collectionFileName(c)); err != nil {
+			return fmt.Errorf("collection %q: %w", c, err)
 		}
 	}
 	return nil

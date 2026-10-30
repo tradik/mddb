@@ -17,6 +17,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// automationNotInitialized is the error every automation call returns on a
+// server started without an automation manager.
+const automationNotInitialized = "automation not initialized"
+
 // automationRuleToProto converts internal AutomationRule to proto.
 func automationRuleToProto(r *AutomationRule) *proto.AutomationRuleProto {
 	p := &proto.AutomationRuleProto{
@@ -180,7 +184,7 @@ func (g *GRPCServer) ListAutomation(ctx context.Context, req *proto.ListAutomati
 		}
 	}
 	if g.server.AutomationManager == nil {
-		return nil, status.Error(codes.FailedPrecondition, "automation not initialized")
+		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
 	}
 	rules := g.server.AutomationManager.List(req.Type)
 	protoRules := make([]*proto.AutomationRuleProto, len(rules))
@@ -201,7 +205,7 @@ func (g *GRPCServer) CreateAutomation(ctx context.Context, req *proto.CreateAuto
 		}
 	}
 	if g.server.AutomationManager == nil {
-		return nil, status.Error(codes.FailedPrecondition, "automation not initialized")
+		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
 	}
 	if req.Rule == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing rule")
@@ -225,7 +229,7 @@ func (g *GRPCServer) GetAutomation(ctx context.Context, req *proto.GetAutomation
 		}
 	}
 	if g.server.AutomationManager == nil {
-		return nil, status.Error(codes.FailedPrecondition, "automation not initialized")
+		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
 	}
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
@@ -248,7 +252,7 @@ func (g *GRPCServer) UpdateAutomation(ctx context.Context, req *proto.UpdateAuto
 		}
 	}
 	if g.server.AutomationManager == nil {
-		return nil, status.Error(codes.FailedPrecondition, "automation not initialized")
+		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
 	}
 	if req.Id == "" || req.Rule == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing id or rule")
@@ -275,7 +279,7 @@ func (g *GRPCServer) DeleteAutomation(ctx context.Context, req *proto.DeleteAuto
 		}
 	}
 	if g.server.AutomationManager == nil {
-		return nil, status.Error(codes.FailedPrecondition, "automation not initialized")
+		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
 	}
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing id")
@@ -299,7 +303,7 @@ func (g *GRPCServer) TestAutomation(ctx context.Context, req *proto.TestAutomati
 		}
 	}
 	if g.server.AutomationManager == nil {
-		return nil, status.Error(codes.FailedPrecondition, "automation not initialized")
+		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
 	}
 	if req.Id == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing id")

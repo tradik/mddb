@@ -194,7 +194,7 @@ func TestStatsForgetTheOldDatabaseAfterARestore(t *testing.T) {
 	defer cleanup()
 	defer func() { _ = s.DB.Close() }() // the restore opens a handle cleanup does not know
 
-	backup := filepath.Join(t.TempDir(), "b.db")
+	backup := filepath.Join(testBackupDir(t), "b.db")
 	if err := s.backupTo(backup); err != nil {
 		t.Fatal(err)
 	}

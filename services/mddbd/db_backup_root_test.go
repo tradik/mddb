@@ -18,11 +18,11 @@ func TestBackupThroughARootReportsEveryFailure(t *testing.T) {
 	defer cleanup()
 
 	// The directory does not exist.
-	if err := s.backupTo(filepath.Join(t.TempDir(), "absent", "x.db")); err == nil {
+	if err := s.backupTo(filepath.Join(testBackupDir(t), "absent", "x.db")); err == nil {
 		t.Error("a backup into a missing directory succeeded")
 	}
 	// The name cannot be created.
-	dir := t.TempDir()
+	dir := testBackupDir(t)
 	if err := s.backupTo(filepath.Join(dir, strings.Repeat("n", 300))); err == nil {
 		t.Error("a backup under an impossible name succeeded")
 	}
@@ -58,7 +58,7 @@ func TestBackupOfCollectionFilesThroughARoot(t *testing.T) {
 		t.Fatal("not the per-collection layout")
 	}
 
-	dir := t.TempDir()
+	dir := testBackupDir(t)
 	// "<name>.d" is a file: the collection directory cannot be opened.
 	if err := os.WriteFile(filepath.Join(dir, "a.db.d"), []byte("x"), 0o600); err != nil {
 		t.Fatal(err)

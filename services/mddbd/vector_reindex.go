@@ -46,41 +46,10 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 
 	chunkSize := s.chunkSizeFor(collection) // #325
 	chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
+	qt, diskOnly := s.reindexQuantization(collection)
 
-	// Disk-only collections store full-precision vectors on disk (the
-	// quantized form lives only in RAM), so storage quantization is off for
-	// them.
-	var qt vec.QuantizationType
-	if s.CollectionManager != nil {
-		if cfg, ok := s.CollectionManager.Get(collection); ok && cfg.Quantization != "" {
-			qt = vec.ParseQuantization(cfg.Quantization)
-		}
-	}
-	diskOnly := s.collectionDiskOnly(collection)
-	if diskOnly {
-		qt = vec.QuantNone
-	}
-
-	type docEntry struct {
-		ID        string
-		ContentMD string
-		// Reindexing must segment a document exactly as the embedding
-		// worker did, or stored chunk indices stop pointing at the passages
-		// they named (CODE-003).
-		Mode ChunkMode
-		// Summary is re-embedded with the chunks (RAG-009).
-		Summary string
-		// Image marks an image document, whose picture is re-embedded too
-		// (RAG-010).
-		Image bool
-	}
-	var docs []docEntry
-	if err := s.DBScanC(collection, s.BucketNames.Docs, []byte("doc|"+collection+"|"), func(_, v []byte) bool {
-		if d, err := loadDoc(v); err == nil {
-			docs = append(docs, docEntry{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(collection, d), Summary: documentSummary(d), Image: isImageDoc(d)})
-		}
-		return true
-	}); err != nil {
+	docs, err := s.reindexDocs(collection)
+	if err != nil {
 		return res, err
 	}
 	res.Total = len(docs)
@@ -108,22 +77,74 @@ func (s *Server) reindexVectors(ctx context.Context, collection string, force bo
 		}
 	}
 
-	// Train the trainable indexes on the new vectors (disk-only collections
-	// have no float32 indexes to train).
-	if res.Embedded > 0 && !diskOnly {
-		if records, loadErr := s.VectorStore.LoadCollection(collection); loadErr == nil {
-			collVecs := make(map[string][]float32, len(records))
-			for docID, rec := range records {
-				collVecs[docID] = rec.Vector
-			}
-			for _, searcher := range s.VectorSearchers {
-				if trainer, isTrainable := searcher.(vec.Trainable); isTrainable {
-					go vec.TrainSafely(trainer, collection, collVecs)
-				}
-			}
+	s.trainAfterReindex(collection, res, diskOnly)
+	return res, nil
+}
+
+// reindexDoc is what a reindex needs of one document.
+type reindexDoc struct {
+	ID        string
+	ContentMD string
+	// Reindexing must segment a document exactly as the embedding
+	// worker did, or stored chunk indices stop pointing at the passages
+	// they named (CODE-003).
+	Mode ChunkMode
+	// Summary is re-embedded with the chunks (RAG-009).
+	Summary string
+	// Image marks an image document, whose picture is re-embedded too
+	// (RAG-010).
+	Image bool
+}
+
+// reindexDocs reads the documents of a collection a reindex goes through.
+func (s *Server) reindexDocs(collection string) ([]reindexDoc, error) {
+	var docs []reindexDoc
+	err := s.DBScanC(collection, s.BucketNames.Docs, []byte("doc|"+collection+"|"), func(_, v []byte) bool {
+		if d, err := loadDoc(v); err == nil {
+			docs = append(docs, reindexDoc{ID: d.ID, ContentMD: d.ContentMD, Mode: s.chunkModeFor(collection, d), Summary: documentSummary(d), Image: isImageDoc(d)})
+		}
+		return true
+	})
+	return docs, err
+}
+
+// reindexQuantization is how a reindex stores a collection's vectors: its
+// configured quantization, and whether it is disk-only. Disk-only
+// collections store full-precision vectors on disk (the quantized form lives
+// only in RAM), so storage quantization is off for them.
+func (s *Server) reindexQuantization(collection string) (qt vec.QuantizationType, diskOnly bool) {
+	if s.CollectionManager != nil {
+		if cfg, ok := s.CollectionManager.Get(collection); ok && cfg.Quantization != "" {
+			qt = vec.ParseQuantization(cfg.Quantization)
 		}
 	}
-	return res, nil
+	diskOnly = s.collectionDiskOnly(collection)
+	if diskOnly {
+		qt = vec.QuantNone
+	}
+	return qt, diskOnly
+}
+
+// trainAfterReindex trains the trainable indexes on the new vectors when a
+// reindex embedded any. Disk-only collections have no float32 indexes to
+// train.
+func (s *Server) trainAfterReindex(collection string, res vectorReindexResult, diskOnly bool) {
+	if res.Embedded <= 0 || diskOnly {
+		return
+	}
+	records, err := s.VectorStore.LoadCollection(collection)
+	if err != nil {
+		return
+	}
+	collVecs := make(map[string][]float32, len(records))
+	for docID, rec := range records {
+		collVecs[docID] = rec.Vector
+	}
+	for _, searcher := range s.VectorSearchers {
+		if trainer, isTrainable := searcher.(vec.Trainable); isTrainable {
+			go vec.TrainSafely(trainer, collection, collVecs)
+		}
+	}
 }
 
 // reindexOne re-embeds one document and records the outcome in res.

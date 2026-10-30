@@ -220,24 +220,9 @@ func (s *Server) processUploadedFile(ctx context.Context, fh *multipart.FileHead
 	if err != nil {
 		return nil, err
 	}
-	contentMD, converted := conv.Markdown, conv.Converted
-
 	// Extract frontmatter for md/txt files
-	if !converted {
-		fmMeta, body := parseFrontmatter(contentMD)
-		if fmMeta != nil {
-			contentMD = body
-			// Merge frontmatter (base meta overrides)
-			if baseMeta == nil {
-				baseMeta = fmMeta
-			} else {
-				for k, v := range fmMeta {
-					if _, exists := baseMeta[k]; !exists {
-						baseMeta[k] = v
-					}
-				}
-			}
-		}
+	if !conv.Converted {
+		conv.Markdown, baseMeta = mergeFrontmatter(conv.Markdown, baseMeta)
 	}
 
 	// Derive key
@@ -249,21 +234,49 @@ func (s *Server) processUploadedFile(ctx context.Context, fh *multipart.FileHead
 		return nil, errors.New("cannot derive key from filename; provide key explicitly")
 	}
 
-	// Clone meta and add upload metadata
-	docMeta := make(map[string][]string)
+	// The file's own document first, then what it held (GO-046).
+	return s.storeUploadedDocs(collection, lang, ttl, convertedDocs(conv, key, uploadDocMeta(baseMeta, conv, fh.Filename)))
+}
+
+// mergeFrontmatter takes the frontmatter off a Markdown or text upload and
+// returns the body with the upload's meta: the request's meta wins over the
+// frontmatter's for a key both name.
+func mergeFrontmatter(content string, baseMeta map[string][]string) (string, map[string][]string) {
+	fmMeta, body := parseFrontmatter(content)
+	if fmMeta == nil {
+		return content, baseMeta
+	}
+	if baseMeta == nil {
+		return body, fmMeta
+	}
+	for k, v := range fmMeta {
+		if _, exists := baseMeta[k]; !exists {
+			baseMeta[k] = v
+		}
+	}
+	return body, baseMeta
+}
+
+// uploadDocMeta is a copy of baseMeta with what the upload records about the
+// file: its format, its name, and whether it was converted.
+func uploadDocMeta(baseMeta map[string][]string, conv conversion, filename string) map[string][]string {
+	docMeta := make(map[string][]string, len(baseMeta)+3)
 	for k, v := range baseMeta {
 		docMeta[k] = v
 	}
 	docMeta["upload_format"] = []string{conv.Format}
-	docMeta["upload_filename"] = []string{fh.Filename}
-	if converted {
+	docMeta["upload_filename"] = []string{filename}
+	if conv.Converted {
 		docMeta["upload_converted"] = []string{"true"}
 	}
+	return docMeta
+}
 
-	// The file's own document first, then what it held (GO-046).
-	conv.Markdown = contentMD
+// storeUploadedDocs validates and stores the documents of one uploaded file.
+// The first is the file's own document; the rest are its parts.
+func (s *Server) storeUploadedDocs(collection, lang string, ttl int64, docs []convertedDoc) (*UploadResponse, error) {
 	var res *UploadResponse
-	for _, d := range convertedDocs(conv, key, docMeta) {
+	for _, d := range docs {
 		if err := s.SchemaManager.Validate(collection, d.Meta); err != nil {
 			return res, fmt.Errorf("%s: %w", d.Key, err)
 		}
@@ -274,11 +287,7 @@ func (s *Server) processUploadedFile(ctx context.Context, fh *multipart.FileHead
 		}); err != nil {
 			return res, fmt.Errorf("%s: %w", d.Key, err)
 		}
-		r := UploadResponse{Key: d.Key, Format: d.Format, Converted: d.Converted, Doc: saved}
-		if d.Converted {
-			confidence := d.Confidence
-			r.ConversionConfidence, r.ConversionWarnings = &confidence, d.Warnings
-		}
+		r := uploadResult(d, saved)
 		if res == nil {
 			res = &r
 		} else {
@@ -286,6 +295,17 @@ func (s *Server) processUploadedFile(ctx context.Context, fh *multipart.FileHead
 		}
 	}
 	return res, nil
+}
+
+// uploadResult is what an upload reports for one stored document, with the
+// conversion's confidence and warnings when it was converted.
+func uploadResult(d convertedDoc, saved storage.Doc) UploadResponse {
+	r := UploadResponse{Key: d.Key, Format: d.Format, Converted: d.Converted, Doc: saved}
+	if d.Converted {
+		confidence := d.Confidence
+		r.ConversionConfidence, r.ConversionWarnings = &confidence, d.Warnings
+	}
+	return r
 }
 
 // splitImageUploads separates the image files of an upload, read into a

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -87,65 +88,14 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 	// no Allow-Origin header and the browser blocks the cross-origin read.
 	envCORSConfig().applyOrigin(w, r.Header.Get("Origin"))
 
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<20) // 4MB
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, `{"error":"request too large"}`, http.StatusRequestEntityTooLarge)
+	req, ok := readMCPPostBody(w, r)
+	if !ok {
 		return
 	}
-
-	var req map[string]interface{}
-	if err := json.Unmarshal(body, &req); err != nil {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","error":{"code":-32700,"message":"Parse error"}}`)
-		return
-	}
-
 	method, _ := req["method"].(string)
 	modern := mcpIsModernRequest(method, req)
-
-	// A legacy request is version-checked from its header exactly as it was
-	// before the stateless era existed. A modern one is checked against its
-	// own body below, where a disagreement between the two is itself an error
-	// the client has to be told about.
-	if !modern {
-		if err := checkMCPVersionHeader(r.Header.Get(mcpHeaderProtocolVersion)); err != nil {
-			http.Error(w, mcpVersionErrorBody(err), http.StatusBadRequest)
-			return
-		}
-	}
-
-	// MCP-004: a client's answer to a question the server asked on another
-	// request's stream. It is routed to the call waiting for it; the POST
-	// that carried it gets no body, as for a notification.
-	if !modern && mcpIsResponse(req) {
-		t.pending.deliver(req)
-		w.WriteHeader(http.StatusAccepted)
+	if t.answerBeforeDispatch(w, r, req, method, modern) {
 		return
-	}
-
-	// Handle notifications (no id) — return 202 Accepted
-	if _, hasID := req["id"]; !hasID {
-		// notifications/initialized, notifications/cancelled, etc. The
-		// revision leaves header requirements for notification POSTs
-		// undefined, so they are not applied here.
-		w.WriteHeader(http.StatusAccepted)
-		return
-	}
-
-	if modern {
-		if errObj := mcpValidateModernHeaders(r.Header, req); errObj != nil {
-			writeMCPErrorResponse(w, req["id"], errObj)
-			return
-		}
-		// A subscription's answer is a stream, not an object: the
-		// acknowledgement has to reach the client before the response that
-		// closes it.
-		if method == "subscriptions/listen" {
-			t.handleListen(w, req)
-			return
-		}
 	}
 
 	// Process request through handler.
@@ -156,29 +106,10 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 	// function is supplied by the transport rather than held by the handler.
 	sessionForProgress := r.Header.Get("Mcp-Session-Id")
 
-	// Sessions belong to the handshake era. 2026-07-28 removed them outright,
-	// and the rule for a server that still serves both is to neither mint nor
-	// echo one for a stateless request: a client that received an
-	// Mcp-Session-Id would have every reason to send it back, and the whole
-	// point of the revision is that nothing is remembered between requests.
-	// Set before the handler runs: a confirmation question (MCP-004) can
-	// start the response before the handler returns.
 	ctx := withMCPCaller(r.Context(), r)
 	var stream *mcpPostStream
 	if !modern {
-		if method == "initialize" {
-			sessionID := generateStreamableSessionID()
-			w.Header().Set("MCP-Session-Id", sessionID)
-			if mcpDeclaresElicitation(mcpParams(req)["capabilities"]) {
-				t.elicit.add(sessionID)
-			}
-		} else if sid := r.Header.Get("MCP-Session-Id"); sid != "" {
-			w.Header().Set("MCP-Session-Id", sid)
-		}
-		var confirmer mcpConfirmer
-		if stream, confirmer = t.legacyConfirmer(w, method, sessionForProgress); confirmer != nil {
-			ctx = withMCPConfirmer(ctx, confirmer)
-		}
+		ctx, stream = t.legacySession(ctx, w, r, req, method, sessionForProgress)
 	}
 
 	resp := t.handler.HandleWithNotifierContext(ctx, req, func(n map[string]interface{}) {
@@ -193,18 +124,121 @@ func (t *MCPStreamableTransport) handlePost(w http.ResponseWriter, r *http.Reque
 		_ = stream.send(resp)
 		return
 	}
+	writeMCPPostResponse(w, resp, modern)
+}
 
-	w.Header().Set("Content-Type", "application/json")
-	if modern {
-		// The revision maps its errors onto HTTP: an unimplemented method is
-		// 404 (with a JSON-RPC body, which distinguishes it from a 404 at a
-		// URL that hosts no MCP endpoint), and everything malformed or
-		// unservable is 400. A client reads the body before concluding that a
-		// 400 means "this server is legacy".
-		if errObj, failed := resp["error"].(map[string]interface{}); failed {
-			code, _ := errObj["code"].(int)
-			w.WriteHeader(mcpErrorHTTPStatus(code))
+// readMCPPostBody reads and parses a POST's JSON-RPC body, answering the
+// request itself — too large, or not JSON — when it cannot.
+func readMCPPostBody(w http.ResponseWriter, r *http.Request) (map[string]interface{}, bool) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<20) // 4MB
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, `{"error":"request too large"}`, http.StatusRequestEntityTooLarge)
+		return nil, false
+	}
+	var req map[string]interface{}
+	if err := json.Unmarshal(body, &req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","error":{"code":-32700,"message":"Parse error"}}`)
+		return nil, false
+	}
+	return req, true
+}
+
+// answerBeforeDispatch answers what never reaches the handler — a version
+// the server does not speak, a client's answer to a server question, a
+// notification, a modern request with bad headers, a subscription — and
+// reports whether it did.
+func (t *MCPStreamableTransport) answerBeforeDispatch(w http.ResponseWriter, r *http.Request, req map[string]interface{}, method string, modern bool) bool {
+	// A legacy request is version-checked from its header exactly as it was
+	// before the stateless era existed. A modern one is checked against its
+	// own body below, where a disagreement between the two is itself an error
+	// the client has to be told about.
+	if !modern {
+		if err := checkMCPVersionHeader(r.Header.Get(mcpHeaderProtocolVersion)); err != nil {
+			http.Error(w, mcpVersionErrorBody(err), http.StatusBadRequest)
+			return true
 		}
+	}
+
+	// MCP-004: a client's answer to a question the server asked on another
+	// request's stream. It is routed to the call waiting for it; the POST
+	// that carried it gets no body, as for a notification.
+	if !modern && mcpIsResponse(req) {
+		t.pending.deliver(req)
+		w.WriteHeader(http.StatusAccepted)
+		return true
+	}
+
+	// Handle notifications (no id) — return 202 Accepted
+	if _, hasID := req["id"]; !hasID {
+		// notifications/initialized, notifications/cancelled, etc. The
+		// revision leaves header requirements for notification POSTs
+		// undefined, so they are not applied here.
+		w.WriteHeader(http.StatusAccepted)
+		return true
+	}
+
+	if !modern {
+		return false
+	}
+	if errObj := mcpValidateModernHeaders(r.Header, req); errObj != nil {
+		writeMCPErrorResponse(w, req["id"], errObj)
+		return true
+	}
+	// A subscription's answer is a stream, not an object: the
+	// acknowledgement has to reach the client before the response that
+	// closes it.
+	if method == "subscriptions/listen" {
+		t.handleListen(w, req)
+		return true
+	}
+	return false
+}
+
+// legacySession does a handshake-era request's session bookkeeping: it mints
+// a session on initialize (remembering whether the client can be asked
+// questions) or echoes the one the request carries, and sets up the stream a
+// confirmation question (MCP-004) would use.
+//
+// Sessions belong to the handshake era. 2026-07-28 removed them outright,
+// and the rule for a server that still serves both is to neither mint nor
+// echo one for a stateless request: a client that received an
+// Mcp-Session-Id would have every reason to send it back, and the whole
+// point of the revision is that nothing is remembered between requests.
+// Called before the handler runs: a confirmation question can start the
+// response before the handler returns.
+func (t *MCPStreamableTransport) legacySession(ctx context.Context, w http.ResponseWriter, r *http.Request,
+	req map[string]interface{}, method, sessionForProgress string) (context.Context, *mcpPostStream) {
+	if method == "initialize" {
+		sessionID := generateStreamableSessionID()
+		w.Header().Set("MCP-Session-Id", sessionID)
+		if mcpDeclaresElicitation(mcpParams(req)["capabilities"]) {
+			t.elicit.add(sessionID)
+		}
+	} else if sid := r.Header.Get("MCP-Session-Id"); sid != "" {
+		w.Header().Set("MCP-Session-Id", sid)
+	}
+	stream, confirmer := t.legacyConfirmer(w, method, sessionForProgress)
+	if confirmer != nil {
+		ctx = withMCPConfirmer(ctx, confirmer)
+	}
+	return ctx, stream
+}
+
+// writeMCPPostResponse writes the handler's response as JSON.
+//
+// For a modern request the revision maps its errors onto HTTP: an
+// unimplemented method is 404 (with a JSON-RPC body, which distinguishes it
+// from a 404 at a URL that hosts no MCP endpoint), and everything malformed
+// or unservable is 400. A client reads the body before concluding that a 400
+// means "this server is legacy".
+func writeMCPPostResponse(w http.ResponseWriter, resp map[string]interface{}, modern bool) {
+	w.Header().Set("Content-Type", "application/json")
+	if errObj, failed := resp["error"].(map[string]interface{}); failed && modern {
+		code, _ := errObj["code"].(int)
+		w.WriteHeader(mcpErrorHTTPStatus(code))
 	}
 	respJSON, _ := json.Marshal(resp)
 	_, _ = w.Write(respJSON)

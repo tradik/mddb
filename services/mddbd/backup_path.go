@@ -58,7 +58,7 @@ func confineToDir(dir, name string, requireExisting bool, label string) (string,
 	if err := os.MkdirAll(root, 0o750); err != nil {
 		return "", fmt.Errorf("create %s dir: %w", label, err)
 	}
-	rootResolved, err := filepath.EvalSymlinks(root)
+	rootResolved, err := evalJailSymlinks(root)
 	if err != nil {
 		return "", fmt.Errorf("resolve %s dir symlinks: %w", label, err)
 	}
@@ -124,11 +124,36 @@ func confineToDir(dir, name string, requireExisting bool, label string) (string,
 			return "", fmt.Errorf("resolve %s parent: %w", label, cmp.Or(perr, errors.New("not a directory")))
 		}
 	}
-	return filepath.Join(rootResolved, rel), nil
+	return confinedJoin(rootResolved, rel, label)
+}
+
+// confinedJoin joins rel to root and returns the cleaned result only when it
+// is still root or inside it.
+//
+// confineToDir has already refused every path that leaves the jail, so this
+// never refuses one of its results. It is the last step on purpose: the value
+// confineToDir returns is the one this check returned, in the Clean-then-
+// prefix form taint analysers recognise as a path sanitiser (SonarCloud
+// gosecurity:S2083 on backupCollections did not follow withinDir and the
+// os.Root opens above). The callers write to what comes out of here.
+func confinedJoin(root, rel, label string) (string, error) {
+	cleaned := filepath.Clean(filepath.Join(root, rel))
+	prefix := root
+	if !strings.HasSuffix(prefix, string(filepath.Separator)) {
+		prefix += string(filepath.Separator)
+	}
+	if cleaned != root && !strings.HasPrefix(cleaned, prefix) {
+		return "", fmt.Errorf("%s path escapes its directory", label)
+	}
+	return cleaned, nil
 }
 
 // openJail is os.OpenRoot; a test replaces it to reach the error path.
 var openJail = os.OpenRoot
+
+// evalJailSymlinks is filepath.EvalSymlinks; a test replaces it to reach the
+// error path, which a directory MkdirAll has just made cannot otherwise take.
+var evalJailSymlinks = filepath.EvalSymlinks
 
 // withinDir reports whether p lies inside root, lexically. Both must already be
 // cleaned; symlinks are the caller's business.

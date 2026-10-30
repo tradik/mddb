@@ -6,6 +6,10 @@ import (
 	json "mddb/internal/jsonx"
 )
 
+// restoreFromBackupDescription describes the restore call, the same on
+// every surface that lists it.
+const restoreFromBackupDescription = "Restore from backup"
+
 // ---- Request/Response types ----
 
 // EndpointsResponse contains all available HTTP, gRPC, and MCP endpoints.
@@ -130,7 +134,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 		// Export & Backup
 		{Name: "Export", Description: "Export collection (streaming)"},
 		{Name: "Backup", Description: "Create database backup"},
-		{Name: "Restore", Description: "Restore from backup"},
+		{Name: "Restore", Description: restoreFromBackupDescription},
 		// FTS Config
 		{Name: "ListSynonyms", Description: "List FTS synonyms"},
 		{Name: "AddSynonym", Description: "Add/update synonym group"},
@@ -174,7 +178,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 		{Name: "delete_documents_batch", Description: "Batch delete documents"},
 		{Name: "export_documents", Description: "Export collection"},
 		{Name: "create_backup", Description: "Create database backup"},
-		{Name: "restore_backup", Description: "Restore from backup"},
+		{Name: "restore_backup", Description: restoreFromBackupDescription},
 		{Name: "semantic_search", Description: "Semantic/vector search"},
 		{Name: "hybrid_search", Description: "Hybrid sparse+dense search (FTS + vector)"},
 		{Name: "vector_reindex", Description: "Re-embed collection"},
@@ -261,7 +265,7 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 		// Export & backup
 		{Method: "POST", Path: "/v1/export", Description: "Export collection (NDJSON/ZIP)", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/backup", Description: "Create database backup", RequiresAuth: authEnabled},
-		{Method: "POST", Path: "/v1/restore", Description: "Restore from backup", RequiresAuth: authEnabled},
+		{Method: "POST", Path: "/v1/restore", Description: restoreFromBackupDescription, RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/truncate", Description: "Truncate revision history", RequiresAuth: authEnabled},
 		{Method: "GET", Path: "/v1/admin/diagnose", Description: "Diagnose bundle without user data (tar.gz, admin)", RequiresAuth: authEnabled},
 

@@ -170,65 +170,102 @@ func odpToMarkdown(data []byte) (string, conversionSignals, error) {
 	if err != nil {
 		return "", conversionSignals{}, err
 	}
-	dec := xml.NewDecoder(strings.NewReader(string(content)))
-	var slides []slide
-	inNotes, isTitle := false, false
-	var para *strings.Builder
-	for {
-		tok, err := dec.Token()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return "", conversionSignals{}, errors.New("invalid odp: content.xml: " + err.Error())
-		}
-		switch t := tok.(type) {
-		case xml.StartElement:
-			switch t.Name.Local {
-			case "page":
-				slides = append(slides, slide{})
-			case "notes":
-				inNotes = true
-			case "frame":
-				isTitle = odfAttr(t, "class") == "title"
-			case "p", "h":
-				para = &strings.Builder{}
-			case "s", "tab", "line-break":
-				if para != nil {
-					para.WriteByte(' ')
-				}
-			}
-		case xml.EndElement:
-			switch t.Name.Local {
-			case "notes":
-				inNotes = false
-			case "frame":
-				isTitle = false
-			case "p", "h":
-				if para == nil {
-					continue
-				}
-				text := strings.Join(strings.Fields(para.String()), " ")
-				para = nil
-				if text == "" || len(slides) == 0 {
-					continue
-				}
-				s := &slides[len(slides)-1]
-				switch {
-				case inNotes:
-					s.notes = append(s.notes, text)
-				case isTitle && s.title == "":
-					s.title = text
-				default:
-					s.body = append(s.body, text)
-				}
-			}
-		case xml.CharData:
-			if para != nil {
-				para.Write(t)
-			}
-		}
+	slides, err := odpSlides(content)
+	if err != nil {
+		return "", conversionSignals{}, err
 	}
 	md, sig := slidesToMarkdown(slides)
 	return md, sig, nil
+}
+
+// odpSlides streams content.xml into slides.
+func odpSlides(content []byte) ([]slide, error) {
+	dec := xml.NewDecoder(strings.NewReader(string(content)))
+	r := &odpReader{}
+	for {
+		tok, err := dec.Token()
+		if errors.Is(err, io.EOF) {
+			return r.slides, nil
+		}
+		if err != nil {
+			return nil, errors.New("invalid odp: content.xml: " + err.Error())
+		}
+		r.token(tok)
+	}
+}
+
+// odpReader is odpSlides' state between tokens: the slides so far, whether
+// the reader is in the notes or a title frame, and the paragraph being read.
+type odpReader struct {
+	slides  []slide
+	inNotes bool
+	isTitle bool
+	para    *strings.Builder
+}
+
+// token feeds one token of content.xml to the reader.
+func (r *odpReader) token(tok xml.Token) {
+	switch t := tok.(type) {
+	case xml.StartElement:
+		r.start(t)
+	case xml.EndElement:
+		r.end(t)
+	case xml.CharData:
+		if r.para != nil {
+			r.para.Write(t)
+		}
+	}
+}
+
+// start opens a slide, the notes, a frame or a paragraph, or adds the space
+// a tab or line break stands for.
+func (r *odpReader) start(t xml.StartElement) {
+	switch t.Name.Local {
+	case "page":
+		r.slides = append(r.slides, slide{})
+	case "notes":
+		r.inNotes = true
+	case "frame":
+		r.isTitle = odfAttr(t, "class") == "title"
+	case "p", "h":
+		r.para = &strings.Builder{}
+	case "s", "tab", "line-break":
+		if r.para != nil {
+			r.para.WriteByte(' ')
+		}
+	}
+}
+
+// end closes the notes, a frame or a paragraph.
+func (r *odpReader) end(t xml.EndElement) {
+	switch t.Name.Local {
+	case "notes":
+		r.inNotes = false
+	case "frame":
+		r.isTitle = false
+	case "p", "h":
+		r.endParagraph()
+	}
+}
+
+// endParagraph files the finished paragraph on the current slide: as a note,
+// as the slide's title (the first paragraph of a title frame), or as body.
+func (r *odpReader) endParagraph() {
+	if r.para == nil {
+		return
+	}
+	text := strings.Join(strings.Fields(r.para.String()), " ")
+	r.para = nil
+	if text == "" || len(r.slides) == 0 {
+		return
+	}
+	s := &r.slides[len(r.slides)-1]
+	switch {
+	case r.inNotes:
+		s.notes = append(s.notes, text)
+	case r.isTitle && s.title == "":
+		s.title = text
+	default:
+		s.body = append(s.body, text)
+	}
 }

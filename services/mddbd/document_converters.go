@@ -63,137 +63,18 @@ func htmlToMarkdown(data []byte) string {
 	s = strings.ReplaceAll(html.UnescapeString(s), "\u00a0", " ")
 
 	// Clean up excessive whitespace
-	for strings.Contains(s, "\n\n\n") {
-		s = strings.ReplaceAll(s, "\n\n\n", "\n\n")
-	}
+	s = squeezeBlankLines(s)
 
 	return strings.TrimSpace(s)
 }
 
-// docxToMarkdown extracts text from a DOCX file (which is a ZIP containing XML).
-func docxToMarkdown(data []byte) (string, error) {
-	r, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil {
-		return "", fmt.Errorf("invalid docx file: %w", err)
-	}
-
-	// Find word/document.xml
-	var docFile *zip.File
-	for _, f := range r.File {
-		if f.Name == "word/document.xml" {
-			docFile = f
-			break
-		}
-	}
-	if docFile == nil {
-		return "", errors.New("invalid docx: word/document.xml not found")
-	}
-
-	rc, err := docFile.Open()
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = rc.Close() }()
-
-	xmlData, err := io.ReadAll(rc)
-	if err != nil {
-		return "", err
-	}
-
-	return docxXMLToMarkdown(string(xmlData)), nil
-}
-
-// docxXMLToMarkdown converts word/document.xml content to markdown.
-// Handles paragraphs, runs, headings (pStyle), bold, italic, and lists.
-func docxXMLToMarkdown(xml string) string {
-	var result strings.Builder
-
-	// Process paragraph by paragraph: <w:p ...>...</w:p>
-	remaining := xml
-	for {
-		pStart := strings.Index(remaining, "<w:p")
-		if pStart < 0 {
-			break
-		}
-		pEnd := strings.Index(remaining[pStart:], "</w:p>")
-		if pEnd < 0 {
-			break
-		}
-		para := remaining[pStart : pStart+pEnd+6]
-		remaining = remaining[pStart+pEnd+6:]
-
-		// Check paragraph style for headings
-		headingLevel := 0
-		if styleIdx := strings.Index(para, `<w:pStyle w:val="`); styleIdx >= 0 {
-			valStart := styleIdx + len(`<w:pStyle w:val="`)
-			valEnd := strings.Index(para[valStart:], `"`)
-			if valEnd > 0 {
-				style := para[valStart : valStart+valEnd]
-				// Heading1, Heading2, ... or heading 1, heading 2, ...
-				style = strings.ToLower(style)
-				if strings.HasPrefix(style, "heading") {
-					n := strings.TrimPrefix(style, "heading")
-					n = strings.TrimSpace(n)
-					if level, err := strconv.Atoi(n); err == nil && level >= 1 && level <= 6 {
-						headingLevel = level
-					}
-				}
-			}
-		}
-
-		// Check for list (numPr)
-		isList := strings.Contains(para, "<w:numPr")
-
-		// Extract text runs: <w:t ...>text</w:t> or <w:t>text</w:t>
-		var paraText strings.Builder
-		runRemaining := para
-		for {
-			tStart := strings.Index(runRemaining, "<w:t")
-			if tStart < 0 {
-				break
-			}
-			// Skip past the opening tag
-			gtIdx := strings.Index(runRemaining[tStart:], ">")
-			if gtIdx < 0 {
-				break
-			}
-			textStart := tStart + gtIdx + 1
-			tEnd := strings.Index(runRemaining[textStart:], "</w:t>")
-			if tEnd < 0 {
-				break
-			}
-			paraText.WriteString(runRemaining[textStart : textStart+tEnd])
-			runRemaining = runRemaining[textStart+tEnd+6:]
-		}
-
-		text := paraText.String()
-		if text == "" && headingLevel == 0 {
-			// Empty paragraph → blank line
-			result.WriteByte('\n')
-			continue
-		}
-
-		if headingLevel > 0 {
-			result.WriteString(strings.Repeat("#", headingLevel))
-			result.WriteByte(' ')
-			result.WriteString(text)
-			result.WriteString("\n\n")
-		} else if isList {
-			result.WriteString("- ")
-			result.WriteString(text)
-			result.WriteByte('\n')
-		} else {
-			result.WriteString(text)
-			result.WriteString("\n\n")
-		}
-	}
-
-	s := result.String()
-	// Clean up excessive newlines
+// squeezeBlankLines turns every run of blank lines in s into one, so no two
+// paragraphs are more than one empty line apart.
+func squeezeBlankLines(s string) string {
 	for strings.Contains(s, "\n\n\n") {
 		s = strings.ReplaceAll(s, "\n\n\n", "\n\n")
 	}
-	return strings.TrimSpace(s)
+	return s
 }
 
 // ---------------------------------------------------------------------------
@@ -438,9 +319,7 @@ func odtXMLToMarkdown(xml string) string {
 	}
 
 	s := result.String()
-	for strings.Contains(s, "\n\n\n") {
-		s = strings.ReplaceAll(s, "\n\n\n", "\n\n")
-	}
+	s = squeezeBlankLines(s)
 	return strings.TrimSpace(s)
 }
 
@@ -563,9 +442,7 @@ func rtfToMarkdown(data []byte) string {
 
 	text := result.String()
 	// Clean up
-	for strings.Contains(text, "\n\n\n") {
-		text = strings.ReplaceAll(text, "\n\n\n", "\n\n")
-	}
+	text = squeezeBlankLines(text)
 	return strings.TrimSpace(text)
 }
 
@@ -740,9 +617,7 @@ func texToMarkdown(data []byte) string {
 	s = strings.ReplaceAll(s, `--`, "–")
 
 	// Clean up
-	for strings.Contains(s, "\n\n\n") {
-		s = strings.ReplaceAll(s, "\n\n\n", "\n\n")
-	}
+	s = squeezeBlankLines(s)
 	return strings.TrimSpace(s)
 }
 

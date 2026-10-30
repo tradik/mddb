@@ -23,7 +23,7 @@ import (
 // ListAutomation returns automation rules via the direct client.
 func (c *DirectClient) ListAutomation(ctx context.Context, filterType string) (*MCPAutomationListResponse, error) {
 	if c.server.AutomationManager == nil {
-		return nil, errors.New("automation not initialized")
+		return nil, errors.New(automationNotInitialized)
 	}
 	rules := c.server.AutomationManager.List(filterType)
 	return &MCPAutomationListResponse{Rules: rules, Total: len(rules)}, nil
@@ -32,7 +32,7 @@ func (c *DirectClient) ListAutomation(ctx context.Context, filterType string) (*
 // CreateAutomation creates a new automation rule via the direct client.
 func (c *DirectClient) CreateAutomation(ctx context.Context, rule AutomationRule) (*AutomationRule, error) {
 	if c.server.AutomationManager == nil {
-		return nil, errors.New("automation not initialized")
+		return nil, errors.New(automationNotInitialized)
 	}
 	return c.server.AutomationManager.Create(rule)
 }
@@ -40,7 +40,7 @@ func (c *DirectClient) CreateAutomation(ctx context.Context, rule AutomationRule
 // GetAutomation retrieves an automation rule by ID via the direct client.
 func (c *DirectClient) GetAutomation(ctx context.Context, id string) (*AutomationRule, error) {
 	if c.server.AutomationManager == nil {
-		return nil, errors.New("automation not initialized")
+		return nil, errors.New(automationNotInitialized)
 	}
 	rule := c.server.AutomationManager.Get(id)
 	if rule == nil {
@@ -52,7 +52,7 @@ func (c *DirectClient) GetAutomation(ctx context.Context, id string) (*Automatio
 // UpdateAutomation updates an automation rule via the direct client.
 func (c *DirectClient) UpdateAutomation(ctx context.Context, id string, rule AutomationRule) (*AutomationRule, error) {
 	if c.server.AutomationManager == nil {
-		return nil, errors.New("automation not initialized")
+		return nil, errors.New(automationNotInitialized)
 	}
 	return c.server.AutomationManager.Update(id, rule)
 }
@@ -60,7 +60,7 @@ func (c *DirectClient) UpdateAutomation(ctx context.Context, id string, rule Aut
 // DeleteAutomation removes an automation rule via the direct client.
 func (c *DirectClient) DeleteAutomation(ctx context.Context, id string) error {
 	if c.server.AutomationManager == nil {
-		return errors.New("automation not initialized")
+		return errors.New(automationNotInitialized)
 	}
 	return c.server.AutomationManager.Delete(id)
 }
@@ -68,7 +68,7 @@ func (c *DirectClient) DeleteAutomation(ctx context.Context, id string) error {
 // TestAutomation runs an automation rule in test mode via the direct client.
 func (c *DirectClient) TestAutomation(ctx context.Context, id string) (string, error) {
 	if c.server.AutomationManager == nil {
-		return "", errors.New("automation not initialized")
+		return "", errors.New(automationNotInitialized)
 	}
 	rule := c.server.AutomationManager.Get(id)
 	if rule == nil {

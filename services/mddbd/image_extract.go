@@ -35,15 +35,23 @@ const (
 	minImageSide = 16
 )
 
+// The MIME types of the image formats kept.
+const (
+	mimeJPEG = "image/jpeg"
+	mimePNG  = "image/png"
+	mimeGIF  = "image/gif"
+	mimeWebP = "image/webp"
+)
+
 // imageFormats maps the formats an image may have to their MIME types.
 var imageFormats = map[string]string{
-	"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "gif": "image/gif", "webp": "image/webp",
+	"jpg": mimeJPEG, "jpeg": mimeJPEG, "png": mimePNG, "gif": mimeGIF, "webp": mimeWebP,
 }
 
 // imageExtensions maps a MIME type to the extension an image document's name
 // gets.
 var imageExtensions = map[string]string{
-	"image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp",
+	mimeJPEG: "jpg", mimePNG: "png", mimeGIF: "gif", mimeWebP: "webp",
 }
 
 // errImageType is wrapped by the error for bytes that are no image of a kept
@@ -91,14 +99,14 @@ func validateImage(data []byte) (mime string, width, height int, err error) {
 	}
 	switch {
 	case bytes.HasPrefix(data, []byte{0xFF, 0xD8, 0xFF}):
-		mime = "image/jpeg"
+		mime = mimeJPEG
 	case bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")):
-		mime = "image/png"
+		mime = mimePNG
 	case bytes.HasPrefix(data, []byte("GIF87a")), bytes.HasPrefix(data, []byte("GIF89a")):
-		mime = "image/gif"
+		mime = mimeGIF
 	case len(data) >= 12 && string(data[:4]) == "RIFF" && string(data[8:12]) == "WEBP":
 		width, height, err = webpSize(data)
-		return "image/webp", width, height, err
+		return mimeWebP, width, height, err
 	default:
 		return "", 0, 0, errImageType
 	}

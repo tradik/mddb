@@ -33,7 +33,7 @@ func TestManagersFollowTheDatabaseAcrossARestore(t *testing.T) {
 	if err := s.CollectionManager.Set("kept", &CollectionConfig{Type: "default"}); err != nil {
 		t.Fatal(err)
 	}
-	backup := filepath.Join(t.TempDir(), "b.db")
+	backup := filepath.Join(testBackupDir(t), "b.db")
 	if err := s.backupTo(backup); err != nil {
 		t.Fatal(err)
 	}
