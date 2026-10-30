@@ -3381,7 +3381,7 @@ it works on a read-only instance and on a replication follower.
 
 | Parameter | Default | Effect |
 |---|---|---|
-| `profiles` | `false` | Add `goroutines.txt` and `heap.pprof` |
+| `profiles` | `false` | Add `goroutines.pprof` and `heap.pprof` |
 | `integrity` | `false` | Add `integrity.json`: bbolt's consistency check of every database file (slow on a large database; the request budget becomes 30 minutes) |
 | `keepNames` | `false` | Keep collection names instead of `c_` + 8 hex digits of their SHA-256 |
 

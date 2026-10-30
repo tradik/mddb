@@ -700,7 +700,7 @@ redaction applied; the CLI checks each file against it.
 | `query-shape.json` | the [query-shape counters](#query-shape-v21810), with the CODE-006/007 gates computed | counters only; collections hashed | always |
 | `audit-summary.json` | `/v1/audit`, last 7 days | action × result counts; no actors, IPs, keys or details | audit log on |
 | `errors.json` | the last 200 errors answered | error class (`not_found`, `json`, `quota`, a Go type) and `file:line`; never the message | always |
-| `goroutines.txt`, `heap.pprof` | `runtime/pprof` | stacks and allocation sites: function names and source `file:line` of the build, no values | `--profiles` |
+| `goroutines.pprof`, `heap.pprof` | `runtime/pprof` | stacks and allocation sites: function names and source `file:line` of the build, no values | `--profiles` |
 | `integrity.json` | bbolt's consistency check of the main file and every collection file | problem counts per file; bbolt's messages (which can quote keys) are dropped | `--integrity` |
 
 **Never in the bundle:**

@@ -4875,7 +4875,7 @@ paths:
           schema:
             type: boolean
             default: false
-          description: Add goroutines.txt (stack traces) and heap.pprof
+          description: Add goroutines.pprof (stack traces) and heap.pprof
         - name: integrity
           in: query
           schema:

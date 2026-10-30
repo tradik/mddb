@@ -294,10 +294,12 @@ func countProblems(problems <-chan error) int {
 	return n
 }
 
-// profilePart writes a runtime profile: goroutine stacks as text (debug 1:
-// function names and file:line, no argument values) or the heap profile.
-func profilePart(name string, debugLevel int) ([]byte, error) {
+// profilePart writes a runtime profile (goroutine or heap) in pprof's
+// gzipped protobuf form, which `go tool pprof` reads: function names and
+// source file:line, no argument or variable values. The text forms (debug
+// levels above 0) are not used.
+func profilePart(name string) ([]byte, error) {
 	var buf bytes.Buffer
-	err := pprof.Lookup(name).WriteTo(&buf, debugLevel)
+	err := pprof.Lookup(name).WriteTo(&buf, 0)
 	return buf.Bytes(), err
 }

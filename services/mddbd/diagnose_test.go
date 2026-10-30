@@ -225,7 +225,7 @@ func TestDiagnoseBundleCarriesNoCanary(t *testing.T) {
 			files, order := getBundle(t, h, "?profiles=true&integrity=true")
 			for _, want := range []string{"MANIFEST.json", "build.json", "config.json", "env.json", "stats.json", "storage.json",
 				"vector-stats.json", "indexing.json", "metrics.prom", "query-shape.json", "audit-summary.json", "errors.json",
-				"goroutines.txt", "heap.pprof", "integrity.json"} {
+				"goroutines.pprof", "heap.pprof", "integrity.json"} {
 				if files[want] == nil {
 					t.Errorf("bundle lacks %s (has %v)", want, order)
 				}
@@ -307,7 +307,7 @@ func TestDiagnoseManifestDescribesEveryFile(t *testing.T) {
 	for _, o := range man.Omitted {
 		omitted[o.Name] = o.Reason
 	}
-	if omitted["goroutines.txt"] != "opt-in: profiles" || omitted["heap.pprof"] != "opt-in: profiles" ||
+	if omitted["goroutines.pprof"] != "opt-in: profiles" || omitted["heap.pprof"] != "opt-in: profiles" ||
 		omitted["integrity.json"] != "opt-in: integrity" {
 		t.Errorf("omitted %v", omitted)
 	}
