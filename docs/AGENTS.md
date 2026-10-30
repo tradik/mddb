@@ -54,8 +54,8 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
 # or a static key: MDDB_MCP_API_KEYS=key:code-reviewer:search|code
 ```
 
-With `search,code` the 22 tool schemas take about 36 KB per turn, against
-78 KB for all of them. A tool outside the caller's toolsets is not listed,
+With `search,code` the 22 tool schemas take about 43 KB per turn, against
+94 KB for all 93 of them. A tool outside the caller's toolsets is not listed,
 and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets-v2188)).
 
 Operators can add their own tools and prompts in YAML

@@ -551,9 +551,9 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   answered with JSON-RPC `-32601` — the list is not the authorisation.
 - Custom tools are never filtered: they are the operator's explicit choice.
 
-Measured on this build, the `tools/list` schemas of all 90 tools take about
-78 KB (≈19 600 tokens) per turn. The 22 tools of `search,code` take about 36 KB
-(≈8 900 tokens).
+Measured on 2.18.10, the `tools/list` schemas of all 93 tools take about
+94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB
+(≈10 800 tokens), less than half.
 
 | Agent | Toolsets |
 |---|---|
