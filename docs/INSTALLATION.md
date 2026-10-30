@@ -178,17 +178,20 @@ sudo journalctl -u mddbd -f
 
 ## macOS
 
-### Homebrew (Coming Soon)
+### Homebrew
+
+Every release updates the formula in [tradik/homebrew-tap](https://github.com/tradik/homebrew-tap)
+(macOS and Linux, amd64 and arm64). It installs the server, `mddbd`; the CLI
+comes from the release archives below.
 
 ```bash
-brew tap tradik/mddb
-brew install mddbd mddb-cli
+brew install tradik/tap/mddb
 
 # Run server
 mddbd
 
-# Or as service
-brew services start mddbd
+# Or as a service
+brew services start mddb
 ```
 
 ### Manual Installation
