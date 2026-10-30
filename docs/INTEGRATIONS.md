@@ -1,13 +1,13 @@
 ---
 title: "Integrations: Docling, Langflow, Airbyte & more"
 slug: "docs/integrations"
-description: "Use MDDB with Docling, Langflow, OpenSearch, Airbyte, WordPress, GitHub Actions, Grafana and Chrome to build document processing and RAG pipelines."
+description: "MDDB with Docling, Langflow, OpenSearch, Airbyte, WordPress, GitHub Actions, Grafana, Chrome and LangChain: document processing and RAG pipelines."
 status: publish
 ---
 
-# Integrations: Docling, Langflow, OpenSearch, Airbyte, GitHub Action & Grafana
+# Integrations: Docling, Langflow, OpenSearch, Airbyte, WordPress, GitHub Action, Grafana, Chrome & LangChain
 
-Use MDDB alongside popular AI/ML, ELT, and observability tools to build production document processing and RAG pipelines.
+Use MDDB alongside AI/ML, ELT and observability tools to build document processing and RAG pipelines. AI agents that talk to MDDB directly over MCP are covered in [AGENTS.md](AGENTS.md).
 
 ## Architecture Overview
 
@@ -21,13 +21,14 @@ graph LR
         WPSYNC[WordPress<br>Sync plugin]
         AB[Airbyte<br>300+ ELT sources]
         GHA[GitHub Action<br>repo docs / READMEs]
+        SITES[Sitemaps, URL lists,<br>S3 prefixes]
     end
 
     subgraph Storage & Search
         MDDB[mddbd<br>:11023 / :11024]
         BOLT[(BoltDB)]
         VEC[(Vector Index)]
-        OS[(OpenSearch<br>optional)]
+        OS[(OpenSearch<br>optional, for scale-out)]
     end
 
     subgraph Output & Orchestration
@@ -36,6 +37,10 @@ graph LR
         LLM[LLM<br>Claude / GPT / Llama]
         DEPLOY[GitHub Pages<br>Cloudflare / Netlify]
         GRAFANA[Grafana<br>datasource plugin]
+        CHROME[Chrome extension<br>toolbar stats]
+        LC[LangChain / LangGraph<br>langchain-mddb]
+        AGENT[AI agents<br>MCP clients]
+        ES[Elasticsearch-style<br>clients]
     end
 
     PDF -->|parse| DOCLING
@@ -46,17 +51,22 @@ graph LR
     WPSYNC -->|/v1/add /v1/delete| MDDB
     AB -->|destination-mddb| MDDB
     GHA -->|/v1/add per file| MDDB
+    SITES -->|scheduled sync| MDDB
     MDDB --> BOLT
     MDDB --> VEC
-    MDDB -.->|sync| OS
+    MDDB -.->|export + webhooks| OS
 
     MDDB -->|fetch docs| SSG
     SSG -->|static HTML| DEPLOY
     LF -->|REST / MCP| MDDB
-    LF -->|query| OS
+    LF -.->|query| OS
     LF -->|generate| LLM
     LLM -->|answer| LF
     MDDB -->|/v1/temporal /v1/aggregate| GRAFANA
+    CHROME -->|/v1/stats| MDDB
+    LC -->|gRPC| MDDB
+    AGENT -->|MCP| MDDB
+    ES -->|/es subset| MDDB
 ```
 
 ---
@@ -64,6 +74,8 @@ graph LR
 ## 1. Docling → MDDB (Document Ingestion)
 
 [Docling](https://github.com/DS4SD/docling) is IBM's document parser that converts PDF, DOCX, PPTX, and HTML into structured Markdown. Since MDDB stores Markdown natively, this is a natural fit.
+
+MDDB converts PDF, DOCX, ODT, RTF, XLSX, ODS, PPTX, ODP, EPUB, CSV, EML and MBOX itself on upload (v2.18.9+, see [BULK-IMPORT.md](BULK-IMPORT.md)), and marks each result with `meta.conversionConfidence`. It has no OCR and no layout model: a scanned PDF is stored with confidence 0. Reach for Docling when documents are scans, or when their tables and reading order need a layout model; `filter: {"conversionConfidence": {"lt": 0.5}}` finds the documents worth sending through it.
 
 ### Install Docling
 
@@ -390,25 +402,98 @@ graph LR
 
 ---
 
-## 3. OpenSearch + MDDB (Scalable Search)
+## 3. OpenSearch + MDDB
 
-MDDB's built-in vector search works well up to ~50K documents. For larger datasets or advanced full-text search (BM25, aggregations, facets), sync documents to [OpenSearch](https://opensearch.org/).
+MDDB and [OpenSearch](https://opensearch.org/) overlap on search, but they are
+built for different sizes of deployment. MDDB is one process on one machine,
+with read-only followers for read scaling ([REPLICATION.md](REPLICATION.md)).
+OpenSearch is a cluster: an index is split into shards spread over nodes. This
+section says when MDDB is enough on its own, when OpenSearch is the better
+tool, how to move between them, and how to run both.
 
-### Architecture
+### What each side does
 
-| Feature | MDDB | OpenSearch |
-|---------|------|------------|
-| Storage | Primary (BoltDB) | Search index (replica) |
-| Vector search | In-memory, ~50K docs | kNN plugin, millions |
-| Full-text search | Built-in TF scoring | BM25, analyzers, stemming |
-| Aggregations | No | Yes (facets, histograms) |
-| MCP tools | 52 built-in | No |
+| | MDDB (v2.18.10) | OpenSearch |
+|---|---|---|
+| Deployment | One node; leader-follower replication copies the whole database to each follower | A cluster; shards and replicas spread one index over many nodes |
+| Vector search | 8 index types (flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ) and `algorithm: "auto"`, which picks one per query from the collection size, memory and filter ([SEARCH.md](SEARCH.md)). int8/int4 quantization and disk-only vectors cut memory ([QUANTIZATION.md](QUANTIZATION.md)). Every vector of a collection lives on one machine | k-NN plugin (Lucene, Faiss); vectors are split across shards and nodes |
+| Measured vector scale | Synthetic 32-dimension corpus, recall@10 against the exact top 10 ([BENCHMARK.md](BENCHMARK.md#vector-query-planner-v2189)): 200k vectors, HNSW 0.46 ms p50 at recall 1.000; 2M vectors, trained IVF 14 ms p50 at recall 1.000. 2M took about 2 hours to load and 10 minutes to train IVF on one machine | Scales by adding nodes |
+| Full text | TF-IDF, BM25, BM25F, PMISparse; simple, boolean, phrase, wildcard, proximity, range and fuzzy modes; stemming for 18 languages; synonyms, stop words, typo tolerance, per-query BM25 `k1`/`b`. One index per document, covering the body and metadata values; no custom analyzers | Analyzer chains per field (tokenizers, token filters, ICU, language analyzers), per-field mappings |
+| Aggregations | Facet counts (`facetBy`, `facetScope: "all"`) and date histograms (`/v1/aggregate`) | The full aggregation framework: metrics, buckets, pipelines, nested |
+| Hybrid search | Built in: `/v1/hybrid-search` with alpha blending or RRF | Hybrid query with a search pipeline that normalises and combines scores |
+| For agents | 93 MCP tools, passages with path and line ranges, code symbols and graph, conversation memory ([AGENTS.md](AGENTS.md)) | Not built in |
+| Around it | One binary, embedded storage, web panel, Prometheus metrics | Dashboards, ingest pipelines, alerting, security plugin, a large client and tooling ecosystem |
 
-**Strategy**: MDDB as the primary store + MCP interface, OpenSearch as the search backend for scale.
+### When MDDB alone is enough
 
-### Setup OpenSearch
+- The collection fits one machine. Vectors take dimensions × 4 bytes each in
+  float32, less with int8/int4, and disk-only collections keep only the
+  quantized copy in memory. Per collection, `algorithm: "auto"` uses flat
+  below 10k vectors, HNSW up to 1M and IVF above.
+- You want BM25 with stemming, synonyms and fuzzy matching, but not your own
+  analyzers per field.
+- Counts by metadata value and date histograms are the aggregations you need.
+- The consumers are agents and RAG pipelines: MCP, passages, the code graph
+  and the context budget are what MDDB is for.
 
-```bash
+### When to add or choose OpenSearch
+
+- One index must outgrow one machine's memory or disk, or writes must scale
+  beyond one leader. MDDB has no sharding.
+- Search depends on analyzers: per-field tokenisation, ICU, n-gram or edge
+  n-gram fields, language analyzers MDDB's stemmers do not cover.
+- You need aggregations beyond counts and histograms (metrics, pipeline,
+  nested), or OpenSearch Dashboards, alerting and its security plugin.
+- The organisation already runs an OpenSearch cluster and its tooling.
+
+### Moving between them: the `/es` subset
+
+`MDDB_ES_COMPAT=true` mounts a subset of the Elasticsearch REST API under
+`/es` (v2.18.10+, [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md)): index,
+get, delete, `_bulk`, `_search`, `_count`, `_refresh`, with `match`,
+`match_phrase`, `multi_match`, `bool`, `term`, `terms`, `range`, top-level
+`knn` and `terms` aggregations. Code written against an Elasticsearch-style
+client can run against MDDB unchanged as long as it stays inside that subset;
+every clause outside it is a `400` that names it, so nothing is silently
+ignored. Mappings, analyzers, scroll and aggregations beyond `terms` are out
+of scope.
+
+CI runs the official `elasticsearch-py` against it. `opensearch-py` is not
+tested in CI. It was checked by hand against a v2.18.10 build with the
+lexical embedding provider: `opensearch-py` 3.2.0 ran `info`, `ping`,
+`index`, `helpers.bulk`, `indices.refresh`, `indices.exists`, `get`, `search`
+with `match`, with `bool` + `term` and with Elasticsearch's top-level `knn`,
+a `terms` aggregation, `count` and `delete`. OpenSearch's own k-NN syntax,
+`knn` inside `query`, is refused; write it as top-level `knn`.
+
+```python
+from opensearchpy import OpenSearch
+
+client = OpenSearch(hosts=[{"host": "localhost", "port": 11023, "url_prefix": "es"}])
+client.index(index="books", id="bear", body={"content": "Brown bears eat honey", "genre": "nature"})
+client.indices.refresh(index="books")
+client.search(index="books", body={
+    "query": {"bool": {"must": [{"match": {"content": "honey"}}],
+                       "filter": [{"term": {"genre": "nature"}}]}},
+})
+# Vector search: top-level knn, embedded with the collection's provider
+client.search(index="books", body={
+    "knn": {"field": "content", "k": 5, "num_candidates": 50,
+            "query_vector_builder": {"text_embedding": {"model_text": "what do bears eat"}}},
+})
+```
+
+An index is an MDDB collection, and `_source` fields other than the content
+become metadata. With authentication on, `/es` takes the same credentials as
+`/v1`, plus `Authorization: ApiKey <key>`.
+
+### Running both: MDDB as the source, OpenSearch as an index
+
+Keep MDDB as the store and agent interface, and copy documents into
+OpenSearch for the searches that need it. MDDB stays the source of truth;
+OpenSearch can be rebuilt from it at any time.
+
+```yaml
 # docker-compose.yml
 services:
   mddb:
@@ -431,296 +516,141 @@ services:
     volumes:
       - os-data:/usr/share/opensearch/data
 
-  opensearch-dashboards:
-    image: opensearchproject/opensearch-dashboards:2
-    ports:
-      - "5601:5601"
-    environment:
-      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
-      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
-
 volumes:
   mddb-data:
   os-data:
 ```
 
-### Create OpenSearch Index
+The security plugin is off only to keep the example short; turn it on for
+anything reachable from outside.
+
+#### Index
+
+MDDB stores `addedAt` and `updatedAt` as Unix seconds, so map them with
+`epoch_second`. Metadata values are lists of strings.
 
 ```bash
 curl -X PUT http://localhost:9200/mddb-docs -H 'Content-Type: application/json' -d '{
-  "settings": {
-    "index": {
-      "knn": true,
-      "number_of_replicas": 0
-    }
-  },
   "mappings": {
     "properties": {
       "key":        { "type": "keyword" },
       "collection": { "type": "keyword" },
       "lang":       { "type": "keyword" },
       "contentMd":  { "type": "text", "analyzer": "standard" },
-      "meta":       { "type": "object", "enabled": true },
-      "addedAt":    { "type": "date" },
-      "updatedAt":  { "type": "date" },
-      "embedding": {
-        "type": "knn_vector",
-        "dimension": 1536,
-        "method": {
-          "name": "hnsw",
-          "engine": "lucene"
-        }
-      }
+      "meta":       { "type": "object", "dynamic": true },
+      "addedAt":    { "type": "date", "format": "epoch_second" },
+      "updatedAt":  { "type": "date", "format": "epoch_second" }
     }
   }
 }'
 ```
 
-### Sync Script: MDDB → OpenSearch
+#### Full copy
+
+`POST /v1/export` with `format: "ndjson"` streams a collection;
+`GET /v1/stats` lists the collections.
 
 ```python
-"""
-Sync documents from MDDB to OpenSearch.
-Run periodically (cron) or trigger via MDDB webhook.
-"""
-import requests
 import json
+import requests
 
 MDDB_URL = "http://localhost:11023"
 OS_URL = "http://localhost:9200"
 INDEX = "mddb-docs"
 
 
-def sync_collection(collection: str):
-    """Export all docs from MDDB and index into OpenSearch."""
-
-    # Step 1: Export from MDDB as NDJSON
-    resp = requests.post(f"{MDDB_URL}/v1/export", json={
+def os_doc(collection: str, doc: dict) -> dict:
+    return {
+        "key": doc["key"],
         "collection": collection,
-        "format": "ndjson",
-    })
+        "lang": doc.get("lang", ""),
+        "contentMd": doc.get("contentMd", ""),
+        "meta": doc.get("meta", {}),
+        "addedAt": doc.get("addedAt"),
+        "updatedAt": doc.get("updatedAt"),
+    }
 
-    if resp.status_code != 200:
-        print(f"Export failed: {resp.text}")
-        return
 
-    # Step 2: Bulk index into OpenSearch
-    bulk_body = ""
-    count = 0
-
-    for line in resp.text.strip().split("\n"):
+def sync_collection(collection: str) -> None:
+    resp = requests.post(f"{MDDB_URL}/v1/export",
+                         json={"collection": collection, "format": "ndjson"}, stream=True)
+    resp.raise_for_status()
+    lines = []
+    for line in resp.iter_lines():
         if not line:
             continue
         doc = json.loads(line)
-        doc_id = f"{collection}|{doc['key']}|{doc.get('lang', 'en_us')}"
-
-        bulk_body += json.dumps({"index": {"_index": INDEX, "_id": doc_id}}) + "\n"
-        bulk_body += json.dumps({
-            "key": doc["key"],
-            "collection": collection,
-            "lang": doc.get("lang", ""),
-            "contentMd": doc.get("contentMd", ""),
-            "meta": doc.get("meta", {}),
-            "addedAt": doc.get("addedAt"),
-            "updatedAt": doc.get("updatedAt"),
-        }) + "\n"
-        count += 1
-
-    if bulk_body:
-        r = requests.post(
-            f"{OS_URL}/_bulk",
-            data=bulk_body,
-            headers={"Content-Type": "application/x-ndjson"},
-        )
-        result = r.json()
-        errors = result.get("errors", False)
-        print(f"Synced {count} docs from '{collection}' → OpenSearch (errors={errors})")
+        doc_id = f"{collection}|{doc['key']}|{doc.get('lang', '')}"
+        lines.append(json.dumps({"index": {"_index": INDEX, "_id": doc_id}}))
+        lines.append(json.dumps(os_doc(collection, doc)))
+        if len(lines) >= 2000:  # 1000 documents per bulk request
+            requests.post(f"{OS_URL}/_bulk", data="\n".join(lines) + "\n",
+                          headers={"Content-Type": "application/x-ndjson"}).raise_for_status()
+            lines = []
+    if lines:
+        requests.post(f"{OS_URL}/_bulk", data="\n".join(lines) + "\n",
+                      headers={"Content-Type": "application/x-ndjson"}).raise_for_status()
 
 
-# Sync all collections
-stats = requests.get(f"{MDDB_URL}/v1/stats").json()
-for coll in stats.get("collections", {}).keys():
-    sync_collection(coll)
+for coll in requests.get(f"{MDDB_URL}/v1/stats").json().get("collections", []):
+    sync_collection(coll["name"])
 ```
 
-### Real-Time Sync via MDDB Webhooks
+#### Changes as they happen
 
-Instead of periodic sync, use MDDB webhooks for real-time updates:
+A webhook keeps OpenSearch in step after the full copy. The events are
+`doc.added`, `doc.updated` and `doc.deleted`; omit `collection` to receive
+every collection.
 
 ```bash
-# Register webhook that fires on document add/update/delete
 curl -X POST http://localhost:11023/v1/webhooks -H 'Content-Type: application/json' -d '{
   "url": "http://sync-service:8080/mddb-webhook",
-  "events": ["doc.add", "doc.update", "doc.delete"],
-  "collections": ["*"]
+  "events": ["doc.added", "doc.updated", "doc.deleted"]
 }'
 ```
 
-Webhook handler that updates OpenSearch:
+The payload carries `event`, `collection`, `key`, `lang`, `timestamp` and, for
+an add or update, the whole `document`, so the receiver does not read it back
+from MDDB:
 
 ```python
-"""
-Webhook receiver: syncs individual document changes to OpenSearch.
-Run as a small Flask/FastAPI service.
-"""
 from fastapi import FastAPI, Request
 import requests
 
 app = FastAPI()
 OS_URL = "http://localhost:9200"
 INDEX = "mddb-docs"
-MDDB_URL = "http://localhost:11023"
 
 
 @app.post("/mddb-webhook")
 async def handle_webhook(request: Request):
-    payload = await request.json()
-    event = payload.get("event")
-    collection = payload.get("collection")
-    key = payload.get("key")
-    lang = payload.get("lang", "en_us")
-    doc_id = f"{collection}|{key}|{lang}"
-
-    if event in ("doc.add", "doc.update"):
-        # Fetch full document from MDDB
-        resp = requests.post(f"{MDDB_URL}/v1/get", json={
-            "collection": collection, "key": key, "lang": lang,
-        })
-        doc = resp.json()
-
-        # Index into OpenSearch
+    p = await request.json()
+    doc_id = f"{p['collection']}|{p['key']}|{p.get('lang', '')}"
+    if p["event"] in ("doc.added", "doc.updated") and p.get("document"):
+        doc = p["document"]
         requests.put(f"{OS_URL}/{INDEX}/_doc/{doc_id}", json={
-            "key": key,
-            "collection": collection,
-            "lang": lang,
-            "contentMd": doc.get("contentMd", ""),
-            "meta": doc.get("meta", {}),
+            "key": doc["key"], "collection": p["collection"], "lang": doc.get("lang", ""),
+            "contentMd": doc.get("contentMd", ""), "meta": doc.get("meta", {}),
+            "addedAt": doc.get("addedAt"), "updatedAt": doc.get("updatedAt"),
         })
-
-    elif event == "doc.delete":
+    elif p["event"] == "doc.deleted":
         requests.delete(f"{OS_URL}/{INDEX}/_doc/{doc_id}")
-
     return {"ok": True}
 ```
 
-### Query OpenSearch from MDDB Pipeline
+A webhook is delivered up to four times (at once, then after 1, 5 and 15
+seconds) and then dropped, so run the full copy again from time to time, or
+after the receiver was down.
 
-```python
-"""
-Hybrid search: MDDB for semantic, OpenSearch for full-text.
-Merge results for best recall.
-"""
-import requests
+#### Vectors in OpenSearch
 
-MDDB_URL = "http://localhost:11023"
-OS_URL = "http://localhost:9200"
-
-
-def hybrid_search(query: str, collection: str, top_k: int = 5) -> list:
-    # Semantic search via MDDB
-    mddb_resp = requests.post(f"{MDDB_URL}/v1/vector-search", json={
-        "collection": collection,
-        "query": query,
-        "topK": top_k,
-        "threshold": 0.6,
-        "includeContent": True,
-    })
-    vector_results = mddb_resp.json().get("results", [])
-
-    # Full-text search via OpenSearch (BM25)
-    os_resp = requests.post(f"{OS_URL}/mddb-docs/_search", json={
-        "query": {
-            "bool": {
-                "must": {"match": {"contentMd": query}},
-                "filter": {"term": {"collection": collection}},
-            }
-        },
-        "size": top_k,
-    })
-    os_hits = os_resp.json().get("hits", {}).get("hits", [])
-
-    # Merge and deduplicate
-    seen = set()
-    merged = []
-
-    for r in vector_results:
-        key = r["document"]["key"]
-        if key not in seen:
-            seen.add(key)
-            merged.append({
-                "key": key,
-                "content": r["document"].get("contentMd", ""),
-                "vector_score": r["score"],
-                "source": "mddb-vector",
-            })
-
-    for hit in os_hits:
-        key = hit["_source"]["key"]
-        if key not in seen:
-            seen.add(key)
-            merged.append({
-                "key": key,
-                "content": hit["_source"].get("contentMd", ""),
-                "bm25_score": hit["_score"],
-                "source": "opensearch-bm25",
-            })
-
-    return merged[:top_k]
-```
-
-### OpenSearch kNN Search (Vector Search at Scale)
-
-For datasets larger than ~50K documents, use OpenSearch kNN instead of MDDB's in-memory index:
-
-```python
-"""
-Use OpenSearch kNN for large-scale vector search.
-Requires syncing embeddings from MDDB to OpenSearch.
-"""
-import requests
-import numpy as np
-
-MDDB_URL = "http://localhost:11023"
-OS_URL = "http://localhost:9200"
-
-
-def get_embedding(text: str) -> list:
-    """Get embedding vector from MDDB's embedding endpoint."""
-    resp = requests.post(f"{MDDB_URL}/v1/embed", json={"text": text})
-    return resp.json().get("embedding", [])
-
-
-def opensearch_knn_search(query: str, collection: str, k: int = 10):
-    """Semantic search via OpenSearch kNN plugin."""
-    embedding = get_embedding(query)
-
-    resp = requests.post(f"{OS_URL}/mddb-docs/_search", json={
-        "size": k,
-        "query": {
-            "bool": {
-                "must": {
-                    "knn": {
-                        "embedding": {
-                            "vector": embedding,
-                            "k": k,
-                        }
-                    }
-                },
-                "filter": {"term": {"collection": collection}},
-            }
-        },
-    })
-
-    hits = resp.json().get("hits", {}).get("hits", [])
-    return [
-        {
-            "key": h["_source"]["key"],
-            "content": h["_source"].get("contentMd", ""),
-            "score": h["_score"],
-        }
-        for h in hits
-    ]
-```
+MDDB does not export its vectors or offer an endpoint that embeds text for a
+client. To search vectors in OpenSearch, embed the documents there: with an
+OpenSearch ingest pipeline and a model connected to it, or in the sync
+script, calling the same model as `MDDB_EMBEDDING_MODEL` so that both sides
+rank alike. MDDB's own hybrid search (`/v1/hybrid-search`) already fuses BM25
+and vectors in one call; merge results across the two systems only when one
+side holds documents the other does not.
 
 ---
 
@@ -1481,11 +1411,11 @@ graph TB
 
 1. **Import** — wpexporter migrates WordPress content; Docling parses PDFs/DOCX into Markdown
 2. **Store** — MDDB stores all documents with metadata in BoltDB
-3. **Index** — MDDB auto-generates embeddings; optionally syncs to OpenSearch for scale
-4. **Search** — Langflow orchestrates RAG: semantic search via MDDB, BM25 via OpenSearch
+3. **Index** — MDDB indexes full text at once and embeds in the background; a copy can go to OpenSearch when one index must outgrow one machine ([§3](#3-opensearch--mddb))
+4. **Search** — Langflow orchestrates RAG over MDDB's hybrid search (BM25 + vectors in one call); OpenSearch only where it holds what MDDB does not
 5. **Answer** — LLM generates answers from retrieved context, cites sources
 6. **Publish** — SSG renders static sites from MDDB collections, deploys to CDN
-7. **Manage** — Claude Desktop via MCP (52 tools), Panel UI, REST/gRPC APIs
+7. **Manage** — Claude Desktop via MCP (93 tools), Panel UI, REST/gRPC APIs
 
 ### When to Use What
 
@@ -1494,10 +1424,11 @@ graph TB
 | Migrate from WordPress | wpexporter → MDDB |
 | Parse PDF/DOCX to Markdown | Docling → MDDB |
 | Generate static website | MDDB → SSG |
-| < 50K docs, simple RAG | MDDB only (no OpenSearch needed) |
-| > 50K docs, enterprise search | MDDB + OpenSearch |
+| RAG, agents and search on one machine (measured to 2M vectors) | MDDB only |
+| One index larger than a machine, custom analyzers, full aggregations | MDDB + OpenSearch ([§3](#3-opensearch--mddb)) |
+| Existing Elasticsearch-style client code | MDDB `/es` subset ([ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md)) |
 | Visual workflow building | MDDB + Langflow |
-| AI agent integration | MDDB MCP (52 tools) |
+| AI agent integration | MDDB MCP (93 tools, [AGENTS.md](AGENTS.md)) |
 | AI-assisted migration | wpmcp + mddb-mcp via Claude |
 | Full production pipeline | All together |
 

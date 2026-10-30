@@ -294,10 +294,9 @@ Add MDDB MCP to your Claude Desktop or Windsurf config:
     "mddb": {
       "command": "docker",
       "args": [
-        "run", "-i", "--rm", "--network", "host",
+        "run", "-i", "--rm",
+        "-v", "mddb-data:/app/data",
         "-e", "MDDB_MCP_STDIO=true",
-        "-e", "MDDB_GRPC_ADDRESS=localhost:11024",
-        "-e", "MDDB_REST_BASE_URL=http://localhost:11023",
         "tradik/mddb:latest"
       ]
     }
@@ -305,9 +304,15 @@ Add MDDB MCP to your Claude Desktop or Windsurf config:
 }
 ```
 
+In stdio mode `mddbd` opens the database itself, so it cannot share the file
+with a server that is already running. To reach a running server, connect to
+its MCP listener over Streamable HTTP instead:
+`{"mcpServers": {"mddb": {"url": "http://localhost:9000/mcp"}}}` (see
+[LLM_CONNECTIONS.md](LLM_CONNECTIONS.md)).
+
 Now the LLM has access to these tools:
 - `semantic_search` - Find relevant documents by meaning
-- `full_text_search` - Keyword search with TF scoring
+- `full_text_search` - Keyword search (TF-IDF by default; BM25, BM25F or PMISparse on request)
 - `search_documents` - Metadata-based filtering
 - `add_document` - Store new knowledge
 - `import_url` - Import content from any URL

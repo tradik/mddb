@@ -674,10 +674,9 @@ You can use both MCP servers together -- wpmcp for reading live WordPress data, 
     "mddb": {
       "command": "docker",
       "args": [
-        "run", "-i", "--rm", "--network", "host",
+        "run", "-i", "--rm",
+        "-v", "mddb-data:/app/data",
         "-e", "MDDB_MCP_STDIO=true",
-        "-e", "MDDB_GRPC_ADDRESS=localhost:11024",
-        "-e", "MDDB_REST_BASE_URL=http://localhost:11023",
         "tradik/mddb:latest"
       ]
     }
@@ -754,12 +753,10 @@ MCP (Model Context Protocol) works with Claude Desktop and Windsurf/Cursor.
 Open WebUI supports MCP since v0.6.31 (Streamable HTTP transport), but the
 Python Tool approach described above is simpler -- zero extra components.
 
-If you want MCP with Open WebUI, use **MCPO** (proxy):
-```bash
-docker run -p 8000:8000 ghcr.io/open-webui/mcpo:main -- \
-  docker exec -i mddb-mcp /app/mddb-mcp-stdio
-```
-Then in Open WebUI: Admin -> Tools -> Add Server -> MCP (MCPO).
+If you want MCP with Open WebUI, point it at the MCP listener `mddbd` runs
+on port 9000: in Open WebUI's tool server settings, add an MCP (Streamable
+HTTP) server with the URL `http://mddb:9000/mcp`. There is no separate MCP
+service to run.
 
 ### Can I export WooCommerce products?
 Yes -- wpexportjson automatically detects WooCommerce and exports products. Use `--no-products` to skip them if not needed.
@@ -774,25 +771,17 @@ integration method.
 
 ### Claude (Desktop / Code / API)
 
-Claude supports **MCP** natively. Point it at your `mddb-mcp` instance:
+Claude supports **MCP** natively. Point it at the MCP listener of your server
+(port 9000, path `/mcp`, behind your reverse proxy), with an MCP API key:
 
-```json
-{
-  "mcpServers": {
-    "mddb": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "MDDB_MCP_STDIO=true",
-        "-e", "MDDB_REST_BASE_URL=https://mddb.your-site.com",
-        "tradik/mddb:latest"
-      ]
-    }
-  }
-}
+```bash
+claude mcp add mddb --transport http https://mddb.your-site.com/mcp \
+  --header "X-API-Key: mcp_..."
 ```
 
-Claude gets all 23 tools (search, vector search, add, list collections, etc.).
+Claude gets the 93 built-in tools, or the toolsets the key allows, plus your
+custom tools. claude.ai custom connectors sign in with OAuth 2.1 instead of a
+header ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)).
 
 ### ChatGPT (Custom GPTs / Actions)
 
@@ -823,16 +812,10 @@ curl -X POST https://mddb.your-site.com/v1/search \
   -d '{"collection":"wordpress","query":"complaint","limit":10}'
 ```
 
-For agents that support MCP over HTTP (Streamable HTTP transport), run `mddb-mcp`
-in HTTP mode:
-
-```bash
-docker run -p 8080:8080 \
-  -e MDDB_REST_BASE_URL=https://mddb.your-site.com \
-  -e MCP_TRANSPORT=http \
-  -e MCP_PORT=8080 \
-  tradik/mddb:latest
-```
+Agents that support MCP over HTTP (Streamable HTTP transport) connect to the
+MCP listener `mddbd` already runs: `https://mddb.your-site.com/mcp` when your
+proxy forwards it to port 9000 (`MDDB_MCP_ADDR`, default `:9000`). Protect it
+with `MDDB_MCP_API_KEY_ENABLED=true` before exposing it.
 
 ### YAML Custom Tools per Website (v2.3.3+)
 
@@ -899,7 +882,7 @@ custom_tools:
 **Supported actions** (3 available):
 - `semantic_search` → vector/embedding similarity search
 - `search_documents` → metadata-based search with sorting
-- `full_text_search` → keyword search with TF scoring
+- `full_text_search` → keyword search (TF-IDF by default; BM25, BM25F or PMISparse on request)
 
 **Why this matters for external AI:**
 

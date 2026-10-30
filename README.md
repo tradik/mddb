@@ -641,7 +641,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 ### Features & Guides
 - **[Vector Search](docs/EMBEDDING_PROVIDERS.md)** - Semantic search setup (OpenAI, Cohere, Voyage, Ollama)
 - **[RAG Pipeline](docs/RAG-PIPELINE.md)** - Complete RAG implementation guide
-- **[Search Algorithms](docs/SEARCH.md)** - TF-IDF, BM25, BM25F, PMISparse, Flat, HNSW, IVF, PQ, SQ, BQ
+- **[Search Algorithms](docs/SEARCH.md)** - TF-IDF, BM25, BM25F, PMISparse, Flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ, and `algorithm: "auto"`
 - **[Vector Quantization](docs/QUANTIZATION.md)** - Per-collection int8/int4 scalar quantization (4-8x compression)
 - **[Server-Sent Events](docs/SSE.md)** - Real-time document change notifications with auth and rate limiting
 - **[Search algorithms](docs/SEARCH.md)** - Inverted index, four ranking algorithms, multi-language
@@ -654,9 +654,11 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[Authentication](docs/AUTHENTICATION.md)** - JWT & API keys, RBAC, MCP OAuth 2.1
 - **[Web Panel](docs/PANEL.md)** - Admin UI guide
 - **[LLM Connections](docs/LLM_CONNECTIONS.md)** - MCP for Claude, ChatGPT, Ollama, DeepSeek
-- **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension
+- **[Using MDDB from AI Agents](docs/AGENTS.md)** - MCP toolsets and keys, agent instructions for Claude Code / Cursor / Windsurf, `autoindex`, passages and the context budget, code symbols and graph, corpus packs, confirming destructive tools
+- **[Reference Coding](docs/REFERENCE-CODING.md)** - Other projects' code as searchable references, with their licences
+- **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch (and when MDDB alone is enough), SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension, LangChain / LangGraph
 - **[Elasticsearch-compatible subset](docs/ELASTICSEARCH-COMPAT.md)** - `MDDB_ES_COMPAT=true`: unmodified Elasticsearch clients index, search (`match`, `bool`, `term`, `range`, `knn`, `highlight`, `terms` aggs) and delete under `/es`; unsupported clauses are a 400 naming them (v2.18.10+)
-- **[Bulk Import](docs/BULK-IMPORT.md)** - Load markdown folders
+- **[Bulk Import](docs/BULK-IMPORT.md)** - `mddb-cli autoindex` for a directory or repository, and the converters it uses
 - **[Blog](blog/)** - Release announcements and engineering notes
 
 ### Operations

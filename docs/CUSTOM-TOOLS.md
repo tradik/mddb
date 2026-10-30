@@ -11,7 +11,7 @@ Define website-specific MCP tools in YAML that simplify AI interactions with you
 
 ## Overview
 
-By default, `mddbd` exposes 54+ built-in MCP tools (add_document, search_documents, semantic_search, hybrid_search, list_automation, etc.) with tool annotations per MCP 2025-11-25 and 2026-07-28. Custom tools let you create **domain-specific wrappers** with preconfigured defaults — so the AI sees `search_faq(query)` instead of `semantic_search(collection, query, topK, threshold, ...)`.
+By default, `mddbd` exposes 93 built-in MCP tools (add_document, search_documents, semantic_search, hybrid_search, list_automation, etc.) with tool annotations per MCP 2025-11-25 and 2026-07-28. Custom tools let you create **domain-specific wrappers** with preconfigured defaults — so the AI sees `search_faq(query)` instead of `semantic_search(collection, query, topK, threshold, ...)`.
 
 Custom tools are defined in a YAML file under the `custom_tools:` key. Point `mddbd` to the file via `MDDB_MCP_CONFIG=/path/to/config.yaml`. They are registered alongside built-in tools and work on all transports (stdio, Streamable HTTP, and legacy SSE).
 
@@ -74,7 +74,7 @@ custom_tools:
 |--------|---------|----------|
 | `semantic_search` | `toolSemanticSearch` → `/v1/vector-search` | Find documents by meaning |
 | `search_documents` | `toolSearchDocuments` → `/v1/search` | Filter/sort by metadata |
-| `full_text_search` | `toolFTSSearch` → `/v1/fts` | Keyword search with TF scoring |
+| `full_text_search` | `toolFTSSearch` → `/v1/fts` | Keyword search: TF-IDF by default, or BM25, BM25F, PMISparse |
 | `hybrid_search` | `hybrid_search` → `/v1/hybrid-search` | (v2.18.1) Keyword + meaning, the "start here when unsure" tool |
 | `code_graph` | `code_graph` → `/v1/code-graph` | (v2.18.1) What depends on a file or symbol, without the whole built-in catalogue |
 | `aggregate` | `aggregate` → `/v1/aggregate` | (v2.18.1) Counts per metadata value, for dashboards |

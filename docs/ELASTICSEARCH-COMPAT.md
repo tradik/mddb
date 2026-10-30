@@ -216,3 +216,15 @@ make test-es-compat
 The Go tests (`services/mddbd/es_*_test.go`) replay the requests the client
 sends — the compatibility media types, `PUT /_bulk` with NDJSON, the `ApiKey`
 header — through the full middleware chain, in both storage layouts.
+
+### opensearch-py
+
+`opensearch-py` is not in CI. It was run by hand (3.2.0, against a v2.18.10
+build with `MDDB_ES_COMPAT=true` and the lexical provider), with
+`OpenSearch(hosts=[{"host": "localhost", "port": 11023, "url_prefix": "es"}])`.
+`info`, `ping`, `index`, `helpers.bulk`, `indices.refresh`, `indices.exists`,
+`get`, `search` with `match`, with `bool` + `term` and with a top-level `knn`
+using `query_vector_builder`, a `terms` aggregation, `count` and `delete` all
+worked. OpenSearch's k-NN plugin syntax, `knn` inside `query`, is refused
+with a `400` naming it: write it as a top-level `knn` instead. Moving from
+OpenSearch is covered in [INTEGRATIONS.md](INTEGRATIONS.md#3-opensearch--mddb).

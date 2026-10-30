@@ -25,6 +25,8 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 ### Documentation Index
 
 - **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
+- **[Using MDDB from AI Agents](AGENTS.md)** - MCP toolsets and keys, agent instructions, `autoindex`, passages, code symbols and graph, corpus packs, confirming destructive tools
+- **[MCP Server](MCP.md)** - Transports, API keys, OAuth 2.1, toolsets and the built-in tool catalogue
 - **[API Documentation](API.md)** - Complete HTTP/JSON API reference
 - **[OpenAPI specification](/docs/api/openapi.yaml)** - Machine-readable API spec (OpenAPI 3.0)
 - **[REST API reference](/docs/api/reference/)** - every endpoint and schema, with a Try it console
@@ -74,6 +76,11 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 1. Understand the [Architecture](ARCHITECTURE.md)
 2. Review [API Documentation](API.md)
 3. Check [Usage Examples](EXAMPLES.md) for integration patterns
+
+### For AI Agents
+1. Connect and pick toolsets: [Using MDDB from AI Agents](AGENTS.md)
+2. Configure your client: [LLM Connections](LLM_CONNECTIONS.md)
+3. Index a repository: [`mddb-cli autoindex`](BULK-IMPORT.md#autoindex-one-command-v2188)
 
 ### For DevOps
 1. Follow [Deployment Guide](DEPLOYMENT.md)

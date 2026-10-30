@@ -260,7 +260,7 @@ MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVI
 
 | Feature | Description |
 |---------|-------------|
-| **Tool Annotations** | All 52+ tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
+| **Tool Annotations** | All 93 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
 | **Structured Output** | `outputSchema` on key tools (stats, search, classification, aggregation) for client-side validation |
 | **5 Built-in Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
@@ -327,48 +327,42 @@ Use the `mddbd` binary directly:
 }
 ```
 
-### Available MCP Tools (54+)
+### Available MCP Tools (93)
 
-Once connected, your LLM agent has access to all built-in tools (with annotations for auto-approve):
+Once connected, your LLM agent has access to all built-in tools (with annotations for auto-approve). They come in eleven toolsets; `MDDB_MCP_TOOLSETS` or a per-key `toolsets` list exposes only some of them ([MCP.md](MCP.md#toolsets-v2188)):
 
-**Document Management**
-`add_document` `update_document` `delete_document` `search_documents` `get_document_meta` `add_documents_batch` `delete_documents_batch`
+**search**
+`search_documents` `aggregate` `semantic_search` `full_text_search` `hybrid_search` `cross_search` `autocomplete` `fts_languages` `search_advisor` `get_indexing_status` `run_eval` `add_eval_query` `get_gain` `find_duplicates` `classify_document` `get_meta_keys`
 
-**Search**
-`semantic_search` `full_text_search` `hybrid_search` `cross_search`
+**code**
+`code_graph` `code_symbol` `reference_search` `reference_symbol` `reference_examples` `reference_dependencies`
 
-**Vector**
-`vector_reindex` `vector_stats`
+**documents**
+`add_document` `update_document` `delete_document` `get_document_meta` `set_ttl` `add_documents_batch` `delete_documents_batch` `export_documents` `list_revisions` `restore_revision` `delete_where` `update_where` `set_ttl_where`
 
-**Collections**
-`delete_collection` `get_collection_config` `set_collection_config` `list_collection_configs`
+**ingest**
+`import_url` `upload_file` `ingest_documents` `bulk_ingest_submit` `bulk_ingest_status` `bulk_ingest_list` `bulk_ingest_cancel`
 
-**Analysis**
-`classify_document` `find_duplicates` `get_checksum`
+**memory**
+`memory_start_session` `memory_add_message` `memory_recall` `memory_summarize` `memory_list_sessions` `memory_session_history`
 
-**Revisions**
-`list_revisions` `restore_revision` `truncate_revisions`
-
-**Upload & Import**
-`upload_file` `import_url` `ingest_documents`
-
-**Export & Backup**
-`export_documents` `create_backup` `restore_backup`
-
-**Full-Text Search Config**
-`list_synonyms` `add_synonym` `delete_synonym` `list_stopwords` `add_stopwords` `delete_stopwords`
-
-**Schemas**
+**schema**
 `set_schema` `get_schema` `delete_schema` `list_schemas` `validate_document`
 
-**Webhooks**
-`register_webhook` `list_webhooks` `delete_webhook`
+**admin**
+`get_stats` `vector_stats` `vector_reindex` `fts_reindex` `create_backup` `restore_backup` `delete_collection` `truncate_revisions` `get_checksum` `list_synonyms` `add_synonym` `delete_synonym` `list_stopwords` `add_stopwords` `delete_stopwords` `get_collection_config` `set_collection_config` `list_collection_configs` `list_curation_rules` `create_curation_rule` `update_curation_rule` `delete_curation_rule`
 
-**Automation**
+**geo**
+`geo_search` `geo_within` `geo_polygon` `geo_stats` `geo_encode` `geo_decode`
+
+**automation**
 `list_automation` `create_automation` `get_automation` `update_automation` `delete_automation` `test_automation` `get_automation_logs`
 
-**System**
-`get_stats` `set_ttl` `get_meta_keys`
+**webhooks**
+`register_webhook` `list_webhooks` `delete_webhook`
+
+**wordpress**
+`wordpress_publish` `wordpress_set_status`
 
 ## ChatGPT (Custom GPT)
 
