@@ -76,7 +76,11 @@ type gainSize struct{ Returned, Full int }
 
 // GainRecorder holds counts not yet written, by day (UTC, "2006-01-02").
 type GainRecorder struct {
-	mu      sync.Mutex
+	mu sync.Mutex
+	// flushMu runs one Flush at a time. A flush takes the pending counts and
+	// puts them back if the write fails; a second flush in between found
+	// nothing pending, so Stop returned nil on a write that failed (#381).
+	flushMu sync.Mutex
 	pending map[string]*GainCounters
 	// lifetime counts since the process started, for /metrics.
 	lifetime GainCounters
@@ -84,6 +88,9 @@ type GainRecorder struct {
 	now      func() time.Time
 	stop     chan struct{}
 	stopped  sync.Once
+	// afterTickFlush, when set before Start, sees each ticker flush's result.
+	// Tests wait on it instead of sleeping; nil in production.
+	afterTickFlush func(error)
 }
 
 // NewGainRecorder writes to the database db returns, which follows restores.
@@ -146,8 +153,10 @@ func (g *GainRecorder) Lifetime() metrics.RetrievalGainView {
 }
 
 // Flush adds pending counts to the stored days. On failure the counts are
-// kept for the next flush.
+// kept for the next flush. Flushes run one at a time (flushMu).
 func (g *GainRecorder) Flush() error {
+	g.flushMu.Lock()
+	defer g.flushMu.Unlock()
 	g.mu.Lock()
 	pending := g.pending
 	g.pending = map[string]*GainCounters{}
@@ -206,8 +215,12 @@ func (g *GainRecorder) Start() {
 			case <-g.stop:
 				return
 			case <-t.C:
-				if err := g.Flush(); err != nil {
+				err := g.Flush()
+				if err != nil {
 					slog.Warn("gain counters not stored; kept for the next try", "err", err)
+				}
+				if g.afterTickFlush != nil {
+					g.afterTickFlush(err)
 				}
 			}
 		}

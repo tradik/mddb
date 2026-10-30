@@ -340,7 +340,8 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 |-------|------|-------------|
 | `tradik/mddb:latest` | ~43MB | Database server with MCP built-in (Alpine) |
 | `tradik/mddb:panel` | ~88MB | Web admin panel (Node Alpine) |
-| `tradik/mddb:cli` | ~8MB | CLI client (Alpine) |
+
+There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.deb`, `.rpm`), Homebrew (`brew install tradik/tap/mddb-cli`) and snap (`snap install mddb-cli`). To run it in a container, build it from the repository root: `docker build -f services/mddb-cli/Dockerfile -t mddb-cli .`
 
 ### System Packages
 

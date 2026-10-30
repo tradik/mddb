@@ -100,14 +100,43 @@ func TestGain_FlushFailureKeepsCounts(t *testing.T) {
 	}
 }
 
+// tickFlushes makes g report each ticker flush on the returned channel, so a
+// test waits for a flush instead of sleeping (#381). A full channel drops the
+// report: the flusher never blocks on a test that stopped reading.
+func tickFlushes(g *GainRecorder) <-chan error {
+	ch := make(chan error, 1)
+	g.afterTickFlush = func(err error) {
+		select {
+		case ch <- err:
+		default:
+		}
+	}
+	return ch
+}
+
+// nextTickFlush waits for the ticker's next flush. The timeout only turns a
+// hang into a failure; a passing run never reaches it.
+func nextTickFlush(t *testing.T, ch <-chan error) error {
+	t.Helper()
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(10 * time.Second):
+		t.Fatal("the ticker never flushed")
+		return nil
+	}
+}
+
 func TestGain_FlusherAndWindow(t *testing.T) {
 	s, cleanup := gainServer(t)
 	defer cleanup()
 	defer func(d time.Duration) { gainFlushEvery = d }(gainFlushEvery)
-	gainFlushEvery = 5 * time.Millisecond
+	gainFlushEvery = time.Millisecond
+	flushes := tickFlushes(s.Gain)
 	s.Gain.Start()
 	s.Gain.Search(gainKind{Type: "fts"})
-	// The ticker writes it without a Stop.
+	// The ticker writes it without a Stop. A tick may come before the search,
+	// so wait for the flush that stored it.
 	stored := func() int64 {
 		var n int64
 		_ = s.DB.View(func(tx *bolt.Tx) error {
@@ -118,21 +147,24 @@ func TestGain_FlusherAndWindow(t *testing.T) {
 		})
 		return n
 	}
-	for deadline := time.Now().Add(2 * time.Second); stored() != 1; time.Sleep(5 * time.Millisecond) {
-		if time.Now().After(deadline) {
-			t.Fatal("the ticker never flushed")
+	for stored() != 1 {
+		if err := nextTickFlush(t, flushes); err != nil {
+			t.Fatal(err)
 		}
 	}
-	// A failing flush on the ticker is logged and kept.
-	closed, _ := bolt.Open(filepath.Join(t.TempDir(), "c.db"), 0o600, nil)
-	_ = closed.Close()
 	if err := s.Gain.Stop(); err != nil {
 		t.Fatal(err)
 	}
+	// A failing flush on the ticker is logged and kept, so Stop reports it.
+	closed, _ := bolt.Open(filepath.Join(t.TempDir(), "c.db"), 0o600, nil)
+	_ = closed.Close()
 	failing := NewGainRecorder(func() *bolt.DB { return closed })
-	failing.Start()
+	failed := tickFlushes(failing)
 	failing.Search(gainKind{Type: "fts"})
-	time.Sleep(30 * time.Millisecond)
+	failing.Start()
+	if err := nextTickFlush(t, failed); err == nil {
+		t.Fatal("a tick flush on a closed database reports it")
+	}
 	if err := failing.Stop(); err == nil {
 		t.Fatal("stop on a closed database reports it")
 	}

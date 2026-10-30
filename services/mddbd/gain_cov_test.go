@@ -1,7 +1,9 @@
 package main
 
 import (
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,4 +51,49 @@ func TestCovHGainFlushKeepsCountsWhenAWriteFails(t *testing.T) {
 		}
 		return nil
 	})
+}
+
+// TestGain_StopWaitsForAFlushInProgress is #381's root cause. Flush takes the
+// pending counts before it writes and puts them back when the write fails. A
+// Stop whose flush ran in between saw nothing pending and returned nil, so
+// "stop on a closed database reports it" failed whenever the ticker was
+// mid-flush. Flushes now run one at a time: Stop's flush waits, then sees the
+// counts the failed flush put back.
+func TestGain_StopWaitsForAFlushInProgress(t *testing.T) {
+	closed, err := bolt.Open(filepath.Join(t.TempDir(), "c.db"), 0o600, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = closed.Close()
+	inWrite, release := make(chan struct{}), make(chan struct{})
+	var calls atomic.Int32
+	g := NewGainRecorder(func() *bolt.DB {
+		if calls.Add(1) == 1 { // the first flush holds its write open
+			close(inWrite)
+			<-release
+		}
+		return closed
+	})
+	g.Search(gainKind{Type: "fts"})
+	first := make(chan error, 1)
+	go func() { first <- g.Flush() }()
+	<-inWrite // the first flush has taken the counts and is writing them
+
+	// Without the lock, a flush now finds nothing pending and returns nil.
+	if g.flushMu.TryLock() {
+		g.flushMu.Unlock()
+		t.Fatal("a flush is writing, yet another flush could start")
+	}
+	stopped := make(chan error, 1)
+	go func() { stopped <- g.Stop() }()
+	close(release)
+	if err := <-first; err == nil {
+		t.Fatal("the first flush wrote to a closed database")
+	}
+	if err := <-stopped; err == nil {
+		t.Fatal("Stop lost the counts a failed flush put back")
+	}
+	if n := calls.Load(); n != 2 {
+		t.Fatalf("db() called %d times, want 2 (one per flush)", n)
+	}
 }
