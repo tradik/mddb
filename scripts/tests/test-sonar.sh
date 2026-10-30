@@ -180,6 +180,13 @@ if [[ ${rc} -ne 0 && "${out}" == *"outside the repository and the working direct
 out="$(python3 "${PATHS}" go "${OUTSIDE}" "${OUTSIDE}/p.out" "${TMP}/q.out" 2>&1)" && rc=0 || rc=$?
 if [[ ${rc} -ne 0 && "${out}" == *"outside the repository"* ]]; then ok "sonar-coverage-paths refuses a root outside"; else bad "paths outside: rc=${rc} ${out}"; fi
 
+# sonar-local.sh --dry-run prints the plan without a token: the same report
+# paths and scanner arguments the CI job uses, and a pull-request or branch target.
+out="$(env -u SONAR_TOKEN bash "${REPO_ROOT}/scripts/sonar-local.sh" --dry-run 2>&1)" && rc=0 || rc=$?
+if [[ ${rc} -eq 0 && "${out}" == *"sonar.qualitygate.wait=true"* && "${out}" == *"go-mddbd.out"* && "${out}" == *"panel.lcov"* && "${out}" == *"langchain.xml"* ]]; then ok "sonar-local --dry-run plans every report and waits for the gate"; else bad "sonar-local dry run: rc=${rc} ${out:0:300}"; fi
+out="$(env -u SONAR_TOKEN bash "${REPO_ROOT}/scripts/sonar-local.sh" 2>&1)" && rc=0 || rc=$?
+if [[ ${rc} -eq 2 && "${out}" == *"SONAR_TOKEN is not set"* ]]; then ok "sonar-local refuses to run without SONAR_TOKEN"; else bad "sonar-local without token: rc=${rc} ${out}"; fi
+
 echo
 echo "passed: ${PASS}, failed: ${FAIL}"
 [[ "${FAIL}" -eq 0 ]]

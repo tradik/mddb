@@ -75,6 +75,19 @@ make check-sonar-exclusions   # the two lists are in step
 make test-sonar               # the scan helpers' own tests
 ```
 
+Run the scan locally before pushing a fix for a Sonar finding; a red gate found
+in CI costs a full Tests run. `make sonar-local` produces the same coverage
+reports, rewrites them as the CI job does and runs the scanner in Docker
+against SonarCloud, as the open pull request for your branch (or as the
+branch). The exit status is the quality gate's. It needs Docker and a
+SonarCloud token in your environment:
+
+```bash
+export SONAR_TOKEN=…            # SonarCloud → My Account → Security
+make sonar-local                # ~10 min: the Go server's suite is most of it
+GO_COVERPROFILE=coverage.out make sonar-local   # reuse a profile you already have
+```
+
 ## Development Workflow
 
 1. **Fork** the repository
