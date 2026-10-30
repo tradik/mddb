@@ -33,9 +33,6 @@ func (m *recordingMux) HandleFunc(p string, h func(http.ResponseWriter, *http.Re
 	m.Handle(p, http.HandlerFunc(h))
 }
 
-// opsPending are rules for routes another change of the same release adds.
-var opsPending = map[string]bool{"/v1/admin/diagnose": true} // OPS-025
-
 // allRoutes registers every route the server can serve, every optional
 // subsystem on, on a recorder.
 func allRoutes(t *testing.T) map[string]http.Handler {
@@ -64,7 +61,7 @@ func TestEveryHTTPRouteIsClassified(t *testing.T) {
 		}
 	}
 	for p := range httpAccessRules {
-		if _, ok := routes[p]; !ok && !opsPending[p] {
+		if _, ok := routes[p]; !ok {
 			t.Errorf("httpAccessRules names %s, which no listener registers", p)
 		}
 	}
