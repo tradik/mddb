@@ -73,7 +73,8 @@ type PassagesResponse struct {
 	Indexing         *IndexWaitResult `json:"indexing,omitempty"`
 	// ImageHits are the images the query matched by their picture, with
 	// includeImages and a provider that embeds images (RAG-010).
-	ImageHits []ImageRef `json:"imageHits,omitempty"`
+	ImageHits   []ImageRef `json:"imageHits,omitempty"`
+	LimitReport            // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // ResolveFormat applies the precedence rule to the result format: the

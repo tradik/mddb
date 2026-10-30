@@ -8,10 +8,11 @@ import (
 
 // AutocompleteResponse is returned by the HTTP handler.
 type AutocompleteResponse struct {
-	Items []fts.AutocompleteItem `json:"items"`
-	Total int                    `json:"total"`
-	Query string                 `json:"query"`
-	Field string                 `json:"field,omitempty"`
+	Items       []fts.AutocompleteItem `json:"items"`
+	Total       int                    `json:"total"`
+	Query       string                 `json:"query"`
+	Field       string                 `json:"field,omitempty"`
+	LimitReport                        // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // handleAutocomplete serves GET /v1/autocomplete?collection=X&q=mar&field=Y&topN=10.
@@ -41,7 +42,7 @@ func (s *Server) handleAutocomplete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	items, err := s.FTSIndex.Autocomplete(collection, query, field, topN)
+	resp, err := s.autocomplete(collection, query, field, topN)
 	if err != nil {
 		bad(w, err)
 		return
@@ -49,12 +50,19 @@ func (s *Server) handleAutocomplete(w http.ResponseWriter, r *http.Request) {
 	if s.Metrics != nil {
 		s.Metrics.IncOp("autocomplete", field)
 	}
-	ok(w, AutocompleteResponse{
-		Items: items,
-		Total: len(items),
-		Query: query,
-		Field: field,
-	})
+	ok(w, resp)
+}
+
+// autocomplete is the prefix lookup behind GET /v1/autocomplete and the MCP
+// autocomplete tool. topN is capped like every search limit (#368), and the
+// response says when it was.
+func (s *Server) autocomplete(collection, query, field string, topN int) (AutocompleteResponse, error) {
+	topN, limitReport := s.CapLimit(collection, topN, 0)
+	items, err := s.FTSIndex.Autocomplete(collection, query, field, topN)
+	if err != nil {
+		return AutocompleteResponse{}, err
+	}
+	return AutocompleteResponse{Items: items, Total: len(items), Query: query, Field: field, LimitReport: limitReport}, nil
 }
 
 // parseIntParam reads a URL query parameter as int with a fallback. Used for

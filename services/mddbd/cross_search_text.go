@@ -145,8 +145,9 @@ func (s *Server) oneCollectionText(ctx context.Context, coll string, p crossText
 // respondCrossText answers a REST cross-search of type fts or hybrid.
 func (s *Server) respondCrossText(w http.ResponseWriter, r *http.Request, req CrossSearchRequest) {
 	waited := s.waitForIndexAll(r.Context(), req.TargetCollections, req.IndexWait)
+	topK, limitReport := s.crossTopK(req.TargetCollections, req.TopK)
 	items := s.crossTextItems(r.Context(), crossTextParams{SearchType: req.SearchType, Query: req.Query,
-		Targets: req.TargetCollections, TopK: crossTopK(req.TopK), FilterMeta: req.FilterMeta, Filter: req.Filter,
+		Targets: req.TargetCollections, TopK: topK, FilterMeta: req.FilterMeta, Filter: req.Filter,
 		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
 	if s.Metrics != nil {
 		s.Metrics.IncOp("cross_search", req.SearchType)
@@ -155,18 +156,20 @@ func (s *Server) respondCrossText(w http.ResponseWriter, r *http.Request, req Cr
 	if req.wantsPassages() {
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
 		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
+		p.LimitReport = limitReport
 		ok(w, p)
 		return
 	}
 	s.crossImages(items, req.IncludeImages) // RAG-010
 	ok(w, CrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
-		Algorithm: req.SearchType, Indexing: waited})
+		Algorithm: req.SearchType, Indexing: waited, LimitReport: limitReport})
 }
 
-// crossTopK is the result count of a cross-search: 10 unless asked.
-func crossTopK(n int) int {
+// crossTopK is the result count of a cross-search: 10 unless asked, under
+// the strictest target's cap (#368).
+func (s *Server) crossTopK(targets []string, n int) (int, LimitReport) {
 	if n <= 0 {
-		return 10
+		n = 10
 	}
-	return n
+	return s.capCrossLimit(targets, n)
 }

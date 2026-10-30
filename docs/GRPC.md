@@ -203,6 +203,25 @@ whose IVF, PQ, OPQ, SQ and SQ4 indexes are still training after a load
 those algorithms on such a collection answers `UNAVAILABLE` naming it; flat and
 HNSW answer already.
 
+Every search RPC's result count is capped by `MDDB_SEARCH_MAX_LIMIT` (default
+1000) and the collection's `RetrievalProfileProto.max_top_k` (17), which can
+only lower the server value (#368). When the cap lowered a request's
+`limit` / `top_k`, the response says so in two new fields:
+
+| Response | `limit_capped` | `limit` |
+|---|---|---|
+| `FTSResponse` | 9 | 10 |
+| `SearchResponse` | 3 | 4 |
+| `VectorSearchResponse` | 11 | 12 |
+| `HybridSearchResponse` | 12 | 13 |
+| `CrossSearchResponse` | 11 | 12 |
+| `CodeSymbolResponse` | 10 | 11 |
+| `GeoSearchResponse` | 5 | 6 |
+
+`limit` is the count used and is set only with `limit_capped`; a request under
+the cap leaves both at their zero values, so its response is unchanged. See
+[SEARCH.md](SEARCH.md#result-limits-v21810).
+
 ### New in v2.18.9
 
 The query planner (SRCH-013) is available over gRPC. `VectorSearch` and

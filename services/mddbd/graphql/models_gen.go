@@ -103,6 +103,10 @@ type CodeSymbol struct {
 	Tests       []*Passage `json:"tests"`
 	Siblings    []*Passage `json:"siblings"`
 	Truncated   bool       `json:"truncated"`
+	// True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise.
+	LimitCapped *bool `json:"limitCapped,omitempty"`
+	// The limit used; set only when limitCapped.
+	Limit *int `json:"limit,omitempty"`
 }
 
 type CodeSymbolInput struct {
@@ -149,6 +153,10 @@ type DocumentConnection struct {
 	Edges      []*DocumentEdge `json:"edges"`
 	PageInfo   *PageInfo       `json:"pageInfo"`
 	TotalCount int             `json:"totalCount"`
+	// True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise.
+	LimitCapped *bool `json:"limitCapped,omitempty"`
+	// The limit used; set only when limitCapped.
+	Limit *int `json:"limit,omitempty"`
 }
 
 type DocumentEdge struct {
@@ -172,6 +180,10 @@ type FTSResponse struct {
 	Total   int          `json:"total"`
 	// Set instead of results when the input asked for format passages (AGT-002).
 	Passages []*Passage `json:"passages,omitempty"`
+	// True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise.
+	LimitCapped *bool `json:"limitCapped,omitempty"`
+	// The limit used; set only when limitCapped.
+	Limit *int `json:"limit,omitempty"`
 }
 
 type FTSResult struct {
@@ -533,6 +545,10 @@ type VectorSearchResponse struct {
 	Plan *SearchPlan `json:"plan,omitempty"`
 	// Images the query matched by their picture, with includeImages and a provider that embeds images (RAG-010).
 	ImageHits []*ImageRef `json:"imageHits,omitempty"`
+	// True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise.
+	LimitCapped *bool `json:"limitCapped,omitempty"`
+	// The limit used; set only when limitCapped.
+	Limit *int `json:"limit,omitempty"`
 }
 
 type VectorSearchResult struct {

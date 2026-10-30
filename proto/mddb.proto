@@ -323,6 +323,8 @@ message SearchRequest {
 message SearchResponse {
   repeated Document documents = 1;
   int32 total = 2;
+  bool limit_capped = 3;                        // (v2.18.10, #368) the requested limit was above the server's cap
+  int32 limit = 4;                              // (v2.18.10, #368) the limit used, set when limit_capped
 }
 
 // Export request
@@ -539,6 +541,8 @@ message VectorSearchResponse {
   bool context_truncated = 8;
   SearchPlan plan = 9;                           // (v2.18.9, SRCH-013) set when the request had explain
   repeated ImageRef image_hits = 10;             // (v2.18.9, RAG-010) images the query matched by their picture
+  bool limit_capped = 11;                        // (v2.18.10, #368) the requested limit was above the server's cap
+  int32 limit = 12;                              // (v2.18.10, #368) the limit used, set when limit_capped
 }
 
 // How a vector search ran and why (v2.18.9, SRCH-013), returned with explain.
@@ -664,6 +668,8 @@ message FTSResponse {
   map<string, FacetBucketList> facets = 6;       // (v2.9.14+) per-key facet counts
   repeated Passage passages = 7;                 // (v2.18.8) set when format is "passages"
   bool context_truncated = 8;                    // (v2.18.8) the collection's context budget dropped results
+  bool limit_capped = 9;                        // (v2.18.10, #368) the requested limit was above the server's cap
+  int32 limit = 10;                              // (v2.18.10, #368) the limit used, set when limit_capped
 }
 
 // --- FTS reindex ---
@@ -760,6 +766,8 @@ message HybridSearchResponse {
   bool context_truncated = 9;
   SearchPlan plan = 10;                          // (v2.18.9, SRCH-013) the vector half's plan, with explain
   repeated ImageRef image_hits = 11;             // (v2.18.9, RAG-010) images the query matched by their picture
+  bool limit_capped = 12;                        // (v2.18.10, #368) the requested limit was above the server's cap
+  int32 limit = 13;                              // (v2.18.10, #368) the limit used, set when limit_capped
 }
 
 // --- Webhooks ---
@@ -1195,6 +1203,7 @@ message RetrievalProfileProto {
   string vector_algorithm = 14;     // (SRCH-013) default vector index; "auto" = the query planner chooses
   string summary_mode = 15;         // (RAG-009) client-written summaries on a search: off (default), blend, expand
   optional double summary_weight = 16; // (RAG-009) BM25F weight of meta.summary when summary_mode is not off, 0-10; unset = 2.0
+  int32 max_top_k = 17;             // (v2.18.10, #368) most results one search returns; lowers MDDB_SEARCH_MAX_LIMIT, never raises it; 0 = unset
 }
 
 // NOTE (RAG-001): this message knows only 6 of CollectionConfig's ~15 fields.
@@ -1421,6 +1430,8 @@ message CrossSearchResponse {
   repeated Passage passages = 8;                 // (v2.18.8)
   IndexWaitResult indexing = 9;                  // (v2.18.8)
   SearchPlan plan = 10;                          // (v2.18.9, SRCH-013) set when the request had explain
+  bool limit_capped = 11;                        // (v2.18.10, #368) the requested limit was above the server's cap
+  int32 limit = 12;                              // (v2.18.10, #368) the limit used, set when limit_capped
 }
 
 // --- Find Duplicates ---
@@ -1733,6 +1744,8 @@ message GeoSearchResponse {
   int32 total = 2;
   double radius_meters = 3;
   string algorithm = 4;
+  bool limit_capped = 5;                        // (v2.18.10, #368) the requested limit was above the server's cap
+  int32 limit = 6;                              // (v2.18.10, #368) the limit used, set when limit_capped
 }
 
 // GeoWithinRequest: find docs inside the axis-aligned bbox
@@ -2003,6 +2016,8 @@ message CodeSymbolResponse {
   repeated Passage tests = 7;
   repeated Passage siblings = 8;
   bool truncated = 9;
+  bool limit_capped = 10;                        // (v2.18.10, #368) the requested limit was above the server's cap
+  int32 limit = 11;                              // (v2.18.10, #368) the limit used, set when limit_capped
 }
 
 // ---- v2.18.8: retrieval evaluation (SRCH-019) ----

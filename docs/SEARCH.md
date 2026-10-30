@@ -592,6 +592,69 @@ curl -X POST http://localhost:11023/v1/fts \
 }
 ```
 
+## Result Limits (v2.18.10+)
+
+Every search returns at most `MDDB_SEARCH_MAX_LIMIT` results (default
+**1000**), whatever the request asks for. One public `POST /v1/fts` with
+`"limit": 100000` used to return 21 MB; a rate limit counts requests, not bytes,
+so the cap is the server's own guard.
+
+The cap applies to every endpoint that takes a result count — `limit`, `topK`
+or `topN` — on REST, MCP, gRPC and GraphQL alike, through one function:
+
+| Endpoint | Field | Default | Own bound |
+|----------|-------|---------|-----------|
+| `POST /v1/fts`, MCP `full_text_search`, gRPC `FTS`, GraphQL `fts` | `limit` | 50 | — |
+| `POST /v1/search`, MCP `search_documents`, gRPC `Search`, GraphQL `search` | `limit` | 50 (GraphQL 100) | — |
+| `GET /v1/autocomplete`, MCP `autocomplete` | `topN` | 10 | — |
+| `POST /v1/vector-search`, MCP `semantic_search`, gRPC `VectorSearch`, GraphQL `vectorSearch` | `topK` | 5 | — |
+| `POST /v1/hybrid-search`, MCP `hybrid_search`, gRPC `HybridSearch` | `topK` | 10 | — |
+| `POST /v1/cross-search`, MCP `cross_search`, gRPC `CrossSearch` | `topK` | 10 | the strictest target's `maxTopK` |
+| `POST /v1/symbol`, MCP `code_symbol`, gRPC `CodeSymbol`, GraphQL `codeSymbol` | `limit` per relation | 20 | 200 |
+| `POST /v1/geo-search`, MCP `geo_search`, gRPC `GeoSearch` | `topK` | 10 | — |
+| `POST /v1/memory/recall` | `topK` | 10 | — |
+| `POST /v1/eval` (and its MCP/gRPC forms) | `k` | 10 | 100 |
+
+A collection can set a lower ceiling of its own in its retrieval profile:
+
+```json
+{ "retrieval": { "topK": 20, "maxTopK": 100 } }
+```
+
+The effective cap is the smallest of `MDDB_SEARCH_MAX_LIMIT`, the collection's
+`maxTopK` and the endpoint's own bound. **`maxTopK` only lowers the cap.** The
+server value is the operator's safety limit for a public deployment; a
+collection config can be written by anyone with config write access on that
+collection, so a `maxTopK` above the server value has no effect. A profile's
+`topK` (its default) cannot exceed its own `maxTopK`.
+
+When the cap lowered a request's limit, the response says so:
+
+```json
+{ "results": [ ... ], "total": 1000, "limit": 1000, "limitCapped": true }
+```
+
+- REST JSON bodies (including `format: "passages"`) carry `limit` and
+  `limitCapped`. `POST /v1/search` answers a bare array, so it sends the
+  headers `X-Limit-Capped: true` and `X-Limit: 1000` instead.
+- gRPC responses have `limit_capped` and `limit`.
+- MCP tool results carry both fields in the JSON text and also as
+  `structuredContent: {"limitCapped": true, "limit": 1000}`.
+- GraphQL `fts`, `vectorSearch`, `search` and `codeSymbol` have `limitCapped`
+  and `limit`; both are `null` when nothing was capped.
+
+A request under the cap gets exactly the answer it always got: neither field
+appears. A default above the cap (for example the FTS default of 50 with
+`MDDB_SEARCH_MAX_LIMIT=20`) is capped and reported the same way.
+
+Response size has two other levers, bounded the same way in v2.18.10:
+
+- `facetMaxValues` (full-text search) never exceeds the cap; `0`, which used
+  to mean "every value", now means the cap.
+- Highlights: `maxHighlights` is at most 20 fragments per result and
+  `fragmentSize` at most 1000 characters. The defaults (3 and 150) are
+  unchanged.
+
 ## Result Caching
 
 Agents repeat identical queries in loops, and a repeated search redoes the full

@@ -69,10 +69,20 @@ func projectSearchResult(resp *MCPSearchResponse, fields []string, includeConten
 	for i := range resp.Documents {
 		docs[i] = projectMCPDocument(resp.Documents[i], fields, includeContent)
 	}
-	return map[string]interface{}{
+	return withLimitReport(map[string]interface{}{
 		"documents": docs,
 		"total":     resp.Total,
+	}, resp.LimitReport)
+}
+
+// withLimitReport adds limit and limitCapped to a projected response when
+// the server's cap lowered the request's limit (#368); a projection keeps the
+// fields that say the answer is short, like the full shape does.
+func withLimitReport(m map[string]interface{}, rep LimitReport) map[string]interface{} {
+	if rep.LimitCapped {
+		m["limit"], m["limitCapped"] = rep.Limit, true
 	}
+	return m
 }
 
 // projectFTSResult builds the projected view of a full_text_search response,
@@ -103,7 +113,7 @@ func projectFTSResult(resp *MCPFTSSearchResponse, fields []string, includeConten
 	if resp.Lang != "" {
 		out["lang"] = resp.Lang
 	}
-	return out
+	return withLimitReport(out, resp.LimitReport)
 }
 
 // projectVectorResult builds the projected view of a semantic_search response,
@@ -117,12 +127,12 @@ func projectVectorResult(resp *MCPVectorSearchResponse, fields []string, include
 			"rank":     resp.Results[i].Rank,
 		}
 	}
-	return map[string]interface{}{
+	return withLimitReport(map[string]interface{}{
 		"results":        results,
 		"total":          resp.Total,
 		"model":          resp.Model,
 		"dimensions":     resp.Dimensions,
 		"algorithm":      resp.Algorithm,
 		"distanceMetric": resp.DistanceMetric,
-	}
+	}, resp.LimitReport)
 }

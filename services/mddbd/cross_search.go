@@ -75,7 +75,8 @@ type CrossSearchResponse struct {
 	Indexing *IndexWaitResult `json:"indexing,omitempty"`
 	// Plan is how the vector search ran and why, when the request set explain
 	// (SRCH-013).
-	Plan *SearchPlan `json:"plan,omitempty"`
+	Plan        *SearchPlan `json:"plan,omitempty"`
+	LimitReport             // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // handleCrossSearch handles POST /v1/cross-search
@@ -156,7 +157,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	topK := crossTopK(req.TopK)
+	topK, limitReport := s.crossTopK(req.TargetCollections, req.TopK) // #368
 	// Oversample per collection for better merging (SRCH-005). Resolved
 	// against no collection: a cross-collection search has no single profile
 	// that could own the factor, so only the request parameter and the
@@ -229,6 +230,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 	if req.wantsPassages() {
 		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
 		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
+		p.LimitReport = limitReport
 		ok(w, p)
 		return
 	}
@@ -244,6 +246,7 @@ func (s *Server) handleCrossSearch(w http.ResponseWriter, r *http.Request) {
 		DistanceMetric:    metricName,
 		Indexing:          waited,
 		Plan:              req.explained(plan),
+		LimitReport:       limitReport,
 	}
 
 	if searchStatsEnabled() {

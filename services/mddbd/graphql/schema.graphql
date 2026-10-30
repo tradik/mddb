@@ -36,6 +36,10 @@ type DocumentConnection {
   edges: [DocumentEdge!]!
   pageInfo: PageInfo!
   totalCount: Int!
+  "True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise."
+  limitCapped: Boolean
+  "The limit used; set only when limitCapped."
+  limit: Int
 }
 
 type DocumentEdge {
@@ -135,6 +139,10 @@ type CodeSymbol {
   tests: [Passage!]!
   siblings: [Passage!]!
   truncated: Boolean!
+  "True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise."
+  limitCapped: Boolean
+  "The limit used; set only when limitCapped."
+  limit: Int
 }
 
 "Queued indexing work (GO-042); fields match GET /v1/indexing-status."
@@ -165,6 +173,10 @@ type VectorSearchResponse {
   plan: SearchPlan
   "Images the query matched by their picture, with includeImages and a provider that embeds images (RAG-010)."
   imageHits: [ImageRef!]
+  "True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise."
+  limitCapped: Boolean
+  "The limit used; set only when limitCapped."
+  limit: Int
 }
 
 "How a vector search ran and why (SRCH-013): the index chosen and the reasons."
@@ -223,6 +235,10 @@ type FTSResponse {
   total: Int!
   "Set instead of results when the input asked for format passages (AGT-002)."
   passages: [Passage!]
+  "True when the requested limit was above the server's cap and was lowered to limit (#368); null otherwise."
+  limitCapped: Boolean
+  "The limit used; set only when limitCapped."
+  limit: Int
 }
 
 # Stats and metrics

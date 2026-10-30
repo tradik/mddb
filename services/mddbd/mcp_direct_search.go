@@ -12,7 +12,21 @@ import (
 )
 
 // VectorSearch performs a vector similarity search via the direct client.
+// MCP, gRPC and GraphQL all run it; every answer it gives, passages and image
+// queries included, reports a limit the server's cap lowered (#368).
 func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchRequest) (*MCPVectorSearchResponse, error) {
+	resp, err := c.vectorSearch(ctx, req)
+	if resp != nil {
+		resp.LimitReport = req.limitReport
+		if resp.Passages != nil {
+			resp.Passages.LimitReport = req.limitReport
+		}
+	}
+	return resp, err
+}
+
+// vectorSearch is VectorSearch before the limit report is attached.
+func (c *DirectClient) vectorSearch(ctx context.Context, req *MCPVectorSearchRequest) (*MCPVectorSearchResponse, error) {
 	s := c.server
 	req.GroupBy = s.ResolveGroupBy(req.Collection, req.GroupBy)
 	if err := req.GroupBy.Validate(); err != nil {
@@ -44,8 +58,10 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		return nil, errors.New("either query or queryVector is required")
 	}
 
-	// RAG-001: request > collection profile > historical default.
-	topK := c.server.ResolveTopK(req.Collection, req.TopK, 5)
+	// RAG-001: request > collection profile > historical default, under the
+	// server's cap (#368).
+	topK, limitReport := c.server.ResolveTopK(req.Collection, req.TopK, 5)
+	req.limitReport = limitReport
 	// Oversample for chunk deduplication (SRCH-005).
 	searchTopK := OversampledTopK(topK, s.ResolveOversample(req.Collection, req.Oversample), 20)
 	allowedIDs, filtered := s.allowedDocIDs(req.Collection, req.FilterMeta, req.Filter)
@@ -412,7 +428,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 
 	c.server.Gain.Search(gainKind{Type: SearchTypeFTS, Algorithm: full.Algorithm}) // AGT-004
 	if full.passages != nil {
-		return &MCPFTSSearchResponse{Passages: full.passages, Algorithm: full.Algorithm}, nil
+		return &MCPFTSSearchResponse{Passages: full.passages, Algorithm: full.Algorithm, LimitReport: full.LimitReport}, nil
 	}
 
 	resp := &MCPFTSSearchResponse{
@@ -422,6 +438,7 @@ func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) 
 		Results:        make([]MCPFTSResult, 0, len(full.Results)),
 		Facets:         full.Facets,
 		ResponsePrompt: c.server.ResponsePrompt(req.Collection, req.Query),
+		LimitReport:    full.LimitReport,
 	}
 	for _, r := range full.Results {
 		doc := r.Document
@@ -555,7 +572,8 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if req.wantsPassages() {
 		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, httpReq.plan)
 		c.server.passageImages(&p, httpReq.IncludeImages, imageHits)
-		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy}, nil
+		p.LimitReport = httpReq.limitReport
+		return &MCPHybridSearchResponse{Passages: &p, Strategy: httpReq.Strategy, LimitReport: httpReq.limitReport}, nil
 	}
 
 	distMetric := httpReq.DistanceMetric
@@ -572,6 +590,7 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		Indexing:        waited,
 		Plan:            req.explained(httpReq.plan),
 		ImageHits:       imageHits,
+		LimitReport:     httpReq.limitReport,
 	}
 	for _, item := range items {
 		resp.Results = append(resp.Results, MCPHybridSearchResult{
@@ -634,6 +653,12 @@ func (c *DirectClient) SearchAdvisor(ctx context.Context, collection string) (*S
 // halves, fused, boosted, loaded and grouped. It returns the request with its
 // defaults resolved, for the response to report.
 func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) ([]HybridSearchResultItem, HybridSearchRequest, error) {
+	// #368: an explicit topK is capped before either half runs, so neither
+	// fetches candidates for a limit the answer cannot have. An absent one
+	// stays absent here, as both halves expect, and is resolved below.
+	if httpReq.TopK > 0 {
+		httpReq.TopK, httpReq.limitReport = s.ResolveTopK(httpReq.Collection, httpReq.TopK, 0)
+	}
 	// Run FTS
 	ftsResults, err := s.tracedFTS(ctx, httpReq)
 	if err != nil {
@@ -649,7 +674,12 @@ func (s *Server) hybridItems(ctx context.Context, httpReq HybridSearchRequest) (
 	httpReq.plan = plan
 
 	// Defaults. RAG-001: request > collection profile > historical default.
-	httpReq.TopK = s.ResolveTopK(httpReq.Collection, httpReq.TopK, 10)
+	// An explicit topK is already under the cap, so only a resolved default
+	// can be capped here; resolving again keeps the first report.
+	var rep LimitReport
+	if httpReq.TopK, rep = s.ResolveTopK(httpReq.Collection, httpReq.TopK, 10); rep.LimitCapped {
+		httpReq.limitReport = rep
+	}
 	if httpReq.Strategy == "" {
 		httpReq.Strategy = "alpha"
 	}

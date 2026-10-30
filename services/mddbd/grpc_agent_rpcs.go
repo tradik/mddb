@@ -37,7 +37,8 @@ func (g *GRPCServer) CodeSymbol(ctx context.Context, req *proto.CodeSymbolReques
 	return &proto.CodeSymbolResponse{Collection: res.Collection, Symbol: res.Symbol,
 		Definitions: passagesToProto(res.Definitions), References: passagesToProto(res.References),
 		Callers: passagesToProto(res.Callers), Callees: passagesToProto(res.Callees), Tests: passagesToProto(res.Tests),
-		Siblings: passagesToProto(res.Siblings), Truncated: res.Truncated}, nil
+		Siblings: passagesToProto(res.Siblings), Truncated: res.Truncated,
+		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}, nil
 }
 
 func evalQueryFromProto(q *proto.EvalQueryProto) EvalQuery {

@@ -81,6 +81,9 @@ type HybridSearchRequest struct {
 	// summaryMode overrides the collection's summaryMode (RAG-009) for an
 	// evaluation config; "" = the profile's.
 	summaryMode string
+	// limitReport is set when the server's cap lowered TopK (#368), for the
+	// response to say so.
+	limitReport LimitReport
 }
 
 // HybridGeoFilter restricts hybrid search to docs within radius of a point.
@@ -142,7 +145,8 @@ type HybridSearchResponse struct {
 	Plan *SearchPlan `json:"plan,omitempty"`
 	// ImageHits are the images the query matched by their picture, with
 	// includeImages and a provider that embeds images (RAG-010).
-	ImageHits []ImageRef `json:"imageHits,omitempty"`
+	ImageHits   []ImageRef `json:"imageHits,omitempty"`
+	LimitReport            // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // handleHybridSearch handles POST /v1/hybrid-search
@@ -193,7 +197,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Defaults. RAG-001 inserts the collection profile between the request
 	// and each historical default, so a collection without one is unchanged.
-	req.TopK = s.ResolveTopK(req.Collection, req.TopK, 10)
+	req.TopK, req.limitReport = s.ResolveTopK(req.Collection, req.TopK, 10)
 	if req.Algorithm == "" {
 		req.Algorithm = "bm25"
 	}
@@ -280,6 +284,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 				FTSAlgorithm:    req.Algorithm,
 				VectorAlgorithm: req.VectorAlgorithm,
 				DistanceMetric:  "cosine",
+				LimitReport:     req.limitReport,
 			})
 			return
 		}
@@ -393,6 +398,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 	if req.wantsPassages() {
 		p := s.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, plan)
 		s.passageImages(&p, req.IncludeImages, imageHits)
+		p.LimitReport = req.limitReport
 		ok(w, p)
 		return
 	}
@@ -413,6 +419,7 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		Indexing:        waited,
 		Plan:            req.explained(plan),
 		ImageHits:       imageHits,
+		LimitReport:     req.limitReport,
 	}
 	if req.Strategy == "alpha" {
 		resp.Alpha = alpha

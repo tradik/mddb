@@ -366,7 +366,20 @@ func (c *DirectClient) ListCollectionConfigs(ctx context.Context) (*MCPCollectio
 // --- Cross-Collection Search ---
 
 // CrossSearch searches across multiple collections via the direct client.
+// MCP and gRPC run it; every answer reports a limit the cap lowered (#368).
 func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchRequest) (*MCPCrossSearchResponse, error) {
+	resp, err := c.crossSearch(ctx, req)
+	if resp != nil {
+		resp.LimitReport = req.limitReport
+		if resp.Passages != nil {
+			resp.Passages.LimitReport = req.limitReport
+		}
+	}
+	return resp, err
+}
+
+// crossSearch is CrossSearch before the limit report is attached.
+func (c *DirectClient) crossSearch(ctx context.Context, req *MCPCrossSearchRequest) (*MCPCrossSearchResponse, error) {
 	s := c.server
 	if err := req.GroupBy.Validate(); err != nil {
 		return nil, err
@@ -390,13 +403,15 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 	if len(req.TargetCollections) == 0 {
 		return nil, fmt.Errorf("no collection matches target_collections")
 	}
+	topK, limitReport := s.crossTopK(req.TargetCollections, req.TopK) // #368
+	req.limitReport = limitReport
 	if req.SearchType == CrossSearchFTS || req.SearchType == CrossSearchHybrid {
 		if req.Query == "" {
 			return nil, fmt.Errorf("searchType %s needs a query", req.SearchType)
 		}
 		waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
 		items := s.crossTextItems(ctx, crossTextParams{SearchType: req.SearchType, Query: req.Query,
-			Targets: req.TargetCollections, TopK: crossTopK(req.TopK), FilterMeta: req.FilterMeta, Filter: req.Filter,
+			Targets: req.TargetCollections, TopK: topK, FilterMeta: req.FilterMeta, Filter: req.Filter,
 			GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
 		s.countCross("", items, req.wantsPassages())
 		if req.wantsPassages() {
@@ -409,7 +424,6 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 			Algorithm: req.SearchType, Indexing: waited}, nil
 	}
 
-	topK := crossTopK(req.TopK)
 	// Oversample per collection for better merging (SRCH-005). No single
 	// collection profile can own the factor across targets, so only the
 	// request parameter and the default apply.

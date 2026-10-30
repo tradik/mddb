@@ -100,6 +100,11 @@ type RetrievalProfileDef struct {
 	// SummaryWeight is the BM25F weight of the meta.summary field while
 	// SummaryMode is not off; nil = 2.0.
 	SummaryWeight *float64 `json:"summaryWeight,omitempty"`
+	// MaxTopK caps how many results one search of this collection returns,
+	// whatever the request asks for (#368); 0 = the server-wide
+	// MDDB_SEARCH_MAX_LIMIT alone. It can only lower that cap, never raise
+	// it: see search_limit.go.
+	MaxTopK int `json:"maxTopK,omitempty"`
 }
 
 // HasHybridAlpha reports whether alpha was configured, including an explicit 0.
@@ -133,6 +138,12 @@ func (p *RetrievalProfileDef) Validate() error {
 
 	if p.TopK < 0 || p.TopK > maxProfileTopK {
 		return fmt.Errorf("invalid retrieval.topK %d: must be between 0 (unset) and %d", p.TopK, maxProfileTopK)
+	}
+	if p.MaxTopK < 0 || p.MaxTopK > searchMaxLimitCeiling {
+		return fmt.Errorf("invalid retrieval.maxTopK %d: must be between 0 (unset) and %d", p.MaxTopK, searchMaxLimitCeiling)
+	}
+	if p.MaxTopK > 0 && p.TopK > p.MaxTopK {
+		return fmt.Errorf("invalid retrieval.topK %d: above the collection's maxTopK %d", p.TopK, p.MaxTopK)
 	}
 	if p.HybridAlphaSet && (p.HybridAlpha < 0 || p.HybridAlpha > 1) {
 		return errors.New("invalid retrieval.hybridAlpha: must be between 0.0 and 1.0")
@@ -177,19 +188,21 @@ func (s *Server) RetrievalProfile(collection string) *RetrievalProfileDef {
 	return cfg.Retrieval
 }
 
-// ResolveTopK applies the precedence rule to a result limit.
+// ResolveTopK applies the precedence rule to a result limit, then the
+// server's cap (#368).
 //
 // requested is what the caller asked for (0 = did not ask); fallback is the
 // path's own historical default, kept so a collection without a profile
-// produces exactly the results it produced before.
-func (s *Server) ResolveTopK(collection string, requested, fallback int) int {
+// produces exactly the results it produced before. The result is never above
+// CapLimit's ceiling, and the report says when it was lowered to it.
+func (s *Server) ResolveTopK(collection string, requested, fallback int) (int, LimitReport) {
+	n := fallback
 	if requested > 0 {
-		return requested
+		n = requested
+	} else if p := s.RetrievalProfile(collection); p != nil && p.TopK > 0 {
+		n = p.TopK
 	}
-	if p := s.RetrievalProfile(collection); p != nil && p.TopK > 0 {
-		return p.TopK
-	}
-	return fallback
+	return s.CapLimit(collection, n, 0)
 }
 
 // ResolveRetrievalMode applies the precedence rule to granularity.
@@ -291,6 +304,7 @@ func retrievalProfileFromProto(p *proto.RetrievalProfileProto) *RetrievalProfile
 		VectorAlgorithm:    p.VectorAlgorithm,
 		SummaryMode:        p.SummaryMode,
 		SummaryWeight:      p.SummaryWeight,
+		MaxTopK:            int(p.MaxTopK),
 	}
 }
 
@@ -325,6 +339,7 @@ func retrievalProfileToProto(p *RetrievalProfileDef) *proto.RetrievalProfileProt
 		VectorAlgorithm:    p.VectorAlgorithm,
 		SummaryMode:        p.SummaryMode,
 		SummaryWeight:      p.SummaryWeight,
+		MaxTopK:            safeInt32(p.MaxTopK),
 	}
 }
 

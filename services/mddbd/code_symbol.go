@@ -55,7 +55,8 @@ type SymbolRequest struct {
 	Name       string `json:"name"`
 	// Include limits the relations returned; empty means all of them.
 	Include []string `json:"include,omitempty"`
-	// Limit caps each relation's passages (default 20, max 200).
+	// Limit caps each relation's passages (default 20, max 200, and never
+	// above the server's search cap — #368).
 	Limit int `json:"limit,omitempty"`
 	// IncludeContent adds each passage's text. References always carry
 	// their line; definitions, callers and callees carry their whole span
@@ -74,7 +75,8 @@ type SymbolResult struct {
 	Tests       []Passage `json:"tests,omitempty"`
 	Siblings    []Passage `json:"siblings,omitempty"`
 	// Truncated says some relation held more than Limit.
-	Truncated bool `json:"truncated,omitempty"`
+	Truncated   bool `json:"truncated,omitempty"`
+	LimitReport      // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 var errSymbolRequest = errors.New("collection and name are required")
@@ -88,7 +90,6 @@ func (r *SymbolRequest) normalize() error {
 	if r.Limit <= 0 {
 		r.Limit = symbolDefaultLimit
 	}
-	r.Limit = min(r.Limit, symbolMaxLimit)
 	for _, inc := range r.Include {
 		if !containsString(allRelations, inc) {
 			return fmt.Errorf("unknown relation %q (known: %s)", inc, strings.Join(allRelations, ", "))
@@ -107,6 +108,9 @@ func (s *Server) LookupSymbol(req SymbolRequest) (*SymbolResult, error) {
 		return nil, err
 	}
 	res := &SymbolResult{Collection: req.Collection, Symbol: req.Name, Definitions: []Passage{}}
+	// #368: the lookup's own bound of 200 per relation, under the server's
+	// cap and the collection's maxTopK — the one cap every search shares.
+	req.Limit, res.LimitReport = s.CapLimit(req.Collection, req.Limit, symbolMaxLimit)
 	wantUsers := req.wants(RelReferences) || req.wants(RelCallers) || req.wants(RelTests)
 	// The extractors leave out calls through a value or a package — x.f(),
 	// pkg.F() — because from text alone they cannot tell what f is. So the

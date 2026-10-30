@@ -132,15 +132,10 @@ func (s *MCPToolServer) toolAutocomplete(_ context.Context, args map[string]inte
 	if topN <= 0 {
 		topN = 10
 	}
-	items, err := dc.server.FTSIndex.Autocomplete(collection, query, field, topN)
+	resp, err := dc.server.autocomplete(collection, query, field, topN)
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]interface{}{
-		"items": items,
-		"total": len(items),
-		"query": query,
-		"field": field,
-	}, "", "  ")
+	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil
 }

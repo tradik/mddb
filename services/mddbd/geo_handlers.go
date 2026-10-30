@@ -76,6 +76,7 @@ type GeoSearchResponse struct {
 	Total        int                   `json:"total"`
 	RadiusMeters float64               `json:"radiusMeters"`
 	Algorithm    string                `json:"algorithm"`
+	LimitReport                        // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // GeoWithinResponse is returned from /v1/geo-within.
@@ -138,6 +139,16 @@ type GeoCollectionStat struct {
 	LastRebuild time.Time `json:"lastRebuild,omitempty"`
 }
 
+// geoDefaultTopK is a radius search's result count when the request gives
+// none — the geo indexes' own default.
+const geoDefaultTopK = 10
+
+// geoTopK resolves a radius search's result count for REST, MCP and gRPC
+// alike: the request's, else 10, under the server's cap (#368).
+func (s *Server) geoTopK(collection string, requested int) (int, LimitReport) {
+	return s.CapLimit(collection, positiveOr(requested, geoDefaultTopK), 0)
+}
+
 // handleGeoSearch handles POST /v1/geo-search.
 func (s *Server) handleGeoSearch(w http.ResponseWriter, r *http.Request) {
 	var req GeoSearchRequest
@@ -170,12 +181,14 @@ func (s *Server) handleGeoSearch(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"error":"geo index is loading, please retry"}`))
 		return
 	}
+	topK, limitReport := s.geoTopK(req.Collection, req.TopK)
 
 	var allowed map[string]struct{}
 	if len(req.FilterMeta) > 0 {
 		ids := s.getDocIDsByMeta(req.Collection, req.FilterMeta)
 		if len(ids) == 0 {
-			ok(w, GeoSearchResponse{Results: []GeoSearchResultItem{}, Total: 0, RadiusMeters: req.RadiusMeters, Algorithm: algo})
+			ok(w, GeoSearchResponse{Results: []GeoSearchResultItem{}, Total: 0, RadiusMeters: req.RadiusMeters, Algorithm: algo,
+				LimitReport: limitReport})
 			return
 		}
 		allowed = make(map[string]struct{}, len(ids))
@@ -192,9 +205,9 @@ func (s *Server) handleGeoSearch(w http.ResponseWriter, r *http.Request) {
 			_, _ = w.Write([]byte(`{"error":"geohash index is loading, please retry"}`))
 			return
 		}
-		hits = s.GeoHashIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, req.TopK, allowed)
+		hits = s.GeoHashIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, topK, allowed)
 	default: // "rtree"
-		hits = s.GeoIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, req.TopK, allowed)
+		hits = s.GeoIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, topK, allowed)
 	}
 	items := s.hydrateGeoResults(req.Collection, hits, req.IncludeContent, true)
 	ok(w, GeoSearchResponse{
@@ -202,6 +215,7 @@ func (s *Server) handleGeoSearch(w http.ResponseWriter, r *http.Request) {
 		Total:        len(items),
 		RadiusMeters: req.RadiusMeters,
 		Algorithm:    algo,
+		LimitReport:  limitReport,
 	})
 }
 

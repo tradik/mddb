@@ -739,7 +739,7 @@ Search for documents in a collection with optional metadata filtering and sortin
 - `filterMeta` (optional): Metadata filters (AND between keys, OR between values)
 - `sort` (optional): Sort field - `addedAt`, `updatedAt`, or `key`
 - `asc` (optional): Sort order - `true` for ascending, `false` for descending
-- `limit` (optional): Maximum number of results (default: 50)
+- `limit` (optional): Maximum number of results (default: 50), never more than `MDDB_SEARCH_MAX_LIMIT` (default 1000, v2.18.10+). A larger `limit` is lowered to the cap and the response carries the headers `X-Limit-Capped: true` and `X-Limit: <the limit used>` — the body is a bare array, with no object to hold the fields every other search returns
 - `offset` (optional): Number of results to skip (default: 0)
 
 **Response**:
@@ -1097,6 +1097,8 @@ Metadata pre-filtering significantly reduces search time (e.g., filtering to 10%
 
 Perform full-text search across document content. Supports multiple search modes: simple, boolean, phrase, wildcard, proximity, and range filtering. Uses TF-IDF, BM25, BM25F, or PMISparse scoring with optional stemming, synonyms, and typo tolerance.
 
+**Result limit (v2.18.10+).** `limit` (default 50) is never above `MDDB_SEARCH_MAX_LIMIT` (default 1000) or the collection's `retrieval.maxTopK`. A request above the cap gets the cap, and the response adds `"limit": <the limit used>, "limitCapped": true`; under the cap neither field appears. `facetMaxValues` is bounded by the same cap (`0` means the cap), `maxHighlights` by 20 and `fragmentSize` by 1000. The same holds for vector, hybrid, cross-collection, autocomplete, code symbol and geo search — see [SEARCH.md](SEARCH.md#result-limits-v21810).
+
 **Request Body**:
 ```json
 {
@@ -1318,7 +1320,7 @@ Return up to `topN` terms starting with the given prefix, ranked by document fre
 - `collection` (required): Collection name
 - `q` (required): Prefix query — lowercased and stripped of non-alphanumerics
 - `field` (optional): Limit to one indexed field (e.g. `title`, `content`, `meta.tags`); empty means global
-- `topN` (optional, default 10): Maximum suggestions
+- `topN` (optional, default 10): Maximum suggestions, never above `MDDB_SEARCH_MAX_LIMIT` or the collection's `retrieval.maxTopK` (v2.18.10+); a capped request's response adds `"limit"` and `"limitCapped": true`
 
 **cURL Examples**:
 ```bash
@@ -2996,6 +2998,7 @@ curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' -d 
 | `hybridAlpha` | number | 0 = keyword only, 1 = semantic only. Requires `hybridAlphaSet: true`, because 0.0 is a real weight and cannot double as "unset". |
 | `oversample` | number | 1.0–10.0. Candidates fetched per requested result before deduplication or merging — see [SEARCH.md](SEARCH.md#oversampling-v2120) for measured effect |
 | `contextTokenBudget` | integer | Cap on total returned context, in tokens |
+| `maxTopK` | integer | Most results one search of this collection returns, whatever the request asks (v2.18.10+). Lowers `MDDB_SEARCH_MAX_LIMIT` for this collection, never raises it; `topK` must not exceed it. 0 = unset. A capped response carries `"limitCapped": true` and the `limit` used — see [SEARCH.md](SEARCH.md#result-limits-v21810) |
 | `groupBy` | object | Default result grouping, e.g. `{"key": "path", "perGroup": 1}` for one passage per file (v2.18.8+); a request's own `groupBy` wins |
 | `summaryMode` | string | `off` (default) \| `blend` \| `expand`: what the documents' client-written summaries (metadata key `summary`) do on vector and hybrid search (v2.18.9+) — see [SEARCH.md](SEARCH.md#summaries--a-second-representation-v2189) |
 | `summaryWeight` | number | 0–10. BM25F weight of `meta.summary` while `summaryMode` is not `off`; unset = 2.0 (v2.18.9+) |

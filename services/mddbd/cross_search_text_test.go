@@ -130,8 +130,11 @@ func TestCrossSearch_TextREST(t *testing.T) {
 			t.Errorf("%s: %d, want %d", body, code, want)
 		}
 	}
-	if crossTopK(0) != 10 || crossTopK(3) != 3 {
-		t.Fatal("crossTopK")
+	if n, _ := s.crossTopK(nil, 0); n != 10 {
+		t.Fatal("crossTopK default")
+	}
+	if n, _ := s.crossTopK(nil, 3); n != 3 {
+		t.Fatal("crossTopK explicit")
 	}
 }
 

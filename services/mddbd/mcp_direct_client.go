@@ -206,6 +206,8 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 	if req.Limit <= 0 {
 		req.Limit = 50
 	}
+	var limitReport LimitReport // #368: a page is never above the server's cap
+	req.Limit, limitReport = c.server.CapLimit(req.Collection, req.Limit, 0)
 	req.PassageOptions = c.server.ResolveFormat(req.Collection, req.PassageOptions)
 	if err := req.ValidatePassageOptions(); err != nil {
 		return nil, err
@@ -227,7 +229,8 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 			hits = append(hits, passageSource{doc: d, bestChunk: -1})
 		}
 		p := c.server.finishPassages(req.Collection, c.server.buildPassages(req.Collection, hits, req.PassageOptions, "search"), nil)
-		return &MCPSearchResponse{Passages: &p, Total: total}, nil
+		p.LimitReport = limitReport
+		return &MCPSearchResponse{Passages: &p, Total: total, LimitReport: limitReport}, nil
 	}
 
 	docs := make([]MCPDocument, 0, len(page))
@@ -237,7 +240,7 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 		}
 		docs = append(docs, docToMCPDocument(d))
 	}
-	return &MCPSearchResponse{Documents: docs, Total: total}, nil
+	return &MCPSearchResponse{Documents: docs, Total: total, LimitReport: limitReport}, nil
 }
 
 // Delete removes a document via the direct client.

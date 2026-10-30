@@ -31,6 +31,7 @@ func (g *GRPCServer) GeoSearch(ctx context.Context, req *proto.GeoSearchRequest)
 	if g.server.GeoIndex == nil || !g.server.GeoIndex.IsReady() {
 		return nil, status.Error(codes.Unavailable, "geo index is loading")
 	}
+	topK, limitReport := g.server.geoTopK(req.Collection, int(req.TopK)) // #368
 
 	var allowed map[string]struct{}
 	if len(req.FilterMeta) > 0 {
@@ -43,6 +44,8 @@ func (g *GRPCServer) GeoSearch(ctx context.Context, req *proto.GeoSearchRequest)
 			return &proto.GeoSearchResponse{
 				RadiusMeters: req.RadiusMeters,
 				Algorithm:    "rtree",
+				LimitCapped:  limitReport.LimitCapped,
+				Limit:        safeInt32(limitReport.Limit),
 			}, nil
 		}
 		allowed = make(map[string]struct{}, len(ids))
@@ -51,7 +54,7 @@ func (g *GRPCServer) GeoSearch(ctx context.Context, req *proto.GeoSearchRequest)
 		}
 	}
 
-	hits := g.server.GeoIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, int(req.TopK), allowed)
+	hits := g.server.GeoIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, topK, allowed)
 	results := make([]*proto.GeoSearchResultItem, 0, len(hits))
 	_ = g.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket(g.server.BucketNames.Docs)
@@ -84,6 +87,8 @@ func (g *GRPCServer) GeoSearch(ctx context.Context, req *proto.GeoSearchRequest)
 		Total:        safeInt32(len(results)),
 		RadiusMeters: req.RadiusMeters,
 		Algorithm:    "rtree",
+		LimitCapped:  limitReport.LimitCapped,
+		Limit:        safeInt32(limitReport.Limit),
 	}, nil
 }
 

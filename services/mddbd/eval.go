@@ -165,7 +165,9 @@ func (s *Server) RunEval(ctx context.Context, req EvalRequest) (*EvalResult, err
 	if k <= 0 {
 		k = defaultEvalK
 	}
-	k = min(k, maxEvalK)
+	// The eval's own bound, under the server's cap like every search (#368);
+	// the result's K says what was used.
+	k, _ = s.CapLimit(req.Collection, k, maxEvalK)
 	configs := req.Configs
 	if len(configs) == 0 {
 		configs = defaultEvalConfigs()

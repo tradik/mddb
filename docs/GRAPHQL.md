@@ -371,9 +371,17 @@ query {
       matchedTerms
     }
     total
+    limitCapped
+    limit
   }
 }
 ```
+
+`fts`, `vectorSearch`, `search` and `codeSymbol` return at most
+`MDDB_SEARCH_MAX_LIMIT` results (default 1000), or the collection's
+`retrieval.maxTopK` when lower (v2.18.10+). When the requested `limit` / `topK`
+was above it, `limitCapped` is `true` and `limit` is the count used; under the
+cap both are `null`. See [Result Limits](SEARCH.md#result-limits-v21810).
 
 ### Images (v2.18.9+)
 

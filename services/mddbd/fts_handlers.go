@@ -57,6 +57,9 @@ type FTSSearchRequest struct {
 	// summaryMode overrides the collection's summaryMode (RAG-009) for an
 	// evaluation config; "" = the profile's.
 	summaryMode string
+	// limitReport is set by normalizeFTSRequest when the server's cap
+	// lowered Limit (#368), for the response to say so.
+	limitReport LimitReport
 	// CacheTTL opts this request into the search-result cache for the given
 	// number of seconds (GO-031). Omitted or 0 means no caching at all, so a
 	// caller that says nothing keeps today's behaviour and today's freshness.
@@ -91,7 +94,8 @@ type FTSSearchResponse struct {
 	ContextTruncated bool `json:"contextTruncated,omitempty"`
 	// passages is set for format "passages" and is what the caller gets
 	// instead of this response (AGT-002).
-	passages *PassagesResponse
+	passages    *PassagesResponse
+	LimitReport // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // FTSResultWithDoc includes the full document in the result.
@@ -171,8 +175,17 @@ func (s *Server) normalizeFTSRequest(req *FTSSearchRequest) error {
 	if req.Collection == "" || req.Query == "" {
 		return fmt.Errorf("missing required fields: collection, query")
 	}
-	// RAG-001: request > collection profile > this path's historical default.
-	req.Limit = s.ResolveTopK(req.Collection, req.Limit, 50)
+	// RAG-001: request > collection profile > this path's historical default,
+	// under the server's cap (#368). Normalising twice keeps the first report.
+	var rep LimitReport
+	if req.Limit, rep = s.ResolveTopK(req.Collection, req.Limit, 50); rep.LimitCapped {
+		req.limitReport = rep
+	}
+	// #368: a facet list and highlight fragments are part of the response
+	// size too. facetMaxValues 0 ("every value") means the cap.
+	req.FacetMaxValues, _ = s.CapLimit(req.Collection, positiveOr(req.FacetMaxValues, searchMaxLimitCeiling), 0)
+	req.MaxHighlights = min(req.MaxHighlights, maxHighlightFragments)
+	req.FragmentSize = min(req.FragmentSize, maxHighlightFragmentSize)
 	switch req.FacetScope {
 	case "", facetScopeReturned, facetScopeAll:
 	default:
@@ -520,6 +533,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 	}
 
 	resp.SpellCorrected = spellCorrected
+	resp.LimitReport = req.limitReport
 
 	if req.wantsPassages() {
 		hits := make([]passageSource, 0, len(resp.Results))
@@ -531,6 +545,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 		if req.IncludeImages {
 			s.attachPassageImages(&p) // RAG-010
 		}
+		p.LimitReport = req.limitReport
 		resp.passages = &p
 	} else if req.IncludeImages {
 		// RAG-010: each hit's images, by alt text and caption found or not.

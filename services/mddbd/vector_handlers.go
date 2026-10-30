@@ -51,6 +51,9 @@ type VectorSearchRequest struct {
 	// http(s) URL fetched through the SSRF guard. Needs a provider that
 	// embeds images; the results are image documents.
 	QueryImage string `json:"queryImage,omitempty"`
+	// limitReport is set when the server's cap lowered TopK (#368), for the
+	// response to say so.
+	limitReport LimitReport
 }
 
 // VectorSearchResultItem represents a single search result.
@@ -101,7 +104,8 @@ type VectorSearchResponseHTTP struct {
 	Plan *SearchPlan `json:"plan,omitempty"`
 	// ImageHits are the images the query matched by their picture, with
 	// includeImages and a provider that embeds images (RAG-010).
-	ImageHits []ImageRef `json:"imageHits,omitempty"`
+	ImageHits   []ImageRef `json:"imageHits,omitempty"`
+	LimitReport            // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // VectorReindexRequestHTTP represents a reindex request.
@@ -285,7 +289,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// RAG-001: request > collection profile > this path's historical default.
-	topK := s.ResolveTopK(req.Collection, req.TopK, 5)
+	// #368: under the server's cap, which the response reports.
+	topK, limitReport := s.ResolveTopK(req.Collection, req.TopK, 5)
+	req.limitReport = limitReport
 	// Oversample for chunk deduplication: search for more results, then
 	// deduplicate. SRCH-005 makes the multiplier a request parameter — it was
 	// the fixed `topK * 3` here and in four other places.
@@ -355,6 +361,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 			Algorithm:      algo,
 			DistanceMetric: metricName,
 			Plan:           req.explained(ps.Plan),
+			LimitReport:    limitReport,
 		})
 		return
 	}
@@ -497,6 +504,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		}
 		p := s.finishPassages(req.Collection, s.buildPassages(req.Collection, hits, req.PassageOptions, "vector"), waited)
 		s.passageImages(&p, req.IncludeImages, imageHits)
+		p.LimitReport = limitReport
 		ok(w, p)
 		return
 	}
@@ -511,6 +519,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		Indexing:         waited,
 		Plan:             req.explained(ps.Plan),
 		ImageHits:        imageHits,
+		LimitReport:      limitReport,
 	}
 	if s.Embedding != nil {
 		resp.Model = s.Embedding.Model()

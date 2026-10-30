@@ -50,6 +50,7 @@ func (s *Server) respondImageQuery(w http.ResponseWriter, r *http.Request, req V
 		return
 	}
 	if res.passages != nil {
+		res.passages.LimitReport = req.limitReport
 		ok(w, res.passages)
 		return
 	}
@@ -58,7 +59,7 @@ func (s *Server) respondImageQuery(w http.ResponseWriter, r *http.Request, req V
 		items[i] = VectorSearchResultItem{Document: bodyIf(h.doc, includeContent), Score: h.score, Rank: i + 1}
 	}
 	ok(w, VectorSearchResponseHTTP{Results: items, Total: len(items), Model: res.model, Dimensions: res.dimension,
-		Algorithm: "image", DistanceMetric: "cosine", Indexing: waited})
+		Algorithm: "image", DistanceMetric: "cosine", Indexing: waited, LimitReport: req.limitReport})
 }
 
 // mcpImageQuery answers an MCP vector search that has queryImage.

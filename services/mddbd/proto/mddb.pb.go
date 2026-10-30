@@ -635,6 +635,8 @@ type SearchResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Documents     []*Document            `protobuf:"bytes,1,rep,name=documents,proto3" json:"documents,omitempty"`
 	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	LimitCapped   bool                   `protobuf:"varint,3,opt,name=limit_capped,json=limitCapped,proto3" json:"limit_capped,omitempty"` // (v2.18.10, #368) the requested limit was above the server's cap
+	Limit         int32                  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`                                // (v2.18.10, #368) the limit used, set when limit_capped
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -679,6 +681,20 @@ func (x *SearchResponse) GetDocuments() []*Document {
 func (x *SearchResponse) GetTotal() int32 {
 	if x != nil {
 		return x.Total
+	}
+	return 0
+}
+
+func (x *SearchResponse) GetLimitCapped() bool {
+	if x != nil {
+		return x.LimitCapped
+	}
+	return false
+}
+
+func (x *SearchResponse) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
 	}
 	return 0
 }
@@ -2394,8 +2410,10 @@ type VectorSearchResponse struct {
 	Passages         []*Passage             `protobuf:"bytes,6,rep,name=passages,proto3" json:"passages,omitempty"`   // (v2.18.8) set when format is "passages"
 	Indexing         *IndexWaitResult       `protobuf:"bytes,7,opt,name=indexing,proto3" json:"indexing,omitempty"`   // (v2.18.8) set when the request waited
 	ContextTruncated bool                   `protobuf:"varint,8,opt,name=context_truncated,json=contextTruncated,proto3" json:"context_truncated,omitempty"`
-	Plan             *SearchPlan            `protobuf:"bytes,9,opt,name=plan,proto3" json:"plan,omitempty"`                             // (v2.18.9, SRCH-013) set when the request had explain
-	ImageHits        []*ImageRef            `protobuf:"bytes,10,rep,name=image_hits,json=imageHits,proto3" json:"image_hits,omitempty"` // (v2.18.9, RAG-010) images the query matched by their picture
+	Plan             *SearchPlan            `protobuf:"bytes,9,opt,name=plan,proto3" json:"plan,omitempty"`                                    // (v2.18.9, SRCH-013) set when the request had explain
+	ImageHits        []*ImageRef            `protobuf:"bytes,10,rep,name=image_hits,json=imageHits,proto3" json:"image_hits,omitempty"`        // (v2.18.9, RAG-010) images the query matched by their picture
+	LimitCapped      bool                   `protobuf:"varint,11,opt,name=limit_capped,json=limitCapped,proto3" json:"limit_capped,omitempty"` // (v2.18.10, #368) the requested limit was above the server's cap
+	Limit            int32                  `protobuf:"varint,12,opt,name=limit,proto3" json:"limit,omitempty"`                                // (v2.18.10, #368) the limit used, set when limit_capped
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -2498,6 +2516,20 @@ func (x *VectorSearchResponse) GetImageHits() []*ImageRef {
 		return x.ImageHits
 	}
 	return nil
+}
+
+func (x *VectorSearchResponse) GetLimitCapped() bool {
+	if x != nil {
+		return x.LimitCapped
+	}
+	return false
+}
+
+func (x *VectorSearchResponse) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
 }
 
 // How a vector search ran and why (v2.18.9, SRCH-013), returned with explain.
@@ -3475,6 +3507,8 @@ type FTSResponse struct {
 	Facets           map[string]*FacetBucketList `protobuf:"bytes,6,rep,name=facets,proto3" json:"facets,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // (v2.9.14+) per-key facet counts
 	Passages         []*Passage                  `protobuf:"bytes,7,rep,name=passages,proto3" json:"passages,omitempty"`                                                                       // (v2.18.8) set when format is "passages"
 	ContextTruncated bool                        `protobuf:"varint,8,opt,name=context_truncated,json=contextTruncated,proto3" json:"context_truncated,omitempty"`                              // (v2.18.8) the collection's context budget dropped results
+	LimitCapped      bool                        `protobuf:"varint,9,opt,name=limit_capped,json=limitCapped,proto3" json:"limit_capped,omitempty"`                                             // (v2.18.10, #368) the requested limit was above the server's cap
+	Limit            int32                       `protobuf:"varint,10,opt,name=limit,proto3" json:"limit,omitempty"`                                                                           // (v2.18.10, #368) the limit used, set when limit_capped
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -3563,6 +3597,20 @@ func (x *FTSResponse) GetContextTruncated() bool {
 		return x.ContextTruncated
 	}
 	return false
+}
+
+func (x *FTSResponse) GetLimitCapped() bool {
+	if x != nil {
+		return x.LimitCapped
+	}
+	return false
+}
+
+func (x *FTSResponse) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
 }
 
 type FTSReindexRequest struct {
@@ -4269,8 +4317,10 @@ type HybridSearchResponse struct {
 	Passages         []*Passage                  `protobuf:"bytes,7,rep,name=passages,proto3" json:"passages,omitempty"`                                                                       // (v2.18.8)
 	Indexing         *IndexWaitResult            `protobuf:"bytes,8,opt,name=indexing,proto3" json:"indexing,omitempty"`                                                                       // (v2.18.8)
 	ContextTruncated bool                        `protobuf:"varint,9,opt,name=context_truncated,json=contextTruncated,proto3" json:"context_truncated,omitempty"`
-	Plan             *SearchPlan                 `protobuf:"bytes,10,opt,name=plan,proto3" json:"plan,omitempty"`                            // (v2.18.9, SRCH-013) the vector half's plan, with explain
-	ImageHits        []*ImageRef                 `protobuf:"bytes,11,rep,name=image_hits,json=imageHits,proto3" json:"image_hits,omitempty"` // (v2.18.9, RAG-010) images the query matched by their picture
+	Plan             *SearchPlan                 `protobuf:"bytes,10,opt,name=plan,proto3" json:"plan,omitempty"`                                   // (v2.18.9, SRCH-013) the vector half's plan, with explain
+	ImageHits        []*ImageRef                 `protobuf:"bytes,11,rep,name=image_hits,json=imageHits,proto3" json:"image_hits,omitempty"`        // (v2.18.9, RAG-010) images the query matched by their picture
+	LimitCapped      bool                        `protobuf:"varint,12,opt,name=limit_capped,json=limitCapped,proto3" json:"limit_capped,omitempty"` // (v2.18.10, #368) the requested limit was above the server's cap
+	Limit            int32                       `protobuf:"varint,13,opt,name=limit,proto3" json:"limit,omitempty"`                                // (v2.18.10, #368) the limit used, set when limit_capped
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -4380,6 +4430,20 @@ func (x *HybridSearchResponse) GetImageHits() []*ImageRef {
 		return x.ImageHits
 	}
 	return nil
+}
+
+func (x *HybridSearchResponse) GetLimitCapped() bool {
+	if x != nil {
+		return x.LimitCapped
+	}
+	return false
+}
+
+func (x *HybridSearchResponse) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
 }
 
 type WebhookProto struct {
@@ -8076,6 +8140,7 @@ type RetrievalProfileProto struct {
 	VectorAlgorithm    string   `protobuf:"bytes,14,opt,name=vector_algorithm,json=vectorAlgorithm,proto3" json:"vector_algorithm,omitempty"`            // (SRCH-013) default vector index; "auto" = the query planner chooses
 	SummaryMode        string   `protobuf:"bytes,15,opt,name=summary_mode,json=summaryMode,proto3" json:"summary_mode,omitempty"`                        // (RAG-009) client-written summaries on a search: off (default), blend, expand
 	SummaryWeight      *float64 `protobuf:"fixed64,16,opt,name=summary_weight,json=summaryWeight,proto3,oneof" json:"summary_weight,omitempty"`          // (RAG-009) BM25F weight of meta.summary when summary_mode is not off, 0-10; unset = 2.0
+	MaxTopK            int32    `protobuf:"varint,17,opt,name=max_top_k,json=maxTopK,proto3" json:"max_top_k,omitempty"`                                 // (v2.18.10, #368) most results one search returns; lowers MDDB_SEARCH_MAX_LIMIT, never raises it; 0 = unset
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -8218,6 +8283,13 @@ func (x *RetrievalProfileProto) GetSummaryMode() string {
 func (x *RetrievalProfileProto) GetSummaryWeight() float64 {
 	if x != nil && x.SummaryWeight != nil {
 		return *x.SummaryWeight
+	}
+	return 0
+}
+
+func (x *RetrievalProfileProto) GetMaxTopK() int32 {
+	if x != nil {
+		return x.MaxTopK
 	}
 	return 0
 }
@@ -9865,9 +9937,11 @@ type CrossSearchResponse struct {
 	TargetCollections []string                 `protobuf:"bytes,5,rep,name=target_collections,json=targetCollections,proto3" json:"target_collections,omitempty"`
 	Algorithm         string                   `protobuf:"bytes,6,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
 	DistanceMetric    string                   `protobuf:"bytes,7,opt,name=distance_metric,json=distanceMetric,proto3" json:"distance_metric,omitempty"`
-	Passages          []*Passage               `protobuf:"bytes,8,rep,name=passages,proto3" json:"passages,omitempty"` // (v2.18.8)
-	Indexing          *IndexWaitResult         `protobuf:"bytes,9,opt,name=indexing,proto3" json:"indexing,omitempty"` // (v2.18.8)
-	Plan              *SearchPlan              `protobuf:"bytes,10,opt,name=plan,proto3" json:"plan,omitempty"`        // (v2.18.9, SRCH-013) set when the request had explain
+	Passages          []*Passage               `protobuf:"bytes,8,rep,name=passages,proto3" json:"passages,omitempty"`                            // (v2.18.8)
+	Indexing          *IndexWaitResult         `protobuf:"bytes,9,opt,name=indexing,proto3" json:"indexing,omitempty"`                            // (v2.18.8)
+	Plan              *SearchPlan              `protobuf:"bytes,10,opt,name=plan,proto3" json:"plan,omitempty"`                                   // (v2.18.9, SRCH-013) set when the request had explain
+	LimitCapped       bool                     `protobuf:"varint,11,opt,name=limit_capped,json=limitCapped,proto3" json:"limit_capped,omitempty"` // (v2.18.10, #368) the requested limit was above the server's cap
+	Limit             int32                    `protobuf:"varint,12,opt,name=limit,proto3" json:"limit,omitempty"`                                // (v2.18.10, #368) the limit used, set when limit_capped
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -9970,6 +10044,20 @@ func (x *CrossSearchResponse) GetPlan() *SearchPlan {
 		return x.Plan
 	}
 	return nil
+}
+
+func (x *CrossSearchResponse) GetLimitCapped() bool {
+	if x != nil {
+		return x.LimitCapped
+	}
+	return false
+}
+
+func (x *CrossSearchResponse) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
 }
 
 type FindDuplicatesRequest struct {
@@ -12578,6 +12666,8 @@ type GeoSearchResponse struct {
 	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
 	RadiusMeters  float64                `protobuf:"fixed64,3,opt,name=radius_meters,json=radiusMeters,proto3" json:"radius_meters,omitempty"`
 	Algorithm     string                 `protobuf:"bytes,4,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	LimitCapped   bool                   `protobuf:"varint,5,opt,name=limit_capped,json=limitCapped,proto3" json:"limit_capped,omitempty"` // (v2.18.10, #368) the requested limit was above the server's cap
+	Limit         int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`                                // (v2.18.10, #368) the limit used, set when limit_capped
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -12638,6 +12728,20 @@ func (x *GeoSearchResponse) GetAlgorithm() string {
 		return x.Algorithm
 	}
 	return ""
+}
+
+func (x *GeoSearchResponse) GetLimitCapped() bool {
+	if x != nil {
+		return x.LimitCapped
+	}
+	return false
+}
+
+func (x *GeoSearchResponse) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
 }
 
 // GeoWithinRequest: find docs inside the axis-aligned bbox
@@ -14833,6 +14937,8 @@ type CodeSymbolResponse struct {
 	Tests         []*Passage             `protobuf:"bytes,7,rep,name=tests,proto3" json:"tests,omitempty"`
 	Siblings      []*Passage             `protobuf:"bytes,8,rep,name=siblings,proto3" json:"siblings,omitempty"`
 	Truncated     bool                   `protobuf:"varint,9,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	LimitCapped   bool                   `protobuf:"varint,10,opt,name=limit_capped,json=limitCapped,proto3" json:"limit_capped,omitempty"` // (v2.18.10, #368) the requested limit was above the server's cap
+	Limit         int32                  `protobuf:"varint,11,opt,name=limit,proto3" json:"limit,omitempty"`                                // (v2.18.10, #368) the limit used, set when limit_capped
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -14928,6 +15034,20 @@ func (x *CodeSymbolResponse) GetTruncated() bool {
 		return x.Truncated
 	}
 	return false
+}
+
+func (x *CodeSymbolResponse) GetLimitCapped() bool {
+	if x != nil {
+		return x.LimitCapped
+	}
+	return false
+}
+
+func (x *CodeSymbolResponse) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
 }
 
 type EvalQueryProto struct {
@@ -16261,10 +16381,12 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\x1aN\n" +
 	"\vFilterEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12)\n" +
-	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"T\n" +
+	"\x05value\x18\x02 \x01(\v2\x13.mddb.MetaConditionR\x05value:\x028\x01\"\x8d\x01\n" +
 	"\x0eSearchResponse\x12,\n" +
 	"\tdocuments\x18\x01 \x03(\v2\x0e.mddb.DocumentR\tdocuments\x12\x14\n" +
-	"\x05total\x18\x02 \x01(\x05R\x05total\"\xde\x01\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12!\n" +
+	"\flimit_capped\x18\x03 \x01(\bR\vlimitCapped\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit\"\xde\x01\n" +
 	"\rExportRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -16434,7 +16556,7 @@ const file_mddb_proto_rawDesc = "" +
 	"group_rank\x18\b \x01(\x05R\tgroupRank\x12+\n" +
 	"\x11pending_embedding\x18\t \x01(\bR\x10pendingEmbedding\x12&\n" +
 	"\x06images\x18\n" +
-	" \x03(\v2\x0e.mddb.ImageRefR\x06images\"\x94\x03\n" +
+	" \x03(\v2\x0e.mddb.ImageRefR\x06images\"\xcd\x03\n" +
 	"\x14VectorSearchResponse\x122\n" +
 	"\aresults\x18\x01 \x03(\v2\x18.mddb.VectorSearchResultR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x14\n" +
@@ -16449,7 +16571,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04plan\x18\t \x01(\v2\x10.mddb.SearchPlanR\x04plan\x12-\n" +
 	"\n" +
 	"image_hits\x18\n" +
-	" \x03(\v2\x0e.mddb.ImageRefR\timageHits\"\xb3\x03\n" +
+	" \x03(\v2\x0e.mddb.ImageRefR\timageHits\x12!\n" +
+	"\flimit_capped\x18\v \x01(\bR\vlimitCapped\x12\x14\n" +
+	"\x05limit\x18\f \x01(\x05R\x05limit\"\xb3\x03\n" +
 	"\n" +
 	"SearchPlan\x12\x1c\n" +
 	"\talgorithm\x18\x01 \x01(\tR\talgorithm\x12\x1c\n" +
@@ -16562,7 +16686,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05value\x18\x01 \x01(\tR\x05value\x12\x14\n" +
 	"\x05count\x18\x02 \x01(\x05R\x05count\"C\n" +
 	"\x0fFacetBucketList\x120\n" +
-	"\abuckets\x18\x01 \x03(\v2\x16.mddb.FacetBucketProtoR\abuckets\"\xf7\x02\n" +
+	"\abuckets\x18\x01 \x03(\v2\x16.mddb.FacetBucketProtoR\abuckets\"\xb0\x03\n" +
 	"\vFTSResponse\x12)\n" +
 	"\aresults\x18\x01 \x03(\v2\x0f.mddb.FTSResultR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1c\n" +
@@ -16571,7 +16695,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04lang\x18\x05 \x01(\tR\x04lang\x125\n" +
 	"\x06facets\x18\x06 \x03(\v2\x1d.mddb.FTSResponse.FacetsEntryR\x06facets\x12)\n" +
 	"\bpassages\x18\a \x03(\v2\r.mddb.PassageR\bpassages\x12+\n" +
-	"\x11context_truncated\x18\b \x01(\bR\x10contextTruncated\x1aP\n" +
+	"\x11context_truncated\x18\b \x01(\bR\x10contextTruncated\x12!\n" +
+	"\flimit_capped\x18\t \x01(\bR\vlimitCapped\x12\x14\n" +
+	"\x05limit\x18\n" +
+	" \x01(\x05R\x05limit\x1aP\n" +
 	"\vFacetsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12+\n" +
 	"\x05value\x18\x02 \x01(\v2\x15.mddb.FacetBucketListR\x05value:\x028\x01\"3\n" +
@@ -16661,7 +16788,7 @@ const file_mddb_proto_rawDesc = "" +
 	"group_rank\x18\t \x01(\x05R\tgroupRank\x12+\n" +
 	"\x11pending_embedding\x18\n" +
 	" \x01(\bR\x10pendingEmbedding\x12&\n" +
-	"\x06images\x18\v \x03(\v2\x0e.mddb.ImageRefR\x06images\"\xbe\x04\n" +
+	"\x06images\x18\v \x03(\v2\x0e.mddb.ImageRefR\x06images\"\xf7\x04\n" +
 	"\x14HybridSearchResponse\x122\n" +
 	"\aresults\x18\x01 \x03(\v2\x18.mddb.HybridSearchResultR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1a\n" +
@@ -16675,7 +16802,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04plan\x18\n" +
 	" \x01(\v2\x10.mddb.SearchPlanR\x04plan\x12-\n" +
 	"\n" +
-	"image_hits\x18\v \x03(\v2\x0e.mddb.ImageRefR\timageHits\x1aP\n" +
+	"image_hits\x18\v \x03(\v2\x0e.mddb.ImageRefR\timageHits\x12!\n" +
+	"\flimit_capped\x18\f \x01(\bR\vlimitCapped\x12\x14\n" +
+	"\x05limit\x18\r \x01(\x05R\x05limit\x1aP\n" +
 	"\vFacetsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12+\n" +
 	"\x05value\x18\x02 \x01(\v2\x15.mddb.FacetBucketListR\x05value:\x028\x01\"\x87\x01\n" +
@@ -17019,7 +17148,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x1f\n" +
 	"\vnext_cursor\x18\x03 \x01(\tR\n" +
 	"nextCursor\x12\x19\n" +
-	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\x90\x05\n" +
+	"\bhas_more\x18\x04 \x01(\bR\ahasMore\"\xac\x05\n" +
 	"\x15RetrievalProfileProto\x12.\n" +
 	"\x13default_search_type\x18\x01 \x01(\tR\x11defaultSearchType\x12\x13\n" +
 	"\x05top_k\x18\x02 \x01(\x05R\x04topK\x12%\n" +
@@ -17040,7 +17169,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\x06bm25_b\x18\r \x01(\x01H\x01R\x05bm25B\x88\x01\x01\x12)\n" +
 	"\x10vector_algorithm\x18\x0e \x01(\tR\x0fvectorAlgorithm\x12!\n" +
 	"\fsummary_mode\x18\x0f \x01(\tR\vsummaryMode\x12*\n" +
-	"\x0esummary_weight\x18\x10 \x01(\x01H\x02R\rsummaryWeight\x88\x01\x01B\n" +
+	"\x0esummary_weight\x18\x10 \x01(\x01H\x02R\rsummaryWeight\x88\x01\x01\x12\x1a\n" +
+	"\tmax_top_k\x18\x11 \x01(\x05R\amaxTopKB\n" +
 	"\n" +
 	"\b_bm25_k1B\t\n" +
 	"\a_bm25_bB\x11\n" +
@@ -17236,7 +17366,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05group\x18\x05 \x01(\tR\x05group\x12\x1d\n" +
 	"\n" +
 	"group_rank\x18\x06 \x01(\x05R\tgroupRank\x12&\n" +
-	"\x06images\x18\a \x03(\v2\x0e.mddb.ImageRefR\x06images\"\xad\x03\n" +
+	"\x06images\x18\a \x03(\v2\x0e.mddb.ImageRefR\x06images\"\xe6\x03\n" +
 	"\x13CrossSearchResponse\x125\n" +
 	"\aresults\x18\x01 \x03(\v2\x1b.mddb.CrossSearchResultItemR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12+\n" +
@@ -17248,7 +17378,9 @@ const file_mddb_proto_rawDesc = "" +
 	"\bpassages\x18\b \x03(\v2\r.mddb.PassageR\bpassages\x121\n" +
 	"\bindexing\x18\t \x01(\v2\x15.mddb.IndexWaitResultR\bindexing\x12$\n" +
 	"\x04plan\x18\n" +
-	" \x01(\v2\x10.mddb.SearchPlanR\x04plan\"\xd6\x01\n" +
+	" \x01(\v2\x10.mddb.SearchPlanR\x04plan\x12!\n" +
+	"\flimit_capped\x18\v \x01(\bR\vlimitCapped\x12\x14\n" +
+	"\x05limit\x18\f \x01(\x05R\x05limit\"\xd6\x01\n" +
 	"\x15FindDuplicatesRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -17507,12 +17639,14 @@ const file_mddb_proto_rawDesc = "" +
 	"\x13GeoSearchResultItem\x12*\n" +
 	"\bdocument\x18\x01 \x01(\v2\x0e.mddb.DocumentR\bdocument\x12'\n" +
 	"\x0fdistance_meters\x18\x02 \x01(\x01R\x0edistanceMeters\x12\x12\n" +
-	"\x04rank\x18\x03 \x01(\x05R\x04rank\"\xa1\x01\n" +
+	"\x04rank\x18\x03 \x01(\x05R\x04rank\"\xda\x01\n" +
 	"\x11GeoSearchResponse\x123\n" +
 	"\aresults\x18\x01 \x03(\v2\x19.mddb.GeoSearchResultItemR\aresults\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12#\n" +
 	"\rradius_meters\x18\x03 \x01(\x01R\fradiusMeters\x12\x1c\n" +
-	"\talgorithm\x18\x04 \x01(\tR\talgorithm\"\xd9\x02\n" +
+	"\talgorithm\x18\x04 \x01(\tR\talgorithm\x12!\n" +
+	"\flimit_capped\x18\x05 \x01(\bR\vlimitCapped\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\x05R\x05limit\"\xd9\x02\n" +
 	"\x10GeoWithinRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -17726,7 +17860,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\ainclude\x18\x03 \x03(\tR\ainclude\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\x12'\n" +
-	"\x0finclude_content\x18\x05 \x01(\bR\x0eincludeContent\"\xec\x02\n" +
+	"\x0finclude_content\x18\x05 \x01(\bR\x0eincludeContent\"\xa5\x03\n" +
 	"\x12CodeSymbolResponse\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -17740,7 +17874,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\acallees\x18\x06 \x03(\v2\r.mddb.PassageR\acallees\x12#\n" +
 	"\x05tests\x18\a \x03(\v2\r.mddb.PassageR\x05tests\x12)\n" +
 	"\bsiblings\x18\b \x03(\v2\r.mddb.PassageR\bsiblings\x12\x1c\n" +
-	"\ttruncated\x18\t \x01(\bR\ttruncated\"\xd0\x01\n" +
+	"\ttruncated\x18\t \x01(\bR\ttruncated\x12!\n" +
+	"\flimit_capped\x18\n" +
+	" \x01(\bR\vlimitCapped\x12\x14\n" +
+	"\x05limit\x18\v \x01(\x05R\x05limit\"\xd0\x01\n" +
 	"\x0eEvalQueryProto\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12#\n" +

@@ -491,6 +491,24 @@ embedding call. On `hybrid_search` only the vector half is split. With
 `explain: true`, `plan.decomposition` gives the parts. See
 [Query Decomposition](SEARCH.md#query-decomposition--questions-with-several-needs-v21810).
 
+## Result Limits (v2.18.10+)
+
+Every tool that takes a result count — `limit`, `top_k` or `top_n` on
+`full_text_search`, `search_documents`, `autocomplete`, `semantic_search`,
+`hybrid_search`, `cross_search`, `code_symbol` and `geo_search` — returns at
+most `MDDB_SEARCH_MAX_LIMIT` results (default 1000), or the collection's
+`retrieval.maxTopK` when that is lower. A capped call still succeeds; its JSON
+text adds `"limit"` (the count used) and `"limitCapped": true`, and the tool
+result also carries them as data:
+
+```json
+{"content": [{"type": "text", "text": "{ ... \"limit\": 1000, \"limitCapped\": true }"}],
+ "structuredContent": {"limitCapped": true, "limit": 1000}}
+```
+
+A call under the cap has no `structuredContent` and its text is unchanged.
+See [Result Limits](SEARCH.md#result-limits-v21810).
+
 ## Passages for Code (v2.18.8+)
 
 `search_documents`, `full_text_search`, `semantic_search`, `hybrid_search` and

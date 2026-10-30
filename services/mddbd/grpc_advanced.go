@@ -577,11 +577,13 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 	}
 	if res.Passages != nil {
 		return &proto.CrossSearchResponse{Passages: passagesOf(res.Passages), Total: safeInt32(res.Passages.Total),
-			TargetCollections: targets, Indexing: indexWaitToProto(res.Passages.Indexing)}, nil
+			TargetCollections: targets, Indexing: indexWaitToProto(res.Passages.Indexing),
+			LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}, nil
 	}
 	resp := &proto.CrossSearchResponse{Total: safeInt32(res.Total), SourceCollection: res.SourceCollection,
 		SourceDocId: res.SourceDocID, TargetCollections: res.TargetCollections, Algorithm: res.Algorithm,
-		DistanceMetric: res.DistanceMetric, Indexing: indexWaitToProto(res.Indexing), Plan: planToProto(res.Plan)}
+		DistanceMetric: res.DistanceMetric, Indexing: indexWaitToProto(res.Indexing), Plan: planToProto(res.Plan),
+		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}
 	for _, it := range res.Results {
 		d := it.Document
 		resp.Results = append(resp.Results, &proto.CrossSearchResultItem{Collection: it.Collection, Document: docToProto(&d),

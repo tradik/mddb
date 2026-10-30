@@ -335,7 +335,7 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 		return res
 	}
 
-	return map[string]interface{}{
+	res := map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
 				"type": "text",
@@ -343,6 +343,12 @@ func (h *MCPHandler) handleToolsCall(ctx context.Context, req map[string]interfa
 			},
 		},
 	}
+	// #368: a capped limit is also said as data, so an agent can tell a
+	// short answer from a cut one without parsing the text.
+	if detail := mcpLimitContent(result); detail != nil {
+		res["structuredContent"] = detail
+	}
+	return res
 }
 
 // ---- Prompts ----

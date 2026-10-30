@@ -346,6 +346,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 	if limit == 0 {
 		limit = 50
 	}
+	limit, limitReport := g.server.CapLimit(req.Collection, limit, 0) // #368
 	filter := mergeFilters(metaValuesFromProto(req.FilterMeta), metaFilterFromProto(req.Filter))
 	page, total, err := g.server.searchDocuments(req.Collection, filter, sortField, req.Asc, int(req.Offset), limit)
 	if err != nil {
@@ -355,7 +356,8 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 	for i := range page {
 		protoDocs[i] = docToProto(&page[i])
 	}
-	return &proto.SearchResponse{Documents: protoDocs, Total: safeInt32(total)}, nil
+	return &proto.SearchResponse{Documents: protoDocs, Total: safeInt32(total),
+		LimitCapped: limitReport.LimitCapped, Limit: safeInt32(limitReport.Limit)}, nil
 }
 
 // Export implements the Export RPC (streaming)

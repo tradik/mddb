@@ -30,6 +30,7 @@ func (c *DirectClient) GeoSearch(ctx context.Context, req *MCPGeoSearchRequest) 
 	if algo != "rtree" && algo != "geohash" {
 		return nil, errors.New("unknown algorithm: " + algo)
 	}
+	topK, limitReport := s.geoTopK(req.Collection, req.TopK) // #368
 
 	var allowed map[string]struct{}
 	if len(req.FilterMeta) > 0 {
@@ -39,6 +40,7 @@ func (c *DirectClient) GeoSearch(ctx context.Context, req *MCPGeoSearchRequest) 
 				Results:      []MCPGeoSearchResult{},
 				RadiusMeters: req.RadiusMeters,
 				Algorithm:    algo,
+				LimitReport:  limitReport,
 			}, nil
 		}
 		allowed = make(map[string]struct{}, len(ids))
@@ -53,12 +55,12 @@ func (c *DirectClient) GeoSearch(ctx context.Context, req *MCPGeoSearchRequest) 
 		if s.GeoHashIndex == nil || !s.GeoHashIndex.IsReady() {
 			return nil, errors.New("geohash index is loading")
 		}
-		hits = s.GeoHashIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, req.TopK, allowed)
+		hits = s.GeoHashIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, topK, allowed)
 	default:
 		if s.GeoIndex == nil || !s.GeoIndex.IsReady() {
 			return nil, errors.New("geo index is loading")
 		}
-		hits = s.GeoIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, req.TopK, allowed)
+		hits = s.GeoIndex.Search(req.Collection, req.Lat, req.Lng, req.RadiusMeters, topK, allowed)
 	}
 	items := c.loadGeoResults(req.Collection, hits, req.IncludeContent, true)
 	return &MCPGeoSearchResponse{
@@ -66,6 +68,7 @@ func (c *DirectClient) GeoSearch(ctx context.Context, req *MCPGeoSearchRequest) 
 		Total:        len(items),
 		RadiusMeters: req.RadiusMeters,
 		Algorithm:    algo,
+		LimitReport:  limitReport,
 	}, nil
 }
 

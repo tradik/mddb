@@ -80,6 +80,7 @@ type Server struct {
 	SearchCache         *cache.SearchCache     // Opt-in per-request search-result cache (GO-031)
 	Persistence         PersistenceStatus      // What the data directory can promise (GO-032)
 	SearchLimiter       *SearchLimiter         // Bounds concurrent heavy queries (GO-033)
+	SearchMaxLimit      int                    // MDDB_SEARCH_MAX_LIMIT: most results one search returns; 0 = default 1000 (#368)
 	HTTP3               *HTTP3Server           // Held so shutdown can close the listener (GO-034)
 	LockFreeCache       *cache.LockFreeCache   // Lock-free cache (extreme performance)
 	IndexQueue          *indexqueue.IndexQueue // Async metadata indexing
@@ -365,6 +366,10 @@ func runServer(srvCfg ServerConfig) int {
 	if err := configureClientAddressing(os.Getenv); err != nil {
 		fatal("startup step failed", "step", "client address", "err", err)
 	}
+	// #368: the ceiling on every search's result count. A bad value is a
+	// startup error too — it would either lift the cap or break every search.
+	searchMaxLimit, err := parseSearchMaxLimit(os.Getenv(searchMaxLimitEnv))
+	mustStep(searchMaxLimitEnv, err)
 
 	// GO-032: say plainly what durability this data directory can offer before
 	// accepting a single write. bbolt fsyncs every commit, but that promise is
@@ -389,6 +394,7 @@ func runServer(srvCfg ServerConfig) int {
 	}()
 
 	s := newServer(srvCfg, db, persistence, freelistLoad)
+	s.SearchMaxLimit = searchMaxLimit
 	s.checkCollectionLayout()
 	defer s.closeCollectionFiles()
 

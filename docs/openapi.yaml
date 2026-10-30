@@ -803,6 +803,19 @@ paths:
               schema:
                 type: integer
                 example: 234
+            X-Limit-Capped:
+              description: >
+                (v2.18.10, #368) "true" when the requested limit was above
+                MDDB_SEARCH_MAX_LIMIT or the collection's retrieval.maxTopK.
+                Absent otherwise. The body is a bare array, so the report is a header.
+              schema:
+                type: string
+                example: "true"
+            X-Limit:
+              description: (v2.18.10, #368) The limit used; sent with X-Limit-Capped.
+              schema:
+                type: integer
+                example: 1000
           content:
             application/json:
               schema:
@@ -1844,7 +1857,9 @@ paths:
           schema:
             type: integer
             default: 10
-          description: Maximum number of suggestions returned
+          description: >
+            Maximum number of suggestions returned, never above
+            MDDB_SEARCH_MAX_LIMIT or the collection's retrieval.maxTopK (v2.18.10+).
       responses:
         "200":
           description: Suggestions
@@ -1853,6 +1868,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  limit: { $ref: '#/components/schemas/LimitUsed' }
+                  limitCapped: { $ref: '#/components/schemas/LimitCapped' }
                   items:
                     type: array
                     items:
@@ -6360,6 +6377,8 @@ paths:
               schema:
                 type: object
                 properties:
+                  limit: { $ref: '#/components/schemas/LimitUsed' }
+                  limitCapped: { $ref: '#/components/schemas/LimitCapped' }
                   results:
                     type: array
                     items:
@@ -6895,10 +6914,25 @@ components:
         error: { type: string, example: revision conflict }
         expectedRevision: { type: string }
         currentRevision: { type: string, description: The document's revision now; empty when it does not exist. }
+    LimitUsed:
+      type: integer
+      description: >
+        (v2.18.10, #368) The result count the search used. Present only with
+        limitCapped.
+      example: 1000
+    LimitCapped:
+      type: boolean
+      description: >
+        (v2.18.10, #368) The requested (or default) limit was above
+        MDDB_SEARCH_MAX_LIMIT or the collection's retrieval.maxTopK and was
+        lowered to limit. Absent when nothing was capped.
+      example: true
     PassagesResponse:
       type: object
       description: What a search returns with format "passages" (AGT-002).
       properties:
+        limit: { $ref: '#/components/schemas/LimitUsed' }
+        limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         passages: { type: array, items: { $ref: '#/components/schemas/Passage' } }
         total: { type: integer }
         contextTruncated: { type: boolean }
@@ -6970,11 +7004,17 @@ components:
         include:
           type: array
           items: { type: string, enum: [ definitions, references, callers, callees, tests, siblings ] }
-        limit: { type: integer, default: 20, maximum: 200 }
+        limit:
+          type: integer
+          default: 20
+          maximum: 200
+          description: Per relation; also never above MDDB_SEARCH_MAX_LIMIT or the collection's retrieval.maxTopK (v2.18.10+).
         includeContent: { type: boolean }
     SymbolResult:
       type: object
       properties:
+        limit: { $ref: '#/components/schemas/LimitUsed' }
+        limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         collection: { type: string }
         symbol: { type: string }
         definitions: { type: array, items: { $ref: '#/components/schemas/Passage' } }
@@ -8430,6 +8470,8 @@ components:
     VectorSearchResponse:
       type: object
       properties:
+        limit: { $ref: '#/components/schemas/LimitUsed' }
+        limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         imageHits:
           type: array
           items: { $ref: '#/components/schemas/ImageRef' }
@@ -8921,6 +8963,8 @@ components:
     FTSSearchResponse:
       type: object
       properties:
+        limit: { $ref: '#/components/schemas/LimitUsed' }
+        limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         results:
           type: array
           items:
@@ -9585,6 +9629,8 @@ components:
     HybridSearchResponse:
       type: object
       properties:
+        limit: { $ref: '#/components/schemas/LimitUsed' }
+        limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         imageHits:
           type: array
           items: { $ref: '#/components/schemas/ImageRef' }
@@ -11401,6 +11447,14 @@ components:
             (SRCH-005) Default recall/latency knob for this collection:
             candidates fetched per requested result before deduplication,
             merging or rescoring. A request parameter overrides it.
+        maxTopK:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+          description: >
+            (v2.18.10, #368) Most results one search of this collection returns,
+            whatever the request asks for. Lowers MDDB_SEARCH_MAX_LIMIT for this
+            collection and never raises it; topK must not exceed it. 0 = unset.
         contextTokenBudget:
           type: integer
           minimum: 0
@@ -12019,6 +12073,8 @@ components:
     CrossSearchResponse:
       type: object
       properties:
+        limit: { $ref: '#/components/schemas/LimitUsed' }
+        limitCapped: { $ref: '#/components/schemas/LimitCapped' }
         plan:
           $ref: '#/components/schemas/SearchPlan'
         indexing:

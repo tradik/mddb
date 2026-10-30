@@ -66,7 +66,7 @@ func (a *GraphQLAdapter) SearchDocuments(ctx context.Context, input gql.SearchIn
 		startCursor = &s
 		endCursor = &e
 	}
-	return &gql.DocumentConnection{
+	conn := &gql.DocumentConnection{
 		Edges: edges,
 		PageInfo: &gql.PageInfo{
 			HasNextPage:     hasNext,
@@ -75,7 +75,20 @@ func (a *GraphQLAdapter) SearchDocuments(ctx context.Context, input gql.SearchIn
 			EndCursor:       endCursor,
 		},
 		TotalCount: resp.Total,
-	}, nil
+	}
+	conn.LimitCapped, conn.Limit = limitToGQL(resp.LimitReport)
+	return conn, nil
+}
+
+// limitToGQL is a limit report as GraphQL carries it (#368): limitCapped
+// and limit when the cap lowered the limit, both null otherwise — so an
+// answer under the cap is the one it always was.
+func limitToGQL(rep LimitReport) (*bool, *int) {
+	if !rep.LimitCapped {
+		return nil, nil
+	}
+	capped, n := true, rep.Limit
+	return &capped, &n
 }
 
 func (a *GraphQLAdapter) AddDocument(ctx context.Context, input gql.AddDocumentInput) (*gql.Document, error) {
@@ -342,9 +355,11 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 	if err != nil {
 		return nil, err
 	}
+	capped, limit := limitToGQL(resp.LimitReport)
 	if resp.Passages != nil {
 		return &gql.VectorSearchResponse{Results: []*gql.VectorSearchResult{}, Total: resp.Passages.Total,
-			Passages: passagesToGQL(resp.Passages.Passages), ImageHits: imageRefsToGQL(resp.Passages.ImageHits)}, nil
+			Passages: passagesToGQL(resp.Passages.Passages), ImageHits: imageRefsToGQL(resp.Passages.ImageHits),
+			LimitCapped: capped, Limit: limit}, nil
 	}
 	results := make([]*gql.VectorSearchResult, 0, len(resp.Results))
 	for i := range resp.Results {
@@ -364,12 +379,14 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 	model := resp.Model
 	dims := resp.Dimensions
 	return &gql.VectorSearchResponse{
-		Results:    results,
-		Total:      resp.Total,
-		Model:      &model,
-		Dimensions: &dims,
-		Plan:       searchPlanToGQL(resp.Plan),
-		ImageHits:  imageRefsToGQL(resp.ImageHits),
+		Results:     results,
+		Total:       resp.Total,
+		Model:       &model,
+		Dimensions:  &dims,
+		Plan:        searchPlanToGQL(resp.Plan),
+		ImageHits:   imageRefsToGQL(resp.ImageHits),
+		LimitCapped: capped,
+		Limit:       limit,
 	}, nil
 }
 
@@ -422,8 +439,10 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 	if err != nil {
 		return nil, err
 	}
+	capped, limit := limitToGQL(resp.LimitReport)
 	if resp.Passages != nil {
-		return &gql.FTSResponse{Results: []*gql.FTSResult{}, Total: resp.Passages.Total, Passages: passagesToGQL(resp.Passages.Passages)}, nil
+		return &gql.FTSResponse{Results: []*gql.FTSResult{}, Total: resp.Passages.Total, Passages: passagesToGQL(resp.Passages.Passages),
+			LimitCapped: capped, Limit: limit}, nil
 	}
 	out := make([]*gql.FTSResult, 0, len(resp.Results))
 	for i := range resp.Results {
@@ -435,7 +454,7 @@ func (a *GraphQLAdapter) FullTextSearch(ctx context.Context, input gql.FTSInput)
 			Images:       imageRefsToGQL(r.Images),
 		})
 	}
-	return &gql.FTSResponse{Results: out, Total: resp.Total}, nil
+	return &gql.FTSResponse{Results: out, Total: resp.Total, LimitCapped: capped, Limit: limit}, nil
 }
 
 // groupByFromGQL converts the GraphQL groupBy input (SRCH-016).

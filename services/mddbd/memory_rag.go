@@ -104,6 +104,7 @@ type MemoryRecallResponse struct {
 	// ContextTruncated reports that the messages collection's
 	// contextTokenBudget dropped results from the tail (RAG-001).
 	ContextTruncated bool `json:"contextTruncated,omitempty"`
+	LimitReport           // limit, limitCapped: set when the server's cap lowered topK (#368)
 }
 
 // MemorySummarizeRequest is the request body for summarizing a session.
@@ -337,7 +338,7 @@ func (s *Server) handleMemoryRecall(w http.ResponseWriter, r *http.Request) {
 
 	// RAG-001: memory recall always searches the fixed messages collection,
 	// so a profile set on it configures recall for every caller.
-	topK := s.ResolveTopK(memoryMessagesCollection, req.TopK, defaultRecallTopK)
+	topK, limitReport := s.ResolveTopK(memoryMessagesCollection, req.TopK, defaultRecallTopK)
 	strategy := req.Strategy
 	if strategy == "" {
 		strategy = "hybrid"
@@ -350,7 +351,7 @@ func (s *Server) handleMemoryRecall(w http.ResponseWriter, r *http.Request) {
 		// Get sessions for this user first, then filter messages by sessionId
 		sessionIDs := s.getSessionIDsForUser(req.UserID)
 		if len(sessionIDs) == 0 {
-			ok(w, MemoryRecallResponse{Results: []MemoryRecallResultItem{}, Strategy: strategy, Query: req.Query})
+			ok(w, MemoryRecallResponse{Results: []MemoryRecallResultItem{}, Strategy: strategy, Query: req.Query, LimitReport: limitReport})
 			return
 		}
 		filterMeta["sessionId"] = sessionIDs
@@ -387,6 +388,7 @@ func (s *Server) handleMemoryRecall(w http.ResponseWriter, r *http.Request) {
 		Strategy:         strategy,
 		Query:            req.Query,
 		ContextTruncated: contextTruncated,
+		LimitReport:      limitReport,
 	}
 	ok(w, resp)
 }

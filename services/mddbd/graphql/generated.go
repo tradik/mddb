@@ -90,6 +90,8 @@ type ComplexityRoot struct {
 		Callers     func(childComplexity int) int
 		Collection  func(childComplexity int) int
 		Definitions func(childComplexity int) int
+		Limit       func(childComplexity int) int
+		LimitCapped func(childComplexity int) int
 		References  func(childComplexity int) int
 		Siblings    func(childComplexity int) int
 		Symbol      func(childComplexity int) int
@@ -117,9 +119,11 @@ type ComplexityRoot struct {
 	}
 
 	DocumentConnection struct {
-		Edges      func(childComplexity int) int
-		PageInfo   func(childComplexity int) int
-		TotalCount func(childComplexity int) int
+		Edges       func(childComplexity int) int
+		Limit       func(childComplexity int) int
+		LimitCapped func(childComplexity int) int
+		PageInfo    func(childComplexity int) int
+		TotalCount  func(childComplexity int) int
 	}
 
 	DocumentEdge struct {
@@ -128,9 +132,11 @@ type ComplexityRoot struct {
 	}
 
 	FTSResponse struct {
-		Passages func(childComplexity int) int
-		Results  func(childComplexity int) int
-		Total    func(childComplexity int) int
+		Limit       func(childComplexity int) int
+		LimitCapped func(childComplexity int) int
+		Passages    func(childComplexity int) int
+		Results     func(childComplexity int) int
+		Total       func(childComplexity int) int
 	}
 
 	FTSResult struct {
@@ -342,13 +348,15 @@ type ComplexityRoot struct {
 	}
 
 	VectorSearchResponse struct {
-		Dimensions func(childComplexity int) int
-		ImageHits  func(childComplexity int) int
-		Model      func(childComplexity int) int
-		Passages   func(childComplexity int) int
-		Plan       func(childComplexity int) int
-		Results    func(childComplexity int) int
-		Total      func(childComplexity int) int
+		Dimensions  func(childComplexity int) int
+		ImageHits   func(childComplexity int) int
+		Limit       func(childComplexity int) int
+		LimitCapped func(childComplexity int) int
+		Model       func(childComplexity int) int
+		Passages    func(childComplexity int) int
+		Plan        func(childComplexity int) int
+		Results     func(childComplexity int) int
+		Total       func(childComplexity int) int
 	}
 
 	VectorSearchResult struct {
@@ -648,6 +656,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CodeSymbol.Definitions(childComplexity), true
+	case "CodeSymbol.limit":
+		if e.ComplexityRoot.CodeSymbol.Limit == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Limit(childComplexity), true
+	case "CodeSymbol.limitCapped":
+		if e.ComplexityRoot.CodeSymbol.LimitCapped == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.LimitCapped(childComplexity), true
 	case "CodeSymbol.references":
 		if e.ComplexityRoot.CodeSymbol.References == nil {
 			break
@@ -765,6 +785,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.DocumentConnection.Edges(childComplexity), true
+	case "DocumentConnection.limit":
+		if e.ComplexityRoot.DocumentConnection.Limit == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DocumentConnection.Limit(childComplexity), true
+	case "DocumentConnection.limitCapped":
+		if e.ComplexityRoot.DocumentConnection.LimitCapped == nil {
+			break
+		}
+
+		return e.ComplexityRoot.DocumentConnection.LimitCapped(childComplexity), true
 	case "DocumentConnection.pageInfo":
 		if e.ComplexityRoot.DocumentConnection.PageInfo == nil {
 			break
@@ -791,6 +823,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.DocumentEdge.Node(childComplexity), true
 
+	case "FTSResponse.limit":
+		if e.ComplexityRoot.FTSResponse.Limit == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FTSResponse.Limit(childComplexity), true
+	case "FTSResponse.limitCapped":
+		if e.ComplexityRoot.FTSResponse.LimitCapped == nil {
+			break
+		}
+
+		return e.ComplexityRoot.FTSResponse.LimitCapped(childComplexity), true
 	case "FTSResponse.passages":
 		if e.ComplexityRoot.FTSResponse.Passages == nil {
 			break
@@ -1879,6 +1923,18 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.VectorSearchResponse.ImageHits(childComplexity), true
+	case "VectorSearchResponse.limit":
+		if e.ComplexityRoot.VectorSearchResponse.Limit == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResponse.Limit(childComplexity), true
+	case "VectorSearchResponse.limitCapped":
+		if e.ComplexityRoot.VectorSearchResponse.LimitCapped == nil {
+			break
+		}
+
+		return e.ComplexityRoot.VectorSearchResponse.LimitCapped(childComplexity), true
 	case "VectorSearchResponse.model":
 		if e.ComplexityRoot.VectorSearchResponse.Model == nil {
 			break
@@ -2253,6 +2309,10 @@ func (ec *executionContext) childFields_CodeSymbol(ctx context.Context, field gr
 		return ec.fieldContext_CodeSymbol_siblings(ctx, field)
 	case "truncated":
 		return ec.fieldContext_CodeSymbol_truncated(ctx, field)
+	case "limitCapped":
+		return ec.fieldContext_CodeSymbol_limitCapped(ctx, field)
+	case "limit":
+		return ec.fieldContext_CodeSymbol_limit(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type CodeSymbol", field.Name)
 }
@@ -2303,6 +2363,10 @@ func (ec *executionContext) childFields_DocumentConnection(ctx context.Context, 
 		return ec.fieldContext_DocumentConnection_pageInfo(ctx, field)
 	case "totalCount":
 		return ec.fieldContext_DocumentConnection_totalCount(ctx, field)
+	case "limitCapped":
+		return ec.fieldContext_DocumentConnection_limitCapped(ctx, field)
+	case "limit":
+		return ec.fieldContext_DocumentConnection_limit(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type DocumentConnection", field.Name)
 }
@@ -2325,6 +2389,10 @@ func (ec *executionContext) childFields_FTSResponse(ctx context.Context, field g
 		return ec.fieldContext_FTSResponse_total(ctx, field)
 	case "passages":
 		return ec.fieldContext_FTSResponse_passages(ctx, field)
+	case "limitCapped":
+		return ec.fieldContext_FTSResponse_limitCapped(ctx, field)
+	case "limit":
+		return ec.fieldContext_FTSResponse_limit(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type FTSResponse", field.Name)
 }
@@ -2671,6 +2739,10 @@ func (ec *executionContext) childFields_VectorSearchResponse(ctx context.Context
 		return ec.fieldContext_VectorSearchResponse_plan(ctx, field)
 	case "imageHits":
 		return ec.fieldContext_VectorSearchResponse_imageHits(ctx, field)
+	case "limitCapped":
+		return ec.fieldContext_VectorSearchResponse_limitCapped(ctx, field)
+	case "limit":
+		return ec.fieldContext_VectorSearchResponse_limit(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type VectorSearchResponse", field.Name)
 }
@@ -4515,6 +4587,52 @@ func (ec *executionContext) fieldContext_CodeSymbol_truncated(_ context.Context,
 	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "Boolean")
 }
 
+func (ec *executionContext) _CodeSymbol_limitCapped(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_limitCapped(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LimitCapped, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *bool) graphql.Marshaler {
+			return ec.marshalOBoolean2ᚖbool(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_limitCapped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _CodeSymbol_limit(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_limit(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Limit, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_limit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "Int")
+}
+
 func (ec *executionContext) _CollectionStats_name(ctx context.Context, field graphql.CollectedField, obj *CollectionStats) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4901,6 +5019,52 @@ func (ec *executionContext) fieldContext_DocumentConnection_totalCount(_ context
 	return graphql.NewScalarFieldContext("DocumentConnection", field, false, false, "Int")
 }
 
+func (ec *executionContext) _DocumentConnection_limitCapped(ctx context.Context, field graphql.CollectedField, obj *DocumentConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DocumentConnection_limitCapped(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LimitCapped, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *bool) graphql.Marshaler {
+			return ec.marshalOBoolean2ᚖbool(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_DocumentConnection_limitCapped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DocumentConnection", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _DocumentConnection_limit(ctx context.Context, field graphql.CollectedField, obj *DocumentConnection) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_DocumentConnection_limit(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Limit, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_DocumentConnection_limit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("DocumentConnection", field, false, false, "Int")
+}
+
 func (ec *executionContext) _DocumentEdge_cursor(ctx context.Context, field graphql.CollectedField, obj *DocumentEdge) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -5041,6 +5205,52 @@ func (ec *executionContext) fieldContext_FTSResponse_passages(_ context.Context,
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _FTSResponse_limitCapped(ctx context.Context, field graphql.CollectedField, obj *FTSResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FTSResponse_limitCapped(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LimitCapped, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *bool) graphql.Marshaler {
+			return ec.marshalOBoolean2ᚖbool(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FTSResponse_limitCapped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FTSResponse", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _FTSResponse_limit(ctx context.Context, field graphql.CollectedField, obj *FTSResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_FTSResponse_limit(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Limit, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_FTSResponse_limit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("FTSResponse", field, false, false, "Int")
 }
 
 func (ec *executionContext) _FTSResult_document(ctx context.Context, field graphql.CollectedField, obj *FTSResult) (ret graphql.Marshaler) {
@@ -10144,6 +10354,52 @@ func (ec *executionContext) fieldContext_VectorSearchResponse_imageHits(_ contex
 	return fc, nil
 }
 
+func (ec *executionContext) _VectorSearchResponse_limitCapped(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResponse_limitCapped(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.LimitCapped, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *bool) graphql.Marshaler {
+			return ec.marshalOBoolean2ᚖbool(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResponse_limitCapped(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("VectorSearchResponse", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _VectorSearchResponse_limit(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResponse) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_VectorSearchResponse_limit(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Limit, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *int) graphql.Marshaler {
+			return ec.marshalOInt2ᚖint(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_VectorSearchResponse_limit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("VectorSearchResponse", field, false, false, "Int")
+}
+
 func (ec *executionContext) _VectorSearchResult_document(ctx context.Context, field graphql.CollectedField, obj *VectorSearchResult) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -13468,6 +13724,16 @@ func (ec *executionContext) _CodeSymbol(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "limitCapped":
+			out.Values[i] = ec._CodeSymbol_limitCapped(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "limit":
+			out.Values[i] = ec._CodeSymbol_limit(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13632,6 +13898,16 @@ func (ec *executionContext) _DocumentConnection(ctx context.Context, sel ast.Sel
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "limitCapped":
+			out.Values[i] = ec._DocumentConnection_limitCapped(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "limit":
+			out.Values[i] = ec._DocumentConnection_limit(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -13710,6 +13986,16 @@ func (ec *executionContext) _FTSResponse(ctx context.Context, sel ast.SelectionS
 			}
 		case "passages":
 			out.Values[i] = ec._FTSResponse_passages(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "limitCapped":
+			out.Values[i] = ec._FTSResponse_limitCapped(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "limit":
+			out.Values[i] = ec._FTSResponse_limit(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -15177,6 +15463,16 @@ func (ec *executionContext) _VectorSearchResponse(ctx context.Context, sel ast.S
 			}
 		case "imageHits":
 			out.Values[i] = ec._VectorSearchResponse_imageHits(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "limitCapped":
+			out.Values[i] = ec._VectorSearchResponse_limitCapped(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "limit":
+			out.Values[i] = ec._VectorSearchResponse_limit(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}

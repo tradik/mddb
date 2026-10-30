@@ -40,7 +40,7 @@ func TestResolveFallsBackWithoutAProfile(t *testing.T) {
 	srv, cleanup := profileServer(t)
 	defer cleanup()
 
-	if got := srv.ResolveTopK("unconfigured", 0, 50); got != 50 {
+	if got, _ := srv.ResolveTopK("unconfigured", 0, 50); got != 50 {
 		t.Errorf("topK = %d, want the path default 50", got)
 	}
 	if got := srv.ResolveRetrievalMode("unconfigured", "", "parent"); got != "parent" {
@@ -64,7 +64,7 @@ func TestEmptyProfileChangesNothing(t *testing.T) {
 	defer cleanup()
 	setProfile(t, srv, "empty", &RetrievalProfileDef{})
 
-	if got := srv.ResolveTopK("empty", 0, 50); got != 50 {
+	if got, _ := srv.ResolveTopK("empty", 0, 50); got != 50 {
 		t.Errorf("topK = %d, want the path default 50", got)
 	}
 	if got := srv.ResolveHybridStrategy("empty", "", "alpha"); got != "alpha" {
@@ -83,7 +83,7 @@ func TestProfileBeatsThePathDefault(t *testing.T) {
 		HybridAlphaSet: true,
 	})
 
-	if got := srv.ResolveTopK("docs", 0, 50); got != 40 {
+	if got, _ := srv.ResolveTopK("docs", 0, 50); got != 40 {
 		t.Errorf("topK = %d, want the profile's 40", got)
 	}
 	if got := srv.ResolveRetrievalMode("docs", "", "parent"); got != RetrievalModeChunk {
@@ -110,7 +110,7 @@ func TestRequestBeatsTheProfile(t *testing.T) {
 		HybridAlphaSet: true,
 	})
 
-	if got := srv.ResolveTopK("docs", 7, 50); got != 7 {
+	if got, _ := srv.ResolveTopK("docs", 7, 50); got != 7 {
 		t.Errorf("topK = %d, want the caller's 7", got)
 	}
 	if got := srv.ResolveRetrievalMode("docs", RetrievalModeWindow, "parent"); got != RetrievalModeWindow {
@@ -144,7 +144,7 @@ func TestExplicitZeroAlphaInProfileIsHonoured(t *testing.T) {
 
 func TestResolversSurviveAMissingManager(t *testing.T) {
 	srv := &Server{}
-	if got := srv.ResolveTopK("any", 0, 50); got != 50 {
+	if got, _ := srv.ResolveTopK("any", 0, 50); got != 50 {
 		t.Errorf("topK = %d without a collection manager, want the fallback", got)
 	}
 	if p := srv.RetrievalProfile("any"); p != nil {

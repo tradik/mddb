@@ -93,7 +93,8 @@ type MCPSearchResponse struct {
 	Total     int           `json:"total"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages *PassagesResponse `json:"-"`
+	Passages    *PassagesResponse `json:"-"`
+	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // MCPDeleteRequest represents request to delete a document.
@@ -254,6 +255,8 @@ type MCPVectorSearchRequest struct {
 	ImageOptions         // includeImages (RAG-010)
 	// QueryImage searches by an image (RAG-010); see VectorSearchRequest.
 	QueryImage string `json:"queryImage,omitempty"`
+	// limitReport is set when the server's cap lowered TopK (#368).
+	limitReport LimitReport
 }
 
 // MCPVectorSearchResult represents a single semantic search result.
@@ -307,7 +310,8 @@ type MCPVectorSearchResponse struct {
 	ImageHits []ImageRef `json:"imageHits,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages *PassagesResponse `json:"-"`
+	Passages    *PassagesResponse `json:"-"`
+	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // MCPVectorReindexRequest represents a reindex request.
@@ -426,7 +430,8 @@ type MCPFTSSearchResponse struct {
 	ResponsePrompt string `json:"responsePrompt,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages *PassagesResponse `json:"-"`
+	Passages    *PassagesResponse `json:"-"`
+	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // MCPFTSReindexRequest represents a request to reindex FTS for a collection.
@@ -537,7 +542,8 @@ type MCPHybridSearchResponse struct {
 	ImageHits []ImageRef `json:"imageHits,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages *PassagesResponse `json:"-"`
+	Passages    *PassagesResponse `json:"-"`
+	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // MCPGeoSearchRequest represents a geo radius search.
@@ -576,6 +582,7 @@ type MCPGeoSearchResponse struct {
 	Total        int                  `json:"total"`
 	RadiusMeters float64              `json:"radiusMeters,omitempty"`
 	Algorithm    string               `json:"algorithm"`
+	LimitReport                       // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // MCPGeoStatsResponse is returned from GeoStats.
@@ -819,6 +826,8 @@ type MCPCrossSearchRequest struct {
 	// include "role:reference" for every reference collection.
 	SearchType   string `json:"searchType,omitempty"`
 	ImageOptions        // includeImages (RAG-010)
+	// limitReport is set when the server's cap lowered TopK (#368).
+	limitReport LimitReport
 }
 
 // MCPCrossSearchResponse is the response for cross_search.
@@ -837,7 +846,8 @@ type MCPCrossSearchResponse struct {
 	Plan *SearchPlan `json:"plan,omitempty"`
 	// Passages is set when the request asked for format "passages"; the tool
 	// returns it instead of the results (AGT-002).
-	Passages *PassagesResponse `json:"-"`
+	Passages    *PassagesResponse `json:"-"`
+	LimitReport                   // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
 }
 
 // --- Find Duplicates MCP Types ---

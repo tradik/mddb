@@ -99,12 +99,14 @@ func (a *GraphQLAdapter) CodeSymbol(ctx context.Context, input gql.CodeSymbolInp
 	if err != nil {
 		return nil, err
 	}
-	return &gql.CodeSymbol{
+	out := &gql.CodeSymbol{
 		Collection: res.Collection, Symbol: res.Symbol, Truncated: res.Truncated,
 		Definitions: passagesToGQL(res.Definitions), References: passagesToGQL(res.References),
 		Callers: passagesToGQL(res.Callers), Callees: passagesToGQL(res.Callees),
 		Tests: passagesToGQL(res.Tests), Siblings: passagesToGQL(res.Siblings),
-	}, nil
+	}
+	out.LimitCapped, out.Limit = limitToGQL(res.LimitReport)
+	return out, nil
 }
 
 // passagesToGQL converts passages for GraphQL; optional fields become nil
