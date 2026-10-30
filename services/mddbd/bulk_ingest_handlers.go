@@ -79,23 +79,28 @@ func (s *Server) handleBulkIngestStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	switch r.Method {
-	case http.MethodGet:
-		job, err := s.BulkIngest.Get(jobID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-		ok(w, job)
-	case http.MethodDelete:
-		if err := s.BulkIngest.Cancel(jobID); err != nil {
-			bad(w, err)
-			return
-		}
-		ok(w, map[string]string{"status": "cancelled", "id": jobID})
-	default:
+	if r.Method != http.MethodGet && r.Method != http.MethodDelete {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
+	job, err := s.BulkIngest.Get(jobID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	// SEC-019: reading a job reads its collection; cancelling writes it.
+	if !s.allowed(w, r, ruleReadWrite.forMethod(r.Method), job.Collection) {
+		return
+	}
+	if r.Method == http.MethodGet {
+		ok(w, job)
+		return
+	}
+	if err := s.BulkIngest.Cancel(jobID); err != nil {
+		bad(w, err)
+		return
+	}
+	ok(w, map[string]string{"status": "cancelled", "id": jobID})
 }
 
 // handleBulkIngestList returns all jobs, optionally filtered by collection

@@ -70,6 +70,16 @@ Listing endpoints return only the caller's namespace:
 - `POST /v1/collection-config/list` — only tenant collections.
 - Curation rule listing, schema listing (gRPC) — filtered likewise.
 
+Every other request that names no collection is about all of them, and a
+tenant user is refused it with `403` (v2.18.10+, SEC-019): server-wide
+`/v1/geo-stats`, `/v1/schema/list`, `/v1/gain`, `/v1/bulk-ingest-jobs` and
+`/v1/indexing-status` without `?collection=`, the webhook list, and the
+same operations over gRPC, MCP and GraphQL. Name the collection instead. The
+memory store (`/v1/memory/*`) is shared by every tenant and is closed to
+tenant users. See
+[AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced-21810-sec-019)
+for how every entry point is classified.
+
 ## Permissions within a tenant
 
 Standard per-collection permissions work unchanged inside the namespace:

@@ -48,6 +48,12 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 	if dc, ok := s.client.(*DirectClient); ok && args != nil {
 		dc.server.Aliases.resolveAliasArgs(args)
 	}
+	// SEC-019: the tool's rule, on the collections the aliases resolved to.
+	if dc, ok := s.client.(*DirectClient); ok {
+		if err := dc.server.authorizeTool(ctx, name, args); err != nil {
+			return "", fmt.Errorf("tool %q: %w", name, err)
+		}
+	}
 	// #333: writes wait while the freelist is rebuilt; reads do not.
 	if dc, ok := s.client.(*DirectClient); ok && !s.isToolReadOnly(name) {
 		if err := dc.server.writeBlocked(); err != nil {

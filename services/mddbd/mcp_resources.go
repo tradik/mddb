@@ -52,6 +52,12 @@ func (s *MCPToolServer) readResource(ctx context.Context, uri string) (string, e
 	if err != nil {
 		return "", fmt.Errorf("invalid uri: %w", err)
 	}
+	// SEC-019: the resource's collection, as for the tool that reads it.
+	if dc, ok := s.client.(*DirectClient); ok {
+		if err := dc.server.authorizeResource(ctx, parsed); err != nil {
+			return "", fmt.Errorf("resource %q: %w", uri, err)
+		}
+	}
 
 	switch parsed.Scheme {
 	case "mddb":

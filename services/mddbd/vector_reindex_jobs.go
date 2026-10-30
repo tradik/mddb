@@ -140,7 +140,9 @@ func (s *Server) startReindexJob(collection string, force bool) (vectorReindexJo
 func (s *Server) handleVectorReindexJobs(w http.ResponseWriter, r *http.Request) {
 	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/v1/vector-reindex/jobs"), "/")
 	if id == "" {
-		ok(w, map[string]any{"jobs": s.reindexJobs.list()})
+		if s.allowed(w, r, ruleAllRead) { // SEC-019: every collection's jobs
+			ok(w, map[string]any{"jobs": s.reindexJobs.list()})
+		}
 		return
 	}
 	job, found := s.reindexJobs.get(id)
@@ -150,5 +152,7 @@ func (s *Server) handleVectorReindexJobs(w http.ResponseWriter, r *http.Request)
 		_, _ = w.Write([]byte(`{"error":"no such reindex job (jobs are kept in memory and a restart forgets them)"}`))
 		return
 	}
-	ok(w, job)
+	if s.allowed(w, r, ruleRead, job.Collection) { // SEC-019: the job's collection
+		ok(w, job)
+	}
 }

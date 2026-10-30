@@ -1,7 +1,6 @@
 package main
 
 import (
-	"net/http"
 	"net/http/pprof"
 )
 
@@ -21,7 +20,7 @@ import (
 //	GET /debug/pprof/block      - Block (contention) profile
 //	GET /debug/pprof/mutex      - Mutex contention profile
 //	GET /debug/pprof/threadcreate - Thread creation profile
-func registerPprof(mux *http.ServeMux) {
+func registerPprof(mux routeMux) {
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
 	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)

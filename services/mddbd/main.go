@@ -1171,7 +1171,8 @@ func (s *Server) logProtocolConfig() {
 
 // registerGraphQL serves /graphql and the playground unless
 // MDDB_GRAPHQL_ENABLED=false.
-func (s *Server) registerGraphQL(mux *http.ServeMux, authEnabled bool) {
+func (s *Server) registerGraphQL(m routeMux, authEnabled bool) {
+	mux := s.gated(m) // SEC-019; each field is gated by graphqlAccessRules
 	if env("MDDB_GRAPHQL_ENABLED", "true") == "false" {
 		return
 	}
@@ -1332,25 +1333,32 @@ func (s *Server) startMCPListener(panelMode string, readTimeout, writeTimeout ti
 	go s.serveMCP(mcpSSE, mcpStreamable, panelMode, readTimeout, writeTimeout)
 }
 
+// registerMCPRoutes registers the MCP listener's routes, behind the access
+// gate (SEC-019); tool calls and resource reads are gated per tool inside.
+func (s *Server) registerMCPRoutes(m routeMux, mcpSSE *MCPSSETransport, mcpStreamable *MCPStreamableTransport) {
+	mux := s.gated(m)
+	mcpSrv := s.newMCPHTTPServer()
+	mux.HandleFunc("/resources", mcpSrv.handleResources)
+	mux.HandleFunc("/resources/read", mcpSrv.handleResourceRead)
+	mux.HandleFunc("/tools", mcpSrv.handleTools)
+	mux.HandleFunc("/tools/call", s.guardWrite(mcpSrv.handleToolCall))
+	mux.HandleFunc("/events", s.handleSSE)
+
+	// MCP-over-SSE transport (legacy, 2024-11-05 spec)
+	mux.HandleFunc("/sse", mcpSSE.HandleSSE)
+	mux.HandleFunc("/message", mcpSSE.HandleMessage)
+	slog.Info("MCP-over-SSE transport enabled at /sse + /message (legacy)")
+
+	// Streamable HTTP transport (2025-11-25 spec)
+	mux.HandleFunc("/mcp", mcpStreamable.Handle)
+	slog.Info("MCP Streamable HTTP transport enabled at /mcp")
+}
+
 // serveMCP runs the MCP HTTP listener until it fails.
 func (s *Server) serveMCP(mcpSSE *MCPSSETransport, mcpStreamable *MCPStreamableTransport, panelMode string, readTimeout, writeTimeout time.Duration) {
 	srvCfg := s.Config
 	mcpMux := http.NewServeMux()
-	mcpSrv := s.newMCPHTTPServer()
-	mcpMux.HandleFunc("/resources", mcpSrv.handleResources)
-	mcpMux.HandleFunc("/resources/read", mcpSrv.handleResourceRead)
-	mcpMux.HandleFunc("/tools", mcpSrv.handleTools)
-	mcpMux.HandleFunc("/tools/call", s.guardWrite(mcpSrv.handleToolCall))
-	mcpMux.HandleFunc("/events", s.handleSSE)
-
-	// MCP-over-SSE transport (legacy, 2024-11-05 spec)
-	mcpMux.HandleFunc("/sse", mcpSSE.HandleSSE)
-	mcpMux.HandleFunc("/message", mcpSSE.HandleMessage)
-	slog.Info("MCP-over-SSE transport enabled at /sse + /message (legacy)")
-
-	// Streamable HTTP transport (2025-11-25 spec)
-	mcpMux.HandleFunc("/mcp", mcpStreamable.Handle)
-	slog.Info("MCP Streamable HTTP transport enabled at /mcp")
+	s.registerMCPRoutes(mcpMux, mcpSSE, mcpStreamable)
 
 	// MCP middleware chain: CORS → OAuth (#322) → API Key Auth → Rate Limit → Request Logging → JSON → Routes
 	var mcpHandler http.Handler = mcpMux
@@ -1483,6 +1491,9 @@ func (s *Server) grpcServerOptions(authEnabled bool) ([]grpc.ServerOption, strin
 		// authenticated too — and claims injected so stream handlers'
 		// CheckPermission sees them.
 		streamChain = append(streamChain, s.AuthManager.GRPCStreamInterceptor())
+		// SEC-019: then the method's rule, on the authenticated claims.
+		unaryChain = append(unaryChain, s.accessUnaryInterceptor())
+		streamChain = append(streamChain, s.accessStreamInterceptor())
 	}
 	if len(unaryChain) > 0 {
 		grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryChain...))

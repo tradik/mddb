@@ -161,7 +161,7 @@ bound wiki-dump imports against decompression bombs.
 ### In scope
 
 - **Unauthenticated RCE via HTTP/gRPC/GraphQL/MCP endpoints** — every mutating request runs through auth middleware when `MDDB_AUTH_ENABLED=true`, through RBAC permission checks, and (when configured) through the rate limiter. The production guard prevents a server from coming up without these in place.
-- **Privilege escalation between collections** — collection-level RBAC is enforced at every write and read handler; admin-only endpoints check the `admin` claim.
+- **Privilege escalation between collections and tenants** — one access gate per surface applies each entry point's rule before it runs (2.18.10+, SEC-019): permission on every collection the request names, admin for administration, and tenant confinement. Every REST route, gRPC method, MCP tool and GraphQL field is classified in a table, and the completeness tests fail on one that is not; see [AUTHENTICATION.md](AUTHENTICATION.md#where-permissions-are-enforced-21810-sec-019).
 - **Data exfiltration via stolen backup or filesystem snapshot** — at-rest encryption protects `docs` and `rev` on a per-collection opt-in.
 - **Credential stuffing / brute force** — `security.auth_failure_burst` fires a webhook above threshold; rate limiter caps request volume regardless of auth state; timing-safe "invalid token" response prevents user-existence enumeration.
 - **Replay / MITM** — TLS 1.2+ on HTTP and gRPC; optional mTLS with operator-supplied client CA bundle.
@@ -185,8 +185,9 @@ bound wiki-dump imports against decompression bombs.
 3. **Audit log is local-only.** A SIEM forwarder is an operator integration, not a shipped component. The recommended pattern is a watermarked sidecar polling `GET /v1/audit`.
 4. **Rate-limiter buckets are in-memory and per-node.** Followers and leaders each enforce their own budget. For a cluster-wide limit, use an external gateway.
 5. **`ops.disk_usage_high` uses `syscall.Statfs`.** Linux and macOS work correctly. Windows is unspecified — consider an external disk-monitor on that platform.
-6. **GraphQL field-level auth** relies on the same adapter-level permission check as REST; per-field directives are intentional pass-throughs.
-7. **In-process MCP direct client** bypasses HTTP middleware (auth, rate limit) but still honours RBAC through `AuthManager`. Do not expose the in-process embedding to untrusted callers.
+6. **GraphQL field-level auth** is a field middleware that applies `graphqlAccessRules` to every `Query` and `Mutation` field (SEC-019); the `@auth` / `@hasRole` directives are intentional pass-throughs.
+7. **In-process MCP direct client** bypasses HTTP middleware (auth, rate limit). Tool calls that carry the main auth's claims are gated per tool (SEC-019); calls authenticated by an MCP API key, or over stdio, are scoped by the key's toolsets, not by collections. Do not expose the in-process embedding to untrusted callers.
+8. **Before 2.18.10 permissions were checked per handler, and some handlers did not check** (SEC-019): with auth on, a credential limited to one collection or tenant could reach others through routes such as `/v1/fts`, `/v1/add-batch`, `/v1/ingest`, `/v1/schema/*`, `/v1/geo-*`, `/v1/webhooks`, `/v1/memory/*`, the matching gRPC methods (synonyms, stopwords, geo stats) and MCP tools, and GraphQL `schema`, `schemas`, `stats` and `vectorStats`. Upgrade; there is no configuration workaround short of giving such credentials no access at all.
 
 ---
 

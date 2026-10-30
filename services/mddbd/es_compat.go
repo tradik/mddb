@@ -63,7 +63,7 @@ func esAPIKey(r *http.Request) string {
 }
 
 // registerESRoutes mounts the surface when it is enabled.
-func (s *Server) registerESRoutes(mux *http.ServeMux) {
+func (s *Server) registerESRoutes(mux routeMux) {
 	if !esCompatEnabled() {
 		return
 	}

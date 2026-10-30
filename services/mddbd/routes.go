@@ -2,7 +2,6 @@ package main
 
 import (
 	"log/slog"
-	"net/http"
 )
 
 // HTTP route registration (TEST-002).
@@ -15,7 +14,9 @@ import (
 //
 // registerRoutes is deliberately not clever: it is a list, and a list is the
 // right shape for something whose only job is to be complete and auditable.
-func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
+func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
+	// SEC-019: every route below is registered behind the access gate.
+	mux := s.gated(m)
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/v1/health", s.handleHealth)
 	mux.HandleFunc("/v1/compliance-status", s.handleComplianceStatus)

@@ -225,6 +225,62 @@ Use `"*"` to grant database-wide permissions:
 3. Check wildcard (`"*"`) permission
 4. Deny by default
 
+### Where permissions are enforced (2.18.10+, SEC-019)
+
+Every entry point of every surface — each REST route, gRPC method, MCP tool
+and resource, and GraphQL root field — has one rule in a table, and a gate
+applies that rule **before** the entry point runs. Until 2.18.10 each handler
+checked permissions on its own, and some never did: a key confined to one
+collection could read (and through `add-batch`, `ingest` or `schema/set`,
+write) another, and a tenant could reach another tenant's collections.
+
+The tables live next to the gates:
+
+| Surface | Table | Gate |
+|---------|-------|------|
+| REST (API and MCP listeners) | `httpAccessRules` in [access_rules_http.go](https://github.com/tradik/mddb/blob/main/services/mddbd/access_rules_http.go) | every route is registered through the gate |
+| gRPC | `grpcAccessRules` in [access_rules_grpc.go](https://github.com/tradik/mddb/blob/main/services/mddbd/access_rules_grpc.go) | unary and stream interceptors, after authentication |
+| MCP | `mcpToolAccessRules` in [access_rules_mcp.go](https://github.com/tradik/mddb/blob/main/services/mddbd/access_rules_mcp.go) | every `tools/call` and `resources/read`, after alias resolution |
+| GraphQL | `graphqlAccessRules` in [access_rules_graphql.go](https://github.com/tradik/mddb/blob/main/services/mddbd/access_rules_graphql.go) | a field middleware on `Query` and `Mutation` fields |
+
+A rule is one of:
+
+| Class | Needs | Examples |
+|-------|-------|----------|
+| public | nothing | `/health`, `/v1/auth/login`, `/metrics` with `MDDB_METRICS_PUBLIC=true` |
+| authenticated | any valid credential; touches no collection data | `/v1/system/info`, `/v1/fts-languages`, `/v1/geo-encode`, `/v1/auth/me` |
+| admin | a global administrator | backup, restore, audit, encryption, automation, embedding configs, corpus build/install, user management, pprof, `/v1/admin/diagnose` |
+| collection | read, write (or admin) on **every** collection the request names | `/v1/fts`, `/v1/add-batch`, `/v1/ingest`, `/v1/schema/*`, `/v1/geo-*`, `/v1/synonyms` (GET reads, POST/DELETE write) |
+| handler | the entry point checks, because only it knows the collection | a job, alias or curation rule looked up by id, a multipart upload, the `/es` index in the path, the event stream (filtered per event), replication (its own secret, mTLS or an admin) |
+
+How the collection is found: the query string (`collection`, `collections`)
+and a JSON body (`collection`, `sourceCollection`, `collections`,
+`targetCollections`) on REST; the same fields of the request message (and of
+the messages it holds) on gRPC; the tool's arguments on MCP; the field's
+arguments and input objects on GraphQL. All of them are checked, after alias
+resolution, so a cross-collection search needs read on its source and on every
+target, and a `role:<role>` target needs read on each collection it expands to.
+
+A request that names **no** collection is about all of them and needs the
+permission on `"*"`. A tenant user may make such a request only where the
+answer is filtered to its tenant (`/v1/stats`, `/v1/vector-stats`,
+`/v1/storage`, `/v1/collection-configs`, `/v1/corpus`, gRPC `ListSchemas` and
+`ListCollectionConfigs`); everywhere else it must name its collection.
+
+The memory store (`/v1/memory/*`, `memory_*` tools) keeps three shared
+collections — `memory_sessions`, `memory_messages`, `memory_summaries` — and
+needs the permission on all three.
+
+An entry point missing from its table is refused while auth is on, and the
+completeness tests (`TestEvery*IsClassified`) fail, so a new route, RPC, tool
+or field cannot ship without a rule. With `MDDB_AUTH_ENABLED=false` the gates
+do nothing.
+
+MCP calls authenticated by an **MCP API key** (`MDDB_MCP_API_KEY_ENABLED=true`)
+or arriving over stdio carry no user and are scoped by the key's toolsets, not
+by collections, as before; with main auth on and MCP keys off, the MCP
+listener requires the main credentials and every tool call is gated.
+
 ### Example Scenarios
 
 #### Scenario 1: Read-only user for analytics
@@ -442,7 +498,7 @@ registering the same name works.
 - `GET /health`
 - `GET /v1/health`
 - `POST /v1/auth/login`
-- `GET /metrics`
+- `GET /metrics` — only with `MDDB_METRICS_PUBLIC=true` (SEC-009)
 
 ---
 
