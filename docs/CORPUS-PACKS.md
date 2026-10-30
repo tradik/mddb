@@ -221,4 +221,4 @@ name the terms. An install refuses a pack without them.
 | `POST` | `/v1/corpus/install` | multipart, field `pack` → `{"name","docCount","vectorsDisabled","warnings"}` |
 | `POST` | `/v1/corpus/remove` | `{"name"}` |
 
-See [openapi.yaml](openapi.yaml) for the full schemas.
+See the [REST API reference](/docs/api/reference/), generated from `openapi.yaml`, for the full schemas.
