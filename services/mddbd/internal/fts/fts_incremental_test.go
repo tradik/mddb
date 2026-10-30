@@ -45,10 +45,13 @@ func propText(r *rand.Rand, n int) string {
 // propStep applies one random update to d and names it.
 func propStep(r *rand.Rand, d *propDoc) string {
 	keys := []string{"title", "tags", "license", "url", "vulnerable"}
-	switch r.Intn(7) {
+	switch r.Intn(8) {
 	case 0:
 		d.content = propText(r, 1+r.Intn(12))
 		return "content"
+	case 7: // GO-048: the content postings go, the meta fields stay
+		d.content = ""
+		return "content emptied"
 	case 1, 2:
 		d.meta[keys[r.Intn(len(keys))]] = propText(r, 1+r.Intn(4))
 		return "meta add/change"
@@ -246,6 +249,49 @@ func TestMetaOnlyUpdateLeavesContentAlone(t *testing.T) {
 	}
 	if _, ok := after["ftsfstat|ftsfstat|c|meta.url"]; ok {
 		t.Error("a field no document has kept its statistics")
+	}
+}
+
+// GO-048: a document whose content is emptied loses its content postings,
+// positions and BM25 length, and keeps its meta fields; writing content back
+// restores them. Each step leaves the index as a fresh build would.
+func TestEmptiedContentLeavesOnlyMetaFields(t *testing.T) {
+	bg := propDoc{id: "bg", content: "river stone", lang: "en", meta: map[string]string{}}
+	// Alone, the document takes the collection's statistics with its content.
+	for name, others := range map[string][]propDoc{"alone": nil, "with another document": {bg}} {
+		t.Run(name, func(t *testing.T) {
+			idx := newPropIndex(t)
+			d := propDoc{id: "d", content: "alpha beta gamma", lang: "en", meta: map[string]string{"title": "zenith"}}
+			if err := idx.IndexDocs("c", bulkOf(append(append([]propDoc{}, others...), d))); err != nil {
+				t.Fatal(err)
+			}
+			for _, content := range []string{"", "", "aurora alpha"} {
+				d.content = content
+				if err := idx.IndexDocs("c", []BulkDoc{d.bulk()}); err != nil {
+					t.Fatal(err)
+				}
+				fresh := newPropIndex(t)
+				if err := fresh.IndexDocs("c", bulkOf(append(append([]propDoc{}, others...), d))); err != nil {
+					t.Fatal(err)
+				}
+				assertSameIndex(t, fmt.Sprintf("content %q", content), idx, fresh)
+
+				wantContent := 0
+				if content != "" {
+					wantContent = 1
+				}
+				if hits, _ := idx.Search("c", "alpha", 10); len(hits) != wantContent {
+					t.Errorf("content %q: alpha found in %d documents, want %d", content, len(hits), wantContent)
+				}
+				if hits, _ := idx.SearchBM25("c", "alpha", 10, DefaultBM25); len(hits) != wantContent {
+					t.Errorf("content %q: BM25 alpha found in %d documents, want %d", content, len(hits), wantContent)
+				}
+				hits, err := idx.SearchBM25F("c", map[string]int{"zenith": 1}, 10, map[string]float64{"meta.title": 1}, DefaultBM25)
+				if err != nil || len(hits) != 1 {
+					t.Errorf("content %q: the title is no longer found: %v %v", content, hits, err)
+				}
+			}
+		})
 	}
 }
 

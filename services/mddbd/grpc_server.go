@@ -157,7 +157,7 @@ func (g *GRPCServer) Add(ctx context.Context, req *proto.AddRequest) (*proto.Doc
 	}
 
 	// Single write path: full pipeline (meta index in-tx, revisions + trim,
-	// then FTS/geo/webhooks/SSE/temporal/embedding via runPostWriteHooks).
+	// then FTS/geo/webhooks/SSE/temporal/embedding via firePostBatchHooks).
 	// addDocument also refreshes the read cache (GO-002), so the gRPC Get path
 	// stays coherent without re-marshaling here.
 	saved, _, err := g.server.addDocument(req.Collection, req.Key, req.Lang, meta, req.ContentMd, req.Ttl, req.SaveRevision)

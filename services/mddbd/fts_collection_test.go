@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"mddb/internal/storage"
 	pb "mddb/proto"
 
 	bolt "go.etcd.io/bbolt"
@@ -111,7 +112,8 @@ func TestFTSSettingTravelsEveryTransport(t *testing.T) {
 	}
 }
 
-// Undecodable and empty documents are skipped; a closed database is an error.
+// Undecodable documents are skipped; an empty one is rebuilt like the rest
+// (GO-048: its meta fields are indexed). A closed database is an error.
 func TestReindexFTSSkipsAndFails(t *testing.T) {
 	t.Setenv("MDDB_STORAGE_LAYOUT", "single") // writes and closes the main file directly
 	s, cleanup := newHandlerTestServer(t)
@@ -122,11 +124,39 @@ func TestReindexFTSSkipsAndFails(t *testing.T) {
 		return tx.Bucket(s.BucketNames.Docs).Put([]byte("doc|c|broken"), []byte("not a document"))
 	})
 	res, err := s.reindexCollectionFTS("c")
-	if err != nil || res.Reindexed != 1 || res.Skipped != 2 {
+	if err != nil || res.Reindexed != 2 || res.Skipped != 1 {
 		t.Errorf("reindex: %+v %v", res, err)
 	}
 	_ = s.DB.Close()
 	if _, err := s.reindexCollectionFTS("c"); err == nil {
 		t.Error("closed database")
+	}
+}
+
+// GO-048: a reindex rebuilds an emptied document (its meta fields) and skips
+// an expired one; without a full-text index there is nothing to write.
+func TestReindexFTSEmptiedAndExpired(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	addTestDoc(t, s, "c", "empty", "en", "", map[string][]string{"title": {"zenith"}})
+	expired := storage.Doc{ID: genID("c", "gone", "en"), Key: "gone", Lang: "en", ContentMD: "wombat", ExpiresAt: 1}
+	buf, err := marshalAndEncrypt(&expired, "c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DBUpdateC("c", func(tx *bolt.Tx) error {
+		return tx.Bucket(s.BucketNames.Docs).Put(storage.DocKey("c", expired.ID), buf)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	res, err := s.reindexCollectionFTS("c")
+	if err != nil || res.Reindexed != 1 || res.Skipped != 1 {
+		t.Fatalf("reindex: %+v %v", res, err)
+	}
+	if titleHits(t, s, "meta.title", "zenith") != 1 || ftsHits(t, s, "c", "wombat") != 0 {
+		t.Error("the emptied document lost its title, or the expired one was indexed")
+	}
+	if err := (&Server{}).indexDocumentFTS("c", &expired, false); err != nil {
+		t.Errorf("no index: %v", err)
 	}
 }

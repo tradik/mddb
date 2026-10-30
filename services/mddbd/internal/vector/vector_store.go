@@ -243,8 +243,10 @@ func (vs *VectorStore) CleanStaleChunks(collection, docID string, currentChunkCo
 			}
 			stale = append(stale, staleKey{bytes.Clone(k), fmt.Sprintf("%s#%d", docID, idx)})
 		}
-		// A document embedded before chunking kept one non-chunked key.
-		if oldKey := buildVecKey(collection, docID); currentChunkCount > 1 && b.Get(oldKey) != nil {
+		// A document embedded before chunking kept one non-chunked key. It
+		// is stale when the document now has several chunks, or none: its
+		// content was emptied (GO-048).
+		if oldKey := buildVecKey(collection, docID); currentChunkCount != 1 && b.Get(oldKey) != nil {
 			stale = append(stale, staleKey{oldKey, docID})
 		}
 		return nil

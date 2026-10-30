@@ -145,8 +145,25 @@ func (s *Server) processBatchWithDocs(ctx context.Context, collection string, pr
 	return resp, processed, err
 }
 
-// firePostBatchHooks fires embedding, FTS, webhook, TTL, and automation hooks
-// for all successfully processed documents after batch commit.
+// firePostBatchHooks is the one "after a document write" pipeline (GO-001,
+// GO-048). Every write path calls it once its transaction is durable and its
+// binlog entries are flushed: REST add, PATCH and batch, ingest, the
+// scheduled sync, gRPC Add, UpdateDocument, AddBatch and UpdateBatch, MCP and
+// GraphQL — a single write as a one-element slice. For each document that
+// landed it runs the embedding job, the TTL entry, geo (R-tree, geohash,
+// GeoStore), temporal tracking, full-text indexing, webhooks, SSE and
+// automation triggers; then it drops the collection's cached searches.
+//
+// Revision history and the metadata index are not here: they are written
+// inside the write transaction, so a crash cannot separate them from the
+// document. The read cache stays with each write, which knows whether it
+// holds the new bytes.
+//
+// A document whose content is empty is still embedded and indexed: the
+// embedding job removes the vectors of the content it no longer has, and
+// the full-text index drops its content postings while its meta fields stay
+// searchable (GO-048).
+//
 // It returns the number of documents whose embedding job the queue refused,
 // which the caller is expected to pass on rather than discard (#232).
 func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc, opts postBatchOptions) int {
@@ -165,7 +182,7 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 		}
 
 		// Embedding
-		if !opts.SkipEmbeddings && s.EmbeddingWorker != nil && p.Doc.ContentMD != "" {
+		if !opts.SkipEmbeddings && s.EmbeddingWorker != nil {
 			job := s.embeddingJob(collection, &p.Doc) // RAG-009, RAG-010
 			job.DocID, job.trace = p.DocID, opts.Trace
 			if !s.EmbeddingWorker.Enqueue(job) {
@@ -207,7 +224,7 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 		// FTS indexing is collected here and written once for the whole batch
 		// below (GO-027) — see indexBatchFTS. An update writes only what it
 		// changed, and a resent identical document nothing (#367).
-		if !opts.SkipFTS && s.FTSIndex != nil && p.Doc.ContentMD != "" {
+		if !opts.SkipFTS && s.FTSIndex != nil {
 			bd := ftsBulkDoc(&p.Doc, ftsExclude)
 			bd.DocID = p.DocID
 			ftsBatch = append(ftsBatch, bd)

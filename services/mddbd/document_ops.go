@@ -6,7 +6,6 @@ import (
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
 	"mddb/internal/storage"
-	"mddb/internal/temporal"
 	"strconv"
 	"time"
 
@@ -165,98 +164,10 @@ func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]s
 		}
 	}
 
-	// Side-effect pipeline shared by every write transport (GO-001).
-	s.runPostWriteHooks(collection, saved, isNew)
+	// The after-write pipeline every write path shares (GO-001, GO-048).
+	s.firePostBatchHooks(collection, []*ProcessedDoc{{DocID: saved.ID, Doc: saved, IsUpdate: !isNew}}, postBatchOptions{})
 
 	return saved, isNew, nil
-}
-
-// runPostWriteHooks runs the side-effect pipeline that must fire after a
-// document write commits to BoltDB, regardless of the transport that produced
-// it — HTTP, gRPC (single Add or AddBatch), MCP, or GraphQL. Centralising it
-// here is what guarantees identical behaviour across transports (GO-001):
-// async embedding, TTL bucket registration, FTS (content + positional +
-// field/BM25F), geo (R-tree + geohash + GeoStore), temporal tracking,
-// webhooks, SSE broadcast, and automation triggers. Every dependency is
-// nil-guarded so partially-configured servers (and tests) are safe.
-//
-// Revision writing and MaxRevisions trimming are intentionally NOT here: they
-// must happen inside the write transaction (see addDocument / the batch
-// commits) so a crash can never leave a doc without its revision.
-func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew bool) {
-	// A write changes what a search returns, so cached result sets for this
-	// collection must stop being reachable (GO-031). This is the shared
-	// pipeline for every write transport, so one call covers them all.
-	s.invalidateSearchCache(collection)
-
-	// Trigger async embedding
-	if s.EmbeddingWorker != nil && saved.ContentMD != "" {
-		// The drop is not discarded, it is counted: the worker logs the
-		// document and /v1/vector-stats reports the running total (#232).
-		// A single write has nothing useful to do with the boolean that a
-		// batch does — there is no per-request tally to add it to.
-		_ = s.EmbeddingWorker.Enqueue(s.embeddingJob(collection, &saved)) // RAG-009, RAG-010
-	}
-
-	// TTL bucket entry
-	if s.TTLManager != nil && saved.ExpiresAt > 0 {
-		_ = s.TTLManager.Set(collection, saved.ID, saved.ExpiresAt)
-	}
-
-	// FTS indexing: terms, positions and fields, with the tokeniser the
-	// document's kind calls for (#326).
-	_ = s.indexDocumentFTS(collection, &saved, false)
-
-	// Geo indexing: persist resolved lat/lng to BoltDB and mirror into
-	// BOTH in-memory indexes (R-tree + geohash). Coordinates are extracted
-	// from meta via AddFromMeta, which tries explicit geo_lat/geo_lng,
-	// then geo_hash, then the optional postcode lookup — silent no-op if
-	// the doc has none of those.
-	if s.GeoIndex != nil && s.GeoStore != nil {
-		if lat, lng, ok := s.GeoIndex.AddFromMeta(collection, saved.ID, saved.Meta); ok {
-			_ = s.GeoStore.Put(collection, saved.ID, lat, lng)
-			if s.GeoHashIndex != nil {
-				s.GeoHashIndex.Add(collection, saved.ID, lat, lng)
-			}
-		} else if !isNew {
-			// Update may have dropped the geo fields — remove any stale entry.
-			s.GeoIndex.Remove(collection, saved.ID)
-			if s.GeoHashIndex != nil {
-				s.GeoHashIndex.Remove(collection, saved.ID)
-			}
-			_ = s.GeoStore.Delete(collection, saved.ID)
-		}
-	}
-
-	// Temporal tracking
-	if s.TemporalManager != nil {
-		et := temporal.EventUpdate
-		if isNew {
-			et = temporal.EventCreate
-		}
-		s.TemporalManager.RecordAsync(collection, saved.ID, et, "")
-	}
-
-	// Webhooks + SSE
-	event := "doc.updated"
-	if isNew {
-		event = "doc.added"
-	}
-	if s.WebhookManager != nil {
-		s.WebhookManager.Fire(event, collection, saved.Key, saved.Lang, &saved)
-	}
-	if s.SSEHub != nil {
-		s.SSEHub.BroadcastWithAuth(event, collection, saved.Key, saved.Lang, s.AuthManager)
-	}
-
-	// Automation triggers
-	if s.AutomationManager != nil && env("MDDB_TRIGGERS", "false") == "true" {
-		triggerEvent := "insert"
-		if !isNew {
-			triggerEvent = "update"
-		}
-		go s.AutomationManager.EvaluateTriggers(collection, saved, triggerEvent)
-	}
 }
 
 // deleteDocumentInternal deletes a document and all its associated data.
@@ -401,67 +312,4 @@ func (s *Server) invalidateDocReadCaches(collection, key, lang string) {
 		s.LockFreeCache.Delete(cacheKey)
 	}
 	s.invalidateSearchCache(collection)
-}
-
-// runPostUpdateHooks is the side-effect pipeline shared by both partial-update
-// transports (PATCH /v1/update and gRPC UpdateDocument) after their
-// transaction commits. GO-038: the gRPC path used to skip cache invalidation,
-// FTS/geo reindexing, webhooks and metrics entirely, so a gRPC Get served the
-// pre-update document for up to the cache TTL and FTS kept matching the old
-// content. One pipeline, like runPostWriteHooks for Add (GO-001), keeps the
-// transports from drifting again. contentChanged re-embeds the document; it
-// is also true when only the summary changed (RAG-009).
-func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.Doc, contentChanged, ttlChanged bool) {
-	s.invalidateDocReadCaches(collection, key, lang)
-
-	if contentChanged && s.EmbeddingWorker != nil && saved.ContentMD != "" {
-		// The drop is not discarded, it is counted: the worker logs the
-		// document and /v1/vector-stats reports the running total (#232).
-		// A single write has nothing useful to do with the boolean that a
-		// batch does — there is no per-request tally to add it to.
-		_ = s.EmbeddingWorker.Enqueue(s.embeddingJob(collection, &saved)) // RAG-009, RAG-010
-	}
-
-	if s.TTLManager != nil {
-		if saved.ExpiresAt > 0 {
-			_ = s.TTLManager.Set(collection, saved.ID, saved.ExpiresAt)
-		} else if ttlChanged {
-			_ = s.TTLManager.Remove(collection, saved.ID)
-		}
-	}
-
-	// The index decides what changed (#367): new content re-indexes the
-	// document, new metadata only its meta.* fields (a metadata-only PATCH
-	// used to leave them stale, #362), and a TTL-only PATCH writes nothing.
-	_ = s.indexDocumentFTS(collection, &saved, false)
-
-	// Geo re-index on partial update. Mirrors the Add/Upsert path: if meta now
-	// contains a usable point, upsert it into both indexes; otherwise drop any
-	// stale points.
-	if s.GeoIndex != nil && s.GeoStore != nil {
-		if lat, lng, geoOK := s.GeoIndex.AddFromMeta(collection, saved.ID, saved.Meta); geoOK {
-			_ = s.GeoStore.Put(collection, saved.ID, lat, lng)
-			if s.GeoHashIndex != nil {
-				s.GeoHashIndex.Add(collection, saved.ID, lat, lng)
-			}
-		} else {
-			s.GeoIndex.Remove(collection, saved.ID)
-			if s.GeoHashIndex != nil {
-				s.GeoHashIndex.Remove(collection, saved.ID)
-			}
-			_ = s.GeoStore.Delete(collection, saved.ID)
-		}
-	}
-
-	if s.WebhookManager != nil {
-		s.WebhookManager.Fire("doc.updated", collection, key, lang, &saved)
-	}
-
-	if s.AutomationManager != nil && env("MDDB_TRIGGERS", "false") == "true" {
-		go s.AutomationManager.EvaluateTriggers(collection, saved, "update")
-	}
-
-	if s.Metrics != nil {
-		s.Metrics.IncOp("doc_update")
-	}
 }

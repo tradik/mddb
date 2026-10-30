@@ -119,6 +119,11 @@ func (f *FTSIndex) RemoveBM25Meta(tx *bolt.Tx, collection, docID string) error {
 	} else {
 		stats.TotalTerms = 0
 	}
+	// No document with content left: no statistics, as in an index built
+	// from these documents, which never wrote them (GO-048).
+	if stats.TotalDocs == 0 {
+		return bRev.Delete(statKey)
+	}
 	return bRev.Put(statKey, encodeCollectionStats(stats))
 }
 

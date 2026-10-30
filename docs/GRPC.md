@@ -190,6 +190,16 @@ write path — `Add`, `AddBatch`, `UpdateDocument` and `UpdateBatch` — now
 re-indexes only what changed; `UpdateBatch` did not re-index full text at all
 before.
 
+`UpdateBatch` now runs the same after-write step as every other write
+(GO-048): the embedding queue, geo, temporal tracking, the `doc.updated`
+webhook and SSE event, and automation triggers, which it never fired; a
+document's vectors and geo point followed its old content and meta until a
+reindex. `UpdateDocument` now sends the SSE event too. An empty `content_md`
+in `UpdateBatch` still means "leave the content as it is"; to empty a
+document, use `UpdateDocument` with `update_content: true` or `Add`. An
+emptied document loses its content postings and vectors and keeps its meta
+fields in full-text search.
+
 `AutomationRuleProto.sync` (26, `SyncActionProto`) is a cron rule's third
 action: keep a collection in step with a sitemap, a URL list or an S3
 prefix (`source`, `collection`, `lang`, `url`, `urls`, `bucket`, `prefix`,

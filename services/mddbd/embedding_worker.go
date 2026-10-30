@@ -359,7 +359,15 @@ func (w *EmbeddingWorker) processJob(job EmbeddingJob) jobOutcome {
 }
 
 // processChunks embeds the document's chunks: processJob without the summary.
+//
+// A document whose content is now empty has no chunks: the vectors of the
+// content it had are removed, or semantic and hybrid search would go on
+// finding it by text it no longer contains (GO-048).
 func (w *EmbeddingWorker) processChunks(job EmbeddingJob) jobOutcome {
+	if job.ContentMD == "" {
+		w.vectorStore.CleanStaleChunks(job.Collection, job.DocID, 0, w.indexer)
+		return jobDone
+	}
 	contentHash := vec.ContentHash(job.ContentMD)
 
 	// Check if content already has a matching embedding

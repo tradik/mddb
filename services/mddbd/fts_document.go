@@ -39,9 +39,11 @@ func ftsBulkDoc(doc *storage.Doc, exclude map[string]bool) fts.BulkDoc {
 
 // indexDocumentFTS indexes one document. The index writes only what changed
 // since it last indexed the document, and nothing when nothing did (#367);
-// rebuild re-indexes it from scratch, for an fts-reindex.
+// rebuild re-indexes it from scratch, for an fts-reindex. A document with no
+// content is indexed too: it has no content postings, and its meta fields
+// are searchable like any other document's (GO-048).
 func (s *Server) indexDocumentFTS(collection string, doc *storage.Doc, rebuild bool) error {
-	if s.FTSIndex == nil || doc.ContentMD == "" || !s.ftsEnabledFor(collection) {
+	if s.FTSIndex == nil || !s.ftsEnabledFor(collection) {
 		return nil
 	}
 	bd := ftsBulkDoc(doc, s.ftsExcludedMetaKeys(collection))

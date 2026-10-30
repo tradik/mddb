@@ -107,7 +107,6 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 	now := time.Now().Unix()
 	var saved storage.Doc
 	var bo binlog.BinlogOps
-	summaryChanged := false // RAG-009: a new summary is embedded like new content
 	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs, bIdx, bByK := tx.Bucket([]byte("docs")), tx.Bucket([]byte("idxmeta")), tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
@@ -125,7 +124,6 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 			return err
 		}
 		doc := applyPatch(*existing, p, now)
-		summaryChanged = documentSummary(existing) != documentSummary(&doc)
 		EnrichCodeSymbolsWith(&doc, s.codeIncludePaths(collection))
 		buf, err := marshalAndEncrypt(&doc, collection)
 		if err != nil {
@@ -151,7 +149,20 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 		return storage.Doc{}, err
 	}
 	bo.FlushTo(s.Binlog)
-	s.runPostUpdateHooks(collection, key, lang, saved, p.Content != nil || summaryChanged, p.TTL != nil)
+	// The cached copy is the old document; the next read takes the new one.
+	s.invalidateDocReadCaches(collection, key, lang)
+	// The after-write pipeline every write path shares (GO-001, GO-048). It
+	// used to be a copy of its own that sent no SSE event and recorded no
+	// temporal event.
+	s.firePostBatchHooks(collection, []*ProcessedDoc{{DocID: saved.ID, Doc: saved, IsUpdate: true}}, postBatchOptions{})
+	// A cleared expiry is the one thing the pipeline cannot see: it sets
+	// the entries of documents that expire and leaves the rest alone.
+	if p.TTL != nil && saved.ExpiresAt == 0 && s.TTLManager != nil {
+		_ = s.TTLManager.Remove(collection, saved.ID)
+	}
+	if s.Metrics != nil {
+		s.Metrics.IncOp("doc_update")
+	}
 	return saved, nil
 }
 

@@ -2376,6 +2376,24 @@ Since v2.18.8 an update also re-extracts code symbols from new content, and
 REST, gRPC, MCP and GraphQL updates share one implementation — the MCP one
 used to skip the metadata index, revision history and full-text reindex.
 
+**After every write (v2.18.10, GO-048).** Every write path ends in the same
+after-write step: `POST /v1/add`, this endpoint, `POST /v1/add-batch`, ingest,
+the scheduled sync, gRPC `Add`, `UpdateDocument`, `AddBatch` and
+`UpdateBatch`, MCP and GraphQL. It queues the embedding, updates TTL, geo
+and temporal tracking, re-indexes full text (only what changed), fires the
+`doc.added` / `doc.updated` webhook and SSE event and the automation
+triggers, and drops cached searches. Before, gRPC `UpdateBatch` re-indexed
+full text only, and `PATCH /v1/update` (and gRPC, MCP and GraphQL updates)
+sent no SSE event.
+
+Setting `contentMd` to `""` empties the document's content. Its content
+postings and its vectors are removed, so full-text, vector and hybrid search
+no longer find it by text it no longer has. Its `meta.<key>` fields stay
+searchable unless `fts.excludeMetaKeys` excludes them. Before, an empty
+content was never indexed, and the old postings and vectors stayed. Batch
+updates (gRPC `UpdateBatch`, MCP) read an empty `content_md` as "leave it":
+empty a document with this endpoint, `POST /v1/add` or a batch add.
+
 **Example:**
 ```bash
 # Update only metadata

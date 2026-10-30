@@ -90,7 +90,10 @@ func (s *Server) reindexCollectionFTS(collection string) (ftsReindexResult, erro
 			return true
 		}
 		all = append(all, doc.ID)
-		if doc.ContentMD == "" || (doc.ExpiresAt > 0 && doc.ExpiresAt < now) {
+		// A document with no content is rebuilt like the rest: the writes
+		// index its meta fields, so a rebuild that skipped it would leave
+		// its old postings standing (GO-048).
+		if doc.ExpiresAt > 0 && doc.ExpiresAt < now {
 			res.Skipped++
 			return true
 		}

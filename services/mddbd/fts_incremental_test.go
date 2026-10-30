@@ -112,9 +112,9 @@ var ftsWriters = []ftsWriter{
 		s.firePostBatchHooks("c", processed, postBatchOptions{})
 	}},
 	{"update batch (gRPC UpdateBatch, MCP)", func(t *testing.T, s *Server, key, content string, meta map[string][]string) {
-		if len(meta) == 0 {
-			// An empty meta in a batch update means "leave it", so the
-			// update cannot express this version: write it another way.
+		if len(meta) == 0 || content == "" {
+			// An empty meta or content in a batch update means "leave it",
+			// so the update cannot express this version: write it another way.
 			ftsAdd(t, s, key, content, meta)
 			return
 		}
@@ -216,9 +216,11 @@ func TestServerIncrementalIndexEqualsRebuild(t *testing.T) {
 			key := []string{"a", "b"}[r.Intn(2)]
 			v := docs[key]
 			v.meta = maps.Clone(v.meta)
-			switch op := r.Intn(5); op {
+			switch op := r.Intn(6); op {
 			case 0:
 				v.content = text(r, 1+r.Intn(8))
+			case 5: // GO-048: content emptied; the meta fields stay indexed
+				v.content = ""
 			case 1, 2:
 				v.meta[[]string{"title", "tags", "license"}[r.Intn(3)]] = []string{text(r, 1+r.Intn(3))}
 			case 3:

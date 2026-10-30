@@ -57,6 +57,7 @@ scheduled sync, gRPC and MCP — compares the document with it:
 | nothing indexed (a resent document, a TTL-only update) | nothing |
 | meta values only | the postings of the changed `meta.<key>` fields; the fields that are gone lose theirs |
 | content, `lang` or the document's kind | the whole document, as before |
+| content emptied (v2.18.10, GO-048) | the content postings, positions and BM25 length are removed; the `meta.<key>` fields stay searchable unless excluded |
 
 The result is the index a full rebuild would produce, byte for byte,
 statistics included, so ranking does not change. On a database larger than

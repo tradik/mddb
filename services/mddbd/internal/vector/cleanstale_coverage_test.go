@@ -66,6 +66,55 @@ func TestVectorStoreCleanStaleChunks(t *testing.T) {
 	})
 }
 
+// A document whose content was emptied has no chunks (GO-048): every vector
+// it had goes, its chunks and a legacy non-chunked key alike. With exactly
+// one chunk the legacy key is the document's vector and stays.
+func TestVectorStoreCleanStaleChunksNoChunksLeft(t *testing.T) {
+	db, err := bolt.Open(t.TempDir()+"/v.db", 0600, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	store := NewVectorStore(db)
+	if err := store.EnsureBucket(); err != nil {
+		t.Fatal(err)
+	}
+	idx := NewVectorIndex()
+	if err := store.PutChunks("c", "d", []ChunkEmbedding{{ChunkIndex: 0, Vector: []float32{1, 0}}, {ChunkIndex: 1, Vector: []float32{0, 1}}}, "m", "h"); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"d#0", "d#1", "d", "keep"} {
+		if err := idx.Add("c", key, []float32{1, 1}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	legacy := func(docID string) []byte { return buildVecKey("c", docID) }
+	if err := db.Update(func(tx *bolt.Tx) error {
+		if err := tx.Bucket(store.bucketName).Put(legacy("d"), []byte("legacy")); err != nil {
+			return err
+		}
+		return tx.Bucket(store.bucketName).Put(legacy("keep"), []byte("legacy"))
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	store.CleanStaleChunks("c", "keep", 1, idx)
+	store.CleanStaleChunks("c", "d", 0, idx)
+
+	if rec, _ := store.Get("c", "d"); rec != nil {
+		t.Error("an emptied document kept a vector")
+	}
+	if idx.CollectionSize("c") != 1 {
+		t.Errorf("the index holds %d vectors, want only the one-chunk document's", idx.CollectionSize("c"))
+	}
+	_ = db.View(func(tx *bolt.Tx) error {
+		if tx.Bucket(store.bucketName).Get(legacy("keep")) == nil {
+			t.Error("a one-chunk document lost its legacy key")
+		}
+		return nil
+	})
+}
+
 // writeCommits counts the write transactions committed since the last call:
 // bbolt advances the meta txid once per commit, and nothing else does.
 func writeCommits(t *testing.T, db *bolt.DB) func() int {
