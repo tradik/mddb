@@ -128,8 +128,15 @@ kept, so you can roll back with `alias set`.
 
 ```bash
 mddb-cli autoindex [path] [-c collection] [--lang en] [--include glob]... [--exclude glob]...
-                   [--max-file-size bytes] [--profile fast] [--images] [--prune] [--dry-run]
+                   [--max-file-size bytes] [--profile fast] [--images] [--no-frontmatter]
+                   [--prune] [--dry-run]
 ```
+
+A Markdown file's frontmatter becomes metadata (v2.18.11+): the file is sent as
+it is and the server reads the frontmatter once, with the parser `/v1/upload`
+uses, then stores the body without the block. `tags: a, b`, `tags: [a, b]` and
+a `- a` block list all become lists; the file meta below wins for a key both
+name. `--no-frontmatter` stores Markdown files untouched.
 
 Walks the directory (git-aware), skips binary and oversized files, sends the
 rest in batches with path, kind, language, size, modified and git metadata,
@@ -163,6 +170,25 @@ mddb-cli add blog post1 en_US -f post.md \
 **Options:**
 - `-f, --file FILE` - Read content from file
 - `-m, --meta META` - Metadata (format: key=val1|val2,key2=val)
+- `--no-frontmatter` - Store the content as it is, frontmatter block included
+
+A frontmatter block at the top is read as `/v1/upload` reads it (v2.18.11+):
+
+```markdown
+---
+title: Getting Started
+tags: [tutorial, beginner]
+topics:
+  - go
+  - search
+---
+# Getting Started
+```
+
+is stored as the body `# Getting Started` with meta `title=[Getting Started]`,
+`tags=[tutorial, beginner]` and `topics=[go, search]`; `tags: tutorial, beginner`
+gives the same list. A `-m` key wins over a frontmatter key of the same name.
+Content without frontmatter is sent unchanged.
 
 #### get - Retrieve a document
 
@@ -463,6 +489,19 @@ Raw JSON responses from server.
 
 ### Content-Only (`-c` with get)
 Only markdown content, suitable for piping.
+
+## Updating
+
+```bash
+mddb-cli self-update --check    # report only
+mddb-cli self-update            # download, verify against checksums.txt, install
+```
+
+A snap or container install is updated through its own channel; the command
+says which. On Windows `self-update` (with `--check` too) stops with a non-zero
+exit: releases carry Linux, macOS and FreeBSD archives only, so build the
+Windows binary from source with `make build-windows`
+([docs/INSTALLATION.md](../../docs/INSTALLATION.md#windows)).
 
 ## Man Page
 

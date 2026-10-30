@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -21,7 +22,10 @@ The download is verified against the release's checksums.txt before anything on
 disk is touched, and the current binary is kept as <path>.bak.
 
 A binary installed through snap or running inside a container is not replaced —
-the packaging channel owns it, and the command says which one to use instead.`,
+the packaging channel owns it, and the command says which one to use instead.
+
+On Windows the command stops with an error: releases carry no Windows archives,
+so mddb-cli is built from source there (make build-windows).`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return runSelfUpdate(cmd, checkOnly)
 		},
@@ -30,7 +34,17 @@ the packaging channel owns it, and the command says which one to use instead.`,
 	return cmd
 }
 
+// errNoWindowsReleases is self-update's answer on Windows (#374): releases
+// carry Linux, macOS and FreeBSD archives only, so there is nothing to
+// download, and a Windows binary is built from source.
+var errNoWindowsReleases = errors.New("self-update is not available on Windows: there are no Windows release archives; " +
+	"build mddb-cli from source with `make build-windows` (see docs/INSTALLATION.md#windows " +
+	"at https://github.com/tradik/mddb/blob/main/docs/INSTALLATION.md#windows)")
+
 func runSelfUpdate(cmd *cobra.Command, checkOnly bool) error {
+	if hostOS == "windows" {
+		return errNoWindowsReleases
+	}
 	out := cmd.OutOrStdout()
 	current := CurrentVersion()
 
@@ -73,7 +87,7 @@ func runSelfUpdate(cmd *cobra.Command, checkOnly bool) error {
 func installUpdate(cmd *cobra.Command, current, version string) error {
 	out := cmd.OutOrStdout()
 
-	path, err := os.Executable()
+	path, err := executablePath()
 	if err != nil {
 		return fmt.Errorf("cannot locate this binary: %w", err)
 	}
@@ -106,6 +120,9 @@ func installUpdate(cmd *cobra.Command, current, version string) error {
 	_, _ = fmt.Fprintf(out, "  previous:  %s\n", backup)
 	return nil
 }
+
+// executablePath finds this binary; a variable so a test can make it fail.
+var executablePath = os.Executable
 
 // resolveExecutable follows symlinks to the real binary.
 var resolveExecutable = func(path string) (string, error) {

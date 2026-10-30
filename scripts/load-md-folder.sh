@@ -11,7 +11,6 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
@@ -61,6 +60,11 @@ ${CYAN}Examples:${NC}
   # Dry run to see what would be loaded
   $0 ./docs blog -d
 
+${CYAN}Frontmatter:${NC}
+  Each file is stored with mddb-cli add (2.18.11 or newer), which reads its
+  frontmatter as meta: tags: a, b / tags: [a, b] / a "- a" block list all
+  become lists. -m values win for a key both name.
+
 ${CYAN}Environment Variables:${NC}
   MDDB_SERVER    Server URL (default: http://localhost:11023)
   MDDB_CLI       CLI command (default: mddb-cli)
@@ -82,36 +86,21 @@ check_server() {
 # Function to generate key from filename
 generate_key() {
     local filepath=$1
-    local filename=$(basename "$filepath" .md)
+    local filename
+    filename=$(basename "$filepath" .md)
     # Convert to lowercase and replace spaces/special chars with hyphens
     echo "$filename" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//'
 }
 
-# Function to extract metadata from frontmatter (if exists)
-extract_frontmatter() {
-    local file=$1
-    local meta=""
-    
-    # Check if file starts with ---
-    if head -n 1 "$file" | grep -q "^---$"; then
-        # Extract frontmatter between first and second ---
-        local frontmatter=$(awk '/^---$/{if(++n==2) exit; next} n==1' "$file")
-        
-        # Parse YAML-like key: value pairs
-        while IFS=: read -r key value; do
-            if [ -n "$key" ] && [ -n "$value" ]; then
-                key=$(echo "$key" | xargs)
-                value=$(echo "$value" | xargs | sed 's/^["'\'']\|["'\'']$//g')
-                if [ -n "$meta" ]; then
-                    meta="$meta,$key=$value"
-                else
-                    meta="$key=$value"
-                fi
-            fi
-        done <<< "$frontmatter"
+# Frontmatter is not parsed here (#372): `mddb-cli add` reads it with the
+# parser /v1/upload uses, so `tags: a, b`, `tags: [a, b]` and a `- a` block
+# list all arrive as full lists. The loader only checks that the CLI is new
+# enough to do that, since an older one would store the block as text.
+check_cli_frontmatter() {
+    if ! $CLI add --help 2>/dev/null | grep -q -- "--no-frontmatter"; then
+        echo -e "${RED}✗ $CLI does not read frontmatter (needs mddb-cli 2.18.11 or newer)${NC}"
+        exit 1
     fi
-    
-    echo "$meta"
 }
 
 # Function to load a single file
@@ -121,12 +110,13 @@ load_file() {
     local lang=$3
     local extra_meta=$4
     
-    local key=$(generate_key "$filepath")
-    local file_meta=$(extract_frontmatter "$filepath")
-    
-    # Combine metadata
-    local meta="source=folder-import,filename=$(basename "$filepath")"
-    [ -n "$file_meta" ] && meta="$meta,$file_meta"
+    local key
+    key=$(generate_key "$filepath")
+
+    # The loader's own meta; mddb-cli add adds the file's frontmatter keys,
+    # and these win for a key both name.
+    local meta
+    meta="source=folder-import,filename=$(basename "$filepath")"
     [ -n "$extra_meta" ] && meta="$meta,$extra_meta"
     
     if [ "$DRY_RUN" = true ]; then
@@ -134,7 +124,7 @@ load_file() {
         echo -e "  Collection: $collection"
         echo -e "  Key: $key"
         echo -e "  Lang: $lang"
-        echo -e "  Meta: $meta"
+        echo -e "  Meta: $meta (+ frontmatter keys, read by mddb-cli add)"
         return 0
     fi
     
@@ -144,8 +134,8 @@ load_file() {
         echo -e "  Meta: $meta"
     fi
     
-    # Load file using CLI
-    if cat "$filepath" | $CLI add "$collection" "$key" "$lang" -m "$meta" > /dev/null 2>&1; then
+    # Load file using CLI (it takes the frontmatter off and reads it as meta)
+    if $CLI add "$collection" "$key" "$lang" -f "$filepath" -m "$meta" > /dev/null 2>&1; then
         return 0
     else
         echo -e "${RED}✗ Failed to load: $filepath${NC}"
@@ -230,6 +220,9 @@ if [ ! -d "$FOLDER_PATH" ]; then
     exit 1
 fi
 
+# mddb-cli reads the server from MDDB_SERVER, so -s reaches it this way.
+export MDDB_SERVER="$SERVER_URL"
+
 # Print header
 echo -e "${BLUE}════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}  MDDB Folder Loader${NC}"
@@ -239,6 +232,7 @@ echo ""
 # Check server connectivity (skip in dry-run mode)
 if [ "$DRY_RUN" = false ]; then
     check_server
+    check_cli_frontmatter
     echo ""
 fi
 
@@ -295,11 +289,11 @@ while IFS= read -r file; do
     fi
     
     # Progress indicator
-    if [ $((CURRENT % BATCH_SIZE)) -eq 0 ] || [ $CURRENT -eq $FILE_COUNT ]; then
+    if [ $((CURRENT % BATCH_SIZE)) -eq 0 ] || [ "$CURRENT" -eq "$FILE_COUNT" ]; then
         PROGRESS=$((CURRENT * 100 / FILE_COUNT))
+        BAR=$(printf '%*s' $((PROGRESS / 2)) '' | tr ' ' '#')
         printf "\r${CYAN}Progress:${NC} [%-50s] %d%% (%d/%d files)" \
-            $(printf '#%.0s' $(seq 1 $((PROGRESS / 2)))) \
-            $PROGRESS $CURRENT $FILE_COUNT
+            "$BAR" "$PROGRESS" "$CURRENT" "$FILE_COUNT"
     fi
 done <<< "$FILES"
 

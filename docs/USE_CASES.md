@@ -61,9 +61,10 @@ mddb-cli autoindex ./docs --collection api-docs --prune     # index; drop delete
 ```
 
 Each document's key is its path (`guides/auth.md`), and its metadata holds
-`path`, `extension`, `kind`, `size` and `modified`. `autoindex` does not read
-YAML frontmatter; for files whose frontmatter carries the metadata you search
-by, use the [folder loader](#13-bulk-content-migration).
+`path`, `extension`, `kind`, `size` and `modified`. Since 2.18.11 a Markdown
+file's frontmatter becomes metadata too (`tags: a, b`, `tags: [a, b]` and a
+`- a` block list are all lists), read by the server as `/v1/upload` reads it,
+and the body is stored without the block; `--no-frontmatter` turns that off.
 
 **Perfect for:** Technical documentation, API references, developer guides, internal wikis
 
@@ -665,7 +666,7 @@ Import large amounts of content from existing systems.
 # A folder of mixed files: Markdown as is; PDF, DOCX, XLSX, PPTX, EPUB, EML, HTML converted
 mddb-cli autoindex ./content --collection blog
 
-# Markdown whose YAML frontmatter should become metadata
+# Markdown keyed by file name rather than path (frontmatter becomes metadata)
 ./scripts/load-md-folder.sh ./content blog -r -v
 
 # With custom metadata
@@ -677,9 +678,10 @@ mddb-cli autoindex ./content --collection blog
 
 `autoindex` keys each document by its path and records `path`, `extension`,
 `kind`, `size` and `modified`; it is the choice for files from many tools.
-`load-md-folder.sh` keys each document by its file name and turns the
-frontmatter (`title`, `author`, `category`...) into metadata; it is the choice
-for exports from static-site generators and WordPress.
+`load-md-folder.sh` keys each document by its file name; it is the choice for
+exports from static-site generators and WordPress. Both turn the frontmatter
+(`title`, `author`, `tags`...) into metadata the way `/v1/upload` does, lists
+included, and store the body without it (2.18.11+).
 
 **Coming from Elasticsearch.** With `MDDB_ES_COMPAT=true`, MDDB answers a
 subset of the Elasticsearch API under `/es`, so an indexing script or a client

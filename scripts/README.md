@@ -10,7 +10,8 @@ Bulk import markdown files from a folder into MDDB database.
 
 **Features:**
 - Automatic key generation from filenames
-- YAML frontmatter metadata extraction
+- Frontmatter read as metadata by `mddb-cli add` (needs mddb-cli 2.18.11+):
+  comma, `[flow]` and `- item` block lists all arrive as full lists
 - Recursive folder scanning
 - Progress tracking with statistics
 - Dry run mode for preview
@@ -44,11 +45,15 @@ Bulk import markdown files from a folder into MDDB database.
 - `-l, --lang LANG` - Language code (default: en_US)
 - `-r, --recursive` - Process subfolders recursively
 - `-m, --meta KEY=VALUE` - Add metadata (can be used multiple times)
-- `-s, --server URL` - MDDB server URL
+- `-s, --server URL` - MDDB server URL (passed to mddb-cli as `MDDB_SERVER`)
 - `-v, --verbose` - Verbose output
 - `-d, --dry-run` - Preview without executing
 - `-b, --batch-size N` - Progress update frequency
 - `-h, --help` - Show help message
+
+**Tests:** `make test-load-md-folder` runs the loader with the CLI built from
+this tree against a stub server and checks the stored metadata
+(`scripts/tests/test-load-md-folder.sh`; needs go and python3).
 
 **Documentation:**
 See [BULK-IMPORT.md](../docs/BULK-IMPORT.md) for detailed documentation.

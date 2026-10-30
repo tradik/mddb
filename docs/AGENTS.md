@@ -105,8 +105,12 @@ mddb-cli autoindex docs --images      # keep the images Markdown files link to
 In a git repository it takes the files git tracks; elsewhere it skips
 `node_modules`, `vendor`, `dist` and the like. Each document is keyed by its
 path and carries `path`, `extension`, `kind`, `language`, `size`, `modified`
-and, in a repository, `gitCommit` and `gitBranch`. A second run rewrites only
-the files that changed. At the end the search advisor stores a retrieval
+and, in a repository, `gitCommit` and `gitBranch`. A Markdown file's
+frontmatter becomes metadata as well (2.18.11+): the server reads it once, with
+the parser `/v1/upload` uses, so `tags: a, b`, `tags: [a, b]` and a `- a` block
+list are all lists, and the body is stored without the block. The meta above
+wins for a key both name; `--no-frontmatter` stores Markdown files as they are.
+A second run rewrites only the files that changed. At the end the search advisor stores a retrieval
 profile on the collection: for code, hybrid search, graph mode and
 `format: "passages"`.
 

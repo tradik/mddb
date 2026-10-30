@@ -276,8 +276,10 @@ release is built and tested against, so it inherits the full test suite.
 test suite runs on `windows-latest` on every push (in three parallel shards
 since 2.18.9), and the server and CLI build for `windows/amd64` from source.
 There are no Windows release artifacts: publishing them (an installer, scoop or
-winget) has not been taken on yet, so you build the binaries yourself, and
-`mddb-cli update` cannot update a Windows install.
+winget) has not been taken on yet, so you build the binaries yourself. For the
+same reason `mddb-cli self-update` (and `--check`) stops on Windows with a
+non-zero exit and points here: there is no Windows archive to update to, so
+update by pulling and building again.
 
 One difference is deliberate: **Unix domain sockets are refused on Windows**.
 The listener's security model is owner-only `0600` mode bits, which Windows
@@ -513,6 +515,10 @@ until the download has been read to the end and matched, so an interrupted or
 corrupted download leaves a working binary in place. The replacement is a
 rename within the same directory, which is atomic — the path never holds half
 a file — and the previous binary is kept as `mddb-cli.bak`.
+
+On Windows there is nothing to download (releases have no Windows archives),
+so the command stops at once with a non-zero exit and says to build from
+source with `make build-windows` ([Windows](#windows)).
 
 **What the checksum does and does not prove.** It proves the download arrived
 intact and was not swapped in transit. It does **not** prove the release itself

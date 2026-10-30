@@ -140,7 +140,11 @@ converted document with its format and conversion confidence (0 to 1; a scan
 without a text layer scores 0). Other binary files and files over the size
 limit are skipped. Each document is keyed by its path and
 carries meta path, extension, kind, language, size, modified, and gitCommit
-and gitBranch in a repository. Unchanged files are not rewritten. The search
+and gitBranch in a repository. A Markdown file's frontmatter becomes meta too
+(v2.18.11): the file is sent as it is and the server reads the frontmatter
+once, with the parser /v1/upload uses, so comma, [flow] and block lists are
+lists, and stores the body without the block; the meta above wins for a key
+both name. Unchanged files are not rewritten. The search
 advisor then stores a retrieval profile for the collection.
 .PP
 Options:
@@ -169,6 +173,9 @@ image links name (inside the indexed tree, at most 2 MB each); the server
 stores them, and the pictures of PDFs, as image documents with their alt text
 and captions searchable (v2.18.9).
 .TP
+.B \-\-no\-frontmatter
+Store Markdown files as they are; do not read frontmatter as meta (v2.18.11).
+.TP
 .B \-\-prune
 Delete documents whose file no longer exists.
 .TP
@@ -182,6 +189,13 @@ Add or update a markdown document in the database.
 .PP
 Reads content from stdin or a file specified with \fB\-f\fR.
 .PP
+A frontmatter block (between \-\-\- lines at the top) is read as /v1/upload
+reads it (v2.18.11): its keys become meta \(em a comma list (tags: a, b), a
+flow list (tags: [a, b]) and a block list (tags: followed by "\- a" lines) all
+become lists \(em and the document is stored without the block. A \fB\-m\fR
+key wins over a frontmatter key of the same name. Content without frontmatter
+is sent unchanged.
+.PP
 Options:
 .TP
 .BR \-f ", " \-\-file =\fIFILE\fR
@@ -189,12 +203,16 @@ Read content from FILE instead of stdin
 .TP
 .BR \-m ", " \-\-meta =\fIMETA\fR
 Metadata in format: key=val1|val2,key2=val
+.TP
+.B \-\-no\-frontmatter
+Store the content as it is, frontmatter block included; only \fB\-m\fR sets meta.
 .PP
 Examples:
 .RS
 .nf
 echo "# Hello World" | mddb-cli add blog hello en_US
 mddb-cli add blog post1 en_US -f post.md -m "category=tech,author=John"
+mddb-cli add blog raw en_US -f post.md --no-frontmatter
 .fi
 .RE
 .SS get
@@ -824,6 +842,12 @@ Artifact signing would close that and is not configured for this project.
 .PP
 A binary installed through snap or running inside a container is not replaced —
 the packaging channel owns it, and the command names the right one instead.
+.PP
+On Windows the command, \fB\-\-check\fR included, stops at once with a non-zero
+exit status: releases carry no Windows archives, so there is nothing to update
+to. Build mddb-cli from source with
+.B make build-windows
+(see docs/INSTALLATION.md#windows).
 .PP
 .B mddbd
 never replaces itself; see

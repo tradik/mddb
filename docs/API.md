@@ -4508,6 +4508,14 @@ queryable, but the numbering makes reordering the source a metadata migration.
 Leaving the block in the markdown body costs nothing and stays findable through
 full-text search; choose it when nothing queries the structure.
 
+MDDB's own frontmatter reader (`/v1/upload`, `/v1/ingest` with
+`extractFrontmatter`, `/v1/import-url`, `mddb-cli add`, `mddb-cli autoindex`)
+reads flat keys only: a scalar, a comma list, a `[flow, list]` or a block list
+of `- item` lines (2.18.11+; before, a flow list kept its brackets and a block
+list was dropped). A `- key: value` item is a map and is not stored, so the
+`faq` above does not arrive as garbage; to keep it, use one of the patterns
+above, or `mddb-cli add --no-frontmatter` to leave it in the body.
+
 **The validator warns, it does not reject.** `POST /v1/validate` (and the gRPC,
 GraphQL and MCP equivalents) returns a `warnings` list alongside `errors` when a
 value looks like Go stringification:

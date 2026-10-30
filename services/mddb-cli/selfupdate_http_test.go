@@ -199,6 +199,35 @@ func runSelfUpdateCmd(t *testing.T, args ...string) string {
 	return out.String()
 }
 
+// #374: no release has Windows archives, so on Windows self-update stops
+// before asking GitHub anything, says how to build instead, and fails.
+func TestSelfUpdateOnWindowsPointsToTheSourceBuild(t *testing.T) {
+	original := hostOS
+	defer func() { hostOS = original }()
+	hostOS = "windows"
+
+	withReleaseServer(t, func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("self-update on Windows asked GitHub for a release")
+	})
+
+	for _, args := range [][]string{nil, {"--check"}} {
+		cmd := newSelfUpdateCmd()
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetArgs(args)
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatalf("self-update %v on Windows succeeded; the shell would see exit 0", args)
+		}
+		for _, want := range []string{"no Windows release archives", "make build-windows", "docs/INSTALLATION.md#windows"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("error %q does not say %q", err, want)
+			}
+		}
+	}
+}
+
 func TestSelfUpdateReportsADevelopmentBuild(t *testing.T) {
 	original := Version
 	defer func() { Version = original }()

@@ -56,6 +56,39 @@ func TestAddReadsAFileWhenGivenOne(t *testing.T) {
 	assertBodyField(t, fs.lastCall(t).Body, "contentMd", "from a file")
 }
 
+// #373: add reads frontmatter the way /v1/upload does — its keys become meta,
+// the body goes without the block, and --meta wins for a key both name.
+func TestAddReadsFrontmatterAsMeta(t *testing.T) {
+	fs := newFakeServer(t, map[string]interface{}{
+		"/v1/add": map[string]interface{}{"id": "x", "addedAt": 1700000000},
+	})
+	doc := "---\ntitle: Hello\nstatus: draft\ntags:\n  - database\n  - golang\n---\n# Body\n"
+
+	if _, err := runCLIWithStdin(t, fs.URL, doc, "add", "blog", "post", "en", "--meta", "status=published"); err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+	body := fs.lastCall(t).Body
+	assertBodyField(t, body, "contentMd", "# Body")
+	assertBodyField(t, body, "meta", map[string][]string{
+		"title": {"Hello"}, "status": {"published"}, "tags": {"database", "golang"},
+	})
+}
+
+// --no-frontmatter stores the file as it is, block and all, with --meta only.
+func TestAddNoFrontmatterSendsTheFileUntouched(t *testing.T) {
+	fs := newFakeServer(t, map[string]interface{}{
+		"/v1/add": map[string]interface{}{"id": "x", "addedAt": 1700000000},
+	})
+	doc := "---\ntitle: Hello\n---\n# Body\n"
+
+	if _, err := runCLIWithStdin(t, fs.URL, doc, "add", "blog", "post", "en", "--no-frontmatter", "-m", "a=b"); err != nil {
+		t.Fatalf("add failed: %v", err)
+	}
+	body := fs.lastCall(t).Body
+	assertBodyField(t, body, "contentMd", doc)
+	assertBodyField(t, body, "meta", map[string][]string{"a": {"b"}})
+}
+
 // A missing file must fail before anything is sent: a half-written document is
 // worse than none.
 func TestAddWithAMissingFileSendsNothing(t *testing.T) {

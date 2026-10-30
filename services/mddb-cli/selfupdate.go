@@ -153,9 +153,13 @@ func FetchLatestRelease(ctx context.Context) (*ReleaseInfo, error) {
 	}, nil
 }
 
+// hostOS is the GOOS self-update decides by; a variable so the Windows
+// refusal (#374) is tested on any platform.
+var hostOS = runtime.GOOS
+
 // platformSuffix is the GOOS-GOARCH pair release artifacts are named with.
 func platformSuffix() string {
-	return runtime.GOOS + "-" + runtime.GOARCH
+	return hostOS + "-" + runtime.GOARCH
 }
 
 // artifactName is the tarball for this binary, version and platform.

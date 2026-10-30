@@ -1,0 +1,86 @@
+[
+  {
+    "name": "comma list",
+    "input": "---\ntitle: Hello\ntags: database, markdown, golang\n---\n# Body",
+    "meta": {"title": ["Hello"], "tags": ["database", "markdown", "golang"]},
+    "body": "# Body"
+  },
+  {
+    "name": "flow list",
+    "input": "---\ntags: [database, markdown, golang]\n---\nBody",
+    "meta": {"tags": ["database", "markdown", "golang"]},
+    "body": "Body"
+  },
+  {
+    "name": "flow list with quoted items",
+    "input": "---\ntags: [\"two words\", 'single']\n---\nBody",
+    "meta": {"tags": ["two words", "single"]},
+    "body": "Body"
+  },
+  {
+    "name": "empty flow list",
+    "input": "---\ntags: []\n- not an item of tags\ntitle: T\n---\nBody",
+    "meta": {"title": ["T"]},
+    "body": "Body"
+  },
+  {
+    "name": "block list",
+    "input": "---\ntags:\n  - database\n  - \"markdown\"\n- golang\ntitle: After\n---\nBody",
+    "meta": {"tags": ["database", "markdown", "golang"], "title": ["After"]},
+    "body": "Body"
+  },
+  {
+    "name": "block list skips empty items and comments",
+    "input": "---\ntags:\n  -\n  # a comment\n  - one\n\n  - two\n---\nBody",
+    "meta": {"tags": ["one", "two"]},
+    "body": "Body"
+  },
+  {
+    "name": "a list of maps is not stored as items",
+    "input": "---\nfaq:\n  - \"quoted: kept\"\n  - question: Is it free?\n    answer: Yes\n---\nBody",
+    "meta": {"faq": ["quoted: kept"], "answer": ["Yes"]},
+    "body": "Body"
+  },
+  {
+    "name": "item with no list before it is ignored",
+    "input": "---\ntitle: T\n- stray\nplain line\n- also stray\n---\nBody",
+    "meta": {"title": ["T"]},
+    "body": "Body"
+  },
+  {
+    "name": "key with no value and no items is left out",
+    "input": "---\ntitle:\nsubtitle: \"\"\nauthor: alice\n---\nBody",
+    "meta": {"author": ["alice"]},
+    "body": "Body"
+  },
+  {
+    "name": "comma list drops empty items and quotes",
+    "input": "---\ntags: \"a\", , 'b',\n---\nBody",
+    "meta": {"tags": ["a", "b"]},
+    "body": "Body"
+  },
+  {
+    "name": "quoted scalar keeps a colon, a line with no key is skipped",
+    "input": "---\ntitle: \"Time: 10am\"\n: novalue\n---\nBody",
+    "meta": {"title": ["Time: 10am"]},
+    "body": "Body"
+  },
+  {
+    "name": "no frontmatter",
+    "input": "  # Just markdown\n\ntags: a, b\n",
+    "meta": null,
+    "body": "# Just markdown\n\ntags: a, b"
+  },
+  {
+    "name": "no closing delimiter",
+    "input": "---\ntitle: T\nbody",
+    "meta": null,
+    "body": "---\ntitle: T\nbody"
+  },
+  {
+    "name": "opening delimiter only",
+    "input": "---",
+    "meta": null,
+    "body": "---"
+  }
+]

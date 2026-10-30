@@ -36,6 +36,9 @@ type autoindexOptions struct {
 	// images sends each Markdown file's linked images and asks the server
 	// to store them, and a PDF's pictures, as image documents (RAG-010).
 	images bool
+	// noFrontmatter stores Markdown files as they are; by default the
+	// server's ingest reads their frontmatter as meta (#373).
+	noFrontmatter bool
 	// extraMeta is added to every document: a reference repository's
 	// licence and source (AGT-003).
 	extraMeta map[string][]string
@@ -91,7 +94,10 @@ files are skipped by content, except the documents the server converts to
 Markdown: PDF, DOCX, ODT, RTF, XLSX, ODS, PPTX, ODP and EPUB by content, and
 HTML, TeX, CSV, TSV, EML and MBOX by extension. Each document gets meta path, extension, kind,
 language, size and modified (and gitCommit, gitBranch in a repository); the
-server extracts symbols. A second run only rewrites files whose content changed.`,
+server extracts symbols. A Markdown file's frontmatter becomes meta too, read by
+the server as /v1/upload reads it, and the body is stored without it; the meta
+above wins for a key both name, and --no-frontmatter turns this off.
+A second run only rewrites files whose content changed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.root = "."
@@ -110,6 +116,7 @@ server extracts symbols. A second run only rewrites files whose content changed.
 	f.StringVar(&o.profile, "profile", "", `Ingest profile: "" (default) or "fast"`)
 	f.BoolVar(&o.prune, "prune", false, "Delete documents whose file no longer exists")
 	f.BoolVar(&o.dryRun, "dry-run", false, "Show what would be indexed, skipped and pruned; write nothing")
+	f.BoolVar(&o.noFrontmatter, "no-frontmatter", false, "Store Markdown files as they are; do not read frontmatter as meta")
 	f.BoolVar(&o.images, "images", false, "Store the images of Markdown files (their linked JPEG, PNG, GIF and WebP files) and PDFs as image documents")
 	return cmd
 }
@@ -125,14 +132,7 @@ func runAutoindex(ctx context.Context, client *mddb.Client, o autoindexOptions) 
 		return fmt.Errorf("%s is not a directory", o.root)
 	}
 	rep := &autoindexReport{Root: root, Git: detectGit(root), DryRun: o.dryRun}
-	rep.Collection = o.collection
-	if rep.Collection == "" {
-		name := filepath.Base(root)
-		if rep.Git != nil && rep.Git.Name != "" {
-			name = rep.Git.Name
-		}
-		rep.Collection = sanitizeCollection(name)
-	}
+	rep.Collection = autoindexCollection(o.collection, root, rep.Git)
 
 	files, err := planFiles(ctx, client, root, rep, o)
 	if err != nil {
@@ -159,6 +159,19 @@ func runAutoindex(ctx context.Context, client *mddb.Client, o autoindexOptions) 
 		rep.Errors = append(rep.Errors, "search advisor: "+err.Error())
 	}
 	return printAutoindex(rep, start)
+}
+
+// autoindexCollection is the collection a run writes to: the one asked for,
+// else the repository's name, else the directory's.
+func autoindexCollection(asked, root string, g *gitInfo) string {
+	if asked != "" {
+		return asked
+	}
+	name := filepath.Base(root)
+	if g != nil && g.Name != "" {
+		name = g.Name
+	}
+	return sanitizeCollection(name)
 }
 
 // planFiles lists and classifies the files, recording skips in the report.
@@ -216,25 +229,7 @@ func fileMeta(f autoFile, g *gitInfo) map[string][]string {
 // Unchanged content is skipped by the server (skipDuplicates), which is what
 // makes a second run cheap.
 func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport, files []autoFile, o autoindexOptions) {
-	var batch []mddb.IngestDocument
-	size := 0
-	flush := func() {
-		if len(batch) == 0 {
-			return
-		}
-		resp, err := client.Ingest(ctx, mddb.IngestRequest{Collection: rep.Collection, Documents: batch,
-			Options: mddb.IngestOptions{SkipDuplicates: true, Profile: o.profile, ExtractImages: o.images}})
-		if err != nil {
-			rep.Failed += len(batch)
-			rep.Errors = append(rep.Errors, err.Error())
-		} else {
-			rep.Added, rep.Updated, rep.Unchanged = rep.Added+resp.Added, rep.Updated+resp.Updated, rep.Unchanged+resp.Skipped
-			rep.Failed += resp.Failed
-			rep.Errors = append(rep.Errors, resp.Errors...)
-			rep.noteConversions(resp.Conversions)
-		}
-		batch, size = nil, 0
-	}
+	b := &ingestBatch{ctx: ctx, client: client, rep: rep, o: o}
 	for _, f := range files {
 		content, err := os.ReadFile(f.abs) // #nosec G304 -- a file under the directory the user asked to index
 		if err != nil {
@@ -242,28 +237,68 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 			rep.Errors = append(rep.Errors, f.Rel+": "+err.Error())
 			continue
 		}
-		doc := mddb.IngestDocument{Key: f.Rel, Lang: o.lang}
-		if o.images && docExtensions[strings.ToLower(filepath.Ext(f.Rel))] {
-			doc.Images = markdownImageFiles(rep.Root, f.Rel, content) // RAG-010
-		}
-		if len(batch) > 0 && (len(batch) >= autoindexBatchDocs || size+wireSize(f, content, doc.Images) > autoindexBatchBytes) {
-			flush()
-		}
-		doc.Meta = fileMeta(f, rep.Git)
-		for k, v := range o.extraMeta {
-			doc.Meta[k] = v
-		}
-		if f.Format != "" {
-			// The server converts it, with the converters /v1/upload uses.
-			doc.Format, doc.Content = f.Format, content
-			rep.Converted = append(rep.Converted, autoConverted{Rel: f.Rel, Format: f.Format})
-		} else {
-			doc.ContentMD = string(content)
-		}
-		batch = append(batch, doc)
-		size += wireSize(f, content, doc.Images)
+		b.add(f, content)
 	}
-	flush()
+	b.flush()
+}
+
+// ingestBatch collects documents for one /v1/ingest call and records what
+// each call did in the report.
+type ingestBatch struct {
+	ctx    context.Context
+	client *mddb.Client
+	rep    *autoindexReport
+	o      autoindexOptions
+	docs   []mddb.IngestDocument
+	size   int
+}
+
+// add queues a file's document, sending the batch first when the file
+// would take it over the document or byte limit.
+func (b *ingestBatch) add(f autoFile, content []byte) {
+	isMarkdown := docExtensions[strings.ToLower(filepath.Ext(f.Rel))]
+	// The server reads the frontmatter, once, with the /v1/upload parser.
+	doc := mddb.IngestDocument{Key: f.Rel, Lang: b.o.lang, ExtractFrontmatter: isMarkdown && !b.o.noFrontmatter}
+	if b.o.images && isMarkdown {
+		doc.Images = markdownImageFiles(b.rep.Root, f.Rel, content) // RAG-010
+	}
+	n := wireSize(f, content, doc.Images)
+	if len(b.docs) > 0 && (len(b.docs) >= autoindexBatchDocs || b.size+n > autoindexBatchBytes) {
+		b.flush()
+	}
+	doc.Meta = fileMeta(f, b.rep.Git)
+	for k, v := range b.o.extraMeta {
+		doc.Meta[k] = v
+	}
+	if f.Format != "" {
+		// The server converts it, with the converters /v1/upload uses.
+		doc.Format, doc.Content = f.Format, content
+		b.rep.Converted = append(b.rep.Converted, autoConverted{Rel: f.Rel, Format: f.Format})
+	} else {
+		doc.ContentMD = string(content)
+	}
+	b.docs = append(b.docs, doc)
+	b.size += n
+}
+
+// flush sends the queued documents, if any, and empties the batch.
+func (b *ingestBatch) flush() {
+	if len(b.docs) == 0 {
+		return
+	}
+	rep := b.rep
+	resp, err := b.client.Ingest(b.ctx, mddb.IngestRequest{Collection: rep.Collection, Documents: b.docs,
+		Options: mddb.IngestOptions{SkipDuplicates: true, Profile: b.o.profile, ExtractImages: b.o.images}})
+	if err != nil {
+		rep.Failed += len(b.docs)
+		rep.Errors = append(rep.Errors, err.Error())
+	} else {
+		rep.Added, rep.Updated, rep.Unchanged = rep.Added+resp.Added, rep.Updated+resp.Updated, rep.Unchanged+resp.Skipped
+		rep.Failed += resp.Failed
+		rep.Errors = append(rep.Errors, resp.Errors...)
+		rep.noteConversions(resp.Conversions)
+	}
+	b.docs, b.size = nil, 0
 }
 
 // noteConversions records how well the server converted each document:

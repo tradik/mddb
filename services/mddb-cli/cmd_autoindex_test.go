@@ -395,3 +395,35 @@ func TestAutoindex_PruneTakesAMailFilesParts(t *testing.T) {
 		t.Fatalf("a failed lookup is reported: %s", out)
 	}
 }
+
+// #373: a Markdown file's frontmatter is read once, by the server's ingest
+// (the parser /v1/upload uses): the CLI asks for it and sends the file as it
+// is. Other files, and --no-frontmatter runs, do not ask.
+func TestAutoindex_MarkdownAsksTheServerForFrontmatter(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		args []string
+		want bool
+	}{{"default", nil, true}, {"no-frontmatter", []string{"--no-frontmatter"}, false}} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			md := "---\ntags: a, b\n---\n# Hi\n"
+			writeTree(t, dir, map[string][]byte{"README.md": []byte(md), "conf.yaml": []byte("---\na: b\n---\n")})
+			fs := newFakeServer(t, autoindexRoutes())
+			args := append([]string{"autoindex", "-c", "proj"}, tc.args...)
+			if _, err := runCLI(t, fs.URL, append(args, dir)...); err != nil {
+				t.Fatal(err)
+			}
+			for _, d := range callsTo(fs, "POST", "/v1/ingest")[0].Body["documents"].([]interface{}) {
+				doc := asMap(d)
+				want := tc.want && doc["key"] == "README.md"
+				if got := doc["extractFrontmatter"] == true; got != want {
+					t.Errorf("%v extractFrontmatter = %v, want %v", doc["key"], got, want)
+				}
+				if doc["key"] == "README.md" && doc["contentMd"] != md {
+					t.Errorf("README.md sent as %q, want the file as it is", doc["contentMd"])
+				}
+			}
+		})
+	}
+}

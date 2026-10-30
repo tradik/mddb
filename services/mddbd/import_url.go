@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strings"
 	"time"
 
 	json "mddb/internal/jsonx"
@@ -151,65 +150,6 @@ func fetchOutbound(ctx context.Context, rawURL string, limit int64, timeout time
 	out.overLimit = int64(len(body)) > limit
 	out.body = body[:min(int64(len(body)), limit)]
 	return out, nil
-}
-
-// parseFrontmatter extracts YAML frontmatter (between --- markers) from markdown.
-// Returns extracted metadata and the remaining body content.
-func parseFrontmatter(content string) (map[string][]string, string) {
-	content = strings.TrimSpace(content)
-	if !strings.HasPrefix(content, "---") {
-		return nil, content
-	}
-
-	// Find closing ---
-	rest := content[3:]
-	if idx := strings.Index(rest, "\n"); idx >= 0 {
-		rest = rest[idx+1:]
-	} else {
-		return nil, content
-	}
-
-	endIdx := strings.Index(rest, "\n---")
-	if endIdx < 0 {
-		return nil, content
-	}
-
-	fmBlock := rest[:endIdx]
-	body := strings.TrimSpace(rest[endIdx+4:])
-
-	// Simple YAML key: value parser
-	meta := make(map[string][]string)
-	for _, line := range strings.Split(fmBlock, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		colonIdx := strings.Index(line, ":")
-		if colonIdx < 0 {
-			continue
-		}
-		key := strings.TrimSpace(line[:colonIdx])
-		val := strings.TrimSpace(line[colonIdx+1:])
-		if key == "" {
-			continue
-		}
-		// Strip quotes
-		val = strings.Trim(val, `"'`)
-		if val != "" {
-			// Support comma-separated values: tags: go, database, markdown
-			if strings.Contains(val, ",") {
-				parts := strings.Split(val, ",")
-				for i := range parts {
-					parts[i] = strings.TrimSpace(parts[i])
-				}
-				meta[key] = parts
-			} else {
-				meta[key] = []string{val}
-			}
-		}
-	}
-
-	return meta, body
 }
 
 // deriveKeyFromURL extracts a document key from the URL path.

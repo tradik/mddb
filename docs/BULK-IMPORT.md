@@ -27,6 +27,7 @@ mddb-cli autoindex docs --images          # also store the images Markdown files
 | Images (v2.18.9+) | With `--images`, each Markdown file is sent with the JPEG, PNG, GIF and WebP files its relative image links name (inside the indexed tree, at most 2 MB each; `images` on `/v1/ingest`), and `extractImages` is set: the server stores them, and the pictures of PDFs, as image documents below the file's key with `meta.parent`, `meta.altText` and `meta.caption`, which full-text search indexes. See [SEARCH.md](SEARCH.md#images--alt-text-captions-and-pictures-v2189). |
 | Skipped | Other binary files (a NUL byte in the first 8 KiB, or a zip that is no document) and files over `--max-file-size` (default 1 MiB). `--dry-run` lists each with the reason. |
 | Documents | Key = the file's path; `lang` from `--lang` (default `en`). Meta: `path`, `extension`, `kind` (`code`, `doc` for Markdown and converted files, `text`), `sourceFormat` for converted files, `language` (from the server's table, `GET /v1/code-languages`), `size`, `modified` (RFC 3339), and `gitCommit`, `gitBranch` in a repository. The server extracts `defines` / `uses` / `imports`. |
+| Frontmatter (v2.18.11+) | A Markdown file (`.md`, `.markdown`, `.mdx`) is sent as it is with `extractFrontmatter` set, so the server reads its frontmatter once, with the parser `/v1/upload` uses: the keys become meta (comma, `[flow]` and `- item` block lists are lists; see [Frontmatter Format](#frontmatter-format)) and the body is stored without the block. The meta above wins for a key both name. Other files are never parsed for frontmatter, so a YAML file's `---` stays. `--no-frontmatter` turns it off. |
 | Sending | Batches of 200 documents or 4 MiB (converted files counted at their base64 size) to `/v1/ingest`, with `skipDuplicates`: an unchanged file is counted `unchanged` and not rewritten, so a second run takes about a second. A converted file is compared by its Markdown, which the converters produce the same way every time. |
 | Quality (v2.18.9+) | Every converted document carries `meta.conversionConfidence` (0–1) and `meta.conversionWarnings`; a scan without a text layer scores 0. List them with `"filter": {"conversionConfidence": {"lt": 0.5}}`; the search advisor run at the end warns when there are any. See [API.md](API.md#post-v1upload) for the heuristic. |
 | C and C++ | Directories named `include` holding headers become the collection's `code.includePaths`, unless it already has some, so `#include <...>` resolves in the code graph. |
@@ -47,7 +48,7 @@ autoindex` like any other command.
 ## Features
 
 - **Automatic Key Generation** - Creates unique keys from filenames
-- **Frontmatter Support** - Extracts YAML-style metadata from file headers
+- **Frontmatter Support** - `mddb-cli add` (2.18.11+) reads each file's frontmatter as metadata, lists included
 - **Recursive Scanning** - Process entire directory trees
 - **Progress Tracking** - Real-time progress with statistics
 - **Dry Run Mode** - Preview imports without making changes
@@ -143,8 +144,9 @@ Preview what would be imported without making changes:
 This shows:
 - Which files would be imported
 - Generated keys
-- Extracted metadata
-- Final metadata combination
+- The loader's own metadata (`source`, `filename`, `-m` values); the
+  frontmatter keys are read by `mddb-cli add` when the file is stored, so a dry
+  run does not list them
 
 ### Verbose Output
 
@@ -263,7 +265,12 @@ limits and reconnection.
 
 ## Frontmatter Support
 
-The script automatically extracts metadata from YAML-style frontmatter:
+The script does not parse frontmatter itself. It stores each file with
+`mddb-cli add -f FILE`, and `mddb-cli add` reads the frontmatter with the same
+rules as `/v1/upload` and `/v1/ingest`: the keys become metadata and the
+document is stored without the block. The loader therefore needs mddb-cli
+2.18.11 or newer, and stops with an error on an older one, which would store
+the block as text.
 
 ```markdown
 ---
@@ -279,29 +286,40 @@ date: 2024-01-15
 Your content here...
 ```
 
-This frontmatter will be converted to metadata:
-- `title=Getting Started`
-- `author=John Doe`
-- `tags=tutorial, beginner`
-- `category=documentation`
-- `date=2024-01-15`
+This frontmatter becomes the metadata:
+- `title=[Getting Started]`
+- `author=[John Doe]`
+- `tags=[tutorial, beginner]`, a list of two values
+- `category=[documentation]`
+- `date=[2024-01-15]`
+
+Before 2.18.11 the script parsed frontmatter in shell and kept only the first
+item of a list, so `tags: a, b, c` arrived as `tags=[a]` (#372).
 
 ### Frontmatter Format
 
-Supported format:
 ```yaml
 ---
-key: value
-another_key: another value
-tags: value1, value2
+title: "Quoted: a colon is fine"
+tags: value1, value2          # comma list
+keywords: [value1, value2]    # flow list
+topics:                       # block list
+  - value1
+  - value2
 ---
 ```
 
-Requirements:
-- Must start with `---` on first line
-- Must end with `---` on its own line
-- Use `key: value` format
-- Values can contain spaces (quotes optional)
+Rules:
+- The first line is `---`, and a line starting with `---` closes the block
+- One level of `key: value` lines; `#` lines are comments
+- A value with a comma, a `[flow, list]` and a key followed by `- item` lines
+  all become lists; quotes around a value or an item are dropped
+- A key with no value and no items is left out
+- Nested maps are not read as maps; their inner `key: value` lines become
+  top-level keys, and a `- key: value` item (a list of maps) is not stored
+  (see [API.md](API.md#structured-frontmatter-and-flat-meta))
+- The same rules apply to `/v1/upload`, `/v1/ingest` with `extractFrontmatter`,
+  `import-url`, `mddb-cli add` and `mddb-cli autoindex`
 
 ## Key Generation
 
@@ -328,9 +346,11 @@ Metadata is combined from multiple sources:
    - `source=folder-import`
    - `filename=original-filename.md`
 
-2. **Frontmatter metadata** (extracted from file)
+2. **Frontmatter metadata** (read by `mddb-cli add`)
 
 3. **Custom metadata** (from `--meta` flags)
+
+The automatic and custom metadata win over a frontmatter key of the same name.
 
 Example:
 ```bash
@@ -344,7 +364,7 @@ category: tutorial
 ./scripts/load-md-folder.sh ./docs blog -m "status=published"
 
 # Final metadata:
-source=folder-import,filename=tutorial.md,author=Jane,category=tutorial,status=published
+source=[folder-import] filename=[tutorial.md] author=[Jane] category=[tutorial] status=[published]
 ```
 
 ## Examples
@@ -548,6 +568,9 @@ Ensure frontmatter format:
 - Starts with `---` on line 1
 - Ends with `---` on its own line
 - Uses `key: value` format
+
+If the loader says `mddb-cli` does not read frontmatter, the CLI on `PATH` (or in
+`MDDB_CLI`) is older than 2.18.11; upgrade it.
 
 ## Integration with CI/CD
 
