@@ -1273,6 +1273,27 @@ message CollectionConfigProto {
   EmbeddingChunkingProto embedding = 20;         // (v2.18.1+) chunking for embeddings (#325)
   CollectionFTSProto fts = 21;                   // (v2.18.2+) full-text indexing on or off (#335)
   CollectionQuotaProto quota = 22;               // (v2.18.9+) limits (GO-043); unset = unlimited
+  // (v2.18.10+, AGT-005) Output only: set when the collection was installed
+  // from a corpus pack. Every write to a read-only collection is refused with
+  // PERMISSION_DENIED; a SetCollectionConfig keeps both fields as stored.
+  bool read_only = 23;
+  CorpusInfoProto corpus = 24;
+}
+
+// CorpusInfoProto mirrors CorpusInfo (AGT-005): the pack a read-only
+// collection was installed from.
+message CorpusInfoProto {
+  string name = 1;
+  string version = 2;
+  string license = 3;
+  string mddb_version = 4;                       // the server version that built the pack
+  int64 doc_count = 5;
+  string sha256 = 6;                             // of the .mddbpack archive
+  int64 installed_at = 7;                        // unix seconds
+  bool vectors_disabled = 8;                     // the pack's model differs from the server's: hybrid answers from full text
+  string embedding_provider = 9;
+  string embedding_model = 10;
+  int32 embedding_dims = 11;
 }
 
 // CollectionQuotaProto mirrors CollectionQuota (GO-043). 0 = no limit.

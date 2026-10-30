@@ -189,6 +189,14 @@ prefix (`source`, `collection`, `lang`, `url`, `urls`, `bucket`, `prefix`,
 defaults and secret masking are those of the REST body; see
 [AUTOMATIONS.md](AUTOMATIONS.md#synced-sources).
 
+`CollectionConfigProto.read_only` (23) and `corpus` (24, `CorpusInfoProto`:
+name, version, license, building server version, document count, archive
+sha256, install time in unix seconds, `vectors_disabled` and the pack's
+embedding provider, model and dimensions) show a collection installed from a
+corpus pack. Both are output only: `SetCollectionConfig` keeps them as
+stored. Every write to a read-only collection answers `PERMISSION_DENIED`;
+see [CORPUS-PACKS.md](CORPUS-PACKS.md).
+
 ### New in v2.18.9
 
 The query planner (SRCH-013) is available over gRPC. `VectorSearch` and

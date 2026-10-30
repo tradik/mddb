@@ -125,7 +125,29 @@ func collectionConfigToProto(cfg *CollectionConfig) *proto.CollectionConfigProto
 		Embedding:       chunkingToProto(cfg.Embedding),
 		Fts:             ftsToProto(cfg.FTS),
 		Quota:           quotaToProto(cfg.Quota),
+		ReadOnly:        cfg.ReadOnly,
+		Corpus:          corpusInfoToProto(cfg.Corpus),
 	}
+}
+
+// corpusInfoToProto carries CorpusInfo (AGT-005). There is no FromProto:
+// both fields are set by a pack install only, and SetCollectionConfig keeps
+// them as stored.
+func corpusInfoToProto(c *CorpusInfo) *proto.CorpusInfoProto {
+	if c == nil {
+		return nil
+	}
+	out := &proto.CorpusInfoProto{
+		Name: c.Name, Version: c.Version, License: c.License, MddbVersion: c.MddbVersion,
+		DocCount: int64(c.DocCount), Sha256: c.SHA256, VectorsDisabled: c.VectorsDisabled,
+	}
+	if !c.InstalledAt.IsZero() {
+		out.InstalledAt = c.InstalledAt.Unix()
+	}
+	if e := c.Embedding; e != nil {
+		out.EmbeddingProvider, out.EmbeddingModel, out.EmbeddingDims = e.Provider, e.Model, safeInt32(e.Dims)
+	}
+	return out
 }
 
 // quotaToProto and quotaFromProto carry CollectionQuota (GO-043).
