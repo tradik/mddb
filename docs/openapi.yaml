@@ -77,11 +77,21 @@ info:
     name: BSD-3-Clause
     url: https://github.com/tradik/mddb/blob/main/LICENSE
 
+# The defaults resolve to http://localhost:11023, the HTTP listener's default
+# address (http.addr / MDDB_ADDR, ":11023"). Paths carry their /v1 prefix.
 servers:
-  - url: http://localhost:11023
-    description: Local development server
-  - url: http://localhost:11023/v1
-    description: Local development server (with version prefix)
+  - url: "{scheme}://{host}:{port}"
+    description: MDDB HTTP API listener (default http://localhost:11023)
+    variables:
+      scheme:
+        default: http
+        enum: [http, https]
+      host:
+        default: localhost
+        description: The server's host name or address
+      port:
+        default: "11023"
+        description: The HTTP listener's port (http.addr, MDDB_ADDR)
 
 # Authentication is off unless MDDB_AUTH_ENABLED=true, so each operation
 # accepts a JWT, an API key, or nothing; with auth on, only /health and the
@@ -336,6 +346,7 @@ paths:
       tags:
         - Health
       summary: (v2.18.2+) Bytes per bucket and per collection, and free space
+      operationId: getStorage
       description: >
         Attributes every key and value to its bucket and collection (#335).
         Without `collection` it reads the whole file, in read transactions of
@@ -391,6 +402,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/stats:
     get:
@@ -406,6 +419,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Stats"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/add:
     post:
@@ -438,12 +454,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RevisionConflict"
-        "507":
-          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/QuotaExceeded"
+        "507": {$ref: "#/components/responses/InsufficientStorage"}
         "400":
           description: Invalid request
           content:
@@ -479,12 +490,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AddBatchResponse"
-        "507":
-          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/QuotaExceeded"
+        "507": {$ref: "#/components/responses/InsufficientStorage"}
         "400":
           description: Invalid request
           content:
@@ -604,6 +610,10 @@ paths:
                       $ref: "#/components/schemas/BulkIngestJob"
                   total:
                     type: integer
+        "400": {description: "Bulk ingest is not initialized", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/ingest:
     post:
@@ -628,12 +638,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IngestResponse"
-        "507":
-          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/QuotaExceeded"
+        "507": {$ref: "#/components/responses/InsufficientStorage"}
         "400":
           description: Invalid request
           content:
@@ -1186,7 +1191,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/VectorSearchResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/VectorSearchResponse"
+                  - $ref: "#/components/schemas/PassagesResponse"
         "400":
           description: Invalid request
           content:
@@ -1510,14 +1517,19 @@ paths:
       tags:
         - Vector Search
       summary: (v2.18.4+) Recent reindex jobs, newest first
+      operationId: listVectorReindexJobs
       responses:
         "200":
           description: Jobs
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
   /v1/vector-reindex/jobs/{id}:
     get:
       tags:
         - Vector Search
       summary: (v2.18.4+) A reindex job's progress and result
+      operationId: getVectorReindexJob
       description: >
         status is running, completed or failed; done, percent and etaSeconds
         give the progress; result holds total, embedded, skipped, failed,
@@ -1529,6 +1541,9 @@ paths:
           description: The job
         "404":
           description: No such job (a restart forgets jobs)
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/vector-stats:
     get:
@@ -1546,6 +1561,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VectorStatsResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/geo-search:
     post:
@@ -1612,6 +1630,11 @@ paths:
                 includeContent: { type: boolean }
       responses:
         "200": { description: OK }
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/geo-polygon:
     post:
@@ -1675,6 +1698,12 @@ paths:
                       csvPath: { type: string }
       responses:
         "200": { description: OK }
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
 
   /v1/geo-stats:
     get:
@@ -1684,6 +1713,9 @@ paths:
       operationId: geoStats
       responses:
         "200": { description: OK }
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/geo-encode:
     post:
@@ -1704,6 +1736,10 @@ paths:
                 precision: { type: integer, minimum: 1, maximum: 12, default: 12 }
       responses:
         "200": { description: OK }
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/geo-decode:
     post:
@@ -1722,6 +1758,10 @@ paths:
                 geohash: { type: string }
       responses:
         "200": { description: OK }
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/fts:
     post:
@@ -1761,7 +1801,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FTSSearchResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/FTSSearchResponse"
+                  - $ref: "#/components/schemas/PassagesResponse"
         "400":
           description: Invalid request
           content:
@@ -1896,6 +1938,10 @@ paths:
                     type: string
                   field:
                     type: string
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/fts-languages:
     get:
@@ -1927,6 +1973,8 @@ paths:
                   defaultLang:
                     type: string
                     example: en
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/hybrid-search:
     post:
@@ -1958,7 +2006,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HybridSearchResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/HybridSearchResponse"
+                  - $ref: "#/components/schemas/PassagesResponse"
         "400":
           description: Invalid request
           content:
@@ -2173,6 +2223,10 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Webhook"
+        "400": {description: "Webhooks are not initialized", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     post:
       tags:
         - Webhooks
@@ -2407,6 +2461,9 @@ paths:
                           type: string
                           description: JSON Schema string
                           example: "{\"type\":\"object\",\"required\":[\"author\"]}"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/validate:
     post:
@@ -2498,6 +2555,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReplicationStatusResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/synonyms:
     get:
@@ -2752,6 +2811,9 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/EmbeddingConfig"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     post:
       tags:
         - Embedding Config
@@ -2938,6 +3000,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SystemInfoResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/config:
     get:
@@ -2955,6 +3019,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConfigResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/mcp/config:
     get:
@@ -2981,6 +3047,8 @@ paths:
                     transportMode: "grpc_with_rest_fallback"
                     timeoutSeconds: 2
                     maxRetries: 1
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/endpoints:
     get:
@@ -2998,6 +3066,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EndpointsResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/auth/login:
     post:
@@ -3690,6 +3760,11 @@ paths:
                           items:
                             type: string
                     description: GraphQL errors (if any)
+        "400": {description: "The body is not JSON (gqlgen); the reason is in errors[0].message", content: {application/json: {schema: {$ref: "#/components/schemas/GraphQLResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "422": {description: "The query does not parse or validate against the schema; errors name where", content: {application/json: {schema: {$ref: "#/components/schemas/GraphQLResponse"}}}}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /playground:
     get:
@@ -3707,11 +3782,14 @@ paths:
             text/html:
               schema:
                 type: string
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/automation:
     get:
       tags: [ Automation ]
       summary: List automation rules
+      operationId: listAutomationRules
       description: Returns all automation rules (webhooks, triggers, crons).
         Optionally filter by type.
       parameters:
@@ -3735,9 +3813,14 @@ paths:
                       $ref: "#/components/schemas/AutomationRule"
                   total:
                     type: integer
+        "400": {description: "Automation is not initialized", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     post:
       tags: [ Automation ]
       summary: Create automation rule
+      operationId: createAutomationRule
       description: Create a new webhook target, trigger, or cron rule.
       requestBody:
         required: true
@@ -3754,11 +3837,16 @@ paths:
                 $ref: "#/components/schemas/AutomationRule"
         "400":
           description: Validation error
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/automation/{id}:
     get:
       tags: [ Automation ]
       summary: Get automation rule
+      operationId: getAutomationRule
       parameters:
         - name: id
           in: path
@@ -3774,9 +3862,14 @@ paths:
                 $ref: "#/components/schemas/AutomationRule"
         "404":
           description: Not found
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     put:
       tags: [ Automation ]
       summary: Update automation rule
+      operationId: updateAutomationRule
       parameters:
         - name: id
           in: path
@@ -3796,9 +3889,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AutomationRule"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     delete:
       tags: [ Automation ]
       summary: Delete automation rule
+      operationId: deleteAutomationRule
       parameters:
         - name: id
           in: path
@@ -3808,11 +3908,17 @@ paths:
       responses:
         "200":
           description: Rule deleted
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/automation/{id}/test:
     post:
       tags: [ Automation ]
       summary: Test trigger (dry run)
+      operationId: testAutomationRule
       description: Execute a trigger's search and return matching documents without
         firing the webhook.
       parameters:
@@ -3848,11 +3954,17 @@ paths:
                       $ref: "#/components/schemas/TriggerMatch"
                   total:
                     type: integer
+        "400": {description: "Not a trigger rule (only triggers can be tested), or the test failed", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/automation-logs:
     get:
       tags: [ Automation ]
       summary: List automation execution logs
+      operationId: listAutomationLogs
       description: Returns automation execution logs ordered newest-first with
         cursor-based pagination. Requires MDDB_AUTOMATION_LOGS != "disable".
       parameters:
@@ -3898,6 +4010,10 @@ paths:
                     type: string
                   hasMore:
                     type: boolean
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {description: "Automation logs are disabled", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/code-languages:
     get:
@@ -4005,6 +4121,7 @@ paths:
       tags:
         - Search
       summary: Code connection graph for one document
+      operationId: getCodeGraph
       description: >
         Answers the relational questions full-text search cannot: what breaks if
         this selector changes, which pages load this script, which file defines
@@ -4076,6 +4193,7 @@ paths:
       tags:
         - Search
       summary: Code connection graph for one document (JSON body)
+      operationId: postCodeGraph
       description: >
         Identical to the GET form. Accepts a JSON body for keys containing
         characters awkward in a query string.
@@ -4130,6 +4248,7 @@ paths:
       tags:
         - Search
       summary: List metadata keys and values for a collection
+      operationId: listMetaKeys
       description: Returns all unique metadata keys and their unique values for a
         given collection. Useful for building filter UIs.
       parameters:
@@ -4165,6 +4284,7 @@ paths:
       tags:
         - Collections
       summary: Get collection checksum
+      operationId: getChecksum
       description: Returns a CRC32-based checksum for a collection that changes
         whenever documents are added, updated, or deleted. Useful for cache
         invalidation - clients can poll this lightweight endpoint to detect
@@ -4203,6 +4323,7 @@ paths:
       tags:
         - Documents
       summary: Partial document update
+      operationId: updateDocument
       description: |
         Update document metadata and/or content independently.
         Only provided fields are updated; omitted fields remain unchanged.
@@ -4263,12 +4384,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AddResponse"
-        "507":
-          description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/QuotaExceeded"
+        "507": {$ref: "#/components/responses/InsufficientStorage"}
         "400":
           description: Missing required fields or no fields to update
         "404":
@@ -4287,6 +4403,7 @@ paths:
       tags:
         - Documents
       summary: Get document metadata only
+      operationId: getDocumentMeta
       description: Returns metadata for a document without content. Lightweight read
         useful for checking tags without transferring document body.
       parameters:
@@ -4350,6 +4467,7 @@ paths:
       tags:
         - Classification
       summary: Zero-shot document classification
+      operationId: classifyDocument
       description: |
         Classify a document or text against candidate labels using embedding similarity.
         Provide either a document reference (collection + key + lang) or raw text, plus an array of candidate labels.
@@ -4544,9 +4662,17 @@ paths:
           description: Document or revision not found
 
   /.well-known/oauth-protected-resource:
+    servers:
+      - url: "{scheme}://{host}:{port}"
+        description: MDDB MCP listener (default http://localhost:9000; mcp.addr, MDDB_MCP_ADDR)
+        variables:
+          scheme: {default: http, enum: [http, https]}
+          host: {default: localhost}
+          port: {default: "9000"}
     get:
       tags: [MCP]
       summary: (v2.18.1+) OAuth protected-resource metadata, RFC 9728 (MCP listener)
+      operationId: getOAuthProtectedResourceMetadata
       description: Served on the MCP listener when MDDB_MCP_OAUTH_ENABLED=true (#322).
       security: []
       responses:
@@ -4558,10 +4684,19 @@ paths:
                 resource: https://mcp.example.com/mcp
                 authorization_servers: [https://mcp.example.com]
                 bearer_methods_supported: [header]
+        "404": {description: "OAuth is off (MDDB_MCP_OAUTH_ENABLED is not true): the path is not served", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
   /.well-known/oauth-authorization-server:
+    servers:
+      - url: "{scheme}://{host}:{port}"
+        description: MDDB MCP listener (default http://localhost:9000; mcp.addr, MDDB_MCP_ADDR)
+        variables:
+          scheme: {default: http, enum: [http, https]}
+          host: {default: localhost}
+          port: {default: "9000"}
     get:
       tags: [MCP]
       summary: (v2.18.1+) OAuth authorization-server metadata, RFC 8414 (MCP listener)
+      operationId: getOAuthAuthorizationServerMetadata
       security: []
       responses:
         "200":
@@ -4577,10 +4712,19 @@ paths:
                 grant_types_supported: [authorization_code, refresh_token]
                 code_challenge_methods_supported: [S256]
                 token_endpoint_auth_methods_supported: [none]
+        "404": {description: "OAuth is off (MDDB_MCP_OAUTH_ENABLED is not true): the path is not served", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
   /oauth/register:
+    servers:
+      - url: "{scheme}://{host}:{port}"
+        description: MDDB MCP listener (default http://localhost:9000; mcp.addr, MDDB_MCP_ADDR)
+        variables:
+          scheme: {default: http, enum: [http, https]}
+          host: {default: localhost}
+          port: {default: "9000"}
     post:
       tags: [MCP]
       summary: (v2.18.1+) Dynamic client registration, RFC 7591 (MCP listener)
+      operationId: registerOAuthClient
       security: []
       requestBody:
         required: true
@@ -4602,9 +4746,17 @@ paths:
         "400":
           description: invalid_client_metadata or invalid_redirect_uri
   /oauth/authorize:
+    servers:
+      - url: "{scheme}://{host}:{port}"
+        description: MDDB MCP listener (default http://localhost:9000; mcp.addr, MDDB_MCP_ADDR)
+        variables:
+          scheme: {default: http, enum: [http, https]}
+          host: {default: localhost}
+          port: {default: "9000"}
     get:
       tags: [MCP]
       summary: (v2.18.1+) Authorization endpoint — consent page (MCP listener)
+      operationId: authorizeOAuthClient
       description: >
         Authorization code with PKCE (S256 only). Renders a page asking for an
         MCP API key; POSTing it redirects to redirect_uri with code, state and iss.
@@ -4621,9 +4773,17 @@ paths:
         "302": {description: Redirect to the client with an error}
         "400": {description: Unknown client or redirect URI}
   /oauth/token:
+    servers:
+      - url: "{scheme}://{host}:{port}"
+        description: MDDB MCP listener (default http://localhost:9000; mcp.addr, MDDB_MCP_ADDR)
+        variables:
+          scheme: {default: http, enum: [http, https]}
+          host: {default: localhost}
+          port: {default: "9000"}
     post:
       tags: [MCP]
       summary: (v2.18.1+) Token endpoint (MCP listener)
+      operationId: issueOAuthToken
       security: []
       requestBody:
         required: true
@@ -4649,6 +4809,13 @@ paths:
         "401": {description: invalid_client}
 
   /mcp:
+    servers:
+      - url: "{scheme}://{host}:{port}"
+        description: MDDB MCP listener (default http://localhost:9000; mcp.addr, MDDB_MCP_ADDR)
+        variables:
+          scheme: {default: http, enum: [http, https]}
+          host: {default: localhost}
+          port: {default: "9000"}
     post:
       tags:
         - MCP
@@ -4781,6 +4948,10 @@ paths:
             text/event-stream:
               schema:
                 type: string
+        "400": {description: "No MCP-Session-Id, or MCP-Protocol-Version names a revision this server does not serve", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/MCPUnauthorized"}
+        "403": {$ref: "#/components/responses/MCPForbidden"}
+        "429": {$ref: "#/components/responses/MCPRateLimited"}
     delete:
       tags:
         - MCP
@@ -4796,6 +4967,10 @@ paths:
       responses:
         "204":
           description: Session terminated
+        "400": {description: "MCP-Protocol-Version names a revision this server does not serve", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/MCPUnauthorized"}
+        "403": {$ref: "#/components/responses/MCPForbidden"}
+        "429": {$ref: "#/components/responses/MCPRateLimited"}
 
   /v1/events:
     get:
@@ -4843,6 +5018,10 @@ paths:
             text/event-stream:
               schema:
                 type: string
+        "401": {description: "Auth is on and the request carries no valid credentials", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "403": {description: "No read permission on the collection asked for", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "429": {description: "Too many SSE connections from this IP, or the API rate limit (MDDB_RATE_LIMIT_ENABLED)", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "503": {description: "SSE is disabled (MDDB_SSE_ENABLED=false)", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
 
   /v1/admin/diagnose:
     get:
@@ -5014,6 +5193,7 @@ paths:
       tags:
         - Audit
       summary: Per-sink audit export delivery counters (2.9.16+)
+      operationId: listAuditExporters
       description: |
         Returns a snapshot of every configured audit-log exporter (webhook,
         syslog) with delivered / failed / dropped counts and the last error.
@@ -5066,6 +5246,7 @@ paths:
       tags:
         - Encryption
       summary: At-rest encryption posture (2.9.16+)
+      operationId: getEncryptionStatus
       description: |
         Primary keyID, configured previous keyIDs, and per-collection counts
         of how each document is sealed (primary / legacy / plaintext / unknown).
@@ -5123,6 +5304,7 @@ paths:
       tags:
         - Encryption
       summary: Start a re-encryption job (2.9.16+)
+      operationId: rotateEncryptionKey
       description: |
         Walks every encrypted entry sealed under a non-primary key and re-seals
         it with the current `MDDB_ENCRYPTION_KEY`. Plaintext entries and entries
@@ -5159,6 +5341,7 @@ paths:
       tags:
         - Encryption
       summary: List rotation jobs (2.9.16+)
+      operationId: listEncryptionJobs
       security:
         - BearerAuth: []
         - APIKeyAuth: []
@@ -5174,6 +5357,10 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/RotationJob"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {description: "At-rest encryption is not configured", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "429": {$ref: "#/components/responses/RateLimited"}
   /v1/encryption/jobs/{id}:
     get:
       tags:
@@ -5250,12 +5437,15 @@ paths:
                   missingCount:
                     type: integer
                     example: 0
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/curation:
     get:
       tags:
         - Curation
       summary: List or fetch curation rules (v2.9.15+)
+      operationId: listCurationRules
       description: |
         Pass `id` for a single rule, `collection` to list rules for one collection,
         or neither to list all rules (admin).
@@ -5277,6 +5467,9 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/CurationRule"
                   - type: object
+                    description: Without id; collection is present when the request filtered by it.
+                    required: [rules, total]
+                    additionalProperties: false
                     properties:
                       rules:
                         type: array
@@ -5286,10 +5479,16 @@ paths:
                         type: integer
                       collection:
                         type: string
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     post:
       tags:
         - Curation
       summary: Create a curation rule (v2.9.15+)
+      operationId: createCurationRule
       requestBody:
         required: true
         content:
@@ -5303,10 +5502,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CurationRule"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     put:
       tags:
         - Curation
       summary: Replace an existing curation rule (v2.9.15+)
+      operationId: updateCurationRule
       requestBody:
         required: true
         content:
@@ -5320,10 +5525,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CurationRule"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     delete:
       tags:
         - Curation
       summary: Delete a curation rule (v2.9.15+)
+      operationId: deleteCurationRule
       parameters:
         - name: id
           in: query
@@ -5342,6 +5554,11 @@ paths:
                     type: string
                   id:
                     type: string
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/indexing-status:
     get:
@@ -5436,6 +5653,8 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Alias"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/aliases/{alias}:
     parameters:
@@ -5834,6 +6053,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SearchRecommendation"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/collection-config:
     get:
@@ -6050,6 +6274,9 @@ paths:
                     type: integer
                     description: Total number of configured collections
                     example: 3
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/corpus:
     get:
@@ -6313,6 +6540,7 @@ paths:
     post:
       tags: [ Memory RAG ]
       summary: Create a new memory session
+      operationId: createMemorySession
       description: Start a new conversation session for storing and recalling messages.
       requestBody:
         required: true
@@ -6358,11 +6586,19 @@ paths:
                     type: integer
                   expiresAt:
                     type: integer
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+        "507": {$ref: "#/components/responses/InsufficientStorage"}
 
   /v1/memory/message:
     post:
       tags: [ Memory RAG ]
       summary: Add a message to a session
+      operationId: addMemoryMessage
       description: Store a message in a memory session. Messages are auto-embedded for
         semantic recall.
       requestBody:
@@ -6402,11 +6638,19 @@ paths:
                     type: integer
                   embedded:
                     type: boolean
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+        "507": {$ref: "#/components/responses/InsufficientStorage"}
 
   /v1/memory/recall:
     post:
       tags: [ Memory RAG ]
       summary: Recall relevant messages
+      operationId: recallMemory
       description: Semantically recall relevant messages from past conversations using
         hybrid search (vector + keyword).
       requestBody:
@@ -6473,11 +6717,17 @@ paths:
                     type: string
                   query:
                     type: string
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/memory/summarize:
     post:
       tags: [ Memory RAG ]
       summary: Summarize a session
+      operationId: summarizeMemorySession
       description: Generate and store a summary of a session's conversation.
       requestBody:
         required: true
@@ -6509,11 +6759,19 @@ paths:
                     type: integer
                   messages:
                     type: integer
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
+        "507": {$ref: "#/components/responses/InsufficientStorage"}
 
   /v1/memory/sessions:
     post:
       tags: [ Memory RAG ]
       summary: List memory sessions
+      operationId: listMemorySessions
       description: List sessions with optional user/scenario filtering and pagination.
       requestBody:
         content:
@@ -6567,11 +6825,17 @@ paths:
                           type: integer
                   total:
                     type: integer
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/memory/history:
     post:
       tags: [ Memory RAG ]
       summary: Get session message history
+      operationId: getMemoryHistory
       description: Retrieve chronologically ordered message history for a session.
       requestBody:
         required: true
@@ -6602,11 +6866,17 @@ paths:
                       $ref: "#/components/schemas/Document"
                   total:
                     type: integer
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/temporal/query:
     post:
       tags: [ Temporal Tracking ]
       summary: Query document event history
+      operationId: queryTemporalEvents
       description: Returns create/update/access events for a specific document within
         a time range. Requires MDDB_TEMPORAL=true.
       requestBody:
@@ -6663,6 +6933,7 @@ paths:
     post:
       tags: [ Temporal Tracking ]
       summary: Hot documents leaderboard
+      operationId: getTemporalHotDocuments
       description: Returns the top-N most accessed documents in a collection. Requires
         MDDB_TEMPORAL=true.
       requestBody:
@@ -6714,6 +6985,7 @@ paths:
     post:
       tags: [ Temporal Tracking ]
       summary: Event frequency histogram
+      operationId: getTemporalHistogram
       description: Returns a bucketed histogram of event frequency for a collection.
         Requires MDDB_TEMPORAL=true.
       requestBody:
@@ -6774,6 +7046,7 @@ paths:
     post:
       tags: [ Spell Correction ]
       summary: Spell correction suggestions
+      operationId: suggestSpelling
       description: Returns per-token spell suggestions and a corrected version of the
         input text. Requires MDDB_SPELL=true.
       requestBody:
@@ -6820,11 +7093,17 @@ paths:
                             type: string
         "503":
           description: Spell index still loading — retry
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/spell-cleanup:
     post:
       tags: [ Spell Correction ]
       summary: Apply spell corrections to text
+      operationId: correctSpelling
       description: Applies the best corrections to each token and returns the cleaned
         text. Requires MDDB_SPELL=true.
       requestBody:
@@ -6857,11 +7136,17 @@ paths:
                     type: integer
         "503":
           description: Spell index still loading — retry
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
 
   /v1/spell-dictionary:
     get:
       tags: [ Spell Correction ]
       summary: List custom dictionary words
+      operationId: listSpellDictionaryWords
       description: Returns words in the custom dictionary for the given collection and
         language.
       parameters:
@@ -6890,9 +7175,14 @@ paths:
                     type: array
                     items:
                       type: string
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     put:
       tags: [ Spell Correction ]
       summary: Add words to custom dictionary
+      operationId: addSpellDictionaryWords
       requestBody:
         required: true
         content:
@@ -6923,9 +7213,15 @@ paths:
                 properties:
                   added:
                     type: integer
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     delete:
       tags: [ Spell Correction ]
       summary: Remove words from custom dictionary
+      operationId: deleteSpellDictionaryWords
       requestBody:
         required: true
         content:
@@ -6957,6 +7253,11 @@ paths:
   # MDDB_ES_COMPAT=true; every answer carries X-Elastic-Product. The bodies
   # follow the Elasticsearch REST API; see docs/ELASTICSEARCH-COMPAT.md for
   # what is translated and what is refused (400, naming the clause).
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
   /es:
     get:
       tags: [Elasticsearch Compatibility]
@@ -6975,12 +7276,16 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/ESInfo"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
     head:
       tags: [Elasticsearch Compatibility]
       summary: Ping
       operationId: esPing
       responses:
         "200": {description: The server is up}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
   /es/_bulk:
     post:
       tags: [Elasticsearch Compatibility]
@@ -7099,6 +7404,11 @@ paths:
                 type: object
                 properties:
                   count: {type: integer}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {$ref: "#/components/responses/ServiceUnavailable"}
   /es/{index}/_refresh:
     post:
       tags: [Elasticsearch Compatibility]
@@ -7108,6 +7418,9 @@ paths:
       parameters: [{$ref: "#/components/parameters/ESIndex"}]
       responses:
         "200": {description: Refreshed}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "429": {$ref: "#/components/responses/RateLimited"}
   /es/{index}/_bulk:
     post:
       tags: [Elasticsearch Compatibility]
@@ -7188,6 +7501,13 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {description: "No write permission ({\"error\":\"forbidden\"}), read-only mode, or a read-only collection (an Elasticsearch-shaped cluster_block_exception)"}
+        "409": {description: "op_type=create and the document exists (version_conflict_engine_exception)", content: {application/json: {schema: {$ref: "#/components/schemas/ESError"}}}}
+        "413": {$ref: "#/components/responses/PayloadTooLarge"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "507": {description: "Collection quota reached (quota_exceeded_exception)", content: {application/json: {schema: {$ref: "#/components/schemas/ESError"}}}}
     get:
       tags: [Elasticsearch Compatibility]
       summary: Get a document
@@ -7402,6 +7722,7 @@ components:
     PassagesResponse:
       type: object
       description: What a search returns with format "passages" (AGT-002).
+      required: [passages]
       properties:
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
@@ -8941,6 +9262,7 @@ components:
 
     VectorSearchResponse:
       type: object
+      required: [results]
       properties:
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
@@ -9260,6 +9582,10 @@ components:
             type: number
           description: Field weights for BM25F algorithm (keys are "title", "meta",
             "content")
+          example:
+            title: 3.0
+            meta: 2.0
+            content: 1.0
         bm25K1:
           type: number
           minimum: 0
@@ -9270,10 +9596,7 @@ components:
           minimum: 0
           maximum: 1
           description: (v2.18.8, SRCH-018) BM25 length normalisation for this query; 0 ignores length. Default the collection profile, then 0.75.
-          example:
-            title: 3.0
-            meta: 2.0
-            content: 1.0
+          example: 0.75
         disableStem:
           type: boolean
           description: Disable stemming for this query
@@ -9434,6 +9757,7 @@ components:
 
     FTSSearchResponse:
       type: object
+      required: [results]
       properties:
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
@@ -9535,6 +9859,11 @@ components:
             type: string
           description: Terms from the query that matched
           example: [ cancel, subscription ]
+        highlights:
+          type: array
+          items:
+            $ref: "#/components/schemas/Highlight"
+          description: (v2.9.15+) Snippets around the matched terms; only with highlight=true.
         pinned:
           type: boolean
           description: |
@@ -10034,6 +10363,10 @@ components:
           additionalProperties:
             type: number
           description: Field weights for BM25F (keys are "title", "meta", "content")
+          example:
+            title: 3.0
+            meta: 2.0
+            content: 1.0
         bm25K1:
           type: number
           minimum: 0
@@ -10044,10 +10377,7 @@ components:
           minimum: 0
           maximum: 1
           description: (v2.18.8, SRCH-018) BM25 length normalisation of the full-text half; 0 ignores length. Default the collection profile, then 0.75.
-          example:
-            title: 3.0
-            meta: 2.0
-            content: 1.0
+          example: 0.75
         disableStem:
           type: boolean
           description: Disable stemming for FTS
@@ -10100,6 +10430,7 @@ components:
 
     HybridSearchResponse:
       type: object
+      required: [results]
       properties:
         limit: { $ref: '#/components/schemas/LimitUsed' }
         limitCapped: { $ref: '#/components/schemas/LimitCapped' }
@@ -10150,6 +10481,13 @@ components:
           $ref: "#/components/schemas/SearchStats"
         facets:
           $ref: "#/components/schemas/FacetMap"
+        signals:
+          $ref: "#/components/schemas/FusionSignals"
+        signalBreakdown:
+          type: array
+          description: (SRCH-002) The weighted strategy only; one entry per result, in the order of results.
+          items:
+            $ref: "#/components/schemas/SignalBreakdown"
 
     HybridSearchResultItem:
       type: object
@@ -10744,11 +11082,72 @@ components:
 
     ErrorResponse:
       type: object
+      description: >
+        What bad(), unprocessable(), the auth middleware and the access gate
+        write: {"error": "<message>"}. Some refusals add fields (a quota
+        refusal is QuotaExceeded; a write refused while the freelist is
+        rebuilt adds phase and progress).
+      required: [error]
       properties:
         error:
           type: string
           description: Error message
           example: document not found
+
+    RateLimitError:
+      type: object
+      description: The API rate limiter's refusal (MDDB_RATE_LIMIT_ENABLED=true).
+      required: [error, retryAfter]
+      properties:
+        error:
+          type: string
+          example: rate limit exceeded
+        retryAfter:
+          type: integer
+          description: Seconds until the client's window resets (also in Retry-After)
+          example: 12
+
+    JSONRPCError:
+      type: object
+      description: A JSON-RPC 2.0 error, as the MCP listener's key auth, OAuth and rate limiter write it.
+      required: [jsonrpc, error]
+      properties:
+        jsonrpc:
+          type: string
+          enum: ["2.0"]
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: integer
+              description: -32001 (API key required or invalid, authorization required), -32429 (rate limit)
+              example: -32001
+            message:
+              type: string
+              example: Invalid API key
+
+    GraphQLResponse:
+      type: object
+      description: A GraphQL response (gqlgen); a request it refuses carries errors and no data.
+      properties:
+        data:
+          type: object
+          nullable: true
+        errors:
+          type: array
+          items:
+            type: object
+            required: [message]
+            properties:
+              message:
+                type: string
+              path:
+                type: array
+                items:
+                  type: string
+              extensions:
+                type: object
 
     UploadResponse:
       type: object
@@ -12009,6 +12408,7 @@ components:
             against, as a compiler's -I does. ["src"] makes `<net/conn.h>` in
             any file the document `src/net/conn.h`, which gives code_graph its
             include edges. Applied when a document is written.
+          example: ["src"]
         role:
           type: string
           enum: [ "", reference ]
@@ -12016,7 +12416,7 @@ components:
             (v2.18.8, AGT-003) "" for the project's own code, "reference" for
             code kept to learn from. Cross-search target "role:reference"
             selects every reference collection.
-          example: ["src"]
+          example: reference
     CollectionFTS:
       type: object
       description: >
@@ -12779,6 +13179,114 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/ESError"}
+    # Refusals shared by many operations. Each matches what the server
+    # writes; an operation with a narrower meaning documents it inline.
+    BadRequest:
+      description: >
+        The request is malformed (a body that is not JSON, a missing or
+        invalid field, an unreadable body) or names a subsystem that is not
+        initialized. The message says which.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: missing collection}
+    Unauthorized:
+      description: >
+        Auth is on (MDDB_AUTH_ENABLED=true) and the request carries no
+        credentials, an invalid or expired JWT, or an unknown API key.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: missing authentication}
+    Forbidden:
+      description: >
+        The caller lacks the permission the route needs (SEC-019 access
+        gate, auth on: read, write or admin on the collections the request
+        names), or a write meets read-only mode (MDDB_MODE=read or the
+        protocol's own mode).
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: forbidden}
+    NotFound:
+      description: The thing the request names does not exist.
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: not found}
+    PayloadTooLarge:
+      description: The body is over MDDB_MAX_BODY_BYTES (32 MiB by default).
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: request body too large}
+    RateLimited:
+      description: >
+        The client is over the API rate limit (MDDB_RATE_LIMIT_ENABLED=true,
+        MDDB_RATE_LIMIT_REQUESTS per MDDB_RATE_LIMIT_WINDOW seconds). A call
+        that embeds can also be refused by the collection's daily embedding
+        budget, with a QuotaExceeded body.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema: {type: integer}
+        X-RateLimit-Limit:
+          schema: {type: integer}
+        X-RateLimit-Remaining:
+          schema: {type: integer}
+        X-RateLimit-Reset:
+          description: Unix time the window resets
+          schema: {type: integer, format: int64}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/RateLimitError"}
+    ServiceUnavailable:
+      description: >
+        Not now: the search concurrency limit is reached, the subsystem is
+        disabled, or a write meets the database while its freelist is
+        rebuilt (#333; the body then adds phase and progress). Retry after
+        Retry-After seconds.
+      headers:
+        Retry-After:
+          schema: {type: integer}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+    InsufficientStorage:
+      description: (v2.18.9+) Refused by a collection quota or the disk reserve / vector RAM limit; nothing was written (GO-043)
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/QuotaExceeded"}
+    MCPUnauthorized:
+      description: >
+        The MCP listener wants credentials: MDDB_MCP_API_KEY_ENABLED=true and
+        no key (JSON-RPC -32001), OAuth on and no valid access token
+        (JSON-RPC -32001 and a WWW-Authenticate header naming the resource
+        metadata), or MDDB_AUTH_ENABLED=true guarding the listener
+        ({"error": ...}).
+      headers:
+        WWW-Authenticate:
+          description: OAuth only (MDDB_MCP_OAUTH_ENABLED=true)
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/JSONRPCError"
+              - $ref: "#/components/schemas/ErrorResponse"
+    MCPForbidden:
+      description: The MCP API key is unknown or disabled (JSON-RPC -32001).
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/JSONRPCError"}
+    MCPRateLimited:
+      description: Over the MCP listener's rate limit (JSON-RPC -32429); retry after Retry-After seconds.
+      headers:
+        Retry-After:
+          schema: {type: integer}
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/JSONRPCError"}
   securitySchemes:
     BearerAuth:
       type: http

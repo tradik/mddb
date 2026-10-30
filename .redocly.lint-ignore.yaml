@@ -1,0 +1,11 @@
+# Redocly lint exceptions (redocly.yaml). Each entry says why the rule does
+# not apply; add one only when the server really behaves that way.
+# See https://redocly.com/docs/cli/ for more information.
+docs/openapi.yaml:
+  # The liveness probes answer 200 or 503 and nothing else: they are public
+  # with auth on, exempt from the rate limiter, and accept any method
+  # (handleHealth, buildPublicEndpoints, NewRateLimiter). A 4xx documented
+  # here would be invented.
+  operation-4xx-response:
+    - '#/paths/~1health/get/responses'
+    - '#/paths/~1v1~1health/get/responses'

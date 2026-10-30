@@ -1,0 +1,11 @@
+# Redocly CLI lint for the REST spec (make openapi-lint; CI: Tests ->
+# clients-nodejs). recommended-strict is the recommended ruleset with every
+# warning raised to an error, so a new warning fails the check instead of
+# piling up. Deliberate exceptions live in .redocly.lint-ignore.yaml, each
+# with its reason.
+extends:
+  - recommended-strict
+
+apis:
+  mddb:
+    root: docs/openapi.yaml

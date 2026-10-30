@@ -40,6 +40,10 @@ on:
       - 'integrations/langchain-mddb/**'
       - 'clients/python/**'
       - 'clients/nodejs/**'
+      # The REST spec and its lint config: clients-nodejs lints it.
+      - 'docs/openapi.yaml'
+      - 'redocly.yaml'
+      - '.redocly.lint-ignore.yaml'
   pull_request:
     branches: [main, develop]
     paths:
@@ -75,6 +79,10 @@ on:
       - 'integrations/langchain-mddb/**'
       - 'clients/python/**'
       - 'clients/nodejs/**'
+      # The REST spec and its lint config: clients-nodejs lints it.
+      - 'docs/openapi.yaml'
+      - 'redocly.yaml'
+      - '.redocly.lint-ignore.yaml'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -611,6 +619,12 @@ jobs:
       - name: npm audit (production, high+)
         working-directory: clients/nodejs
         run: npm audit --omit=dev --audit-level=high
+
+      # The REST spec the clients are generated from, and the site's API
+      # reference: Redocly recommended-strict, so any warning fails. The
+      # version is pinned in the Makefile (REDOCLY_CLI_VERSION).
+      - name: Lint the OpenAPI spec (Redocly)
+        run: make openapi-lint
 
       # TEST-001: the package had no tests and no importable client — `main`
       # pointed at example.js, so requiring it ran a demo against localhost.
