@@ -389,26 +389,40 @@ func (f *FTSIndex) indexFieldTokensInTx(tx *bolt.Tx, put putFunc, collection, do
 	if err := f.removeFieldData(tx, collection, docID); err != nil {
 		return err
 	}
-	bF, bMeta, bStat, bRev := tx.Bucket(bucketFTSF), tx.Bucket(bucketFTSFMeta), tx.Bucket(bucketFTSFStat), tx.Bucket(bucketFTSFRev)
-	if bF == nil || bMeta == nil || bStat == nil || bRev == nil {
+	b, ok := openFieldBuckets(tx)
+	if !ok {
 		return nil
 	}
 	var allEntries []fieldTermEntry
 	for field, tokens := range fieldTokens {
-		entries, err := writeFieldInTx(put, bF, bMeta, bStat, collection, field, docID, tokens)
+		entries, err := writeFieldInTx(put, b, collection, field, docID, tokens)
 		if err != nil {
 			return err
 		}
 		allEntries = append(allEntries, entries...)
 	}
-	return putFieldRev(bRev, ftsfRevKey(collection, docID), allEntries)
+	return putFieldRev(b.rev, ftsfRevKey(collection, docID), allEntries)
+}
+
+// fieldBuckets are the per-field index buckets of one transaction: the
+// postings, the field lengths, the field statistics and the reverse index.
+type fieldBuckets struct {
+	postings, meta, stat, rev *bolt.Bucket
+}
+
+// openFieldBuckets returns tx's per-field index buckets; false when any of
+// them is missing.
+func openFieldBuckets(tx *bolt.Tx) (fieldBuckets, bool) {
+	b := fieldBuckets{postings: tx.Bucket(bucketFTSF), meta: tx.Bucket(bucketFTSFMeta),
+		stat: tx.Bucket(bucketFTSFStat), rev: tx.Bucket(bucketFTSFRev)}
+	return b, b.postings != nil && b.meta != nil && b.stat != nil && b.rev != nil
 }
 
 // writeFieldInTx writes one field of one document: its postings, its length
 // and its share of the field's collection statistics. It returns the field's
 // reverse-index entries. The content field is skipped: BM25F reads it from
 // the main index (#317).
-func writeFieldInTx(put putFunc, bF, bMeta, bStat *bolt.Bucket, collection, field, docID string, tokens map[string]int) ([]fieldTermEntry, error) {
+func writeFieldInTx(put putFunc, b fieldBuckets, collection, field, docID string, tokens map[string]int) ([]fieldTermEntry, error) {
 	if field == contentField || len(tokens) == 0 {
 		return nil, nil
 	}
@@ -417,7 +431,7 @@ func writeFieldInTx(put putFunc, bF, bMeta, bStat *bolt.Bucket, collection, fiel
 	for term, count := range tokens {
 		var buf [4]byte
 		binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
-		if err := put(bF, ftsfKey(collection, field, term, docID), buf[:]); err != nil {
+		if err := put(b.postings, ftsfKey(collection, field, term, docID), buf[:]); err != nil {
 			return nil, err
 		}
 		entries = append(entries, fieldTermEntry{Field: field, Term: term})
@@ -426,15 +440,15 @@ func writeFieldInTx(put putFunc, bF, bMeta, bStat *bolt.Bucket, collection, fiel
 
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], docLength)
-	if err := bMeta.Put(ftsfMetaKey(collection, field, docID), buf[:]); err != nil {
+	if err := b.meta.Put(ftsfMetaKey(collection, field, docID), buf[:]); err != nil {
 		return nil, err
 	}
 
 	sk := ftsfStatKey(collection, field)
-	stats := decodeCollectionStats(bStat.Get(sk))
+	stats := decodeCollectionStats(b.stat.Get(sk))
 	stats.TotalDocs++
 	stats.TotalTerms += uint64(docLength)
-	return entries, bStat.Put(sk, encodeCollectionStats(stats))
+	return entries, b.stat.Put(sk, encodeCollectionStats(stats))
 }
 
 // putFieldRev stores a document's field reverse index, sorted so identical

@@ -356,8 +356,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Search: with or without metadata filter
 	if filtered && len(allowedIDs) == 0 {
-		s.recordSearch(r.Context(), vectorShape(metrics.ModeVector, req.Collection, s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), algo,
-			req.FilterMeta, req.Filter, ps.Plan, 0, limitReport)) // OPS-025: the filter matched nothing
+		s.recordSearch(r.Context(), vectorShape(vectorShapeInput{Mode: metrics.ModeVector, Collection: req.Collection,
+			Requested: s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), Ran: algo,
+			FilterMeta: req.FilterMeta, Filter: req.Filter, Plan: ps.Plan, Limit: limitReport})) // OPS-025: the filter matched nothing
 		ok(w, VectorSearchResponseHTTP{
 			Results:        []VectorSearchResultItem{},
 			Total:          0,
@@ -374,7 +375,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// Disk-only collections: rescore the quantized candidates against the
 	// full-precision vectors on disk before any downstream ranking — per
 	// query vector, before a decomposed query's lists are fused (SRCH-020).
-	results, diskVecs := s.searchVectorPath(ps, req.Collection, vectors, searchTopK, req.Threshold, allowedIDs, filtered, metric)
+	results, diskVecs := s.searchVectorPath(ps, indexQuery{Collection: req.Collection, TopK: searchTopK,
+		Threshold: req.Threshold, Allowed: allowedIDs, Filtered: filtered, Metric: metric}, vectors)
 	results = s.rescoreFeedback(fb, req.Collection, results, metric) // SRCH-015, rescore mode
 	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, ""),
 		Query: queryVector, SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Allowed: allowedIDs,
@@ -403,8 +405,9 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	if s.Metrics != nil {
 		s.Metrics.IncOp("vector_search", algo)
 	}
-	s.recordSearch(r.Context(), vectorShape(metrics.ModeVector, req.Collection, s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), algo,
-		req.FilterMeta, req.Filter, ps.Plan, len(results), limitReport)) // OPS-025
+	s.recordSearch(r.Context(), vectorShape(vectorShapeInput{Mode: metrics.ModeVector, Collection: req.Collection,
+		Requested: s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), Ran: algo,
+		FilterMeta: req.FilterMeta, Filter: req.Filter, Plan: ps.Plan, Results: len(results), Limit: limitReport})) // OPS-025
 	s.Gain.Search(gainKind{Type: SearchTypeVector, Algorithm: algo}) // AGT-004
 
 	// Load full documents for results

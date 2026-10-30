@@ -166,17 +166,18 @@ func searchQueryVectors(vectors [][]float32, limit int, search func([]float32) [
 // searchVectorPath is the index search of vector search (REST, and the
 // direct client MCP, gRPC, GraphQL and evaluation share): the planned search
 // per query vector, each rescored from disk first in a disk-only collection,
-// then fused. It returns the full-precision vectors the disk rescore read,
-// nil for an in-memory collection.
-func (s *Server) searchVectorPath(ps plannedSearch, collection string, vectors [][]float32, searchTopK int, threshold float64,
-	allowed map[string]bool, filtered bool, metric vec.SimilarityFunc) ([]vec.VectorResult, map[string][]float32) {
+// then fused. q describes the search; its Vector is ignored, each of vectors
+// is searched in turn. It returns the full-precision vectors the disk rescore
+// read, nil for an in-memory collection.
+func (s *Server) searchVectorPath(ps plannedSearch, q indexQuery, vectors [][]float32) ([]vec.VectorResult, map[string][]float32) {
 	var diskVecs map[string][]float32
-	results := searchQueryVectors(vectors, searchTopK, func(v []float32) []vec.VectorResult {
-		found := s.runPlanned(ps, indexQuery{Collection: collection, Vector: v, TopK: searchTopK, Threshold: threshold,
-			Allowed: allowed, Filtered: filtered, Metric: metric})
-		if s.collectionDiskOnly(collection) {
+	results := searchQueryVectors(vectors, q.TopK, func(v []float32) []vec.VectorResult {
+		one := q
+		one.Vector = v
+		found := s.runPlanned(ps, one)
+		if s.collectionDiskOnly(q.Collection) {
 			var fetched map[string][]float32
-			found, fetched = s.rescoreFromDisk(collection, v, found, metric)
+			found, fetched = s.rescoreFromDisk(q.Collection, v, found, q.Metric)
 			diskVecs = mergeVectors(diskVecs, fetched)
 		}
 		return found

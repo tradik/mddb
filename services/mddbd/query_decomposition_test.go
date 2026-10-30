@@ -151,7 +151,7 @@ func TestSearchVectorPath_DiskOnlyRescoresEachVector(t *testing.T) {
 		}
 	}
 	ps := plannedSearch{Searcher: flat, Algorithm: "flat", Plan: &SearchPlan{}}
-	results, disk := s.searchVectorPath(ps, "disk", [][]float32{{1, 0}, {0, 1}}, 5, 0, nil, false, nil)
+	results, disk := s.searchVectorPath(ps, indexQuery{Collection: "disk", TopK: 5}, [][]float32{{1, 0}, {0, 1}})
 	if len(results) != 2 || results[0].Score < 0.99 || results[1].Score < 0.99 || len(disk) != 2 {
 		t.Fatalf("each document keeps its best exact score: %+v, %d vectors", results, len(disk))
 	}

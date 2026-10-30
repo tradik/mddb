@@ -41,24 +41,8 @@ func parseESKNN(raw json.RawMessage) (*esKNN, error) {
 		return nil, err
 	}
 	knn := &esKNN{}
-	if v, ok := obj["query_vector"]; ok {
-		if err := json.Unmarshal(v, &knn.Vector); err != nil || len(knn.Vector) == 0 {
-			return nil, dslErr("knn.query_vector", "must be a non-empty list of numbers")
-		}
-	}
-	if v, ok := obj["query_vector_builder"]; ok {
-		var b struct {
-			TextEmbedding struct {
-				ModelText string `json:"model_text"`
-			} `json:"text_embedding"`
-		}
-		if err := json.Unmarshal(v, &b); err != nil || b.TextEmbedding.ModelText == "" {
-			return nil, dslErr("knn.query_vector_builder", "must be {\"text_embedding\": {\"model_text\": \"...\"}}")
-		}
-		knn.Text = b.TextEmbedding.ModelText
-	}
-	if (knn.Vector == nil) == (knn.Text == "") {
-		return nil, dslErr("knn", "needs exactly one of query_vector and query_vector_builder")
+	if err := knn.readQuery(obj); err != nil {
+		return nil, err
 	}
 	if v, ok := obj["k"]; ok {
 		if knn.K, err = strconv.Atoi(string(v)); err != nil || knn.K < 1 {
@@ -69,6 +53,31 @@ func parseESKNN(raw json.RawMessage) (*esKNN, error) {
 		return nil, err
 	}
 	return knn, nil
+}
+
+// readQuery reads what knn searches with: exactly one of query_vector and
+// query_vector_builder's text.
+func (knn *esKNN) readQuery(obj map[string]json.RawMessage) error {
+	if v, ok := obj["query_vector"]; ok {
+		if err := json.Unmarshal(v, &knn.Vector); err != nil || len(knn.Vector) == 0 {
+			return dslErr("knn.query_vector", "must be a non-empty list of numbers")
+		}
+	}
+	if v, ok := obj["query_vector_builder"]; ok {
+		var b struct {
+			TextEmbedding struct {
+				ModelText string `json:"model_text"`
+			} `json:"text_embedding"`
+		}
+		if err := json.Unmarshal(v, &b); err != nil || b.TextEmbedding.ModelText == "" {
+			return dslErr("knn.query_vector_builder", "must be {\"text_embedding\": {\"model_text\": \"...\"}}")
+		}
+		knn.Text = b.TextEmbedding.ModelText
+	}
+	if (knn.Vector == nil) == (knn.Text == "") {
+		return dslErr("knn", "needs exactly one of query_vector and query_vector_builder")
+	}
+	return nil
 }
 
 // esKNNFilter compiles knn.filter: one query or a list of them, ANDed, which

@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"mddb/internal/storage"
 	"path/filepath"
 	"testing"
 
 	bolt "go.etcd.io/bbolt"
+	bolterrors "go.etcd.io/bbolt/errors"
 )
 
 func newRevTestDB(t *testing.T) *bolt.DB {
@@ -149,5 +151,22 @@ func TestTrimRevisions_IsolatesByDocID(t *testing.T) {
 	}
 	if got := countRevs(t, db, "blog", "docB"); got != 4 {
 		t.Errorf("docB must be untouched, got %d", got)
+	}
+}
+
+// A delete the bucket refuses (here: a read-only transaction) is returned,
+// not skipped, so the caller's transaction rolls back.
+func TestTrimRevisions_DeleteErrorIsReturned(t *testing.T) {
+	db := newRevTestDB(t)
+	seedRevs(t, db, "blog", "doc1", 3)
+
+	err := db.View(func(tx *bolt.Tx) error {
+		return trimRevisions(tx, nil, "blog", "doc1", 1)
+	})
+	if !errors.Is(err, bolterrors.ErrTxNotWritable) {
+		t.Fatalf("err = %v, want ErrTxNotWritable", err)
+	}
+	if got := countRevs(t, db, "blog", "doc1"); got != 3 {
+		t.Errorf("a failed trim must delete nothing, got %d revs", got)
 	}
 }

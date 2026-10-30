@@ -225,41 +225,71 @@ func parseESHighlight(raw json.RawMessage) (*esHighlightSpec, error) {
 	if err := esOnlyKeys("highlight", obj, "fields", "pre_tags", "post_tags", "fragment_size", "number_of_fragments", "type"); err != nil {
 		return nil, err
 	}
-	fields := map[string]json.RawMessage{}
-	if f := obj["fields"]; f != nil {
-		var list []map[string]json.RawMessage
-		if json.Unmarshal(f, &list) == nil {
-			for _, m := range list {
-				for k, v := range m {
-					fields[k] = v
-				}
-			}
-		} else if fields, err = esObject(f, "highlight.fields"); err != nil {
-			return nil, err
-		}
-	}
-	for name, opts := range fields {
-		if name != esContentField && name != "*" {
-			return nil, dslErr("highlight.fields."+name, "only %q (the document body) can be highlighted", esContentField)
-		}
-		if o, err := esObject(opts, "highlight.fields."+name); err != nil || len(o) > 0 {
-			return nil, dslErr("highlight.fields."+name, "per-field options are not supported; set them on highlight")
-		}
+	if err := esHighlightFields(obj["fields"]); err != nil {
+		return nil, err
 	}
 	spec := &esHighlightSpec{}
 	if err := esHighlightTags(obj, spec); err != nil {
 		return nil, err
 	}
+	if err := esHighlightSizes(obj, spec); err != nil {
+		return nil, err
+	}
+	return spec, nil
+}
+
+// esHighlightFields checks highlight.fields, an object or a list of
+// one-field objects: only the document body can be highlighted, and without
+// per-field options.
+func esHighlightFields(f json.RawMessage) error {
+	fields, err := esHighlightFieldMap(f)
+	if err != nil {
+		return err
+	}
+	for name, opts := range fields {
+		path := "highlight.fields." + name
+		if name != esContentField && name != "*" {
+			return dslErr(path, "only %q (the document body) can be highlighted", esContentField)
+		}
+		if o, err := esObject(opts, path); err != nil || len(o) > 0 {
+			return dslErr(path, "per-field options are not supported; set them on highlight")
+		}
+	}
+	return nil
+}
+
+// esHighlightFieldMap reads highlight.fields, an object or a list of
+// one-field objects, into one map; empty when absent.
+func esHighlightFieldMap(f json.RawMessage) (map[string]json.RawMessage, error) {
+	fields := map[string]json.RawMessage{}
+	if f == nil {
+		return fields, nil
+	}
+	var list []map[string]json.RawMessage
+	if json.Unmarshal(f, &list) != nil {
+		return esObject(f, "highlight.fields")
+	}
+	for _, m := range list {
+		for k, v := range m {
+			fields[k] = v
+		}
+	}
+	return fields, nil
+}
+
+// esHighlightSizes reads fragment_size and number_of_fragments, whole
+// numbers of 1 or more.
+func esHighlightSizes(obj map[string]json.RawMessage, spec *esHighlightSpec) error {
 	for key, dst := range map[string]*int{"fragment_size": &spec.FragmentSize, "number_of_fragments": &spec.Fragments} {
 		if v, ok := obj[key]; ok {
 			if n, err := strconv.Atoi(string(v)); err != nil || n < 1 {
-				return nil, dslErr("highlight."+key, "must be a whole number, 1 or more")
+				return dslErr("highlight."+key, "must be a whole number, 1 or more")
 			} else {
 				*dst = n
 			}
 		}
 	}
-	return spec, nil
+	return nil
 }
 
 // esHighlightTags reads pre_tags and post_tags: MDDB wraps a match in one

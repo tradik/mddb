@@ -66,35 +66,56 @@ func pptxToMarkdown(data []byte) (string, conversionSignals, error) {
 	targets, _ := z.relTargets("ppt/presentation.xml")
 	var slides []slide
 	for _, ref := range pres.Slides {
-		part := targets[ref.RID]
-		raw, err := z.read(part)
+		s, err := pptxSlide(z, targets[ref.RID])
 		if err != nil {
 			return "", conversionSignals{}, err
-		}
-		s := slide{}
-		paras, err := pptxParagraphs(raw, map[string]bool{"sldNum": true, "dt": true, "ftr": true})
-		if err != nil {
-			return "", conversionSignals{}, err
-		}
-		for _, p := range paras {
-			if p.title && s.title == "" {
-				s.title = p.text
-			} else {
-				s.body = append(s.body, p.text)
-			}
-		}
-		if _, byType := z.relTargets(part); byType["notesSlide"] != "" {
-			if notes, err := z.read(byType["notesSlide"]); err == nil {
-				paras, _ := pptxParagraphs(notes, map[string]bool{"sldNum": true, "sldImg": true, "hdr": true, "ftr": true, "dt": true})
-				for _, p := range paras {
-					s.notes = append(s.notes, p.text)
-				}
-			}
 		}
 		slides = append(slides, s)
 	}
 	md, sig := slidesToMarkdown(slides)
 	return md, sig, nil
+}
+
+// pptxSlide reads one slide part: its title, its body paragraphs and the
+// text of its notes slide, when it has a readable one.
+func pptxSlide(z *zipDoc, part string) (slide, error) {
+	raw, err := z.read(part)
+	if err != nil {
+		return slide{}, err
+	}
+	s := slide{}
+	paras, err := pptxParagraphs(raw, map[string]bool{"sldNum": true, "dt": true, "ftr": true})
+	if err != nil {
+		return slide{}, err
+	}
+	for _, p := range paras {
+		if p.title && s.title == "" {
+			s.title = p.text
+		} else {
+			s.body = append(s.body, p.text)
+		}
+	}
+	s.notes = pptxNotes(z, part)
+	return s, nil
+}
+
+// pptxNotes is the text of a slide's notes slide; none when it has none or
+// it cannot be read.
+func pptxNotes(z *zipDoc, part string) []string {
+	_, byType := z.relTargets(part)
+	if byType["notesSlide"] == "" {
+		return nil
+	}
+	notes, err := z.read(byType["notesSlide"])
+	if err != nil {
+		return nil
+	}
+	paras, _ := pptxParagraphs(notes, map[string]bool{"sldNum": true, "sldImg": true, "hdr": true, "ftr": true, "dt": true})
+	var out []string
+	for _, p := range paras {
+		out = append(out, p.text)
+	}
+	return out
 }
 
 // slideParagraph is a paragraph of text and whether it is the slide title.

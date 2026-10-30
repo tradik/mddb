@@ -381,22 +381,7 @@ func (c *DirectClient) CrossSearch(ctx context.Context, req *MCPCrossSearchReque
 // crossSearch is CrossSearch before the limit report is attached.
 func (c *DirectClient) crossSearch(ctx context.Context, req *MCPCrossSearchRequest) (*MCPCrossSearchResponse, error) {
 	s := c.server
-	if err := req.GroupBy.Validate(); err != nil {
-		return nil, err
-	}
-	if err := req.ValidateIndexWait(); err != nil {
-		return nil, err
-	}
-	if err := req.ValidatePassageOptions(); err != nil {
-		return nil, err
-	}
-	if err := validCrossSearchType(req.SearchType); err != nil {
-		return nil, err
-	}
-	if err := req.ValidatePlanOptions(); err != nil {
-		return nil, err
-	}
-	if err := req.ValidateFeedback(); err != nil {
+	if err := req.validateCross(); err != nil {
 		return nil, err
 	}
 	req.TargetCollections = s.expandTargets(req.TargetCollections)
@@ -406,22 +391,7 @@ func (c *DirectClient) crossSearch(ctx context.Context, req *MCPCrossSearchReque
 	topK, limitReport := s.crossTopK(req.TargetCollections, req.TopK) // #368
 	req.limitReport = limitReport
 	if req.SearchType == CrossSearchFTS || req.SearchType == CrossSearchHybrid {
-		if req.Query == "" {
-			return nil, fmt.Errorf("searchType %s needs a query", req.SearchType)
-		}
-		waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
-		items := s.crossTextItems(ctx, crossTextParams{SearchType: req.SearchType, Query: req.Query,
-			Targets: req.TargetCollections, TopK: topK, FilterMeta: req.FilterMeta, Filter: req.Filter,
-			GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
-		s.countCross("", items, req.wantsPassages())
-		if req.wantsPassages() {
-			p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
-			s.passageImages(&p, req.IncludeImages, nil) // RAG-010
-			return &MCPCrossSearchResponse{Passages: &p}, nil
-		}
-		s.crossImages(items, req.IncludeImages) // RAG-010
-		return &MCPCrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
-			Algorithm: req.SearchType, Indexing: waited}, nil
+		return s.crossTextSearch(ctx, req, topK)
 	}
 
 	// Oversample per collection for better merging (SRCH-005). No single
@@ -436,31 +406,9 @@ func (c *DirectClient) crossSearch(ctx context.Context, req *MCPCrossSearchReque
 		return nil, err
 	}
 
-	// Resolve query vector
-	var queryVector []float32
-	if len(req.QueryVector) > 0 {
-		queryVector = req.QueryVector
-	} else if req.SourceDocID != "" {
-		if req.SourceCollection == "" {
-			return nil, fmt.Errorf("sourceCollection required when using sourceDocID")
-		}
-		rec, err := s.VectorStore.Get(req.SourceCollection, req.SourceDocID)
-		if err != nil || rec == nil {
-			return nil, fmt.Errorf("%w: %s/%s", errSourceNoEmbedding, req.SourceCollection, req.SourceDocID)
-		}
-		queryVector = rec.Vector
-	} else if req.Query != "" && s.Embedding != nil {
-		embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-		defer cancel()
-		var err error
-		queryVector, err = s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", errEmbedQuery, err)
-		}
-	} else if req.Query != "" {
-		return nil, errNoEmbeddingProvider
-	} else {
-		return nil, fmt.Errorf("one of query, queryVector or sourceDocID is required")
+	queryVector, err := s.crossQueryVector(ctx, req)
+	if err != nil {
+		return nil, err
 	}
 	// SRCH-015: the examples as vectors; query mode corrects the query here.
 	fb, queryVector, err := s.crossFeedback(req.FeedbackOptions, req.SourceCollection, req.TargetCollections, queryVector, plan)
@@ -501,6 +449,68 @@ func (c *DirectClient) crossSearch(ctx context.Context, req *MCPCrossSearchReque
 		Indexing:          waited,
 		Plan:              req.explained(plan),
 	}, nil
+}
+
+// validateCross checks a cross-collection search's options.
+func (req *MCPCrossSearchRequest) validateCross() error {
+	for _, validate := range []func() error{req.GroupBy.Validate, req.ValidateIndexWait, req.ValidatePassageOptions,
+		func() error { return validCrossSearchType(req.SearchType) }, req.ValidatePlanOptions, req.ValidateFeedback} {
+		if err := validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// crossTextSearch answers a cross-collection fts or hybrid search.
+func (s *Server) crossTextSearch(ctx context.Context, req *MCPCrossSearchRequest, topK int) (*MCPCrossSearchResponse, error) {
+	if req.Query == "" {
+		return nil, fmt.Errorf("searchType %s needs a query", req.SearchType)
+	}
+	waited := s.waitForIndexAll(ctx, req.TargetCollections, req.IndexWait)
+	items := s.crossTextItems(ctx, crossTextParams{SearchType: req.SearchType, Query: req.Query,
+		Targets: req.TargetCollections, TopK: topK, FilterMeta: req.FilterMeta, Filter: req.Filter,
+		GroupBy: req.GroupBy, IncludeContent: req.IncludeContent || req.wantsPassages()})
+	s.countCross("", items, req.wantsPassages())
+	if req.wantsPassages() {
+		p := s.crossPassages(req.Query, items, req.PassageOptions, waited)
+		s.passageImages(&p, req.IncludeImages, nil) // RAG-010
+		return &MCPCrossSearchResponse{Passages: &p}, nil
+	}
+	s.crossImages(items, req.IncludeImages) // RAG-010
+	return &MCPCrossSearchResponse{Results: items, Total: len(items), TargetCollections: req.TargetCollections,
+		Algorithm: req.SearchType, Indexing: waited}, nil
+}
+
+// crossQueryVector resolves what a cross-collection vector search searches
+// with: the request's vector, the source document's embedding, or the query
+// embedded.
+func (s *Server) crossQueryVector(ctx context.Context, req *MCPCrossSearchRequest) ([]float32, error) {
+	switch {
+	case len(req.QueryVector) > 0:
+		return req.QueryVector, nil
+	case req.SourceDocID != "":
+		if req.SourceCollection == "" {
+			return nil, fmt.Errorf("sourceCollection required when using sourceDocID")
+		}
+		rec, err := s.VectorStore.Get(req.SourceCollection, req.SourceDocID)
+		if err != nil || rec == nil {
+			return nil, fmt.Errorf("%w: %s/%s", errSourceNoEmbedding, req.SourceCollection, req.SourceDocID)
+		}
+		return rec.Vector, nil
+	case req.Query != "" && s.Embedding != nil:
+		embedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		queryVector, err := s.Embedding.Embed(embedCtx, req.Query, embedding.RoleQuery)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", errEmbedQuery, err)
+		}
+		return queryVector, nil
+	case req.Query != "":
+		return nil, errNoEmbeddingProvider
+	default:
+		return nil, fmt.Errorf("one of query, queryVector or sourceDocID is required")
+	}
 }
 
 // --- Find Duplicates ---

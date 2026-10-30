@@ -394,8 +394,9 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		items = items[:req.TopK]
 	}
 	req.plan = plan
-	s.recordSearch(r.Context(), vectorShape(metrics.ModeHybrid, req.Collection, req.VectorAlgorithm, ranVectorAlgorithm(req.VectorAlgorithm, plan),
-		req.FilterMeta, req.Filter, plan, len(items), req.limitReport)) // OPS-025
+	s.recordSearch(r.Context(), vectorShape(vectorShapeInput{Mode: metrics.ModeHybrid, Collection: req.Collection,
+		Requested: req.VectorAlgorithm, Ran: ranVectorAlgorithm(req.VectorAlgorithm, plan),
+		FilterMeta: req.FilterMeta, Filter: req.Filter, Plan: plan, Results: len(items), Limit: req.limitReport})) // OPS-025
 	imageHits := s.hybridImages(r.Context(), req, items) // RAG-010
 
 	if req.wantsPassages() {
@@ -788,36 +789,40 @@ func (s *Server) loadHybridDocs(collection string, items []HybridSearchResultIte
 		if bDocs == nil {
 			return nil
 		}
-		rank := 0
 		for _, item := range items {
-			v := bDocs.Get(storage.DocKey(collection, item.Document.ID))
-			if v == nil {
+			doc, ok := liveHybridDoc(bDocs, collection, item.Document.ID)
+			if !ok {
 				continue
 			}
-			docPtr, err := loadDoc(v)
-			if err != nil {
-				continue
-			}
-			if docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < currentUnix() {
-				continue
-			}
-			doc := *docPtr
 			if !includeContent {
 				doc.ContentMD = ""
 			}
-			rank++
 			results = append(results, HybridSearchResultItem{
 				Document:      doc,
 				CombinedScore: item.CombinedScore,
 				FTSScore:      item.FTSScore,
 				VectorScore:   item.VectorScore,
 				MatchedTerms:  item.MatchedTerms,
-				Rank:          rank,
+				Rank:          len(results) + 1,
 			})
 		}
 		return nil
 	})
 	return results
+}
+
+// liveHybridDoc reads a hit's document; false when it is gone, unreadable
+// or expired.
+func liveHybridDoc(bDocs *bolt.Bucket, collection, id string) (storage.Doc, bool) {
+	v := bDocs.Get(storage.DocKey(collection, id))
+	if v == nil {
+		return storage.Doc{}, false
+	}
+	docPtr, err := loadDoc(v)
+	if err != nil || (docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < currentUnix()) {
+		return storage.Doc{}, false
+	}
+	return *docPtr, true
 }
 
 // floatPtr is how an internal caller states an alpha it means, as opposed to

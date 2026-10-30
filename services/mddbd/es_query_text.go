@@ -10,6 +10,9 @@ import (
 // Text clauses of the Query DSL subset (INT-019): match, match_phrase and
 // multi_match, reduced to words for the full-text expression.
 
+// errMustBeString is the DSL error for a clause value that is not a string.
+const errMustBeString = "must be a string"
+
 // match compiles match and match_phrase: {"field": "text"} or
 // {"field": {"query": "text", "operator": "and"}}. The field does not narrow
 // the search — see docs/ELASTICSEARCH-COMPAT.md.
@@ -46,12 +49,12 @@ func esMatchText(name string, v json.RawMessage) (text, operator string, err err
 		return "", "", err
 	}
 	if text, err = scalarString(obj["query"]); err != nil {
-		return "", "", dslErr(name+".query", "must be a string")
+		return "", "", dslErr(name+".query", errMustBeString)
 	}
 	operator = "or"
 	if raw, ok := obj["operator"]; ok {
 		if err := json.Unmarshal(raw, &operator); err != nil {
-			return "", "", dslErr(name+".operator", "must be a string")
+			return "", "", dslErr(name+".operator", errMustBeString)
 		}
 		operator = strings.ToLower(operator)
 	}
@@ -71,7 +74,7 @@ func (c *esCompiler) multiMatch(body json.RawMessage, scope esScope) (string, er
 	}
 	text, err := scalarString(obj["query"])
 	if err != nil {
-		return "", dslErr("multi_match.query", "must be a string")
+		return "", dslErr("multi_match.query", errMustBeString)
 	}
 	if raw, ok := obj["fields"]; ok {
 		if _, err := stringList(raw); err != nil {
@@ -81,7 +84,7 @@ func (c *esCompiler) multiMatch(body json.RawMessage, scope esScope) (string, er
 	var typ, operator string
 	for key, dst := range map[string]*string{"type": &typ, "operator": &operator} {
 		if raw, ok := obj[key]; ok && json.Unmarshal(raw, dst) != nil {
-			return "", dslErr("multi_match."+key, "must be a string")
+			return "", dslErr("multi_match."+key, errMustBeString)
 		}
 	}
 	operator = strings.ToLower(operator)

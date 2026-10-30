@@ -35,14 +35,7 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 		Icon:        mcpGetString(args, "icon"),
 		Color:       mcpGetString(args, "color"),
 	}
-	if cm, ok := args["custom_meta"].(map[string]interface{}); ok {
-		req.CustomMeta = make(map[string]string, len(cm))
-		for k, v := range cm {
-			if str, ok := v.(string); ok {
-				req.CustomMeta[k] = str
-			}
-		}
-	}
+	req.CustomMeta = mcpCustomMeta(args)
 	if wp, ok := args["wordpress"].(map[string]interface{}); ok {
 		req.WordPress = &WordPressTargetConfig{
 			URL:    mcpGetString(wp, "url"),
@@ -57,17 +50,7 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 	if code, ok := args["code"].(map[string]interface{}); ok {
 		req.Code = &CodeConfigDef{IncludePaths: mcpGetStringSlice(code, "include_paths")}
 	}
-	if f, ok := args["fts"].(map[string]interface{}); ok {
-		def := &CollectionFTSDef{ExcludeMetaKeys: mcpGetStringSlice(f, "exclude_meta_keys")}
-		if v, set := f["enabled"].(bool); set {
-			def.Enabled = &v
-		}
-		// The block replaces the stored one: an empty exclude_meta_keys
-		// clears the list.
-		if _, listed := f["exclude_meta_keys"]; listed || def.Enabled != nil {
-			req.FTS = def
-		}
-	}
+	req.FTS = mcpCollectionFTS(args)
 	if emb, ok := args["embedding"].(map[string]interface{}); ok {
 		req.Embedding = &EmbeddingChunkingDef{
 			ChunkSize: mcpGetInt(emb, "chunk_size"),
@@ -87,6 +70,41 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 		return "", err
 	}
 	return fmt.Sprintf("Collection %q config updated", collection), nil
+}
+
+// mcpCustomMeta reads set_collection_config's custom_meta: its string
+// values, nil when the argument is absent.
+func mcpCustomMeta(args map[string]interface{}) map[string]string {
+	cm, ok := args["custom_meta"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	out := make(map[string]string, len(cm))
+	for k, v := range cm {
+		if str, ok := v.(string); ok {
+			out[k] = str
+		}
+	}
+	return out
+}
+
+// mcpCollectionFTS reads set_collection_config's fts block; nil when it is
+// absent or sets neither field.
+func mcpCollectionFTS(args map[string]interface{}) *CollectionFTSDef {
+	f, ok := args["fts"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	def := &CollectionFTSDef{ExcludeMetaKeys: mcpGetStringSlice(f, "exclude_meta_keys")}
+	if v, set := f["enabled"].(bool); set {
+		def.Enabled = &v
+	}
+	// The block replaces the stored one: an empty exclude_meta_keys
+	// clears the list.
+	if _, listed := f["exclude_meta_keys"]; listed || def.Enabled != nil {
+		return def
+	}
+	return nil
 }
 
 func (s *MCPToolServer) toolListCollectionConfigs(ctx context.Context, args map[string]interface{}) (string, error) {

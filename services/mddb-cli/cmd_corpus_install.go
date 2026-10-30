@@ -82,7 +82,10 @@ server checks collection.db against the manifest's checksum either way.`,
 // localPack is the pack as a local file: arg itself, or arg downloaded when
 // it is a URL. cleanup removes a download.
 func localPack(arg string) (string, func(), error) {
-	noop := func() {}
+	noop := func() {
+		// Nothing to remove: a local file is the user's, and a failed
+		// download has already removed its temporary file.
+	}
 	if !strings.Contains(arg, "://") {
 		return arg, noop, nil
 	}

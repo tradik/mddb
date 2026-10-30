@@ -218,7 +218,8 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 		req.IncludeContent = true
 	}
 
-	page, total, err := c.server.shapedListing(ctx, req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit, limitReport)
+	page, total, err := c.server.shapedListing(ctx, listingQuery{Collection: req.Collection,
+		Filter: mergeFilters(req.FilterMeta, req.Filter), SortBy: req.Sort, Asc: req.Asc, Offset: req.Offset, Limit: req.Limit}, limitReport)
 	if err != nil {
 		return nil, err
 	}
@@ -271,29 +272,10 @@ func (c *DirectClient) collectExportDocs(req *MCPExportRequest) ([]storage.Doc, 
 	filter := filterMetaAsFilter(req.FilterMeta)
 	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
-
 		if len(filter) == 0 {
-			cur := bDocs.Cursor()
-			prefix := []byte("doc|" + req.Collection + "|")
-			for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
-				d, err := loadDoc(v)
-				if err != nil {
-					continue
-				}
-				docs = append(docs, *d)
-			}
+			docs = collectionDocs(bDocs, req.Collection)
 		} else {
-			for _, id := range sortedIDs(metaFilterIDs(tx, req.Collection, filter)) {
-				v := bDocs.Get(storage.DocKey(req.Collection, id))
-				if v == nil {
-					continue
-				}
-				d, err := loadDoc(v)
-				if err != nil {
-					continue
-				}
-				docs = append(docs, *d)
-			}
+			docs = docsByID(bDocs, req.Collection, sortedIDs(metaFilterIDs(tx, req.Collection, filter)))
 		}
 		return nil
 	})
@@ -301,6 +283,36 @@ func (c *DirectClient) collectExportDocs(req *MCPExportRequest) ([]storage.Doc, 
 		return nil, err
 	}
 	return docs, nil
+}
+
+// collectionDocs reads every document of collection in key order; one that
+// cannot be decoded is skipped.
+func collectionDocs(bDocs *bolt.Bucket, collection string) []storage.Doc {
+	var docs []storage.Doc
+	cur := bDocs.Cursor()
+	prefix := []byte("doc|" + collection + "|")
+	for k, v := cur.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = cur.Next() {
+		if d, err := loadDoc(v); err == nil {
+			docs = append(docs, *d)
+		}
+	}
+	return docs
+}
+
+// docsByID reads the documents of collection with ids, in that order; one
+// gone or undecodable is skipped.
+func docsByID(bDocs *bolt.Bucket, collection string, ids []string) []storage.Doc {
+	var docs []storage.Doc
+	for _, id := range ids {
+		v := bDocs.Get(storage.DocKey(collection, id))
+		if v == nil {
+			continue
+		}
+		if d, err := loadDoc(v); err == nil {
+			docs = append(docs, *d)
+		}
+	}
+	return docs
 }
 
 // Export streams a collection as NDJSON.
@@ -403,21 +415,7 @@ func (c *DirectClient) Truncate(ctx context.Context, req *MCPTruncateRequest) (*
 			if err != nil {
 				return err
 			}
-			d := *dPtr
-			rc := bRev.Cursor()
-			rp := storage.RevPrefix(req.Collection, d.ID)
-			var revKeys [][]byte
-			for rk, _ := rc.Seek(rp); rk != nil && bytes.HasPrefix(rk, rp); rk, _ = rc.Next() {
-				cp := make([]byte, len(rk))
-				copy(cp, rk)
-				revKeys = append(revKeys, cp)
-			}
-			if req.KeepRevs >= 0 && len(revKeys) > req.KeepRevs {
-				toDel := revKeys[:len(revKeys)-req.KeepRevs]
-				for _, delk := range toDel {
-					_ = bRev.Delete(delk)
-				}
-			}
+			truncateRevisions(bRev, req.Collection, dPtr.ID, req.KeepRevs)
 		}
 		return nil
 	})
@@ -425,4 +423,16 @@ func (c *DirectClient) Truncate(ctx context.Context, req *MCPTruncateRequest) (*
 		return nil, err
 	}
 	return &MCPTruncateResponse{Status: "truncated"}, nil
+}
+
+// truncateRevisions deletes all but the newest keep revisions of a document
+// for Truncate: keep 0 drops the whole history, a negative keep deletes none.
+// (trimRevisions, the write-time cap, treats 0 as "no cap".)
+func truncateRevisions(bRev *bolt.Bucket, collection, docID string, keep int) {
+	revKeys := revisionKeys(bRev, collection, docID)
+	if keep >= 0 && len(revKeys) > keep {
+		for _, delk := range revKeys[:len(revKeys)-keep] {
+			_ = bRev.Delete(delk)
+		}
+	}
 }

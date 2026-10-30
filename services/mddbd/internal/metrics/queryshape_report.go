@@ -146,29 +146,7 @@ func (q *QueryShape) Report(name func(string) string) QueryShapeReport {
 		return r
 	}
 	r.Since = q.since.UTC().Format(time.RFC3339)
-	var modeTotal, modeEmpty [modeCount]int64
-	for s := Surface(0); s < surfaceCount; s++ {
-		for m := SearchMode(0); m < modeCount; m++ {
-			c := SearchCounts{Total: q.searches[s][m].Load(), Empty: q.empty[s][m].Load(), LimitCapped: q.limitCapped[s][m].Load()}
-			if c.Total == 0 {
-				continue
-			}
-			nested(r.Searches, s.String())[modeNames[m]] = c
-			modeTotal[m] += c.Total
-			modeEmpty[m] += c.Empty
-		}
-		put(r.Decomposition.Searches, s.String(), q.decomposed[s].Load())
-	}
-	for m := SearchMode(0); m < modeCount; m++ {
-		if modeTotal[m] > 0 {
-			r.EmptyRatio[modeNames[m]] = float64(modeEmpty[m]) / float64(modeTotal[m])
-		}
-		for a, name := range algorithmNames {
-			if v := q.algorithms[m][a].Load(); v != 0 {
-				nested(r.Algorithms, modeNames[m])[name] = v
-			}
-		}
-	}
+	q.reportSearches(&r)
 	for a, name := range algorithmNames {
 		put(r.AutoChoices, name, q.autoChoices[a].Load())
 	}
@@ -184,25 +162,44 @@ func (q *QueryShape) Report(name func(string) string) QueryShapeReport {
 	return r
 }
 
+// reportSearches fills r's per-surface search counts, the per-mode empty
+// ratios, the decomposed searches and the algorithms that ran.
+func (q *QueryShape) reportSearches(r *QueryShapeReport) {
+	var modeTotal, modeEmpty [modeCount]int64
+	for s := Surface(0); s < surfaceCount; s++ {
+		for m := SearchMode(0); m < modeCount; m++ {
+			c := SearchCounts{Total: q.searches[s][m].Load(), Empty: q.empty[s][m].Load(), LimitCapped: q.limitCapped[s][m].Load()}
+			if c.Total == 0 {
+				continue
+			}
+			nested(r.Searches, s.String())[modeNames[m]] = c
+			modeTotal[m] += c.Total
+			modeEmpty[m] += c.Empty
+		}
+		put(r.Decomposition.Searches, s.String(), q.decomposed[s].Load())
+	}
+	q.reportModes(r, &modeTotal, &modeEmpty)
+}
+
+// reportModes fills r's per-mode empty ratios from the totals reportSearches
+// summed, and the algorithms each mode ran.
+func (q *QueryShape) reportModes(r *QueryShapeReport, modeTotal, modeEmpty *[modeCount]int64) {
+	for m := SearchMode(0); m < modeCount; m++ {
+		if modeTotal[m] > 0 {
+			r.EmptyRatio[modeNames[m]] = float64(modeEmpty[m]) / float64(modeTotal[m])
+		}
+		for a, name := range algorithmNames {
+			if v := q.algorithms[m][a].Load(); v != 0 {
+				nested(r.Algorithms, modeNames[m])[name] = v
+			}
+		}
+	}
+}
+
 // reportGraph fills the graph half of r and the gates.
 func (q *QueryShape) reportGraph(r *QueryShapeReport) {
 	g, gr := &q.graph, &r.Graph
-	var codeGraph, mapShaped int64
-	for s := Surface(0); s < surfaceCount; s++ {
-		for k := GraphKind(0); k < graphKindCount; k++ {
-			if v := g.requests[s][k].Load(); v != 0 {
-				nested(gr.Requests, s.String())[graphKindNames[k]] = v
-			}
-			if v := g.clamped[s][k].Load(); v != 0 {
-				nested(gr.DepthClamped, s.String())[graphKindNames[k]] = v
-			}
-		}
-		codeGraph += g.requests[s][GraphCodeGraph].Load()
-		noStart, whole := g.noStart[s].Load(), g.wholeGraph[s].Load()
-		mapShaped += noStart + whole
-		put(gr.NoStart, s.String(), noStart)
-		put(gr.WholeGraph, s.String(), whole)
-	}
+	codeGraph, mapShaped := g.reportSurfaces(gr)
 	for k := GraphKind(0); k < graphKindCount; k++ {
 		for b, name := range smallBucketNames {
 			if v := g.depth[k][b].Load(); v != 0 {
@@ -223,6 +220,28 @@ func (q *QueryShape) reportGraph(r *QueryShapeReport) {
 		gr.Chains.AtLeast3, cs.sessions, Code006ChainShare, Code006MinSessions)
 	r.Gates.Code007 = newGate("code-graph requests with no start document, or at maximum depth and fan-out",
 		mapShaped, codeGraph, Code007MapShare, Code007MinRequests)
+}
+
+// reportSurfaces fills gr's per-surface request, clamp, no-start and
+// whole-graph counts, and returns the code-graph requests and how many of
+// them were map-shaped (no start document, or the whole graph).
+func (g *graphCounters) reportSurfaces(gr *GraphReport) (codeGraph, mapShaped int64) {
+	for s := Surface(0); s < surfaceCount; s++ {
+		for k := GraphKind(0); k < graphKindCount; k++ {
+			if v := g.requests[s][k].Load(); v != 0 {
+				nested(gr.Requests, s.String())[graphKindNames[k]] = v
+			}
+			if v := g.clamped[s][k].Load(); v != 0 {
+				nested(gr.DepthClamped, s.String())[graphKindNames[k]] = v
+			}
+		}
+		codeGraph += g.requests[s][GraphCodeGraph].Load()
+		noStart, whole := g.noStart[s].Load(), g.wholeGraph[s].Load()
+		mapShaped += noStart + whole
+		put(gr.NoStart, s.String(), noStart)
+		put(gr.WholeGraph, s.String(), whole)
+	}
+	return codeGraph, mapShaped
 }
 
 // reportCollections fills r's per-collection rows.
@@ -307,6 +326,32 @@ func (f *family) add(v *atomic.Int64, labels ...string) {
 	f.values = append(f.values, v.Load())
 }
 
+// surfaceFamilies holds the counter families labelled by surface.
+type surfaceFamilies struct {
+	searches, empty, capped, decomposed, requests, clamped, noStart, whole family
+}
+
+// collect adds q's per-surface series to the families.
+func (f *surfaceFamilies) collect(q *QueryShape) {
+	for s := Surface(0); s < surfaceCount; s++ {
+		sl := "surface=" + s.String()
+		for m := SearchMode(0); m < modeCount; m++ {
+			ml := "mode=" + modeNames[m]
+			f.searches.add(&q.searches[s][m], sl, ml)
+			f.empty.add(&q.empty[s][m], sl, ml)
+			f.capped.add(&q.limitCapped[s][m], sl, ml)
+		}
+		f.decomposed.add(&q.decomposed[s], sl)
+		for k := GraphKind(0); k < graphKindCount; k++ {
+			kl := "kind=" + graphKindNames[k]
+			f.requests.add(&q.graph.requests[s][k], sl, kl)
+			f.clamped.add(&q.graph.clamped[s][k], sl, kl)
+		}
+		f.noStart.add(&q.graph.noStart[s], sl)
+		f.whole.add(&q.graph.wholeGraph[s], sl)
+	}
+}
+
 // writeQueryShape renders the counters as mddb_query_shape_* series.
 // Families with nothing to report are left out, except the two the CODE-006
 // dashboard reads, which are always present.
@@ -314,24 +359,8 @@ func (q *QueryShape) writeQueryShape(buf *strings.Builder) {
 	if q == nil {
 		return
 	}
-	var searches, empty, capped, decomposed, requests, clamped, noStart, whole family
-	for s := Surface(0); s < surfaceCount; s++ {
-		sl := "surface=" + s.String()
-		for m := SearchMode(0); m < modeCount; m++ {
-			ml := "mode=" + modeNames[m]
-			searches.add(&q.searches[s][m], sl, ml)
-			empty.add(&q.empty[s][m], sl, ml)
-			capped.add(&q.limitCapped[s][m], sl, ml)
-		}
-		decomposed.add(&q.decomposed[s], sl)
-		for k := GraphKind(0); k < graphKindCount; k++ {
-			kl := "kind=" + graphKindNames[k]
-			requests.add(&q.graph.requests[s][k], sl, kl)
-			clamped.add(&q.graph.clamped[s][k], sl, kl)
-		}
-		noStart.add(&q.graph.noStart[s], sl)
-		whole.add(&q.graph.wholeGraph[s], sl)
-	}
+	var sf surfaceFamilies
+	sf.collect(q)
 	var algos, autos, ops, conds, depth, truncated family
 	for m := SearchMode(0); m < modeCount; m++ {
 		for a, name := range algorithmNames {
@@ -354,20 +383,20 @@ func (q *QueryShape) writeQueryShape(buf *strings.Builder) {
 		truncated.add(&q.graph.truncated[k], "kind="+graphKindNames[k])
 	}
 	const p = "mddb_query_shape_"
-	promCounter(buf, p+"searches_total", "Searches by surface and mode.", false, searches.series, searches.values)
-	promCounter(buf, p+"empty_results_total", "Searches that returned nothing, by surface and mode.", false, empty.series, empty.values)
-	promCounter(buf, p+"limit_capped_total", "Searches whose result count the server's cap lowered.", false, capped.series, capped.values)
+	promCounter(buf, p+"searches_total", "Searches by surface and mode.", false, sf.searches.series, sf.searches.values)
+	promCounter(buf, p+"empty_results_total", "Searches that returned nothing, by surface and mode.", false, sf.empty.series, sf.empty.values)
+	promCounter(buf, p+"limit_capped_total", "Searches whose result count the server's cap lowered.", false, sf.capped.series, sf.capped.values)
 	promCounter(buf, p+"algorithm_total", "Searches by mode and the algorithm that ran.", false, algos.series, algos.values)
 	promCounter(buf, p+"auto_choice_total", "The planner's choice for algorithm auto.", false, autos.series, autos.values)
 	promCounter(buf, p+"filter_operator_total", "Searches using each metadata filter operator.", false, ops.series, ops.values)
 	promCounter(buf, p+"filter_conditions_total", "Searches by number of filtered metadata keys.", false, conds.series, conds.values)
-	promCounter(buf, p+"decomposed_total", "Searches whose query was decomposed into parts.", false, decomposed.series, decomposed.values)
-	promCounter(buf, p+"graph_requests_total", "Graph requests by surface and kind.", false, requests.series, requests.values)
+	promCounter(buf, p+"decomposed_total", "Searches whose query was decomposed into parts.", false, sf.decomposed.series, sf.decomposed.values)
+	promCounter(buf, p+"graph_requests_total", "Graph requests by surface and kind.", false, sf.requests.series, sf.requests.values)
 	promCounter(buf, p+"graph_depth_total", "Graph requests by requested depth (0 = default).", false, depth.series, depth.values)
-	promCounter(buf, p+"graph_depth_clamped_total", "Graph requests whose depth was clamped to the server's maximum.", true, clamped.series, clamped.values)
+	promCounter(buf, p+"graph_depth_clamped_total", "Graph requests whose depth was clamped to the server's maximum.", true, sf.clamped.series, sf.clamped.values)
 	promCounter(buf, p+"graph_truncated_total", "Graph walks a degree or depth limit cut short.", false, truncated.series, truncated.values)
-	promCounter(buf, p+"graph_no_start_total", "Code-graph requests refused for want of a start document.", false, noStart.series, noStart.values)
-	promCounter(buf, p+"graph_whole_graph_total", "Code-graph requests at maximum depth and fan-out.", false, whole.series, whole.values)
+	promCounter(buf, p+"graph_no_start_total", "Code-graph requests refused for want of a start document.", false, sf.noStart.series, sf.noStart.values)
+	promCounter(buf, p+"graph_whole_graph_total", "Code-graph requests at maximum depth and fan-out.", false, sf.whole.series, sf.whole.values)
 	if v := q.parts.Load(); v != 0 {
 		promFamily(buf, p+"decomposition_parts_total", "Sub-queries run by decomposed searches.", "counter")
 		writef(buf, "%sdecomposition_parts_total %d\n\n", p, v)

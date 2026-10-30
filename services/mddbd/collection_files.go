@@ -329,34 +329,17 @@ func mainFileHoldsCollections(db *bolt.DB) (bool, error) {
 // ones back. It does nothing in the single-file layout. The caller holds the
 // restore write lock.
 func (s *Server) swapCollectionFiles(srcDir string) (undo func(), err error) {
-	noop := func() {}
+	noop := func() {
+		// Nothing to undo: no file was moved.
+	}
 	if !perCollectionLayout() {
 		return noop, nil
 	}
-	// srcDir is derived from a path safeBackupPath accepted; checked again so
-	// it cannot climb out of the backup directory.
-	if strings.Contains(srcDir, "..") {
-		return noop, fmt.Errorf("invalid backup path %q", srcDir)
-	}
-	entries, err := os.ReadDir(srcDir)
+	entries, err := backupCollectionFiles(srcDir)
 	if err != nil {
-		return noop, fmt.Errorf("this backup has no collection files (%s): it was taken in the single-file layout; "+
-			"restore it with MDDB_STORAGE_LAYOUT=single, then run mddbd -split-collections", filepath.Base(srcDir))
+		return noop, err
 	}
-	for _, e := range entries {
-		if _, ok := collectionFromFileName(e.Name()); ok {
-			if err := verifyDatabase(filepath.Join(srcDir, e.Name())); err != nil {
-				return noop, fmt.Errorf("%s is not a usable database: %w", e.Name(), err)
-			}
-		}
-	}
-
-	s.collMu.Lock()
-	if s.collFiles != nil {
-		s.collFiles.closeAll()
-		s.collFiles = nil
-	}
-	s.collMu.Unlock()
+	s.dropCollectionFiles()
 
 	live := collectionDir(s.Path)
 	aside := live + ".pre-restore"
@@ -372,12 +355,7 @@ func (s *Server) swapCollectionFiles(srcDir string) (undo func(), err error) {
 	// files, so closing them afterwards left a failed restore with no
 	// collection files at all there.
 	putBack := func() {
-		s.collMu.Lock()
-		if s.collFiles != nil {
-			s.collFiles.closeAll()
-		}
-		s.collFiles = nil
-		s.collMu.Unlock()
+		s.dropCollectionFiles()
 		_ = os.RemoveAll(live)
 		_ = os.Rename(aside, live)
 	}
@@ -386,15 +364,50 @@ func (s *Server) swapCollectionFiles(srcDir string) (undo func(), err error) {
 		return noop, err
 	}
 	for _, e := range entries {
-		if _, ok := collectionFromFileName(e.Name()); !ok {
-			continue
-		}
-		if err := collCopyFile(filepath.Join(srcDir, e.Name()), filepath.Join(live, e.Name())); err != nil {
+		if err := collCopyFile(filepath.Join(srcDir, e), filepath.Join(live, e)); err != nil {
 			putBack()
-			return noop, fmt.Errorf("copying %s: %w", e.Name(), err)
+			return noop, fmt.Errorf("copying %s: %w", e, err)
 		}
 	}
 	return putBack, nil
+}
+
+// backupCollectionFiles names the collection files of the backup in srcDir,
+// each checked to be a usable database.
+func backupCollectionFiles(srcDir string) ([]string, error) {
+	// srcDir is derived from a path safeBackupPath accepted; checked again so
+	// it cannot climb out of the backup directory.
+	if strings.Contains(srcDir, "..") {
+		return nil, fmt.Errorf("invalid backup path %q", srcDir)
+	}
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return nil, fmt.Errorf("this backup has no collection files (%s): it was taken in the single-file layout; "+
+			"restore it with MDDB_STORAGE_LAYOUT=single, then run mddbd -split-collections", filepath.Base(srcDir))
+	}
+	var names []string
+	for _, e := range entries {
+		if _, ok := collectionFromFileName(e.Name()); !ok {
+			continue
+		}
+		if err := verifyDatabase(filepath.Join(srcDir, e.Name())); err != nil {
+			return nil, fmt.Errorf("%s is not a usable database: %w", e.Name(), err)
+		}
+		names = append(names, e.Name())
+	}
+	return names, nil
+}
+
+// dropCollectionFiles closes the open collection files and forgets them, so
+// the next access opens what is on disk then. Unlike closeCollectionFiles
+// (at exit), the set is cleared under the same lock.
+func (s *Server) dropCollectionFiles() {
+	s.collMu.Lock()
+	defer s.collMu.Unlock()
+	if s.collFiles != nil {
+		s.collFiles.closeAll()
+	}
+	s.collFiles = nil
 }
 
 // errSnapshotPerCollection is why replication snapshots are refused in the

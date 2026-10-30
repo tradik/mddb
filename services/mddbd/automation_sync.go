@@ -95,7 +95,13 @@ func (a *SyncAction) normalize() error {
 	}
 	a.MaxDocuments = cmp.Or(a.MaxDocuments, defaultSyncMaxDocuments)
 	a.MaxBytes = cmp.Or(a.MaxBytes, defaultSyncMaxBytes)
+	return a.checkSource()
+}
 
+// checkSource rejects a source that cannot be fetched: an unknown kind, a bad
+// URL, or an s3 source without an endpoint and bucket (which it fills from
+// storageConfig).
+func (a *SyncAction) checkSource() error {
 	switch a.Source {
 	case SyncSourceSitemap:
 		return checkSyncURL(a.URL)
@@ -197,7 +203,7 @@ func keepStoredSecret(update, stored *StorageConfigDef) {
 // keys when an update has none, and the whole stored action when an update
 // names none — a client that does not know the fields (the MCP tools, an
 // older gRPC client) toggling `enabled`.
-func carryOverAction(update *AutomationRule, existing *AutomationRule) {
+func carryOverAction(update, existing *AutomationRule) {
 	if update.WebhookID == "" && update.Backup == nil && update.Sync == nil {
 		if existing.Backup != nil {
 			b := *existing.Backup

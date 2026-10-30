@@ -86,18 +86,19 @@ func (c *esCompiler) rangeClause(body json.RawMessage, scope esScope) error {
 	if scope != esMust {
 		return dslErr("range", "is only supported in the query, bool.must and bool.filter")
 	}
-	obj, err := esObject(v, "range."+field)
+	path := "range." + field
+	obj, err := esObject(v, path)
 	if err != nil {
 		return err
 	}
-	if err := esOnlyKeys("range."+field, obj, "gt", "gte", "lt", "lte", "boost"); err != nil {
+	if err := esOnlyKeys(path, obj, "gt", "gte", "lt", "lte", "boost"); err != nil {
 		return err
 	}
 	rf := RangeFilter{Field: field}
 	for op, dst := range map[string]*string{"gt": &rf.Gt, "gte": &rf.Gte, "lt": &rf.Lt, "lte": &rf.Lte} {
 		if raw, ok := obj[op]; ok {
 			if *dst, err = scalarString(raw); err != nil {
-				return dslErr("range."+field+"."+op, "%v", err)
+				return dslErr(path+"."+op, "%v", err)
 			}
 		}
 	}

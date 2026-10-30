@@ -140,7 +140,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	page, total, err := s.shapedListing(r.Context(), req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit, limitReport)
+	page, total, err := s.shapedListing(r.Context(), listingQuery{Collection: req.Collection,
+		Filter: mergeFilters(req.FilterMeta, req.Filter), SortBy: req.Sort, Asc: req.Asc, Offset: req.Offset, Limit: req.Limit}, limitReport)
 	if err != nil {
 		bad(w, err)
 		return

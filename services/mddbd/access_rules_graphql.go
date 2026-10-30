@@ -100,7 +100,12 @@ func argCollections(name string, v any) []string {
 		}
 		return nil
 	}
-	rv := reflect.Indirect(reflect.ValueOf(v))
+	return structCollections(reflect.Indirect(reflect.ValueOf(v)))
+}
+
+// structCollections reads the collection fields of an input object; none
+// when rv is not a struct.
+func structCollections(rv reflect.Value) []string {
 	if rv.Kind() != reflect.Struct {
 		return nil
 	}

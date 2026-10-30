@@ -91,12 +91,12 @@ func TestFilterShapeNamesOperatorsNotValues(t *testing.T) {
 }
 
 func TestVectorAndGraphShapes(t *testing.T) {
-	sh := vectorShape(metrics.ModeVector, "c", AlgorithmAuto, "hnsw", nil, nil,
-		&SearchPlan{Decomposition: &QueryDecomposition{Parts: 3}}, 0, LimitReport{LimitCapped: true})
+	sh := vectorShape(vectorShapeInput{Mode: metrics.ModeVector, Collection: "c", Requested: AlgorithmAuto, Ran: "hnsw",
+		Plan: &SearchPlan{Decomposition: &QueryDecomposition{Parts: 3}}, Limit: LimitReport{LimitCapped: true}})
 	if !sh.Auto || sh.Algorithm != "hnsw" || sh.DecomposedParts != 3 || !sh.LimitCapped {
 		t.Errorf("vector shape %+v", sh)
 	}
-	if sh := vectorShape(metrics.ModeHybrid, "c", "flat", "flat", nil, nil, nil, 1, LimitReport{}); sh.Auto || sh.DecomposedParts != 0 {
+	if sh := vectorShape(vectorShapeInput{Mode: metrics.ModeHybrid, Collection: "c", Requested: "flat", Ran: "flat", Results: 1}); sh.Auto || sh.DecomposedParts != 0 {
 		t.Errorf("plain shape %+v", sh)
 	}
 	g := codeGraphShape("c", "", GraphMaxDepth, GraphMaxDegree, nil)

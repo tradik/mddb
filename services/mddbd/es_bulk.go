@@ -130,54 +130,81 @@ func (s *Server) esBulk(w http.ResponseWriter, r *http.Request, defaultIndex str
 		esFail(w, err)
 		return
 	}
-	items := make([]map[string]any, len(ops))
-	run := &esBulkRun{}
+	b := &esBulkBatch{s: s, r: r, ops: ops, items: make([]map[string]any, len(ops)), run: &esBulkRun{}}
 	touched := map[string]bool{}
-	flush := func() {
-		s.esBulkWrite(r.Context(), run, ops, items)
-		run = &esBulkRun{}
-	}
 	for i, op := range ops {
 		touched[op.Index] = true
-		switch {
-		case op.Err != nil:
-			items[i] = esBulkResult(op, 0, "", op.Err)
-		case s.AuthManager != nil && s.AuthManager.CheckPermission(r.Context(), op.Index, PermWrite) != nil:
-			items[i] = esBulkItem(op, http.StatusForbidden, "security_exception", "no write permission on "+op.Index)
-		case op.Action == "delete":
-			flush()
-			status, result, err := s.esRemove(op.Index, op.ID, esLang(r))
-			items[i] = esBulkResult(op, status, result, err)
-		default:
-			lang := op.Doc.Lang
-			if lang == "" {
-				lang = esLang(r)
-			}
-			key := storage.NormalizeKey(op.ID)
-			if len(run.ops) > 0 && (run.index != op.Index || run.lang != lang || run.keys[key]) {
-				flush()
-			}
-			if op.Action == "create" {
-				if _, err := s.loadDocByRef(op.Index, op.ID, lang); err == nil {
-					items[i] = esBulkItem(op, http.StatusConflict, "version_conflict_engine_exception", "["+op.ID+"]: document already exists")
-					continue
-				}
-			}
-			if len(run.ops) == 0 {
-				run.index, run.lang, run.keys = op.Index, lang, map[string]bool{}
-			}
-			run.ops, run.keys[key] = append(run.ops, i), true
-		}
+		b.apply(i, op)
 	}
-	flush()
+	b.flush()
 	failed := false
-	for i, it := range items {
+	for i, it := range b.items {
 		failed = failed || it[ops[i].Action].(map[string]any)["error"] != nil
 	}
 	for index := range touched {
 		s.esRefreshAfterWrite(r, index)
 	}
-	esJSON(w, http.StatusOK, map[string]any{"took": time.Since(start).Milliseconds(), "errors": failed, "items": items})
+	esJSON(w, http.StatusOK, map[string]any{"took": time.Since(start).Milliseconds(), "errors": failed, "items": b.items})
+}
+
+// esBulkBatch carries a bulk request's operations: consecutive index and
+// create writes to one index and language gather in a run, written as one
+// batch when something else comes between them.
+type esBulkBatch struct {
+	s     *Server
+	r     *http.Request
+	ops   []esBulkOp
+	items []map[string]any
+	run   *esBulkRun
+}
+
+// flush writes the run waiting for a batch and starts an empty one.
+func (b *esBulkBatch) flush() {
+	b.s.esBulkWrite(b.r.Context(), b.run, b.ops, b.items)
+	b.run = &esBulkRun{}
+}
+
+// apply answers operation i, or queues it in the run.
+func (b *esBulkBatch) apply(i int, op esBulkOp) {
+	s, r := b.s, b.r
+	switch {
+	case op.Err != nil:
+		b.items[i] = esBulkResult(op, 0, "", op.Err)
+	case s.AuthManager != nil && s.AuthManager.CheckPermission(r.Context(), op.Index, PermWrite) != nil:
+		b.items[i] = esBulkItem(op, http.StatusForbidden, "security_exception", "no write permission on "+op.Index)
+	case op.Action == "delete":
+		b.flush()
+		status, result, err := s.esRemove(op.Index, op.ID, esLang(r))
+		b.items[i] = esBulkResult(op, status, result, err)
+	default:
+		b.queue(i, op)
+	}
+}
+
+// queue adds an index or create operation to the run, flushing first when
+// it targets another index or language or repeats a key of the run. A create
+// of a document that exists is answered with a conflict instead.
+func (b *esBulkBatch) queue(i int, op esBulkOp) {
+	lang := op.Doc.Lang
+	if lang == "" {
+		lang = esLang(b.r)
+	}
+	key := storage.NormalizeKey(op.ID)
+	run := b.run
+	if len(run.ops) > 0 && (run.index != op.Index || run.lang != lang || run.keys[key]) {
+		b.flush()
+		run = b.run
+	}
+	if op.Action == "create" {
+		if _, err := b.s.loadDocByRef(op.Index, op.ID, lang); err == nil {
+			b.items[i] = esBulkItem(op, http.StatusConflict, "version_conflict_engine_exception", "["+op.ID+"]: document already exists")
+			return
+		}
+	}
+	if len(run.ops) == 0 {
+		run.index, run.lang, run.keys = op.Index, lang, map[string]bool{}
+	}
+	run.ops, run.keys[key] = append(run.ops, i), true
 }
 
 // esBulkWrite writes a run through the batch path and fills its items.

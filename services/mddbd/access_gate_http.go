@@ -14,6 +14,9 @@ import (
 // through a gatedMux, which puts httpGate in front of the handler with the
 // route's rule from httpAccessRules.
 
+// headerContentType is the Content-Type header.
+const headerContentType = "Content-Type"
+
 // routeMux is what routes are registered on: an *http.ServeMux, or a wrapper
 // that gates or records them.
 type routeMux interface {
@@ -72,7 +75,7 @@ func (s *Server) httpGate(pattern string, next http.Handler) http.Handler {
 func requestCollections(r *http.Request) ([]string, error) {
 	q := r.URL.Query()
 	names := append(append([]string(nil), q["collection"]...), q["collections"]...)
-	ct := r.Header.Get("Content-Type")
+	ct := r.Header.Get(headerContentType)
 	if r.Body == nil || r.Body == http.NoBody || (ct != "" && !strings.Contains(ct, "json")) {
 		return names, nil
 	}
@@ -99,7 +102,7 @@ func requestCollections(r *http.Request) ([]string, error) {
 // writeBodyError answers a body that could not be read: 413 over the cap,
 // 400 otherwise.
 func writeBodyError(w http.ResponseWriter, err error) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, "application/json")
 	var tooLarge *http.MaxBytesError
 	if errors.As(err, &tooLarge) {
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
@@ -113,7 +116,7 @@ func writeBodyError(w http.ResponseWriter, err error) {
 // writeAccessDenied answers a refusal: 401 without credentials, 403 without
 // the permission.
 func writeAccessDenied(w http.ResponseWriter, err error) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, "application/json")
 	if errors.Is(err, ErrUnauthorized) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"error":"unauthorized"}`))

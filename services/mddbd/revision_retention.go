@@ -27,15 +27,7 @@ func trimRevisions(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string, 
 		return nil
 	}
 
-	prefix := storage.RevPrefix(collection, docID)
-	c := bRev.Cursor()
-
-	var keys [][]byte
-	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
-		cp := make([]byte, len(k))
-		copy(cp, k)
-		keys = append(keys, cp)
-	}
+	keys := revisionKeys(bRev, collection, docID)
 	if len(keys) <= keep {
 		return nil
 	}
@@ -49,4 +41,17 @@ func trimRevisions(tx *bolt.Tx, bo *binlog.BinlogOps, collection, docID string, 
 		}
 	}
 	return nil
+}
+
+// revisionKeys copies the revision keys of a document, oldest first. Copies,
+// because the caller deletes them: a key slice from a cursor is only valid
+// until the bucket changes.
+func revisionKeys(bRev *bolt.Bucket, collection, docID string) [][]byte {
+	prefix := storage.RevPrefix(collection, docID)
+	c := bRev.Cursor()
+	var keys [][]byte
+	for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+		keys = append(keys, bytes.Clone(k))
+	}
+	return keys
 }

@@ -297,10 +297,8 @@ func (g *GRPCServer) DeleteAutomation(ctx context.Context, req *proto.DeleteAuto
 
 // TestAutomation implements the TestAutomation RPC — dry run of a trigger.
 func (g *GRPCServer) TestAutomation(ctx context.Context, req *proto.TestAutomationRequest) (*proto.TestAutomationResponse, error) {
-	if g.server.AuthManager != nil {
-		if err := g.server.AuthManager.CheckPermission(ctx, "*", PermAdmin); err != nil {
-			return nil, status.Error(codes.PermissionDenied, err.Error())
-		}
+	if err := g.permit(ctx, "*", PermAdmin); err != nil {
+		return nil, err
 	}
 	if g.server.AutomationManager == nil {
 		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
@@ -321,9 +319,19 @@ func (g *GRPCServer) TestAutomation(ctx context.Context, req *proto.TestAutomati
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Load matched documents
+	protoDocs := g.server.matchedProtoDocs(rule.Collection, matches)
+	return &proto.TestAutomationResponse{
+		Trigger: automationRuleToProto(rule),
+		Matches: protoDocs,
+		Total:   safeInt32(len(protoDocs)),
+	}, nil
+}
+
+// matchedProtoDocs loads the documents a trigger matched in collection; one
+// gone or unreadable is left out.
+func (s *Server) matchedProtoDocs(collection string, matches []TriggerMatch) []*proto.Document {
 	var protoDocs []*proto.Document
-	_ = g.server.DBViewC(rule.Collection, func(tx *bolt.Tx) error {
+	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
 		bDocs := tx.Bucket([]byte("docs"))
 		if bDocs == nil {
 			return nil
@@ -341,12 +349,7 @@ func (g *GRPCServer) TestAutomation(ctx context.Context, req *proto.TestAutomati
 		}
 		return nil
 	})
-
-	return &proto.TestAutomationResponse{
-		Trigger: automationRuleToProto(rule),
-		Matches: protoDocs,
-		Total:   safeInt32(len(protoDocs)),
-	}, nil
+	return protoDocs
 }
 
 // GetAutomationLogs implements the GetAutomationLogs RPC.
@@ -431,10 +434,8 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	if req.Collection == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing collection")
 	}
-	if g.server.AuthManager != nil {
-		if err := g.server.AuthManager.CheckPermission(ctx, req.Collection, PermWrite); err != nil {
-			return nil, status.Error(codes.PermissionDenied, err.Error())
-		}
+	if err := g.permit(ctx, req.Collection, PermWrite); err != nil {
+		return nil, err
 	}
 	if g.server.CollectionManager == nil {
 		return nil, status.Error(codes.FailedPrecondition, "collection manager not initialized")
@@ -485,31 +486,50 @@ func (g *GRPCServer) SetCollectionConfig(ctx context.Context, req *proto.SetColl
 	if err := cfg.Code.Validate(); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	// GO-043: nil leaves the stored quota alone; a change needs a global admin.
-	if quota := quotaFromProto(req.Quota); quota != nil {
-		if err := g.server.checkQuotaChange(ctx, req.Collection, quota); err != nil {
-			if errors.Is(err, errQuotaAdminOnly) {
-				return nil, status.Error(codes.PermissionDenied, err.Error())
-			}
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
-		cfg.Quota = quota
+	if err := g.applyQuota(ctx, req, cfg); err != nil {
+		return nil, err
 	}
 
-	// RAG-001: a nil retrieval block means "not sent", which leaves any
-	// profile configured over REST in place.
-	if req.Retrieval != nil {
-		profile := retrievalProfileFromProto(req.Retrieval)
-		if err := profile.Validate(); err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
-		cfg.Retrieval = profile
+	if err := applyRetrievalProto(cfg, req.Retrieval); err != nil {
+		return nil, err
 	}
 
 	if err := g.server.CollectionManager.Set(req.Collection, cfg); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	return &proto.SetCollectionConfigResponse{Status: "ok", Collection: req.Collection}, nil
+}
+
+// applyQuota sets the request's quota on cfg (GO-043): nil leaves the stored
+// quota alone; a change needs a global admin.
+func (g *GRPCServer) applyQuota(ctx context.Context, req *proto.SetCollectionConfigRequest, cfg *CollectionConfig) error {
+	quota := quotaFromProto(req.Quota)
+	if quota == nil {
+		return nil
+	}
+	if err := g.server.checkQuotaChange(ctx, req.Collection, quota); err != nil {
+		if errors.Is(err, errQuotaAdminOnly) {
+			return status.Error(codes.PermissionDenied, err.Error())
+		}
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	cfg.Quota = quota
+	return nil
+}
+
+// applyRetrievalProto sets a retrieval profile sent over gRPC on cfg
+// (RAG-001): nil means "not sent", which leaves any profile configured over
+// REST in place.
+func applyRetrievalProto(cfg *CollectionConfig, p *proto.RetrievalProfileProto) error {
+	if p == nil {
+		return nil
+	}
+	profile := retrievalProfileFromProto(p)
+	if err := profile.Validate(); err != nil {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	cfg.Retrieval = profile
+	return nil
 }
 
 // ListCollectionConfigs implements the ListCollectionConfigs RPC.

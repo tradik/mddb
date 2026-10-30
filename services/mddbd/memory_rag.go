@@ -866,14 +866,9 @@ func (s *Server) loadSessionMessages(sessionID string, limit, offset int) []stor
 		prefix := []byte("doc|" + memoryMessagesCollection + "|" + strings.ToLower(memoryMessagesCollection+"|"+sessionID+"/"))
 		c := bDocs.Cursor()
 		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-			d, err := loadDoc(v)
-			if err != nil {
-				continue
+			if d, err := loadDoc(v); err == nil && (d.ExpiresAt <= 0 || d.ExpiresAt >= time.Now().Unix()) {
+				messages = append(messages, *d)
 			}
-			if d.ExpiresAt > 0 && d.ExpiresAt < time.Now().Unix() {
-				continue
-			}
-			messages = append(messages, *d)
 		}
 		return nil
 	})
@@ -882,8 +877,12 @@ func (s *Server) loadSessionMessages(sessionID string, limit, offset int) []stor
 	sort.Slice(messages, func(i, j int) bool {
 		return messages[i].AddedAt < messages[j].AddedAt
 	})
+	return pageMessages(messages, limit, offset)
+}
 
-	// Apply offset/limit
+// pageMessages is the page of messages from offset, at most limit long (0
+// means no limit); nil when offset is past the end.
+func pageMessages(messages []storage.Doc, limit, offset int) []storage.Doc {
 	if offset > 0 && offset < len(messages) {
 		messages = messages[offset:]
 	} else if offset >= len(messages) {

@@ -160,7 +160,8 @@ func (s *Server) esList(ctx context.Context, index string, spec *esSearchSpec, w
 	if whole {
 		limit = math.MaxInt
 	}
-	docs, total, err := s.shapedListing(ctx, index, filter, spec.SortField, spec.SortAsc, 0, limit, LimitReport{})
+	docs, total, err := s.shapedListing(ctx, listingQuery{Collection: index, Filter: filter, SortBy: spec.SortField,
+		Asc: spec.SortAsc, Limit: limit}, LimitReport{})
 	if err != nil {
 		return nil, err
 	}

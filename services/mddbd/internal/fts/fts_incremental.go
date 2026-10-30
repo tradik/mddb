@@ -273,13 +273,13 @@ func (f *FTSIndex) reindexInTx(tx *bolt.Tx, bo *binlog.BinlogOps, put putFunc, c
 // index and leaves its other fields as they are. A field with no tokens loses
 // its postings, length and share of the field statistics.
 func replaceFieldsInTx(tx *bolt.Tx, put putFunc, collection, docID string, tokens map[string]map[string]int) error {
-	bF, bMeta, bStat, bRev := tx.Bucket(bucketFTSF), tx.Bucket(bucketFTSFMeta), tx.Bucket(bucketFTSFStat), tx.Bucket(bucketFTSFRev)
-	if bF == nil || bMeta == nil || bStat == nil || bRev == nil {
+	b, ok := openFieldBuckets(tx)
+	if !ok {
 		return nil
 	}
 	revKey := ftsfRevKey(collection, docID)
 	var entries []fieldTermEntry
-	if raw := bRev.Get(revKey); raw != nil {
+	if raw := b.rev.Get(revKey); raw != nil {
 		if err := json.Unmarshal(raw, &entries); err != nil {
 			return errFieldRevUnreadable
 		}
@@ -288,18 +288,18 @@ func replaceFieldsInTx(tx *bolt.Tx, put putFunc, collection, docID string, token
 	kept := entries[:0]
 	for _, e := range entries {
 		if _, replaced := tokens[e.Field]; replaced {
-			_ = bF.Delete(ftsfKey(collection, e.Field, e.Term, docID))
+			_ = b.postings.Delete(ftsfKey(collection, e.Field, e.Term, docID))
 		} else {
 			kept = append(kept, e)
 		}
 	}
 	for field, fieldTokens := range tokens {
 		dropFieldLength(tx, collection, field, docID)
-		written, err := writeFieldInTx(put, bF, bMeta, bStat, collection, field, docID, fieldTokens)
+		written, err := writeFieldInTx(put, b, collection, field, docID, fieldTokens)
 		if err != nil {
 			return err
 		}
 		kept = append(kept, written...)
 	}
-	return putFieldRev(bRev, revKey, kept)
+	return putFieldRev(b.rev, revKey, kept)
 }

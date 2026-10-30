@@ -169,29 +169,51 @@ func (s *Server) shapedFTS(ctx context.Context, req FTSSearchRequest, start time
 	return resp, nil
 }
 
-// shapedListing is searchDocuments for a metadata listing, counted.
-func (s *Server) shapedListing(ctx context.Context, collection string, filter MetaFilter, sortBy string, asc bool, offset, limit int,
-	rep LimitReport) ([]storage.Doc, int, error) {
-	page, total, err := s.searchDocuments(collection, filter, sortBy, asc, offset, limit)
+// listingQuery is one page of a metadata listing.
+type listingQuery struct {
+	Collection string
+	Filter     MetaFilter
+	SortBy     string
+	Asc        bool
+	Offset     int
+	Limit      int
+}
+
+// shapedListing is searchDocuments for a metadata listing, counted; rep says
+// whether the server's cap lowered the page size.
+func (s *Server) shapedListing(ctx context.Context, q listingQuery, rep LimitReport) ([]storage.Doc, int, error) {
+	page, total, err := s.searchDocuments(q.Collection, q.Filter, q.SortBy, q.Asc, q.Offset, q.Limit)
 	if err != nil {
 		return nil, 0, err
 	}
-	ops, conds := filterShape(nil, filter, 0)
-	s.recordSearch(ctx, metrics.SearchShape{Mode: metrics.ModeMeta, Collection: collection, FilterOps: ops,
+	ops, conds := filterShape(nil, q.Filter, 0)
+	s.recordSearch(ctx, metrics.SearchShape{Mode: metrics.ModeMeta, Collection: q.Collection, FilterOps: ops,
 		Conditions: conds, Results: len(page), LimitCapped: rep.LimitCapped})
 	return page, total, nil
+}
+
+// vectorShapeInput describes a vector or hybrid search for vectorShape.
+type vectorShapeInput struct {
+	Mode       metrics.SearchMode
+	Collection string
+	Requested  string // the algorithm the caller asked for
+	Ran        string // the algorithm that ran
+	FilterMeta map[string][]string
+	Filter     MetaFilter
+	Plan       *SearchPlan
+	Results    int
+	Limit      LimitReport
 }
 
 // vectorShape describes a vector or hybrid search for the counters: the
 // algorithm the planner ran (and whether the caller left the choice to it),
 // the filters, the sub-queries of a decomposed query and the result count.
-func vectorShape(mode metrics.SearchMode, collection, requested, ran string, fm map[string][]string, f MetaFilter,
-	plan *SearchPlan, results int, rep LimitReport) metrics.SearchShape {
-	ops, conds := filterShape(fm, f, 0)
-	sh := metrics.SearchShape{Mode: mode, Collection: collection, Algorithm: ran, Auto: requested == AlgorithmAuto,
-		FilterOps: ops, Conditions: conds, Results: results, LimitCapped: rep.LimitCapped}
-	if plan != nil && plan.Decomposition != nil {
-		sh.DecomposedParts = plan.Decomposition.Parts
+func vectorShape(v vectorShapeInput) metrics.SearchShape {
+	ops, conds := filterShape(v.FilterMeta, v.Filter, 0)
+	sh := metrics.SearchShape{Mode: v.Mode, Collection: v.Collection, Algorithm: v.Ran, Auto: v.Requested == AlgorithmAuto,
+		FilterOps: ops, Conditions: conds, Results: v.Results, LimitCapped: v.Limit.LimitCapped}
+	if v.Plan != nil && v.Plan.Decomposition != nil {
+		sh.DecomposedParts = v.Plan.Decomposition.Parts
 	}
 	return sh
 }

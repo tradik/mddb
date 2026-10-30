@@ -117,7 +117,17 @@ func (p *RetrievalProfileDef) Validate() error {
 	if p == nil {
 		return nil
 	}
+	for _, check := range []func() error{p.validateChoices, p.validateTopK, p.validateTuning} {
+		if err := check(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
+// validateChoices rejects an unknown search type, retrieval mode or hybrid
+// strategy.
+func (p *RetrievalProfileDef) validateChoices() error {
 	switch p.DefaultSearchType {
 	case "", SearchTypeFTS, SearchTypeVector, SearchTypeHybrid:
 	default:
@@ -135,7 +145,12 @@ func (p *RetrievalProfileDef) Validate() error {
 	default:
 		return fmt.Errorf("invalid retrieval.hybridStrategy %q: must be alpha or rrf", p.HybridStrategy)
 	}
+	return nil
+}
 
+// validateTopK rejects a topK or maxTopK out of range, or a topK above the
+// collection's own cap.
+func (p *RetrievalProfileDef) validateTopK() error {
 	if p.TopK < 0 || p.TopK > maxProfileTopK {
 		return fmt.Errorf("invalid retrieval.topK %d: must be between 0 (unset) and %d", p.TopK, maxProfileTopK)
 	}
@@ -145,6 +160,13 @@ func (p *RetrievalProfileDef) Validate() error {
 	if p.MaxTopK > 0 && p.TopK > p.MaxTopK {
 		return fmt.Errorf("invalid retrieval.topK %d: above the collection's maxTopK %d", p.TopK, p.MaxTopK)
 	}
+	return nil
+}
+
+// validateTuning rejects a ranking or answer setting out of range: hybrid
+// alpha, oversampling, algorithm, grouping, summaries, format, BM25 and the
+// context token budget.
+func (p *RetrievalProfileDef) validateTuning() error {
 	if p.HybridAlphaSet && (p.HybridAlpha < 0 || p.HybridAlpha > 1) {
 		return errors.New("invalid retrieval.hybridAlpha: must be between 0.0 and 1.0")
 	}
