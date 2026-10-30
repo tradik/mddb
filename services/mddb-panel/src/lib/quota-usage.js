@@ -24,6 +24,13 @@ export function formatAmount(n, bytes = false) {
   return n.toLocaleString('en-US');
 }
 
+/** The state of a share: at or over the limit, near it, or fine. */
+function usageLevel(percent) {
+  if (percent >= 100) return 'over';
+  if (percent >= NEAR_LIMIT) return 'near';
+  return 'ok';
+}
+
 /**
  * One row per limit the quota sets: what is used, the limit, the share in
  * percent (above 100 when a limit was lowered below what the collection
@@ -36,7 +43,7 @@ export function usageRows(quota, usage) {
     const used = usage[f.used] || 0;
     const limit = quota[f.limit];
     const percent = Math.round((used / limit) * 100);
-    const level = percent >= 100 ? 'over' : percent >= NEAR_LIMIT ? 'near' : 'ok';
+    const level = usageLevel(percent);
     return {
       key: f.limit,
       label: f.label,

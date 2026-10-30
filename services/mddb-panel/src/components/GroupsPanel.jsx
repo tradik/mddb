@@ -280,6 +280,46 @@ export default function GroupsPanel() {
 }
 
 // Create Group Modal Component
+
+/**
+ * The members of a group as checkboxes: a native <fieldset> whose <legend>
+ * ("Members (n)") names the group for assistive technology.
+ */
+function MemberPicker({ users, selected, onToggle }) {
+  return (
+    <fieldset className="m-0 min-w-0 border-0 p-0">
+      <legend className="block text-sm font-medium text-gray-700 mb-2">
+        Members ({selected.length})
+      </legend>
+      <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
+        {users.length === 0 ? (
+          <div className="text-sm text-gray-500 p-3">No users available</div>
+        ) : (
+          users.map((user) => (
+            <label
+              key={user.username}
+              className="flex items-center p-2 hover:bg-gray-50 cursor-pointer"
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(user.username)}
+                onChange={() => onToggle(user.username)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <span className="ml-2 text-sm text-gray-700">{user.username}</span>
+              {user.admin && (
+                <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                  Admin
+                </span>
+              )}
+            </label>
+          ))
+        )}
+      </div>
+    </fieldset>
+  );
+}
+
 function CreateGroupModal({ users, onClose, onSuccess }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -353,36 +393,7 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
               />
             </div>
 
-            <div>
-              <p id="create-group-members" className="block text-sm font-medium text-gray-700 mb-2">
-                Members ({selectedMembers.length})
-              </p>
-              <div role="group" aria-labelledby="create-group-members" className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
-                {users.length === 0 ? (
-                  <div className="text-sm text-gray-500 p-3">No users available</div>
-                ) : (
-                  users.map((user) => (
-                    <label
-                      key={user.username}
-                      className="flex items-center p-2 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMembers.includes(user.username)}
-                        onChange={() => toggleMember(user.username)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{user.username}</span>
-                      {user.admin && (
-                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                          Admin
-                        </span>
-                      )}
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
+            <MemberPicker users={users} selected={selectedMembers} onToggle={toggleMember} />
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">
@@ -471,36 +482,7 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
               />
             </div>
 
-            <div>
-              <p id="edit-group-members" className="block text-sm font-medium text-gray-700 mb-2">
-                Members ({selectedMembers.length})
-              </p>
-              <div role="group" aria-labelledby="edit-group-members" className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
-                {users.length === 0 ? (
-                  <div className="text-sm text-gray-500 p-3">No users available</div>
-                ) : (
-                  users.map((user) => (
-                    <label
-                      key={user.username}
-                      className="flex items-center p-2 hover:bg-gray-50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedMembers.includes(user.username)}
-                        onChange={() => toggleMember(user.username)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{user.username}</span>
-                      {user.admin && (
-                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                          Admin
-                        </span>
-                      )}
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
+            <MemberPicker users={users} selected={selectedMembers} onToggle={toggleMember} />
 
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded text-sm">

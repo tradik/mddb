@@ -93,8 +93,8 @@ save() {
 
 # opaque <w> <h> <mark px> <out>: the mark centred on the tile gradient.
 opaque() {
-	local width="$1" height="$2" markPx="$3" out="$4"
-	render mddb-mark.svg "${markPx}" "${TMP}/mark.png"
+	local width="$1" height="$2" mark_px="$3" out="$4"
+	render mddb-mark.svg "${mark_px}" "${TMP}/mark.png"
 	save -size "${width}x${height}" "${BG}" "${TMP}/mark.png" -gravity center -composite \
 		-alpha off "${out}" PNG24
 }

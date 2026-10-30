@@ -53,6 +53,7 @@ describe('Header', () => {
     expect(screen.queryByRole('status')).toBeNull();
     act(() => reportLimit({ endpoint: '/fts', limit: 1000 }));
     const notice = screen.getByRole('status');
+    expect(notice.tagName).toBe('OUTPUT');
     expect(notice.textContent).toContain('The last search (/fts) was capped at 1000 results');
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('status')).toBeNull();

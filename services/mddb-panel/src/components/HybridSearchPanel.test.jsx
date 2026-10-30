@@ -4,7 +4,7 @@
 // plan, the boost editor, results and their scores, opening a result, the 503
 // message (GO-047), other failures, Cancel and the Command modal.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, act, waitFor, within } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({
   default: {
@@ -383,8 +383,8 @@ describe('HybridSearchPanel', () => {
     await renderLoaded();
     fireEvent.click(searchButton());
     await screen.findByText('1 result found');
-    await act(async () => fireEvent.click(screen.getByText('k').closest('button')));
-    expect(useStore.getState().currentDocument).toMatchObject({ key: 'k', contentMd: 'Error loading content: gone' });
+    fireEvent.click(screen.getByText('k').closest('button'));
+    await waitFor(() => expect(useStore.getState().currentDocument).toMatchObject({ key: 'k', contentMd: 'Error loading content: gone' }));
   });
 
   test('a result with no document opens nothing', async () => {

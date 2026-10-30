@@ -110,14 +110,14 @@ func assertSameIndex(t *testing.T, step string, got, want *FTSIndex) {
 	for _, q := range []string{"alpha", "running", "zenith aurora", "parse_config", "koty", "river stone"} {
 		gs, err1 := got.SearchBM25("c", q, 0, DefaultBM25)
 		ws, err2 := want.SearchBM25("c", q, 0, DefaultBM25)
-		assertSameRanking(t, step, "BM25", q, gs, ws, err1, err2)
+		assertSameRanking(t, step, "BM25", q, rankedPair{gs, ws, err1, err2})
 		tokens := got.TokenizeQuery("c", q)
 		gs, err1 = got.SearchBM25F("c", tokens, 0, weights, DefaultBM25)
 		ws, err2 = want.SearchBM25F("c", tokens, 0, weights, DefaultBM25)
-		assertSameRanking(t, step, "BM25F", q, gs, ws, err1, err2)
+		assertSameRanking(t, step, "BM25F", q, rankedPair{gs, ws, err1, err2})
 		gs, err1 = got.SearchPhrase("c", q, 0)
 		ws, err2 = want.SearchPhrase("c", q, 0)
-		assertSameRanking(t, step, "phrase", q, gs, ws, err1, err2)
+		assertSameRanking(t, step, "phrase", q, rankedPair{gs, ws, err1, err2})
 	}
 }
 
@@ -139,11 +139,18 @@ func bucketDiff(g, w map[string]string) []string {
 	return diff
 }
 
+// rankedPair is one search run on the incremental index (got) and on the
+// rebuilt one (want), with the error each returned.
+type rankedPair struct {
+	got, want       []FTSResult
+	gotErr, wantErr error
+}
+
 // assertSameRanking fails unless both searches succeeded and ranked alike.
-func assertSameRanking(t *testing.T, step, scorer, q string, gs, ws []FTSResult, err1, err2 error) {
+func assertSameRanking(t *testing.T, step, scorer, q string, p rankedPair) {
 	t.Helper()
-	if err1 != nil || err2 != nil || !sameResults(gs, ws) {
-		t.Fatalf("after %s %s %q: incremental %v, rebuild %v", step, scorer, q, gs, ws)
+	if p.gotErr != nil || p.wantErr != nil || !sameResults(p.got, p.want) {
+		t.Fatalf("after %s %s %q: incremental %v, rebuild %v", step, scorer, q, p.got, p.want)
 	}
 }
 

@@ -110,7 +110,8 @@ export default function VectorSearchPanel() {
         retrying = true;
         retryRef.current = setTimeout(() => {
           retryRef.current = null;
-          handleSearch(retryCount + 1);
+          // A retry runs outside this call: its own failure still shows.
+          handleSearch(retryCount + 1).catch((retryError) => setVectorError(retryError.message));
         }, 2000);
         return;
       }

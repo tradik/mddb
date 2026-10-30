@@ -179,7 +179,7 @@ describe('GroupsPanel create group', () => {
     // Every field is named by its label (htmlFor/id), for screen readers.
     fireEvent.change(within(dialog).getByLabelText('Group Name'), { target: { value: 'writers' } });
     fireEvent.change(within(dialog).getByLabelText('Description'), { target: { value: 'Blog writers' } });
-    expect(within(dialog).getByRole('group', { name: 'Members (0)' })).toBeTruthy();
+    expect(within(dialog).getByRole('group', { name: 'Members (0)' }).tagName).toBe('FIELDSET');
     toggle(dialog, 'alice');
     toggle(dialog, 'carol');
     toggle(dialog, 'alice');

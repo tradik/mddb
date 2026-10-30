@@ -69,7 +69,10 @@ export default function CorpusPacksCard() {
     load();
   }, []);
 
+  const fail = (err) => setError(err.message);
+
   // Runs one admin action, then reloads the packs and the collection list.
+  // It rejects on failure; every caller ends it with .catch(fail).
   const run = async (name, action) => {
     setBusy(name);
     setError(null);
@@ -78,8 +81,6 @@ export default function CorpusPacksCard() {
       setMessage(await action());
       await load();
       setStats(await mddbClient.getStats());
-    } catch (err) {
-      setError(err.message);
     } finally {
       setBusy(null);
     }
@@ -91,14 +92,14 @@ export default function CorpusPacksCard() {
     fileInput.current.value = '';
     const warnings = res.warnings?.length ? ` ${res.warnings.join(' ')}` : '';
     return `Installed ${res.name} (${res.docCount} documents), read-only.${warnings}`;
-  });
+  }).catch(fail);
 
   const remove = (name) => {
     if (!confirm(`Remove the pack "${name}" and its collection? Its documents are deleted from this server.`)) return;
     run('remove', async () => {
       const res = await mddbClient.removeCorpus(name);
       return `Removed ${name} (${res.deleted} documents deleted).`;
-    });
+    }).catch(fail);
   };
 
   const buildPack = async (e) => {
@@ -109,7 +110,7 @@ export default function CorpusPacksCard() {
     try {
       saveBlob(await mddbClient.buildCorpus(build), `${build.collection}.mddbpack`);
     } catch (err) {
-      setError(err.message);
+      fail(err);
     } finally {
       setBusy(null);
     }
@@ -130,7 +131,7 @@ export default function CorpusPacksCard() {
       </p>
 
       {error && <p role="alert" className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
-      {message && <p role="status" className="mb-3 rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</p>}
+      {message && <output className="mb-3 block rounded border border-green-200 bg-green-50 p-2 text-sm text-green-800">{message}</output>}
 
       {packs.length === 0 ? (
         <p className="text-sm text-gray-600">No packs installed.</p>

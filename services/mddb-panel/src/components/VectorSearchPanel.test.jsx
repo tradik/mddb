@@ -4,7 +4,7 @@
 // plan, opening a result, the 503 handling (a loading index retried three
 // times every 2s, a training one not), Cancel, Reindex and the Command modal.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, act, waitFor, within } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({
   default: {
@@ -209,7 +209,8 @@ describe('VectorSearchPanel', () => {
       unavailable({ error: 'ivf index is training; flat or hnsw answer now', training: true }),
     );
     renderPanel();
-    await act(async () => fireEvent.click(searchButton()));
+    fireEvent.click(searchButton());
+    await act(async () => {});
     const message = screen.getByText('ivf index is training; flat or hnsw answer now');
     expect(message.className).toContain('text-amber-800');
     await act(async () => vi.advanceTimersByTimeAsync(10000));
@@ -221,7 +222,8 @@ describe('VectorSearchPanel', () => {
     vi.useFakeTimers();
     vi.mocked(mddbClient.vectorSearch).mockRejectedValue(unavailable({ error: 'vector index loading' }));
     renderPanel();
-    await act(async () => fireEvent.click(searchButton()));
+    fireEvent.click(searchButton());
+    await act(async () => {});
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       const status = screen.getByText(`Vector index is loading... retrying (${attempt}/3)`);
@@ -247,7 +249,8 @@ describe('VectorSearchPanel', () => {
       Object.assign(new Error('API Error (503)'), { status: 503 }),
     );
     renderPanel();
-    await act(async () => fireEvent.click(searchButton()));
+    fireEvent.click(searchButton());
+    await act(async () => {});
     await act(async () => vi.advanceTimersByTimeAsync(6000));
     expect(mddbClient.vectorSearch).toHaveBeenCalledTimes(4);
     expect(screen.getByText('The vector index is still loading. Please retry in a moment.')).toBeTruthy();
@@ -259,7 +262,8 @@ describe('VectorSearchPanel', () => {
       .mockRejectedValueOnce(unavailable({ error: 'loading' }))
       .mockResolvedValueOnce({ results: [results[0]] });
     renderPanel();
-    await act(async () => fireEvent.click(searchButton()));
+    fireEvent.click(searchButton());
+    await act(async () => {});
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
     await act(async () => vi.advanceTimersByTimeAsync(2000));
     expect(screen.getByText('1 result found')).toBeTruthy();
@@ -268,11 +272,28 @@ describe('VectorSearchPanel', () => {
     expect(searchButton()).toBeTruthy();
   });
 
+  test('a retry that fails outside the search shows that failure', async () => {
+    vi.useFakeTimers();
+    // A null rejection breaks the error handling itself (null.name), so the
+    // retry's promise rejects; the panel shows that instead of dropping it.
+    vi.mocked(mddbClient.vectorSearch)
+      .mockRejectedValueOnce(unavailable({ error: 'loading' }))
+      .mockRejectedValueOnce(null);
+    renderPanel();
+    fireEvent.click(searchButton());
+    await act(async () => {});
+    await act(async () => vi.advanceTimersByTimeAsync(2000));
+    expect(mddbClient.vectorSearch).toHaveBeenCalledTimes(2);
+    expect(useStore.getState().vectorError).toMatch(/null/);
+    expect(useStore.getState().vectorLoading).toBe(false);
+  });
+
   test('Cancel while a retry waits stops it', async () => {
     vi.useFakeTimers();
     vi.mocked(mddbClient.vectorSearch).mockRejectedValue(unavailable({ error: 'loading' }));
     renderPanel();
-    await act(async () => fireEvent.click(searchButton()));
+    fireEvent.click(searchButton());
+    await act(async () => {});
     expect(screen.getByText('Vector index is loading... retrying (1/3)')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByText(/retrying/)).toBeNull();
@@ -352,10 +373,10 @@ describe('VectorSearchPanel', () => {
     renderPanel();
     fireEvent.click(searchButton());
     await screen.findByText('1 result found');
-    await act(async () => fireEvent.click(screen.getByText('k').closest('button')));
-    expect(useStore.getState().currentDocument).toMatchObject({
+    fireEvent.click(screen.getByText('k').closest('button'));
+    await waitFor(() => expect(useStore.getState().currentDocument).toMatchObject({
       key: 'k', collection: 'docs', contentMd: 'Error loading content: gone',
-    });
+    }));
   });
 
   test('a result with no document opens nothing', async () => {

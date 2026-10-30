@@ -4,7 +4,7 @@
 // real planningOptions), results with per-collection plans, opening a result,
 // failures incl. the 503 message (GO-047), and Cancel.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, act, waitFor } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -280,10 +280,10 @@ describe('CrossSearchPanel', () => {
     fireEvent.change(queryBox(), { target: { value: 'q' } });
     fireEvent.click(searchButton());
     await screen.findByText('1 result found');
-    await act(async () => fireEvent.click(screen.getByText('k').closest('button')));
-    expect(useStore.getState().currentDocument).toMatchObject({
+    fireEvent.click(screen.getByText('k').closest('button'));
+    await waitFor(() => expect(useStore.getState().currentDocument).toMatchObject({
       key: 'k', collection: 'docs', contentMd: 'Error loading content: gone',
-    });
+    }));
   });
 
   test('a result with no document opens nothing', async () => {

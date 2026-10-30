@@ -3,7 +3,7 @@
 // 2.18.9/2.18.10 settings, with a quota only when it changed.
 import { describe, test, expect } from 'vitest';
 import {
-  EDITED_RETRIEVAL_KEYS, QUOTA_FIELDS, preservedConfig, advancedFromConfig, buildQuota, applyAdvanced,
+  EDITED_RETRIEVAL_KEYS, QUOTA_FIELDS, omit, preservedConfig, advancedFromConfig, buildQuota, applyAdvanced,
 } from './collection-config.js';
 
 const emptyQuota = { maxDocuments: '', maxBytes: '', maxVectors: '', embeddingCallsPerDay: '', embeddingTokensPerDay: '' };
@@ -22,6 +22,18 @@ describe('constants', () => {
 
   test('the dialog edits the 2.18.10 retrieval keys', () => {
     expect(EDITED_RETRIEVAL_KEYS).toEqual(expect.arrayContaining(['vectorAlgorithm', 'summaryMode', 'summaryWeight', 'maxTopK']));
+  });
+});
+
+describe('omit', () => {
+  test('copies without the named keys and leaves the source as it is', () => {
+    const source = { a: 1, b: 2, c: 3 };
+    expect(omit(source, ['b', 'missing'])).toEqual({ a: 1, c: 3 });
+    expect(source).toEqual({ a: 1, b: 2, c: 3 });
+  });
+
+  test('an undefined source gives an empty object', () => {
+    expect(omit(undefined, ['a'])).toEqual({});
   });
 });
 

@@ -25,13 +25,20 @@ export const QUOTA_FIELDS = [
   { key: 'embeddingTokensPerDay', label: 'Embedding tokens / day' },
 ];
 
+/** Fields of a stored config the server owns or never takes back. */
+const SERVER_OWNED_KEYS = ['readOnly', 'corpus', 'evalSet', 'quota'];
+
+/** A shallow copy of `obj` without `keys`; `obj` itself is left as it is. */
+export function omit(obj, keys) {
+  const copy = { ...obj };
+  for (const key of keys) delete copy[key];
+  return copy;
+}
+
 /** The stored config minus what the server owns or never takes back. */
 export function preservedConfig(cfg = {}) {
-  const { readOnly: _readOnly, corpus: _corpus, evalSet: _evalSet, quota: _quota, ...rest } = cfg;
-  if (rest.storageConfig) {
-    const { secretKeySet: _set, ...storage } = rest.storageConfig;
-    rest.storageConfig = storage;
-  }
+  const rest = omit(cfg, SERVER_OWNED_KEYS);
+  if (rest.storageConfig) rest.storageConfig = omit(rest.storageConfig, ['secretKeySet']);
   if (rest.retrieval) {
     rest.retrieval = Object.fromEntries(
       Object.entries(rest.retrieval).filter(([key]) => !EDITED_RETRIEVAL_KEYS.includes(key)),
@@ -77,7 +84,7 @@ function sameQuota(a, b) {
  * every limit sends {} to remove it.
  */
 export function applyAdvanced(payload, advanced, stored = {}) {
-  const retrieval = { ...(payload.retrieval || {}) };
+  const retrieval = { ...payload.retrieval };
   if (advanced.vectorAlgorithm) retrieval.vectorAlgorithm = advanced.vectorAlgorithm;
   if (advanced.summaryMode) retrieval.summaryMode = advanced.summaryMode;
   if (advanced.summaryWeight !== '' && Number(advanced.summaryWeight) > 0) {
@@ -88,7 +95,7 @@ export function applyAdvanced(payload, advanced, stored = {}) {
   else delete payload.retrieval;
 
   const keys = advanced.excludeMetaKeys.split(',').map((k) => k.trim()).filter(Boolean);
-  const fts = { ...(payload.fts || {}) };
+  const fts = { ...payload.fts };
   if (keys.length) fts.excludeMetaKeys = keys;
   else delete fts.excludeMetaKeys;
   if (Object.keys(fts).length > 0) payload.fts = fts;

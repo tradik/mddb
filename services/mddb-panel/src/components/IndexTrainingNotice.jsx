@@ -9,20 +9,22 @@ export default function IndexTrainingNotice({ training }) {
   if (!training?.pending?.length) return null;
   const indexes = (training.indexes || []).join(', ') || 'trainable indexes';
   return (
-    <div role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4">
-      <div className="flex items-start gap-2">
+    // <output> is a polite live region (role "status"); it holds phrasing
+    // content only, so the layout uses block spans.
+    <output className="block rounded-lg border border-amber-300 bg-amber-50 p-4">
+      <span className="flex items-start gap-2">
         <Hourglass className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-        <div className="text-sm text-amber-900">
-          <p className="font-medium">
+        <span className="block text-sm text-amber-900">
+          <span className="block font-medium">
             Training {indexes} for {training.pending.length} collection{training.pending.length === 1 ? '' : 's'}
             {training.current ? ` (now: ${training.current})` : ''}
-          </p>
-          <p className="mt-0.5">
+          </span>
+          <span className="mt-0.5 block">
             Flat, HNSW, BQ and Auto answer now. A search naming {indexes} on {training.pending.join(', ')} is
             refused with 503 until its training finishes.
-          </p>
-        </div>
-      </div>
-    </div>
+          </span>
+        </span>
+      </span>
+    </output>
   );
 }

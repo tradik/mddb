@@ -103,45 +103,61 @@ export function buildSync(s) {
   return out;
 }
 
+/** A webhook's headers: the JSON typed in, {} when it does not parse. */
+function parseHeaders(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+/** The fields of a webhook rule. */
+function webhookFields(form) {
+  const out = { url: form.url, method: form.method };
+  if (form.headers.trim()) out.headers = parseHeaders(form.headers);
+  return out;
+}
+
+/** The fields of a trigger rule; the sentiment bounds only when enabled. */
+function triggerFields(form) {
+  const out = {
+    collection: form.collection,
+    searchType: form.searchType,
+    query: form.query,
+    threshold: form.threshold,
+    events: form.events?.length > 0 ? form.events : ['insert', 'update'],
+  };
+  if (form.webhookId) out.webhookId = form.webhookId;
+  out.sentimentEnabled = form.sentimentEnabled;
+  if (form.sentimentEnabled) {
+    out.sentimentMin = form.sentimentMin;
+    out.sentimentMax = form.sentimentMax;
+  }
+  if (form.query && form.sentimentEnabled) out.conditionLogic = form.conditionLogic;
+  return out;
+}
+
+/** The fields of a cron rule: its schedule and one action. */
+function cronFields(form) {
+  const out = { schedule: form.schedule };
+  if (form.cronAction === 'backup') out.backup = buildBackup(form.backup);
+  else if (form.cronAction === 'sync') out.sync = buildSync(form.sync);
+  else if (form.webhookId) out.webhookId = form.webhookId;
+  return out;
+}
+
+const TYPE_FIELDS = { webhook: webhookFields, trigger: triggerFields, cron: cronFields };
+
 /** The REST payload of a rule from the form state. */
 export function buildPayload(form) {
-  const payload = {
+  const fields = TYPE_FIELDS[form.type];
+  return {
     type: form.type,
     name: form.name,
     enabled: form.enabled,
+    ...(fields ? fields(form) : {}),
   };
-  if (form.type === 'webhook') {
-    payload.url = form.url;
-    payload.method = form.method;
-    if (form.headers.trim()) {
-      try {
-        payload.headers = JSON.parse(form.headers);
-      } catch {
-        payload.headers = {};
-      }
-    }
-  } else if (form.type === 'trigger') {
-    payload.collection = form.collection;
-    payload.searchType = form.searchType;
-    payload.query = form.query;
-    payload.threshold = form.threshold;
-    payload.events = form.events && form.events.length > 0 ? form.events : ['insert', 'update'];
-    if (form.webhookId) payload.webhookId = form.webhookId;
-    payload.sentimentEnabled = form.sentimentEnabled;
-    if (form.sentimentEnabled) {
-      payload.sentimentMin = form.sentimentMin;
-      payload.sentimentMax = form.sentimentMax;
-    }
-    if (form.query && form.sentimentEnabled) {
-      payload.conditionLogic = form.conditionLogic;
-    }
-  } else if (form.type === 'cron') {
-    payload.schedule = form.schedule;
-    if (form.cronAction === 'backup') payload.backup = buildBackup(form.backup);
-    else if (form.cronAction === 'sync') payload.sync = buildSync(form.sync);
-    else if (form.webhookId) payload.webhookId = form.webhookId;
-  }
-  return payload;
 }
 
 /** The form state of a stored S3 block (its secret is never returned). */
@@ -149,10 +165,45 @@ function storageToForm(sc) {
   return { ...EMPTY_STORAGE, ...sc, secretKey: '', useTLS: sc?.useTLS ?? false };
 }
 
+/** The form state of a stored backup block. */
+function backupToForm(b) {
+  return {
+    target: b.target || 'local',
+    path: b.path || '',
+    bucket: b.bucket || '',
+    prefix: b.prefix || '',
+    keep: b.keep ? String(b.keep) : '',
+    collections: (b.collections || ['*']).join(', '),
+    storageConfig: storageToForm(b.storageConfig),
+  };
+}
+
+/** The form state of a stored sync block. */
+function syncToForm(s) {
+  return {
+    source: s.source,
+    collection: s.collection,
+    lang: s.lang,
+    url: s.url || '',
+    urls: (s.urls || []).join('\n'),
+    bucket: s.bucket || '',
+    prefix: s.prefix || '',
+    prune: s.prune === true,
+    maxDocuments: s.maxDocuments ? String(s.maxDocuments) : '',
+    maxMiB: s.maxBytes ? String(Math.round(s.maxBytes / MIB)) : '',
+    storageConfig: storageToForm(s.storageConfig),
+  };
+}
+
+/** What a stored cron rule runs: a sync, a backup or a webhook. */
+function cronActionOf(rule) {
+  if (rule.sync) return 'sync';
+  if (rule.backup) return 'backup';
+  return 'webhook';
+}
+
 /** The form state of a stored rule. */
 export function ruleToForm(rule) {
-  const b = rule.backup;
-  const s = rule.sync;
   return {
     type: rule.type || 'webhook',
     name: rule.name || '',
@@ -171,47 +222,31 @@ export function ruleToForm(rule) {
     sentimentMax: rule.sentimentMax ?? 1.0,
     conditionLogic: rule.conditionLogic || 'and',
     schedule: rule.schedule || '',
-    cronAction: s ? 'sync' : b ? 'backup' : 'webhook',
-    backup: b
-      ? {
-        target: b.target || 'local',
-        path: b.path || '',
-        bucket: b.bucket || '',
-        prefix: b.prefix || '',
-        keep: b.keep ? String(b.keep) : '',
-        collections: (b.collections || ['*']).join(', '),
-        storageConfig: storageToForm(b.storageConfig),
-      }
-      : EMPTY_BACKUP,
-    sync: s
-      ? {
-        source: s.source,
-        collection: s.collection,
-        lang: s.lang,
-        url: s.url || '',
-        urls: (s.urls || []).join('\n'),
-        bucket: s.bucket || '',
-        prefix: s.prefix || '',
-        prune: s.prune === true,
-        maxDocuments: s.maxDocuments ? String(s.maxDocuments) : '',
-        maxMiB: s.maxBytes ? String(Math.round(s.maxBytes / MIB)) : '',
-        storageConfig: storageToForm(s.storageConfig),
-      }
-      : EMPTY_SYNC,
+    cronAction: cronActionOf(rule),
+    backup: rule.backup ? backupToForm(rule.backup) : EMPTY_BACKUP,
+    sync: rule.sync ? syncToForm(rule.sync) : EMPTY_SYNC,
   };
+}
+
+/** Where a sync reads from: a URL count, an S3 location or the sitemap URL. */
+function syncSourceText(s) {
+  if (s.source === 'urls') return `${(s.urls || []).length} URLs`;
+  if (s.source === 's3') return `s3://${s.bucket}/${s.prefix || ''}`;
+  return s.url;
 }
 
 /** One line saying what a cron rule does, for the rules table. */
 export function describeCronAction(rule) {
   if (rule.sync) {
     const s = rule.sync;
-    const from = s.source === 'urls' ? `${(s.urls || []).length} URLs` : s.source === 's3' ? `s3://${s.bucket}/${s.prefix || ''}` : s.url;
-    return `sync ${s.source} ${from} → ${s.collection}${s.prune ? ' (prune)' : ''}`;
+    const prune = s.prune ? ' (prune)' : '';
+    return `sync ${s.source} ${syncSourceText(s)} → ${s.collection}${prune}`;
   }
   if (rule.backup) {
     const b = rule.backup;
     const where = b.target === 's3' ? `s3://${b.bucket || b.storageConfig?.bucket || ''}` : b.path || 'MDDB_BACKUP_DIR';
-    return `backup → ${where}${b.keep ? `, keep ${b.keep}` : ''}`;
+    const keep = b.keep ? ', keep ' + b.keep : '';
+    return `backup → ${where}${keep}`;
   }
   return rule.webhookId ? `webhook ${rule.webhookId}` : '';
 }

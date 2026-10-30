@@ -2,8 +2,10 @@ import { usageRows } from '../lib/quota-usage';
 
 // What a collection uses of its quota (GO-043), in the collection settings
 // dialog: one bar per limit, e.g. "1,234 / 5,000 documents". Each bar is a
-// progressbar whose aria-valuetext repeats the visible text, so a screen
-// reader hears the numbers, not only a percentage.
+// native <progress> (role progressbar) whose aria-valuetext repeats the
+// visible text, so a screen reader hears the numbers, not only a percentage.
+// The track is styled through ::-webkit-progress-bar and the element itself
+// (Firefox); the fill through ::-webkit-progress-value / ::-moz-progress-bar.
 //
 // Colours (WCAG 2.2, 1.4.11 non-text contrast >= 3:1 against the gray-200
 // track, 1.4.3 text >= 4.5:1 on white): primary-700 4.8:1, amber-700 4.1:1,
@@ -11,10 +13,13 @@ import { usageRows } from '../lib/quota-usage';
 // (6.5:1) on white. The state is also said in words, never by colour alone.
 
 const FILL = {
-  ok: 'bg-primary-700',
-  near: 'bg-amber-700',
-  over: 'bg-red-700',
+  ok: '[&::-webkit-progress-value]:bg-primary-700 [&::-moz-progress-bar]:bg-primary-700',
+  near: '[&::-webkit-progress-value]:bg-amber-700 [&::-moz-progress-bar]:bg-amber-700',
+  over: '[&::-webkit-progress-value]:bg-red-700 [&::-moz-progress-bar]:bg-red-700',
 };
+
+const BAR = 'block w-full h-2 appearance-none overflow-hidden rounded-full border-0 bg-gray-200'
+  + ' [&::-webkit-progress-bar]:bg-gray-200 [&::-webkit-progress-value]:rounded-full [&::-moz-progress-bar]:rounded-full';
 
 const NOTE = {
   near: 'Close to the limit.',
@@ -35,17 +40,15 @@ export default function QuotaUsage({ quota, usage }) {
               <span>{r.text}</span>
               <span>{r.percent}%</span>
             </div>
-            <div
-              role="progressbar"
+            <progress
               aria-label={r.label}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.min(r.percent, 100)}
+              max={100}
+              value={Math.min(r.percent, 100)}
               aria-valuetext={`${r.text} (${r.percent}%)`}
-              className="w-full h-2 rounded-full bg-gray-200"
+              className={`${BAR} ${FILL[r.level]}`}
             >
-              <div className={`h-2 rounded-full ${FILL[r.level]}`} style={{ width: `${Math.min(r.percent, 100)}%` }} />
-            </div>
+              {r.text} ({r.percent}%)
+            </progress>
             {NOTE[r.level] && (
               <p className={`text-xs mt-1 ${r.level === 'over' ? 'text-red-700' : 'text-amber-800'}`}>{NOTE[r.level]}</p>
             )}

@@ -8,19 +8,18 @@ export default function LimitCappedNotice() {
   const notice = useLimitNotice();
   if (!notice) return null;
 
+  // <output> is a polite live region (role "status"); it holds phrasing
+  // content only, so the layout uses block spans.
   return (
-    <div
-      role="status"
-      className="fixed bottom-4 left-4 z-50 max-w-md rounded-lg border border-amber-300 bg-amber-50 p-3 shadow-lg"
-    >
-      <div className="flex items-start gap-2">
+    <output className="fixed bottom-4 left-4 z-50 block max-w-md rounded-lg border border-amber-300 bg-amber-50 p-3 shadow-lg">
+      <span className="flex items-start gap-2">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
-        <p className="text-sm text-amber-900">
+        <span className="block text-sm text-amber-900">
           The last search ({notice.endpoint}) was capped at{' '}
           <strong>{notice.limit ?? 'the server limit'}</strong> results. Page with offset, or ask the
           operator to raise <code className="rounded bg-amber-100 px-1">MDDB_SEARCH_MAX_LIMIT</code>{' '}
           or the collection&apos;s <code className="rounded bg-amber-100 px-1">maxTopK</code>.
-        </p>
+        </span>
         <button
           type="button"
           onClick={() => reportLimit(null)}
@@ -29,7 +28,7 @@ export default function LimitCappedNotice() {
         >
           <X className="h-4 w-4" />
         </button>
-      </div>
-    </div>
+      </span>
+    </output>
   );
 }

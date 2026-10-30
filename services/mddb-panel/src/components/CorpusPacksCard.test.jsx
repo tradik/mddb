@@ -111,6 +111,16 @@ describe('CorpusPacksCard', () => {
     expect(mddbClient.removeCorpus).toHaveBeenCalledWith('kb');
   });
 
+  test('a failed removal is shown and the button is usable again', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.mocked(mddbClient.removeCorpus).mockRejectedValue(new Error('API Error (403): admin on "*" required'));
+    render(<CorpusPacksCard />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove pack kb' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('API Error (403): admin on "*" required');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove pack kb' }).disabled).toBe(false);
+  });
+
   test('a declined confirm removes nothing', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<CorpusPacksCard />);

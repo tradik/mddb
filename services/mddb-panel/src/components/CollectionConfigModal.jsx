@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Settings2, Plus, Trash2 } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
-import { advancedFromConfig, applyAdvanced, preservedConfig } from '../lib/collection-config';
+import { advancedFromConfig, applyAdvanced, omit, preservedConfig } from '../lib/collection-config';
 import CollectionAdvancedSettings from './CollectionAdvancedSettings';
 import QuotaUsage from './QuotaUsage';
 import ReadOnlyNotice from './ReadOnlyNotice';
@@ -160,8 +160,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
       applyAdvanced(payload, advanced, stored);
       payload.responsePrompt = responsePrompt.trim() || undefined;
       if (storageBackend === 's3') {
-        const { secretKeySet: _set, ...s3 } = storageConfig;
-        payload.storageConfig = s3;
+        payload.storageConfig = omit(storageConfig, ['secretKeySet']);
       } else {
         delete payload.storageConfig;
       }

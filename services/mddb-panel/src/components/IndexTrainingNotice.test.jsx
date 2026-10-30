@@ -24,6 +24,8 @@ describe('IndexTrainingNotice', () => {
       <IndexTrainingNotice training={{ current: 'blog', pending: ['blog', 'docs'], indexes: ['ivf', 'pq'] }} />,
     );
     const status = screen.getByRole('status');
+    // A native <output>: a polite live region without an explicit role.
+    expect(status.tagName).toBe('OUTPUT');
     expect(status.querySelector('.font-medium').textContent).toBe('Training ivf, pq for 2 collections (now: blog)');
     expect(status.textContent).toContain('A search naming ivf, pq on blog, docs is refused with 503');
   });

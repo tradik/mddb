@@ -111,7 +111,7 @@ function SyncFields({ value, onChange, collections }) {
       )}
       {value.source === 'urls' && (
         <label className={`${labelClass} md:col-span-2`}>
-          URLs (one per line)
+          {'URLs (one per line)'}
           <textarea rows={3} value={value.urls} onChange={(e) => set('urls')(e.target.value)} className={`${field} font-mono`} />
         </label>
       )}

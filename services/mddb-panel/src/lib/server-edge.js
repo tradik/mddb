@@ -6,16 +6,30 @@
 
 const NOT_REPORTED = 'Not reported by this server';
 
+/** `describe(section)` for a reported section, NOT_REPORTED for a missing one. */
+function reported(section, describe) {
+  return section ? describe(section) : NOT_REPORTED;
+}
+
+/** "On<detail>" when a switch is on, "Off" otherwise. */
+function onOff(enabled, detail = '') {
+  return enabled ? `On${detail}` : 'Off';
+}
+
+/** The trusted proxy count, or what an empty list means. */
+function proxyText(proxies) {
+  return proxies ? `${proxies} configured` : 'None: forwarding headers are ignored';
+}
+
 /** The rows the card shows, in order: [label, value]. */
 export function edgeRows(config) {
-  const { esCompat, searchMaxLimit, telemetry, clientAddressing: ca } = config;
-  const proxies = ca?.trustedProxies;
+  const { esCompat, searchMaxLimit, telemetry, clientAddressing } = config;
   return [
-    ['Elasticsearch subset', esCompat ? (esCompat.enabled ? `On, under ${esCompat.prefix}` : 'Off') : NOT_REPORTED],
-    ['Search result cap', searchMaxLimit ? `${searchMaxLimit.toLocaleString('en-US')} results per search` : NOT_REPORTED],
-    ['OpenTelemetry traces', telemetry ? (telemetry.enabled ? `On, to ${telemetry.endpoint}` : 'Off') : NOT_REPORTED],
-    ['Trusted proxies', ca ? (proxies ? `${proxies} configured` : 'None: forwarding headers are ignored') : NOT_REPORTED],
-    ['Client IP header', ca ? ca.header : NOT_REPORTED],
-    ['PROXY protocol', ca ? (ca.proxyProtocol ? 'On' : 'Off') : NOT_REPORTED],
+    ['Elasticsearch subset', reported(esCompat, (es) => onOff(es.enabled, `, under ${es.prefix}`))],
+    ['Search result cap', reported(searchMaxLimit, (max) => `${max.toLocaleString('en-US')} results per search`)],
+    ['OpenTelemetry traces', reported(telemetry, (t) => onOff(t.enabled, `, to ${t.endpoint}`))],
+    ['Trusted proxies', reported(clientAddressing, (ca) => proxyText(ca.trustedProxies))],
+    ['Client IP header', reported(clientAddressing, (ca) => ca.header)],
+    ['PROXY protocol', reported(clientAddressing, (ca) => onOff(ca.proxyProtocol))],
   ];
 }

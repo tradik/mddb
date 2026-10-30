@@ -1130,7 +1130,8 @@ class MDDBClient {
     if (integrity) params.set('integrity', 'true');
     if (keepNames) params.set('keepNames', 'true');
     const query = params.toString();
-    return this.requestBlob(`/admin/diagnose${query ? `?${query}` : ''}`);
+    const suffix = query ? '?' + query : '';
+    return this.requestBlob(`/admin/diagnose${suffix}`);
   }
 
   async getRevisions({ collection, key, lang }) {
