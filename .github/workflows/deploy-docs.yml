@@ -48,6 +48,13 @@ jobs:
       - name: Test SSG templates
         run: node --test services/ssg-template/*.test.mjs
 
+      # The REST spec renders as /docs/api/reference/: a spec Redocly rejects is
+      # not published. Pull requests lint it in the Tests workflow
+      # (clients-nodejs); a spec-only change does not start Tests, so this is
+      # the check that catches it before the site does.
+      - name: Lint the OpenAPI spec (Redocly)
+        run: make openapi-lint
+
       - name: Prepare metadata
         run: echo '{"categories":[],"media":[],"users":[]}' > docs/metadata.json
 

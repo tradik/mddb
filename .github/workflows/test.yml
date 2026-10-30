@@ -41,9 +41,6 @@ on:
       - 'clients/python/**'
       - 'clients/nodejs/**'
       # The REST spec and its lint config: clients-nodejs lints it.
-      - 'docs/openapi.yaml'
-      - 'redocly.yaml'
-      - '.redocly.lint-ignore.yaml'
   pull_request:
     branches: [main, develop]
     paths:
@@ -80,9 +77,6 @@ on:
       - 'clients/python/**'
       - 'clients/nodejs/**'
       # The REST spec and its lint config: clients-nodejs lints it.
-      - 'docs/openapi.yaml'
-      - 'redocly.yaml'
-      - '.redocly.lint-ignore.yaml'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
