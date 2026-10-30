@@ -3,6 +3,8 @@ package main
 import (
 	"mddb/internal/envconf"
 	"net/http"
+	"os"
+	"strings"
 
 	json "mddb/internal/jsonx"
 )
@@ -24,6 +26,36 @@ type ConfigResponse struct {
 	AutomationsEnabled    bool            `json:"automationsEnabled"`
 	AutomationLogsEnabled bool            `json:"automationLogsEnabled"`
 	SearchStatsEnabled    bool            `json:"searchStatsEnabled"`
+	// ESCompat is the Elasticsearch-compatible search subset (MDDB_ES_COMPAT).
+	ESCompat ESCompatStatus `json:"esCompat"`
+	// SearchMaxLimit is the most results one search returns
+	// (MDDB_SEARCH_MAX_LIMIT, #368); a collection's maxTopK can only lower it.
+	SearchMaxLimit int `json:"searchMaxLimit"`
+	// Telemetry is OpenTelemetry trace export (OPS-024).
+	Telemetry TelemetryStatus `json:"telemetry"`
+	// ClientAddressing is how the client address is found behind a proxy (#366).
+	ClientAddressing ClientAddressingStatus `json:"clientAddressing"`
+}
+
+// ESCompatStatus says whether the Elasticsearch subset is served, and where.
+type ESCompatStatus struct {
+	Enabled bool   `json:"enabled"`
+	Prefix  string `json:"prefix"`
+}
+
+// TelemetryStatus says whether traces are exported, and to which collector:
+// its scheme and host only (the configuration allowlist's origin class).
+type TelemetryStatus struct {
+	Enabled  bool   `json:"enabled"`
+	Endpoint string `json:"endpoint,omitempty"`
+}
+
+// ClientAddressingStatus is the client-address settings. Trusted proxies are
+// counted: their addresses describe the operator's internal network.
+type ClientAddressingStatus struct {
+	TrustedProxies int    `json:"trustedProxies"`
+	Header         string `json:"header"`
+	ProxyProtocol  bool   `json:"proxyProtocol"`
 }
 
 // ChunkConfig holds the chunking configuration for embeddings.
@@ -133,6 +165,10 @@ func (s *Server) configResponse(aud configAudience) ConfigResponse {
 		AutomationsEnabled:    env("MDDB_AUTOMATIONS", "enable") != "disable",
 		AutomationLogsEnabled: env("MDDB_AUTOMATION_LOGS", "enable") != "disable",
 		SearchStatsEnabled:    searchStatsEnabled(),
+		ESCompat:              ESCompatStatus{Enabled: esCompatEnabled(), Prefix: esPathPrefix},
+		SearchMaxLimit:        s.searchMaxLimit(),
+		Telemetry:             telemetryStatus(aud),
+		ClientAddressing:      clientAddressingStatus(),
 	}
 
 	response.VectorConfig = s.vectorConfig()
@@ -148,4 +184,21 @@ func (s *Server) configResponse(aud configAudience) ConfigResponse {
 		ChunkSize: chunkSize,
 	}
 	return response
+}
+
+// telemetryStatus is trace export as MDDB_OTEL_ENDPOINT sets it (unset is
+// off), the endpoint rendered for aud through the configuration allowlist.
+func telemetryStatus(aud configAudience) TelemetryStatus {
+	endpoint := strings.TrimSpace(os.Getenv("MDDB_OTEL_ENDPOINT"))
+	return TelemetryStatus{Enabled: endpoint != "", Endpoint: configValue("MDDB_OTEL_ENDPOINT", endpoint, aud)}
+}
+
+// clientAddressingStatus is the client-address settings installed at startup
+// (configureClientAddressing).
+func clientAddressingStatus() ClientAddressingStatus {
+	st := ClientAddressingStatus{Header: currentClientIPHeader().name, ProxyProtocol: proxyProtocolOn.Load()}
+	if list := trustedProxies.Load(); list != nil {
+		st.TrustedProxies = len(*list)
+	}
+	return st
 }

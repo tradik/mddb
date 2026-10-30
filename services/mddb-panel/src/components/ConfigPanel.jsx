@@ -2,6 +2,29 @@ import { useEffect } from 'react';
 import { Settings, Database, Network, ToggleLeft, ToggleRight, Brain } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
+import ServerEdgeCard from './ServerEdgeCard';
+
+/** One on/off feature row. */
+function FeatureToggle({ label, enabled }) {
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className="text-sm text-gray-700">{label}</span>
+      <div className="flex items-center">
+        {enabled ? (
+          <>
+            <ToggleRight className="w-5 h-5 text-green-600" />
+            <span className="ml-2 text-xs font-medium text-green-700">Enabled</span>
+          </>
+        ) : (
+          <>
+            <ToggleLeft className="w-5 h-5 text-gray-400" />
+            <span className="ml-2 text-xs font-medium text-gray-500">Disabled</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ConfigPanel() {
   const {
@@ -30,25 +53,6 @@ export default function ConfigPanel() {
       setConfigLoading(false);
     }
   };
-
-  const FeatureToggle = ({ label, enabled }) => (
-    <div className="flex items-center justify-between py-2">
-      <span className="text-sm text-gray-700">{label}</span>
-      <div className="flex items-center">
-        {enabled ? (
-          <>
-            <ToggleRight className="w-5 h-5 text-green-600" />
-            <span className="ml-2 text-xs font-medium text-green-600">Enabled</span>
-          </>
-        ) : (
-          <>
-            <ToggleLeft className="w-5 h-5 text-gray-400" />
-            <span className="ml-2 text-xs font-medium text-gray-500">Disabled</span>
-          </>
-        )}
-      </div>
-    </div>
-  );
 
   if (configLoading) {
     return (
@@ -114,16 +118,16 @@ export default function ConfigPanel() {
           <div className="space-y-3">
             <div className="flex justify-between py-2 border-b">
               <span className="text-sm text-gray-600">HTTP Address</span>
-              <span className="text-sm font-medium text-gray-900 font-mono">{config.httpAddr}</span>
+              <span className="text-sm font-medium text-gray-900 font-mono">{config.protocols?.http?.addr}</span>
             </div>
             <div className="flex justify-between py-2 border-b">
               <span className="text-sm text-gray-600">gRPC Address</span>
-              <span className="text-sm font-medium text-gray-900 font-mono">{config.grpcAddr}</span>
+              <span className="text-sm font-medium text-gray-900 font-mono">{config.protocols?.grpc?.addr}</span>
             </div>
-            {config.http3Addr && (
+            {config.protocols?.http3?.enabled && (
               <div className="flex justify-between py-2">
                 <span className="text-sm text-gray-600">HTTP/3 Address</span>
-                <span className="text-sm font-medium text-gray-900 font-mono">{config.http3Addr}</span>
+                <span className="text-sm font-medium text-gray-900 font-mono">{config.protocols.http3.addr}</span>
               </div>
             )}
           </div>
@@ -138,10 +142,13 @@ export default function ConfigPanel() {
           <div className="space-y-1 divide-y">
             <FeatureToggle label="Authentication & RBAC" enabled={config.authEnabled} />
             <FeatureToggle label="Prometheus Metrics" enabled={config.metricsEnabled} />
-            <FeatureToggle label="Extreme Performance Mode" enabled={config.extremeMode} />
+            <FeatureToggle label="Search Statistics" enabled={config.searchStatsEnabled} />
             <FeatureToggle label="Vector Search" enabled={config.vectorConfig?.enabled} />
           </div>
         </div>
+
+        {/* Search surface, tracing and proxies (2.18.10) */}
+        <ServerEdgeCard config={config} />
 
         {/* Vector Configuration */}
         {config.vectorConfig && config.vectorConfig.enabled && (

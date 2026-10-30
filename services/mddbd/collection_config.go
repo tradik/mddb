@@ -368,12 +368,17 @@ func (s *Server) handleCollectionConfigGet(w http.ResponseWriter, r *http.Reques
 	if !found {
 		cfg = &CollectionConfig{Type: "default"}
 	}
-	ok(w, map[string]interface{}{
+	resp := map[string]interface{}{
 		"collection": collection,
 		// GO-035: credentials are masked; see collection_config_secrets.go.
 		"config":     redactCollectionConfig(cfg),
 		"configured": found,
-	})
+	}
+	// GO-043: what the collection uses of its quota, next to the quota.
+	if usage := s.quotaUsageReport(collection, cfg.Quota); usage != nil {
+		resp["usage"] = usage
+	}
+	ok(w, resp)
 }
 
 func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Request) {
@@ -404,104 +409,25 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		s.Metrics.IncOp("collection_config_set", req.Collection)
 	}
 
-	// Validate storage backend
-	sb := req.StorageBackend
-	if sb != "" && sb != "boltdb" && sb != "memory" && sb != "s3" {
-		bad(w, errors.New("invalid storageBackend: must be boltdb, memory, or s3"))
-		return
-	}
-	if sb == "s3" && (req.StorageConfig == nil || req.StorageConfig.Endpoint == "" || req.StorageConfig.Bucket == "") {
-		bad(w, errors.New("s3 storageBackend requires storageConfig with endpoint and bucket"))
-		return
-	}
-
-	// Validate quantization
-	qt := req.Quantization
-	if qt != "" && qt != "float32" && qt != "int8" && qt != "int4" {
-		bad(w, errors.New("invalid quantization: must be float32, int8, or int4"))
-		return
-	}
-
-	if req.MaxRevisions < 0 {
-		bad(w, errors.New("invalid maxRevisions: must be >= 0 (0 = unlimited)"))
-		return
-	}
-
-	if req.DiskOnlyVectors && (qt == "" || qt == "float32") {
-		bad(w, errors.New("diskOnlyVectors requires quantization (int8 or int4)"))
-		return
-	}
-
-	if err := validateWordPressTarget(req.WordPress); err != nil {
-		bad(w, err)
-		return
-	}
-
-	// RAG-001: a profile is stored data, so a value that cannot mean anything
-	// is refused here rather than surfacing as a strange result months later.
-	if err := req.Retrieval.Validate(); err != nil {
-		bad(w, err)
-		return
-	}
-	if err := req.Code.Validate(); err != nil {
-		bad(w, err)
-		return
-	}
-
-	// RAG-002: this text is prepended to prompts automatically, so an
-	// unbounded value would silently eat the context the answer needs.
-	if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
-		bad(w, err)
-		return
-	}
-	if err := validateChunking(req.Embedding); err != nil {
+	if err := req.validate(); err != nil {
 		bad(w, err)
 		return
 	}
 	// GO-043: a quota is a limit on the caller, so only a global admin may
 	// change one.
 	if err := s.checkQuotaChange(r.Context(), req.Collection, req.Quota); err != nil {
-		if errors.Is(err, errQuotaAdminOnly) {
-			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
-			return
-		}
-		bad(w, err)
+		writeQuotaChangeError(w, err)
 		return
 	}
 
-	cfg := &CollectionConfig{
-		Type:            req.Type,
-		Description:     req.Description,
-		Icon:            req.Icon,
-		Color:           req.Color,
-		CustomMeta:      req.CustomMeta,
-		StorageBackend:  sb,
-		StorageConfig:   req.StorageConfig,
-		Quantization:    qt,
-		DiskOnlyVectors: req.DiskOnlyVectors,
-		MaxRevisions:    req.MaxRevisions,
-		Encrypted:       req.Encrypted,
-		WordPress:       req.WordPress,
-		Retrieval:       req.Retrieval,
-		TrackAccess:     req.TrackAccess,
-		TrackHot:        req.TrackHot,
-		SpellCorrect:    req.SpellCorrect,
-		SpellLang:       req.SpellLang,
-		ResponsePrompt:  req.ResponsePrompt,
-		Code:            req.Code,
-		Embedding:       req.Embedding,
-		FTS:             req.FTS,
-		Quota:           req.Quota,
-	}
+	cfg := req.config()
 	// GO-035: a client that read this config back saw masked credentials, so
 	// an empty one means "unchanged", not "remove it". Runs before the backend
 	// is applied — connecting to S3 with a blanked secret would fail here for
-	// a reason that has nothing to do with the config being wrong.
-	if stored, found := s.CollectionManager.Get(req.Collection); found {
-		carryOverSecrets(cfg, stored)
-	} else {
-		carryOverSecrets(cfg, nil)
-	}
+	// a reason that has nothing to do with the config being wrong. An
+	// unconfigured collection has no stored config (nil).
+	stored, _ := s.CollectionManager.Get(req.Collection)
+	carryOverSecrets(cfg, stored)
 
 	// GO-021: create or drop the storage backend this config asks for, before
 	// storing it — a config that names a backend which cannot be reached
@@ -517,6 +443,91 @@ func (s *Server) handleCollectionConfigSet(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	ok(w, map[string]string{"status": "ok", "collection": req.Collection})
+}
+
+// writeQuotaChangeError answers a refused quota change: 403 for a caller who
+// may not change quotas, 400 for a quota that is not valid.
+func writeQuotaChangeError(w http.ResponseWriter, err error) {
+	if errors.Is(err, errQuotaAdminOnly) {
+		http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
+		return
+	}
+	bad(w, err)
+}
+
+// validate refuses a request whose values cannot mean anything. A retrieval
+// profile, a prompt or a chunking setting is stored data, so it is refused
+// here rather than surfacing as a strange result months later (RAG-001).
+func (req *SetCollectionConfigRequest) validate() error {
+	if err := req.validateStorage(); err != nil {
+		return err
+	}
+	if req.MaxRevisions < 0 {
+		return errors.New("invalid maxRevisions: must be >= 0 (0 = unlimited)")
+	}
+	if err := validateWordPressTarget(req.WordPress); err != nil {
+		return err
+	}
+	if err := req.Retrieval.Validate(); err != nil {
+		return err
+	}
+	if err := req.Code.Validate(); err != nil {
+		return err
+	}
+	// RAG-002: this text is prepended to prompts automatically, so an
+	// unbounded value would silently eat the context the answer needs.
+	if err := ValidateResponsePrompt(req.ResponsePrompt); err != nil {
+		return err
+	}
+	return validateChunking(req.Embedding)
+}
+
+// validateStorage checks the storage backend, its settings and the vector
+// quantization.
+func (req *SetCollectionConfigRequest) validateStorage() error {
+	sb := req.StorageBackend
+	if sb != "" && sb != "boltdb" && sb != "memory" && sb != "s3" {
+		return errors.New("invalid storageBackend: must be boltdb, memory, or s3")
+	}
+	if sb == "s3" && (req.StorageConfig == nil || req.StorageConfig.Endpoint == "" || req.StorageConfig.Bucket == "") {
+		return errors.New("s3 storageBackend requires storageConfig with endpoint and bucket")
+	}
+	qt := req.Quantization
+	if qt != "" && qt != "float32" && qt != "int8" && qt != "int4" {
+		return errors.New("invalid quantization: must be float32, int8, or int4")
+	}
+	if req.DiskOnlyVectors && (qt == "" || qt == "float32") {
+		return errors.New("diskOnlyVectors requires quantization (int8 or int4)")
+	}
+	return nil
+}
+
+// config is the collection config the request describes.
+func (req *SetCollectionConfigRequest) config() *CollectionConfig {
+	return &CollectionConfig{
+		Type:            req.Type,
+		Description:     req.Description,
+		Icon:            req.Icon,
+		Color:           req.Color,
+		CustomMeta:      req.CustomMeta,
+		StorageBackend:  req.StorageBackend,
+		StorageConfig:   req.StorageConfig,
+		Quantization:    req.Quantization,
+		DiskOnlyVectors: req.DiskOnlyVectors,
+		MaxRevisions:    req.MaxRevisions,
+		Encrypted:       req.Encrypted,
+		WordPress:       req.WordPress,
+		Retrieval:       req.Retrieval,
+		TrackAccess:     req.TrackAccess,
+		TrackHot:        req.TrackHot,
+		SpellCorrect:    req.SpellCorrect,
+		SpellLang:       req.SpellLang,
+		ResponsePrompt:  req.ResponsePrompt,
+		Code:            req.Code,
+		Embedding:       req.Embedding,
+		FTS:             req.FTS,
+		Quota:           req.Quota,
+	}
 }
 
 func (s *Server) handleCollectionConfigDelete(w http.ResponseWriter, r *http.Request) {

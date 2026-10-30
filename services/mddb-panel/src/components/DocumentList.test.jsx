@@ -180,8 +180,8 @@ describe('DocumentList opening a document', () => {
     fireEvent.click(rows()[2]);
     expect(useStore.getState().currentDocument).toEqual({ ...docs[2], collection: 'docs', contentMd: 'Loading content...' });
     expect(mddbClient.getDocument).toHaveBeenCalledWith({ collection: 'docs', key: 'gamma', lang: 'en' });
-    expect(rows()[2].className).toContain('bg-blue-50');
-    expect(rows()[0].className).not.toContain('bg-blue-50');
+    expect(rows()[2].closest('li').className).toContain('bg-blue-50');
+    expect(rows()[0].closest('li').className).not.toContain('bg-blue-50');
 
     resolve({ key: 'gamma', lang: 'en', contentMd: '# Gamma full' });
     await waitFor(() => expect(useStore.getState().currentDocument.contentMd).toBe('# Gamma full'));
@@ -207,6 +207,30 @@ describe('DocumentList opening a document', () => {
     await waitFor(() => expect(useStore.getState().currentDocument.contentMd)
       .toBe('Error loading document content: timeout. Please try again.'));
     expect(console.error).toHaveBeenCalledWith('Failed to load full document content:', expect.any(Error));
+  });
+});
+
+describe('DocumentList row structure', () => {
+  test('no button sits inside another: the row opens, the delete beside it is its own control', async () => {
+    vi.mocked(mddbClient.getDocument).mockResolvedValue({ key: 'alpha', lang: 'en' });
+    const { container } = await renderList();
+    expect(container.querySelectorAll('button button')).toHaveLength(0);
+    const del = screen.getByRole('button', { name: 'Delete alpha (en)' });
+    expect(del.closest('li')).toBe(rows()[0].closest('li'));
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+
+    // The row is a native button: focusable, and Enter/Space activate it.
+    expect(rows()[0].tagName).toBe('BUTTON');
+    expect(rows()[0].getAttribute('aria-current')).toBeNull();
+    fireEvent.click(rows()[0]);
+    await waitFor(() => expect(rows()[0].getAttribute('aria-current')).toBe('true'));
+    expect(rows()[0].closest('li').className).toContain('bg-blue-50');
+
+    // Delete asks first and does not open the document.
+    vi.mocked(mddbClient.getDocument).mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete gamma (en)' }));
+    expect(mddbClient.getDocument).not.toHaveBeenCalled();
+    expect(screen.getByText('Are you sure you want to delete "gamma" (en)? This action cannot be undone.')).toBeTruthy();
   });
 });
 

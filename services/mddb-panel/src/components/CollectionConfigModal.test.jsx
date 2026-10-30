@@ -248,6 +248,18 @@ describe('CollectionConfigModal with a stored config', () => {
     expect(payload.quota).toEqual({});
   });
 
+  test('shows the stored quota used, from the usage the server sends with it', async () => {
+    await open({ configured: true, config: fullConfig, usage: { documents: 40, bytes: 1024 } });
+    const bar = screen.getByRole('progressbar', { name: 'Documents' });
+    expect(bar.getAttribute('aria-valuetext')).toBe('40 / 100 documents (40%)');
+    expect(screen.getByText('40 / 100 documents')).toBeTruthy();
+  });
+
+  test('without usage (no quota, or an older server) there is no usage section', async () => {
+    await open({ configured: true, config: fullConfig });
+    expect(screen.queryByRole('heading', { name: 'Quota usage' })).toBeNull();
+  });
+
   test('clearing the advanced settings removes them but keeps other stored keys', async () => {
     await open({ configured: true, config: fullConfig });
     fireEvent.change(screen.getByLabelText('Vector index'), { target: { value: '' } });

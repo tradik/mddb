@@ -274,6 +274,24 @@ describe('HybridSearchPanel', () => {
     expect(await screen.findByText('1 result found')).toBeTruthy();
   });
 
+  test('Cancel still stops a search that replaced another', async () => {
+    const signals = [];
+    vi.mocked(mddbClient.hybridSearch).mockImplementation(({ signal }) => new Promise((_resolve, reject) => {
+      signals.push(signal);
+      signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+    }));
+    await renderLoaded();
+    fireEvent.click(searchButton());
+    fireEvent.keyDown(queryBox(), { key: 'Enter' });
+    // The first search's abort settles; it must not release the second one.
+    await act(async () => {});
+    expect(useStore.getState().hybridLoading).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(signals[1].aborted).toBe(true);
+    expect(await screen.findByRole('button', { name: 'Search' })).toBeTruthy();
+    expect(useStore.getState().hybridLoading).toBe(false);
+  });
+
   describe('boost editor', () => {
     const keyBox = () => screen.getByPlaceholderText('tag:featured');
     const valueBox = () => keyBox().nextElementSibling;

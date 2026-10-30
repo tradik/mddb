@@ -182,6 +182,13 @@ Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blo
 
 ### New in v2.18.10
 
+`GetCollectionConfigResponse.usage` (4, `CollectionQuotaUsageProto`) is what
+a collection with a quota uses of it (GO-043): `documents`, `bytes`,
+`vectors`, and today's (UTC) `embedding_calls` and `embedding_tokens` —
+compare each with the `CollectionQuotaProto` limit. Unset for a collection
+without a quota. The same numbers as REST `GET /v1/collection-config`
+(`usage`); see [API.md](API.md#quota-usage-v21810).
+
 `CollectionFTSProto.exclude_meta_keys` (2) lists meta keys kept out of
 full-text search (#367): no `meta.<key>` postings, so changing them costs no
 full-text work, while metadata filters and facets still use them. It applies

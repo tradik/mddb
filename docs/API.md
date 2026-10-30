@@ -2825,6 +2825,36 @@ curl "http://localhost:11023/v1/collection-config?collection=blog"
 
 Also supports **PUT** to set config and **DELETE** to remove config for a collection.
 
+##### Quota usage (v2.18.10)
+
+A collection with a [quota](#quotas-v2189) also gets `usage`: what it uses of each
+limit, next to `config.quota`.
+
+```json
+{
+  "collection": "tenant-a",
+  "config": { "type": "default", "quota": { "maxDocuments": 5000, "embeddingCallsPerDay": 200 } },
+  "configured": true,
+  "usage": { "documents": 1234, "bytes": 5242880, "vectors": 3810, "embeddingCalls": 17, "embeddingTokens": 9120 }
+}
+```
+
+| Field | Compare with | Meaning |
+|-------|--------------|---------|
+| `documents` | `maxDocuments` | Documents the collection holds |
+| `bytes` | `maxBytes` | Stored size of its documents (after compression and encryption) |
+| `vectors` | `maxVectors` | Chunk vectors in the largest of the server's indexes |
+| `embeddingCalls` | `embeddingCallsPerDay` | Embedding provider calls today (UTC) |
+| `embeddingTokens` | `embeddingTokensPerDay` | Estimated tokens (characters / 4) embedded today (UTC) |
+
+These are the counts the write gate and the embedding budget check, so a
+value at or above its limit is the reason a write is refused (507) or an
+embedding waits. Embedding use is counted only while the collection has an
+embedding budget, and from zero after a restart. A collection without a quota
+gets no `usage`: it is not scanned on a config read. gRPC returns the same
+numbers in `GetCollectionConfigResponse.usage`; `/metrics` keeps the
+`mddb_collection_fullness` and `mddb_embedding_budget_used` gauges.
+
 ##### Credentials are masked on read (v2.12.0+)
 
 A collection config can hold two credentials: `storageConfig.secretKey` and
@@ -3978,9 +4008,28 @@ curl http://localhost:11023/v1/config
     "dimensions": 1536
   },
   "automationsEnabled": true,
-  "searchStatsEnabled": true
+  "searchStatsEnabled": true,
+  "esCompat": { "enabled": true, "prefix": "/es" },
+  "searchMaxLimit": 1000,
+  "telemetry": { "enabled": true, "endpoint": "https://collector.internal:4318" },
+  "clientAddressing": { "trustedProxies": 2, "header": "X-Forwarded-For", "proxyProtocol": false }
 }
 ```
+
+**Search surface, tracing and proxies (2.18.10):**
+
+| Field | Source | Meaning |
+|-------|--------|---------|
+| `esCompat.enabled`, `esCompat.prefix` | `MDDB_ES_COMPAT` | Whether the [Elasticsearch-compatible subset](ELASTICSEARCH-COMPAT.md) is served, and under which path (always `/es`) |
+| `searchMaxLimit` | `MDDB_SEARCH_MAX_LIMIT` | The most results one search returns (default 1000); a collection's `retrieval.maxTopK` can only lower it |
+| `telemetry.enabled`, `telemetry.endpoint` | `MDDB_OTEL_ENDPOINT` | Whether traces are exported, and the collector's **scheme and host only** — never a path, query or credentials. Omitted when tracing is off |
+| `clientAddressing.trustedProxies` | `MDDB_TRUSTED_PROXIES` | **How many** proxy entries are trusted, never which: the addresses describe the operator's network |
+| `clientAddressing.header` | `MDDB_CLIENT_IP_HEADER` | The header a trusted proxy carries the client address in (canonical form; default `X-Forwarded-For`) |
+| `clientAddressing.proxyProtocol` | `MDDB_PROXY_PROTOCOL` | Whether the TCP listeners accept a PROXY protocol header |
+
+The diagnose bundle renders the same fields with its stricter rules: the
+collector endpoint becomes `<set: https>`. A server before 2.18.10 omits these
+fields.
 
 ---
 

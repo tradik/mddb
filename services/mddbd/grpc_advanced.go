@@ -422,6 +422,7 @@ func (g *GRPCServer) GetCollectionConfig(ctx context.Context, req *proto.GetColl
 	if found && cfg != nil {
 		// GO-035: every field, secrets masked. See grpc_collection_config.go.
 		resp.Config = collectionConfigToProto(cfg)
+		resp.Usage = quotaUsageToProto(g.server.quotaUsageReport(req.Collection, cfg.Quota))
 	}
 	return resp, nil
 }

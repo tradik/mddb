@@ -1323,10 +1323,21 @@ message GetCollectionConfigRequest {
   string collection = 1;
 }
 
+// CollectionQuotaUsageProto is what a collection uses of its quota
+// (GO-043, v2.18.10). Compare each field with the CollectionQuotaProto limit.
+message CollectionQuotaUsageProto {
+  int64 documents = 1;                           // documents the collection holds
+  int64 bytes = 2;                               // stored bytes of its documents
+  int64 vectors = 3;                             // chunk vectors it holds
+  int64 embedding_calls = 4;                     // embedding provider calls today (UTC); counted only under an embedding budget
+  int64 embedding_tokens = 5;                    // estimated tokens embedded today (UTC); counted only under an embedding budget
+}
+
 message GetCollectionConfigResponse {
   string collection = 1;
   CollectionConfigProto config = 2;
   bool configured = 3;
+  CollectionQuotaUsageProto usage = 4;           // (v2.18.10) set only when the collection has a quota
 }
 
 message SetCollectionConfigRequest {

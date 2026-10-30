@@ -311,6 +311,24 @@ describe('VectorSearchPanel', () => {
     expect(await screen.findByText('1 result found')).toBeTruthy();
   });
 
+  test('Cancel still stops a search that replaced another', async () => {
+    const signals = [];
+    vi.mocked(mddbClient.vectorSearch).mockImplementation(({ signal }) => new Promise((_resolve, reject) => {
+      signals.push(signal);
+      signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+    }));
+    renderPanel();
+    fireEvent.click(searchButton());
+    fireEvent.keyDown(queryBox(), { key: 'Enter' });
+    // The first search's abort settles; it must not release the second one.
+    await act(async () => {});
+    expect(useStore.getState().vectorLoading).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(signals[1].aborted).toBe(true);
+    expect(await screen.findByRole('button', { name: 'Search' })).toBeTruthy();
+    expect(useStore.getState().vectorLoading).toBe(false);
+  });
+
   test('opening a result loads the full document', async () => {
     vi.mocked(mddbClient.vectorSearch).mockResolvedValue({ results });
     let resolveDoc;

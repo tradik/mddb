@@ -3,6 +3,7 @@ import { Search, AlertCircle, Tag, Terminal, Ban, ChevronDown, ChevronUp, Plus, 
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import { VECTOR_ALGORITHMS, indexUnavailable } from '../lib/search-options';
+import { releaseAbort } from '../lib/abort-slot';
 import CommandModal from './CommandModal';
 import MetaFilterBar from './MetaFilterBar';
 import SearchPlan from './SearchPlan';
@@ -111,8 +112,8 @@ export default function HybridSearchPanel() {
         setPlan(null);
       }
     } finally {
-      setHybridLoading(false);
-      abortRef.current = null;
+      // A search replaced by a newer one leaves loading to it (lib/abort-slot.js).
+      if (!releaseAbort(abortRef, controller)) setHybridLoading(false);
     }
   };
 

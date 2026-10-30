@@ -65,7 +65,7 @@ Complete reference for all MDDB configuration parameters.
 
 ## OpenTelemetry Tracing (v2.18.9+)
 
-Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is set, and free when off. Spans, attributes and an example collector: [TELEMETRY.md](TELEMETRY.md#opentelemetry-tracing-v2189).
+Trace export over OTLP/HTTP JSON (OPS-024). Off unless `MDDB_OTEL_ENDPOINT` is set, and free when off. Spans, attributes and an example collector: [TELEMETRY.md](TELEMETRY.md#opentelemetry-tracing-v2189). `GET /v1/config` reports `telemetry.enabled` and the collector's scheme and host only (v2.18.10+): a path or query can carry a tenant token, and `MDDB_OTEL_HEADERS` is a secret that is never shown.
 
 | Variable | Default | Type | Description |
 |---|---|---|---|
@@ -378,6 +378,8 @@ Shared sliding-window limiter covering both HTTP and gRPC. Separate from the pre
 | `MDDB_TRUSTED_PROXIES` | `""` | list | Comma-separated IPs or CIDR prefixes of the reverse proxies and load balancers whose client IP header and PROXY header are believed, e.g. `127.0.0.1,10.0.0.0/8,fd00::/8`. Empty (the default) trusts nobody. An entry that is not an IP or prefix stops startup with that entry named. `0.0.0.0/0` or `::/0` trusts every client again: mddbd warns at startup and `MDDB_PRODUCTION=true` refuses it. See [Client IP and trusted proxies](#client-ip-and-trusted-proxies). |
 | `MDDB_CLIENT_IP_HEADER` | `X-Forwarded-For` | string | v2.18.10+. The header a trusted proxy puts the client address in. `X-Forwarded-For` (with the `X-Real-IP` fallback) and `Forwarded` (RFC 7239) are chains; any other name (`X-Real-IP`, `CF-Connecting-IP`, `True-Client-IP`, `X-Cluster-Client-Ip`, `Client-IP`, ...) is one address. gRPC reads the same name in lower case from the metadata. A name that is not a valid HTTP header name stops startup. See [Proxies and load balancers](#proxies-and-load-balancers). |
 | `MDDB_PROXY_PROTOCOL` | `off` | `off`/`on` | v2.18.10+. PROXY protocol v1 and v2 on the HTTP, gRPC and MCP listeners. When `on`, a peer in `MDDB_TRUSTED_PROXIES` **must** send a PROXY header and any other peer **must not**. Any other value stops startup. See [PROXY protocol](#proxy-protocol). |
+
+`GET /v1/config` reports these settings under `clientAddressing` (v2.18.10+): how many trusted proxy entries there are (never their addresses), the client IP header and whether PROXY protocol is on. The admin panel shows them on the Config and System pages.
 
 HTTP responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`; rejected requests get `429 Too Many Requests` with `Retry-After`. gRPC rejects with `codes.ResourceExhausted`. The paths `/health`, `/v1/health`, and `/metrics` are always exempt so monitoring and load-balancer probes never trip the limiter.
 

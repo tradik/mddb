@@ -3,6 +3,7 @@ import { X, Settings2, Plus, Trash2 } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { advancedFromConfig, applyAdvanced, preservedConfig } from '../lib/collection-config';
 import CollectionAdvancedSettings from './CollectionAdvancedSettings';
+import QuotaUsage from './QuotaUsage';
 import ReadOnlyNotice from './ReadOnlyNotice';
 
 const COLLECTION_TYPES = [
@@ -53,6 +54,8 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
   // they are, so saving never erases them (see lib/collection-config.js).
   const [stored, setStored] = useState({});
   const [advanced, setAdvanced] = useState(() => advancedFromConfig());
+  // What the collection uses of its quota (GO-043); sent only with a quota.
+  const [usage, setUsage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -99,6 +102,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         setResponsePrompt(cfg.responsePrompt || '');
         setStored(cfg);
         setAdvanced(advancedFromConfig(cfg));
+        setUsage(data.usage || null);
       }
     } catch (err) {
       setError(err.message);
@@ -606,6 +610,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
 
               {/* 2.18.9/2.18.10: index, summaries, result cap, FTS exclusions, quota */}
               <CollectionAdvancedSettings value={advanced} onChange={setAdvanced} />
+              <QuotaUsage quota={stored.quota} usage={usage} />
 
               {/* Response prompt (RAG-002, v2.12.0+) */}
               <div>

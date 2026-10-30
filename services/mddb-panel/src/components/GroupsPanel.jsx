@@ -327,10 +327,11 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-group-name" className="block text-sm font-medium text-gray-700 mb-1">
                 Group Name
               </label>
               <input
+                id="create-group-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -340,10 +341,11 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-group-description" className="block text-sm font-medium text-gray-700 mb-1">
                 Description
               </label>
               <textarea
+                id="create-group-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows="3"
@@ -352,10 +354,10 @@ function CreateGroupModal({ users, onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <p id="create-group-members" className="block text-sm font-medium text-gray-700 mb-2">
                 Members ({selectedMembers.length})
-              </label>
-              <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
+              </p>
+              <div role="group" aria-labelledby="create-group-members" className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
                 {users.length === 0 ? (
                   <div className="text-sm text-gray-500 p-3">No users available</div>
                 ) : (
@@ -457,10 +459,11 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="edit-group-description" className="block text-sm font-medium text-gray-700 mb-1">
                 Description
               </label>
               <textarea
+                id="edit-group-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows="3"
@@ -469,10 +472,10 @@ function EditGroupModal({ group, users, onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <p id="edit-group-members" className="block text-sm font-medium text-gray-700 mb-2">
                 Members ({selectedMembers.length})
-              </label>
-              <div className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
+              </p>
+              <div role="group" aria-labelledby="edit-group-members" className="border border-gray-300 rounded-md max-h-48 overflow-y-auto">
                 {users.length === 0 ? (
                   <div className="text-sm text-gray-500 p-3">No users available</div>
                 ) : (
@@ -676,10 +679,11 @@ function GroupPermissionsModal({ group, onClose }) {
           <h3 className="text-sm font-medium text-gray-700 mb-2">Add New Permission</h3>
           <form onSubmit={handleAddPermission} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="group-permission-collection" className="block text-sm font-medium text-gray-700 mb-1">
                 Collection (* for all)
               </label>
               <input
+                id="group-permission-collection"
                 type="text"
                 value={collection}
                 onChange={(e) => setCollection(e.target.value)}

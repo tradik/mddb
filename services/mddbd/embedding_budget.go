@@ -119,12 +119,18 @@ func (b *embeddingBudget) spendTokens(collection string, tokens int64) {
 	b.used[collection] = u
 }
 
+// today is the collection's spend this UTC day; zero for a collection
+// without an embedding budget, whose spend is not counted.
+func (b *embeddingBudget) today(collection string) budgetUse {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.rollLocked()
+	return b.used[collection]
+}
+
 // usedFraction is the larger share of today's call and token budgets spent.
 func (b *embeddingBudget) usedFraction(collection string, q *CollectionQuota) float64 {
-	b.mu.Lock()
-	b.rollLocked()
-	u := b.used[collection]
-	b.mu.Unlock()
+	u := b.today(collection)
 	var f float64
 	if q.EmbeddingCallsPerDay > 0 {
 		f = float64(u.calls) / float64(q.EmbeddingCallsPerDay)

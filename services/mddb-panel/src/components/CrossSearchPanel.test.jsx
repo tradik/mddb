@@ -237,6 +237,25 @@ describe('CrossSearchPanel', () => {
     expect(await screen.findByText('1 result found')).toBeTruthy();
   });
 
+  test('Cancel still stops a search that replaced another', async () => {
+    const signals = [];
+    vi.mocked(mddbClient.crossSearch).mockImplementation((_params, options) => {
+      signals.push(options.signal);
+      return hanging(options);
+    });
+    renderPanel();
+    fireEvent.change(queryBox(), { target: { value: 'q' } });
+    fireEvent.click(searchButton());
+    fireEvent.keyDown(queryBox(), { key: 'Enter' });
+    // The first search's abort settles; it must not release the second one.
+    await act(async () => {});
+    expect(useStore.getState().crossSearchLoading).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(signals[1].aborted).toBe(true);
+    expect(await screen.findByRole('button', { name: 'Search' })).toBeTruthy();
+    expect(useStore.getState().crossSearchLoading).toBe(false);
+  });
+
   test('opening a result loads it from its own collection', async () => {
     vi.mocked(mddbClient.crossSearch).mockResolvedValue({ results });
     let resolveDoc;

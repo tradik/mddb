@@ -176,8 +176,10 @@ describe('GroupsPanel create group', () => {
     const dialog = modal('Create New Group');
     expect(within(dialog).getByText('Admin')).toBeTruthy();
 
-    fireEvent.change(dialog.querySelector('input[type="text"]'), { target: { value: 'writers' } });
-    fireEvent.change(dialog.querySelector('textarea'), { target: { value: 'Blog writers' } });
+    // Every field is named by its label (htmlFor/id), for screen readers.
+    fireEvent.change(within(dialog).getByLabelText('Group Name'), { target: { value: 'writers' } });
+    fireEvent.change(within(dialog).getByLabelText('Description'), { target: { value: 'Blog writers' } });
+    expect(within(dialog).getByRole('group', { name: 'Members (0)' })).toBeTruthy();
     toggle(dialog, 'alice');
     toggle(dialog, 'carol');
     toggle(dialog, 'alice');
@@ -237,7 +239,7 @@ describe('GroupsPanel edit group', () => {
     expect(ticked(dialog)).toEqual(['alice', 'bob', 'carol']);
     expect(within(dialog).getByText('Members (7)')).toBeTruthy();
 
-    fireEvent.change(dialog.querySelector('textarea'), { target: { value: 'Ops' } });
+    fireEvent.change(within(dialog).getByLabelText('Description'), { target: { value: 'Ops' } });
     toggle(dialog, 'bob');
     let finish;
     vi.mocked(mddbClient.updateGroup).mockReturnValue(new Promise((resolve) => (finish = resolve)));

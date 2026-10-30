@@ -127,8 +127,9 @@ describe('UsersPanel create user', () => {
     const dialog = modal('Create New User');
     expect(within(dialog).getByText('Administrator privileges (admin on "*", server-wide)')).toBeTruthy();
 
-    fireEvent.change(dialog.querySelector('input[type="text"]'), { target: { value: 'dave' } });
-    fireEvent.change(dialog.querySelector('input[type="password"]'), { target: { value: 's3cret!' } });
+    // Every field is named by its label (htmlFor/id), for screen readers.
+    fireEvent.change(within(dialog).getByLabelText('Username'), { target: { value: 'dave' } });
+    fireEvent.change(within(dialog).getByLabelText('Password'), { target: { value: 's3cret!' } });
     fireEvent.click(within(dialog).getByLabelText(/Administrator privileges/));
     let finish;
     vi.mocked(mddbClient.createUser).mockReturnValue(new Promise((resolve) => (finish = resolve)));

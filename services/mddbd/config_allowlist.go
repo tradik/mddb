@@ -38,6 +38,10 @@ const (
 	// cfgList values are lists that name hosts or origins (trusted proxies,
 	// CORS origins): the bundle counts the entries.
 	cfgList
+	// cfgOrigin values are URLs of which only the origin matters (the
+	// OpenTelemetry collector): /v1/config shows the scheme and host, the
+	// bundle only the scheme.
+	cfgOrigin
 )
 
 // configAudience is who a rendered value is for.
@@ -71,8 +75,10 @@ var configKeys = map[string]configClass{
 	"MDDB_HTTP3_ADDR": cfgListen,
 
 	// URLs.
-	"MDDB_EMBEDDING_API_URL": cfgURL, "MDDB_AUDIT_EXPORT_WEBHOOK_URL": cfgURL, "MDDB_OTEL_ENDPOINT": cfgURL,
+	"MDDB_EMBEDDING_API_URL": cfgURL, "MDDB_AUDIT_EXPORT_WEBHOOK_URL": cfgURL,
 	"MDDB_MCP_OAUTH_ISSUER": cfgURL, "MDDB_MCP_SERVER_HOMEPAGE": cfgURL,
+	// Collector URLs: the origin. A path or query may carry a tenant token.
+	"MDDB_OTEL_ENDPOINT": cfgOrigin,
 
 	// Lists of hosts and origins: counted. Trusted proxies (#366) name the
 	// operator's internal network, so the bundle says how many, not which.
@@ -159,11 +165,13 @@ func renderConfig(key, value string, set bool, aud configAudience) string {
 		return cfgSet
 	case aud == audienceEndpoint && class == cfgURL:
 		return endpointURL(value)
+	case aud == audienceEndpoint && class == cfgOrigin:
+		return urlOrigin(value)
 	case aud == audienceEndpoint:
 		return value
 	case class == cfgListen:
 		return listenPort(value)
-	case class == cfgURL:
+	case class == cfgURL, class == cfgOrigin:
 		return bundleURL(value)
 	case class == cfgList:
 		return "<" + strconv.Itoa(listCount(value)) + " entries>"
@@ -187,6 +195,16 @@ func endpointURL(raw string) string {
 	}
 	u.User, u.RawQuery, u.Fragment = nil, "", ""
 	return u.String()
+}
+
+// urlOrigin keeps a URL's scheme and host (with the port); a value without
+// both is only set.
+func urlOrigin(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return cfgSet
+	}
+	return u.Scheme + "://" + u.Host
 }
 
 // bundleURL keeps only a URL's scheme: the host may be internal.

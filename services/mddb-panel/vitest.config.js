@@ -46,6 +46,13 @@ const coverageFiles = [
   'src/components/PermissionScopeHint.jsx',
   'src/components/UsersPanel.jsx',
   'src/components/GroupsPanel.jsx',
+  // 2.18.10: the last server/panel gaps (config report, quota usage, a11y).
+  'src/lib/abort-slot.js',
+  'src/lib/quota-usage.js',
+  'src/lib/server-edge.js',
+  'src/components/QuotaUsage.jsx',
+  'src/components/ServerEdgeCard.jsx',
+  'src/components/ConfigPanel.jsx',
 ];
 
 export default mergeConfig(

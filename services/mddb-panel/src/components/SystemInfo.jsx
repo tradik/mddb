@@ -5,6 +5,7 @@ import mddbClient from '../lib/mddb-client';
 import GainCard from './GainCard';
 import CorpusPacksCard from './CorpusPacksCard';
 import DiagnoseCard from './DiagnoseCard';
+import ServerEdgeCard from './ServerEdgeCard';
 
 export default function SystemInfo() {
   const {
@@ -230,6 +231,11 @@ export default function SystemInfo() {
               <div className="font-medium text-gray-900">{systemInfo.version}</div>
             </div>
           </div>
+        </div>
+
+        {/* Search surface, tracing and proxies, from GET /v1/config (2.18.10) */}
+        <div className="mt-6">
+          <ServerEdgeCard />
         </div>
 
         <GainCard />

@@ -5868,6 +5868,8 @@ paths:
                     type: boolean
                     description: Whether the collection has been explicitly configured
                     example: true
+                  usage:
+                    $ref: "#/components/schemas/CollectionQuotaUsage"
         "400":
           description: Missing collection parameter
           content:
@@ -7352,6 +7354,20 @@ components:
         maxVectors: { type: integer, format: int64, minimum: 0, description: Chunk vectors it may hold }
         embeddingCallsPerDay: { type: integer, format: int64, minimum: 0, description: Embedding provider calls per UTC day; over it documents wait as pending }
         embeddingTokensPerDay: { type: integer, format: int64, minimum: 0, description: Estimated tokens (characters / 4) embedded per UTC day }
+    CollectionQuotaUsage:
+      type: object
+      description: |
+        (v2.18.10, GO-043) What a collection uses of its quota, returned by
+        GET /v1/collection-config only for a collection with a quota. Compare
+        each field with the matching CollectionQuota limit. Embedding use is
+        today's (UTC), counted only while the collection has an embedding
+        budget, and starts from zero after a restart.
+      properties:
+        documents: { type: integer, format: int64, description: Documents the collection holds (maxDocuments) }
+        bytes: { type: integer, format: int64, description: Stored bytes of its documents (maxBytes) }
+        vectors: { type: integer, format: int64, description: Chunk vectors it holds (maxVectors) }
+        embeddingCalls: { type: integer, format: int64, description: Embedding provider calls today (embeddingCallsPerDay) }
+        embeddingTokens: { type: integer, format: int64, description: Estimated tokens embedded today (embeddingTokensPerDay) }
     QuotaExceeded:
       type: object
       description: (v2.18.9+, GO-043) A write or reindex refused by a quota.
@@ -11093,6 +11109,29 @@ components:
           type: boolean
           description: Whether search statistics are included in search responses
           example: false
+        esCompat:
+          type: object
+          description: (v2.18.10) The Elasticsearch-compatible search subset (MDDB_ES_COMPAT)
+          properties:
+            enabled: { type: boolean, example: false }
+            prefix: { type: string, example: /es, description: Path the subset is served under }
+        searchMaxLimit:
+          type: integer
+          description: (v2.18.10) Most results one search returns (MDDB_SEARCH_MAX_LIMIT); a collection's maxTopK can only lower it
+          example: 1000
+        telemetry:
+          type: object
+          description: (v2.18.10) OpenTelemetry trace export (MDDB_OTEL_ENDPOINT)
+          properties:
+            enabled: { type: boolean, example: true }
+            endpoint: { type: string, example: "https://collector.internal:4318", description: "The collector's scheme and host only: never a path, query or credentials. Omitted when off" }
+        clientAddressing:
+          type: object
+          description: (v2.18.10) How the client address is found behind a proxy
+          properties:
+            trustedProxies: { type: integer, example: 2, description: "How many MDDB_TRUSTED_PROXIES entries are trusted; the addresses are never shown" }
+            header: { type: string, example: X-Forwarded-For, description: MDDB_CLIENT_IP_HEADER in canonical form }
+            proxyProtocol: { type: boolean, example: false, description: MDDB_PROXY_PROTOCOL }
         replicationRole:
           type: string
           description: Replication role of this node

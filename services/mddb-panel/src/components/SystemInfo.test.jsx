@@ -5,9 +5,10 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({ default: { getSystemInfo: vi.fn(), getGain: vi.fn() } }));
-// The corpus-pack and diagnose cards have their own suites.
+// The corpus-pack, diagnose and server-edge cards have their own suites.
 vi.mock('./CorpusPacksCard', () => ({ default: () => <div>corpus packs card</div> }));
 vi.mock('./DiagnoseCard', () => ({ default: () => <div>diagnose card</div> }));
+vi.mock('./ServerEdgeCard', () => ({ default: () => <div>server edge card</div> }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
@@ -106,6 +107,7 @@ describe('SystemInfo', () => {
     expect(await screen.findByText('Retrieval gain, last 30 days')).toBeTruthy();
     expect(screen.getByText('corpus packs card')).toBeTruthy();
     expect(screen.getByText('diagnose card')).toBeTruthy();
+    expect(screen.getByText('server edge card')).toBeTruthy();
   });
 
   test.each([

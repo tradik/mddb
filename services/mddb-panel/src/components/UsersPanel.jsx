@@ -307,10 +307,11 @@ function CreateUserModal({ onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-user-username" className="block text-sm font-medium text-gray-700 mb-1">
                 Username
               </label>
               <input
+                id="create-user-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -320,10 +321,11 @@ function CreateUserModal({ onClose, onSuccess }) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="create-user-password" className="block text-sm font-medium text-gray-700 mb-1">
                 Password
               </label>
               <input
+                id="create-user-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -524,10 +526,11 @@ function PermissionsModal({ user, onClose }) {
           <h3 className="text-sm font-medium text-gray-700 mb-2">Add New Permission</h3>
           <form onSubmit={handleAddPermission} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="user-permission-collection" className="block text-sm font-medium text-gray-700 mb-1">
                 Collection (* for all)
               </label>
               <input
+                id="user-permission-collection"
                 type="text"
                 value={collection}
                 onChange={(e) => setCollection(e.target.value)}

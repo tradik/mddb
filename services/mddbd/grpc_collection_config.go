@@ -171,6 +171,17 @@ func quotaFromProto(in *proto.CollectionQuotaProto) *CollectionQuota {
 	}
 }
 
+// quotaUsageToProto carries CollectionQuotaUsage (GO-043); nil stays nil.
+func quotaUsageToProto(u *CollectionQuotaUsage) *proto.CollectionQuotaUsageProto {
+	if u == nil {
+		return nil
+	}
+	return &proto.CollectionQuotaUsageProto{
+		Documents: u.Documents, Bytes: u.Bytes, Vectors: u.Vectors,
+		EmbeddingCalls: u.EmbeddingCalls, EmbeddingTokens: u.EmbeddingTokens,
+	}
+}
+
 // codeConfigToProto and codeConfigFromProto carry CodeConfigDef (#319).
 func codeConfigToProto(cfg *CodeConfigDef) *proto.CodeConfigProto {
 	if cfg == nil {

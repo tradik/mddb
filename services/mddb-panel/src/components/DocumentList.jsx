@@ -218,58 +218,69 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             </div>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {documents.filter(doc => !filterText || doc.key.toLowerCase().includes(filterText.toLowerCase())).map((doc) => (
-              <button
-                key={`${doc.key}-${doc.lang}`}
-                onClick={() => handleDocumentClick(doc)}
-                className={`w-full text-left p-4 hover:bg-gray-50 transition-colors ${
-                  currentDocument?.key === doc.key && currentDocument?.lang === doc.lang
-                    ? 'bg-blue-50 border-l-4 border-blue-600'
-                    : ''
-                }`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <h4 className="font-medium text-gray-900 truncate flex-1">
-                    {doc.key}
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">{doc.lang}</span>
-                    {!readOnly && <button
-                      onClick={(e) => handleDelete(doc, e)}
-                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                      title="Delete document"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>}
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-3 text-xs text-gray-500">
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="w-3 h-3" />
-                    <span>
-                      {doc.updatedAt ? format(new Date(doc.updatedAt * 1000), 'MMM d, yyyy') : 'N/A'}
-                    </span>
-                  </div>
-                  {doc.meta && Object.keys(doc.meta).length > 0 && (
-                    <div className="flex items-center space-x-1">
-                      <Tag className="w-3 h-3" />
-                      <span>{Object.keys(doc.meta).length} tags</span>
+          <ul className="divide-y divide-gray-200">
+            {documents.filter(doc => !filterText || doc.key.toLowerCase().includes(filterText.toLowerCase())).map((doc) => {
+              const selected = currentDocument?.key === doc.key && currentDocument?.lang === doc.lang;
+              // The row and its delete are sibling controls: a button inside a
+              // button is invalid HTML, and screen readers announce only one.
+              return (
+                <li
+                  key={`${doc.key}-${doc.lang}`}
+                  className={`flex items-start hover:bg-gray-50 transition-colors ${
+                    selected ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleDocumentClick(doc)}
+                    aria-current={selected ? 'true' : undefined}
+                    className="flex-1 min-w-0 text-left p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-600"
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-medium text-gray-900 truncate flex-1">
+                        {doc.key}
+                      </h4>
+                      <span className="text-xs text-gray-500">{doc.lang}</span>
                     </div>
-                  )}
-                </div>
 
-                {doc.meta && Object.entries(doc.meta).slice(0, 2).map(([key, values]) => (
-                  <div key={key} className="mt-2">
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                      {key}: {Array.isArray(values) ? values.join(', ') : values}
-                    </span>
-                  </div>
-                ))}
-              </button>
-            ))}
-          </div>
+                    <div className="flex items-center space-x-3 text-xs text-gray-500">
+                      <div className="flex items-center space-x-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>
+                          {doc.updatedAt ? format(new Date(doc.updatedAt * 1000), 'MMM d, yyyy') : 'N/A'}
+                        </span>
+                      </div>
+                      {doc.meta && Object.keys(doc.meta).length > 0 && (
+                        <div className="flex items-center space-x-1">
+                          <Tag className="w-3 h-3" />
+                          <span>{Object.keys(doc.meta).length} tags</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {doc.meta && Object.entries(doc.meta).slice(0, 2).map(([key, values]) => (
+                      <div key={key} className="mt-2">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                          {key}: {Array.isArray(values) ? values.join(', ') : values}
+                        </span>
+                      </div>
+                    ))}
+                  </button>
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(doc, e)}
+                      className="m-3 p-1 text-gray-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700"
+                      title="Delete document"
+                      aria-label={`Delete ${doc.key} (${doc.lang})`}
+                    >
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 

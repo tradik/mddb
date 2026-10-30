@@ -3,6 +3,7 @@ import { Search, RotateCcw, AlertCircle, Terminal, Ban, ThumbsUp, ThumbsDown } f
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import { VECTOR_ALGORITHMS, indexUnavailable } from '../lib/search-options';
+import { releaseAbort } from '../lib/abort-slot';
 import CommandModal from './CommandModal';
 import MetaFilterBar from './MetaFilterBar';
 import SearchPlan from './SearchPlan';
@@ -99,8 +100,6 @@ export default function VectorSearchPanel() {
     } catch (error) {
       if (error.name === 'AbortError') {
         setVectorError(null);
-        setVectorLoading(false);
-        abortRef.current = null;
         return;
       }
       // GO-047: a loading index is retried; a training one is not — flat,
@@ -121,9 +120,10 @@ export default function VectorSearchPanel() {
       setPlan(null);
     } finally {
       // Loading stays on while a retry waits (Cancel stops it), and ends on
-      // any answer — including a retry that succeeds.
-      if (!retrying) setVectorLoading(false);
-      abortRef.current = null;
+      // any answer — including a retry that succeeds. A search replaced by a
+      // newer one leaves both to that one (lib/abort-slot.js).
+      const superseded = releaseAbort(abortRef, controller);
+      if (!retrying && !superseded) setVectorLoading(false);
     }
   };
 

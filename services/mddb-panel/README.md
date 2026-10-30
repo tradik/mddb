@@ -23,6 +23,8 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - ⏰ **Cron actions** (2.18.9+/2.18.10+) - A cron rule calls a webhook, takes a backup (local or S3, retention) or syncs a sitemap / URL list / S3 prefix; the automation log shows backup targets and sync counts
 - 🧭 **Search planning** (2.18.9+/2.18.10+) - `Auto` vector index, *Explain plan*, *Split multi-part questions* (`queryDecomposition`), relevance feedback from vector results, and a notice when the server capped a result list (`limitCapped`)
 - ⚙️ **Collection settings** (2.18.10+) - Vector index, summary mode/weight, `maxTopK`, `fts.excludeMetaKeys` and quota; saving keeps every stored setting the dialog does not show
+- 🛡️ **Search surface, tracing & proxies** (2.18.10+) - On the Config and System pages: the Elasticsearch subset and its `/es` prefix, the result cap, OpenTelemetry on or off (collector scheme and host), the trusted-proxy count, client IP header and PROXY protocol, from `GET /v1/config`
+- 📏 **Quota usage** (2.18.10+) - In collection settings: "1,234 / 5,000 documents" bars for every quota limit, from the `usage` of `GET /v1/collection-config`, with a text alternative and WCAG 2.2 contrast (see [docs/PANEL.md](../../docs/PANEL.md#colours-and-contrast))
 - 🔑 **Permission scope** (2.18.10+) - Admin badges say *global* (on `"*"`) or *this collection*; a 403 says which permission the request needed
 
 ## Screenshots
@@ -226,10 +228,11 @@ below that the run fails. The text summary prints to the terminal and the
 HTML report is written to `coverage/index.html` (ignored by git and Docker).
 A file a release touches is added to `coverageFiles` with its tests.
 
-`coverageFiles` lists 33 files today: the API client and the lib modules
+`coverageFiles` lists 39 files today: the API client and the lib modules
 (`limit-notice`, `search-options`, `automation-form`, `collection-config`,
-`permissions`, `download`, `gain-format`) and every component 2.18.8–2.18.10
-touched, the large ones included (`AutomationPanel`, `CollectionConfigModal`,
+`permissions`, `download`, `gain-format`, `abort-slot`, `quota-usage`,
+`server-edge`) and every component 2.18.8–2.18.10 touched, the large ones
+included (`AutomationPanel`, `CollectionConfigModal`, `ConfigPanel`,
 `DocumentList`, `UsersPanel`, `GroupsPanel`, the vector/hybrid/cross search
 panels). Pure logic lives in `src/lib/*.js` so it can be tested without a DOM.
 

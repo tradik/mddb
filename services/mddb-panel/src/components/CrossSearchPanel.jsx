@@ -3,6 +3,7 @@ import { Search, Shuffle, AlertCircle, Ban } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient, { planningOptions } from '../lib/mddb-client';
 import { VECTOR_ALGORITHMS, indexUnavailable } from '../lib/search-options';
+import { releaseAbort } from '../lib/abort-slot';
 import SearchPlan from './SearchPlan';
 import SearchPlanningControls from './SearchPlanningControls';
 
@@ -85,8 +86,8 @@ export default function CrossSearchPanel() {
         setPlan(null);
       }
     } finally {
-      setCrossSearchLoading(false);
-      abortRef.current = null;
+      // A search replaced by a newer one leaves loading to it (lib/abort-slot.js).
+      if (!releaseAbort(abortRef, controller)) setCrossSearchLoading(false);
     }
   };
 

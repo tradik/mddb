@@ -94,9 +94,43 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 - **Search advisor**: recommended summary mode, the share of documents with a
   summary, and *Matches by meaning: No* for the lexical provider.
 
-Server settings with no API to read them (PROXY protocol, trusted proxies,
-OpenTelemetry export, the Elasticsearch-compatible `/es` subset,
-`MDDB_SEARCH_MAX_LIMIT`) are not shown.
+- **Search surface, tracing and proxies** (Config and System pages, 2.18.10):
+  from `GET /v1/config` — the Elasticsearch-compatible subset on or off with
+  its `/es` prefix, the server's result cap (`MDDB_SEARCH_MAX_LIMIT`),
+  OpenTelemetry export on or off with the collector's scheme and host, how
+  many trusted proxies are configured (never their addresses), the client IP
+  header and PROXY protocol. A server before 2.18.10 shows *Not reported by
+  this server*.
+- **Quota usage** (collection settings, 2.18.10): for a collection with a
+  quota, one bar per limit — *1,234 / 5,000 documents*, stored bytes,
+  vectors, and today's embedding calls and tokens — from the `usage` that
+  `GET /v1/collection-config` returns. Each bar is a `progressbar` whose
+  `aria-valuetext` repeats the numbers; amber from 80%, red at the limit,
+  and the state is also said in words.
+- **Accessibility fixes** (2.18.10): a document row and its delete button are
+  sibling buttons (a button nested in a button was invalid HTML and hid the
+  delete from screen readers); the create-user, create-group, edit-group and
+  add-permission fields are tied to their labels; Cancel on the vector,
+  hybrid and cross-collection search pages stops a search that replaced
+  another one (the replaced search used to empty the abort slot as it
+  settled).
+
+### Colours and contrast
+
+The panel's palette is Tailwind's gray, red, amber and green plus the
+`primary` scale in `tailwind.config.js`. Text meets WCAG 2.2 SC 1.4.3 (4.5:1)
+and bars and other meaningful graphics meet SC 1.4.11 (3:1):
+
+| Use | Token | Contrast |
+|-----|-------|----------|
+| Body and secondary text on white | `gray-900`, `gray-700`, `gray-600` | 17.7:1, 10.3:1, 7.6:1 |
+| Quota bar track | `gray-200` | — |
+| Quota bar fill: under 80% / 80–99% / at the limit | `primary-700`, `amber-700`, `red-700` | 4.8:1, 4.1:1, 5.2:1 against the track |
+| Warning / error notes on white | `amber-800`, `red-700` | 7.1:1, 6.5:1 |
+| *Enabled* label on the Config page | `green-700` | 5.0:1 |
+
+Colour never carries a state alone: every bar has its numbers as text, and
+near or over a limit a sentence says so.
 
 ### 🎨 Modern UI
 - Clean, responsive design

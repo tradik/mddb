@@ -75,7 +75,8 @@ func scanUsage(tx *bolt.Tx, collection string) quotaUsage {
 	return u
 }
 
-// collectionUsage reads a collection's usage outside a write, for metrics.
+// collectionUsage reads a collection's usage outside a write, for metrics
+// and the collection-config read.
 func (s *Server) collectionUsage(collection string) quotaUsage {
 	var u quotaUsage
 	_ = s.DBViewC(collection, func(tx *bolt.Tx) error {
@@ -83,6 +84,33 @@ func (s *Server) collectionUsage(collection string) quotaUsage {
 		return nil
 	})
 	return u
+}
+
+// CollectionQuotaUsage is what a collection uses of its quota (GO-043): the
+// documents, stored bytes and vectors the write gate counts, and the
+// embedding provider calls and estimated tokens spent today (UTC; counted
+// only while the collection has an embedding budget, and from zero after a
+// restart). Compare each with the matching CollectionQuota limit.
+type CollectionQuotaUsage struct {
+	Documents       int64 `json:"documents"`
+	Bytes           int64 `json:"bytes"`
+	Vectors         int64 `json:"vectors"`
+	EmbeddingCalls  int64 `json:"embeddingCalls"`
+	EmbeddingTokens int64 `json:"embeddingTokens"`
+}
+
+// quotaUsageReport is the collection's use of quota q, nil when q limits
+// nothing: a collection without a quota is not scanned on a config read.
+func (s *Server) quotaUsageReport(collection string, q *CollectionQuota) *CollectionQuotaUsage {
+	if q.isZero() {
+		return nil
+	}
+	u := s.collectionUsage(collection)
+	spent := s.quotas().budget.today(collection)
+	return &CollectionQuotaUsage{
+		Documents: u.docs, Bytes: u.bytes, Vectors: s.collectionVectorCount(collection),
+		EmbeddingCalls: spent.calls, EmbeddingTokens: spent.tokens,
+	}
 }
 
 // collectionVectorCount is the number of chunk vectors a collection has in
