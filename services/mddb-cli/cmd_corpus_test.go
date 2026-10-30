@@ -204,7 +204,11 @@ func TestCorpusInstallFromAURL(t *testing.T) {
 			t.Fatalf("installed from %s", url)
 		}
 	}
-	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "none"))
+	// os.TempDir reads TMPDIR on Unix and TMP/TEMP on Windows.
+	none := filepath.Join(t.TempDir(), "none")
+	for _, v := range []string{"TMPDIR", "TMP", "TEMP"} {
+		t.Setenv(v, none)
+	}
 	if _, err := runCLI(t, srv.URL, "corpus", "install", pack.URL+"/docs.mddbpack"); err == nil {
 		t.Fatal("downloaded without a temporary directory")
 	}
