@@ -12,8 +12,12 @@ WORKDIR /app
 COPY mddbd-linux-${TARGETARCH} /app/mddbd
 RUN chmod +x /app/mddbd
 
-RUN mkdir -p /app/data && \
-    chown -R mddb:mddb /app
+# /data as in Dockerfile (issue #211): docker-compose.yml mounts a named volume
+# there, and Docker hands a fresh volume the owner of the image directory only
+# when the directory exists. Without it the published image starts the compose
+# stack with a root-owned /data and dies on "open /data/mddb.db: permission denied".
+RUN mkdir -p /app/data /data && \
+    chown -R mddb:mddb /app /data
 
 USER mddb
 

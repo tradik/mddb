@@ -2,8 +2,10 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -50,31 +52,36 @@ func TestMCPToolCountDocsInSync(t *testing.T) {
 	}
 }
 
-// landingToolCountRe matches the MCP tool count wherever it appears on the SSG
-// landing page: the JS single-source const, the SEO <meta> "(N tools)", and the
-// JSON-LD "with N tools". The visible badges/headers are driven by the const at
-// runtime, so pinning the const + the two static SEO spots covers the page.
-var landingToolCountRe = regexp.MustCompile(`MDDB_MCP_TOOLS\s*=\s*(\d+)|MCP server \((\d+) tools\)|with (\d+) tools,`)
+// landingToolCountRe matches a tool count written as a number anywhere in the
+// SSG landing templates: "N MCP Tools", "N tools", "N built-in tools", the old
+// JS const. The landing page renders the count from {{$.Vars.mcpTools}}, which
+// TestMCPToolCountSiteInSync pins; a literal next to it is a second source that
+// drifts (it said 67 and 72 here), so any literal must equal the code count.
+var landingToolCountRe = regexp.MustCompile(`MDDB_MCP_TOOLS\s*=\s*(\d+)|\b(\d+) (?:built-in )?(?:MCP )?[Tt]ools\b`)
 
 // TestMCPToolCountLandingInSync guards the landing page (services/ssg-template)
-// against the same drift DOC-001 fixed in the docs: every tool-count reference
-// must equal len(mcpBuiltinTools()). The count had drifted to 67 and 72 here.
+// against the same drift DOC-001 fixed in the docs.
 func TestMCPToolCountLandingInSync(t *testing.T) {
 	want := strconv.Itoa(len(mcpBuiltinTools()))
-	const path = "../../services/ssg-template/index.html"
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read %s: %v", path, err)
+	paths, err := filepath.Glob("../../services/ssg-template/index*.html")
+	if err != nil || len(paths) == 0 {
+		t.Fatalf("no landing templates found: %v", err)
 	}
-	matches := landingToolCountRe.FindAllStringSubmatch(string(data), -1)
-	if len(matches) == 0 {
-		t.Fatalf("%s: found no MCP tool-count reference — guard regex may be stale", path)
-	}
-	for _, m := range matches {
-		got := m[1] + m[2] + m[3] // exactly one capture group is non-empty per match
-		if got != want {
-			t.Errorf("%s: tool count %q != code count %s (update MDDB_MCP_TOOLS / SEO meta / JSON-LD)", path, got, want)
+	usesVar := false
+	for _, path := range paths {
+		data, err := os.ReadFile(path) // #nosec G304 -- a landing template found by a fixed glob, not user input
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
 		}
+		usesVar = usesVar || strings.Contains(string(data), "{{$.Vars.mcpTools}}")
+		for _, m := range landingToolCountRe.FindAllStringSubmatch(string(data), -1) {
+			if got := m[1] + m[2]; got != want {
+				t.Errorf("%s: tool count %q != code count %s (in %q); render {{$.Vars.mcpTools}}", path, got, want, m[0])
+			}
+		}
+	}
+	if !usesVar {
+		t.Error("no landing template renders {{$.Vars.mcpTools}} — the guard is checking nothing")
 	}
 }
 

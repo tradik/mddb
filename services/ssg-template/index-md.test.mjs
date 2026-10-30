@@ -33,3 +33,17 @@ test('FE-010: inline markdown still works', () => {
   assert.match(md('**bold**'), /<strong>bold<\/strong>/);
   assert.match(md('`code`'), /<code>code<\/code>/);
 });
+
+// The inline chat widget connects to ws://localhost:11030 — an mddb-chat on the
+// visitor's machine. It must start only where the page is served locally; on
+// the public site it was a bubble stuck on "Connecting..." for everyone.
+test('chat widget starts only on a local host', () => {
+  const m = html.match(/if \(!(\/\^\(localhost[^\n]*?\$\/)\.test\(window\.location\.hostname\)\) return;/);
+  assert.ok(m, 'local-host guard not found before the chat widget');
+  assert.ok(html.indexOf(m[0]) < html.indexOf("const CHAT_SERVER = 'ws://localhost:11030/ws'"),
+    'the guard must run before the widget is built');
+  // eslint-disable-next-line no-new-func
+  const re = new Function(`return ${m[1]}`)();
+  for (const host of ['localhost', '127.0.0.1', '[::1]']) assert.ok(re.test(host), host);
+  for (const host of ['mddb.tradik.com', 'localhost.example.com', 'evil-localhost']) assert.ok(!re.test(host), host);
+});

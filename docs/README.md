@@ -82,18 +82,18 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 
 ## 📚 What is MDDB?
 
-MDDB (Markdown Database) is an **AI-native embedded document database** for markdown content. Single ~28 MB binary, embedded BoltDB storage, zero external dependencies. Core capabilities at a glance (full list in [FEATURES.md](FEATURES.md) and the root [README.md](../README.md)):
+MDDB (Markdown Database) is an **AI-native embedded document database** for markdown content. Single ~32MB binary, embedded BoltDB storage, zero external dependencies. Core capabilities at a glance (full list in [FEATURES.md](FEATURES.md) and the root [README.md](../README.md)):
 
 - **Triple protocol** — HTTP/JSON REST, gRPC/Protobuf, GraphQL, all over TCP or Unix Domain Sockets
 - **Built-in [MCP server](MCP.md)** — 93 MCP tools, [MCP 2026-07-28 and 2025-11-25](MCP-REVISIONS.md) served side by side, stdio + Streamable HTTP + SSE transports for Claude / Cursor / Windsurf / ChatGPT / Ollama / DeepSeek
-- **[Vector / semantic search](SEARCH.md)** — 7 index algorithms (Flat / HNSW / IVF / PQ / OPQ / SQ / BQ) with per-collection int8/int4 quantization; OpenAI / Ollama / Cohere / Voyage embeddings
+- **[Vector / semantic search](SEARCH.md)** — 8 index algorithms (Flat / HNSW / IVF / PQ / OPQ / SQ / SQ4 / BQ), or `auto` to let the server choose, with per-collection int8/int4 quantization; OpenAI / Ollama / Cohere / Voyage embeddings or the offline lexical provider
 - **[Reference coding](REFERENCE-CODING.md)** — index other projects' code as reference collections and ask how they solved it (`mddb-cli reference`, `reference_*` MCP tools)
-- **[Full-text search](SEARCH.md)** — TF-IDF / BM25 / BM25F / PMISparse, 7 modes (simple / boolean / phrase / wildcard / proximity / range / fuzzy), 18-language stemming, typo tolerance
+- **[Full-text search](SEARCH.md)** — TF-IDF / BM25 / BM25F / PMISparse, 8 modes (simple / boolean / phrase / wildcard / proximity / expression / range / fuzzy), 17-language stemming, typo tolerance
 - **[Hybrid search](RAG-PIPELINE.md)** — sparse BM25 + dense vector via alpha blending or Reciprocal Rank Fusion
 - **[Code search and code graph](API.md#the-connection-graph)** — code indexed as code, chunked on brackets, and linked by calls, includes and references across C/C++, Go, Rust, Java, Python, Ruby, PHP, JS/TS, CSS/HTML, Terraform, Kubernetes, Kustomize and Ansible
 - **[Geosearch](GEOSEARCH.md)** — R-tree + geohash radius / bounding-box queries, composable with FTS and vector
 - **[Memory RAG](RAG-PIPELINE.md)** — conversational memory with session management and semantic recall
-- **Multi-format upload** — `.md`, `.txt`, `.html`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.tex`, `.yaml` auto-converted to Markdown; URL import; Wikipedia XML dump streaming
+- **Multi-format upload** — 20 file formats (`.md`, `.txt`, `.html`, `.pdf`, `.docx`, `.odt`, `.rtf`, `.tex`, `.yaml`, `.xlsx`, `.ods`, `.csv`, `.tsv`, `.pptx`, `.odp`, `.epub`, `.eml`, `.mbox` and more) auto-converted to Markdown; URL import; [synced sources](AUTOMATIONS.md#synced-sources) (sitemap, URL list, S3 prefix); Wikipedia XML dump streaming
 - **[Authentication](AUTHENTICATION.md)** — JWT, API keys, per-collection RBAC, per-protocol access modes
 - **[TLS / mTLS](TLS.md)** — built-in HTTPS with optional client certificate authentication
 - **[Replication](REPLICATION.md)** — leader-follower binlog streaming for read scaling

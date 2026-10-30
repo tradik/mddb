@@ -559,8 +559,9 @@ a:hover {
     color: var(--text-primary);
 }
 
-.feat-stack-layer.l1 span { border-color: #667eea; color: #667eea; }
-.feat-stack-layer.l2 span { border-color: #28a745; color: #28a745; }
+/* At least 5:1 on the white chip (#667eea and #28a745 were 3.7:1 and 3.1:1). */
+.feat-stack-layer.l1 span { border-color: #4c51bf; color: #4c51bf; }
+.feat-stack-layer.l2 span { border-color: #15803d; color: #15803d; }
 .feat-stack-layer.l3 span {
     background: linear-gradient(135deg, var(--color-palette-accent-400), var(--color-palette-accent-600));
     color: white;
@@ -578,6 +579,7 @@ a:hover {
 /* Protocol boxes */
 .feat-protocol {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     width: 100%;
     justify-content: center;
@@ -599,13 +601,15 @@ a:hover {
 .feat-proto-box small {
     font-size: 0.65rem;
     font-weight: 500;
-    opacity: 0.85;
 }
 
-.feat-proto-box.rest { background: #3b82f6; }
-.feat-proto-box.grpc { background: #10b981; }
-.feat-proto-box.gql { background: #e535ab; }
-.feat-proto-box.ws { background: #f59e0b; }
+/* WCAG 2.2 AA: white text on each box is at least 5:1 (the 400/500 shades
+   used before measured 2.2–3.9:1). */
+.feat-proto-box.rest { background: #1d4ed8; }
+.feat-proto-box.grpc { background: #047857; }
+.feat-proto-box.gql { background: #be185d; }
+.feat-proto-box.ws { background: #b45309; }
+.feat-proto-box.es { background: #6d28d9; }
 
 /* Format pipeline */
 .feat-formats {
@@ -625,12 +629,14 @@ a:hover {
     background: white;
 }
 
-.feat-file.f-md { border-color: #3b82f6; color: #3b82f6; }
+/* At least 4.8:1 on the white chip; #3b82f6, #f97316, #ef4444 and #8b5cf6
+   measured 2.8–4.2:1. */
+.feat-file.f-md { border-color: #1d4ed8; color: #1d4ed8; }
 .feat-file.f-txt { border-color: #6b7280; color: #6b7280; }
-.feat-file.f-html { border-color: #f97316; color: #f97316; }
-.feat-file.f-pdf { border-color: #ef4444; color: #ef4444; }
+.feat-file.f-html { border-color: #c2410c; color: #c2410c; }
+.feat-file.f-pdf { border-color: #b91c1c; color: #b91c1c; }
 .feat-file.f-docx { border-color: #2563eb; color: #2563eb; }
-.feat-file.f-url { border-color: #8b5cf6; color: #8b5cf6; }
+.feat-file.f-url { border-color: #6d28d9; color: #6d28d9; }
 .feat-file.f-out {
     background: linear-gradient(135deg, var(--color-palette-accent-400), var(--color-palette-accent-600));
     color: white;

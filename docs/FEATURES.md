@@ -53,7 +53,7 @@ Complete list of MDDB features organized by category.
 - **Auto-embeddings** - Documents embedded automatically in background
 - **Multiple Providers** - OpenAI, Cohere, Voyage AI, Ollama, plus `lexical` (hashed n-grams, no model — for CI and offline; matches spelling, not meaning)
 - **Similarity Search** - Find documents by meaning, not keywords
-- **Multiple Algorithms** - Flat (exact), HNSW (approximate), IVF (clustered), PQ (compressed), SQ (scalar quantized), BQ (binary quantized)
+- **Multiple Algorithms** - Flat (exact), HNSW (approximate), IVF (clustered), PQ (compressed), OPQ (rotated PQ), SQ (int8 scalar quantized), SQ4 (int4), BQ (binary quantized), or `auto` to let the server choose per query
 - **Query-time Algorithm Selection** - Choose algorithm per request via `algorithm` parameter
 - **Threshold Filtering** - Minimum similarity score
 - **Metadata Filtering** - Combine semantic + metadata filters
@@ -293,7 +293,7 @@ Complete list of MDDB features organized by category.
 
 ### Docker Support
 - **Multi-arch Images** - amd64, arm64, armv7
-- **Alpine Linux** - Minimal image size (~29MB)
+- **Alpine Linux** - Minimal image size (~43MB compressed)
 - **Health Checks** - Built-in health check endpoint
 - **Volume Persistence** - Mount `/data` for database
 - **Environment Config** - All settings via env vars

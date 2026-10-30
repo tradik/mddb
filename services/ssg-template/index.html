@@ -54,7 +54,7 @@
       "applicationCategory": "DeveloperApplication",
       "url": "https://mddb.tradik.com/",
       "downloadUrl": "https://github.com/tradik/mddb/releases",
-      "operatingSystem": "Linux, macOS, Windows, FreeBSD",
+      "operatingSystem": "Linux, macOS, FreeBSD",
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -63,10 +63,10 @@
       "description": "AI-native knowledge base with built-in MCP server, vector search, RAG support, and semantic retrieval for AI agents and LLM workflows",
       "softwareVersion": "{{$.Vars.mddbVersion}}",
       "featureList": [
-        "Built-in MCP server speaking both 2026-07-28 (stateless, server/discover) and 2025-11-25, with 93 tools, tool annotations, prompts, completion, structured output — stdio, Streamable HTTP, SSE transports for Claude, Cursor, Windsurf, ChatGPT, Ollama, DeepSeek",
-        "Vector/semantic search with 7 index algorithms: Flat, HNSW, IVF, PQ, OPQ, SQ, BQ + per-collection int8/int4 quantization (OpenAI, Ollama, Cohere, Voyage AI)",
+        "Built-in MCP server speaking both 2026-07-28 (stateless, server/discover) and 2025-11-25, with {{$.Vars.mcpTools}} tools, tool annotations, prompts, completion, structured output — stdio, Streamable HTTP, SSE transports for Claude, Cursor, Windsurf, ChatGPT, Ollama, DeepSeek",
+        "Vector/semantic search with 8 index algorithms: Flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ, or algorithm auto to let the server choose; per-collection int8/int4 quantization (OpenAI, Ollama, Cohere, Voyage AI, or the offline lexical provider)",
         "Hybrid search combining sparse BM25 + dense vector with alpha blending and Reciprocal Rank Fusion",
-        "Full-text search with TF-IDF, BM25, BM25F, PMISparse scoring, 7 search modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy), multi-language stemming (18 languages), typo tolerance, per-query metadata boost/demote, and prefix autocomplete",
+        "Full-text search with TF-IDF, BM25, BM25F, PMISparse scoring, 8 search modes (simple, boolean, phrase, wildcard, proximity, expression, range, fuzzy), multi-language stemming (17 languages), typo tolerance, per-query metadata boost/demote, and prefix autocomplete",
         "Inline facets (v2.9.14+): facetBy parameter on FTS and Hybrid search returns per-key value counts alongside results — no separate aggregate call",
         "Curation rules (v2.9.14+): pin documents to fixed positions or hide others for specific queries — editorial overrides applied in FTS + Hybrid pipelines, inspired by Typesense",
         "Per-collection revision retention (v2.9.14+): maxRevisions cap trims older revisions synchronously on every write so history stays bounded on high-churn collections",
@@ -75,19 +75,24 @@
         "Zero-shot document classification using embedding cosine similarity",
         "Custom YAML-based MCP tools for domain-specific AI workflows",
         "RAG pipeline: auto-embed on ingest, semantic retrieval, MCP exposure",
-        "Multi-format upload: .md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex, .yaml with auto-conversion to Markdown",
+        "Multi-format upload: 20 file formats (.md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex, .yaml, .xlsx, .ods, .csv, .pptx, .odp, .epub, .eml, .mbox and more) with auto-conversion to Markdown",
         "Wikipedia XML dump import: stream multi-GB MediaWiki dumps (.xml.bz2) with wikitext-to-Markdown conversion",
         "URL import: fetch and store documents from any URL",
         "Full revision history for every document",
-        "Multi-protocol: HTTP/JSON REST + gRPC/Protobuf + GraphQL + WebSocket streaming (via mddb-chat) + MCP (Streamable HTTP / SSE / stdio)",
+        "Multi-protocol: HTTP/JSON REST + HTTP/3 + gRPC/Protobuf + GraphQL + Server-Sent Events + WebSocket streaming (via mddb-chat) + MCP (Streamable HTTP / SSE / stdio)",
+        "Elasticsearch-compatible subset under /es for existing Elasticsearch clients (MDDB_ES_COMPAT=true)",
+        "Corpus packs: a collection built once and installed read-only anywhere, without re-embedding",
+        "Synced sources: a cron rule keeps a collection in step with a sitemap, a URL list or an S3 prefix",
         "Transport options: TCP host:port or Unix Domain Socket (unix:/path.sock) for zero-network local deployments",
         "TLS and mutual TLS (mTLS): user-supplied server cert+key, optional client CA bundle for cert-based client authentication",
         "Automation: triggers, crons, webhooks, sentiment analysis, template variables",
         "Document TTL with auto-expiry and background cleanup",
         "JWT authentication, RBAC, per-protocol access modes (MDDB_MCP_MODE, MDDB_API_MODE, MDDB_GRPC_MODE)",
         "Leader-follower replication with binlog streaming",
+        "Scheduled backups with retention and an S3 target; per-collection quotas and embedding budgets",
+        "Trusted proxies and PROXY protocol v1/v2 for the real client IP behind a load balancer",
         "Multi-language support: same key, multiple locales",
-        "Prometheus metrics and Grafana dashboards",
+        "Prometheus metrics, Grafana dashboards and OpenTelemetry trace export",
         "Web admin panel (React-based)",
         "{{$.Vars.mddbBinarySize}} single binary, embedded BoltDB, zero external dependencies",
         "{{$.Vars.mddbDockerSize}} Alpine-based Docker image with health checks",
@@ -348,6 +353,11 @@
     <!-- MDDB Chat Widget (inline for local dev) -->
     <script>
         (function () {
+            // The widget talks to an mddb-chat on the visitor's own machine, so
+            // it only makes sense where the page itself is served locally
+            // (`make docs-dev`). On mddb.tradik.com it was a bubble that stayed
+            // on "Connecting..." for every visitor.
+            if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname)) return;
             const CHAT_SERVER = 'ws://localhost:11030/ws';
             const ACCENT = '#3B82F6';
 

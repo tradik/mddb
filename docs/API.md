@@ -118,7 +118,7 @@ The server can be configured using environment variables:
 | `MDDB_EMBEDDING_MODEL` | *(per provider)* | Embedding model name |
 | `MDDB_EMBEDDING_DIMENSIONS` | *(per provider)* | Vector dimensions |
 | `MDDB_FTS_STEMMING` | `true` | Enable stemming for FTS |
-| `MDDB_FTS_DEFAULT_LANG` | `en` | Default language for FTS stemming and stop words (18 languages supported) |
+| `MDDB_FTS_DEFAULT_LANG` | `en` | Default language for FTS stemming and stop words (17 languages supported) |
 | `MDDB_FTS_SYNONYMS` | `true` | Enable synonym expansion for FTS |
 | `MDDB_COMPRESSION_ENABLED` | `true` | Enable adaptive compression (Snappy/Zstd) |
 | `MDDB_COMPRESSION_SMALL_THRESHOLD` | `1024` | Snappy compression threshold (bytes) |

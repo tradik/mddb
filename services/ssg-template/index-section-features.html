@@ -21,11 +21,12 @@
                     zero-network local deployments (PHP-FPM sidecars, cron, same-host panel)</li>
                 <li>TLS and mutual TLS (mTLS): user-supplied server cert/key, optional client CA bundle for
                     certificate-based client authentication (MDDB_TLS_CLIENT_CA)</li>
-                <li>Vector/semantic search with 7 index algorithms: Flat (exact), HNSW, IVF, PQ, OPQ, SQ, BQ —
-                    supports OpenAI, Ollama, Cohere, Voyage AI embeddings + per-collection int8/int4
+                <li>Vector/semantic search with 8 index algorithms: Flat (exact), HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ,
+                    or <code>algorithm: auto</code> to let the server choose — OpenAI, Ollama, Cohere,
+                    Voyage AI embeddings or the offline lexical provider, with per-collection int8/int4
                     quantization (4-8x compression)</li>
-                <li>Full-text search with 7 modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy),
-                    TF-IDF, BM25, BM25F, PMISparse scoring, multi-language stemming (18 languages), typo
+                <li>Full-text search with 8 modes (simple, boolean, phrase, wildcard, proximity, expression, range,
+                    fuzzy), TF-IDF, BM25, BM25F, PMISparse scoring, multi-language stemming (17 languages), typo
                     tolerance, metadata
                     pre-filtering</li>
                 <li>Hybrid search combining sparse (BM25) and dense (vector) with alpha blending or Reciprocal
@@ -35,9 +36,16 @@
                 <li>RAG pipeline: auto-embed on ingest, semantic retrieval, MCP exposure to LLMs</li>
                 <li>Memory RAG: conversational memory with session management, semantic recall, and
                     summarization</li>
-                <li>Multi-protocol: HTTP/JSON REST API, gRPC/Protobuf, GraphQL, WebSocket streaming (via mddb-chat), MCP (Streamable HTTP / SSE / stdio)</li>
-                <li>Multi-format upload: .md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex, .yaml with
+                <li>Multi-protocol: HTTP/JSON REST API, HTTP/3, gRPC/Protobuf, GraphQL, Server-Sent Events, WebSocket streaming (via mddb-chat), MCP (Streamable HTTP / SSE / stdio)</li>
+                <li>Elasticsearch-compatible subset under <code>/es</code> (<code>MDDB_ES_COMPAT=true</code>):
+                    search, count, document and bulk calls for existing Elasticsearch clients</li>
+                <li>Multi-format upload: 20 file formats — .md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex,
+                    .yaml, .xlsx, .ods, .csv, .tsv, .pptx, .odp, .epub, .eml, .mbox and more — with
                     auto-conversion to Markdown</li>
+                <li>Corpus packs: a collection built once and installed read-only anywhere, without
+                    re-embedding or reindexing</li>
+                <li>Synced sources: a cron rule keeps a collection in step with a sitemap, a URL list or an
+                    S3 prefix</li>
                 <li>Wikipedia XML dump import: stream multi-GB MediaWiki dumps with wikitext-to-Markdown
                     conversion, namespace filtering, batch processing</li>
                 <li>URL import: fetch and store documents from any URL</li>
@@ -46,11 +54,15 @@
                 <li>JWT authentication and RBAC authorization (opt-in)</li>
                 <li>Compliance-first (v2.9.15+): ISO 27001 / SOC 2 hardening built-in — audit log, AES-256-GCM at-rest encryption, HTTP+gRPC rate limiter, incident webhooks, and a single <code>MDDB_PRODUCTION=true</code> switch that refuses to boot without every control in place</li>
                 <li>Leader-follower replication with binlog streaming</li>
+                <li>Scheduled backups with retention and an S3 target; per-collection quotas, disk reserve
+                    and embedding budget</li>
+                <li>Behind a load balancer: trusted proxies (<code>MDDB_TRUSTED_PROXIES</code>) and PROXY
+                    protocol v1/v2 give rate limits and the audit log the real client IP</li>
                 <li>Automation: triggers, crons, webhooks, sentiment analysis, template variables</li>
                 <li>Multi-language support: same document key, multiple locales</li>
-                <li>Prometheus metrics and Grafana dashboard support</li>
+                <li>Prometheus metrics, Grafana dashboard support and OpenTelemetry trace export</li>
                 <li>{{$.Vars.mddbBinarySize}} single binary, embedded BoltDB, zero external dependencies</li>
-                <li>Docker image: {{$.Vars.mddbDockerSize}} Alpine-based with health checks</li>
+                <li>Docker image: {{$.Vars.mddbDockerSize}} compressed, Alpine-based, with health checks</li>
                 <li>Aggregations: metadata facets (value counts) and date histograms with optional pre-filtering
                 </li>
                 <li>Per-collection storage backends: BoltDB (default), in-memory (ephemeral), S3/MinIO —
@@ -96,7 +108,7 @@
                         </div>
                         <div class="feat-stack-plus">+</div>
                         <div class="feat-stack-layer l2">
-                            <span>Flat</span><span>HNSW</span><span>IVF</span><span>PQ</span><span>OPQ</span><span>SQ</span><span>BQ</span>
+                            <span>Flat</span><span>HNSW</span><span>IVF</span><span>PQ</span><span>OPQ</span><span>SQ</span><span>SQ4</span><span>BQ</span>
                         </div>
                         <div class="feat-stack-eq">=</div>
                         <div class="feat-stack-layer l3"><span>Hybrid RAG</span></div>
@@ -105,15 +117,16 @@
                 <div class="feat-text">
                     <span class="feat-label">Search</span>
                     <h3>Hybrid Search Engine</h3>
-                    <p>Full-text with 7 search modes (simple, boolean, phrase, wildcard, proximity, range,
-                        fuzzy) + vector search with 7 index types. Multi-language stemming for 18 languages.
+                    <p>Full-text with 8 search modes (simple, boolean, phrase, wildcard, proximity, expression,
+                        range, fuzzy) + vector search with 8 index types, or <code>auto</code> to let the
+                        server pick one for the collection. Multi-language stemming for 17 languages.
                         Combine with
                         alpha blending or Reciprocal Rank Fusion. Metadata pre-filtering, typo tolerance.
                         Source code is searched as code and linked into a graph of calls, includes and
                         references, from C and Go to Terraform and Kubernetes manifests.</p>
                     <ul class="feat-tags">
                         <li>Vector Search</li>
-                        <li>Full-Text (7 modes, 18 langs)</li>
+                        <li>Full-Text (8 modes, 17 langs)</li>
                         <li>Hybrid RAG</li>
                         <li>Code Graph</li>
                         <li>Zero-Shot Classification</li>
@@ -128,6 +141,7 @@
                         <div class="feat-proto-box grpc">gRPC<small>Protobuf</small></div>
                         <div class="feat-proto-box gql">GraphQL<small>Flexible queries</small></div>
                         <div class="feat-proto-box ws">WebSocket<small>mddb-chat</small></div>
+                        <div class="feat-proto-box es">/es<small>Elasticsearch subset</small></div>
                     </div>
                 </div>
                 <div class="feat-text">
@@ -135,12 +149,16 @@
                     <h3>Multi-Protocol Access</h3>
                     <p>REST for easy debugging, gRPC for high-throughput pipelines, GraphQL for flexible
                         frontend queries, and WebSocket streaming via <code>mddb-chat</code> for LLM chat
-                        pipelines. All endpoints, one stack.</p>
+                        pipelines. HTTP/3 when you turn it on, and an Elasticsearch-compatible subset
+                        under <code>/es</code> so an existing Elasticsearch client can search and write
+                        without a rewrite. All endpoints, one stack.</p>
                     <ul class="feat-tags">
                         <li>REST API</li>
                         <li>gRPC</li>
                         <li>GraphQL</li>
                         <li>WebSocket</li>
+                        <li>HTTP/3</li>
+                        <li>Elasticsearch subset</li>
                     </ul>
                 </div>
             </div>
@@ -157,6 +175,10 @@
                         <div class="feat-file f-rtf">.rtf</div>
                         <div class="feat-file f-tex">.tex</div>
                         <div class="feat-file f-yaml">.yaml</div>
+                        <div class="feat-file f-xlsx">.xlsx</div>
+                        <div class="feat-file f-pptx">.pptx</div>
+                        <div class="feat-file f-epub">.epub</div>
+                        <div class="feat-file f-eml">.eml</div>
                         <div class="feat-file f-url">URL</div>
                         <div class="feat-file f-wiki">Wiki XML</div>
                         <div class="feat-arrow-down"></div>
@@ -166,12 +188,14 @@
                 <div class="feat-text">
                     <span class="feat-label">Ingestion</span>
                     <h3>Multi-Format Pipeline</h3>
-                    <p>Upload .md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex, .yaml, import from any URL,
+                    <p>Upload 20 file formats — documents, spreadsheets, slides, e-books and mail (.pdf, .docx,
+                        .xlsx, .csv, .pptx, .epub, .eml, .mbox, .odt, .rtf, .tex, .yaml and more) — import
+                        from any URL, keep a collection synced with a sitemap or an S3 prefix,
                         or stream Wikipedia XML dumps (.xml.bz2).
                         Everything auto-converts to Markdown. Background embedding worker indexes documents as
                         they arrive.</p>
                     <ul class="feat-tags">
-                        <li>13 Formats</li>
+                        <li>20 File Formats</li>
                         <li>Wikipedia Import</li>
                         <li>URL Import</li>
                         <li>Auto-Embed</li>
@@ -187,16 +211,20 @@
             <div class="feat-chip"><strong>Unix Socket</strong> Zero-network local transport</div>
             <div class="feat-chip"><strong>mTLS</strong> Mutual TLS with client CAs</div>
             <div class="feat-chip"><strong>Revisions</strong> Full document history</div>
+                <div class="feat-chip"><strong>Backups</strong> Scheduled, verified, S3 target</div>
+                <div class="feat-chip"><strong>Quotas</strong> Documents, bytes, embedding budget</div>
+                <div class="feat-chip"><strong>Corpus Packs</strong> Build once, install read-only</div>
+                <div class="feat-chip"><strong>Behind a Proxy</strong> Trusted proxies, PROXY protocol</div>
             <div class="feat-chip"><strong>Replication</strong> Leader-follower binlog</div>
             <div class="feat-chip"><strong>Auth & RBAC</strong> JWT, API keys, per-collection</div>
             <div class="feat-chip"><strong>ISO 27001 / SOC 2</strong> Audit log, AES-256-GCM, rate limiter, incident webhooks (v2.9.15+)</div>
             <div class="feat-chip"><strong>Automations</strong> Triggers, crons, webhooks</div>
             <div class="feat-chip"><strong>Aggregations</strong> Facets & histograms</div>
             <div class="feat-chip"><strong>Multi-Language</strong> Same key, many locales</div>
-            <div class="feat-chip"><strong>Docker</strong> {{$.Vars.mddbDockerSize}} Alpine image</div>
+            <div class="feat-chip"><strong>Docker</strong> {{$.Vars.mddbDockerSize}} Alpine image (compressed)</div>
             <div class="feat-chip"><strong>Zero Config</strong> Single binary, no deps</div>
             <div class="feat-chip"><strong>Storage Backends</strong> BoltDB, In-Memory, S3</div>
-            <div class="feat-chip"><strong>Telemetry</strong> Prometheus + Grafana</div>
+            <div class="feat-chip"><strong>Telemetry</strong> Prometheus, Grafana, OpenTelemetry</div>
         </div>
     </div>
 </section>

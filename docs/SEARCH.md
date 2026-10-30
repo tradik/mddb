@@ -25,9 +25,9 @@ Full-text search uses an inverted index built from document content. Queries are
 
 ### Multi-Language Support (v2.8.0+)
 
-FTS supports language-aware stemming and stop word filtering for 18 languages. Each document's `lang` field determines which stemmer and stop word list is used during indexing and querying.
+FTS supports language-aware stemming and stop word filtering for 17 languages. Each document's `lang` field determines which stemmer and stop word list is used during indexing and querying.
 
-**Supported languages:** English, Polish, German, French, Spanish, Italian, Portuguese, Dutch, Russian, Swedish, Norwegian, Danish, Finnish, Hungarian, Romanian, Turkish, Arabic, Tamil.
+**Supported languages:** English, Polish, German, French, Spanish, Italian, Portuguese, Dutch, Russian, Swedish, Norwegian, Danish, Finnish, Hungarian, Romanian, Turkish, Arabic.
 
 Language codes are normalized: `en_US` → `en`, `pl_PL` → `pl`. Unknown languages fall back to the configured default (English by default).
 
@@ -113,7 +113,7 @@ curl -X DELETE http://localhost:11023/v1/synonyms \
 
 ### Stop Word Management
 
-MDDB ships with language-specific stop words for 18 languages (e.g., ~79 English, ~297 Polish, ~232 German). You can add custom stop words per collection on top of language defaults.
+MDDB ships with language-specific stop words for 17 languages (e.g., ~79 English, ~297 Polish, ~232 German). You can add custom stop words per collection on top of language defaults.
 
 ```bash
 # Add custom stop words

@@ -11,7 +11,7 @@
 
 **AI-native document database with built-in MCP server, file upload (PDF/DOCX/XLSX/PPTX/EPUB/EML/HTML/ODT/RTF/TEX/YAML/Wikipedia XML to Markdown), vector search, RAG pipelines, and 93 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
 
-MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 93 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~26MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
+MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 93 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~32MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
 
 ## 🎯 What is MDDB?
 
@@ -20,7 +20,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **File Upload** - Upload PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT files, auto-converted to Markdown and indexed, each with a conversion confidence score
 - **Wikipedia Import** - Stream and import MediaWiki XML dumps (`.xml.bz2`). Wikitext is auto-converted to Markdown, with namespace filtering, and multi-GB files are handled
 - **Built-in MCP Server** - 93 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
-- **Vector Search** - Auto-embed documents, semantic similarity with 7 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, BQ) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode-v2114) + ARM NEON/SME hardware acceleration + goroutine parallel search
+- **Vector Search** - Auto-embed documents, semantic similarity with 8 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ, or `auto` to let the server choose) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode-v2114) + ARM NEON/SME hardware acceleration + goroutine parallel search
 - **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere, plus an offline lexical provider (spelling, not meaning), configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
 - **[Geo Search](docs/GEOSEARCH.md)** - R-tree and geohash indexes for radius/bounding-box queries, composable with FTS/vector via `hybrid-search`, optional postcode lookup
 - **RAG-Ready** - Hybrid search (BM25 keyword + vector, fused with RRF or alpha blending), [parent/chunk/window retrieval modes](docs/SEARCH.md#retrieval-modes--parent-chunk-window-v2114) for precise LLM context, [MMR result diversification](docs/SEARCH.md#mmr-result-diversification-v2114), and per-query metadata boosting (freshness/recency ranking)
@@ -42,7 +42,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Measured, not guessed (v2.18.8)** - Evaluation sets score search configurations on your own questions (recall@k, nDCG@k, MRR, latency, tokens), `mddb-cli eval --fail-below` gates CI, and the advisor recommends from the measurement, BM25 `k1`/`b` included. `mddb-cli gain` reports the tokens retrieval returned and saved ([SEARCH.md](docs/SEARCH.md#measuring-instead-of-guessing-v2188))
 - **Safe for many agents (v2.18.8)** - Conditional writes with `expectedRevision`, collection aliases for blue/green rebuilds (`mddb-cli reindex-swap`), and delete/update/TTL by metadata filter with a dry run ([API.md](docs/API.md#collection-aliases-v1aliases))
 - **Agent Instructions** - Ready-made guidance for Claude Code, Cursor and Windsurf on which tool fits a question and how to ask for chunks instead of whole documents ([integrations/agent-instructions/](integrations/agent-instructions/)), measured at 60x fewer tokens for the same search
-- **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse, 8 search modes (simple, boolean, phrase, wildcard, proximity, **expression**, range, fuzzy), typo tolerance, multi-language stemming (18 languages), synonyms, per-query metadata boost/demote, prefix autocomplete, **search-result highlighting with fragments**, incremental re-indexing (an update writes only the fields it changed) and per-collection `excludeMetaKeys`
+- **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse, 8 search modes (simple, boolean, phrase, wildcard, proximity, **expression**, range, fuzzy), typo tolerance, multi-language stemming (17 languages), synonyms, per-query metadata boost/demote, prefix autocomplete, **search-result highlighting with fragments**, incremental re-indexing (an update writes only the fields it changed) and per-collection `excludeMetaKeys`
 - **Geosearch** - R-tree + geohash radius/bbox queries, **GeoJSON polygon and multi-polygon containment**, postcode lookup, **distance-sorted hybrid search** combining proximity with keyword/vector relevance
 - **Async Bulk Ingest** - Queue long-running document imports with job tracking, progress polling, and optional webhook callback
 - **Full Revision History** - Every update creates a new revision with complete snapshots
@@ -51,7 +51,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 - **Real-Time Events** - Server-Sent Events (SSE) for live document change notifications
 - **MCP Transports** - Streamable HTTP (`/mcp`, 2026-07-28 + 2025-11-25), legacy SSE (`/sse`), and stdio
 - **Built-in TLS** - Native HTTPS support, connection pooling, pprof profiling
-- **Zero Configuration** - Single ~26MB binary, embedded database, no dependencies
+- **Zero Configuration** - Single ~32MB binary, embedded database, no dependencies
 
 **Perfect for:** AI agent memory, RAG pipelines, knowledge bases for LLMs, documentation chatbots, semantic search APIs, document processing (PDF/DOCX to Markdown), static site generation, WordPress migration
 
@@ -153,7 +153,7 @@ That is it. Your AI agent now has full access to your knowledge base with 93 bui
 # MDDB Server only
 docker run -d --name mddb \
   -p 11023:11023 -p 11024:11024 -p 9000:9000 \
-  -v mddb-data:/data \
+  -v mddb-data:/app/data \
   tradik/mddb:latest
 
 # Web Panel (connect to existing server)
@@ -338,7 +338,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 
 | Image | Size | Description |
 |-------|------|-------------|
-| `tradik/mddb:latest` | ~26MB | Database server with MCP built-in (Alpine) |
+| `tradik/mddb:latest` | ~43MB | Database server with MCP built-in (Alpine) |
 | `tradik/mddb:panel` | ~88MB | Web admin panel (Node Alpine) |
 | `tradik/mddb:cli` | ~8MB | CLI client (Alpine) |
 
@@ -359,7 +359,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext to Markdown conversion, namespace filtering, batch processing
 - ✅ **Vector Search** - Semantic similarity with auto-embeddings (OpenAI, Ollama, Cohere, Voyage), ARM NEON/SME SIMD acceleration
 - ✅ **Query Planner & Relevance Feedback** - `algorithm: "auto"` picks the vector index per query (`explain: true` shows why); `positive`/`negative` examples correct a search with Rocchio or rescoring; client-written document summaries as a second representation (`summaryMode: blend|expand`); images from Markdown and PDF attached to hits (`includeImages`) and searchable by picture with Voyage or Cohere; `queryDecomposition: "auto"` searches a question with several needs clause by clause (v2.18.10); after a restart a collection answers with flat and HNSW as soon as its vectors are loaded, while IVF/PQ/OPQ/SQ train in the background and `auto` skips them until they are ready (v2.18.10) ([guide](docs/SEARCH.md))
-- ✅ **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse scoring, 7 search modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy), typo tolerance, metadata pre-filtering, multi-language stemming and stop words (18 languages)
+- ✅ **Full-Text Search** - Built-in inverted index with TF-IDF, BM25, BM25F, PMISparse scoring, 8 search modes (simple, boolean, phrase, wildcard, proximity, expression, range, fuzzy), typo tolerance, metadata pre-filtering, multi-language stemming and stop words (17 languages)
 - ✅ **Hybrid Search** - Sparse (BM25) + dense (vector) fusion with alpha blending or RRF
 - ✅ **Aggregations** - Metadata facets (value counts) and date histograms with optional pre-filtering
 - ✅ **Inline Facets on Search** (v2.9.14+) - Pass `facetBy` to `/v1/fts` or `/v1/hybrid-search` and get per-key value counts alongside results, with no separate aggregate call
@@ -715,9 +715,10 @@ Both are current by construction, which a hand-written roadmap was not.
 
 ## 🏁 Used by
 
-- **[daemonports.org](https://daemonports.org/)** — search over 110,000–120,000
-  pages from the ports trees of five BSD systems runs on mddb, refreshed every
-  30 minutes. Its
+- **[daemonports.org](https://daemonports.org/)** — about 120,000 pages from the
+  ports trees of five BSD systems in one collection, refreshed every 30 minutes;
+  its public full-text search and autocomplete (`POST /v1/fts`,
+  `GET /v1/autocomplete` behind nginx) are served by mddb on FreeBSD with ZFS. Its
   [stats page](https://daemonports.org/stats/) shows mddb's live memory and
   disk use.
 

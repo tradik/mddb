@@ -9,45 +9,38 @@
                 <div class="version">v{{$.Vars.mddbVersion}}</div>
                 <p class="release-date">Released: {{$.Vars.mddbReleaseDate}}</p>
                 <div class="download-links">
-                    <a href="#"
-                        href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-linux-amd64.tar.gz"
+                    <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-linux-amd64.tar.gz"
                         class="download-link">
                         <span class="platform">Linux AMD64</span>
-                        <span class="size">{{$.Vars.mddbBinarySize}}</span>
+                        <span class="size">{{$.Vars.mddbDownloadSize}}</span>
                     </a>
-                    <a href="#"
-                        href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-linux-arm64.tar.gz"
+                    <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-linux-arm64.tar.gz"
                         class="download-link">
                         <span class="platform">Linux ARM64</span>
-                        <span class="size">{{$.Vars.mddbBinarySize}}</span>
+                        <span class="size">{{$.Vars.mddbDownloadSize}}</span>
                     </a>
-                    <a href="#"
-                        href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-darwin-amd64.tar.gz"
+                    <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-darwin-amd64.tar.gz"
                         class="download-link">
                         <span class="platform">macOS AMD64</span>
-                        <span class="size">{{$.Vars.mddbBinarySize}}</span>
+                        <span class="size">{{$.Vars.mddbDownloadSize}}</span>
                     </a>
-                    <a href="#"
-                        href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-darwin-arm64.tar.gz"
+                    <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-darwin-arm64.tar.gz"
                         class="download-link">
                         <span class="platform">macOS ARM64</span>
-                        <span class="size">{{$.Vars.mddbBinarySize}}</span>
+                        <span class="size">{{$.Vars.mddbDownloadSize}}</span>
                     </a>
-                    <a href="#"
-                        href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-freebsd-amd64.tar.gz"
+                    <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-v{{$.Vars.mddbVersion}}-freebsd-amd64.tar.gz"
                         class="download-link">
                         <span class="platform">FreeBSD AMD64</span>
-                        <span class="size">{{$.Vars.mddbBinarySize}}</span>
+                        <span class="size">{{$.Vars.mddbDownloadSize}}</span>
                     </a>
                 </div>
                 <div class="package-links">
-                    <a href="#"
-                        href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-amd64.deb"
+                    <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-amd64.deb"
                         class="package-link">
                         📦 Debian/Ubuntu (.deb)
                     </a>
-                    <a href="#"
-                        href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-amd64.rpm"
+                    <a href="https://github.com/tradik/mddb/releases/download/v{{$.Vars.mddbVersion}}/mddbd-{{$.Vars.mddbVersion}}-linux-amd64.rpm"
                         class="package-link">
                         📦 RedHat/CentOS (.rpm)
                     </a>
@@ -82,77 +75,38 @@ docker pull tradik/mddb:{{$.Vars.mddbVersion}}</code></pre>
             </div>
         </div>
         <div class="release-notes">
-            <!-- Content mirrors CHANGELOG.md [2.18.0]–[2.18.6]. TODO: replace with the
-                 native SSG changelog data source when spagu/ssg#69 ships. -->
+            <!-- Content mirrors CHANGELOG.md [2.18.10]: what a visitor upgrading to
+                 this release needs to know, not the whole section. TODO: replace
+                 with the native SSG changelog data source when spagu/ssg#69 ships. -->
             <h3>What's New in v{{$.Vars.mddbVersion}}</h3>
             <ul>
-                <li><strong>Code as a graph</strong>: store a repository one file per document
-                    and <code>code_graph</code> answers what calls a function, what includes a
-                    header and which manifest uses a Secret. Go, Rust, Java, Python, Ruby, PHP,
-                    C, C++, assembly, Terraform, Kubernetes, OpenShift, Kustomize and Ansible.
+                <li><strong>One permission gate on every surface</strong>: with auth on, a key
+                    limited to one collection or one tenant can no longer read or write others
+                    over REST, gRPC, GraphQL or MCP, and <code>admin</code> on one collection no
+                    longer makes a global admin.
                 </li>
-                <li><strong>Chunking per collection</strong>: <code>embedding: {chunkSize,
-                    chunkMode}</code>, with code split where brackets balance so an embedded
-                    chunk is a whole function.
+                <li><strong>The real client IP behind a proxy</strong>:
+                    <code>MDDB_TRUSTED_PROXIES</code>, <code>MDDB_CLIENT_IP_HEADER</code> and PROXY
+                    protocol v1/v2. Behind a reverse proxy, set <code>MDDB_TRUSTED_PROXIES</code>
+                    when you upgrade, or every client shares the proxy's rate limit.
                 </li>
-                <li><strong>Restarts in milliseconds</strong>: a clean shutdown records the
-                    free pages, so a planned restart no longer walks the database, and after a
-                    crash reads start at once while the freelist rebuilds in the background.
+                <li><strong>A result cap</strong>: a search returns at most
+                    <code>MDDB_SEARCH_MAX_LIMIT</code> results (1000 by default) and says
+                    <code>"limitCapped": true</code> when it lowered a request.
                 </li>
-                <li><strong>One storage file per collection</strong>:
-                    <code>MDDB_STORAGE_LAYOUT=per-collection</code>, full-text indexing that a
-                    collection can switch off, and <code>/v1/storage</code> to see where the
-                    bytes go.
+                <li><strong>Elasticsearch-compatible subset</strong>:
+                    <code>MDDB_ES_COMPAT=true</code> mounts <code>_search</code>, <code>_count</code>,
+                    <code>_doc</code> and <code>_bulk</code> under <code>/es</code>, and refuses an
+                    unsupported clause by name.
                 </li>
-                <li><strong>A large database stays responsive</strong>: stats and long scans
-                    read in short transactions, <code>/health</code> answers while the database
-                    is busy, and vector reindexing runs as a job with progress.
+                <li><strong>Corpus packs and synced sources</strong>: install a collection
+                    read-only without re-embedding it, or keep one in step with a sitemap, a URL
+                    list or an S3 prefix.
                 </li>
-                <li><strong>OAuth 2.1 for MCP</strong>: claude.ai custom connectors sign in to
-                    the MCP listener, which also gains custom prompts and more actions for
-                    custom tools.
-                </li>
-            </ul>
-            <a href="https://github.com/tradik/mddb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">View
-                Full Changelog →</a>
-        </div>
-        <!-- previous release notes kept below for reference; hidden by default in template renderer -->
-        <div class="release-notes-prev" hidden>
-            <h3>v2.9.12 highlights</h3>
-            <ul>
-                <li><strong>Per-query boost / demote for FTS and Hybrid search</strong> — attach a
-                    <code>boost</code> map keyed by <code>"metaKey:metaValue"</code> to multiply or divide
-                    matching documents' scores at query time. Positive values boost
-                    (<code>5.0</code> = 5×), negative values demote (<code>-2.0</code> = ½×). Combines
-                    multiplicatively across matches with a <code>0.001</code> floor. No reindex. Wired
-                    through HTTP, gRPC, MCP tools and the web panel (collapsible UI in both FTS and
-                    Hybrid views).
-                </li>
-                <li><strong>Async bulk ingest with job tracking</strong> — four new endpoints under
-                    <code>/v1/bulk-ingest-job*</code> for long-running imports: submit returns HTTP
-                    <code>202</code> with a job ID, GET polls status, DELETE cancels pending, list returns
-                    all jobs newest-first. Single FIFO worker drains 500-doc chunks; orphan jobs from a
-                    crashed run are flipped to <code>failed</code> on startup. Optional
-                    <code>callbackUrl</code> fires a webhook on completion. Four companion MCP tools
-                    (<code>bulk_ingest_submit</code> / <code>_status</code> / <code>_list</code> /
-                    <code>_cancel</code>).
-                </li>
-                <li><strong>Prefix autocomplete</strong> — <code>GET /v1/autocomplete</code> returns
-                    top-N terms starting with the given prefix, ranked by document frequency. Scans the
-                    existing FTS inverted index (no new storage), with optional field scoping via
-                    <code>field</code> and a 10 000-entry scan cap to keep pathological prefixes fast. The
-                    FTS search input in the panel gains a debounced (150 ms) suggestion dropdown with
-                    doc-count badges. MCP <code>autocomplete</code> tool mirrors the HTTP API.
-                </li>
-                <li><strong>Proto backwards-compatible bump</strong> — <code>FTSRequest</code> gets field
-                    <code>boost = 8</code> and <code>HybridSearchRequest</code> gets field
-                    <code>boost = 15</code>. Regenerated via <code>buf</code> for Go, Python, Node.js and
-                    PHP. Pre-2.9.12 clients keep working — they simply don't set the new field.
-                </li>
-                <li><strong>Coverage &gt;90% on the new surface</strong> —
-                    <code>fts_boost.go</code> at 100% across all six functions;
-                    <code>fts_autocomplete.go</code> ~90% average; <code>bulk_ingest_job.go</code> ~87%
-                    average (shutdown-only paths untested by design).
+                <li><strong>Query decomposition and <code>mddb-cli diagnose</code></strong>:
+                    <code>queryDecomposition: "auto"</code> searches a question with several needs
+                    part by part; the diagnose bundle is a tar.gz without user data to attach to
+                    an issue.
                 </li>
             </ul>
             <a href="https://github.com/tradik/mddb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">View

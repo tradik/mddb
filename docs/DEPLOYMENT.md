@@ -139,7 +139,7 @@ docker build -t mddb:latest .
 docker run -d \
   --name mddb \
   -p 11023:11023 \
-  -v mddb-data:/data \
+  -v mddb-data:/app/data \
   --restart unless-stopped \
   mddb:latest
 

@@ -272,19 +272,20 @@ Tested with 3,000 documents on identical hardware:
 # Create named volume
 docker volume create mddb-data
 
-# Backup database
-docker run --rm \
+# Backup database (stop the server first: a copy of an open file is not a backup;
+# the image's entrypoint is mddbd, so cp needs --entrypoint)
+docker run --rm --entrypoint cp \
   -v mddb-data:/data \
   -v $(pwd)/backups:/backups \
   tradik/mddb:latest \
-  cp /data/mddb.db /backups/mddb-backup-$(date +%Y%m%d).db
+  /data/mddb.db /backups/mddb-backup-$(date +%Y%m%d).db
 
 # Restore database
-docker run --rm \
+docker run --rm --entrypoint cp \
   -v mddb-data:/data \
   -v $(pwd)/backups:/backups \
   tradik/mddb:latest \
-  cp /backups/mddb-backup-20250107.db /data/mddb.db
+  /backups/mddb-backup-20250107.db /data/mddb.db
 ```
 
 ## 🛠️ Troubleshooting
