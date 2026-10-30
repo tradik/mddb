@@ -8,6 +8,27 @@ const (
 	mcpFieldsDesc         = "(v2.10.2+) Restrict returned meta to these keys (e.g. [\"name\",\"currentVersion\"]); each hit is reduced to id, key and the listed meta. Since v2.11.0 setting fields also drops the body unless include_content=true is passed explicitly. Empty = all meta."
 )
 
+// mcpSyncActionSchema is a cron rule's sync action (INT-022), shared by
+// create_automation and update_automation.
+var mcpSyncActionSchema = map[string]interface{}{
+	"type":        "object",
+	"description": "(v2.18.10+) type=cron: keep a collection in step with a source instead of firing webhookId. Unchanged sources are not written (ETag / Last-Modified / content hash); prune deletes documents whose source is gone.",
+	"properties": map[string]interface{}{
+		"source":        map[string]interface{}{"type": "string", "enum": []string{"sitemap", "urls", "s3"}},
+		"collection":    map[string]interface{}{"type": "string"},
+		"lang":          map[string]interface{}{"type": "string"},
+		"url":           map[string]interface{}{"type": "string", "description": "sitemap: the sitemap or sitemap index URL"},
+		"urls":          map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "urls: the pages"},
+		"bucket":        map[string]interface{}{"type": "string", "description": "s3: the bucket"},
+		"prefix":        map[string]interface{}{"type": "string", "description": "s3: the key prefix"},
+		"storageConfig": map[string]interface{}{"type": "object", "description": "s3: endpoint, region, accessKey, secretKey, useTLS"},
+		"prune":         map[string]interface{}{"type": "boolean", "description": "Delete documents whose source is gone (default false)"},
+		"maxDocuments":  map[string]interface{}{"type": "integer", "description": "Sources per run (default 1000, max 50000)"},
+		"maxBytes":      map[string]interface{}{"type": "integer", "description": "Bytes per document (default 10 MiB, max 100 MiB)"},
+	},
+	"required": []string{"source", "collection", "lang"},
+}
+
 // mcpBuiltinTools returns the full builtin MCP tool catalog. Partitioned into
 // core + advanced groups (GO-015) to keep any single function manageable.
 func mcpBuiltinTools() []MCPTool {
@@ -827,6 +848,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"events":     map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Events: insert, update, delete (type=trigger)"},
 					"schedule":   map[string]interface{}{"type": "string", "description": "Cron expression (type=cron)"},
 					"triggerId":  map[string]interface{}{"type": "string", "description": "Target trigger ID (type=cron)"},
+					"sync":       mcpSyncActionSchema,
 				},
 				"required": []string{"type", "name"},
 			},
@@ -856,6 +878,7 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"query":      map[string]interface{}{"type": "string", "description": "Updated query"},
 					"threshold":  map[string]interface{}{"type": "number", "description": "Updated threshold"},
 					"schedule":   map[string]interface{}{"type": "string", "description": "Updated cron schedule"},
+					"sync":       mcpSyncActionSchema,
 				},
 				"required": []string{"id"},
 			},

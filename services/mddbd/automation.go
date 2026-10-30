@@ -54,6 +54,10 @@ type AutomationRule struct {
 	// Backup is a cron rule's other action (OPS-023): a backup instead of a
 	// webhook. See automation_backup.go.
 	Backup *BackupAction `json:"backup,omitempty"`
+	// Sync is a cron rule's third action (INT-022): keep a collection in
+	// step with a sitemap, a list of URLs or an S3 prefix. See
+	// automation_sync.go.
+	Sync *SyncAction `json:"sync,omitempty"`
 }
 
 // AutomationManager manages automation rules (webhooks, triggers, crons).
@@ -190,9 +194,9 @@ func (am *AutomationManager) Update(id string, update AutomationRule) (*Automati
 	update.UpdatedAt = time.Now().Unix()
 
 	// Preserve lastRun/nextRun for crons, and what a client of the backup
-	// action could not send back.
+	// or sync action could not send back.
 	if update.Type == "cron" {
-		carryOverBackup(&update, existing)
+		carryOverAction(&update, existing)
 		if update.LastRun == 0 {
 			update.LastRun = existing.LastRun
 		}
@@ -384,6 +388,9 @@ func (am *AutomationManager) validateRule(rule *AutomationRule) error {
 
 	if rule.Backup != nil && rule.Type != "cron" {
 		return fmt.Errorf("backup is an action of a cron rule, not of a %s", rule.Type)
+	}
+	if rule.Sync != nil && rule.Type != "cron" {
+		return fmt.Errorf("sync is an action of a cron rule, not of a %s", rule.Type)
 	}
 
 	switch rule.Type {

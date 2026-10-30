@@ -56,7 +56,7 @@ func (s *Server) runScheduledBackup(rule AutomationRule, now time.Time) (backupO
 		SubmittedAt: start.Unix(),
 		StartedAt:   start.Unix(),
 	}
-	s.announceBackup(SSEJobStarted, job)
+	s.announceJob(SSEJobStarted, job)
 
 	out, err := s.takeBackup(rule.Backup, rule.Backup.name(now), job)
 	if out.where != "" {
@@ -67,7 +67,7 @@ func (s *Server) runScheduledBackup(rule AutomationRule, now time.Time) (backupO
 	job.CompletedAt = time.Now().Unix()
 	if err != nil {
 		job.Status, job.Failed, job.Errors = BulkJobFailed, 1, []string{err.Error()}
-		s.announceBackup(SSEJobFailed, job)
+		s.announceJob(SSEJobFailed, job)
 		s.logBackup(rule, start, out, "error", err)
 		s.Metrics.IncOp("backup_failed", rule.ID)
 		if s.WebhookManager != nil {
@@ -82,7 +82,7 @@ func (s *Server) runScheduledBackup(rule AutomationRule, now time.Time) (backupO
 		return out, err
 	}
 	job.Status = BulkJobCompleted
-	s.announceBackup(SSEJobCompleted, job)
+	s.announceJob(SSEJobCompleted, job)
 	s.logBackup(rule, start, out, "success", nil)
 	return out, nil
 }
@@ -130,13 +130,14 @@ func (s *Server) takeBackup(a *BackupAction, name string, job *BulkIngestJob) (o
 // backupProgress counts one finished step and announces it.
 func (s *Server) backupProgress(job *BulkIngestJob) {
 	job.Processed++
-	s.announceBackup(SSEJobProgress, job)
+	s.announceJob(SSEJobProgress, job)
 }
 
-// announceBackup puts a run's job event on the SSE stream. A backup covers
-// the whole database, so its job's collection is "*": a client needs read
-// permission on every collection to hear of it.
-func (s *Server) announceBackup(event string, job *BulkIngestJob) {
+// announceJob puts a scheduled run's job event on the SSE stream. A backup
+// covers the whole database, so its job's collection is "*": a client needs
+// read permission on every collection to hear of it. A sync's job names its
+// collection (INT-022).
+func (s *Server) announceJob(event string, job *BulkIngestJob) {
 	if s.SSEHub != nil {
 		s.SSEHub.BroadcastJob(event, job, s.AuthManager)
 	}

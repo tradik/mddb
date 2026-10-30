@@ -37,6 +37,17 @@ type Entry struct {
 	Target string `json:"target,omitempty"`
 	// Removed lists the backups retention deleted after this one.
 	Removed []string `json:"removed,omitempty"`
+	// Sync is what a source sync (INT-022, action "sync") did.
+	Sync *SyncCounts `json:"sync,omitempty"`
+}
+
+// SyncCounts is what one run of a synced source did with its sources.
+type SyncCounts struct {
+	Added     int `json:"added"`
+	Updated   int `json:"updated"`
+	Unchanged int `json:"unchanged"`
+	Deleted   int `json:"deleted"`
+	Failed    int `json:"failed"`
 }
 
 // Store persists and queries automation execution logs in BoltDB.

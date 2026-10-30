@@ -76,12 +76,12 @@ func (cs *CronScheduler) Reload() {
 	slog.Info("Cron scheduler reloaded active crons", "entryMapCount", len(cs.entryMap))
 }
 
-// addEntry adds a single cron entry to the scheduler: a backup when the rule
-// has one, otherwise its webhook.
+// addEntry adds a single cron entry to the scheduler: a backup or a sync when
+// the rule has one, otherwise its webhook.
 func (cs *CronScheduler) addEntry(cronRule AutomationRule) {
 	var job func()
-	if cronRule.Backup != nil {
-		job = cs.backupJob(cronRule)
+	if cronRule.Backup != nil || cronRule.Sync != nil {
+		job = cs.actionJob(cronRule.ID)
 	} else {
 		job = cs.webhookJob(cronRule)
 	}
@@ -96,21 +96,30 @@ func (cs *CronScheduler) addEntry(cronRule AutomationRule) {
 	cs.entryMap[cronRule.ID] = entryID
 }
 
-// backupJob runs a scheduled backup (OPS-023). The rule is read again when it
-// fires — with its credentials, which List leaves out — so an edit made since
-// the last reload applies.
-func (cs *CronScheduler) backupJob(cronRule AutomationRule) func() {
-	ruleID := cronRule.ID
+// actionJob runs a rule's own action: a scheduled backup (OPS-023) or a
+// source sync (INT-022). The rule is read again when it fires — with its
+// credentials, which List leaves out — so an edit made since the last reload
+// applies.
+func (cs *CronScheduler) actionJob(ruleID string) func() {
 	return func() {
 		am := cs.server.AutomationManager
 		cs.server.Metrics.IncOp("automation_cron", ruleID)
 		rule := am.stored(ruleID)
-		if rule == nil || !rule.Enabled || rule.Backup == nil {
-			return // deleted or changed since the reload; the next one drops it
+		if rule == nil || !rule.Enabled {
+			return // deleted or disabled since the reload; the next one drops it
 		}
 		now := cs.now()
-		if _, err := cs.server.runScheduledBackup(*rule, now); err != nil {
-			slog.Warn("scheduled backup failed", "ruleID", ruleID, "err", err)
+		var err error
+		switch {
+		case rule.Backup != nil:
+			_, err = cs.server.runScheduledBackup(*rule, now)
+		case rule.Sync != nil:
+			_, err = cs.server.runSourceSync(*rule, now)
+		default:
+			return // switched to a webhook since the reload
+		}
+		if err != nil {
+			slog.Warn("scheduled action failed", "ruleID", ruleID, "err", err)
 		}
 		am.UpdateLastRun(ruleID, now.Unix())
 	}

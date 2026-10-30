@@ -212,6 +212,7 @@ Complete list of MDDB features organized by category.
 - **Triggers** - Fire webhooks when new/updated/deleted documents match search criteria (FTS/vector/hybrid) above configurable threshold
 - **Crons** - Schedule periodic trigger execution using cron expressions (5 fields, or 6 with seconds first)
 - **Scheduled Backups** (v2.18.9+) - A cron's `backup` action: verified backups with sha256 checksum files to a local directory or an S3-compatible bucket, `keep: N` retention applied only after a successful run, `backup.failed` webhook event, `mddb_backup_last_success_timestamp` metric, `mddb-cli backup schedule add|list|remove`. See [BACKUP.md](BACKUP.md#scheduled-backups)
+- **Synced Sources** (v2.18.10+) - A cron's `sync` action: a sitemap, a URL list or an S3 prefix kept in step with a collection; unchanged sources are not written (ETag / Last-Modified / sha256), `prune` deletes documents whose source is gone, every request through the SSRF guard, robots.txt honoured, `source.synced` webhook event. See [AUTOMATIONS.md](AUTOMATIONS.md#synced-sources)
 - **Webhook Targets** - Named HTTP endpoints with custom method (POST/GET/PUT), custom headers, and template variable substitution (`{{doc.id}}`, `{{collection}}`, etc.)
 - **Sentiment Analysis** - Optional keyword-based sentiment condition (-1.0 to +1.0) on triggers with AND/OR logic for combining with search
 - **Execution Logs** - `GET /v1/automation-logs` with cursor-based pagination, status filtering, TTL-based cleanup

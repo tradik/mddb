@@ -682,6 +682,29 @@ In-flight jobs (`processing`) cannot be cancelled — they run to completion.
 | You need the response inline | You can poll or accept a callback |
 | CLI one-shot imports | Pipeline-driven or UI-driven imports |
 
+## Keeping a site or bucket in sync (v2.18.10+)
+
+An import is a copy of the moment. To keep a collection in step with a web
+site or an S3-compatible bucket, give a cron automation rule a `sync`
+action instead: on its schedule the server lists a sitemap, a list of URLs
+or the objects under a prefix, fetches only what changed (ETag /
+Last-Modified, the object's ETag, else a sha256 of the content), writes it
+through the `/v1/upload` converters, and — with `prune: true` — deletes the
+documents whose source is gone.
+
+```bash
+curl -X POST http://localhost:11023/v1/automation \
+  -H "Content-Type: application/json" \
+  -d '{"type": "cron", "name": "handbook", "schedule": "0 * * * *", "enabled": true,
+       "sync": {"source": "s3", "bucket": "handbook", "prefix": "published/",
+                "collection": "handbook", "lang": "en", "prune": true,
+                "storageConfig": {"endpoint": "minio:9000", "accessKey": "...", "secretKey": "..."}}}'
+```
+
+Fields, bounds, keys and safety rules: [AUTOMATIONS.md](AUTOMATIONS.md#synced-sources).
+Git repositories stay on the client side (`mddb-cli autoindex`): the server
+never runs `git`.
+
 ## See Also
 
 - [API Documentation](API.md)

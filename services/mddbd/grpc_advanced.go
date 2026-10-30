@@ -44,6 +44,7 @@ func automationRuleToProto(r *AutomationRule) *proto.AutomationRuleProto {
 		LastRun:          r.LastRun,
 		NextRun:          r.NextRun,
 		Backup:           backupActionToProto(r.Backup),
+		Sync:             syncActionToProto(r.Sync),
 	}
 	if r.SearchParams != nil {
 		if b, err := json.Marshal(r.SearchParams); err == nil {
@@ -80,6 +81,7 @@ func protoToAutomationRule(p *proto.AutomationRuleProto) AutomationRule {
 		LastRun:          p.LastRun,
 		NextRun:          p.NextRun,
 		Backup:           backupActionFromProto(p.GetBackup()),
+		Sync:             syncActionFromProto(p.GetSync()),
 	}
 	if p.SearchParamsJson != "" {
 		var sp map[string]interface{}
@@ -125,6 +127,48 @@ func backupActionFromProto(p *proto.BackupActionProto) *BackupAction {
 		Keep:          int(p.GetKeep()),
 		Collections:   p.GetCollections(),
 		StorageConfig: storageConfigFromProto(p.GetStorageConfig(), nil),
+	}
+}
+
+// syncActionToProto converts a cron rule's sync action (INT-022) for the
+// wire; like a backup's, the storage config never carries the secret.
+func syncActionToProto(a *SyncAction) *proto.SyncActionProto {
+	if a == nil {
+		return nil
+	}
+	return &proto.SyncActionProto{
+		Source:        a.Source,
+		Collection:    a.Collection,
+		Lang:          a.Lang,
+		Url:           a.URL,
+		Urls:          a.URLs,
+		Bucket:        a.Bucket,
+		Prefix:        a.Prefix,
+		StorageConfig: storageConfigToProto(a.StorageConfig),
+		Prune:         a.Prune,
+		MaxDocuments:  clampInt32(a.MaxDocuments),
+		MaxBytes:      a.MaxBytes,
+	}
+}
+
+// syncActionFromProto converts an incoming sync action; validation, the
+// defaults and the kept secret are the AutomationManager's, as for REST.
+func syncActionFromProto(p *proto.SyncActionProto) *SyncAction {
+	if p == nil {
+		return nil
+	}
+	return &SyncAction{
+		Source:        p.GetSource(),
+		Collection:    p.GetCollection(),
+		Lang:          p.GetLang(),
+		URL:           p.GetUrl(),
+		URLs:          p.GetUrls(),
+		Bucket:        p.GetBucket(),
+		Prefix:        p.GetPrefix(),
+		StorageConfig: storageConfigFromProto(p.GetStorageConfig(), nil),
+		Prune:         p.GetPrune(),
+		MaxDocuments:  int(p.GetMaxDocuments()),
+		MaxBytes:      p.GetMaxBytes(),
 	}
 }
 

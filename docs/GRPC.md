@@ -180,6 +180,15 @@ A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/f
 
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
 
+### New in v2.18.10
+
+`AutomationRuleProto.sync` (26, `SyncActionProto`) is a cron rule's third
+action: keep a collection in step with a sitemap, a URL list or an S3
+prefix (`source`, `collection`, `lang`, `url`, `urls`, `bucket`, `prefix`,
+`storage_config`, `prune`, `max_documents`, `max_bytes`). Validation,
+defaults and secret masking are those of the REST body; see
+[AUTOMATIONS.md](AUTOMATIONS.md#synced-sources).
+
 ### New in v2.18.9
 
 The query planner (SRCH-013) is available over gRPC. `VectorSearch` and

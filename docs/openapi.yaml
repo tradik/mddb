@@ -8898,11 +8898,13 @@ components:
             enum: [ doc.added, doc.updated, doc.deleted,
               security.auth_failure_burst, security.rate_limit_exceeded,
               ops.replication_lag_high, ops.panic_recovered,
-              ops.disk_usage_high, backup.failed, quota.exceeded ]
+              ops.disk_usage_high, backup.failed, quota.exceeded,
+              source.synced ]
           description: Event types to listen for. In 2.18.9, `backup.failed`
             fires when a scheduled backup fails, and `quota.exceeded` when a
             write or embedding is refused by a collection quota, the disk
-            reserve or the vector RAM limit.
+            reserve or the vector RAM limit. In 2.18.10, `source.synced` fires
+            when a run of a synced source (a cron rule's `sync`) finishes.
           example: [ doc.added, doc.updated ]
         collection:
           type: string
@@ -8932,11 +8934,13 @@ components:
             enum: [ doc.added, doc.updated, doc.deleted,
               security.auth_failure_burst, security.rate_limit_exceeded,
               ops.replication_lag_high, ops.panic_recovered,
-              ops.disk_usage_high, backup.failed, quota.exceeded ]
+              ops.disk_usage_high, backup.failed, quota.exceeded,
+              source.synced ]
           description: Event types to listen for. In 2.18.9, `backup.failed`
             fires when a scheduled backup fails, and `quota.exceeded` when a
             write or embedding is refused by a collection quota, the disk
-            reserve or the vector RAM limit.
+            reserve or the vector RAM limit. In 2.18.10, `source.synced` fires
+            when a run of a synced source (a cron rule's `sync`) finishes.
           example: [ doc.added, doc.updated ]
         collection:
           type: string
@@ -10854,7 +10858,7 @@ components:
         webhookId:
           type: string
           description: Target webhook ID (type=trigger; type=cron unless
-            `backup` is set)
+            `backup` or `sync` is set)
         searchParams:
           type: object
           description: Extra search parameters (type=trigger)
@@ -10901,6 +10905,68 @@ components:
           description: Next scheduled execution (type=cron)
         backup:
           $ref: "#/components/schemas/BackupAction"
+        sync:
+          $ref: "#/components/schemas/SyncAction"
+
+    SyncAction:
+      type: object
+      required: [ source, collection, lang ]
+      description: |
+        A cron rule's sync action (2.18.10), instead of `webhookId` or
+        `backup`. Each run lists the source, fetches only what changed
+        (ETag / Last-Modified, the object's ETag, else a sha256 of the
+        content), converts it with the /v1/upload converters and writes it
+        through the normal write path (schemas, quotas, read-only). Every
+        HTTP request goes through the SSRF guard; robots.txt is honoured for
+        a sitemap. Documents carry `syncRule`, `syncSource`, `syncHash` and,
+        when sent, `syncEtag` / `syncLastModified` meta. A listing cut at
+        maxDocuments or one that lists nothing prunes nothing. See
+        docs/AUTOMATIONS.md#synced-sources.
+      properties:
+        source:
+          type: string
+          enum: [ sitemap, urls, s3 ]
+        collection:
+          type: string
+        lang:
+          type: string
+        url:
+          type: string
+          format: uri
+          description: sitemap — a sitemap or sitemap index, plain or gzipped
+        urls:
+          type: array
+          items:
+            type: string
+            format: uri
+          description: urls — the pages
+        bucket:
+          type: string
+          description: s3 — bucket (default storageConfig.bucket)
+        prefix:
+          type: string
+          description: s3 — the objects under it are synced (default
+            storageConfig.prefix)
+        storageConfig:
+          $ref: "#/components/schemas/StorageConfigDef"
+        prune:
+          type: boolean
+          default: false
+          description: Delete the documents whose source is gone (no longer
+            listed, or answering 404/410)
+        maxDocuments:
+          type: integer
+          minimum: 0
+          maximum: 50000
+          default: 1000
+          description: Sources one run looks at; 0 takes the default
+        maxBytes:
+          type: integer
+          format: int64
+          minimum: 0
+          maximum: 104857600
+          default: 10485760
+          description: Bytes per fetched document; a larger one fails
 
     BackupAction:
       type: object
@@ -10981,16 +11047,33 @@ components:
           type: integer
         action:
           type: string
-          enum: [ backup ]
-          description: Set for a scheduled backup run (2.18.9)
+          enum: [ backup, sync ]
+          description: Set for a scheduled backup run (2.18.9) or a synced
+            source's run (2.18.10)
         target:
           type: string
-          description: Where the backup went — a path or s3://bucket/key
+          description: Where the backup went — a path or s3://bucket/key;
+            for a sync, its source (the sitemap, "N urls" or
+            s3://bucket/prefix)
         removed:
           type: array
           items:
             type: string
           description: Backups retention deleted after this one
+        sync:
+          type: object
+          description: What a sync run did with its sources (2.18.10)
+          properties:
+            added:
+              type: integer
+            updated:
+              type: integer
+            unchanged:
+              type: integer
+            deleted:
+              type: integer
+            failed:
+              type: integer
 
     SearchStats:
       type: object

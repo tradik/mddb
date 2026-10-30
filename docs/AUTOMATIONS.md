@@ -249,8 +249,9 @@ in the webhook payload as `sentimentScore`.
 |-------|------|---------|-------------|
 | `schedule` | string | (required) | Cron expression (e.g., `"0 9 * * *"`), checked on create and update |
 | `triggerId` | string | (required) | ID of the trigger to execute |
-| `webhookId` | string | | The webhook to fire; required unless `backup` is set |
+| `webhookId` | string | | The webhook to fire; required unless `backup` or `sync` is set |
 | `backup` | object | | Take a backup instead of firing a webhook — see [Scheduled Backups](#scheduled-backups) |
+| `sync` | object | | Sync a sitemap, URL list or S3 prefix into a collection instead — see [Synced Sources](#synced-sources) |
 | `lastRun` | int64 | `0` | Unix timestamp of last execution |
 | `nextRun` | int64 | `0` | Unix timestamp of next scheduled execution |
 
@@ -744,6 +745,98 @@ is) and `removed` (what retention deleted). A failed run fires the
 `mddb_backup_last_success_timestamp{rule="<id>"}`. The whole procedure —
 verification, checksums, restoring from S3 — is in
 [BACKUP.md](BACKUP.md#scheduled-backups).
+
+### Synced Sources
+
+Since 2.18.10 a cron rule can keep a collection in step with a source: give
+it a `sync` object and neither `webhookId` nor `backup` (a cron rule takes
+exactly one action). The same scheduler runs it and the same automation log
+records it; each run is a job on the SSE stream and fires the
+`source.synced` webhook event.
+
+```bash
+curl -X POST http://localhost:11023/v1/automation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "cron",
+    "name": "docs site",
+    "schedule": "0 */6 * * *",
+    "enabled": true,
+    "sync": {
+      "source": "sitemap",
+      "url": "https://docs.example.com/sitemap.xml",
+      "collection": "docs",
+      "lang": "en",
+      "prune": true
+    }
+  }'
+```
+
+| `sync` field | Default | Description |
+|---|---|---|
+| `source` | (required) | `sitemap`, `urls` or `s3` |
+| `collection`, `lang` | (required) | where the documents go |
+| `url` | | `sitemap`: a sitemap or sitemap index, plain or gzipped |
+| `urls` | | `urls`: the pages |
+| `bucket` | `storageConfig.bucket` | `s3`: the bucket |
+| `prefix` | `storageConfig.prefix` | `s3`: the objects synced are the keys under it |
+| `storageConfig` | | `s3`: `endpoint`, `region`, `accessKey`, `secretKey`, `useTLS` — the block S3-backed collections and backups use |
+| `prune` | `false` | delete the documents whose source is gone (no longer listed, or answering 404/410) |
+| `maxDocuments` | `1000` | sources one run looks at, at most 50000 |
+| `maxBytes` | `10485760` | bytes per fetched document, at most 100 MiB; a larger one fails, it is never cut |
+
+**What a run does.** It lists the source (the sitemap's pages, the URL list,
+the objects under the prefix), then for each source, two at a time:
+
+1. Reads the validators the previous run left on its document.
+2. Fetches it only if it changed: a page with `If-None-Match` /
+   `If-Modified-Since` (a `304` is unchanged), an object only when its
+   listed ETag differs. A source with no validators is downloaded and
+   compared by sha256 — an unchanged hash writes nothing.
+3. Converts it with the `/v1/upload` converters: the `Content-Type` names
+   the format (HTML, Markdown, text, CSV, PDF), else the path's extension;
+   PDF and the office formats are also recognised by content. Markdown
+   frontmatter becomes metadata. A mailbox's messages and a file's images
+   are not split out.
+4. Writes it through the one write path, so schemas, collection quotas
+   (507 past a limit) and a read-only collection apply as to any write.
+
+**Documents and keys.** The key comes from the URL path or the object key
+below the prefix: lower case, extension dropped, every other character run
+one `-` (`/blog/Post 1.html` → `blog-post-1`, `/` → `index`). Two sources of
+one run that derive the same key: the first keeps it, the rest fail. Each
+document carries `syncRule` (the rule ID), `syncSource` (its URL or object
+key), `syncHash`, and `syncEtag` / `syncLastModified` when the source sent
+them. A sync never overwrites a document it did not write (one without its
+`syncRule`), and a prune deletes only documents with its `syncRule` in the
+rule's collection.
+
+**Safety and bounds.** Every request goes through the SSRF guard: an
+internal, loopback or link-local address is refused unless
+`MDDB_OUTBOUND_ALLOW_PRIVATE` / `MDDB_OUTBOUND_ALLOWLIST` allow it. A
+sitemap's pages and sitemaps must be on its own scheme and host; `robots.txt`
+is honoured (the `mddb` group, else `*`; `*` and `$` patterns; a site
+without one sets no rules). Requests time out after 30 s and send
+`User-Agent: mddb`; a sitemap may be 50 MB uncompressed and an index lists
+at most 50 sitemaps per run. A listing cut at `maxDocuments` (or at 50
+sitemaps), or one that lists nothing — a wrong prefix, a site in
+maintenance — prunes nothing and ends the run with an error. A run of a
+rule still going when the next is due is skipped and logged.
+
+**Watching it.** A run's log entry has `action: "sync"`, `target` (the
+sitemap, `N urls` or `s3://bucket/prefix`) and `sync: {added, updated,
+unchanged, deleted, failed}`; `status` is `error` when the listing failed,
+any source failed or a prune was withheld, with the first reasons in
+`error`. The SSE job (`sync-<ruleId>-<UTC stamp>`) names the collection and
+counts `added`, `updated` and `failed`. The `source.synced` webhook carries
+`{ruleId, ruleName, collection, source, added, updated, unchanged, deleted,
+failed}`, plus `error` and `errors` when it failed.
+
+Reads blank `storageConfig.secretKey` and set `secretKeySet: true`; an
+update without a `secretKey` keeps the stored one, and an update naming no
+action keeps the rule's `sync`. Over gRPC the block is
+`AutomationRuleProto.sync` (26, `SyncActionProto`); over MCP it is the
+`sync` argument of `create_automation` / `update_automation`.
 
 ---
 

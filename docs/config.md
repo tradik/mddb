@@ -199,6 +199,7 @@ Security and operational incidents are delivered through the existing `/v1/webho
 | `ops.panic_recovered` | An HTTP handler panicked and was recovered by the middleware | `{method, path, panic, ip}` |
 | `ops.disk_usage_high` | DB filesystem used-% ≥ threshold | `{path, usedBytes, totalBytes, usedPct, thresholdPct}` |
 | `backup.failed` | A scheduled backup failed (2.18.9, [BACKUP.md](BACKUP.md#scheduled-backups)) | `{ruleId, ruleName, target, backup, error}` |
+| `source.synced` | (v2.18.10+) A run of a synced source finished ([AUTOMATIONS.md](AUTOMATIONS.md#synced-sources)) | `{ruleId, ruleName, collection, source, added, updated, unchanged, deleted, failed, error?, errors?}` |
 | `quota.exceeded` | (v2.18.9+) A write or embedding refused by a collection quota, the disk reserve or the vector RAM limit; at most once a minute per collection and resource. Collection-scoped webhooks receive their collection's events | `{error, code, collection, resource, limit, used, retryAfterSeconds?}` |
 
 | Env Var | Default | Type | Description |

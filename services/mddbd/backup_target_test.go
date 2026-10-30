@@ -240,7 +240,7 @@ func TestBackupJobRereadsTheRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	job := cs.backupJob(*rule)
+	job := cs.actionJob(rule.ID)
 	upd := *s.AutomationManager.Get(rule.ID)
 	upd.Enabled = false
 	if _, err := s.AutomationManager.Update(rule.ID, upd); err != nil {

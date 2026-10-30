@@ -219,7 +219,10 @@ func (s *MCPToolServer) toolListAutomation(ctx context.Context, args map[string]
 }
 
 func (s *MCPToolServer) toolCreateAutomation(ctx context.Context, args map[string]interface{}) (string, error) {
-	rule := mcpArgsToAutomationRule(args)
+	rule, err := mcpArgsToAutomationRule(args)
+	if err != nil {
+		return "", err
+	}
 	created, err := s.client.CreateAutomation(ctx, rule)
 	if err != nil {
 		return "", err
@@ -246,7 +249,10 @@ func (s *MCPToolServer) toolUpdateAutomation(ctx context.Context, args map[strin
 	if id == "" {
 		return "", fmt.Errorf("id is required")
 	}
-	rule := mcpArgsToAutomationRule(args)
+	rule, err := mcpArgsToAutomationRule(args)
+	if err != nil {
+		return "", err
+	}
 	updated, err := s.client.UpdateAutomation(ctx, id, rule)
 	if err != nil {
 		return "", err
@@ -292,7 +298,9 @@ func (s *MCPToolServer) toolGetAutomationLogs(ctx context.Context, args map[stri
 }
 
 // mcpArgsToAutomationRule converts MCP tool arguments to an AutomationRule.
-func mcpArgsToAutomationRule(args map[string]interface{}) AutomationRule {
+// A `sync` object (INT-022) is decoded as the REST body's is; a field of the
+// wrong type is an error rather than a setting silently left out.
+func mcpArgsToAutomationRule(args map[string]interface{}) (AutomationRule, error) {
 	rule := AutomationRule{
 		Type:       mcpGetString(args, "type"),
 		Name:       mcpGetString(args, "name"),
@@ -327,5 +335,12 @@ func mcpArgsToAutomationRule(args map[string]interface{}) AutomationRule {
 			}
 		}
 	}
-	return rule
+	if raw, ok := args["sync"].(map[string]interface{}); ok {
+		data, _ := json.Marshal(raw) // decoded from JSON: it encodes again
+		rule.Sync = &SyncAction{}
+		if err := json.Unmarshal(data, rule.Sync); err != nil {
+			return rule, fmt.Errorf("sync: %w", err)
+		}
+	}
+	return rule, nil
 }

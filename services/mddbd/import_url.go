@@ -97,24 +97,60 @@ func fetchURLBytes(ctx context.Context, rawURL string, limit int64) ([]byte, err
 	// like a network problem, and it puts the guard where a reader can see it.
 	// CodeQL reported this call as critical go/request-forgery precisely
 	// because a dialer inside a transport is invisible to it.
-	safeURL, err := httpclient.ValidateOutboundURL(rawURL)
+	res, err := fetchOutbound(ctx, rawURL, limit, 10*time.Second, nil)
 	if err != nil {
 		return nil, err
+	}
+	if res.status != http.StatusOK {
+		return nil, errors.New("fetch failed: " + res.statusText)
+	}
+	return res.body, nil
+}
+
+// outboundResponse is what fetchOutbound read.
+type outboundResponse struct {
+	status     int
+	statusText string
+	header     http.Header
+	// body holds at most limit bytes, and only for a 200 answer; overLimit
+	// says the body went on past them.
+	body      []byte
+	overLimit bool
+}
+
+// fetchOutbound GETs a URL through the SSRF guard with the given extra
+// header and timeout — the one outbound fetch behind import-url, remote
+// images and synced sources (INT-022). A status other than 200 is no error
+// here: a synced source tells 304 and 404 apart.
+func fetchOutbound(ctx context.Context, rawURL string, limit int64, timeout time.Duration, header http.Header) (outboundResponse, error) {
+	safeURL, err := httpclient.ValidateOutboundURL(rawURL)
+	if err != nil {
+		return outboundResponse{}, err
 	}
 
 	// GET of a URL ValidateOutboundURL has just parsed: building the request
 	// cannot fail.
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, safeURL, nil)
-	resp, err := httpclient.NewPooledClientWithTimeout(10 * time.Second).Do(req) // #nosec G107 -- SSRF-guarded by httpclient.SafeDialContext
+	for k, v := range header {
+		req.Header[k] = v
+	}
+	resp, err := httpclient.NewPooledClientWithTimeout(timeout).Do(req) // #nosec G107 -- SSRF-guarded by httpclient.SafeDialContext
 	if err != nil {
-		return nil, err
+		return outboundResponse{}, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != 200 {
-		return nil, errors.New("fetch failed: " + resp.Status)
+	out := outboundResponse{status: resp.StatusCode, statusText: resp.Status, header: resp.Header}
+	if resp.StatusCode != http.StatusOK {
+		return out, nil
 	}
-	return io.ReadAll(io.LimitReader(resp.Body, limit))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil {
+		return out, err
+	}
+	out.overLimit = int64(len(body)) > limit
+	out.body = body[:min(int64(len(body)), limit)]
+	return out, nil
 }
 
 // parseFrontmatter extracts YAML frontmatter (between --- markers) from markdown.

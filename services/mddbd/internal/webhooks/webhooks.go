@@ -132,6 +132,7 @@ func (wm *WebhookManager) Register(url string, events []string, collection strin
 		EventDiskUsageHigh:      true,
 		EventBackupFailed:       true,
 		EventQuotaExceeded:      true,
+		EventSourceSynced:       true,
 	}
 	for _, e := range events {
 		if !validEvents[e] {

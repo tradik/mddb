@@ -1053,6 +1053,27 @@ message AutomationRuleProto {
   // (OPS-023) A cron rule's other action: a backup instead of webhook_id.
   // Unset on an update keeps the stored backup unless webhook_id is set.
   BackupActionProto backup = 25;
+  // (INT-022) A cron rule's third action: keep a collection in step with a
+  // sitemap, a list of URLs or an S3 prefix. Unset on an update that names
+  // no action keeps the stored one.
+  SyncActionProto sync = 26;
+}
+
+// SyncActionProto is what a cron rule with a sync does on each run
+// (INT-022). Its storage_config (s3) follows BackupActionProto's: the secret
+// is write-only and an update without one keeps the stored one.
+message SyncActionProto {
+  string source = 1;                     // "sitemap", "urls" or "s3"
+  string collection = 2;
+  string lang = 3;
+  string url = 4;                        // sitemap: the sitemap or sitemap index
+  repeated string urls = 5;              // urls: the pages
+  string bucket = 6;                     // s3: empty takes storage_config.bucket
+  string prefix = 7;                     // s3: empty takes storage_config.prefix
+  StorageConfigProto storage_config = 8; // s3 endpoint, region, credentials, TLS
+  bool prune = 9;                        // delete documents whose source is gone
+  int32 max_documents = 10;              // sources per run; 0 = 1000, at most 50000
+  int64 max_bytes = 11;                  // bytes per document; 0 = 10 MiB, at most 100 MiB
 }
 
 // BackupActionProto is what a cron rule with a backup does on each run

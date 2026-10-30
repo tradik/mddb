@@ -636,7 +636,7 @@ mddb-cli stats
 - **[Zero-Shot Classification](docs/ZERO-SHOT-CLASSIFICATION.md)** - Classify documents against labels using embeddings
 - **[PMISparse](docs/PMISPARSE.md)** - Two-phase BM25 + PPMI query expansion (invented by Tradik Limited)
 - **[Webhooks](docs/API.md#getpost-v1webhooks)** - Event-driven integration (API reference)
-- **[Automations](docs/AUTOMATIONS.md)** - Triggers, crons, webhooks, sentiment, template variables
+- **[Automations](docs/AUTOMATIONS.md)** - Triggers, crons, webhooks, sentiment, template variables; scheduled backups and synced sources (sitemap, URL list or S3 prefix kept in step with a collection, v2.18.10)
 - **[Temporal Tracking](docs/TEMPORAL-TRACK.md)** - Document event history, hot-docs leaderboard, activity histograms
 - **[Spell Correction](docs/SYMSPELL.md)** - SymSpell FTS spell suggestions, text cleanup, custom dictionaries
 - **[Authentication](docs/AUTHENTICATION.md)** - JWT & API keys, RBAC, MCP OAuth 2.1

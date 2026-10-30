@@ -128,57 +128,39 @@ func (a *BackupAction) isBackupName(name string) bool {
 	return err == nil
 }
 
-// redacted returns a copy of the rule safe to hand a client: the S3 secret key
-// blanked and secretKeySet set (GO-035). The stored rule is not changed.
+// redacted returns a copy of the rule safe to hand a client: the S3 secret
+// keys of its backup or sync blanked and secretKeySet set (GO-035). The
+// stored rule is not changed.
 func (r AutomationRule) redacted() AutomationRule {
-	if r.Backup == nil {
-		return r
+	if r.Backup != nil {
+		b := *r.Backup
+		b.Collections = slices.Clone(b.Collections)
+		b.StorageConfig = redactedStorageConfig(b.StorageConfig)
+		r.Backup = &b
 	}
-	b := *r.Backup
-	b.Collections = slices.Clone(b.Collections)
-	if b.StorageConfig != nil {
-		sc := *b.StorageConfig
-		sc.SecretKeySet = sc.SecretKey != ""
-		sc.SecretKey = ""
-		b.StorageConfig = &sc
-	}
-	r.Backup = &b
+	r.Sync = redactedSync(r.Sync)
 	return r
 }
 
-// carryOverBackup keeps what a client could not send back: the stored secret
-// key when an update has none, and the whole backup action when an update
-// names neither a webhook nor a backup — a client that does not know the
-// field (the gRPC rule message) toggling `enabled`.
-func carryOverBackup(update *AutomationRule, existing *AutomationRule) {
-	if existing.Backup == nil {
-		return
-	}
-	if update.Backup == nil {
-		if update.WebhookID == "" {
-			b := *existing.Backup
-			update.Backup = &b
-		}
-		return
-	}
-	if sc := update.Backup.StorageConfig; sc != nil && sc.SecretKey == "" && existing.Backup.StorageConfig != nil {
-		sc.SecretKey = existing.Backup.StorageConfig.SecretKey
-	}
-}
-
 // validateCronAction checks that a cron rule does exactly one thing: fire an
-// existing webhook, or take a backup.
+// existing webhook, take a backup, or sync a source (INT-022).
 func (am *AutomationManager) validateCronAction(rule *AutomationRule) error {
-	if rule.Backup != nil {
-		if rule.WebhookID != "" {
-			return errors.New("a cron rule takes webhookId or backup, not both")
+	actions := 0
+	for _, set := range []bool{rule.WebhookID != "", rule.Backup != nil, rule.Sync != nil} {
+		if set {
+			actions++
 		}
+	}
+	switch {
+	case actions > 1:
+		return errors.New("a cron rule takes one of webhookId, backup and sync")
+	case rule.Backup != nil:
 		return rule.Backup.normalize()
-	}
-	if rule.WebhookID == "" {
-		return errors.New("webhookId or backup is required for cron")
-	}
-	if am.GetWebhook(rule.WebhookID) == nil {
+	case rule.Sync != nil:
+		return rule.Sync.normalize()
+	case rule.WebhookID == "":
+		return errors.New("webhookId, backup or sync is required for cron")
+	case am.GetWebhook(rule.WebhookID) == nil:
 		return fmt.Errorf("webhook not found: %s", rule.WebhookID)
 	}
 	return nil

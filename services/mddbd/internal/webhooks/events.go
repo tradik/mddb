@@ -13,4 +13,7 @@ const (
 	// EventQuotaExceeded is a write or embedding refused by a collection
 	// quota, the disk reserve or the vector RAM limit (GO-043).
 	EventQuotaExceeded = "quota.exceeded"
+	// EventSourceSynced is a finished run of a synced source (INT-022),
+	// with what it added, updated, deleted and failed on.
+	EventSourceSynced = "source.synced"
 )

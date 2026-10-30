@@ -92,35 +92,35 @@ func TestAutomationRuleRedactedHidesTheSecret(t *testing.T) {
 	}
 }
 
-func TestCarryOverBackup(t *testing.T) {
+func TestCarryOverAction(t *testing.T) {
 	existing := &AutomationRule{Backup: &BackupAction{Target: "s3", StorageConfig: &StorageConfigDef{SecretKey: "s"}}}
 
 	// No backup and no webhook: a client that does not know the field.
 	u := &AutomationRule{}
-	carryOverBackup(u, existing)
+	carryOverAction(u, existing)
 	if u.Backup == nil || u.Backup.Target != "s3" {
 		t.Errorf("not carried over: %+v", u.Backup)
 	}
 	// A switch to a webhook drops the backup.
 	u = &AutomationRule{WebhookID: "wh"}
-	carryOverBackup(u, existing)
+	carryOverAction(u, existing)
 	if u.Backup != nil {
 		t.Error("a switch to a webhook kept the backup")
 	}
 	// A blank secret keeps the stored one; a new one replaces it.
 	u = &AutomationRule{Backup: &BackupAction{StorageConfig: &StorageConfigDef{}}}
-	carryOverBackup(u, existing)
+	carryOverAction(u, existing)
 	if u.Backup.StorageConfig.SecretKey != "s" {
 		t.Error("the stored secret was lost")
 	}
 	u = &AutomationRule{Backup: &BackupAction{StorageConfig: &StorageConfigDef{SecretKey: "new"}}}
-	carryOverBackup(u, existing)
+	carryOverAction(u, existing)
 	if u.Backup.StorageConfig.SecretKey != "new" {
 		t.Error("a new secret was overwritten")
 	}
 	// Nothing stored: nothing to carry.
 	u = &AutomationRule{}
-	carryOverBackup(u, &AutomationRule{})
+	carryOverAction(u, &AutomationRule{})
 	if u.Backup != nil {
 		t.Error("carried a backup from a rule without one")
 	}
@@ -140,8 +140,8 @@ func TestAutomationManagerBackupRules(t *testing.T) {
 		want string
 	}{
 		{AutomationRule{Type: "trigger", Name: "t", Backup: &BackupAction{}}, "action of a cron rule"},
-		{AutomationRule{Type: "cron", Name: "c", Schedule: "0 3 * * *", WebhookID: wh.ID, Backup: &BackupAction{}}, "not both"},
-		{AutomationRule{Type: "cron", Name: "c", Schedule: "0 3 * * *"}, "webhookId or backup"},
+		{AutomationRule{Type: "cron", Name: "c", Schedule: "0 3 * * *", WebhookID: wh.ID, Backup: &BackupAction{}}, "one of webhookId, backup and sync"},
+		{AutomationRule{Type: "cron", Name: "c", Schedule: "0 3 * * *"}, "webhookId, backup or sync"},
 		{AutomationRule{Type: "cron", Name: "c", Schedule: "nightly"}, "invalid schedule"},
 		{AutomationRule{Type: "cron", Name: "c", Schedule: "0 3 * * *", WebhookID: "absent"}, "webhook not found"},
 		{AutomationRule{Type: "cron", Name: "c", Schedule: "0 3 * * *", Backup: &BackupAction{Keep: -2}}, "keep"},
