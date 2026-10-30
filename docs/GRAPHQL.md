@@ -188,7 +188,10 @@ query {
 metadata updates — whether what was just written is searchable yet. Omit
 `collection` for the whole server. Fields match
 [`GET /v1/indexing-status`](API.md#get-v1indexing-status); `oldestPendingAt`
-is a unix timestamp.
+is a unix timestamp. Since v2.18.10, `trainingCollections` lists the
+collections an ivf, pq, opq, sq or sq4 index has not trained yet (GO-047):
+flat and hnsw already answer for them, and `algorithm: "auto"` skips the
+index still training.
 
 ```graphql
 query { indexingStatus(collection: "notes") { pendingEmbeddings progress indexed } }

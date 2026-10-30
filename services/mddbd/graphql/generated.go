@@ -199,6 +199,7 @@ type ComplexityRoot struct {
 		PendingMetadata     func(childComplexity int) int
 		Progress            func(childComplexity int) int
 		Provider            func(childComplexity int) int
+		TrainingCollections func(childComplexity int) int
 	}
 
 	IngestResult struct {
@@ -1097,6 +1098,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.IndexingStatus.Provider(childComplexity), true
+	case "IndexingStatus.trainingCollections":
+		if e.ComplexityRoot.IndexingStatus.TrainingCollections == nil {
+			break
+		}
+
+		return e.ComplexityRoot.IndexingStatus.TrainingCollections(childComplexity), true
 
 	case "IngestResult.added":
 		if e.ComplexityRoot.IngestResult.Added == nil {
@@ -2454,6 +2461,8 @@ func (ec *executionContext) childFields_IndexingStatus(ctx context.Context, fiel
 		return ec.fieldContext_IndexingStatus_indexed(ctx, field)
 	case "images":
 		return ec.fieldContext_IndexingStatus_images(ctx, field)
+	case "trainingCollections":
+		return ec.fieldContext_IndexingStatus_trainingCollections(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type IndexingStatus", field.Name)
 }
@@ -6140,6 +6149,29 @@ func (ec *executionContext) fieldContext_IndexingStatus_images(_ context.Context
 		},
 	}
 	return fc, nil
+}
+
+func (ec *executionContext) _IndexingStatus_trainingCollections(ctx context.Context, field graphql.CollectedField, obj *IndexingStatus) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_IndexingStatus_trainingCollections(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.TrainingCollections, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalOString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_IndexingStatus_trainingCollections(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("IndexingStatus", field, false, false, "String")
 }
 
 func (ec *executionContext) _IngestResult_added(ctx context.Context, field graphql.CollectedField, obj *IngestResult) (ret graphql.Marshaler) {
@@ -14109,6 +14141,11 @@ func (ec *executionContext) _IndexingStatus(ctx context.Context, sel ast.Selecti
 			}
 		case "images":
 			out.Values[i] = ec._IndexingStatus_images(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "trainingCollections":
+			out.Values[i] = ec._IndexingStatus_trainingCollections(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}

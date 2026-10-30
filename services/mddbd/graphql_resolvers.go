@@ -481,6 +481,8 @@ func (a *GraphQLAdapter) IndexingStatus(ctx context.Context, collection *string)
 	if st.Provider != "" {
 		out.Provider = &st.Provider
 	}
+	// GO-047: collections a trainable index has not trained yet.
+	out.TrainingCollections = st.TrainingCollections
 	if st.Images != nil { // RAG-010
 		out.Images = &gql.ImageIndexingStatus{Documents: st.Images.Documents, Embedded: st.Images.Embedded,
 			Model: optString(st.Images.Model), Note: optString(st.Images.Note)}

@@ -191,6 +191,10 @@ func TestSecondCollectionReadyWithoutFirstsTraining(t *testing.T) {
 	if err != nil || strings.Join(gs.TrainingCollections, ",") != "a,b" {
 		t.Errorf("gRPC indexing status: %v %v", err, gs)
 	}
+	a := &GraphQLAdapter{server: s, mcp: NewDirectClient(s)}
+	if qs, err := a.IndexingStatus(context.Background(), nil); err != nil || strings.Join(qs.TrainingCollections, ",") != "a,b" {
+		t.Errorf("GraphQL indexing status: %v %+v", err, qs)
+	}
 
 	close(ivf.gate)
 	waitStarted(t, ivf, "b")

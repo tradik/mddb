@@ -268,6 +268,8 @@ type IndexingStatus struct {
 	Indexed             bool    `json:"indexed"`
 	// Image documents and their vectors (RAG-010); null when there are none.
 	Images *ImageIndexingStatus `json:"images,omitempty"`
+	// Collections a trainable index (ivf, pq, opq, sq, sq4) has not trained yet (GO-047); flat and hnsw already answer for them.
+	TrainingCollections []string `json:"trainingCollections,omitempty"`
 }
 
 type IngestDocumentInput struct {
