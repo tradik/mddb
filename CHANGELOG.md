@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.18.11] - 2026-10-30
+
+### Security
+
+- **The access gate reads a JSON body whatever its Content-Type (#371).** The SEC-019 gate read the request body only when `Content-Type` named JSON, while the handlers decode JSON regardless. `curl -d '{…}'` sends `application/x-www-form-urlencoded`, so the gate saw no collection, required `"*"`, and refused a user who has permission on the collection the body names. Only `multipart/*` bodies (uploads, which authorize themselves) are now left to the handler. The gate was stricter than the handler, never looser.
+
+### Added
+
+- **Synced sources: run now, the sources of a collection, `mddb-cli sync` (#377, INT-022 follow-up).** `POST /v1/automation/{id}/run`, gRPC `RunAutomation` and MCP `run_automation` run a cron rule's sync or backup at once, through the code its schedule fires: logged, announced on the jobs SSE stream, firing `source.synced` / `backup.failed`, setting `lastRun`. The answer is 202 with the run's `jobId`, or 409 / `Aborted` while the previous run is still going. A disabled rule can be run. Global administrator only. `GET /v1/automation?collection=` (gRPC `ListAutomationRequest.collection`, MCP `list_automation` `collection`) lists the rules acting on a collection; every sync and backup carries `lastResult` (status, added/updated/unchanged/deleted/failed, error, duration) from the automation log, never stored, with the S3 secret masked. New `mddb-cli sync create|list [--collection]|run|delete`. The panel's automation rules have a Run now button and show each sync or backup's last result. `test_automation` stays a read-only dry run.
+
+- **Corpus packs over MCP and gRPC (#378, AGT-005 follow-up).** MCP tools in the `admin` toolset: `corpus_list` (read-only, the caller's tenant), `corpus_install` (admin; the server downloads a `.mddbpack` from an `https://` URL through its SSRF guard, a redirect may not leave TLS, capped at `MDDB_CORPUS_MAX_BYTES`, an optional `sha256` checked before anything is installed) and `corpus_remove` (admin, destructive; `MDDB_MCP_CONFIRM_DESTRUCTIVE` asks for the pack's name). gRPC: `ListCorpusPacks`, `InstallCorpusPack` (a client stream of the pack, or an https URL in the first message), `RemoveCorpusPack`, `BuildCorpusPack` (a server stream of 1 MiB chunks). Permissions as `/v1/corpus/*`; REST, MCP and gRPC share one implementation. There is no MCP build tool: a pack is a file a tool answer cannot carry. The server now has 97 built-in MCP tools (93 in 2.18.10).
+
+- `make sonar-local`: the SonarCloud scan and quality gate from this machine before a push (Docker, `SONAR_TOKEN`).
+
+### Changed
+
+- **`mddb-cli add` and `mddb-cli autoindex` read Markdown frontmatter (#373)**, like `/v1/upload` and the folder loader: the keys become meta and the body is stored without the block. `add` merges `-m` over the frontmatter; `autoindex` sends `.md`, `.markdown` and `.mdx` files with `extractFrontmatter`, so the server reads them once with the same parser, and the file meta (`path`, `kind`, ...) wins. `--no-frontmatter` on both stores files as they are. The CLI carries a byte-identical copy of the server's parser, kept in step by a test and by shared fixtures in `testdata/frontmatter/cases.json`. A Markdown file with frontmatter is rewritten once on the next `autoindex` run, as its stored body changes.
+
+- Cognitive-complexity backlog split into named helpers, behaviour unchanged (#379): `handleHybridSearch` 77→11, `handleMemorySessionsList` 53→3, `pptxParagraphs` 35→5, `runFTSSearch` 35→5, `DirectClient.SetCollectionConfig` 28→8, `toolIngest` 27→7, gRPC `ListRevisions` 24→6, `parseESAggs` 21→5, and `triggers` in `scripts/sonar-scan-owner.py`; every new helper is ≤13. REST, gRPC and MCP read revision history through one function instead of three copies.
+
+### Fixed
+
+- **`scripts/load-md-folder.sh` kept only the first item of a frontmatter list (#372)**: `tags: database, markdown, golang` became `tags=[database]`. The loader no longer parses frontmatter in shell: it stores each file with `mddb-cli add -f`, which reads it, so comma, `[flow]` and `- item` block lists arrive whole. `-s/--server` now reaches the CLI (exported as `MDDB_SERVER`); before, it was only printed. The loader stops with an error on an mddb-cli older than 2.18.11, which would store the block as text. The loader's `source`, `filename` and `-m` meta now win over a frontmatter key of the same name. New test: `make test-load-md-folder`.
+- **Frontmatter lists in `/v1/upload`, `/v1/ingest` (`extractFrontmatter`), import-url, MCP upload and sync**: a flow list `tags: [a, b]` was stored as `["[a", "b]"]` and a block list (`tags:` then `- a` lines) was dropped; both are now lists. Quotes are stripped per item, empty items are dropped, and a `- key: value` item (a list of maps, which flat meta cannot hold) is not stored.
+- **`mddb-cli self-update` on Windows (#374)**: releases carry no Windows archives, so the command (with `--check` too) now stops at once with a non-zero exit and says to build from source with `make build-windows`, instead of looking for an archive that does not exist.
+
+- Truncate is one function for REST, gRPC and the MCP direct client (#380). gRPC `Truncate` now writes its revision deletions to the binlog, so replicas trim too; a negative `keepRevs` keeps every revision instead of crashing the call; and a document that cannot be decoded fails the truncate, as REST always did. The MCP truncate also writes its deletions to the binlog, and a failed delete is reported instead of ignored.
+
+- **Docs: no `tradik/mddb:cli` image** (#375). README listed a CLI image that no release builds (last pushed 2026-03-04). The row is gone; `mddb-cli` comes from the release archives (`.tar.gz`, `.deb`, `.rpm`), Homebrew (`brew install tradik/tap/mddb-cli`) or snap (`snap install mddb-cli`), or build it with `docker build -f services/mddb-cli/Dockerfile -t mddb-cli .` from the repository root.
+- **Site: linux-arm64 `.deb` and `.rpm` on the download card** (#376). Every release published them; the card linked only amd64. `services/ssg-template/download.test.mjs` derives the asset names from release.yml and fails when a published package has no link or a link names no asset.
+- **Gain counters: `Stop` reports a failed final write** (#381). A flush takes the pending counts and puts them back when the write fails; a `Stop` that ran during a ticker flush found nothing pending and returned nil. Flushes now run one at a time.
+- `TestGain_FlusherAndWindow` waits for ticker flushes on a channel instead of sleeping, and `bulk_ingest_job.go` reaches 98% coverage from tests that call `Stop`, `process`, the status helpers and `fireCallback` directly, so its coverage no longer depends on goroutine timing (#381).
+
+- The release Docker image creates `/data` as `Dockerfile` does (#211): `docker-compose.yml` on the published image started with a root-owned volume and could not open `/data/mddb.db`.
+- Site: the download links pointed at `#` (a duplicate `href`); the binary quick start downloaded 2.11.4 and ran a path the archive does not contain; the from-source quick start ran `./bin/mddbd`, which `make build` does not write; the Compose quick start called `make docker-up`, which does not exist; the Docker quick start mounted the volume at `/data` while the image keeps data in `/app/data`; the MCP example set `MDDB_GRPC_ADDRESS` and `MDDB_REST_BASE_URL`, which the server does not read.
+- Site: the inline chat widget connected every visitor to their own `localhost:11030` and stayed on "Connecting..."; it now starts only when the page is served locally.
+- docs/DOCKER_HUB.md backup and restore passed `cp` to mddbd; they use `--entrypoint cp`.
+
+### Documentation
+
+- The site and docs state what the code has: 93 MCP tools (the site said 81), 8 vector index algorithms (SQ4 was missing) plus `auto`, 8 full-text modes, 17 stemming languages (Tamil was listed but is not registered), 20 upload formats, the lexical embedding provider, HTTP/3, SSE and the `/es` subset. Release binary ~32 MB, download ~12 MB, Docker image ~43 MB compressed (were ~26–28 MB and ~26–33 MB). The JSON-LD no longer lists Windows. "What's New" describes 2.18.10. The landing page mentions the Elasticsearch-compatible subset, corpus packs, synced sources, scheduled backups, quotas, trusted proxies/PROXY protocol and OpenTelemetry. Landing colours meet WCAG 2.2 AA.
+- daemonports.org (site and README "Used by"): about 120,000 pages in one collection, public full-text search and autocomplete served by MDDB on FreeBSD with ZFS.
+- Guards (`mcp_tool_count_doc_test.go`, `site_claims_doc_test.go`) fail when the MCP tool count, algorithm, language or format counts, or the stated sizes drift from the code or from `.ssg.yaml`.
+
+- The REST spec (`docs/openapi.yaml`) passes Redocly's `recommended-strict` ruleset with no warnings (`make openapi-lint`, pinned `@redocly/cli` 2.72.1). Every operation has a camelCase, verb-first `operationId` (44 added, none renamed) and documents the 4xx it can really return, from shared responses (BadRequest, Unauthorized, Forbidden, NotFound, PayloadTooLarge, RateLimited, ServiceUnavailable, InsufficientStorage, and JSON-RPC variants for the MCP listener). Wrong examples fixed (`bm25B` and the field-weights object were swapped; collection code `role` showed a path list). `servers` defaults to `http://localhost:11023`. Search responses document `highlights`, `signals`/`signalBreakdown` and the `format: passages` response. The lint runs in the Tests workflow and before the docs site is published.
+
+### Upgrading
+
+- `mddb-cli autoindex` and `mddb-cli add` now read Markdown frontmatter (`--no-frontmatter` keeps the old behaviour). A Markdown file with frontmatter is rewritten once on the next `autoindex` run, as its stored body changes. `scripts/load-md-folder.sh` needs `mddb-cli` 2.18.11.
+- gRPC `Truncate` behaves like REST: deletions reach replicas through the binlog, and a document that cannot be decoded fails the call.
+
 ## [2.18.10] - 2026-10-30
 
 ### Security
