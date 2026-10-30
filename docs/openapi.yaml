@@ -8118,6 +8118,8 @@ components:
           $ref: '#/components/schemas/FeedbackWeight'
         rocchio:
           $ref: '#/components/schemas/RocchioWeights'
+        queryDecomposition:
+          $ref: '#/components/schemas/QueryDecompositionMode'
 
     PlanExplain:
       type: boolean
@@ -8161,6 +8163,33 @@ components:
             $ref: '#/components/schemas/SearchPlan'
         feedback:
           $ref: '#/components/schemas/FeedbackApplied'
+        decomposition:
+          $ref: '#/components/schemas/QueryDecomposition'
+
+    QueryDecompositionMode:
+      type: string
+      enum: [ "off", auto ]
+      default: "off"
+      description: >-
+        (v2.18.10+, SRCH-020) `auto` searches a query of several clauses —
+        split at sentence punctuation and at "and" between clauses, at most 4
+        parts — part by part as well as whole, and each document keeps its best
+        score. One embedding call per part. A query with nothing to split, or
+        sent as `queryVector`, is searched whole. Hybrid search splits the
+        vector half only. `off` is today's search. Another value returns 422.
+
+    QueryDecomposition:
+      type: object
+      description: (v2.18.10+, SRCH-020) How the query was split, in the plan; set with `queryDecomposition` auto.
+      properties:
+        parts:
+          type: integer
+          description: Parts searched besides the whole query; 1 = not split.
+          example: 2
+        texts:
+          type: array
+          items: { type: string }
+          description: The parts, when there was more than one.
 
     FeedbackExamples:
       type: array
@@ -9212,6 +9241,8 @@ components:
           $ref: '#/components/schemas/FeedbackWeight'
         rocchio:
           $ref: '#/components/schemas/RocchioWeights'
+        queryDecomposition:
+          $ref: '#/components/schemas/QueryDecompositionMode'
         signals:
           $ref: "#/components/schemas/FusionSignals"
         strategy:
@@ -9742,6 +9773,8 @@ components:
           type: string
           enum: [ "off", blend, expand ]
           description: (v2.18.9+, RAG-009) Measure summaries; unset = the collection profile's.
+        queryDecomposition:
+          $ref: '#/components/schemas/QueryDecompositionMode'
 
     EvalRequest:
       type: object

@@ -50,7 +50,9 @@ func TestRunPrintsBothSets(t *testing.T) {
 	}
 	got := out.String()
 	for _, want := range []string{"### plain: 3 queries", "### multi-topic: 3 queries", "vector (server)",
-		"hybrid (server)", "max, whole query", "maxsim, whole + 4-word windows", "agrees with the server's vector top 10 on 3 of 3",
+		"hybrid (server)", "max, whole query", "maxsim, whole + 4-word windows",
+		"vector, decomposition auto (server)", "hybrid, decomposition auto (server)", "best part, whole + clauses ≤4 (= auto)",
+		"rrf, whole + clauses ≤4", "agrees with the server's vector top 10 on 3 of 3",
 		"(server)", "(round trips)", "11 chunks"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output lacks %q:\n%s", want, got)

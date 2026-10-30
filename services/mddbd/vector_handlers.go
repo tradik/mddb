@@ -41,11 +41,12 @@ type VectorSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions  // format, passageLines (AGT-002)
-	PlanOptions     // explain, latencyTargetMs (SRCH-013)
-	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
-	ImageOptions    // includeImages (RAG-010)
+	IndexWait            // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions       // format, passageLines (AGT-002)
+	PlanOptions          // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions      // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
+	DecompositionOptions // queryDecomposition (SRCH-020)
+	ImageOptions         // includeImages (RAG-010)
 	// QueryImage searches by an image (RAG-010): base64, a data URI or an
 	// http(s) URL fetched through the SSRF guard. Needs a provider that
 	// embeds images; the results are image documents.
@@ -243,6 +244,10 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		unprocessable(w, err)
 		return
 	}
+	if err := req.ValidateDecomposition(); err != nil {
+		unprocessable(w, err)
+		return
+	}
 	req.PassageOptions = s.ResolveFormat(req.Collection, req.PassageOptions)
 	if err := req.ValidatePassageOptions(); err != nil {
 		unprocessable(w, err)
@@ -313,6 +318,12 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	queryVector = fb.query(queryVector)
 	ps.Plan.Feedback = fb.report()
+	// SRCH-020: with queryDecomposition auto, one more vector per part.
+	vectors, err := s.queryVectors(r.Context(), req.DecompositionOptions, textQuery(req.Query, req.QueryVector), queryVector, fb, ps.Plan)
+	if err != nil {
+		bad(w, err)
+		return
+	}
 
 	// Resolve distance metric
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
@@ -332,17 +343,13 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
-
 	// Parent mode (default): one result per document, best chunk wins.
 	// Chunk/window modes keep individual chunk hits so the exact matching
 	// passage can be returned alongside the parent document.
 	// Disk-only collections: rescore the quantized candidates against the
-	// full-precision vectors on disk before any downstream ranking.
-	var diskVecs map[string][]float32
-	if s.collectionDiskOnly(req.Collection) {
-		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
-	}
+	// full-precision vectors on disk before any downstream ranking — per
+	// query vector, before a decomposed query's lists are fused (SRCH-020).
+	results, diskVecs := s.searchVectorPath(ps, req.Collection, vectors, searchTopK, req.Threshold, allowedIDs, filtered, metric)
 	results = s.rescoreFeedback(fb, req.Collection, results, metric) // SRCH-015, rescore mode
 	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, ""),
 		Query: queryVector, SearchTopK: searchTopK, TopK: topK, Threshold: req.Threshold, Allowed: allowedIDs,

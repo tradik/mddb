@@ -333,8 +333,10 @@ func (a *GraphQLAdapter) VectorSearch(ctx context.Context, input gql.VectorSearc
 		Algorithm:       derefString(input.Algorithm),
 		PlanOptions:     planOptionsFromGQL(input),
 		FeedbackOptions: feedbackFromGQL(input),
-		ImageOptions:    ImageOptions{IncludeImages: derefBool(input.IncludeImages, false)}, // RAG-010
-		QueryImage:      derefString(input.QueryImage),
+		// SRCH-020: validated and applied by the shared path too.
+		DecompositionOptions: DecompositionOptions{QueryDecomposition: derefString(input.QueryDecomposition)},
+		ImageOptions:         ImageOptions{IncludeImages: derefBool(input.IncludeImages, false)}, // RAG-010
+		QueryImage:           derefString(input.QueryImage),
 	}
 	resp, err := a.mcp.VectorSearch(ctx, req)
 	if err != nil {

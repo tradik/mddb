@@ -62,6 +62,9 @@ type EvalConfig struct {
 	// SummaryMode measures summaries (RAG-009): off, blend or expand; empty
 	// = the collection profile's.
 	SummaryMode string `json:"summaryMode,omitempty"`
+	// QueryDecomposition measures query decomposition (SRCH-020) on vector
+	// and hybrid: off (default) or auto.
+	QueryDecomposition string `json:"queryDecomposition,omitempty"`
 }
 
 func (c EvalConfig) label() string {
@@ -83,6 +86,9 @@ func (c EvalConfig) label() string {
 	}
 	if c.SummaryMode != "" {
 		l += " summary=" + c.SummaryMode
+	}
+	if c.QueryDecomposition != "" {
+		l += " decomposition=" + c.QueryDecomposition
 	}
 	return l
 }
@@ -206,6 +212,9 @@ func (s *Server) evalSearch(ctx context.Context, collection string, k int, c Eva
 	if err := validateSummarySettings(c.SummaryMode, nil); err != nil {
 		return nil, 0, err
 	}
+	if err := (DecompositionOptions{QueryDecomposition: c.QueryDecomposition}).ValidateDecomposition(); err != nil {
+		return nil, 0, err
+	}
 	switch c.SearchType {
 	case SearchTypeFTS:
 		resp, err := s.searchFTS(FTSSearchRequest{Collection: collection, Query: query, Limit: k, Algorithm: c.Algorithm,
@@ -218,7 +227,8 @@ func (s *Server) evalSearch(ctx context.Context, collection string, k int, c Eva
 		}
 	case SearchTypeVector:
 		resp, err := NewDirectClient(s).VectorSearch(ctx, &MCPVectorSearchRequest{Collection: collection, Query: query, TopK: k,
-			Algorithm: c.VectorAlgorithm, RetrievalMode: c.RetrievalMode, IncludeContent: true, noGain: true, summaryMode: c.SummaryMode})
+			Algorithm: c.VectorAlgorithm, RetrievalMode: c.RetrievalMode, IncludeContent: true, noGain: true, summaryMode: c.SummaryMode,
+			DecompositionOptions: DecompositionOptions{QueryDecomposition: c.QueryDecomposition}})
 		if err != nil {
 			return nil, 0, err
 		}
@@ -228,7 +238,8 @@ func (s *Server) evalSearch(ctx context.Context, collection string, k int, c Eva
 	case SearchTypeHybrid:
 		items, _, err := s.hybridItems(ctx, HybridSearchRequest{Collection: collection, Query: query, TopK: k,
 			Algorithm: c.Algorithm, VectorAlgorithm: c.VectorAlgorithm, Alpha: c.Alpha, Strategy: c.Strategy, IncludeContent: true,
-			BM25K1: c.BM25K1, BM25B: c.BM25B, summaryMode: c.SummaryMode})
+			BM25K1: c.BM25K1, BM25B: c.BM25B, summaryMode: c.SummaryMode,
+			DecompositionOptions: DecompositionOptions{QueryDecomposition: c.QueryDecomposition}})
 		if err != nil {
 			return nil, 0, err
 		}

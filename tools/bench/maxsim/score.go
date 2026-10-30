@@ -59,13 +59,20 @@ func scoreQuery(q evalQuery, returned []string, k int) metrics {
 
 // maxSimRank scores each document by the mean over the query parts of the
 // part's best chunk, and returns the top k keys. Mean and sum rank alike: a
-// query has the same number of parts for every document. bestPart takes the
-// best part's score instead (fusion, not MaxSim).
-func maxSimRank(parts []partScores, k int, bestPart bool) []string {
+// query has the same number of parts for every document. fuseMax takes the
+// best part's score instead (fusion, not MaxSim); fuseRRF sums each part's
+// reciprocal rank, 1/(60 + rank), over every document the part scored.
+func maxSimRank(parts []partScores, k int, fusion string) []string {
 	score := map[string]float64{}
 	for _, p := range parts {
+		if fusion == fuseRRF {
+			for i, key := range rankKeys(p.Best) {
+				score[key] += 1 / float64(60+i+1)
+			}
+			continue
+		}
 		for key, s := range p.Best {
-			if bestPart {
+			if fusion == fuseMax {
 				if cur, ok := score[key]; !ok || s > cur {
 					score[key] = s
 				}
@@ -74,6 +81,12 @@ func maxSimRank(parts []partScores, k int, bestPart bool) []string {
 			score[key] += s / float64(len(parts))
 		}
 	}
+	keys := rankKeys(score)
+	return keys[:min(k, len(keys))]
+}
+
+// rankKeys orders the keys best score first, ties by key.
+func rankKeys(score map[string]float64) []string {
 	keys := make([]string, 0, len(score))
 	for key := range score {
 		keys = append(keys, key)
@@ -84,7 +97,7 @@ func maxSimRank(parts []partScores, k int, bestPart bool) []string {
 		}
 		return keys[i] < keys[j]
 	})
-	return keys[:min(k, len(keys))]
+	return keys
 }
 
 // row is one configuration over one query set.
@@ -94,6 +107,7 @@ type row struct {
 	P50, P99 float64
 	Calls    float64 // embedding calls per query, mean
 	Server   bool    // latency measured by the server (eval), not round trips
+	Base     string  // the row the deltas are against; "" = "max, whole query"
 }
 
 // setResult is one query set's rows; Agree counts the queries whose top k
@@ -119,6 +133,13 @@ func measureSet(client *http.Client, cfg config, s querySet, stats *chunkStats) 
 	}
 	for _, b := range bases {
 		r := row{Name: b.Name + " (server)", P50: b.P50, P99: b.P99, Calls: 1, Server: true}
+		if b.Base != "" {
+			// A decomposed search embeds the whole query and each part.
+			r.Base, r.Calls = b.Base+" (server)", 0
+			for _, q := range s.Queries {
+				r.Calls += float64(len(withWhole(splitParts)(q.Query))) / float64(len(s.Queries))
+			}
+		}
 		for i, q := range s.Queries {
 			r.PerQuery = append(r.PerQuery, scoreQuery(q, b.Returned[i], cfg.K))
 		}
@@ -142,7 +163,7 @@ func measureSet(client *http.Client, cfg config, s querySet, stats *chunkStats) 
 				}
 				parts, ms = append(parts, p), ms+p.Ms
 			}
-			ranked := maxSimRank(parts, cfg.K, v.BestPart)
+			ranked := maxSimRank(parts, cfg.K, v.Fusion)
 			if vi == 0 && equal(ranked, bases[0].Returned[qi][:min(cfg.K, len(bases[0].Returned[qi]))]) {
 				res.Agree++
 			}

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -122,16 +123,34 @@ func fetchPart(client *http.Client, cfg config, text string) (partScores, error)
 // baseline is one server-side configuration measured by POST /v1/eval.
 type baseline struct {
 	Name     string
+	Base     string     // the configuration this one is compared with; "" = none
 	Returned [][]string // per query, in rank order
 	P50, P99 float64
+}
+
+// evalConfigs are the server's own searches measured: vector and hybrid as
+// they rank today, and each with queryDecomposition auto (SRCH-020).
+var evalConfigs = []map[string]any{
+	{"name": "vector", "searchType": "vector"},
+	{"name": "hybrid", "searchType": "hybrid"},
+	{"name": "vector, decomposition auto", "searchType": "vector", "queryDecomposition": "auto"},
+	{"name": "hybrid, decomposition auto", "searchType": "hybrid", "queryDecomposition": "auto"},
+}
+
+// baseOf is the configuration a decomposed search is compared with.
+func baseOf(name string) string {
+	plain, _, ok := strings.Cut(name, ", decomposition")
+	if !ok {
+		return ""
+	}
+	return plain
 }
 
 // evalBaselines runs vector and hybrid search through the server's own
 // evaluation endpoint and returns what each query got back.
 func evalBaselines(client *http.Client, cfg config, qs []evalQuery) ([]baseline, error) {
 	raw, err := post(client, cfg.URL+"/v1/eval", map[string]any{"collection": cfg.Collection, "k": cfg.K,
-		"queries": qs, "details": true,
-		"configs": []map[string]any{{"name": "vector", "searchType": "vector"}, {"name": "hybrid", "searchType": "hybrid"}}})
+		"queries": qs, "details": true, "configs": evalConfigs})
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +173,7 @@ func evalBaselines(client *http.Client, cfg config, qs []evalQuery) ([]baseline,
 		if r.Error != "" || len(r.PerQuery) != len(qs) {
 			return nil, fmt.Errorf("eval %s: %q, %d of %d queries", r.Config, r.Error, len(r.PerQuery), len(qs))
 		}
-		b := baseline{Name: r.Config, P50: r.P50Ms, P99: r.P99Ms}
+		b := baseline{Name: r.Config, Base: baseOf(r.Config), P50: r.P50Ms, P99: r.P99Ms}
 		for _, pq := range r.PerQuery {
 			b.Returned = append(b.Returned, pq.Returned)
 		}

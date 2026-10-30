@@ -75,6 +75,9 @@ func planToProto(p *SearchPlan) *proto.SearchPlan {
 		out.Feedback = &proto.FeedbackApplied{Mode: f.Mode, Positive: safeInt32(f.Positive), Negative: safeInt32(f.Negative),
 			Alpha: f.Alpha, Beta: f.Beta, Gamma: f.Gamma, QueryShift: f.QueryShift, Weight: f.Weight, Rescored: safeInt32(f.Rescored)}
 	}
+	if d := p.Decomposition; d != nil {
+		out.Decomposition = &proto.QueryDecomposition{Parts: safeInt32(d.Parts), Texts: d.Texts}
+	}
 	return out
 }
 

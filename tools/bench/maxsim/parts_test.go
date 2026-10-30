@@ -56,6 +56,19 @@ func TestVariantsAddTheWholeQueryOnlyWhenSplit(t *testing.T) {
 	}
 }
 
+func TestSplitPartsBoundsLikeTheServer(t *testing.T) {
+	got := splitParts("a b. c d. e f. g h. i j")
+	if !reflect.DeepEqual(got, []string{"a b", "c d", "e f", "g h i j"}) {
+		t.Errorf("splitParts = %q", got)
+	}
+	if got := splitParts("x y and z w"); !reflect.DeepEqual(got, []string{"x y", "z w"}) {
+		t.Errorf("splitParts = %q", got)
+	}
+	if baseOf("vector, decomposition auto") != "vector" || baseOf("vector") != "" {
+		t.Error("baseOf")
+	}
+}
+
 func TestPairQueriesUnionKeysAndGrades(t *testing.T) {
 	qs := []evalQuery{
 		{ID: "a", Query: "qa", ExpectedKeys: []string{"A.md", "S.md"}, Grades: map[string]int{"A.md": 3, "S.md": 1}},
@@ -104,14 +117,19 @@ func TestMaxSimRankAveragesPartsAndBreaksTies(t *testing.T) {
 		{Best: map[string]float64{"a": 0.9, "b": 0.5, "c": 0.4}},
 		{Best: map[string]float64{"a": 0.1, "b": 0.6, "c": 0.4}},
 	}
-	if got := maxSimRank(parts, 2, false); !reflect.DeepEqual(got, []string{"b", "a"}) {
+	if got := maxSimRank(parts, 2, fuseMean); !reflect.DeepEqual(got, []string{"b", "a"}) {
 		t.Errorf("rank = %q", got)
 	}
-	if got := maxSimRank(parts, 2, true); !reflect.DeepEqual(got, []string{"a", "b"}) {
+	if got := maxSimRank(parts, 2, fuseMax); !reflect.DeepEqual(got, []string{"a", "b"}) {
 		t.Errorf("best-part rank = %q", got)
 	}
+	// RRF: a is 1st and 3rd, b 2nd and 1st, c 3rd and 2nd: b = 1/62 + 1/61
+	// wins, then a = 1/61 + 1/63, then c = 1/63 + 1/62.
+	if got := maxSimRank(parts, 3, fuseRRF); !reflect.DeepEqual(got, []string{"b", "a", "c"}) {
+		t.Errorf("rrf rank = %q", got)
+	}
 	tie := []partScores{{Best: map[string]float64{"z": 1, "y": 1}}}
-	if got := maxSimRank(tie, 5, false); !reflect.DeepEqual(got, []string{"y", "z"}) {
+	if got := maxSimRank(tie, 5, fuseMean); !reflect.DeepEqual(got, []string{"y", "z"}) {
 		t.Errorf("tie rank = %q", got)
 	}
 }
@@ -135,8 +153,11 @@ func TestStatsHelpers(t *testing.T) {
 	if better, worse := tally(b, a); better != 0 || worse != 1 {
 		t.Errorf("tally = %d/%d", better, worse)
 	}
-	if r := baseRow([]row{{Name: "x"}, {Name: "y"}}); r.Name != "x" {
+	if r := baseRow([]row{{Name: "x"}, {Name: "y"}}, ""); r.Name != "x" {
 		t.Errorf("baseRow fallback = %q", r.Name)
+	}
+	if r := baseRow([]row{{Name: "x"}, {Name: "y"}}, "y"); r.Name != "y" {
+		t.Errorf("baseRow named = %q", r.Name)
 	}
 	if meanOf(nil, ndcg) != 0 {
 		t.Error("meanOf empty")

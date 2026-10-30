@@ -340,7 +340,11 @@ query {
 }
 ```
 
-A refused input (an unknown `feedbackMode`, an example with both or neither
+`queryDecomposition: "auto"` (v2.18.10+) also searches a query of several
+clauses clause by clause, and `plan { decomposition { parts texts } }` shows
+the split ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810)).
+
+A refused input (an unknown `feedbackMode` or `queryDecomposition`, an example with both or neither
 of `key` and `vector`, a key with no embedding, `latencyTargetMs` out of
 range) is a GraphQL error carrying the message REST returns with its 422.
 In `plan.feedback`, the fields the mode does not use are `0`. GraphQL has no

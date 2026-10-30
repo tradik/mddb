@@ -127,6 +127,18 @@ func mcpGetFeedback(args map[string]interface{}) (FeedbackOptions, error) {
 	return f, nil
 }
 
+// mcpQueryDecompositionSchema is the query decomposition argument (SRCH-020).
+var mcpQueryDecompositionSchema = map[string]interface{}{
+	"type": "string", "enum": []string{QueryDecompositionOff, QueryDecompositionAuto},
+	"description": "off (default) or auto: a question with several needs (\"set up replication and how does backup work\") " +
+		"is also searched clause by clause, and each document keeps its best score. One embedding call per clause, at most 4",
+}
+
+// mcpGetDecomposition reads query_decomposition.
+func mcpGetDecomposition(args map[string]interface{}) DecompositionOptions {
+	return DecompositionOptions{QueryDecomposition: mcpGetString(args, "query_decomposition")}
+}
+
 // mcpGetPlanOptions reads explain and latency_target_ms.
 func mcpGetPlanOptions(args map[string]interface{}) PlanOptions {
 	o := PlanOptions{LatencyTargetMs: mcpGetInt(args, "latency_target_ms")}

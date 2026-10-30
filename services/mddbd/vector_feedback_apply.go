@@ -118,12 +118,21 @@ func (s *Server) crossFeedback(f FeedbackOptions, source string, targets []strin
 // query returns the corrected query vector in query mode, and the query as
 // given otherwise.
 func (fb *feedback) query(q []float32) []float32 {
+	out := fb.correct(q)
+	if fb != nil && fb.mode == FeedbackModeQuery {
+		fb.applied.QueryShift = 1 - float64(vec.CosineSimilarity(q, out))
+	}
+	return out
+}
+
+// correct moves a query vector by the examples in query mode, without
+// recording the shift: query records the whole query's, and the parts of a
+// decomposed query (SRCH-020) are corrected the same way.
+func (fb *feedback) correct(q []float32) []float32 {
 	if fb == nil || fb.mode != FeedbackModeQuery {
 		return q
 	}
-	out := vec.Rocchio(q, fb.pos, fb.neg, fb.rocchio)
-	fb.applied.QueryShift = 1 - float64(vec.CosineSimilarity(q, out))
-	return out
+	return vec.Rocchio(q, fb.pos, fb.neg, fb.rocchio)
 }
 
 // rescoreFeedback re-ranks one collection's candidates in rescore mode.

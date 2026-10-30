@@ -74,29 +74,30 @@ func contains(xs []string, x string) bool {
 	return false
 }
 
+// Ways of combining the parts' scores into one ranking.
+const (
+	fuseMean = "" // MaxSim: the mean over the parts of each part's best chunk
+	// fuseMax scores a document by its best part: not MaxSim but multi-query
+	// fusion — the control that says whether a change on multi-topic queries
+	// comes from splitting or from summing, and the fusion the server's
+	// queryDecomposition auto ships (SRCH-020).
+	fuseMax = "max"
+	// fuseRRF sums 1/(60 + rank) over the parts' rankings (SRCH-020's
+	// alternative to max).
+	fuseRRF = "rrf"
+)
+
 // variant is one way of splitting a query into the parts MaxSim embeds,
 // and of combining the parts' scores.
 type variant struct {
-	Name  string
-	Parts func(query string) []string
-	// BestPart scores a document by its best part instead of the mean: not
-	// MaxSim but multi-query fusion, the control that says whether a change
-	// on multi-topic queries comes from splitting or from summing.
-	BestPart bool
+	Name   string
+	Parts  func(query string) []string
+	Fusion string // fuseMean, fuseMax or fuseRRF
 }
 
 // variants are the scorings compared. "whole" is today's single-vector max,
 // computed on the same path as the others so only the aggregation differs.
 func variants(window, stride int) []variant {
-	withWhole := func(split func(string) []string) func(string) []string {
-		return func(q string) []string {
-			parts := split(q)
-			if len(parts) == 1 && parts[0] == q {
-				return parts
-			}
-			return append([]string{q}, parts...)
-		}
-	}
 	windows := func(q string) []string { return splitWindows(q, window, stride) }
 	return []variant{
 		{Name: "max, whole query", Parts: func(q string) []string { return []string{q} }},
@@ -104,7 +105,37 @@ func variants(window, stride int) []variant {
 		{Name: fmt.Sprintf("maxsim, %d-word windows", window), Parts: windows},
 		{Name: "maxsim, whole + clauses", Parts: withWhole(splitClauses)},
 		{Name: fmt.Sprintf("maxsim, whole + %d-word windows", window), Parts: withWhole(windows)},
-		{Name: "best part, clauses (control)", Parts: splitClauses, BestPart: true},
+		{Name: "best part, clauses (control)", Parts: splitClauses, Fusion: fuseMax},
+		// SRCH-020: the server's queryDecomposition auto, on the client path —
+		// the whole query kept as one of at most five searches.
+		{Name: "best part, whole + clauses ≤4 (= auto)", Parts: withWhole(splitParts), Fusion: fuseMax},
+		{Name: "rrf, whole + clauses ≤4", Parts: withWhole(splitParts), Fusion: fuseRRF},
+	}
+}
+
+// maxQueryParts is the server's bound on a decomposed query's parts
+// (services/mddbd/query_decomposition.go).
+const maxQueryParts = 4
+
+// splitParts is splitClauses bounded the way the server bounds it: clauses
+// past the fourth join the fourth.
+func splitParts(q string) []string {
+	parts := splitClauses(q)
+	if len(parts) > maxQueryParts {
+		parts[maxQueryParts-1] = strings.Join(parts[maxQueryParts-1:], " ")
+		parts = parts[:maxQueryParts]
+	}
+	return parts
+}
+
+// withWhole adds the whole query to split's parts, unless split left it whole.
+func withWhole(split func(string) []string) func(string) []string {
+	return func(q string) []string {
+		parts := split(q)
+		if len(parts) == 1 && parts[0] == q {
+			return parts
+		}
+		return append([]string{q}, parts...)
 	}
 }
 

@@ -177,6 +177,16 @@ type SearchPlan {
   reasons: [String!]!
   "The correction relevance feedback made (SRCH-015); null without examples."
   feedback: FeedbackApplied
+  "How the query was split (SRCH-020); set with queryDecomposition auto."
+  decomposition: QueryDecomposition
+}
+
+"How query decomposition split the query (SRCH-020)."
+type QueryDecomposition {
+  "Parts searched besides the whole query; 1 = the query was not split."
+  parts: Int!
+  "The parts, when there was more than one."
+  texts: [String!]!
 }
 
 """
@@ -406,6 +416,11 @@ input VectorSearchInput {
   documents.
   """
   queryImage: String
+  """
+  off (default) or auto (SRCH-020): a query of several clauses is also
+  searched per clause, and each document keeps its best score.
+  """
+  queryDecomposition: String
 }
 
 "A relevance-feedback example (SRCH-015): a document key or ID, or a vector — one, not both."

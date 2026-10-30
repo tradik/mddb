@@ -221,6 +221,13 @@ With `explain`, `SearchPlan.feedback` (7, `FeedbackApplied`) reports the
 correction. An example that names nothing usable is `INVALID_ARGUMENT`. All
 of this is additive.
 
+Query decomposition (SRCH-020, v2.18.10) is `string query_decomposition` on
+`VectorSearchRequest` (28) and `HybridSearchRequest` (36): `off` (default)
+or `auto`. With `explain`, `SearchPlan.decomposition` (8,
+`QueryDecomposition`) holds `int32 parts` (1 = not split) and `repeated
+string texts`. Another mode is `INVALID_ARGUMENT`. See
+[SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810).
+
 Summaries (RAG-009) need no new request field. A document carries its
 client-written summary in the metadata key `summary`. The collection profile
 decides what searches do with it, and `VectorSearch` and `HybridSearch`

@@ -827,6 +827,7 @@ Perform semantic (vector) search using natural language queries. Documents are a
 - `feedbackMode` (optional, v2.18.9+): `query` (default: Rocchio on the query vector) or `rescore` (re-rank the candidates by similarity to the examples)
 - `feedbackWeight` (optional, v2.18.9+): Rescore weight, 0–10 (default 0.5)
 - `rocchio` (optional, v2.18.9+): `{alpha, beta, gamma}` for `query` mode (default 1, 0.75, 0.25)
+- `queryDecomposition` (optional, v2.18.10+): `off` (default) or `auto` — a query of several clauses ("set up a replica and take a backup") is also searched clause by clause, at most 4, and each document keeps its best score; with `explain`, `plan.decomposition` gives the parts ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810))
 
 \* Either `query` or `queryVector` is required.
 
@@ -2531,6 +2532,7 @@ Hybrid search combining full-text (sparse) and vector (dense) results using alph
 | `latencyTargetMs` | integer | `0` | (v2.18.9+) Latency goal for `auto`, 0–60000 |
 | `positive`, `negative` | array | | (v2.18.9+) Relevance feedback for the vector half only: document keys/IDs or vectors ([SEARCH.md](SEARCH.md#relevance-feedback--positive-and-negative-examples-v2189)) |
 | `feedbackMode`, `feedbackWeight`, `rocchio` | | `query`, 0.5, 1/0.75/0.25 | (v2.18.9+) How the examples are applied |
+| `queryDecomposition` | string | `"off"` | (v2.18.10+) `auto` splits a multi-clause query for the vector half only ([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810)) |
 | `alpha` | number | `0.5` | Weight blending (0=FTS only, 1=vector only) |
 | `strategy` | string | `"alpha"` | Fusion strategy: `alpha` or `rrf` |
 | `rrfK` | integer | `60` | RRF parameter k |

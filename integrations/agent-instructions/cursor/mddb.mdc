@@ -51,6 +51,12 @@ that answered, `negative` for the ones that did not. The second round moves
 towards the first and away from the second. On a test corpus, one round
 raised recall@10 from 0.31 to 0.49.
 
+When one question asks for two things ("set up a replica and take a backup"),
+pass `query_decomposition: "auto"` to `semantic_search` or `hybrid_search`
+instead of running two searches. The server also searches each clause and
+keeps every document's best score. On the MDDB docs it raised nDCG@10 by
+0.065 on such questions and left ordinary ones unchanged.
+
 When the answer may be in a figure — a diagram, a screenshot, a chart — pass
 `include_images: true`. Each hit then lists its images with their alt text,
 caption, page and `url`, and an image is also a hit of its own by its alt

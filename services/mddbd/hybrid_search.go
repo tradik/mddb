@@ -66,9 +66,10 @@ type HybridSearchRequest struct {
 	GroupBy        *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 	PassageOptions          // format, passageLines (AGT-002)
 	IndexWait
-	PlanOptions     // explain, latencyTargetMs (SRCH-013), for the vector half
-	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015), for the vector half
-	ImageOptions    // includeImages (RAG-010)
+	PlanOptions          // explain, latencyTargetMs (SRCH-013), for the vector half
+	FeedbackOptions      // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015), for the vector half
+	DecompositionOptions // queryDecomposition (SRCH-020), for the vector half
+	ImageOptions         // includeImages (RAG-010)
 
 	// onlyIDs restricts the full-text half to these documents. Internal:
 	// used to find matches among documents still waiting for their
@@ -181,6 +182,10 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := req.ValidateFeedback(); err != nil {
+		unprocessable(w, err)
+		return
+	}
+	if err := req.ValidateDecomposition(); err != nil {
 		unprocessable(w, err)
 		return
 	}
@@ -592,6 +597,12 @@ func (s *Server) vectorHalf(ctx context.Context, req HybridSearchRequest) ([]vec
 	}
 	queryVector = fb.query(queryVector)
 	ps.Plan.Feedback = fb.report()
+	// SRCH-020: decomposition splits the vector half only; the full-text half
+	// already matches each part's words.
+	vectors, err := s.queryVectors(ctx, req.DecompositionOptions, req.Query, queryVector, fb, ps.Plan)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	metric := vector.ResolveSimilarity(req.DistanceMetric)
 	if filtered && len(allowedIDs) == 0 {
@@ -600,7 +611,9 @@ func (s *Server) vectorHalf(ctx context.Context, req HybridSearchRequest) ([]vec
 	sp := s.Tracer.Stage(ctx, spanSearchVector) // OPS-024
 	defer sp.End()
 	sp.SetString("mddb.vector.algorithm", ps.Algorithm)
-	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
+	results := searchQueryVectors(vectors, searchTopK, func(v []float32) []vector.VectorResult {
+		return s.runPlanned(ps, req.Collection, v, searchTopK, req.Threshold, allowedIDs, filtered, metric)
+	})
 	results = s.rescoreFeedback(fb, req.Collection, results, metric)
 	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, req.summaryMode),
 		Query: queryVector, SearchTopK: searchTopK, TopK: req.TopK, Threshold: req.Threshold, Allowed: allowedIDs,

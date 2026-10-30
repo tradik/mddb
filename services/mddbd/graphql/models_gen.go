@@ -346,6 +346,14 @@ type PassageLines struct {
 type Query struct {
 }
 
+// How query decomposition split the query (SRCH-020).
+type QueryDecomposition struct {
+	// Parts searched besides the whole query; 1 = the query was not split.
+	Parts int `json:"parts"`
+	// The parts, when there was more than one.
+	Texts []string `json:"texts"`
+}
+
 type RegisterWebhookInput struct {
 	URL        string   `json:"url"`
 	Events     []string `json:"events"`
@@ -390,6 +398,8 @@ type SearchPlan struct {
 	Reasons       []string `json:"reasons"`
 	// The correction relevance feedback made (SRCH-015); null without examples.
 	Feedback *FeedbackApplied `json:"feedback,omitempty"`
+	// How the query was split (SRCH-020); set with queryDecomposition auto.
+	Decomposition *QueryDecomposition `json:"decomposition,omitempty"`
 }
 
 type SetGroupPermissionInput struct {
@@ -505,6 +515,9 @@ type VectorSearchInput struct {
 	// http(s) URL. Needs a provider that embeds images; the results are image
 	// documents.
 	QueryImage *string `json:"queryImage,omitempty"`
+	// off (default) or auto (SRCH-020): a query of several clauses is also
+	// searched per clause, and each document keeps its best score.
+	QueryDecomposition *string `json:"queryDecomposition,omitempty"`
 }
 
 type VectorSearchResponse struct {

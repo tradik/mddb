@@ -97,8 +97,8 @@ func (f *fakeMDDB) search(req map[string]any) any {
 	return map[string]any{"results": results}
 }
 
-// eval ranks documents by their best chunk for both configs, the way the
-// server's parent mode does.
+// eval ranks documents by their best chunk for every config it is sent, the
+// way the server's parent mode does.
 func (f *fakeMDDB) eval(req map[string]any) any {
 	queries := req["queries"].([]any)
 	if f.shortEval {
@@ -117,8 +117,8 @@ func (f *fakeMDDB) eval(req map[string]any) any {
 		perQuery = append(perQuery, map[string]any{"returned": keys[:min(10, len(keys))]})
 	}
 	var results []map[string]any
-	for _, name := range []string{"vector", "hybrid"} {
-		results = append(results, map[string]any{"config": name, "p50Ms": 1.5, "p99Ms": 3.0,
+	for _, c := range req["configs"].([]any) {
+		results = append(results, map[string]any{"config": c.(map[string]any)["name"], "p50Ms": 1.5, "p99Ms": 3.0,
 			"error": f.evalError, "perQuery": perQuery})
 	}
 	return map[string]any{"results": results}

@@ -246,11 +246,12 @@ type MCPVectorSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions  // format, passageLines (AGT-002)
-	PlanOptions     // explain, latencyTargetMs (SRCH-013)
-	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
-	ImageOptions    // includeImages (RAG-010)
+	IndexWait            // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions       // format, passageLines (AGT-002)
+	PlanOptions          // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions      // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
+	DecompositionOptions // queryDecomposition (SRCH-020)
+	ImageOptions         // includeImages (RAG-010)
 	// QueryImage searches by an image (RAG-010); see VectorSearchRequest.
 	QueryImage string `json:"queryImage,omitempty"`
 }
@@ -481,11 +482,12 @@ type MCPHybridSearchRequest struct {
 	Oversample float64  `json:"oversample,omitempty"`
 	GroupBy    *GroupBy `json:"groupBy,omitempty"` // keep perGroup results per metadata value, document or collection (SRCH-016)
 
-	IndexWait       // readLevel, waitForIndex, waitForKeys (GO-042)
-	PassageOptions  // format, passageLines (AGT-002)
-	PlanOptions     // explain, latencyTargetMs (SRCH-013)
-	FeedbackOptions // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
-	ImageOptions    // includeImages (RAG-010)
+	IndexWait            // readLevel, waitForIndex, waitForKeys (GO-042)
+	PassageOptions       // format, passageLines (AGT-002)
+	PlanOptions          // explain, latencyTargetMs (SRCH-013)
+	FeedbackOptions      // positive, negative, feedbackMode, feedbackWeight, rocchio (SRCH-015)
+	DecompositionOptions // queryDecomposition (SRCH-020)
+	ImageOptions         // includeImages (RAG-010)
 }
 
 // MCPHybridSearchResult represents a single hybrid search result.

@@ -255,6 +255,7 @@ func (s *MCPToolServer) toolSemanticSearch(ctx context.Context, args map[string]
 		return "", feedbackErr
 	}
 	req.FeedbackOptions = feedbackOpts
+	req.DecompositionOptions = mcpGetDecomposition(args) // SRCH-020
 	resp, err := s.client.VectorSearch(ctx, req)
 	if err != nil {
 		return "", err
@@ -462,6 +463,7 @@ func (s *MCPToolServer) toolHybridSearch(ctx context.Context, args map[string]in
 		return "", feedbackErr
 	}
 	req.FeedbackOptions = feedbackOpts
+	req.DecompositionOptions = mcpGetDecomposition(args) // SRCH-020
 	resp, err := s.client.HybridSearch(ctx, req)
 	if err != nil {
 		return "", err

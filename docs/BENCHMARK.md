@@ -430,6 +430,81 @@ The SQ and SQ4 overheads come from the per-vector calibration listed in
 [QUANTIZATION.md](QUANTIZATION.md). The BQ figure assumes no per-vector
 overhead, which has not been measured.
 
+## Query decomposition (v2.18.10)
+
+SRCH-020 turns the spike's best-part control into a server option:
+`queryDecomposition: "auto"` on vector and hybrid search
+([SEARCH.md](SEARCH.md#query-decomposition--questions-with-several-needs-v21810)).
+The same tool, [`tools/bench/maxsim`](https://github.com/tradik/mddb/tree/main/tools/bench/maxsim),
+now also measures four server rows through `POST /v1/eval`: vector and hybrid
+search, each without and with `queryDecomposition: "auto"`. A row with
+decomposition is compared with the same search without it. Two client rows
+compare the fusions on the same parts: **best part, whole + clauses ≤4** is
+what the server ships, and **rrf, whole + clauses ≤4** sums 1/(60 + rank)
+instead. The query sets, the bootstrap and the seed are those of the spike.
+
+Measured 2026-10-30 on the same machine (AMD Ryzen 9 7950X, WSL2, Go 1.27.3,
+Ollama 0.33.3, nomic-embed-text). The 60 pages of `docs/` gave 937 chunks.
+The embedding cache was off, so every part costs one embedding call.
+
+| Set | Search | nDCG@10 | Δ nDCG [95% CI] | Δ recall@10 [95% CI] | better / worse | embed calls | p50 / p99 ms |
+|---|---|---|---|---|---|---|---|
+| plain, 20 | vector | 0.756 | — | — | — | 1.0 | 9.6 / 54.8 |
+| plain, 20 | vector, auto | 0.756 | −0.001 [−0.002, +0.000] | +0.000 [+0.000, +0.000] | 0 / 1 | 1.5 | 9.1 / 43.3 |
+| plain, 20 | hybrid | 0.813 | — | — | — | 1.0 | 8.8 / 13.3 |
+| plain, 20 | hybrid, auto | 0.810 | −0.003 [−0.010, +0.000] | +0.000 [+0.000, +0.000] | 0 / 1 | 1.5 | 9.9 / 34.0 |
+| multi-topic, 190 | vector | 0.597 | — | — | — | 1.0 | 16.7 / 46.0 |
+| multi-topic, 190 | vector, auto | 0.662 | **+0.065 [+0.046, +0.085]** | +0.071 [+0.043, +0.100] | 83 / 37 | 3.5 | 36.2 / 106.9 |
+| multi-topic, 190 | hybrid | 0.600 | — | — | — | 1.0 | 11.0 / 23.1 |
+| multi-topic, 190 | hybrid, auto | 0.647 | **+0.047 [+0.030, +0.066]** | +0.046 [+0.024, +0.069] | 53 / 15 | 3.5 | 38.7 / 62.3 |
+
+Latency is the server's own, from `/v1/eval`.
+
+Fusion, on the client path (Δ against **max, whole query**):
+
+| Set | Fusion over whole + clauses ≤4 | Δ nDCG [95% CI] |
+|---|---|---|
+| plain | max (ships) | −0.001 [−0.002, +0.000] |
+| plain | RRF | +0.024 [+0.000, +0.062] |
+| multi-topic | max (ships) | +0.065 [+0.046, +0.085] |
+| multi-topic | RRF | −0.250 [−0.280, −0.218] |
+
+A similarity gate between the parts was measured outside the tool. The
+parts were embedded with Ollama (`search_query:` prefix, as the server
+does), and the whole query and the parts were scored on the client path.
+`auto` would split only when the lowest cosine between two parts fell below
+the threshold. This sweep did not bound the parts at 4, so its "none" row
+differs from the table above by 0.002:
+
+| Gate | plain Δ nDCG | multi-topic Δ nDCG [95% CI] |
+|---|---|---|
+| none (ships) | −0.001 [−0.002, +0.000] | +0.063 [+0.044, +0.084] |
+| cosine < 0.55 | −0.001 [−0.002, +0.000] | +0.059 [+0.040, +0.079] |
+| cosine < 0.50 | −0.001 [−0.002, +0.000] | +0.044 [+0.027, +0.063] |
+| cosine < 0.45 | +0.000 [+0.000, +0.000] | +0.023 [+0.011, +0.036] |
+
+The lowest cosine between two parts is 0.40–0.66 for the four plain
+questions that split. On the two-topic queries it is 0.34–0.74, median 0.46.
+The two ranges overlap, so a gate cannot tell the cases apart.
+
+- **The gain is real and survives hybrid.** Vector search gains 0.065 nDCG@10
+  on two-topic questions, and every bound lies above zero. Hybrid gains
+  0.047, because its full-text half already matched the words of both parts.
+- **Ordinary questions stay where they were.** The interval includes zero.
+  One question of 20 ("log in and get a JWT token, create API keys") loses
+  0.010; the other 19 are unchanged. The spike's best part without the whole query lost
+  0.030 [−0.079, 0.000]. Keeping the whole query as one of the searches is
+  what removes that loss.
+- **Max, not RRF.** RRF gains 0.024 on plain questions (2 better, none
+  worse), but loses 0.25 on the two-topic set. Summing ranks rewards a page that is
+  mediocre for both parts, the same flaw as MaxSim's mean.
+- **No gate.** Every threshold lowers the gain on two-topic questions. Only
+  0.45 removes the 0.001 loss on plain questions, and it gives up two thirds
+  of the gain to do so.
+- **Cost.** 3.5 embedding calls per two-topic query instead of 1. The p50
+  rises from 17 to 36 ms with Ollama on this machine. A query with nothing
+  to split costs nothing more.
+
 ## Vector query planner (v2.18.9)
 
 Before and after `algorithm: "auto"` (SRCH-013). Before, a search used flat

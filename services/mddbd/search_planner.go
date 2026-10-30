@@ -131,6 +131,9 @@ type SearchPlan struct {
 	Collections map[string]*SearchPlan `json:"collections,omitempty"`
 	// Feedback is the correction relevance feedback made (SRCH-015).
 	Feedback *FeedbackApplied `json:"feedback,omitempty"`
+	// Decomposition is how the query was split (SRCH-020); set with
+	// queryDecomposition auto.
+	Decomposition *QueryDecomposition `json:"decomposition,omitempty"`
 
 	// mayIterate: the planner allows the iterative scan for this search.
 	mayIterate bool

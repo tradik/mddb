@@ -15,6 +15,10 @@
 // baselines — vector and hybrid search as the server ranks them — come from
 // POST /v1/eval with per-query details.
 //
+// SRCH-020 added the server's queryDecomposition "auto" to those baselines
+// (vector and hybrid, each compared with itself without it), and two client
+// rows that compare max and RRF fusion over the whole query and its parts.
+//
 // Start a server with an embedding provider (the spike used Ollama's
 // nomic-embed-text) and the embedding cache off, so latency counts every
 // embedding call, then:

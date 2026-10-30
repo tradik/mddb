@@ -4,10 +4,11 @@ import (
 	gql "mddb/graphql"
 )
 
-// GraphQL's side of SRCH-013 (query planner) and SRCH-015 (relevance
-// feedback): the input fields become the same PlanOptions and FeedbackOptions
-// REST, MCP and gRPC fill, and DirectClient.VectorSearch validates and applies
-// them — there is no GraphQL-only search path.
+// GraphQL's side of SRCH-013 (query planner), SRCH-015 (relevance feedback)
+// and SRCH-020 (query decomposition): the input fields become the same
+// PlanOptions, FeedbackOptions and DecompositionOptions REST, MCP and gRPC
+// fill, and DirectClient.VectorSearch validates and applies them — there is
+// no GraphQL-only search path.
 
 // planOptionsFromGQL reads explain and latencyTargetMs (SRCH-013).
 func planOptionsFromGQL(input gql.VectorSearchInput) PlanOptions {
@@ -68,6 +69,12 @@ func searchPlanToGQL(p *SearchPlan) *gql.SearchPlan {
 	if f := p.Feedback; f != nil {
 		out.Feedback = &gql.FeedbackApplied{Mode: f.Mode, Positive: f.Positive, Negative: f.Negative,
 			Alpha: f.Alpha, Beta: f.Beta, Gamma: f.Gamma, QueryShift: f.QueryShift, Weight: f.Weight, Rescored: f.Rescored}
+	}
+	if d := p.Decomposition; d != nil {
+		out.Decomposition = &gql.QueryDecomposition{Parts: d.Parts, Texts: d.Texts}
+		if out.Decomposition.Texts == nil {
+			out.Decomposition.Texts = []string{}
+		}
 	}
 	return out
 }

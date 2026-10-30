@@ -1116,6 +1116,61 @@ Measured in [BENCHMARK.md](BENCHMARK.md#relevance-feedback-v2189): one round
 of feedback raises recall@10 from 0.31 to 0.49–0.50 on a corpus built so
 that the query is ambiguous.
 
+### Query Decomposition — Questions with Several Needs (v2.18.10+)
+
+"How do I set up a read replica and how does backup work" asks for two
+pages. One query vector for the whole question lands between the two topics,
+so a page vaguely near both can outrank the two pages that each answer one
+half. `queryDecomposition: "auto"` searches such a question part by part:
+
+```bash
+curl -X POST http://localhost:11023/v1/vector-search \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "kb", "query": "set up a read replica and take a backup of the database",
+       "topK": 10, "queryDecomposition": "auto", "explain": true}'
+```
+
+- **The split.** The query is cut at sentence punctuation (`. , ; : ? !`)
+  and at the word "and" between clauses. A one-word fragment joins the part
+  before it, so "latitude and longitude" stays whole. At most 4 parts;
+  clauses past the fourth join the fourth. No language model runs in the
+  server.
+- **The search.** The whole query and each part are searched. A document
+  keeps its best score over all of them (max fusion). Ties go to the lower
+  ID, and the fused list is cut back to the `topK × oversample` candidates
+  one search returns.
+- **A query with nothing to split** is searched as with `off`: one embedding
+  call, the same results.
+- **Cost.** One embedding call and one index search per part, on top of the
+  whole query's. Like the whole query's, these calls are not counted against
+  a collection's embedding budget, which meters document embeddings only.
+- **`off` (the default)** is today's search, byte for byte.
+- **Hybrid search splits the vector half only.** The full-text half already
+  matches the words of every part.
+- **A query sent as `queryVector`** has no text to split and is searched
+  whole; the plan says so.
+- With `explain: true`, `plan.decomposition` gives `parts` (1 = not split)
+  and the part `texts`.
+- **Relevance feedback** in `query` mode corrects every part the way it
+  corrects the whole query.
+- **Surfaces.** Vector and hybrid search on REST, MCP (`query_decomposition`),
+  gRPC (`query_decomposition`), GraphQL `vectorSearch` and `POST /v1/eval`
+  configs. All of them go through one implementation, and an unknown mode is
+  refused with 422 (gRPC `InvalidArgument`).
+
+**Why max, why no similarity gate.** Measured in
+[BENCHMARK.md](BENCHMARK.md#query-decomposition-v21810) on 20 questions and
+190 two-topic questions, nomic-embed-text:
+- On the two-topic questions vector search gains +0.065 nDCG@10
+  (CI [+0.046, +0.085]) and hybrid +0.047 (CI [+0.030, +0.066]). On ordinary
+  questions the change is −0.001 (CI [−0.002, 0.000]), within noise.
+- Fusing by RRF instead of max loses 0.25 nDCG on the two-topic questions.
+  RRF rewards a page that is mediocre for both parts.
+- Splitting only when the parts' vectors diverge was tried at cosine
+  thresholds of 0.45–0.55. It removed up to two thirds of the gain and saved
+  nothing on ordinary questions. Keeping the whole query as one of the
+  searches is what protects them.
+
 ### Summaries — a Second Representation (v2.18.9+)
 
 A question like "what are the main risks here" matches the language of a

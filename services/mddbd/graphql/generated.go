@@ -283,6 +283,11 @@ type ComplexityRoot struct {
 		Webhooks         func(childComplexity int, collection *string) int
 	}
 
+	QueryDecomposition struct {
+		Parts func(childComplexity int) int
+		Texts func(childComplexity int) int
+	}
+
 	Schema struct {
 		Collection func(childComplexity int) int
 		Enabled    func(childComplexity int) int
@@ -292,6 +297,7 @@ type ComplexityRoot struct {
 	SearchPlan struct {
 		Algorithm     func(childComplexity int) int
 		Candidates    func(childComplexity int) int
+		Decomposition func(childComplexity int) int
 		Feedback      func(childComplexity int) int
 		IterativeScan func(childComplexity int) int
 		Prefilter     func(childComplexity int) int
@@ -1648,6 +1654,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Query.Webhooks(childComplexity, args["collection"].(*string)), true
 
+	case "QueryDecomposition.parts":
+		if e.ComplexityRoot.QueryDecomposition.Parts == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueryDecomposition.Parts(childComplexity), true
+	case "QueryDecomposition.texts":
+		if e.ComplexityRoot.QueryDecomposition.Texts == nil {
+			break
+		}
+
+		return e.ComplexityRoot.QueryDecomposition.Texts(childComplexity), true
+
 	case "Schema.collection":
 		if e.ComplexityRoot.Schema.Collection == nil {
 			break
@@ -1679,6 +1698,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.SearchPlan.Candidates(childComplexity), true
+	case "SearchPlan.decomposition":
+		if e.ComplexityRoot.SearchPlan.Decomposition == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SearchPlan.Decomposition(childComplexity), true
 	case "SearchPlan.feedback":
 		if e.ComplexityRoot.SearchPlan.Feedback == nil {
 			break
@@ -2507,6 +2532,16 @@ func (ec *executionContext) childFields_PassageLines(ctx context.Context, field 
 	return nil, fmt.Errorf("no field named %q was found under type PassageLines", field.Name)
 }
 
+func (ec *executionContext) childFields_QueryDecomposition(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "parts":
+		return ec.fieldContext_QueryDecomposition_parts(ctx, field)
+	case "texts":
+		return ec.fieldContext_QueryDecomposition_texts(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type QueryDecomposition", field.Name)
+}
+
 func (ec *executionContext) childFields_Schema(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 	switch field.Name {
 	case "collection":
@@ -2533,6 +2568,8 @@ func (ec *executionContext) childFields_SearchPlan(ctx context.Context, field gr
 		return ec.fieldContext_SearchPlan_reasons(ctx, field)
 	case "feedback":
 		return ec.fieldContext_SearchPlan_feedback(ctx, field)
+	case "decomposition":
+		return ec.fieldContext_SearchPlan_decomposition(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type SearchPlan", field.Name)
 }
@@ -9092,6 +9129,52 @@ func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _QueryDecomposition_parts(ctx context.Context, field graphql.CollectedField, obj *QueryDecomposition) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_QueryDecomposition_parts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Parts, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v int) graphql.Marshaler {
+			return ec.marshalNInt2int(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_QueryDecomposition_parts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("QueryDecomposition", field, false, false, "Int")
+}
+
+func (ec *executionContext) _QueryDecomposition_texts(ctx context.Context, field graphql.CollectedField, obj *QueryDecomposition) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_QueryDecomposition_texts(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Texts, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []string) graphql.Marshaler {
+			return ec.marshalNString2ᚕstringᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_QueryDecomposition_texts(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("QueryDecomposition", field, false, false, "String")
+}
+
 func (ec *executionContext) _Schema_collection(ctx context.Context, field graphql.CollectedField, obj *Schema) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9303,6 +9386,38 @@ func (ec *executionContext) fieldContext_SearchPlan_feedback(_ context.Context, 
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields_FeedbackApplied(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SearchPlan_decomposition(ctx context.Context, field graphql.CollectedField, obj *SearchPlan) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SearchPlan_decomposition(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Decomposition, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *QueryDecomposition) graphql.Marshaler {
+			return ec.marshalOQueryDecomposition2ᚖmddbᚋgraphqlᚐQueryDecomposition(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_SearchPlan_decomposition(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SearchPlan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_QueryDecomposition(ctx, field)
 		},
 	}
 	return fc, nil
@@ -12759,7 +12874,7 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio", "includeImages", "queryImage"}
+	fieldsInOrder := [...]string{"collection", "query", "queryVector", "topK", "threshold", "filterMeta", "filter", "includeContent", "oversample", "groupBy", "format", "passageLines", "algorithm", "explain", "latencyTargetMs", "positive", "negative", "feedbackMode", "feedbackWeight", "rocchio", "includeImages", "queryImage", "queryDecomposition"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12920,6 +13035,13 @@ func (ec *executionContext) unmarshalInputVectorSearchInput(ctx context.Context,
 				return it, err
 			}
 			it.QueryImage = data
+		case "queryDecomposition":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("queryDecomposition"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.QueryDecomposition = data
 		}
 	}
 	return it, nil
@@ -14586,6 +14708,44 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 	return out
 }
 
+var queryDecompositionImplementors = []string{"QueryDecomposition"}
+
+func (ec *executionContext) _QueryDecomposition(ctx context.Context, sel ast.SelectionSet, obj *QueryDecomposition) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, queryDecompositionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("QueryDecomposition")
+		case "parts":
+			out.Values[i] = ec._QueryDecomposition_parts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "texts":
+			out.Values[i] = ec._QueryDecomposition_texts(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
 var schemaImplementors = []string{"Schema"}
 
 func (ec *executionContext) _Schema(ctx context.Context, sel ast.SelectionSet, obj *Schema) graphql.Marshaler {
@@ -14667,6 +14827,11 @@ func (ec *executionContext) _SearchPlan(ctx context.Context, sel ast.SelectionSe
 			}
 		case "feedback":
 			out.Values[i] = ec._SearchPlan_feedback(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "decomposition":
+			out.Values[i] = ec._SearchPlan_decomposition(ctx, field, obj)
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
@@ -16604,6 +16769,13 @@ func (ec *executionContext) marshalOPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ct
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalOQueryDecomposition2ᚖmddbᚋgraphqlᚐQueryDecomposition(ctx context.Context, sel ast.SelectionSet, v *QueryDecomposition) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._QueryDecomposition(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalORocchioInput2ᚖmddbᚋgraphqlᚐRocchioInput(ctx context.Context, v any) (*RocchioInput, error) {

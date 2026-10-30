@@ -31,6 +31,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	if err := req.ValidateFeedback(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateDecomposition(); err != nil {
+		return nil, err
+	}
 	includeContent := req.IncludeContent || req.wantsPassages()
 	waited := s.waitForIndex(ctx, req.Collection, req.IndexWait)
 
@@ -80,6 +83,11 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	}
 	queryVector = fb.query(queryVector)
 	ps.Plan.Feedback = fb.report()
+	// SRCH-020: with queryDecomposition auto, one more vector per part.
+	vectors, err := s.queryVectors(ctx, req.DecompositionOptions, textQuery(req.Query, req.QueryVector), queryVector, fb, ps.Plan)
+	if err != nil {
+		return nil, err
+	}
 
 	metric := vec.ResolveSimilarity(req.DistanceMetric)
 	metricName := req.DistanceMetric
@@ -105,7 +113,9 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	}
 	vsp := s.Tracer.Stage(ctx, spanSearchVector) // OPS-024
 	vsp.SetString("mddb.vector.algorithm", algo)
-	results := s.runPlanned(ps, req.Collection, queryVector, searchTopK, req.Threshold, allowedIDs, filtered, metric)
+	// Disk-only collections: each query vector's quantized candidates are
+	// rescored from disk before a decomposed query's lists are fused.
+	results, diskVecs := s.searchVectorPath(ps, req.Collection, vectors, searchTopK, req.Threshold, allowedIDs, filtered, metric)
 	vsp.SetInt("mddb.results", len(results))
 	vsp.End()
 
@@ -123,11 +133,6 @@ func (c *DirectClient) VectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	mode := s.ResolveRetrievalMode(req.Collection, req.RetrievalMode, RetrievalModeParent)
 	if !validRetrievalMode(mode) {
 		return nil, errors.New("unknown retrievalMode: " + mode + ", available: parent, chunk, window")
-	}
-	// Disk-only collections: rescore quantized candidates from disk first.
-	var diskVecs map[string][]float32
-	if s.collectionDiskOnly(req.Collection) {
-		results, diskVecs = s.rescoreFromDisk(req.Collection, queryVector, results, metric)
 	}
 	results = s.rescoreFeedback(fb, req.Collection, results, metric) // SRCH-015, rescore mode
 	results = s.applySummaries(summarySearch{Collection: req.Collection, Mode: s.ResolveSummaryMode(req.Collection, req.summaryMode),
@@ -507,34 +512,38 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 	if err := req.ValidateFeedback(); err != nil {
 		return nil, err
 	}
+	if err := req.ValidateDecomposition(); err != nil {
+		return nil, err
+	}
 	waited := c.server.waitForIndex(ctx, req.Collection, req.IndexWait)
 
 	httpReq := HybridSearchRequest{
-		Collection:      req.Collection,
-		Query:           req.Query,
-		TopK:            req.TopK,
-		Algorithm:       req.Algorithm,
-		VectorAlgorithm: req.VectorAlgorithm,
-		Alpha:           floatPtr(req.Alpha),
-		Strategy:        req.Strategy,
-		RRFK:            req.RRFK,
-		Fuzzy:           req.Fuzzy,
-		Threshold:       req.Threshold,
-		DistanceMetric:  req.DistanceMetric,
-		FilterMeta:      req.FilterMeta,
-		Filter:          req.Filter,
-		GroupBy:         req.GroupBy,
-		Boost:           req.Boost,
-		Sort:            req.Sort,
-		Oversample:      req.Oversample,
-		FieldWeights:    req.FieldWeights,
-		Lang:            req.Lang,
-		BM25K1:          req.BM25K1,
-		BM25B:           req.BM25B,
-		IncludeContent:  true,
-		PlanOptions:     req.PlanOptions,
-		FeedbackOptions: req.FeedbackOptions,
-		ImageOptions:    req.ImageOptions,
+		Collection:           req.Collection,
+		Query:                req.Query,
+		TopK:                 req.TopK,
+		Algorithm:            req.Algorithm,
+		VectorAlgorithm:      req.VectorAlgorithm,
+		Alpha:                floatPtr(req.Alpha),
+		Strategy:             req.Strategy,
+		RRFK:                 req.RRFK,
+		Fuzzy:                req.Fuzzy,
+		Threshold:            req.Threshold,
+		DistanceMetric:       req.DistanceMetric,
+		FilterMeta:           req.FilterMeta,
+		Filter:               req.Filter,
+		GroupBy:              req.GroupBy,
+		Boost:                req.Boost,
+		Sort:                 req.Sort,
+		Oversample:           req.Oversample,
+		FieldWeights:         req.FieldWeights,
+		Lang:                 req.Lang,
+		BM25K1:               req.BM25K1,
+		BM25B:                req.BM25B,
+		IncludeContent:       true,
+		PlanOptions:          req.PlanOptions,
+		FeedbackOptions:      req.FeedbackOptions,
+		DecompositionOptions: req.DecompositionOptions,
+		ImageOptions:         req.ImageOptions,
 	}
 
 	items, httpReq, err := c.server.hybridItems(ctx, httpReq)

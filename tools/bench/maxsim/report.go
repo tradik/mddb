@@ -7,7 +7,9 @@ import (
 
 // report prints each query set as the markdown table docs/BENCHMARK.md
 // carries. Differences are against "max, whole query" — today's scoring on
-// the same client path — so a row's delta is the aggregation alone.
+// the same client path — so a row's delta is the aggregation alone; a
+// server row with queryDecomposition auto is compared with the same search
+// without it.
 func report(w io.Writer, cfg config, stats *chunkStats, results []setResult) {
 	_, _ = fmt.Fprintf(w, "collection %q, %d chunks, k=%d, windows of %d words every %d, %d bootstrap resamples, seed %d\n",
 		cfg.Collection, stats.Chunks, cfg.K, cfg.Window, cfg.Stride, cfg.Boot, cfg.Seed)
@@ -18,8 +20,8 @@ func report(w io.Writer, cfg config, stats *chunkStats, results []setResult) {
 		_, _ = fmt.Fprintf(w, "Client path agrees with the server's vector top %d on %d of %d queries.\n\n", cfg.K, res.Agree, res.Queries)
 		_, _ = fmt.Fprintf(w, "| Scoring | recall@%d | nDCG@%d | MRR | Δ nDCG [95%% CI] | Δ recall [95%% CI] | better / worse | embed calls | p50 ms | p99 ms |\n", cfg.K, cfg.K)
 		_, _ = fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|---|---|")
-		base := baseRow(res.Rows)
 		for _, r := range res.Rows {
+			base := baseRow(res.Rows, r.Base)
 			nLo, nHi := pairedCI(r.PerQuery, base.PerQuery, ndcg, cfg.Boot, cfg.Seed)
 			rLo, rHi := pairedCI(r.PerQuery, base.PerQuery, recall, cfg.Boot, cfg.Seed)
 			better, worse := tally(r.PerQuery, base.PerQuery)
@@ -36,10 +38,14 @@ func report(w io.Writer, cfg config, stats *chunkStats, results []setResult) {
 	}
 }
 
-// baseRow is the row every other is compared with.
-func baseRow(rows []row) row {
+// baseRow is the row a row is compared with: the one named base, or
+// "max, whole query" — today's scoring on the client path.
+func baseRow(rows []row, base string) row {
+	if base == "" {
+		base = "max, whole query"
+	}
 	for _, r := range rows {
-		if r.Name == "max, whole query" {
+		if r.Name == base {
 			return r
 		}
 	}
