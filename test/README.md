@@ -28,6 +28,12 @@ CI build + vet (GO-011). Build/run any of them with `go run ./<dir>`:
 - `mongodb/` - MongoDB performance test client
 - `couchdb/` - CouchDB performance test client
 
+### Compatibility
+- `es-compat/` - the unmodified `elasticsearch-py` (locked in `uv.lock`)
+  against a freshly built `mddbd` with `MDDB_ES_COMPAT=true` (INT-019). `make
+  test-es-compat` runs it; CI runs it as the `es-compat` job. See
+  [ELASTICSEARCH-COMPAT.md](../docs/ELASTICSEARCH-COMPAT.md).
+
 ### Docker
 - `docker-compose.benchmark.yml` - MySQL 9.1 and PostgreSQL 17 containers
 

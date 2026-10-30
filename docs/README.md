@@ -99,6 +99,7 @@ MDDB (Markdown Database) is an **AI-native embedded document database** for mark
 - **[Replication](REPLICATION.md)** — leader-follower binlog streaming for read scaling
 - **[Backup, restore & repair](BACKUP.md)** — consistent, integrity-checked backups; `mddbd -verify-db` and `-repair-db` for a damaged database file
 - **[Corpus packs](CORPUS-PACKS.md)** — a collection built once and installed read-only anywhere, without re-embedding or reindexing
+- **[Elasticsearch-compatible subset](ELASTICSEARCH-COMPAT.md)** — Elasticsearch clients search and write MDDB under `/es` (`MDDB_ES_COMPAT=true`), with every unsupported clause refused by name
 - **[Automation](AUTOMATIONS.md)** — triggers, crons, webhooks, sentiment analysis, template variables
 - **Document TTL** with auto-expiry, full **revision history**, **schema validation**, **aggregations** (facets + histograms)
 - **[Web Admin Panel](PANEL.md)** — React UI for documents, users, search, geo, settings

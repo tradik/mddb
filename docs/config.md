@@ -740,6 +740,14 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
+## Elasticsearch-Compatible Subset (v2.18.10+)
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_ES_COMPAT` | `false` | bool | `true` mounts a subset of the Elasticsearch REST API under `/es` on the HTTP listener: `_search`, `_count`, `_doc`, `_create`, `_bulk`, `_refresh`, `GET /es`. Requests are translated onto `/v1` search and write paths, behind the same auth, permissions, rate limiter and body cap; `/v1` is unchanged. Unsupported clauses are a `400` naming them. See [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md) |
+
+---
+
 ## Quotas and Reserves (v2.18.9+)
 
 Server-wide limits that protect the node, next to the per-collection `quota`

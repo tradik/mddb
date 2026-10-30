@@ -161,6 +161,12 @@ curl -H "X-API-Key: mddb_live_..." \
   http://localhost:11023/v1/stats
 ```
 
+`Authorization: Bearer mddb_live_...` works too. On the Elasticsearch-compatible
+subset under `/es` (v2.18.10+, `MDDB_ES_COMPAT=true`) the key is also accepted
+as `Authorization: ApiKey mddb_live_...`, the header Elasticsearch clients send
+for `api_key=...`; `/v1` does not read that scheme. See
+[ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md#authentication-and-permissions).
+
 **API Key Format:**
 - Prefix: `mddb_live_`
 - Length: 48 hex characters (24 bytes of randomness)

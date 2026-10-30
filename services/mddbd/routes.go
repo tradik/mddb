@@ -147,6 +147,8 @@ func (s *Server) registerRoutes(mux *http.ServeMux, authEnabled bool) {
 		mux.HandleFunc("/v1/spell-dictionary", s.handleSpellDictionary)
 	}
 	mux.HandleFunc("/metrics", s.Metrics.HandleMetrics)
+	// INT-019: the Elasticsearch-compatible subset under /es, off by default.
+	s.registerESRoutes(mux)
 
 	// pprof profiling endpoints (disabled by default, set MDDB_PPROF_ENABLED=true)
 	if env("MDDB_PPROF_ENABLED", "false") == "true" {

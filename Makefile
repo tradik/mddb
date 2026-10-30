@@ -4,7 +4,7 @@
 # through two releases.
 MDDB_VERSION := $(shell sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' services/mddbd/main.go | head -1)
 
-.PHONY: build build-windows soak check-source-encoding test-source-encoding test-shard test-test-shards brand-icons test-export-brand docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: build build-windows soak check-source-encoding test-source-encoding test-shard test-test-shards test-es-compat brand-icons test-export-brand docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -94,6 +94,10 @@ test-export-brand: ## Check brand/ rasters: exact sizes, ico frames, padding, sa
 test-langchain: ## Run the LangChain adapter tests (INT-017)
 	@cd integrations/langchain-mddb && python3 -m pytest -q
 
+test-es-compat: ## Run elasticsearch-py against a freshly built mddbd with MDDB_ES_COMPAT=true (INT-019; needs uv)
+	cd services/mddbd && go build -o ../../test/es-compat/.mddbd .
+	cd test/es-compat && uv sync --locked && MDDB_BIN=$$PWD/.mddbd uv run --no-sync pytest -q
+
 test-clients: ## Run the Node.js and Python client tests (TEST-001)
 	@echo "🧪 Running Node.js client tests..."
 	cd clients/nodejs && npm test
@@ -159,7 +163,7 @@ test-graphql: ## Run GraphQL tests with coverage
 lint-all: fmt vet sec lint ## Run all linters
 	@echo "✅ All linting passed!"
 
-test-all: test test-graphql test-clients test-langchain ## Run every test suite in the monorepo
+test-all: test test-graphql test-clients test-langchain test-es-compat ## Run every test suite in the monorepo
 	@echo "✅ All tests passed!"
 
 ci: check-go-version check-version check-action-pins check-repo-links check-source-encoding fmt-check lint-all test-all ## Run full CI pipeline (lint + test)

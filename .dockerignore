@@ -48,6 +48,8 @@ services/mddbd/mddb-server
 services/mddb-cli/mddb-cli
 tools/bench/mddb-bench
 tools/bench/maxsim/maxsim
+test/es-compat/.mddbd
+test/es-compat/.venv/
 
 # Rust / cargo build output (can be gigabytes) — any depth
 **/target/

@@ -32,6 +32,11 @@ func buildPublicEndpoints() map[string]bool {
 	return eps
 }
 
+// apiKeySessionToken signs the short-lived JWT an API key is exchanged for.
+// A variable so a test can make signing fail: with HS256 and any secret it
+// cannot, and the refusal path would otherwise go unexercised.
+var apiKeySessionToken = GenerateTenantJWT
+
 // HTTPMiddleware wraps HTTP handlers with authentication
 func (am *AuthManager) HTTPMiddleware(next http.Handler) http.Handler {
 	if !am.enabled {
@@ -57,6 +62,12 @@ func (am *AuthManager) HTTPMiddleware(next http.Handler) http.Handler {
 		// first (#212). The prefix decides it outright: nothing is validated
 		// twice, and a JWT can never be mistaken for a key.
 		apiKey := r.Header.Get("X-API-Key")
+		// INT-019: the Elasticsearch clients send api_key=... as
+		// `Authorization: ApiKey <key>`. Read only on /es, so /v1 accepts
+		// exactly the credentials it always has.
+		if apiKey == "" && isESPath(r.URL.Path) {
+			apiKey = esAPIKey(r)
+		}
 		if apiKey == "" && strings.HasPrefix(token, APIKeyPrefix) {
 			apiKey, token = token, ""
 		}
@@ -76,7 +87,7 @@ func (am *AuthManager) HTTPMiddleware(next http.Handler) http.Handler {
 				// for tenant users).
 				isAdmin := am.IsAdmin(username)
 				tenant := am.UserTenant(username)
-				token, err = GenerateTenantJWT(username, tenant, isAdmin, am.config.JWTSecret, 1*3600*time.Second) // 1h
+				token, err = apiKeySessionToken(username, tenant, isAdmin, am.config.JWTSecret, 1*3600*time.Second) // 1h
 				if err != nil {
 					am.auditAuth(r, username, "auth.apikey", "fail", "jwt generation failed")
 					http.Error(w, `{"error":"failed to generate token"}`, http.StatusInternalServerError)

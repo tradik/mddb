@@ -715,6 +715,48 @@ jobs:
         working-directory: integrations/langchain-mddb
         run: uv run --no-sync pytest -q
 
+  es-compat:
+    name: Elasticsearch client compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: services/mddbd/go.sum
+
+      # INT-019: the official elasticsearch-py, unmodified, against the /es
+      # subset of a real server. One build and eight requests-level tests: it
+      # exists to catch a broken product check or version negotiation, which
+      # no Go test can see from the client's side.
+      - name: Build server
+        working-directory: services/mddbd
+        run: go build -o "$RUNNER_TEMP/mddbd" .
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.12'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.12.4"
+
+      - name: Install
+        working-directory: test/es-compat
+        run: uv sync --locked
+
+      - name: Run tests
+        working-directory: test/es-compat
+        env:
+          MDDB_BIN: ${{ runner.temp }}/mddbd
+        run: uv run --no-sync pytest -q
+
   chat:
     name: mddb-chat (Rust)
     runs-on: ubuntu-latest

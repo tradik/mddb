@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -581,5 +582,63 @@ func TestAuthMiddleware_InvalidAPIKeyInAuthorizationHeader(t *testing.T) {
 	}
 	if !strings.Contains(w.Body.String(), "invalid api key") {
 		t.Errorf("expected the key error, not the token error, got %s", w.Body.String())
+	}
+}
+
+// A key that validates but cannot be turned into a session token is a 500,
+// not a pass: the request must not go on unauthenticated.
+func TestAuthMiddleware_APIKeyTokenGenerationFails(t *testing.T) {
+	am, cleanup := authMwSetup(t)
+	defer cleanup()
+	apiKey, err := am.CreateAPIKey("admin", "test key", 0)
+	if err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	saved := apiKeySessionToken
+	t.Cleanup(func() { apiKeySessionToken = saved })
+	apiKeySessionToken = func(string, string, bool, string, time.Duration) (string, error) {
+		return "", errors.New("signing failed")
+	}
+	req := httptest.NewRequest("GET", "/v1/docs/test", nil)
+	req.Header.Set("X-API-Key", apiKey)
+	w := httptest.NewRecorder()
+	am.HTTPMiddleware(authMwDummyHandler()).ServeHTTP(w, req)
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 when no token can be signed, got %d", w.Code)
+	}
+}
+
+// A failed attempt reaches the incident tracker.
+func TestAuthMiddleware_FailureFeedsTheTracker(t *testing.T) {
+	am, cleanup := authMwSetup(t)
+	defer cleanup()
+	am.SetServer(&Server{AuthFailureTracker: NewAuthFailureTracker(nil)})
+	req := httptest.NewRequest("GET", "/v1/docs/test", nil)
+	req.Header.Set("X-API-Key", "invalid-api-key")
+	w := httptest.NewRecorder()
+	am.HTTPMiddleware(authMwDummyHandler()).ServeHTTP(w, req)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+// INT-019: `Authorization: ApiKey <key>` — what the Elasticsearch clients
+// send for api_key=... — authenticates on /es and nowhere else.
+func TestAuthMiddleware_ApiKeySchemeOnlyOnES(t *testing.T) {
+	am, cleanup := authMwSetup(t)
+	defer cleanup()
+	apiKey, err := am.CreateAPIKey("admin", "test key", 0)
+	if err != nil {
+		t.Fatalf("CreateAPIKey: %v", err)
+	}
+	handler := am.HTTPMiddleware(authMwDummyHandler())
+	for path, want := range map[string]int{"/es/books/_search": http.StatusOK, "/v1/docs/test": http.StatusUnauthorized} {
+		req := httptest.NewRequest("GET", path, nil)
+		req.Header.Set("Authorization", "ApiKey "+apiKey)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, req)
+		if w.Code != want {
+			t.Errorf("%s: got %d, want %d", path, w.Code, want)
+		}
 	}
 }

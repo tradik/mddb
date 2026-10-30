@@ -96,6 +96,8 @@ dist/
 build/
 .venv/
 venv/
+# INT-019: the server binary `make test-es-compat` builds for elasticsearch-py.
+test/es-compat/.mddbd
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

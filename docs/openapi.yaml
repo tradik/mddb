@@ -160,6 +160,10 @@ tags:
   - name: Spell Correction
     description: SymSpell-based FTS spell suggestions, text cleanup, and
       per-collection custom dictionaries (requires MDDB_SPELL=true)
+  - name: Elasticsearch Compatibility
+    description: A subset of the Elasticsearch REST API under /es, translated
+      onto MDDB's own search and write paths (requires MDDB_ES_COMPAT=true;
+      v2.18.10+). See ELASTICSEARCH-COMPAT.md.
 
 paths:
   /health:
@@ -6884,8 +6888,395 @@ paths:
                   removed:
                     type: integer
 
+  # INT-019: the Elasticsearch-compatible subset. Mounted only with
+  # MDDB_ES_COMPAT=true; every answer carries X-Elastic-Product. The bodies
+  # follow the Elasticsearch REST API; see docs/ELASTICSEARCH-COMPAT.md for
+  # what is translated and what is refused (400, naming the clause).
+  /es:
+    get:
+      tags: [Elasticsearch Compatibility]
+      summary: Cluster info (client version negotiation)
+      description: |
+        What `Elasticsearch.info()` reads. `version.number` is the API level the
+        subset follows (8.19.0); `tagline` says it is MDDB. v2.18.10+, needs
+        `MDDB_ES_COMPAT=true`.
+      operationId: esInfo
+      responses:
+        "200":
+          description: Cluster info
+          headers:
+            X-Elastic-Product:
+              schema: {type: string, enum: [Elasticsearch]}
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESInfo"}
+    head:
+      tags: [Elasticsearch Compatibility]
+      summary: Ping
+      operationId: esPing
+      responses:
+        "200": {description: The server is up}
+  /es/_bulk:
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Bulk index, create and delete (NDJSON)
+      description: |
+        Action lines `index`, `create` and `delete` with `_index` and `_id`;
+        any other action or action option refuses the whole request (400)
+        before anything is written. At most 10 000 operations, and the body is
+        bounded by `MDDB_MAX_BODY_BYTES`. Runs of writes go through the batch
+        path of `/v1/add-batch`. `?refresh=true|wait_for` waits for the
+        written collections' embeddings.
+      operationId: esBulk
+      requestBody:
+        required: true
+        content:
+          application/x-ndjson:
+            schema: {type: string}
+      responses:
+        "200":
+          description: One item per operation, in order
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESBulkResponse"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+    put:
+      tags: [Elasticsearch Compatibility]
+      summary: Bulk (PUT, as elasticsearch-py sends it)
+      operationId: esBulkPut
+      requestBody:
+        required: true
+        content:
+          application/x-ndjson:
+            schema: {type: string}
+      responses:
+        "200":
+          description: One item per operation, in order
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESBulkResponse"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+  /es/{index}:
+    head:
+      tags: [Elasticsearch Compatibility]
+      summary: Does the collection exist
+      operationId: esIndexExists
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      responses:
+        "200": {description: The collection has a configuration or a document}
+        "404": {description: No such collection}
+  /es/{index}/_search:
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Search (Query DSL subset)
+      description: |
+        `query` (match, match_phrase, multi_match, term, terms, range, bool,
+        match_all), top-level `knn`, `size`, `from`, `sort`, `_source`,
+        `highlight` and `aggs` (terms) are translated onto `/v1/fts`,
+        `/v1/vector-search` (algorithm auto), `/v1/hybrid-search` (rrf) or the
+        metadata listing. Anything else is a 400 naming the clause. `from+size`
+        is capped by `MDDB_SEARCH_MAX_LIMIT` / `retrieval.maxTopK`: a capped page
+        carries `X-Limit-Capped`, `X-Limit`, a `Warning` header and
+        `limitCapped`/`limit` in the body.
+      operationId: esSearch
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/ESSearchRequest"}
+      responses:
+        "200":
+          description: Hits, totals and aggregations
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESSearchResponse"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+    get:
+      tags: [Elasticsearch Compatibility]
+      summary: Search (GET with a body)
+      operationId: esSearchGet
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      responses:
+        "200":
+          description: Hits, totals and aggregations
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESSearchResponse"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+  /es/{index}/_count:
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Count the documents a query matches
+      description: The body may hold `query` only.
+      operationId: esCount
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      responses:
+        "200":
+          description: The count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: {type: integer}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+    get:
+      tags: [Elasticsearch Compatibility]
+      summary: Count every document
+      operationId: esCountGet
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      responses:
+        "200":
+          description: The count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: {type: integer}
+  /es/{index}/_refresh:
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Wait until recent writes are searchable
+      description: Waits up to 30 s for the collection's queued embeddings; `_shards.successful` is 0 when the wait ran out.
+      operationId: esRefresh
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      responses:
+        "200": {description: Refreshed}
+  /es/{index}/_bulk:
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Bulk with a default collection
+      operationId: esIndexBulk
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      requestBody:
+        required: true
+        content:
+          application/x-ndjson:
+            schema: {type: string}
+      responses:
+        "200":
+          description: One item per operation, in order
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESBulkResponse"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+        "403": {description: No write permission on the collection in the URL}
+  /es/{index}/_doc:
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Index a document under a generated _id
+      operationId: esIndexAutoID
+      parameters: [{$ref: "#/components/parameters/ESIndex"}]
+      requestBody: {$ref: "#/components/requestBodies/ESSource"}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+  /es/{index}/_doc/{id}:
+    parameters:
+      - {$ref: "#/components/parameters/ESIndex"}
+      - {$ref: "#/components/parameters/ESID"}
+      - {$ref: "#/components/parameters/ESLang"}
+    put:
+      tags: [Elasticsearch Compatibility]
+      summary: Index (create or replace) a document
+      description: |
+        `content` is the body, `lang` the language, every other top-level field
+        metadata. Goes through the single write path: schemas (400), quotas
+        (507/429), read-only collections (403 `cluster_block_exception`).
+        `?op_type=create` refuses an existing document (409).
+        `if_seq_no`, `if_primary_term`, `version`, `version_type`, `pipeline`
+        and `routing` are refused.
+      operationId: esIndexDoc
+      requestBody: {$ref: "#/components/requestBodies/ESSource"}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "400": {$ref: "#/components/responses/ESBadRequest"}
+        "403": {description: "No write permission, or a read-only collection"}
+        "507": {description: Collection quota reached}
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Index a document (POST)
+      operationId: esIndexDocPost
+      requestBody: {$ref: "#/components/requestBodies/ESSource"}
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+    get:
+      tags: [Elasticsearch Compatibility]
+      summary: Get a document
+      operationId: esGetDoc
+      responses:
+        "200": {description: "found: true and _source"}
+        "404": {description: "found: false"}
+    head:
+      tags: [Elasticsearch Compatibility]
+      summary: Does the document exist
+      operationId: esDocExists
+      responses:
+        "200": {description: Exists}
+        "404": {description: Does not exist}
+    delete:
+      tags: [Elasticsearch Compatibility]
+      summary: Delete a document
+      operationId: esDeleteDoc
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "404": {description: "result: not_found"}
+  /es/{index}/_create/{id}:
+    parameters:
+      - {$ref: "#/components/parameters/ESIndex"}
+      - {$ref: "#/components/parameters/ESID"}
+      - {$ref: "#/components/parameters/ESLang"}
+    put:
+      tags: [Elasticsearch Compatibility]
+      summary: Create a document, 409 if it exists
+      description: The existence check runs before the write, not inside its transaction.
+      operationId: esCreateDoc
+      requestBody: {$ref: "#/components/requestBodies/ESSource"}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "409": {description: The document exists}
+    post:
+      tags: [Elasticsearch Compatibility]
+      summary: Create a document (POST)
+      operationId: esCreateDocPost
+      requestBody: {$ref: "#/components/requestBodies/ESSource"}
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ESWriteResult"}
+        "409": {description: The document exists}
+
 components:
   schemas:
+    # INT-019: shapes of the Elasticsearch-compatible subset.
+    ESInfo:
+      type: object
+      properties:
+        name: {type: string, example: mddb}
+        cluster_name: {type: string, example: mddb}
+        cluster_uuid: {type: string, example: mddb}
+        version:
+          type: object
+          properties:
+            number: {type: string, example: 8.19.0}
+            build_flavor: {type: string, example: default}
+            build_type: {type: string, example: mddb}
+            build_hash: {type: string, example: mddb-2.18.10}
+        tagline: {type: string}
+    ESSearchRequest:
+      type: object
+      description: The Query DSL subset; see docs/ELASTICSEARCH-COMPAT.md.
+      properties:
+        query: {type: object}
+        knn:
+          type: object
+          properties:
+            field: {type: string}
+            query_vector: {type: array, items: {type: number}}
+            query_vector_builder:
+              type: object
+              properties:
+                text_embedding:
+                  type: object
+                  properties:
+                    model_text: {type: string}
+            k: {type: integer}
+            num_candidates: {type: integer}
+            filter: {type: object}
+        size: {type: integer, default: 10}
+        from: {type: integer, default: 0}
+        sort: {}
+        _source: {}
+        highlight: {type: object}
+        aggs: {type: object}
+    ESSearchResponse:
+      type: object
+      properties:
+        took: {type: integer}
+        timed_out: {type: boolean}
+        hits:
+          type: object
+          properties:
+            total:
+              type: object
+              properties:
+                value: {type: integer}
+                relation: {type: string, enum: [eq]}
+            max_score: {type: number, nullable: true}
+            hits:
+              type: array
+              items:
+                type: object
+                properties:
+                  _index: {type: string}
+                  _id: {type: string}
+                  _score: {type: number, nullable: true}
+                  _source: {type: object}
+                  highlight: {type: object}
+        aggregations: {type: object}
+        limitCapped: {type: boolean, description: "from+size was lowered to the server's cap (#368)"}
+        limit: {type: integer}
+    ESWriteResult:
+      type: object
+      properties:
+        _index: {type: string}
+        _id: {type: string}
+        _version: {type: integer}
+        result: {type: string, enum: [created, updated, deleted, not_found]}
+        status: {type: integer}
+    ESBulkResponse:
+      type: object
+      properties:
+        took: {type: integer}
+        errors: {type: boolean}
+        items:
+          type: array
+          items:
+            type: object
+            description: "{action: ESWriteResult or {status, error}}"
+    ESError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            type: {type: string, example: parsing_exception}
+            reason: {type: string, example: "[fuzzy] query clause is not supported by the MDDB Elasticsearch subset"}
+            root_cause: {type: array, items: {type: object}}
+        status: {type: integer}
     CollectionQuota:
       type: object
       description: |
@@ -6908,7 +7299,7 @@ components:
         collection: { type: string, description: Empty for the server-wide limits }
         resource: { type: string, enum: [documents, bytes, vectors, diskReserve, vectorRam, embeddingCalls, embeddingTokens] }
         limit: { type: integer, format: int64 }
-        used: { type: integer, format: int64, description: Current use; for diskReserve, the bytes available }
+        used: { type: integer, format: int64, description: "Current use; for diskReserve, the bytes available" }
         retryAfterSeconds: { type: integer, description: Embedding budget only }
     RevisionConflict:
       type: object
@@ -6987,14 +7378,14 @@ components:
         width: { type: integer }
         height: { type: integer }
         parent: { type: string, description: The document the image came from. }
-        score: { type: number, description: Similarity to the query, on image hits. }
+        score: { type: number, description: "Similarity to the query, on image hits." }
         url: { type: string, description: 'GET path of the bytes: /v1/image?collection=…&key=…&lang=…' }
     ImageIndexingStatus:
       type: object
       description: (v2.18.9, RAG-010) Image documents and their vectors.
       properties:
         documents: { type: integer, description: Image documents holding an image. }
-        embedded: { type: integer, description: Of them, with an image vector. }
+        embedded: { type: integer, description: "Of them, with an image vector." }
         model: { type: string, description: The multimodal model; absent when the provider embeds no images. }
         note: { type: string, description: 'Why images are not embedded: they are then found by alt text and captions only.' }
     SymbolRequest:
@@ -8642,7 +9033,7 @@ components:
           description: (v2.18.10+, GO-047) Present while the trainable indexes are training after a load. A collection is searchable with flat and hnsw once its vectors are in; the indexes listed refuse it with 503 until it is trained, and algorithm auto does not pick them.
           properties:
             current: {type: string, description: Collection being trained now}
-            pending: {type: array, items: {type: string}, description: Collections not trained yet, current included, in training order}
+            pending: {type: array, items: {type: string}, description: "Collections not trained yet, current included, in training order"}
             indexes: {type: array, items: {type: string}, description: 'Indexes that wait for the training (ivf, opq, pq, sq, sq4)'}
         collections:
           type: object
@@ -12254,6 +12645,38 @@ components:
           type: number
           description: Max similarity to another document in the group
 
+  # INT-019: shared parts of the /es paths.
+  parameters:
+    ESIndex:
+      name: index
+      in: path
+      required: true
+      description: The collection (an alias resolves to its collection).
+      schema: {type: string}
+    ESID:
+      name: id
+      in: path
+      required: true
+      description: The document key.
+      schema: {type: string}
+    ESLang:
+      name: lang
+      in: query
+      description: The document language when _source has none (default en).
+      schema: {type: string, default: en}
+  requestBodies:
+    ESSource:
+      required: true
+      description: "_source: content (body), lang, and metadata fields (strings, numbers, booleans or lists of them)."
+      content:
+        application/json:
+          schema: {type: object}
+  responses:
+    ESBadRequest:
+      description: An unsupported or malformed clause, named in error.reason
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ESError"}
   securitySchemes:
     BearerAuth:
       type: http

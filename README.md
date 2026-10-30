@@ -367,6 +367,7 @@ doc, err := c.Add(ctx, mddb.AddRequest{Collection: "blog", Key: "hello", Lang: "
 - ✅ **Custom MCP Tools** - Define YAML-based AI tools for domain-specific workflows
 - ✅ **RAG Pipeline** - Built-in support for retrieval-augmented generation workflows
 - ✅ **Integrations** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension ([guide](docs/INTEGRATIONS.md))
+- ✅ **Elasticsearch-compatible subset** - `MDDB_ES_COMPAT=true` mounts `_search`, `_count`, `_doc`, `_bulk` under `/es`, translated onto MDDB's full-text, vector (`auto`), hybrid (`rrf`) and metadata paths with the same auth, permissions and limits as `/v1`; tested in CI with the unmodified `elasticsearch-py` (v2.18.10+) — **[Details](docs/ELASTICSEARCH-COMPAT.md)**
 
 ### Core Functionality
 - ✅ **Document Management** - Full CRUD with metadata and collections
@@ -653,6 +654,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[Web Panel](docs/PANEL.md)** - Admin UI guide
 - **[LLM Connections](docs/LLM_CONNECTIONS.md)** - MCP for Claude, ChatGPT, Ollama, DeepSeek
 - **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch, SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension
+- **[Elasticsearch-compatible subset](docs/ELASTICSEARCH-COMPAT.md)** - `MDDB_ES_COMPAT=true`: unmodified Elasticsearch clients index, search (`match`, `bool`, `term`, `range`, `knn`, `highlight`, `terms` aggs) and delete under `/es`; unsupported clauses are a 400 naming them (v2.18.10+)
 - **[Bulk Import](docs/BULK-IMPORT.md)** - Load markdown folders
 - **[Blog](blog/)** - Release announcements and engineering notes
 

@@ -194,6 +194,25 @@ performs best on short technical queries here.
 cluster, log aggregation, or analysis features — custom analyzers, complex
 aggregations, percolation — beyond what a document store should be doing.
 
+### Elasticsearch clients against MDDB (v2.18.10+)
+
+Code written for Elasticsearch does not have to be rewritten to try MDDB.
+With `MDDB_ES_COMPAT=true`, `/es` accepts a subset of the Elasticsearch REST
+API — `_search` (`match`, `multi_match`, `match_phrase`, `bool`, `term`,
+`terms`, `range`, top-level `knn`, `sort`, `highlight`, `terms` aggregations),
+`_count`, `_doc`, `_create`, `_bulk` — and translates it onto MDDB's own
+full-text, vector, hybrid and metadata paths. The unmodified `elasticsearch-py`
+indexes, searches and deletes through it in CI.
+
+What it is not matters as much: no mappings, analyzers, scripts, scroll,
+cluster API or aggregations beyond `terms`. Every clause outside the subset is
+a `400` that names it, never a silently ignored filter. The full mapping and
+the list of refusals are in [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md).
+
+This page has no throughput figures for the subset against Elasticsearch: none
+have been measured. The translation runs in-process in front of the `/v1`
+path it maps onto, so the search numbers above are the ones that apply.
+
 ## vs Vector databases
 
 | | MDDB | Dedicated vector database |
