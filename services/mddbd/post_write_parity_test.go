@@ -303,28 +303,49 @@ func TestEveryWritePathFiresTheSameHooks(t *testing.T) {
 
 			path.write(t, p.s, update)
 
-			if ftsHits(t, p.s, "c", "wombat") != 1 || ftsHits(t, p.s, "c", "quokka") != 0 {
-				t.Error("FTS: the index does not describe the new content")
-			}
-			if titleHits(t, p.s, "meta.title", "zenith") != 1 || titleHits(t, p.s, "meta.title", "aurora") != 0 {
-				t.Error("FTS: the index does not describe the new metadata")
-			}
-			jobs := p.drainJobs()
-			if len(jobs) != 1 || jobs[0].ContentMD != update.content {
-				t.Errorf("embedding queue: %d jobs (%+v), want one for the new content", len(jobs), jobs)
-			}
-			if lat, _, ok, err := p.s.GeoStore.Get("c", p.docID); err != nil || !ok || lat != 50 {
-				t.Errorf("geo: lat %v ok %v err %v, want the new point", lat, ok, err)
-			}
-			if hits := p.s.GeoIndex.Search("c", 50, 20, 1000, 10, nil); len(hits) != 1 {
-				t.Errorf("geo index: %d documents near the new point", len(hits))
-			}
-			if !p.binlogged(t, lsn) {
-				t.Error("binlog: the write was not recorded for replication")
-			}
-			p.expectEvents(t, "doc.updated")
+			p.expectUpdateIndexed(t, update)
+			p.expectGeoMoved(t)
+			p.expectReplicatedUpdate(t, lsn)
 		})
 	}
+}
+
+// expectUpdateIndexed checks the full-text index describes the update's
+// content (wombat, not quokka) and title (zenith, not aurora), and one
+// embedding job was queued for the new content.
+func (p *writeProbe) expectUpdateIndexed(t *testing.T, update docVersion) {
+	t.Helper()
+	if ftsHits(t, p.s, "c", "wombat") != 1 || ftsHits(t, p.s, "c", "quokka") != 0 {
+		t.Error("FTS: the index does not describe the new content")
+	}
+	if titleHits(t, p.s, "meta.title", "zenith") != 1 || titleHits(t, p.s, "meta.title", "aurora") != 0 {
+		t.Error("FTS: the index does not describe the new metadata")
+	}
+	jobs := p.drainJobs()
+	if len(jobs) != 1 || jobs[0].ContentMD != update.content {
+		t.Errorf("embedding queue: %d jobs (%+v), want one for the new content", len(jobs), jobs)
+	}
+}
+
+// expectGeoMoved checks the geo store and index hold the new point (50, 20).
+func (p *writeProbe) expectGeoMoved(t *testing.T) {
+	t.Helper()
+	if lat, _, ok, err := p.s.GeoStore.Get("c", p.docID); err != nil || !ok || lat != 50 {
+		t.Errorf("geo: lat %v ok %v err %v, want the new point", lat, ok, err)
+	}
+	if hits := p.s.GeoIndex.Search("c", 50, 20, 1000, 10, nil); len(hits) != 1 {
+		t.Errorf("geo index: %d documents near the new point", len(hits))
+	}
+}
+
+// expectReplicatedUpdate checks the write reached the binlog after lsn and
+// fired exactly a doc.updated event.
+func (p *writeProbe) expectReplicatedUpdate(t *testing.T, lsn uint64) {
+	t.Helper()
+	if !p.binlogged(t, lsn) {
+		t.Error("binlog: the write was not recorded for replication")
+	}
+	p.expectEvents(t, "doc.updated")
 }
 
 // Content emptied through every path that can express it: the old text
@@ -342,26 +363,38 @@ func TestEveryWritePathEmptiesContent(t *testing.T) {
 
 			path.write(t, p.s, docVersion{"", parityOriginal.meta})
 
-			if ftsHits(t, p.s, "c", "quokka") != 0 {
-				t.Error("FTS: the emptied document is still found by its old content")
-			}
-			if titleHits(t, p.s, "meta.title", "aurora") != 1 {
-				t.Error("FTS: the emptied document lost its metadata postings")
-			}
-			jobs := p.drainJobs()
-			if len(jobs) != 1 || jobs[0].ContentMD != "" {
-				t.Errorf("embedding queue: %+v, want one job for the empty content", jobs)
-			}
-			if rec, _ := p.s.VectorStore.Get("c", p.docID); rec != nil {
-				t.Error("vectors: the emptied document kept its old vectors")
-			}
-			if n := p.s.VectorIndex.CollectionSize("c"); n != 0 {
-				t.Errorf("vector index: %d vectors left, want none", n)
-			}
-			if !p.binlogged(t, lsn) {
-				t.Error("binlog: the write was not recorded for replication")
-			}
-			p.expectEvents(t, "doc.updated")
+			p.expectContentEmptied(t)
+			p.expectVectorsDropped(t)
+			p.expectReplicatedUpdate(t, lsn)
 		})
+	}
+}
+
+// expectContentEmptied checks the old content no longer finds the document
+// while its title still does, and one embedding job was queued for the
+// empty content.
+func (p *writeProbe) expectContentEmptied(t *testing.T) {
+	t.Helper()
+	if ftsHits(t, p.s, "c", "quokka") != 0 {
+		t.Error("FTS: the emptied document is still found by its old content")
+	}
+	if titleHits(t, p.s, "meta.title", "aurora") != 1 {
+		t.Error("FTS: the emptied document lost its metadata postings")
+	}
+	jobs := p.drainJobs()
+	if len(jobs) != 1 || jobs[0].ContentMD != "" {
+		t.Errorf("embedding queue: %+v, want one job for the empty content", jobs)
+	}
+}
+
+// expectVectorsDropped checks the emptied document kept no vector in the
+// store or the index.
+func (p *writeProbe) expectVectorsDropped(t *testing.T) {
+	t.Helper()
+	if rec, _ := p.s.VectorStore.Get("c", p.docID); rec != nil {
+		t.Error("vectors: the emptied document kept its old vectors")
+	}
+	if n := p.s.VectorIndex.CollectionSize("c"); n != 0 {
+		t.Errorf("vector index: %d vectors left, want none", n)
 	}
 }

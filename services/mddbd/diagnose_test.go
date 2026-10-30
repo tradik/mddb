@@ -209,72 +209,107 @@ func TestDiagnoseBundleCarriesNoCanary(t *testing.T) {
 			canaries := []string{canaryCollection, canaryContent, canaryMetaValue, canaryKey, canaryQuery, canaryAPIKey,
 				canaryMCPKeys, canaryProxy, canaryPath, canaryActor, canaryIP, canaryUnknownEnv, filepath.Base(s.Path)}
 
-			// Positive controls: each canary is there to be found, so a clean
-			// bundle is redaction at work and not an empty source.
-			rawMetrics := serveAs(t, h, http.MethodGet, "/metrics", "").Body.String()
-			rawStats := serveAs(t, h, http.MethodGet, "/v1/stats", "").Body.String()
-			for _, c := range []string{canaryCollection} {
-				if !strings.Contains(rawMetrics, c) || !strings.Contains(rawStats, c) {
-					t.Fatalf("the sources do not name %q: the test proves nothing", c)
-				}
-			}
-			if !strings.Contains(rawStats, filepath.Base(s.Path)) || !strings.Contains(rawMetrics, "/v1/aliases/"+canaryCollection) {
-				t.Fatal("/v1/stats lost its path or /metrics its per-request path: the test proves nothing")
-			}
-
+			assertCanarySourcesNameThem(t, s, h)
 			files, order := getBundle(t, h, "?profiles=true&integrity=true")
-			for _, want := range []string{"MANIFEST.json", "build.json", "config.json", "env.json", "stats.json", "storage.json",
-				"vector-stats.json", "indexing.json", "metrics.prom", "query-shape.json", "audit-summary.json", "errors.json",
-				"goroutines.pprof", "heap.pprof", "integrity.json"} {
-				if files[want] == nil {
-					t.Errorf("bundle lacks %s (has %v)", want, order)
-				}
-			}
-			for name, body := range files {
-				text := readable(t, body)
-				for _, c := range canaries {
-					if strings.Contains(text, c) {
-						t.Errorf("%s carries canary %q", name, c)
-					}
-				}
-			}
-
-			// The data the canaries stood in is still described: hashed,
-			// counted.
-			hash := collectionHash(canaryCollection)
-			for _, f := range []string{"stats.json", "metrics.prom", "query-shape.json", "integrity.json"} {
-				oneFile := f == "integrity.json" && layout == "single" // no collection file to name
-				if !oneFile && !strings.Contains(string(files[f]), hash) {
-					t.Errorf("%s does not mention the collection's hash %s", f, hash)
-				}
-			}
-			var cfg diagnoseConfig
-			_ = json.Unmarshal(files["config.json"], &cfg)
-			if c := cfg.Collections[hash]; c.Type != "documents" || c.FTSExcludeMetaKeys != 1 || c.MaxTopK != 50 {
-				t.Errorf("config.json collection %+v", cfg.Collections)
-			}
-			var env map[string]string
-			_ = json.Unmarshal(files["env.json"], &env)
-			if env["MDDB_EMBEDDING_API_KEY"] != cfgSet || env["MDDB_TRUSTED_PROXIES"] != "<2 entries>" ||
-				env["MDDB_CANARY_UNKNOWN"] != cfgUnclassified || env["MDDB_EMBEDDING_API_URL"] != "<set: https>" {
-				t.Errorf("env.json %v", env)
-			}
-
-			// --keep-names keeps the collection's name and nothing else.
-			kept, _ := getBundle(t, h, "?keepNames=true")
-			found := false
-			for name, body := range kept {
-				found = found || strings.Contains(string(body), canaryCollection)
-				for _, c := range canaries[1:] {
-					if strings.Contains(string(body), c) {
-						t.Errorf("keepNames: %s carries canary %q", name, c)
-					}
-				}
-			}
-			if !found {
-				t.Error("keepNames: the collection's name is in no file")
-			}
+			assertBundleHasEveryFile(t, files, order)
+			assertBundleCarriesNoCanary(t, files, canaries)
+			assertBundleDescribesByHash(t, files, layout)
+			assertBundleConfigAndEnv(t, files)
+			assertKeepNamesKeepsOnlyTheName(t, h, canaries)
 		})
+	}
+}
+
+// assertCanarySourcesNameThem is the positive control: each canary is there
+// to be found, so a clean bundle is redaction at work and not an empty source.
+func assertCanarySourcesNameThem(t *testing.T, s *Server, h http.Handler) {
+	t.Helper()
+	rawMetrics := serveAs(t, h, http.MethodGet, "/metrics", "").Body.String()
+	rawStats := serveAs(t, h, http.MethodGet, "/v1/stats", "").Body.String()
+	for _, c := range []string{canaryCollection} {
+		if !strings.Contains(rawMetrics, c) || !strings.Contains(rawStats, c) {
+			t.Fatalf("the sources do not name %q: the test proves nothing", c)
+		}
+	}
+	if !strings.Contains(rawStats, filepath.Base(s.Path)) || !strings.Contains(rawMetrics, "/v1/aliases/"+canaryCollection) {
+		t.Fatal("/v1/stats lost its path or /metrics its per-request path: the test proves nothing")
+	}
+}
+
+// assertBundleHasEveryFile checks the full (profiles + integrity) bundle
+// carries every file it promises.
+func assertBundleHasEveryFile(t *testing.T, files map[string][]byte, order []string) {
+	t.Helper()
+	for _, want := range []string{"MANIFEST.json", "build.json", "config.json", "env.json", "stats.json", "storage.json",
+		"vector-stats.json", "indexing.json", "metrics.prom", "query-shape.json", "audit-summary.json", "errors.json",
+		"goroutines.pprof", "heap.pprof", "integrity.json"} {
+		if files[want] == nil {
+			t.Errorf("bundle lacks %s (has %v)", want, order)
+		}
+	}
+}
+
+// assertBundleCarriesNoCanary checks no file, read as text (gunzipped where
+// compressed), carries any canary.
+func assertBundleCarriesNoCanary(t *testing.T, files map[string][]byte, canaries []string) {
+	t.Helper()
+	for name, body := range files {
+		text := readable(t, body)
+		for _, c := range canaries {
+			if strings.Contains(text, c) {
+				t.Errorf("%s carries canary %q", name, c)
+			}
+		}
+	}
+}
+
+// assertBundleDescribesByHash checks the data the canaries stood in is still
+// described: hashed, counted.
+func assertBundleDescribesByHash(t *testing.T, files map[string][]byte, layout string) {
+	t.Helper()
+	hash := collectionHash(canaryCollection)
+	for _, f := range []string{"stats.json", "metrics.prom", "query-shape.json", "integrity.json"} {
+		oneFile := f == "integrity.json" && layout == "single" // no collection file to name
+		if !oneFile && !strings.Contains(string(files[f]), hash) {
+			t.Errorf("%s does not mention the collection's hash %s", f, hash)
+		}
+	}
+}
+
+// assertBundleConfigAndEnv checks config.json keeps the collection's settings
+// under its hash and env.json describes values without carrying them.
+func assertBundleConfigAndEnv(t *testing.T, files map[string][]byte) {
+	t.Helper()
+	hash := collectionHash(canaryCollection)
+	var cfg diagnoseConfig
+	_ = json.Unmarshal(files["config.json"], &cfg)
+	if c := cfg.Collections[hash]; c.Type != "documents" || c.FTSExcludeMetaKeys != 1 || c.MaxTopK != 50 {
+		t.Errorf("config.json collection %+v", cfg.Collections)
+	}
+	var env map[string]string
+	_ = json.Unmarshal(files["env.json"], &env)
+	if env["MDDB_EMBEDDING_API_KEY"] != cfgSet || env["MDDB_TRUSTED_PROXIES"] != "<2 entries>" ||
+		env["MDDB_CANARY_UNKNOWN"] != cfgUnclassified || env["MDDB_EMBEDDING_API_URL"] != "<set: https>" {
+		t.Errorf("env.json %v", env)
+	}
+}
+
+// assertKeepNamesKeepsOnlyTheName checks --keep-names keeps the collection's
+// name and nothing else (canaries[0] is the collection name).
+func assertKeepNamesKeepsOnlyTheName(t *testing.T, h http.Handler, canaries []string) {
+	t.Helper()
+	kept, _ := getBundle(t, h, "?keepNames=true")
+	found := false
+	for name, body := range kept {
+		found = found || strings.Contains(string(body), canaryCollection)
+		for _, c := range canaries[1:] {
+			if strings.Contains(string(body), c) {
+				t.Errorf("keepNames: %s carries canary %q", name, c)
+			}
+		}
+	}
+	if !found {
+		t.Error("keepNames: the collection's name is in no file")
 	}
 }
 
@@ -292,6 +327,14 @@ func TestDiagnoseManifestDescribesEveryFile(t *testing.T) {
 	if n := rec.Body.Len(); n >= 1<<20 || took >= 2*time.Second {
 		t.Errorf("default bundle %d bytes in %s", n, took)
 	}
+	assertManifestMatchesFiles(t, files)
+	assertDefaultBundleShape(t, files)
+}
+
+// assertManifestMatchesFiles checks MANIFEST.json lists every other file with
+// its true size and hash, and names what was omitted and why.
+func assertManifestMatchesFiles(t *testing.T, files map[string][]byte) {
+	t.Helper()
 	man := manifestOf(t, files)
 	if len(man.Files) != len(files)-1 || len(man.Never) == 0 || man.Version != VERSION {
 		t.Fatalf("manifest lists %d of %d files: %+v", len(man.Files), len(files)-1, man)
@@ -311,6 +354,12 @@ func TestDiagnoseManifestDescribesEveryFile(t *testing.T) {
 		omitted["integrity.json"] != "opt-in: integrity" {
 		t.Errorf("omitted %v", omitted)
 	}
+}
+
+// assertDefaultBundleShape checks query-shape.json counts the seeded traffic
+// and errors.json kept the seeded errors.
+func assertDefaultBundleShape(t *testing.T, files map[string][]byte) {
+	t.Helper()
 	var shape metrics.QueryShapeReport
 	if err := json.Unmarshal(files["query-shape.json"], &shape); err != nil {
 		t.Fatal(err)

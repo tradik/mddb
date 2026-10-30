@@ -211,6 +211,28 @@ func TestGeoCov_GRPC(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 	g := &GRPCServer{server: s}
+
+	geoGRPCSearches(ctx, t, g)
+	if _, err := g.GeoEncode(ctx, &proto.GeoEncodeRequest{Lat: 52.52, Lng: 13.405, Precision: 5}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := g.GeoDecode(ctx, &proto.GeoDecodeRequest{Geohash: "u33db"}); err != nil {
+		t.Fatal(err)
+	}
+	geoGRPCReindexAndStats(ctx, t, g, dir)
+	geoGRPCReindexRefusals(ctx, t, g, s)
+	geoGRPCWithoutDocuments(ctx, t, g, s)
+
+	_ = s.collectionDB("v").Close() // the file holding the collection, in either layout
+	if _, err := g.GeoReindex(ctx, &proto.GeoReindexRequest{Collection: "v"}); status.Code(err) != codes.Internal {
+		t.Fatalf("reindex over a closed store: %v", err)
+	}
+}
+
+// geoGRPCSearches checks radius and bounding-box search over gRPC, filtered
+// and unfiltered, with and without content.
+func geoGRPCSearches(ctx context.Context, t *testing.T, g *GRPCServer) {
+	t.Helper()
 	shops := map[string]*proto.MetaValues{"kind": {Values: []string{"shop"}}}
 	none := map[string]*proto.MetaValues{"kind": {Values: []string{"none"}}}
 
@@ -233,14 +255,12 @@ func TestGeoCov_GRPC(t *testing.T) {
 	if w, err := g.GeoWithin(ctx, &proto.GeoWithinRequest{Collection: "v", MinLat: 52, MaxLat: 53, MinLng: 13, MaxLng: 14, FilterMeta: none}); err != nil || w.Total != 0 {
 		t.Fatalf("within, no match: %v %+v", err, w)
 	}
-	if _, err := g.GeoEncode(ctx, &proto.GeoEncodeRequest{Lat: 52.52, Lng: 13.405, Precision: 5}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := g.GeoDecode(ctx, &proto.GeoDecodeRequest{Geohash: "u33db"}); err != nil {
-		t.Fatal(err)
-	}
+}
 
-	// Stats with a postcode dataset and a rebuilt collection.
+// geoGRPCReindexAndStats rebuilds the collection while loading a postcode
+// dataset written to dir, and checks the stats report both.
+func geoGRPCReindexAndStats(ctx context.Context, t *testing.T, g *GRPCServer, dir string) {
+	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, "pl.csv"), []byte("00-001,52.231,21.006\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -255,8 +275,12 @@ func TestGeoCov_GRPC(t *testing.T) {
 	if st, err := (&GRPCServer{server: &Server{}}).GeoStats(ctx, &proto.GeoStatsRequest{}); err != nil || len(st.Collections) != 0 {
 		t.Fatalf("stats without an index: %v %+v", err, st)
 	}
+}
 
-	// Reindex refusals and failures.
+// geoGRPCReindexRefusals checks reindex refuses bad postcode loads, and
+// creates the postcode lookup when the index has none.
+func geoGRPCReindexRefusals(ctx context.Context, t *testing.T, g *GRPCServer, s *Server) {
+	t.Helper()
 	for name, req := range map[string]*proto.GeoReindexRequest{
 		"outside the data dir": {LoadPostcodes: []*proto.GeoPostcodeLoadProto{{Country: "PL", CsvPath: "../x.csv"}}},
 		"missing CSV":          {LoadPostcodes: []*proto.GeoPostcodeLoadProto{{Country: "PL", CsvPath: "missing.csv"}}},
@@ -270,9 +294,13 @@ func TestGeoCov_GRPC(t *testing.T) {
 	if _, err := g.GeoReindex(ctx, &proto.GeoReindexRequest{LoadPostcodes: []*proto.GeoPostcodeLoadProto{{Country: "PL", CsvPath: "pl.csv"}}}); err != nil {
 		t.Fatalf("reindex creating the postcode lookup: %v", err)
 	}
+}
 
-	// Documents the index knows and the store cannot give back are skipped,
-	// and a store without a documents bucket gives back nothing.
+// geoGRPCWithoutDocuments checks documents the index knows and the store
+// cannot give back are skipped: a store without a documents bucket gives
+// back nothing.
+func geoGRPCWithoutDocuments(ctx context.Context, t *testing.T, g *GRPCServer, s *Server) {
+	t.Helper()
 	if err := s.DBUpdateC("v", func(tx *bolt.Tx) error { return tx.DeleteBucket(s.BucketNames.Docs) }); err != nil {
 		t.Fatal(err)
 	}
@@ -281,11 +309,6 @@ func TestGeoCov_GRPC(t *testing.T) {
 	}
 	if w, err := g.GeoWithin(ctx, &proto.GeoWithinRequest{Collection: "v", MinLat: 52, MaxLat: 53, MinLng: 13, MaxLng: 14}); err != nil || w.Total != 0 {
 		t.Fatalf("within without documents: %v %+v", err, w)
-	}
-
-	_ = s.collectionDB("v").Close() // the file holding the collection, in either layout
-	if _, err := g.GeoReindex(ctx, &proto.GeoReindexRequest{Collection: "v"}); status.Code(err) != codes.Internal {
-		t.Fatalf("reindex over a closed store: %v", err)
 	}
 }
 
@@ -333,8 +356,34 @@ func TestGeoCov_MCPDirect(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 	c := NewDirectClient(s)
-	shops := map[string][]string{"kind": {"shop"}}
 
+	geoMCPSearches(ctx, t, c)
+	if h, err := c.GeoEncode(ctx, 52.52, 13.405, 0); err != nil || len(h) != geo.GeohashMaxPrecision {
+		t.Fatalf("encode at the default precision: %v %q", err, h)
+	}
+	s.GeoIndex.SetPostcodes(geo.NewPostcodeLookup())
+	if st, err := c.GeoStats(ctx); err != nil || st.Collections["v"] == 0 || st.PostcodeDatasets == nil {
+		t.Fatalf("stats: %v %+v", err, st)
+	}
+	if st, err := NewDirectClient(&Server{}).GeoStats(ctx); err != nil || len(st.Collections) != 0 {
+		t.Fatalf("stats without an index: %v %+v", err, st)
+	}
+	geoMCPNotReady(ctx, t, c, s)
+
+	// Hydration without a documents bucket gives back nothing.
+	if err := s.DBUpdateC("v", func(tx *bolt.Tx) error { return tx.DeleteBucket(s.BucketNames.Docs) }); err != nil {
+		t.Fatal(err)
+	}
+	if got := c.loadGeoResults("v", []geo.GeoResult{{DocID: "x"}}, false, false); len(got) != 0 {
+		t.Fatalf("load without a bucket: %v", got)
+	}
+}
+
+// geoMCPSearches checks radius search by both algorithms and bounding-box
+// search through the direct MCP client, and the bounding box's refusals.
+func geoMCPSearches(ctx context.Context, t *testing.T, c *DirectClient) {
+	t.Helper()
+	shops := map[string][]string{"kind": {"shop"}}
 	for _, algo := range []string{"rtree", "geohash"} {
 		r, err := c.GeoSearch(ctx, &MCPGeoSearchRequest{Collection: "v", Lat: 52.52, Lng: 13.405, RadiusMeters: 5000, Algorithm: algo, FilterMeta: shops, IncludeContent: true})
 		if err != nil || r.Total != 3 {
@@ -359,18 +408,12 @@ func TestGeoCov_MCPDirect(t *testing.T) {
 			t.Errorf("within %s: accepted", name)
 		}
 	}
-	if h, err := c.GeoEncode(ctx, 52.52, 13.405, 0); err != nil || len(h) != geo.GeohashMaxPrecision {
-		t.Fatalf("encode at the default precision: %v %q", err, h)
-	}
-	s.GeoIndex.SetPostcodes(geo.NewPostcodeLookup())
-	if st, err := c.GeoStats(ctx); err != nil || st.Collections["v"] == 0 || st.PostcodeDatasets == nil {
-		t.Fatalf("stats: %v %+v", err, st)
-	}
-	if st, err := NewDirectClient(&Server{}).GeoStats(ctx); err != nil || len(st.Collections) != 0 {
-		t.Fatalf("stats without an index: %v %+v", err, st)
-	}
+}
 
-	// Not ready: radius by either index, and the bounding box.
+// geoMCPNotReady swaps in empty indexes and checks radius by either index,
+// and the bounding box, refuse while not ready.
+func geoMCPNotReady(ctx context.Context, t *testing.T, c *DirectClient, s *Server) {
+	t.Helper()
 	s.GeoHashIndex = geo.NewGeoHashIndex()
 	if _, err := c.GeoSearch(ctx, &MCPGeoSearchRequest{Collection: "v", Lat: 1, Lng: 1, RadiusMeters: 1, Algorithm: "geohash"}); err == nil {
 		t.Error("geohash not ready: accepted")
@@ -381,13 +424,5 @@ func TestGeoCov_MCPDirect(t *testing.T) {
 	}
 	if _, err := c.GeoWithin(ctx, &MCPGeoWithinRequest{Collection: "v", MinLat: 1, MaxLat: 2}); err == nil {
 		t.Error("within not ready: accepted")
-	}
-
-	// Hydration without a documents bucket gives back nothing.
-	if err := s.DBUpdateC("v", func(tx *bolt.Tx) error { return tx.DeleteBucket(s.BucketNames.Docs) }); err != nil {
-		t.Fatal(err)
-	}
-	if got := c.loadGeoResults("v", []geo.GeoResult{{DocID: "x"}}, false, false); len(got) != 0 {
-		t.Fatalf("load without a bucket: %v", got)
 	}
 }

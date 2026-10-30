@@ -151,18 +151,7 @@ func TestEveryWritePathIndexesOnlyWhatChanged(t *testing.T) {
 
 			w.write(t, s, "k", content, map[string][]string{"title": {"zenith"}, "url": {"example"}})
 			after := ftsDump(t, s, "c")
-			for k, v := range before {
-				isContent := strings.HasPrefix(k, "fts|") || strings.HasPrefix(k, "ftsp|") || strings.HasPrefix(k, "ftsrev|ftsrev|") || strings.HasPrefix(k, "ftsrev|ftsmeta|")
-				if isContent && after[k] != v {
-					t.Errorf("content key %q was rewritten by a metadata-only update", k)
-				}
-			}
-			if titleHits(t, s, "meta.title", "zenith") != 1 || titleHits(t, s, "meta.title", "aurora") != 0 {
-				t.Error("the title change did not reach the index")
-			}
-			if n := changedKeys(before, after); n == 0 || n > 8 {
-				t.Errorf("a one-field change changed %d keys", n)
-			}
+			assertMetaOnlyChange(t, s, before, after)
 
 			w.write(t, s, "k", content, map[string][]string{"title": {"zenith"}, "url": {"example"}})
 			if n := changedKeys(after, ftsDump(t, s, "c")); n != 0 {
@@ -171,14 +160,44 @@ func TestEveryWritePathIndexesOnlyWhatChanged(t *testing.T) {
 
 			newContent := "the wombat digs a burrow"
 			w.write(t, s, "k", newContent, map[string][]string{"title": {"zenith"}, "url": {"example"}})
-			if ftsHits(t, s, "c", "wombat") != 1 || ftsHits(t, s, "c", "quokka") != 0 {
-				t.Error("a content change did not re-index the content")
-			}
-			res, err := s.searchFTS(FTSSearchRequest{Collection: "c", Query: `"wombat digs"`, Algorithm: "bm25"}, time.Now())
-			if err != nil || res.Total != 1 {
-				t.Errorf("phrase search after a content change: %+v %v", res, err)
-			}
+			assertContentReindexed(t, s)
 		})
+	}
+}
+
+// isFTSContentKey reports whether a dump key belongs to the content's
+// postings (and their reverse entries) rather than to a metadata field.
+func isFTSContentKey(k string) bool {
+	return strings.HasPrefix(k, "fts|") || strings.HasPrefix(k, "ftsp|") || strings.HasPrefix(k, "ftsrev|ftsrev|") || strings.HasPrefix(k, "ftsrev|ftsmeta|")
+}
+
+// assertMetaOnlyChange checks a title-only update (aurora -> zenith) left
+// every content key alone, reached the index, and changed a handful of keys.
+func assertMetaOnlyChange(t *testing.T, s *Server, before, after map[string]string) {
+	t.Helper()
+	for k, v := range before {
+		if isFTSContentKey(k) && after[k] != v {
+			t.Errorf("content key %q was rewritten by a metadata-only update", k)
+		}
+	}
+	if titleHits(t, s, "meta.title", "zenith") != 1 || titleHits(t, s, "meta.title", "aurora") != 0 {
+		t.Error("the title change did not reach the index")
+	}
+	if n := changedKeys(before, after); n == 0 || n > 8 {
+		t.Errorf("a one-field change changed %d keys", n)
+	}
+}
+
+// assertContentReindexed checks a content change (quokka -> wombat) replaced
+// the content's terms and positions.
+func assertContentReindexed(t *testing.T, s *Server) {
+	t.Helper()
+	if ftsHits(t, s, "c", "wombat") != 1 || ftsHits(t, s, "c", "quokka") != 0 {
+		t.Error("a content change did not re-index the content")
+	}
+	res, err := s.searchFTS(FTSSearchRequest{Collection: "c", Query: `"wombat digs"`, Algorithm: "bm25"}, time.Now())
+	if err != nil || res.Total != 1 {
+		t.Errorf("phrase search after a content change: %+v %v", res, err)
 	}
 }
 
@@ -187,83 +206,115 @@ func TestEveryWritePathIndexesOnlyWhatChanged(t *testing.T) {
 // fts-reindex rebuilds from the stored documents — and at the end equals a
 // fresh server's index built from the final documents alone.
 func TestServerIncrementalIndexEqualsRebuild(t *testing.T) {
-	type version struct {
-		content string
-		meta    map[string][]string
-	}
-	words := strings.Fields("alpha beta gamma river stone zenith aurora quokka wombat running the of")
-	text := func(r *rand.Rand, n int) string {
-		out := make([]string, n)
-		for i := range out {
-			out[i] = words[r.Intn(len(words))]
-		}
-		return strings.Join(out, " ")
-	}
 	seeds := 6
 	if testing.Short() {
 		seeds = 2
 	}
 	for seed := int64(1); seed <= int64(seeds); seed++ {
-		r := rand.New(rand.NewSource(seed)) // #nosec G404 -- a seeded, reproducible test sequence, not a secret
-		s, cleanup := newHandlerTestServer(t)
-		docs := map[string]version{}
-		for _, key := range []string{"a", "b"} {
-			docs[key] = version{text(r, 6), map[string][]string{"title": {text(r, 2)}}}
-			ftsAdd(t, s, key, docs[key].content, docs[key].meta)
-		}
-		var history []string
-		for step := 0; step < 15; step++ {
-			key := []string{"a", "b"}[r.Intn(2)]
-			v := docs[key]
-			v.meta = maps.Clone(v.meta)
-			switch op := r.Intn(6); op {
-			case 0:
-				v.content = text(r, 1+r.Intn(8))
-			case 5: // GO-048: content emptied; the meta fields stay indexed
-				v.content = ""
-			case 1, 2:
-				v.meta[[]string{"title", "tags", "license"}[r.Intn(3)]] = []string{text(r, 1+r.Intn(3))}
-			case 3:
-				for k := range v.meta {
-					delete(v.meta, k)
-					break
-				}
-			}
-			docs[key] = v
-			w := ftsWriters[r.Intn(len(ftsWriters))]
-			history = append(history, key+":"+w.name)
-			w.write(t, s, key, v.content, v.meta)
+		runIncrementalSeed(t, seed)
+	}
+}
 
-			incremental := ftsDump(t, s, "c")
-			if _, err := s.reindexCollectionFTS("c"); err != nil {
-				t.Fatal(err)
-			}
-			if rebuilt := ftsDump(t, s, "c"); !reflect.DeepEqual(incremental, rebuilt) {
-				t.Fatalf("seed %d after %v: incremental and rebuilt index differ in %d keys", seed, history, changedKeys(incremental, rebuilt))
-			}
-		}
+// ftsVersion is one version of a document: its content and metadata.
+type ftsVersion struct {
+	content string
+	meta    map[string][]string
+}
 
-		final := ftsDump(t, s, "c")
-		fresh, freshCleanup := newHandlerTestServer(t)
-		keys := []string{"a", "b"}
-		sort.Strings(keys)
-		for _, key := range keys {
-			ftsAdd(t, fresh, key, docs[key].content, docs[key].meta)
+// ftsWords is the small vocabulary the random documents draw from.
+var ftsWords = strings.Fields("alpha beta gamma river stone zenith aurora quokka wombat running the of")
+
+// ftsRandomText returns n random words from ftsWords.
+func ftsRandomText(r *rand.Rand, n int) string {
+	out := make([]string, n)
+	for i := range out {
+		out[i] = ftsWords[r.Intn(len(ftsWords))]
+	}
+	return strings.Join(out, " ")
+}
+
+// ftsMutate returns v with one random change: new content, emptied content,
+// a set meta field, a dropped meta field, or (op 4) nothing.
+func ftsMutate(r *rand.Rand, v ftsVersion) ftsVersion {
+	v.meta = maps.Clone(v.meta)
+	switch op := r.Intn(6); op {
+	case 0:
+		v.content = ftsRandomText(r, 1+r.Intn(8))
+	case 5: // GO-048: content emptied; the meta fields stay indexed
+		v.content = ""
+	case 1, 2:
+		v.meta[[]string{"title", "tags", "license"}[r.Intn(3)]] = []string{ftsRandomText(r, 1+r.Intn(3))}
+	case 3:
+		for k := range v.meta {
+			delete(v.meta, k)
+			break
 		}
-		if got := ftsDump(t, fresh, "c"); !reflect.DeepEqual(final, got) {
-			t.Fatalf("seed %d: the index differs from a fresh build in %d keys", seed, changedKeys(final, got))
-		}
-		for _, q := range []string{"alpha", "zenith aurora", "running"} {
-			for _, algo := range []string{"bm25", "bm25f", "tfidf"} {
-				a, err1 := s.searchFTS(FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
-				b, err2 := fresh.searchFTS(FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
-				if err1 != nil || err2 != nil || rankedIDs(a) != rankedIDs(b) {
-					t.Fatalf("seed %d %s %q: %s vs %s", seed, algo, q, rankedIDs(a), rankedIDs(b))
-				}
+	}
+	return v
+}
+
+// runIncrementalSeed runs one seed of the property: 15 random updates by
+// random write paths, each followed by a comparison with a rebuild, then a
+// comparison with a fresh server built from the final documents.
+func runIncrementalSeed(t *testing.T, seed int64) {
+	t.Helper()
+	r := rand.New(rand.NewSource(seed)) // #nosec G404 -- a seeded, reproducible test sequence, not a secret
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	docs := map[string]ftsVersion{}
+	for _, key := range []string{"a", "b"} {
+		docs[key] = ftsVersion{ftsRandomText(r, 6), map[string][]string{"title": {ftsRandomText(r, 2)}}}
+		ftsAdd(t, s, key, docs[key].content, docs[key].meta)
+	}
+	var history []string
+	for step := 0; step < 15; step++ {
+		key := []string{"a", "b"}[r.Intn(2)]
+		v := ftsMutate(r, docs[key])
+		docs[key] = v
+		w := ftsWriters[r.Intn(len(ftsWriters))]
+		history = append(history, key+":"+w.name)
+		w.write(t, s, key, v.content, v.meta)
+		assertIncrementalEqualsRebuild(t, s, seed, history)
+	}
+	assertEqualsFreshBuild(t, s, docs, seed)
+}
+
+// assertIncrementalEqualsRebuild checks the incrementally maintained index
+// equals the one an fts-reindex rebuilds from the stored documents.
+func assertIncrementalEqualsRebuild(t *testing.T, s *Server, seed int64, history []string) {
+	t.Helper()
+	incremental := ftsDump(t, s, "c")
+	if _, err := s.reindexCollectionFTS("c"); err != nil {
+		t.Fatal(err)
+	}
+	if rebuilt := ftsDump(t, s, "c"); !reflect.DeepEqual(incremental, rebuilt) {
+		t.Fatalf("seed %d after %v: incremental and rebuilt index differ in %d keys", seed, history, changedKeys(incremental, rebuilt))
+	}
+}
+
+// assertEqualsFreshBuild checks s's index equals a fresh server's index
+// built from the final documents alone, and that both rank alike.
+func assertEqualsFreshBuild(t *testing.T, s *Server, docs map[string]ftsVersion, seed int64) {
+	t.Helper()
+	final := ftsDump(t, s, "c")
+	fresh, freshCleanup := newHandlerTestServer(t)
+	defer freshCleanup()
+	keys := []string{"a", "b"}
+	sort.Strings(keys)
+	for _, key := range keys {
+		ftsAdd(t, fresh, key, docs[key].content, docs[key].meta)
+	}
+	if got := ftsDump(t, fresh, "c"); !reflect.DeepEqual(final, got) {
+		t.Fatalf("seed %d: the index differs from a fresh build in %d keys", seed, changedKeys(final, got))
+	}
+	for _, q := range []string{"alpha", "zenith aurora", "running"} {
+		for _, algo := range []string{"bm25", "bm25f", "tfidf"} {
+			a, err1 := s.searchFTS(FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
+			b, err2 := fresh.searchFTS(FTSSearchRequest{Collection: "c", Query: q, Algorithm: algo}, time.Now())
+			if err1 != nil || err2 != nil || rankedIDs(a) != rankedIDs(b) {
+				t.Fatalf("seed %d %s %q: %s vs %s", seed, algo, q, rankedIDs(a), rankedIDs(b))
 			}
 		}
-		freshCleanup()
-		cleanup()
 	}
 }
 
@@ -292,11 +343,7 @@ func TestExcludeMetaKeys(t *testing.T) {
 	}
 
 	addTestDoc(t, s, "c", "new", "en", "ports tree", map[string][]string{"url": {"freshports"}, "license": {"MIT"}})
-	for k := range ftsDump(t, s, "c") {
-		if strings.Contains(k, "|meta.url|") || strings.Contains(k, "|meta.license|") {
-			t.Errorf("an excluded key has a posting: %q", k)
-		}
-	}
+	assertNoExcludedPostings(t, s)
 	before := ftsDump(t, s, "c")
 	addTestDoc(t, s, "c", "new", "en", "ports tree", map[string][]string{"url": {"daemonports"}, "license": {"BSD"}})
 	if n := changedKeys(before, ftsDump(t, s, "c")); n != 0 {
@@ -309,6 +356,24 @@ func TestExcludeMetaKeys(t *testing.T) {
 		t.Fatalf("filterMeta and facets on an excluded key: %+v %v", res, err)
 	}
 
+	assertExcludeListStored(t, s)
+}
+
+// assertNoExcludedPostings checks no full-text key carries a posting for the
+// excluded url and license fields.
+func assertNoExcludedPostings(t *testing.T, s *Server) {
+	t.Helper()
+	for k := range ftsDump(t, s, "c") {
+		if strings.Contains(k, "|meta.url|") || strings.Contains(k, "|meta.license|") {
+			t.Errorf("an excluded key has a posting: %q", k)
+		}
+	}
+}
+
+// assertExcludeListStored checks the collection keeps the list (url,
+// license) and that collections without one exclude nothing.
+func assertExcludeListStored(t *testing.T, s *Server) {
+	t.Helper()
 	got, ok := s.CollectionManager.Get("c")
 	if !ok || got.FTS == nil || !reflect.DeepEqual(got.FTS.ExcludeMetaKeys, []string{"url", "license"}) || !s.ftsEnabledFor("c") {
 		t.Errorf("stored setting: %+v", got.FTS)

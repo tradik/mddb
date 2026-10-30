@@ -41,12 +41,12 @@ func TestCheckPermissionGates(t *testing.T) {
 	ctxFor := func(c *JWTClaims) context.Context {
 		return context.WithValue(context.Background(), authContextKey, c)
 	}
-	member := ctxFor(&JWTClaims{Username: "member"})
-	tenant := ctxFor(&JWTClaims{Username: "member", Tenant: "acme"})
+	member := &JWTClaims{Username: "member"}
+	tenant := &JWTClaims{Username: "member", Tenant: "acme"}
 
 	checks := []struct {
 		name string
-		ctx  context.Context
+		who  *JWTClaims
 		coll string
 		op   PermissionType
 		want error
@@ -59,7 +59,7 @@ func TestCheckPermissionGates(t *testing.T) {
 		{"tenant inside namespace", tenant, "acme/c", PermRead, nil},
 	}
 	for _, c := range checks {
-		if err := am.CheckPermission(c.ctx, c.coll, c.op); !errors.Is(err, c.want) {
+		if err := am.CheckPermission(ctxFor(c.who), c.coll, c.op); !errors.Is(err, c.want) {
 			t.Errorf("%s: err = %v, want %v", c.name, err, c.want)
 		}
 	}

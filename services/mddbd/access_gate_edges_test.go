@@ -136,15 +136,22 @@ func TestRoleTargetsAreExpanded(t *testing.T) {
 	}
 }
 
-// fakeStream is a server stream that receives one request message.
+// fakeStream is a server stream that receives one request message, on
+// behalf of who (anonymous when nil).
 type fakeStream struct {
 	grpc.ServerStream
-	ctx  context.Context
+	who  *JWTClaims
 	coll string
 	err  error
 }
 
-func (f *fakeStream) Context() context.Context { return f.ctx }
+// Context is the stream's context: who's claims, or none when anonymous.
+func (f *fakeStream) Context() context.Context {
+	if f.who == nil {
+		return context.Background()
+	}
+	return context.WithValue(context.Background(), authContextKey, f.who)
+}
 func (f *fakeStream) RecvMsg(m any) error {
 	if f.err != nil {
 		return f.err
@@ -156,29 +163,28 @@ func (f *fakeStream) RecvMsg(m any) error {
 func TestStreamInterceptorGatesEveryMessage(t *testing.T) {
 	s := accessServer(t)
 	icpt := s.accessStreamInterceptor()
-	ctx := context.WithValue(context.Background(), authContextKey, alice)
 	recv := func(_ any, ss grpc.ServerStream) error { return ss.RecvMsg(&proto.ExportRequest{}) }
 	export := &grpc.StreamServerInfo{FullMethod: "/mddb.MDDB/Export"}
-	if err := icpt(nil, &fakeStream{ctx: ctx, coll: "secret"}, export, recv); status.Code(err) != codes.PermissionDenied {
+	if err := icpt(nil, &fakeStream{who: alice, coll: "secret"}, export, recv); status.Code(err) != codes.PermissionDenied {
 		t.Errorf("export of another collection: %v", err)
 	}
-	if err := icpt(nil, &fakeStream{ctx: ctx, coll: "docs"}, export, recv); err != nil {
+	if err := icpt(nil, &fakeStream{who: alice, coll: "docs"}, export, recv); err != nil {
 		t.Errorf("export of her own collection: %v", err)
 	}
 	broken := errors.New("gone")
-	if err := icpt(nil, &fakeStream{ctx: ctx, err: broken}, export, recv); !errors.Is(err, broken) {
+	if err := icpt(nil, &fakeStream{who: alice, err: broken}, export, recv); !errors.Is(err, broken) {
 		t.Errorf("a receive error was replaced: %v", err)
 	}
 	snapshot := &grpc.StreamServerInfo{FullMethod: "/mddb.MDDBReplication/RequestSnapshot"}
 	called := func(any, grpc.ServerStream) error { return nil }
-	if err := icpt(nil, &fakeStream{ctx: ctx}, snapshot, called); err != nil {
+	if err := icpt(nil, &fakeStream{who: alice}, snapshot, called); err != nil {
 		t.Errorf("replication authorizes itself, the gate refused: %v", err)
 	}
 	unknown := &grpc.StreamServerInfo{FullMethod: "/mddb.MDDB/Unknown"}
-	if err := icpt(nil, &fakeStream{ctx: ctx}, unknown, called); status.Code(err) != codes.PermissionDenied {
+	if err := icpt(nil, &fakeStream{who: alice}, unknown, called); status.Code(err) != codes.PermissionDenied {
 		t.Errorf("an unclassified stream ran: %v", err)
 	}
-	anonymous := &fakeStream{ctx: context.Background(), coll: "docs"}
+	anonymous := &fakeStream{coll: "docs"}
 	if err := icpt(nil, anonymous, export, recv); status.Code(err) != codes.Unauthenticated {
 		t.Errorf("an anonymous stream: %v", err)
 	}

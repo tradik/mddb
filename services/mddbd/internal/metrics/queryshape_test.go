@@ -107,7 +107,26 @@ func TestQueryShapeCountsGraphAndGates(t *testing.T) {
 	q.Graph(GraphShape{Kind: graphKindCount}) // out of range: ignored
 
 	r := q.Report(nil)
-	g := r.Graph
+	assertGraphReport(t, r.Graph)
+	if r.Collections["code"].Graph != 9 || r.Collections["code"].DepthClamped != 2 {
+		t.Errorf("collection %+v", r.Collections["code"])
+	}
+	// Too few sessions for the gate, whatever the share.
+	if r.Gates.Code006.Share < 0.33 || r.Gates.Code006.Met || r.Gates.Code007.Numerator != 2 || r.Gates.Code007.Denominator != 8 {
+		t.Errorf("gates %+v", r.Gates)
+	}
+	if g := newGate("m", 2, 20, 0.05, 20); !g.Met || g.Share != 0.1 {
+		t.Errorf("gate over threshold %+v", g)
+	}
+	if g := newGate("m", 0, 0, 0.05, 0); g.Met || g.Share != 0 {
+		t.Errorf("empty gate %+v", g)
+	}
+}
+
+// assertGraphReport checks the graph section of the report the
+// TestQueryShapeCountsGraphAndGates calls produce.
+func assertGraphReport(t *testing.T, g GraphReport) {
+	t.Helper()
 	if g.Requests["rest"]["code_graph"] != 6 || g.Requests["mcp"]["code_graph"] != 1 || g.Requests["rest"]["expand"] != 1 {
 		t.Errorf("requests %v", g.Requests)
 	}
@@ -121,19 +140,6 @@ func TestQueryShapeCountsGraphAndGates(t *testing.T) {
 	// of 1 (expired at the report); client 1's last chain is still open.
 	if g.Chains.Sessions != 3 || g.Chains.Length["3"] != 1 || g.Chains.Length["1"] != 2 || g.Chains.AtLeast3 != 1 || g.Chains.Open != 1 {
 		t.Errorf("chains %+v", g.Chains)
-	}
-	if r.Collections["code"].Graph != 9 || r.Collections["code"].DepthClamped != 2 {
-		t.Errorf("collection %+v", r.Collections["code"])
-	}
-	// Too few sessions for the gate, whatever the share.
-	if r.Gates.Code006.Share < 0.33 || r.Gates.Code006.Met || r.Gates.Code007.Numerator != 2 || r.Gates.Code007.Denominator != 8 {
-		t.Errorf("gates %+v", r.Gates)
-	}
-	if g := newGate("m", 2, 20, 0.05, 20); !g.Met || g.Share != 0.1 {
-		t.Errorf("gate over threshold %+v", g)
-	}
-	if g := newGate("m", 0, 0, 0.05, 0); g.Met || g.Share != 0 {
-		t.Errorf("empty gate %+v", g)
 	}
 }
 

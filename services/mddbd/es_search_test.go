@@ -75,6 +75,23 @@ func TestESSearchFullText(t *testing.T) {
 	if esSortedHitIDs(out) != "bear,fox" || esTotal(out) != 2 {
 		t.Fatalf("match: %v", out)
 	}
+	assertESMatchExtras(t, out)
+
+	out = esSearchOK(t, h, "/es/books/_search", `{"query":{"bool":{"must":[{"match":{"content":"brown"}}],
+		"filter":[{"term":{"genre":"nature"}},{"range":{"year":{"gte":2000}}}]}},"_source":false}`)
+	if esSortedHitIDs(out) != "bear" {
+		t.Fatalf("bool: %v", out)
+	}
+	if _, has := out["hits"].(map[string]any)["hits"].([]any)[0].(map[string]any)["_source"]; has {
+		t.Fatal("_source false drops the source")
+	}
+	esSearchShouldPagesAndPhrase(t, h)
+}
+
+// assertESMatchExtras checks the match search's _source includes, highlight
+// tags, terms aggregation and max_score.
+func assertESMatchExtras(t *testing.T, out map[string]any) {
+	t.Helper()
 	hit := out["hits"].(map[string]any)["hits"].([]any)[0].(map[string]any)
 	if src := hit["_source"].(map[string]any); len(src) != 1 || src["genre"] == nil {
 		t.Fatalf("_source includes: %v", src)
@@ -89,17 +106,13 @@ func TestESSearchFullText(t *testing.T) {
 	if out["hits"].(map[string]any)["max_score"] == nil {
 		t.Fatal("a scored search has a max_score")
 	}
+}
 
-	out = esSearchOK(t, h, "/es/books/_search", `{"query":{"bool":{"must":[{"match":{"content":"brown"}}],
-		"filter":[{"term":{"genre":"nature"}},{"range":{"year":{"gte":2000}}}]}},"_source":false}`)
-	if esSortedHitIDs(out) != "bear" {
-		t.Fatalf("bool: %v", out)
-	}
-	if _, has := out["hits"].(map[string]any)["hits"].([]any)[0].(map[string]any)["_source"]; has {
-		t.Fatal("_source false drops the source")
-	}
-
-	out = esSearchOK(t, h, "/es/books/_search", `{"query":{"bool":{"should":[{"match":{"content":"owl"}},{"match":{"content":"turtle"}}],
+// esSearchShouldPagesAndPhrase checks should + must_not, paging from the URL
+// and past the end, and a phrase query.
+func esSearchShouldPagesAndPhrase(t *testing.T, h http.Handler) {
+	t.Helper()
+	out := esSearchOK(t, h, "/es/books/_search", `{"query":{"bool":{"should":[{"match":{"content":"owl"}},{"match":{"content":"turtle"}}],
 		"must_not":[{"term":{"genre":"fable"}}]}}}`)
 	if esSortedHitIDs(out) != "owl" {
 		t.Fatalf("should + must_not: %v", out)

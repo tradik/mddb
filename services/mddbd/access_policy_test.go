@@ -186,26 +186,37 @@ func ruleKeys(m map[string]accessRule) []string {
 	return keys
 }
 
+// ruleMethods is POST followed by every method a rule overrides.
+func ruleMethods(base accessRule) []string {
+	methods := []string{http.MethodPost}
+	for m := range base.methods {
+		methods = append(methods, m)
+	}
+	return methods
+}
+
+// gateRequest is a request to pattern naming coll (when set) both in the
+// query string and in the JSON body.
+func gateRequest(method, pattern, coll string) *http.Request {
+	target := pattern
+	body := "{}"
+	if coll != "" {
+		target += "?collection=" + coll
+		body = `{"collection":"` + coll + `"}`
+	}
+	return httptest.NewRequest(method, target, strings.NewReader(body))
+}
+
 func TestHTTPGateAppliesEveryRule(t *testing.T) {
 	s := accessServer(t)
 	for _, pattern := range ruleKeys(httpAccessRules) {
 		base := httpAccessRules[pattern]
-		methods := []string{http.MethodPost}
-		for m := range base.methods {
-			methods = append(methods, m)
-		}
-		for _, method := range methods {
+		for _, method := range ruleMethods(base) {
 			rule := base.forMethod(method)
 			for _, c := range accessCases {
 				reached := false
 				h := s.httpGate(pattern, http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true }))
-				target := pattern
-				body := "{}"
-				if c.coll != "" {
-					target += "?collection=" + c.coll
-					body = `{"collection":"` + c.coll + `"}`
-				}
-				req := httptest.NewRequest(method, target, strings.NewReader(body))
+				req := gateRequest(method, pattern, c.coll)
 				rec := httptest.NewRecorder()
 				asUser(c.who, h).ServeHTTP(rec, req)
 				if want := expectAllowed(rule, c.who, c.coll); reached != want {

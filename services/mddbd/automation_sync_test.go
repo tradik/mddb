@@ -158,7 +158,7 @@ func TestCronSchedulerRunsSync(t *testing.T) {
 	s.AutomationManager.mu.Unlock()
 	clock = clock.Add(time.Hour)
 	entry.Job.Run()
-	if got := s.AutomationManager.Get(rule.ID).LastRun; got == clock.Unix() {
+	if s.AutomationManager.Get(rule.ID).LastRun == clock.Unix() {
 		t.Error("a rule without an action of its own ran one")
 	}
 }

@@ -84,7 +84,14 @@ func TestCapLimit_ServerCollectionAndEndpoint(t *testing.T) {
 	if n, rep := s.CapLimit("c", 500, 200); n != 200 || !rep.LimitCapped {
 		t.Fatalf("endpoint bound: %d %+v", n, rep)
 	}
+	capLimitByCollection(t, s)
+}
 
+// capLimitByCollection checks a collection's maxTopK lowers the server cap
+// and never raises it, and a cross-collection search takes the strictest
+// target.
+func capLimitByCollection(t *testing.T, s *Server) {
+	t.Helper()
 	// maxTopK lowers the server cap...
 	if err := s.CollectionManager.Set("low", &CollectionConfig{Retrieval: &RetrievalProfileDef{MaxTopK: 5}}); err != nil {
 		t.Fatal(err)

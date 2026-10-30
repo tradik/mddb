@@ -74,7 +74,8 @@ def loaded(es):
         {"_index": INDEX, "_id": "turtle", "content": "A slow green turtle crosses the road", "genre": "fable"},
         {"_index": INDEX, "_id": "owl", "content": "The owl hunts mice at night", "genre": "nature", "year": 2021},
     ], refresh=True)
-    assert ok == 3 and not errors
+    assert ok == 3
+    assert not errors
     es.indices.refresh(index=INDEX)
     return es
 
@@ -92,7 +93,8 @@ def test_info_and_ping(es):
 
 def test_get(loaded):
     doc = loaded.get(index=INDEX, id="fox")
-    assert doc["found"] and doc["_source"]["genre"] == "fable"
+    assert doc["found"]
+    assert doc["_source"]["genre"] == "fable"
     with pytest.raises(NotFoundError):
         loaded.get(index=INDEX, id="missing")
 
@@ -122,7 +124,9 @@ def test_knn(loaded):
         "field": "embedding", "k": 2,
         "query_vector_builder": {"text_embedding": {"model_text": "brown fox jumps"}},
     })
-    assert _ids(resp)[0] == "fox" and len(_ids(resp)) == 2
+    ids = _ids(resp)
+    assert ids[0] == "fox"
+    assert len(ids) == 2
 
 
 def test_aggs_and_count(loaded):

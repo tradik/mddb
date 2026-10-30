@@ -18,6 +18,26 @@ import (
 func TestESDocumentLifecycle(t *testing.T) {
 	s, h := esTestServer(t)
 
+	esIndexAndReindex(t, h)
+	esGetAndExists(t, h)
+	esCreateOnlyOnce(t, h)
+	esDeleteAndGone(t, h)
+
+	// An expired document is gone, whatever the TTL reaper has done yet.
+	if _, _, err := s.addDocument("books", "old", "en", nil, "x", 1, true); err != nil {
+		t.Fatal(err)
+	}
+	expireDoc(t, s, "books", "old")
+	if rec, _ := esDo(t, h, http.MethodGet, "/es/books/_doc/old", ""); rec.Code != http.StatusNotFound {
+		t.Fatalf("expired: %d", rec.Code)
+	}
+}
+
+// esIndexAndReindex indexes "Fox", re-indexes it as "fox" (ids are
+// case-insensitive), and indexes a document with an automatic id in Polish,
+// which a get in its language finds.
+func esIndexAndReindex(t *testing.T, h http.Handler) {
+	t.Helper()
 	rec, out := esDo(t, h, http.MethodPut, "/es/books/_doc/Fox?refresh=wait_for",
 		`{"content":"The quick brown fox","genre":"fable","year":1990,"tags":["a","b"],"draft":false,"note":null}`)
 	if rec.Code != http.StatusCreated || out["result"] != "created" || out["_id"] != "Fox" {
@@ -35,8 +55,12 @@ func TestESDocumentLifecycle(t *testing.T) {
 	if rec, out = esDo(t, h, http.MethodGet, "/es/books/_doc/"+id+"?lang=pl", ""); rec.Code != http.StatusOK || out["_source"].(map[string]any)["lang"] != "pl" {
 		t.Fatalf("get in its language: %d %v", rec.Code, out)
 	}
+}
 
-	rec, out = esDo(t, h, http.MethodGet, "/es/books/_doc/fox", "")
+// esGetAndExists checks get returns the re-indexed source and HEAD finds it.
+func esGetAndExists(t *testing.T, h http.Handler) {
+	t.Helper()
+	rec, out := esDo(t, h, http.MethodGet, "/es/books/_doc/fox", "")
 	src, _ := out["_source"].(map[string]any)
 	if rec.Code != http.StatusOK || out["found"] != true || src["content"] != "The quick red fox" || src["genre"] != "fable" {
 		t.Fatalf("get: %d %v", rec.Code, out)
@@ -44,16 +68,26 @@ func TestESDocumentLifecycle(t *testing.T) {
 	if rec, _ = esDo(t, h, http.MethodHead, "/es/books/_doc/fox", ""); rec.Code != http.StatusOK {
 		t.Fatalf("exists: %d", rec.Code)
 	}
+}
 
-	rec, out = esDo(t, h, http.MethodPut, "/es/books/_create/fox", `{"content":"again"}`)
+// esCreateOnlyOnce checks _create refuses an existing id with a version
+// conflict and op_type=create creates a new one.
+func esCreateOnlyOnce(t *testing.T, h http.Handler) {
+	t.Helper()
+	rec, out := esDo(t, h, http.MethodPut, "/es/books/_create/fox", `{"content":"again"}`)
 	if rec.Code != http.StatusConflict || esErrType(out) != "version_conflict_engine_exception" {
 		t.Fatalf("create over an existing document: %d %v", rec.Code, out)
 	}
 	if rec, _ = esDo(t, h, http.MethodPut, "/es/books/_doc/owl?op_type=create", `{"content":"owl"}`); rec.Code != http.StatusCreated {
 		t.Fatalf("op_type=create: %d", rec.Code)
 	}
+}
 
-	rec, out = esDo(t, h, http.MethodDelete, "/es/books/_doc/fox?refresh", "")
+// esDeleteAndGone deletes "fox", then checks a second delete, a get and a
+// HEAD all answer not found.
+func esDeleteAndGone(t *testing.T, h http.Handler) {
+	t.Helper()
+	rec, out := esDo(t, h, http.MethodDelete, "/es/books/_doc/fox?refresh", "")
 	if rec.Code != http.StatusOK || out["result"] != "deleted" {
 		t.Fatalf("delete: %d %v", rec.Code, out)
 	}
@@ -67,15 +101,6 @@ func TestESDocumentLifecycle(t *testing.T) {
 	}
 	if rec, _ = esDo(t, h, http.MethodHead, "/es/books/_doc/fox", ""); rec.Code != http.StatusNotFound {
 		t.Fatalf("exists deleted: %d", rec.Code)
-	}
-
-	// An expired document is gone, whatever the TTL reaper has done yet.
-	if _, _, err := s.addDocument("books", "old", "en", nil, "x", 1, true); err != nil {
-		t.Fatal(err)
-	}
-	expireDoc(t, s, "books", "old")
-	if rec, _ = esDo(t, h, http.MethodGet, "/es/books/_doc/old", ""); rec.Code != http.StatusNotFound {
-		t.Fatalf("expired: %d", rec.Code)
 	}
 }
 

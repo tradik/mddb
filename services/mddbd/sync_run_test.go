@@ -30,6 +30,26 @@ func TestSyncSitemapChangeDetectionAndPrune(t *testing.T) {
 		Collection: "web", Lang: "en", Prune: true})
 	_, events := collectSSE(s.SSEHub, "", "")
 
+	updatedAt := syncFirstRunAddsAll(t, s, site, rule, events)
+	syncSecondRunWritesNothing(t, s, site, rule, updatedAt)
+	syncChangedPageUpdates(t, s, site, rule)
+	syncDroppedPageDeletes(t, s, site, rule)
+
+	p := <-synced
+	if p["event"] != webhooks.EventSourceSynced || detailOf(p)["ruleId"] != rule.ID || detailOf(p)["added"] != 3.0 {
+		t.Errorf("source.synced: %v", p)
+	}
+	logs, _, err := s.AutomationLogStore.List(10, "", rule.ID, "")
+	if err != nil || len(logs) != 4 || logs[0].Action != "sync" || logs[0].Sync == nil {
+		t.Fatalf("the automation log: %+v, %v", logs, err)
+	}
+}
+
+// syncFirstRunAddsAll runs the rule once: three pages added, the synced page
+// carries its source, ETag and Last-Modified, and SSE reports the job. It
+// returns the synced page's UpdatedAt.
+func syncFirstRunAddsAll(t *testing.T, s *Server, site *fakeSite, rule AutomationRule, events func() []SSEJobEvent) int64 {
+	t.Helper()
 	out, err := runSync(t, s, rule)
 	if err != nil || out.counts != (automationlog.SyncCounts{Added: 3}) {
 		t.Fatalf("first run: %+v, %v", out, err)
@@ -45,11 +65,15 @@ func TestSyncSitemapChangeDetectionAndPrune(t *testing.T) {
 	if got := events(); len(got) == 0 || got[len(got)-1].Event != SSEJobCompleted || got[len(got)-1].Job.Added != 3 {
 		t.Errorf("SSE: %+v", got)
 	}
+	return doc.UpdatedAt
+}
 
-	// Nothing changed: every page answers 304, nothing is written.
-	updatedAt := doc.UpdatedAt
+// syncSecondRunWritesNothing checks that with nothing changed every page
+// answers 304 and nothing is written.
+func syncSecondRunWritesNothing(t *testing.T, s *Server, site *fakeSite, rule AutomationRule, updatedAt int64) {
+	t.Helper()
 	time.Sleep(1100 * time.Millisecond) // a write now would move UpdatedAt
-	out, err = runSync(t, s, rule)
+	out, err := runSync(t, s, rule)
 	if err != nil || out.counts != (automationlog.SyncCounts{Unchanged: 3}) {
 		t.Fatalf("second run: %+v, %v", out, err)
 	}
@@ -59,20 +83,27 @@ func TestSyncSitemapChangeDetectionAndPrune(t *testing.T) {
 	if d, _ := s.loadDocByRef("web", "blog-b", "en"); d.UpdatedAt != updatedAt {
 		t.Error("an unchanged page was written")
 	}
+}
 
-	// One page changes: one update.
+// syncChangedPageUpdates changes one page and checks the run is one update.
+func syncChangedPageUpdates(t *testing.T, s *Server, site *fakeSite, rule AutomationRule) {
+	t.Helper()
 	site.set("/c", page("C", "gamma, revised"))
-	out, err = runSync(t, s, rule)
+	out, err := runSync(t, s, rule)
 	if err != nil || out.counts != (automationlog.SyncCounts{Updated: 1, Unchanged: 2}) {
 		t.Fatalf("after a change: %+v, %v", out, err)
 	}
 	if d, _ := s.loadDocByRef("web", "c", "en"); !strings.Contains(d.ContentMD, "revised") {
 		t.Errorf("the update did not land: %q", d.ContentMD)
 	}
+}
 
-	// One page leaves the sitemap: one delete.
+// syncDroppedPageDeletes drops one page from the sitemap and checks the run
+// (with prune) is one delete.
+func syncDroppedPageDeletes(t *testing.T, s *Server, site *fakeSite, rule AutomationRule) {
+	t.Helper()
 	site.del("/a.html")
-	out, err = runSync(t, s, rule)
+	out, err := runSync(t, s, rule)
 	if err != nil || out.counts != (automationlog.SyncCounts{Unchanged: 2, Deleted: 1}) {
 		t.Fatalf("after a removal: %+v, %v", out, err)
 	}
@@ -81,15 +112,6 @@ func TestSyncSitemapChangeDetectionAndPrune(t *testing.T) {
 	}
 	if countDocs(t, s, "web") != 2 {
 		t.Errorf("documents left: %d", countDocs(t, s, "web"))
-	}
-
-	p := <-synced
-	if p["event"] != webhooks.EventSourceSynced || detailOf(p)["ruleId"] != rule.ID || detailOf(p)["added"] != 3.0 {
-		t.Errorf("source.synced: %v", p)
-	}
-	logs, _, err := s.AutomationLogStore.List(10, "", rule.ID, "")
-	if err != nil || len(logs) != 4 || logs[0].Action != "sync" || logs[0].Sync == nil {
-		t.Fatalf("the automation log: %+v, %v", logs, err)
 	}
 }
 

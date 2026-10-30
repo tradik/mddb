@@ -104,38 +104,46 @@ func assertSameIndex(t *testing.T, step string, got, want *FTSIndex) {
 	t.Helper()
 	g, w := dumpBuckets(t, got), dumpBuckets(t, want)
 	if !reflect.DeepEqual(g, w) {
-		var diff []string
-		for k, v := range w {
-			if g[k] != v {
-				diff = append(diff, fmt.Sprintf("  %q: incremental %q, rebuild %q", k, g[k], v))
-			}
-		}
-		for k, v := range g {
-			if _, ok := w[k]; !ok {
-				diff = append(diff, fmt.Sprintf("  %q: incremental %q, rebuild has none", k, v))
-			}
-		}
-		sort.Strings(diff)
-		t.Fatalf("after %s the index differs from a rebuild:\n%s", step, strings.Join(diff, "\n"))
+		t.Fatalf("after %s the index differs from a rebuild:\n%s", step, strings.Join(bucketDiff(g, w), "\n"))
 	}
 	weights := map[string]float64{"content": 1, "meta.title": 2, "meta.tags": 1.5, "meta.license": 1, "meta.url": 1, "meta.vulnerable": 1}
 	for _, q := range []string{"alpha", "running", "zenith aurora", "parse_config", "koty", "river stone"} {
 		gs, err1 := got.SearchBM25("c", q, 0, DefaultBM25)
 		ws, err2 := want.SearchBM25("c", q, 0, DefaultBM25)
-		if err1 != nil || err2 != nil || !sameResults(gs, ws) {
-			t.Fatalf("after %s BM25 %q: incremental %v, rebuild %v", step, q, gs, ws)
-		}
+		assertSameRanking(t, step, "BM25", q, gs, ws, err1, err2)
 		tokens := got.TokenizeQuery("c", q)
 		gs, err1 = got.SearchBM25F("c", tokens, 0, weights, DefaultBM25)
 		ws, err2 = want.SearchBM25F("c", tokens, 0, weights, DefaultBM25)
-		if err1 != nil || err2 != nil || !sameResults(gs, ws) {
-			t.Fatalf("after %s BM25F %q: incremental %v, rebuild %v", step, q, gs, ws)
-		}
+		assertSameRanking(t, step, "BM25F", q, gs, ws, err1, err2)
 		gs, err1 = got.SearchPhrase("c", q, 0)
 		ws, err2 = want.SearchPhrase("c", q, 0)
-		if err1 != nil || err2 != nil || !sameResults(gs, ws) {
-			t.Fatalf("after %s phrase %q: incremental %v, rebuild %v", step, q, gs, ws)
+		assertSameRanking(t, step, "phrase", q, gs, ws, err1, err2)
+	}
+}
+
+// bucketDiff lists, sorted, every key the incremental dump g and the
+// rebuilt dump w disagree on.
+func bucketDiff(g, w map[string]string) []string {
+	var diff []string
+	for k, v := range w {
+		if g[k] != v {
+			diff = append(diff, fmt.Sprintf("  %q: incremental %q, rebuild %q", k, g[k], v))
 		}
+	}
+	for k, v := range g {
+		if _, ok := w[k]; !ok {
+			diff = append(diff, fmt.Sprintf("  %q: incremental %q, rebuild has none", k, v))
+		}
+	}
+	sort.Strings(diff)
+	return diff
+}
+
+// assertSameRanking fails unless both searches succeeded and ranked alike.
+func assertSameRanking(t *testing.T, step, scorer, q string, gs, ws []FTSResult, err1, err2 error) {
+	t.Helper()
+	if err1 != nil || err2 != nil || !sameResults(gs, ws) {
+		t.Fatalf("after %s %s %q: incremental %v, rebuild %v", step, scorer, q, gs, ws)
 	}
 }
 
@@ -267,31 +275,40 @@ func TestEmptiedContentLeavesOnlyMetaFields(t *testing.T) {
 			}
 			for _, content := range []string{"", "", "aurora alpha"} {
 				d.content = content
-				if err := idx.IndexDocs("c", []BulkDoc{d.bulk()}); err != nil {
-					t.Fatal(err)
-				}
-				fresh := newPropIndex(t)
-				if err := fresh.IndexDocs("c", bulkOf(append(append([]propDoc{}, others...), d))); err != nil {
-					t.Fatal(err)
-				}
-				assertSameIndex(t, fmt.Sprintf("content %q", content), idx, fresh)
-
-				wantContent := 0
-				if content != "" {
-					wantContent = 1
-				}
-				if hits, _ := idx.Search("c", "alpha", 10); len(hits) != wantContent {
-					t.Errorf("content %q: alpha found in %d documents, want %d", content, len(hits), wantContent)
-				}
-				if hits, _ := idx.SearchBM25("c", "alpha", 10, DefaultBM25); len(hits) != wantContent {
-					t.Errorf("content %q: BM25 alpha found in %d documents, want %d", content, len(hits), wantContent)
-				}
-				hits, err := idx.SearchBM25F("c", map[string]int{"zenith": 1}, 10, map[string]float64{"meta.title": 1}, DefaultBM25)
-				if err != nil || len(hits) != 1 {
-					t.Errorf("content %q: the title is no longer found: %v %v", content, hits, err)
-				}
+				assertContentStep(t, idx, others, d)
 			}
 		})
+	}
+}
+
+// assertContentStep writes d (whose content was just set) over idx and
+// checks the index equals a fresh build, finds alpha only while there is
+// content, and always finds the title.
+func assertContentStep(t *testing.T, idx *FTSIndex, others []propDoc, d propDoc) {
+	t.Helper()
+	content := d.content
+	if err := idx.IndexDocs("c", []BulkDoc{d.bulk()}); err != nil {
+		t.Fatal(err)
+	}
+	fresh := newPropIndex(t)
+	if err := fresh.IndexDocs("c", bulkOf(append(append([]propDoc{}, others...), d))); err != nil {
+		t.Fatal(err)
+	}
+	assertSameIndex(t, fmt.Sprintf("content %q", content), idx, fresh)
+
+	wantContent := 0
+	if content != "" {
+		wantContent = 1
+	}
+	if hits, _ := idx.Search("c", "alpha", 10); len(hits) != wantContent {
+		t.Errorf("content %q: alpha found in %d documents, want %d", content, len(hits), wantContent)
+	}
+	if hits, _ := idx.SearchBM25("c", "alpha", 10, DefaultBM25); len(hits) != wantContent {
+		t.Errorf("content %q: BM25 alpha found in %d documents, want %d", content, len(hits), wantContent)
+	}
+	hits, err := idx.SearchBM25F("c", map[string]int{"zenith": 1}, 10, map[string]float64{"meta.title": 1}, DefaultBM25)
+	if err != nil || len(hits) != 1 {
+		t.Errorf("content %q: the title is no longer found: %v %v", content, hits, err)
 	}
 }
 

@@ -122,9 +122,23 @@ func TestTrainingDoesNotBlockFlatAndHNSW(t *testing.T) {
 			t.Errorf("%s found nothing", algo)
 		}
 	}
+	assertAutoSkipsTrainingIVF(t, s)
 
-	// auto: ivf is trained but its collection is not finished — not a
-	// candidate, and explain says why.
+	close(ivf.gate)
+	stopTrainer(t, s)
+	if _, ran, err := s.readySearcher("docs", "ivf"); err != nil || ran != "ivf" {
+		t.Errorf("ivf after training: %v %s", err, ran)
+	}
+	if in := s.planInput(planRequest{Collection: "docs"}); !in.Built["ivf"] || len(in.Training) != 0 {
+		t.Errorf("plan input after training: %+v", in)
+	}
+}
+
+// assertAutoSkipsTrainingIVF checks auto planning while ivf trains: ivf is
+// trained but its collection is not finished — not a candidate, and explain
+// says why.
+func assertAutoSkipsTrainingIVF(t *testing.T, s *Server) {
+	t.Helper()
 	in := s.planInput(planRequest{Collection: "docs"})
 	if in.Built["ivf"] || strings.Join(in.Training, ",") != "ivf" {
 		t.Errorf("plan input while training: built %v training %v", in.Built, in.Training)
@@ -135,15 +149,6 @@ func TestTrainingDoesNotBlockFlatAndHNSW(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(ps.Plan.Reasons, "\n"), "ivf: training") {
 		t.Errorf("explain does not say ivf is training: %v", ps.Plan.Reasons)
-	}
-
-	close(ivf.gate)
-	stopTrainer(t, s)
-	if _, ran, err := s.readySearcher("docs", "ivf"); err != nil || ran != "ivf" {
-		t.Errorf("ivf after training: %v %s", err, ran)
-	}
-	if in := s.planInput(planRequest{Collection: "docs"}); !in.Built["ivf"] || len(in.Training) != 0 {
-		t.Errorf("plan input after training: %+v", in)
 	}
 }
 
@@ -166,7 +171,21 @@ func TestSecondCollectionReadyWithoutFirstsTraining(t *testing.T) {
 		}
 	}
 
-	// Both reported, with what is training now.
+	assertTrainingReported(t, s)
+
+	close(ivf.gate)
+	waitStarted(t, ivf, "b")
+	stopTrainer(t, s)
+	if s.vectorTrainingStatus() != nil || s.trainingCollections("") != nil {
+		t.Error("training reported after it ended")
+	}
+}
+
+// assertTrainingReported checks both collections a and b are reported as
+// training, with a training now, by vector-stats, the indexing status and
+// its gRPC and GraphQL forms.
+func assertTrainingReported(t *testing.T, s *Server) {
+	t.Helper()
 	rec := httptest.NewRecorder()
 	s.handleVectorStats(rec, httptest.NewRequest(http.MethodGet, "/v1/vector-stats", nil))
 	var stats struct {
@@ -194,13 +213,6 @@ func TestSecondCollectionReadyWithoutFirstsTraining(t *testing.T) {
 	a := &GraphQLAdapter{server: s, mcp: NewDirectClient(s)}
 	if qs, err := a.IndexingStatus(context.Background(), nil); err != nil || strings.Join(qs.TrainingCollections, ",") != "a,b" {
 		t.Errorf("GraphQL indexing status: %v %+v", err, qs)
-	}
-
-	close(ivf.gate)
-	waitStarted(t, ivf, "b")
-	stopTrainer(t, s)
-	if s.vectorTrainingStatus() != nil || s.trainingCollections("") != nil {
-		t.Error("training reported after it ended")
 	}
 }
 

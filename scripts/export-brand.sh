@@ -79,7 +79,10 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
 # render <svg> <px> <out>: one vector render at the final size.
-render() { "${RESVG}" -w "$2" -h "$2" "${BRAND}/$1" "$3"; }
+render() {
+	local svg="$1" px="$2" out="$3"
+	"${RESVG}" -w "${px}" -h "${px}" "${BRAND}/${svg}" "${out}"
+}
 
 # save <in-args...> <out> <PNG24|PNG32>: strip metadata, maximum compression.
 save() {
@@ -90,9 +93,10 @@ save() {
 
 # opaque <w> <h> <mark px> <out>: the mark centred on the tile gradient.
 opaque() {
-	render mddb-mark.svg "$3" "${TMP}/mark.png"
-	save -size "$1x$2" "${BG}" "${TMP}/mark.png" -gravity center -composite \
-		-alpha off "$4" PNG24
+	local width="$1" height="$2" markPx="$3" out="$4"
+	render mddb-mark.svg "${markPx}" "${TMP}/mark.png"
+	save -size "${width}x${height}" "${BG}" "${TMP}/mark.png" -gravity center -composite \
+		-alpha off "${out}" PNG24
 }
 
 mkdir -p "${OUT}/icon" "${OUT}/banner"

@@ -128,22 +128,8 @@ func TestCorpusPackAnswersLikeItsSource(t *testing.T) {
 			pack := buildPack(t, src, "docs")
 
 			dst := corpusServer(t, 256)
-			rec := installPack(t, dst, pack)
-			if rec.Code != http.StatusOK {
-				t.Fatalf("install: %d %s", rec.Code, rec.Body.String())
-			}
-			var res corpusInstallResult
-			_ = json.Unmarshal(rec.Body.Bytes(), &res)
-			if res.Name != "docs" || res.DocCount != 3 || res.VectorsDisabled || res.License != "CC-BY-4.0" {
-				t.Fatalf("install result %+v", res)
-			}
-
-			for _, q := range []string{"follower replica leader", "certificate https", "tarball restore"} {
-				want, got := hybridAnswer(t, src, q), hybridAnswer(t, dst, q)
-				if want == "" || got != want {
-					t.Fatalf("hybrid %q differs after install:\nsource\n%s\ninstalled\n%s", q, want, got)
-				}
-			}
+			assertPackInstalled(t, dst, pack)
+			assertSameHybridAnswers(t, src, dst)
 			if n := dst.GeoIndex.Len("docs"); n != 1 {
 				t.Fatalf("geo index holds %d points of the pack, want 1", n)
 			}
@@ -151,24 +137,61 @@ func TestCorpusPackAnswersLikeItsSource(t *testing.T) {
 
 			// Installed twice: the name is taken.
 			wantHTTPCode(t, installPack(t, dst, pack), http.StatusConflict)
-
-			list := httptest.NewRecorder()
-			dst.handleCorpusList(list, httptest.NewRequest(http.MethodGet, "/v1/corpus", nil))
-			if !bytes.Contains(list.Body.Bytes(), []byte(`"name":"docs"`)) || !bytes.Contains(list.Body.Bytes(), []byte(`"total":1`)) {
-				t.Fatalf("list: %s", list.Body.String())
-			}
-
-			// Removed: gone, writable again, and installable again.
-			wantHTTPCode(t, doRequest(t, dst.handleCorpusRemove, map[string]any{"name": "docs"}), http.StatusOK)
-			if dst.collectionHasData("docs") || dst.collectionReadOnly("docs") {
-				t.Fatal("the removed pack left data or its read-only flag")
-			}
-			if hits, _ := dst.FTSIndex.Search("docs", "replica", 10); len(hits) != 0 {
-				t.Fatalf("full-text search still finds %d documents of the removed pack", len(hits))
-			}
-			wantHTTPCode(t, installPack(t, dst, pack), http.StatusOK)
+			assertPackListed(t, dst)
+			assertPackRemovedAndReinstallable(t, dst, pack)
 		})
 	}
+}
+
+// assertPackInstalled installs pack on dst and checks the install result
+// describes the "docs" pack: three documents, vectors on, its license.
+func assertPackInstalled(t *testing.T, dst *Server, pack []byte) {
+	t.Helper()
+	rec := installPack(t, dst, pack)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("install: %d %s", rec.Code, rec.Body.String())
+	}
+	var res corpusInstallResult
+	_ = json.Unmarshal(rec.Body.Bytes(), &res)
+	if res.Name != "docs" || res.DocCount != 3 || res.VectorsDisabled || res.License != "CC-BY-4.0" {
+		t.Fatalf("install result %+v", res)
+	}
+}
+
+// assertSameHybridAnswers checks the installed pack answers hybrid searches
+// exactly like its source.
+func assertSameHybridAnswers(t *testing.T, src, dst *Server) {
+	t.Helper()
+	for _, q := range []string{"follower replica leader", "certificate https", "tarball restore"} {
+		want, got := hybridAnswer(t, src, q), hybridAnswer(t, dst, q)
+		if want == "" || got != want {
+			t.Fatalf("hybrid %q differs after install:\nsource\n%s\ninstalled\n%s", q, want, got)
+		}
+	}
+}
+
+// assertPackListed checks GET /v1/corpus lists the one installed pack.
+func assertPackListed(t *testing.T, dst *Server) {
+	t.Helper()
+	list := httptest.NewRecorder()
+	dst.handleCorpusList(list, httptest.NewRequest(http.MethodGet, "/v1/corpus", nil))
+	if !bytes.Contains(list.Body.Bytes(), []byte(`"name":"docs"`)) || !bytes.Contains(list.Body.Bytes(), []byte(`"total":1`)) {
+		t.Fatalf("list: %s", list.Body.String())
+	}
+}
+
+// assertPackRemovedAndReinstallable removes the pack and checks it is gone,
+// writable again, and installable again.
+func assertPackRemovedAndReinstallable(t *testing.T, dst *Server, pack []byte) {
+	t.Helper()
+	wantHTTPCode(t, doRequest(t, dst.handleCorpusRemove, map[string]any{"name": "docs"}), http.StatusOK)
+	if dst.collectionHasData("docs") || dst.collectionReadOnly("docs") {
+		t.Fatal("the removed pack left data or its read-only flag")
+	}
+	if hits, _ := dst.FTSIndex.Search("docs", "replica", 10); len(hits) != 0 {
+		t.Fatalf("full-text search still finds %d documents of the removed pack", len(hits))
+	}
+	wantHTTPCode(t, installPack(t, dst, pack), http.StatusOK)
 }
 
 func TestCorpusPackFromAnotherModelSearchesFullTextOnly(t *testing.T) {

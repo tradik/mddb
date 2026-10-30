@@ -227,18 +227,19 @@ func TestGrpcPeerIPUsesTheSameRule(t *testing.T) {
 		return ctx
 	}
 	cases := []struct {
-		name string
-		ctx  context.Context
-		want string
+		name   string
+		peerIP string
+		md     metadata.MD
+		want   string
 	}{
-		{"untrusted peer ignores metadata", ctxFrom("198.51.100.9", metadata.Pairs("x-forwarded-for", "6.6.6.6", "x-real-ip", "7.7.7.7")), "198.51.100.9"},
-		{"trusted peer, forwarded", ctxFrom("10.0.0.1", metadata.Pairs("x-forwarded-for", "6.6.6.6, 203.0.113.5")), "203.0.113.5"},
-		{"trusted peer, real ip", ctxFrom("10.0.0.1", metadata.Pairs("x-real-ip", "203.0.113.6")), "203.0.113.6"},
-		{"trusted peer, no metadata", ctxFrom("10.0.0.1", nil), "10.0.0.1"},
-		{"ipv6 peer", ctxFrom("2001:db8::9", nil), "2001:db8::9"},
+		{"untrusted peer ignores metadata", "198.51.100.9", metadata.Pairs("x-forwarded-for", "6.6.6.6", "x-real-ip", "7.7.7.7"), "198.51.100.9"},
+		{"trusted peer, forwarded", "10.0.0.1", metadata.Pairs("x-forwarded-for", "6.6.6.6, 203.0.113.5"), "203.0.113.5"},
+		{"trusted peer, real ip", "10.0.0.1", metadata.Pairs("x-real-ip", "203.0.113.6"), "203.0.113.6"},
+		{"trusted peer, no metadata", "10.0.0.1", nil, "10.0.0.1"},
+		{"ipv6 peer", "2001:db8::9", nil, "2001:db8::9"},
 	}
 	for _, tc := range cases {
-		if got := grpcPeerIP(tc.ctx); got != tc.want {
+		if got := grpcPeerIP(ctxFrom(tc.peerIP, tc.md)); got != tc.want {
 			t.Errorf("%s: grpcPeerIP = %q, want %q", tc.name, got, tc.want)
 		}
 	}

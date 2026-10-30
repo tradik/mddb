@@ -227,13 +227,7 @@ func TestMCPGateDeniesOtherCollections(t *testing.T) {
 	}
 	for tool, args := range tools {
 		t.Run(tool, func(t *testing.T) {
-			with := func(coll string) map[string]any {
-				out := map[string]any{"collection": coll}
-				for k, v := range args {
-					out[k] = v
-				}
-				return out
-			}
+			with := func(coll string) map[string]any { return mcpArgsFor(coll, args) }
 			if res := mcpCallAs(s, alice, tool, with("secret")); !mcpDenied(res) {
 				t.Errorf("alice on another collection: %v", res)
 			}
@@ -250,6 +244,15 @@ func TestMCPGateDeniesOtherCollections(t *testing.T) {
 	}
 }
 
+// mcpArgsFor is args with the collection set to coll.
+func mcpArgsFor(coll string, args map[string]any) map[string]any {
+	out := map[string]any{"collection": coll}
+	for k, v := range args {
+		out[k] = v
+	}
+	return out
+}
+
 // gqlCall runs one GraphQL document as the principal.
 func gqlCall(t *testing.T, s *Server, c *JWTClaims, query string) string {
 	t.Helper()
@@ -259,6 +262,18 @@ func gqlCall(t *testing.T, s *Server, c *JWTClaims, query string) string {
 	req.Header.Set("Content-Type", "application/json")
 	asUser(c, s.newGraphQLHandler()).ServeHTTP(rec, req)
 	return rec.Body.String()
+}
+
+// assertGQLCollectionGate checks a query naming a collection is refused on
+// another collection and served on alice's own.
+func assertGQLCollectionGate(t *testing.T, s *Server, q string) {
+	t.Helper()
+	if out := gqlCall(t, s, alice, strings.ReplaceAll(q, "%s", "secret")); !strings.Contains(out, "forbidden") {
+		t.Errorf("alice on another collection: %s", out)
+	}
+	if out := gqlCall(t, s, alice, strings.ReplaceAll(q, "%s", "docs")); strings.Contains(out, "forbidden") {
+		t.Errorf("alice on her own collection: %s", out)
+	}
 }
 
 func TestGraphQLGateDeniesOtherCollections(t *testing.T) {
@@ -271,12 +286,7 @@ func TestGraphQLGateDeniesOtherCollections(t *testing.T) {
 	for name, q := range queries {
 		t.Run(name, func(t *testing.T) {
 			if strings.Contains(q, "%s") {
-				if out := gqlCall(t, s, alice, strings.ReplaceAll(q, "%s", "secret")); !strings.Contains(out, "forbidden") {
-					t.Errorf("alice on another collection: %s", out)
-				}
-				if out := gqlCall(t, s, alice, strings.ReplaceAll(q, "%s", "docs")); strings.Contains(out, "forbidden") {
-					t.Errorf("alice on her own collection: %s", out)
-				}
+				assertGQLCollectionGate(t, s, q)
 			}
 			if out := gqlCall(t, s, tina, strings.ReplaceAll(q, "%s", "t2/notes")); !strings.Contains(out, "forbidden") {
 				t.Errorf("tenant t1 across tenants: %s", out)

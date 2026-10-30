@@ -168,8 +168,18 @@ func TestQueryDecomposition_EverySurface(t *testing.T) {
 	defer cleanup()
 	ctx := context.Background()
 	q := decompositionGoldenQuery
-	auto := DecompositionOptions{QueryDecomposition: QueryDecompositionAuto}
 
+	decompositionOverREST(t, s, q)
+	direct := NewDirectClient(s)
+	decompositionOverMCP(ctx, t, direct, q)
+	decompositionOverGRPC(ctx, t, s, q)
+	decompositionOverGraphQL(ctx, t, s, direct, q)
+}
+
+// decompositionOverREST checks REST vector and hybrid search split q in two
+// under "auto", and refuse the unknown mode "on".
+func decompositionOverREST(t *testing.T, s *Server, q string) {
+	t.Helper()
 	for name, h := range map[string]http.HandlerFunc{"vector": s.handleVectorSearch, "hybrid": s.handleHybridSearch} {
 		rec := doRequest(t, h, map[string]any{"collection": "gold", "query": q, "topK": 3, "explain": true, "queryDecomposition": "auto"})
 		if rec.Code != http.StatusOK {
@@ -183,8 +193,13 @@ func TestQueryDecomposition_EverySurface(t *testing.T) {
 			t.Fatalf("rest %s: on gave %d", name, rec.Code)
 		}
 	}
+}
 
-	direct := NewDirectClient(s)
+// decompositionOverMCP checks the direct client and the MCP tools split q
+// in two under "auto", and the client refuses an unknown mode.
+func decompositionOverMCP(ctx context.Context, t *testing.T, direct *DirectClient, q string) {
+	t.Helper()
+	auto := DecompositionOptions{QueryDecomposition: QueryDecompositionAuto}
 	v, err := direct.VectorSearch(ctx, &MCPVectorSearchRequest{Collection: "gold", Query: q, TopK: 3,
 		PlanOptions: PlanOptions{Explain: true}, DecompositionOptions: auto})
 	if err != nil || v.Plan.Decomposition.Parts != 2 {
@@ -210,7 +225,12 @@ func TestQueryDecomposition_EverySurface(t *testing.T) {
 			t.Fatalf("mcp tool %s: %v %s", tool, err, out)
 		}
 	}
+}
 
+// decompositionOverGRPC checks gRPC vector and hybrid search split q in two
+// under "auto", and vector search refuses the unknown mode "on".
+func decompositionOverGRPC(ctx context.Context, t *testing.T, s *Server, q string) {
+	t.Helper()
 	g := &GRPCServer{server: s}
 	gv, err := g.VectorSearch(ctx, &proto.VectorSearchRequest{Collection: "gold", Query: q, TopK: 3, Explain: true, QueryDecomposition: "auto"})
 	if err != nil || gv.Plan.GetDecomposition().GetParts() != 2 || len(gv.Plan.GetDecomposition().GetTexts()) != 2 {
@@ -223,7 +243,12 @@ func TestQueryDecomposition_EverySurface(t *testing.T) {
 	if _, err := g.VectorSearch(ctx, &proto.VectorSearchRequest{Collection: "gold", Query: q, QueryDecomposition: "on"}); err == nil {
 		t.Fatal("grpc vector: bad mode accepted")
 	}
+}
 
+// decompositionOverGraphQL checks GraphQL splits q in two under "auto" and
+// reports a query it cannot split as one part with its texts.
+func decompositionOverGraphQL(ctx context.Context, t *testing.T, s *Server, direct *DirectClient, q string) {
+	t.Helper()
 	a := &GraphQLAdapter{server: s, mcp: direct}
 	mode, explain := "auto", true
 	qv, err := a.VectorSearch(ctx, gql.VectorSearchInput{Collection: "gold", Query: &q, Explain: &explain, QueryDecomposition: &mode})
