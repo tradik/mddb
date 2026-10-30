@@ -5395,10 +5395,10 @@ paths:
         - Compliance
       summary: Report the live state of the ISO 27001 / SOC 2 production guard
       description: |
-        Returns the current compliance posture of the running server. No
-        authentication required — designed for operator-facing liveness /
-        readiness probes and external monitoring that must detect a drifted
-        configuration. When `MDDB_PRODUCTION=true` is set and any guardrail is
+        Returns the current compliance posture of the running server, for
+        operator-facing probes and monitoring that must detect a drifted
+        configuration. With authentication enabled it needs an authenticated
+        caller (any user or API key); no collection permission is required. When `MDDB_PRODUCTION=true` is set and any guardrail is
         missing, the server refuses to boot, so a reachable endpoint with
         `production=true` implies `compliant=true`. When `MDDB_PRODUCTION` is
         unset the server runs with the existing defaults and this endpoint
@@ -10024,9 +10024,13 @@ components:
           example: blog
         schema:
           type: string
-          description: JSON Schema string for metadata validation
-          example: "{\"type\":\"object\",\"required\":[\"author\"],\"properties\":{\"auth\
-            or\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}}}"
+          description: >-
+            The collection's metadata schema as a JSON string (not an object):
+            `required` lists keys every document must carry, and `properties`
+            gives each key a `type` (string, number, integer or boolean) and
+            optional rules such as `enum`, `pattern`, `minItems`, `maxItems`.
+            See docs/SCHEMA-VALIDATION.md.
+          example: "{\"required\":[\"author\"],\"properties\":{\"author\":{\"type\":\"string\"},\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\"]}}}"
 
     SchemaResponse:
       type: object
