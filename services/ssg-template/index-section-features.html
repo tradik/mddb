@@ -33,6 +33,22 @@
                     Rank Fusion</li>
                 <li>Zero-shot document classification using embedding cosine similarity</li>
                 <li>Custom MCP tools defined in YAML for domain-specific AI workflows</li>
+                <li>MCP toolsets: each agent or API key gets only the tool groups it needs
+                    (<code>MDDB_MCP_TOOLSETS</code>, per-key <code>toolsets</code>)</li>
+                <li>Confirmation of destructive MCP tools through MCP elicitation
+                    (<code>MDDB_MCP_CONFIRM_DESTRUCTIVE=elicit|require</code>)</li>
+                <li>Passages: search returns the path, line range and enclosing definition instead of
+                    whole documents</li>
+                <li><code>code_symbol</code>: definitions, references, callers, callees and tests of a
+                    symbol in one call</li>
+                <li><code>mddb-cli autoindex .</code> indexes a repository in one command; a second run
+                    rewrites only the files that changed</li>
+                <li>Retrieval gain: counts the tokens passages and chunks saved against whole
+                    documents</li>
+                <li>Images: alt text and captions are searchable; with Voyage or Cohere embeddings you
+                    can search by picture</li>
+                <li>LangChain / LangGraph: <code>MddbVectorStore</code>, <code>MddbStore</code> and the
+                    Deep Agents <code>MddbBackend</code> (langchain-mddb)</li>
                 <li>RAG pipeline: auto-embed on ingest, semantic retrieval, MCP exposure to LLMs</li>
                 <li>Memory RAG: conversational memory with session management, semantic recall, and
                     summarization</li>
@@ -61,6 +77,8 @@
                 <li>Automation: triggers, crons, webhooks, sentiment analysis, template variables</li>
                 <li>Multi-language support: same document key, multiple locales</li>
                 <li>Prometheus metrics, Grafana dashboard support and OpenTelemetry trace export</li>
+                <li><code>mddb-cli diagnose</code>: a support bundle with no document content, queries,
+                    keys or IP addresses</li>
                 <li>{{$.Vars.mddbBinarySize}} single binary, embedded BoltDB, zero external dependencies</li>
                 <li>Docker image: {{$.Vars.mddbDockerSize}} compressed, Alpine-based, with health checks</li>
                 <li>Aggregations: metadata facets (value counts) and date histograms with optional pre-filtering
@@ -123,12 +141,15 @@
                         Combine with
                         alpha blending or Reciprocal Rank Fusion. Metadata pre-filtering, typo tolerance.
                         Source code is searched as code and linked into a graph of calls, includes and
-                        references, from C and Go to Terraform and Kubernetes manifests.</p>
+                        references, from C and Go to Terraform and Kubernetes manifests.
+                        Alt text and captions of images are searchable; with Voyage or Cohere
+                        embeddings you can search by picture.</p>
                     <ul class="feat-tags">
                         <li>Vector Search</li>
                         <li>Full-Text (8 modes, 17 langs)</li>
                         <li>Hybrid RAG</li>
                         <li>Code Graph</li>
+                        <li>Image Search</li>
                         <li>Zero-Shot Classification</li>
                     </ul>
                 </div>
@@ -203,6 +224,46 @@
                     </ul>
                 </div>
             </div>
+
+            <div class="feat-row">
+                <div class="feat-visual">
+                    <div class="feat-stack">
+                        <div class="feat-stack-layer l1">
+                            <span>autoindex .</span><span>corpus packs</span>
+                        </div>
+                        <div class="feat-stack-plus">+</div>
+                        <div class="feat-stack-layer l2">
+                            <span>toolsets</span><span>passages</span><span>code_symbol</span>
+                        </div>
+                        <div class="feat-stack-eq">=</div>
+                        <div class="feat-stack-layer l3"><span>Fewer tokens per turn</span></div>
+                    </div>
+                </div>
+                <div class="feat-text">
+                    <span class="feat-label">Agents</span>
+                    <h3>Built for Coding Agents</h3>
+                    <p><code>mddb-cli autoindex .</code> indexes a repository in one command; a second
+                        run rewrites only the files that changed. Give each agent or key only the tool
+                        groups it needs: <code>search,code</code> sends less than half the schema bytes
+                        of the full set. Passages return the path, line range and enclosing definition
+                        instead of whole documents, <code>code_symbol</code> returns a symbol's
+                        definitions, references, callers, callees and tests in one call, and retrieval
+                        gain counts the tokens that saved. With
+                        <code>MDDB_MCP_CONFIRM_DESTRUCTIVE</code>, a delete or restore waits for the
+                        human to confirm it through MCP elicitation. For LangChain and LangGraph:
+                        <code>MddbVectorStore</code>, <code>MddbStore</code> and the Deep Agents
+                        <code>MddbBackend</code>.
+                        <a href="/docs/agents/">Using MDDB from AI agents →</a></p>
+                    <ul class="feat-tags">
+                        <li>Toolsets</li>
+                        <li>Passages</li>
+                        <li>code_symbol</li>
+                        <li>autoindex</li>
+                        <li>Retrieval Gain</li>
+                        <li>LangChain</li>
+                    </ul>
+                </div>
+            </div>
         </div>
 
         <!-- Compact feature strip -->
@@ -225,6 +286,7 @@
             <div class="feat-chip"><strong>Zero Config</strong> Single binary, no deps</div>
             <div class="feat-chip"><strong>Storage Backends</strong> BoltDB, In-Memory, S3</div>
             <div class="feat-chip"><strong>Telemetry</strong> Prometheus, Grafana, OpenTelemetry</div>
+            <div class="feat-chip"><strong>Diagnose</strong> Support bundle, no content, queries, keys or IPs</div>
         </div>
     </div>
 </section>

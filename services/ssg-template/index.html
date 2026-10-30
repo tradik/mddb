@@ -11,7 +11,7 @@
     <meta name="description"
         content="AI-native embedded document database with a built-in MCP server ({{$.Vars.mcpTools}} tools), vector and hybrid search, and RAG. One {{$.Vars.mddbBinarySize}} binary, zero config.">
     <meta name="keywords"
-        content="MCP server, AI knowledge base, RAG, LLM integration, Claude MCP, embedding database, semantic search, vector search, code search, code graph, markdown database, document database, gRPC, protobuf, graphql, websocket, embedded database, BoltDB, Go, HNSW, BM25, PMISparse, hybrid search, zero-shot classification, document TTL, replication, automation, webhooks, Cursor MCP, Windsurf MCP, Ollama, DeepSeek, Docling, Langflow, geosearch, geohash, R-tree, unix domain socket, mTLS, mutual TLS">
+        content="MCP server, AI knowledge base, RAG, LLM integration, Claude MCP, embedding database, semantic search, vector search, code search, code graph, markdown database, document database, gRPC, protobuf, graphql, websocket, embedded database, BoltDB, Go, HNSW, BM25, PMISparse, hybrid search, zero-shot classification, document TTL, replication, automation, webhooks, Cursor MCP, Windsurf MCP, Ollama, DeepSeek, Docling, Langflow, LangChain, LangGraph, AI coding agents, geosearch, geohash, R-tree, unix domain socket, mTLS, mutual TLS">
     <meta name="author" content="MDDB Team">
     <meta name="robots" content="index, follow">
 
@@ -74,6 +74,7 @@
         "Async bulk ingest with job tracking: submit long imports that return a job ID, poll status, cancel pending, optional webhook callback on completion",
         "Zero-shot document classification using embedding cosine similarity",
         "Custom YAML-based MCP tools for domain-specific AI workflows",
+        "For coding agents: per-key MCP toolsets, passages (path, line range, enclosing definition) instead of whole documents, code_symbol, mddb-cli autoindex, and confirmation of destructive tools through MCP elicitation",
         "RAG pipeline: auto-embed on ingest, semantic retrieval, MCP exposure",
         "Multi-format upload: 20 file formats (.md, .txt, .html, .pdf, .docx, .odt, .rtf, .tex, .yaml, .xlsx, .ods, .csv, .pptx, .odp, .epub, .eml, .mbox and more) with auto-conversion to Markdown",
         "Wikipedia XML dump import: stream multi-GB MediaWiki dumps (.xml.bz2) with wikitext-to-Markdown conversion",
@@ -97,7 +98,7 @@
         "{{$.Vars.mddbBinarySize}} single binary, embedded BoltDB, zero external dependencies",
         "{{$.Vars.mddbDockerSize}} Alpine-based Docker image with health checks",
         "PHP and Python client libraries (with UDS support)",
-        "Integrations with Docling, Langflow, OpenSearch"
+        "Integrations with Docling, Langflow, OpenSearch, LangChain and LangGraph"
       ],
       "datePublished": "2026-06-13",
       "author": {
