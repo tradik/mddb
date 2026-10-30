@@ -55,7 +55,7 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
 ```
 
 With `search,code` the 22 tool schemas take about 43 KB per turn, against
-94 KB for all 93 tools of 2.18.10 (96 since 2.18.11). A tool outside the caller's toolsets is not listed,
+94 KB for all 93 tools of 2.18.10 (97 since 2.18.11). A tool outside the caller's toolsets is not listed,
 and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets-v2188)).
 
 Operators can add their own tools and prompts in YAML

@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (85 implemented)
+### Available RPCs (86 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
