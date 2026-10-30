@@ -4875,7 +4875,7 @@ paths:
           schema:
             type: boolean
             default: false
-          description: Add goroutines.pprof (stack traces) and heap.pprof
+          description: Add runtime.json (goroutine count, heap and GC counters)
         - name: integrity
           in: query
           schema:

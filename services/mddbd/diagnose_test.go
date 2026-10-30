@@ -26,8 +26,7 @@ import (
 // everywhere a user's data or identity lives — document content, a metadata
 // value, a document key, query text, API keys, a header list of internal
 // addresses, a path, a collection name, an actor and an IP — and the bundle
-// is searched, every file, including the gunzipped heap profile and the
-// metrics page, for any of them.
+// is searched, every file, including the metrics page, for any of them.
 
 // Canaries. The collection, key and query canaries are lowercase on purpose:
 // they then look like the identifiers metric labels may keep, so only the
@@ -171,8 +170,8 @@ func untarBundle(t *testing.T, b []byte) (map[string][]byte, []string) {
 	}
 }
 
-// readable is a file as the canary search reads it: a gzip stream (the heap
-// profile) decompressed.
+// readable is a file as the canary search reads it, a gzip stream
+// decompressed, so a compressed part could not hide a canary.
 func readable(t *testing.T, body []byte) string {
 	t.Helper()
 	if len(body) > 2 && body[0] == 0x1f && body[1] == 0x8b {
@@ -242,7 +241,7 @@ func assertBundleHasEveryFile(t *testing.T, files map[string][]byte, order []str
 	t.Helper()
 	for _, want := range []string{"MANIFEST.json", "build.json", "config.json", "env.json", "stats.json", "storage.json",
 		"vector-stats.json", "indexing.json", "metrics.prom", "query-shape.json", "audit-summary.json", "errors.json",
-		"goroutines.pprof", "heap.pprof", "integrity.json"} {
+		"runtime.json", "integrity.json"} {
 		if files[want] == nil {
 			t.Errorf("bundle lacks %s (has %v)", want, order)
 		}
@@ -350,7 +349,7 @@ func assertManifestMatchesFiles(t *testing.T, files map[string][]byte) {
 	for _, o := range man.Omitted {
 		omitted[o.Name] = o.Reason
 	}
-	if omitted["goroutines.pprof"] != "opt-in: profiles" || omitted["heap.pprof"] != "opt-in: profiles" ||
+	if omitted["runtime.json"] != "opt-in: profiles" ||
 		omitted["integrity.json"] != "opt-in: integrity" {
 		t.Errorf("omitted %v", omitted)
 	}

@@ -317,7 +317,7 @@ content, metadata values, document IDs, query text, keys, actors, IP addresses
 or paths. Collection names are hashed unless `--keep-names` is given.
 `MANIFEST.json` lists every file, its size, its SHA-256 and the redaction
 applied; the CLI checks each file against it. Needs an admin login or key.
-`--profiles` adds goroutine stacks and the heap profile, `--integrity` bbolt's
+`--profiles` adds `runtime.json` (goroutine count, heap and GC counters; stacks and heap profiles come from `/debug/pprof`), `--integrity` bbolt's
 consistency check of every database file (slow on a large database). See
 [TELEMETRY.md, "Diagnose bundle"](../../docs/TELEMETRY.md#diagnose-bundle).
 

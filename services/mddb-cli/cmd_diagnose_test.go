@@ -50,7 +50,7 @@ func testBundle(t *testing.T, sum string) []byte {
 	man, _ := json.Marshal(map[string]any{
 		"version": "2.18.10", "createdAt": "2026-10-30T12:00:00Z",
 		"files":         []map[string]any{{"name": "build.json", "size": len(body), "sha256": sum, "redaction": "none"}},
-		"omitted":       []map[string]any{{"name": "heap.pprof", "reason": "opt-in: profiles"}},
+		"omitted":       []map[string]any{{"name": "runtime.json", "reason": "opt-in: profiles"}},
 		"neverIncluded": []string{"document content"},
 	})
 	return tarGz(t, [2]string{"MANIFEST.json", string(man)}, [2]string{"build.json", body})
@@ -100,7 +100,7 @@ func TestDiagnoseInspectWritesNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"MDDB 2.18.10", "build.json", "Not included:", "heap.pprof", "opt-in: profiles", "Never included:", "document content"} {
+	for _, want := range []string{"MDDB 2.18.10", "build.json", "Not included:", "runtime.json", "opt-in: profiles", "Never included:", "document content"} {
 		mustContain(t, stdout, want)
 	}
 	if entries, _ := os.ReadDir(dir); len(entries) != 0 {

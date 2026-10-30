@@ -63,7 +63,7 @@ without writing anything. Needs an admin login or key.`,
 		RunE: runDiagnose,
 	}
 	cmd.Flags().StringP("out", "o", "", "File to write (default mddb-diagnose-<host>-<time>.tar.gz)")
-	cmd.Flags().Bool("profiles", false, "Include goroutine stacks and the heap profile")
+	cmd.Flags().Bool("profiles", false, "Include runtime counters (goroutines, heap, GC)")
 	cmd.Flags().Bool("integrity", false, "Include bbolt's consistency check of every database file (slow on a large database)")
 	cmd.Flags().Bool("keep-names", false, "Keep collection names instead of hashing them")
 	cmd.Flags().Bool("inspect", false, "Print the bundle's manifest and write nothing")

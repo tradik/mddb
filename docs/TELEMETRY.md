@@ -700,7 +700,7 @@ redaction applied; the CLI checks each file against it.
 | `query-shape.json` | the [query-shape counters](#query-shape-v21810), with the CODE-006/007 gates computed | counters only; collections hashed | always |
 | `audit-summary.json` | `/v1/audit`, last 7 days | action × result counts; no actors, IPs, keys or details | audit log on |
 | `errors.json` | the last 200 errors answered | error class (`not_found`, `json`, `quota`, a Go type) and `file:line`; never the message | always |
-| `goroutines.pprof`, `heap.pprof` | `runtime/pprof` | stacks and allocation sites: function names and source `file:line` of the build, no values | `--profiles` |
+| `runtime.json` | `runtime` | goroutine count, heap and GC counters; numbers only. Stacks and heap profiles come from `/debug/pprof` (`MDDB_PPROF_ENABLED`, admin) | `--profiles` |
 | `integrity.json` | bbolt's consistency check of the main file and every collection file | problem counts per file; bbolt's messages (which can quote keys) are dropped | `--integrity` |
 
 **Never in the bundle:**
@@ -740,7 +740,7 @@ and the manifest says so; so is a part that fails, with its error class.
 strings into document content, a metadata value, a document key, query text,
 API keys, the trusted-proxy list, a path, a collection name, an audit actor and
 a client IP, in both storage layouts, then unpacks the bundle and searches every
-file, the gunzipped heap profile included. Removing any one redaction fails it.
+file. Removing any one redaction fails it.
 
 ## Existing Monitoring Endpoints
 

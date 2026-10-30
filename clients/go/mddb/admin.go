@@ -82,7 +82,7 @@ func (c *Client) Truncate(ctx context.Context, body any) (json.RawMessage, error
 
 // DiagnoseOptions selects the diagnose bundle's opt-in parts (OPS-025).
 type DiagnoseOptions struct {
-	Profiles  bool // goroutine stacks and the heap profile
+	Profiles  bool // runtime.json: goroutine count, heap and GC counters
 	Integrity bool // bbolt's consistency check of every database file; slow on a large one
 	KeepNames bool // keep collection names instead of hashing them
 }

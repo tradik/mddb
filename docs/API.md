@@ -3411,7 +3411,7 @@ it works on a read-only instance and on a replication follower.
 
 | Parameter | Default | Effect |
 |---|---|---|
-| `profiles` | `false` | Add `goroutines.pprof` and `heap.pprof` |
+| `profiles` | `false` | Add `runtime.json` (goroutine count, heap and GC counters); stacks and heap profiles come from `/debug/pprof` |
 | `integrity` | `false` | Add `integrity.json`: bbolt's consistency check of every database file (slow on a large database; the request budget becomes 30 minutes) |
 | `keepNames` | `false` | Keep collection names instead of `c_` + 8 hex digits of their SHA-256 |
 
@@ -3429,7 +3429,7 @@ The first file is `MANIFEST.json`:
     { "name": "build.json", "size": 237, "sha256": "e1db…", "redaction": "none: build and runtime facts only" },
     { "name": "query-shape.json", "size": 2336, "sha256": "b83b…", "redaction": "counters only; collections hashed (c_ + 8 hex of SHA-256)" }
   ],
-  "omitted": [ { "name": "heap.pprof", "reason": "opt-in: profiles" } ],
+  "omitted": [ { "name": "runtime.json", "reason": "opt-in: profiles" } ],
   "neverIncluded": [ "document content, metadata values, document IDs and keys", "…" ]
 }
 ```

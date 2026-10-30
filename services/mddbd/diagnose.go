@@ -136,10 +136,8 @@ func (s *Server) diagnoseParts(opts diagnoseOptions, names *bundleNames) []diagn
 			build: func(context.Context) ([]byte, error) { return jsonPart(s.auditPart()) }},
 		{name: "errors.json", redaction: "error class and file:line of the last 200 errors; no messages",
 			build: func(context.Context) ([]byte, error) { return jsonPart(errorsPart(), nil) }},
-		{name: "goroutines.pprof", redaction: "goroutine profile: function names and source file:line of the build; no values",
-			build: func(context.Context) ([]byte, error) { return profilePart("goroutine") }},
-		{name: "heap.pprof", redaction: "heap profile: allocation sites (function names, source file:line); no values",
-			build: func(context.Context) ([]byte, error) { return profilePart("heap") }},
+		{name: "runtime.json", redaction: "Go runtime counters (goroutines, heap, GC); numbers only",
+			build: func(context.Context) ([]byte, error) { return runtimePart() }},
 		{name: "integrity.json", redaction: "problem counts per database file, no bbolt messages; " + collections,
 			build: func(ctx context.Context) ([]byte, error) { return jsonPart(s.integrityPart(ctx, names)) }},
 	}
@@ -147,7 +145,7 @@ func (s *Server) diagnoseParts(opts diagnoseOptions, names *bundleNames) []diagn
 		switch p := &parts[i]; {
 		case p.name == "audit-summary.json" && (s.AuditManager == nil || !s.AuditManager.Enabled()):
 			p.skip = "audit log disabled"
-		case (p.name == "goroutines.pprof" || p.name == "heap.pprof") && !opts.Profiles:
+		case p.name == "runtime.json" && !opts.Profiles:
 			p.skip = "opt-in: profiles"
 		case p.name == "integrity.json" && !opts.Integrity:
 			p.skip = "opt-in: integrity"

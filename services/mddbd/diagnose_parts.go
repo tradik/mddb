@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -9,7 +8,6 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/debug"
-	"runtime/pprof"
 	"sort"
 	"time"
 
@@ -294,12 +292,25 @@ func countProblems(problems <-chan error) int {
 	return n
 }
 
-// profilePart writes a runtime profile (goroutine or heap) in pprof's
-// gzipped protobuf form, which `go tool pprof` reads: function names and
-// source file:line, no argument or variable values. The text forms (debug
-// levels above 0) are not used.
-func profilePart(name string) ([]byte, error) {
-	var buf bytes.Buffer
-	err := pprof.Lookup(name).WriteTo(&buf, 0)
-	return buf.Bytes(), err
+// diagnoseRuntime is runtime.json (--profiles): the Go runtime's own
+// counters, numbers only. Stack and heap profiles come from /debug/pprof
+// (MDDB_PPROF_ENABLED, admin only), not from the bundle.
+type diagnoseRuntime struct {
+	Goroutines     int    `json:"goroutines"`
+	HeapAllocBytes uint64 `json:"heapAllocBytes"`
+	HeapInuseBytes uint64 `json:"heapInuseBytes"`
+	HeapObjects    uint64 `json:"heapObjects"`
+	SysBytes       uint64 `json:"sysBytes"`
+	NumGC          uint32 `json:"numGC"`
+	GCPauseTotalNs uint64 `json:"gcPauseTotalNs"`
+}
+
+// runtimePart reads the runtime counters for runtime.json.
+func runtimePart() ([]byte, error) {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	return jsonPart(diagnoseRuntime{
+		Goroutines: runtime.NumGoroutine(), HeapAllocBytes: m.HeapAlloc, HeapInuseBytes: m.HeapInuse,
+		HeapObjects: m.HeapObjects, SysBytes: m.Sys, NumGC: m.NumGC, GCPauseTotalNs: m.PauseTotalNs,
+	}, nil)
 }

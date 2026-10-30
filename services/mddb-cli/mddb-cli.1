@@ -715,7 +715,7 @@ File to write (default mddb-diagnose-<host>-<time>.tar.gz in the current
 directory).
 .TP
 .B \-\-profiles
-Include goroutine stacks and the heap profile.
+Include runtime.json: goroutine count, heap and GC counters. Stack and heap profiles come from /debug/pprof (MDDB_PPROF_ENABLED, admin).
 .TP
 .B \-\-integrity
 Include bbolt's consistency check of every database file. Slow on a large
