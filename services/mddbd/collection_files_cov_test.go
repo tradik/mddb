@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -118,5 +119,47 @@ func TestSwapCollectionFilesFailures(t *testing.T) {
 	undo()
 	if _, err := os.Stat(filepath.Join(live, "keep.db")); err != nil {
 		t.Fatalf("undone: %v", err)
+	}
+}
+
+// A collection file whose freelist is not stored opens deferred (#333). When
+// that open fails — here another handle holds the file's lock — the error is
+// returned, not a half-open file.
+func TestOpenCollectionFileDeferredOpenFails(t *testing.T) {
+	path := newWalkingDB(t)
+	t.Setenv("MDDB_FREELIST_BACKGROUND", "true")
+	holder, err := bolt.Open(path, 0o600, &bolt.Options{ReadOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = holder.Close() }()
+	opts := *getOptimizedBoltOptions()
+	opts.Timeout = 50 * time.Millisecond
+	if db, err := openCollectionFile(path, &opts); err == nil {
+		_ = db.Close()
+		t.Fatal("opened a file another handle holds")
+	}
+}
+
+// A collection file closed while its freelist is still being rebuilt in the
+// background: the rebuild stops quietly (the file is gone, there is nothing
+// to rebuild) and the file can be opened again.
+func TestOpenCollectionFileClosedDuringRebuild(t *testing.T) {
+	path := newWalkingDB(t)
+	t.Setenv("MDDB_FREELIST_BACKGROUND", "true")
+	for range 20 {
+		db, err := openCollectionFile(path, getOptimizedBoltOptions())
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = db.Close()
+	}
+	db, err := openCollectionFile(path, getOptimizedBoltOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+	if err := db.LoadFreelist(); err != nil {
+		t.Fatalf("rebuild after the closes: %v", err)
 	}
 }
