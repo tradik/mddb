@@ -33,6 +33,9 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from safepath import confined  # noqa: E402
+
 GO_LINE = re.compile(r"^(?P<file>.+\.go):(?P<rest>\d+\.\d+,\d+\.\d+ \d+ \d+)$")
 SKIP_DIRS = {".git", "node_modules", "vendor", ".venv", "target"}
 
@@ -41,7 +44,9 @@ def go_modules(root):
     """Map every module path declared under root to its directory."""
     modules = {}
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        # Hidden directories (.git, .claude worktrees, caches) hold copies of
+        # the tree, never the modules being scanned.
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
         if "go.mod" not in filenames:
             continue
         with open(os.path.join(dirpath, "go.mod"), encoding="utf-8") as fh:
@@ -104,7 +109,7 @@ def rewrite_cobertura(root, project, src, dst):
 def main(argv):
     if len(argv) < 5 or argv[1] not in ("go", "lcov", "cobertura"):
         sys.exit(__doc__)
-    fmt, root, src, dst = argv[1], os.path.abspath(argv[2]), argv[3], argv[4]
+    fmt, root, src, dst = argv[1], confined(argv[2]), confined(argv[3]), confined(argv[4])
     project = argv[5] if len(argv) > 5 else None
     if fmt != "go" and not project:
         sys.exit(f"{fmt} needs PROJECT_DIR")

@@ -35,6 +35,9 @@ bad() { echo -e "${RED}✗${NC} $1"; FAIL=$((FAIL + 1)); }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
+# The scripts accept only paths inside the repository or the working
+# directory (scripts/safepath.py), so the cases run from their own directory.
+cd "${TMP}"
 
 # 1: the real files.
 if [[ "$(python3 "${CHECK}" --print 2>&1)" == *"in step"* ]]; then ok "--print reports the lists in step"; else bad "--print: $(python3 "${CHECK}" --print 2>&1)"; fi
@@ -166,6 +169,16 @@ sed 's/"b\/\*\*"/"!b\/x"/' "${TMP}/wf.yml" >"${TMP}/wf-neg.yml"
 if printf 'a/x.go\n' | python3 "${OWNER}" pull_request main "${TMP}/wf-neg.yml" >/dev/null 2>&1; then bad "a negated pattern was accepted"; else ok "a negated pattern is refused"; fi
 sed 's/    paths:/    paths-ignore:/' "${TMP}/wf.yml" >"${TMP}/wf-ign.yml"
 if printf 'a/x.go\n' | python3 "${OWNER}" pull_request main "${TMP}/wf-ign.yml" >/dev/null 2>&1; then bad "paths-ignore was accepted"; else ok "paths-ignore is refused"; fi
+
+# Confinement (scripts/safepath.py): a path outside the repository and the
+# working directory is refused by every script, before anything is read.
+OUTSIDE="$(mktemp -d)"
+trap 'rm -rf "${TMP}" "${OUTSIDE}"' EXIT
+cp "${TMP}/scanner" "${OUTSIDE}/scanner"
+out="$(python3 "${CHECK}" "${OUTSIDE}/scanner" "${TMP}/auto" 2>&1)" && rc=0 || rc=$?
+if [[ ${rc} -ne 0 && "${out}" == *"outside the repository and the working directory"* ]]; then ok "check-sonar-exclusions refuses a file outside"; else bad "check outside: rc=${rc} ${out}"; fi
+out="$(python3 "${PATHS}" go "${OUTSIDE}" "${OUTSIDE}/p.out" "${TMP}/q.out" 2>&1)" && rc=0 || rc=$?
+if [[ ${rc} -ne 0 && "${out}" == *"outside the repository"* ]]; then ok "sonar-coverage-paths refuses a root outside"; else bad "paths outside: rc=${rc} ${out}"; fi
 
 echo
 echo "passed: ${PASS}, failed: ${FAIL}"

@@ -24,13 +24,16 @@ Exits 1 and lists every pattern on one side only.
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from safepath import confined  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def properties(path):
     """Parse a .properties file: comments, `key=value`, `\\` continuations."""
     props, buf = {}, ""
-    with open(path, encoding="utf-8") as fh:
+    with open(confined(path), encoding="utf-8") as fh:
         for raw in fh:
             line = raw.strip()
             if not buf and (not line or line[0] in "#!"):

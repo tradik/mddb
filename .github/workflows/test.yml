@@ -996,17 +996,22 @@ jobs:
       - name: Point the reports at this checkout
         if: env.SONAR_TOKEN != ''
         run: |
-          in="${RUNNER_TEMP}/sonar-in"
-          REPORTS="${RUNNER_TEMP}/sonar-reports"
-          fix="python3 scripts/sonar-coverage-paths.py"
+          # The script accepts paths inside the checkout or the working
+          # directory (scripts/safepath.py): it runs from RUNNER_TEMP, where
+          # the reports are, with the checkout as its root.
+          repo="$PWD"
+          cd "${RUNNER_TEMP}"
+          in="sonar-in"
+          REPORTS="sonar-reports"
+          fix="python3 ${repo}/scripts/sonar-coverage-paths.py"
           mkdir -p "${REPORTS}"
-          $fix go "$PWD" "${in}/sonar-go-mddbd/coverage.out" "${REPORTS}/go-mddbd.out"
-          $fix go "$PWD" "${in}/sonar-go-modules/services/mddb-cli/coverage.out" "${REPORTS}/go-cli.out"
-          $fix go "$PWD" "${in}/sonar-go-modules/clients/go/mddb/coverage.out" "${REPORTS}/go-client.out"
-          $fix lcov "$PWD" "${in}/sonar-lcov-panel/lcov.info" "${REPORTS}/panel.lcov" services/mddb-panel
-          $fix lcov "$PWD" "${in}/sonar-lcov-nodejs/lcov.info" "${REPORTS}/nodejs.lcov" clients/nodejs
-          $fix cobertura "$PWD" "${in}/sonar-cobertura-python/coverage.xml" "${REPORTS}/python.xml" clients/python
-          $fix cobertura "$PWD" "${in}/sonar-cobertura-langchain/coverage.xml" "${REPORTS}/langchain.xml" integrations/langchain-mddb
+          $fix go "$repo" "${in}/sonar-go-mddbd/coverage.out" "${REPORTS}/go-mddbd.out"
+          $fix go "$repo" "${in}/sonar-go-modules/services/mddb-cli/coverage.out" "${REPORTS}/go-cli.out"
+          $fix go "$repo" "${in}/sonar-go-modules/clients/go/mddb/coverage.out" "${REPORTS}/go-client.out"
+          $fix lcov "$repo" "${in}/sonar-lcov-panel/lcov.info" "${REPORTS}/panel.lcov" services/mddb-panel
+          $fix lcov "$repo" "${in}/sonar-lcov-nodejs/lcov.info" "${REPORTS}/nodejs.lcov" clients/nodejs
+          $fix cobertura "$repo" "${in}/sonar-cobertura-python/coverage.xml" "${REPORTS}/python.xml" clients/python
+          $fix cobertura "$repo" "${in}/sonar-cobertura-langchain/coverage.xml" "${REPORTS}/langchain.xml" integrations/langchain-mddb
 
       - name: Scan
         if: env.SONAR_TOKEN != ''

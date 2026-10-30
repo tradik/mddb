@@ -26,6 +26,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from safepath import confined  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TESTS = os.path.join(ROOT, ".github", "workflows", "test.yml")
 
@@ -55,7 +58,7 @@ def unquote(value):
 def triggers(path):
     """{event: {"branches": [...], "paths": [...]}} from a workflow's on: block."""
     events, event, key, inside = {}, None, None, False
-    with open(path, encoding="utf-8") as fh:
+    with open(confined(path), encoding="utf-8") as fh:
         for raw in fh:
             line = raw.rstrip("\n")
             stripped = line.strip()
