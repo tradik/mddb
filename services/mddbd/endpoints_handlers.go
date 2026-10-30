@@ -10,6 +10,10 @@ import (
 // every surface that lists it.
 const restoreFromBackupDescription = "Restore from backup"
 
+// runAutomationDescription describes running a cron rule now (#377) in
+// every catalogue it appears in.
+const runAutomationDescription = "Run a sync or backup rule now"
+
 // ---- Request/Response types ----
 
 // EndpointsResponse contains all available HTTP, gRPC, and MCP endpoints.
@@ -160,7 +164,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 		{Name: "DeleteAutomation", Description: "Delete automation rule"},
 		{Name: "TestAutomation", Description: "Test trigger (dry run)"},
 		{Name: "GetAutomationLogs", Description: "List automation execution logs"},
-		{Name: "RunAutomation", Description: "Run a sync or backup rule now"},
+		{Name: "RunAutomation", Description: runAutomationDescription},
 		// Collection Config
 		{Name: "GetCollectionConfig", Description: "Get collection configuration"},
 		{Name: "SetCollectionConfig", Description: "Set collection configuration"},
@@ -217,7 +221,7 @@ func (s *Server) handleEndpoints(w http.ResponseWriter, r *http.Request) {
 		{Name: "delete_automation", Description: "Delete automation rule"},
 		{Name: "test_automation", Description: "Test trigger (dry run)"},
 		{Name: "get_automation_logs", Description: "List automation execution logs"},
-		{Name: "run_automation", Description: "Run a sync or backup rule now"},
+		{Name: "run_automation", Description: runAutomationDescription},
 		{Name: "list_revisions", Description: "List document revision history"},
 		{Name: "restore_revision", Description: "Restore document to a previous revision"},
 		{Name: "get_collection_config", Description: "Get collection configuration"},
@@ -370,7 +374,7 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 			HTTPEndpoint{Method: "GET/POST", Path: "/v1/automation", Description: "List/create automation rules", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "GET/PUT/DELETE", Path: "/v1/automation/{id}", Description: "Get/update/delete automation rule", RequiresAuth: authEnabled},
 			HTTPEndpoint{Method: "POST", Path: "/v1/automation/{id}/test", Description: "Test trigger (dry run)", RequiresAuth: authEnabled},
-			HTTPEndpoint{Method: "POST", Path: "/v1/automation/{id}/run", Description: "Run a sync or backup rule now", RequiresAuth: authEnabled},
+			HTTPEndpoint{Method: "POST", Path: "/v1/automation/{id}/run", Description: runAutomationDescription, RequiresAuth: authEnabled},
 		)
 		if s.AutomationLogStore != nil {
 			endpoints = append(endpoints,

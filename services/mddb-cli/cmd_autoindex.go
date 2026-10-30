@@ -229,7 +229,7 @@ func fileMeta(f autoFile, g *gitInfo) map[string][]string {
 // Unchanged content is skipped by the server (skipDuplicates), which is what
 // makes a second run cheap.
 func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport, files []autoFile, o autoindexOptions) {
-	b := &ingestBatch{ctx: ctx, client: client, rep: rep, o: o}
+	b := &ingestBatch{client: client, rep: rep, o: o}
 	for _, f := range files {
 		content, err := os.ReadFile(f.abs) // #nosec G304 -- a file under the directory the user asked to index
 		if err != nil {
@@ -237,15 +237,14 @@ func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport,
 			rep.Errors = append(rep.Errors, f.Rel+": "+err.Error())
 			continue
 		}
-		b.add(f, content)
+		b.add(ctx, f, content)
 	}
-	b.flush()
+	b.flush(ctx)
 }
 
 // ingestBatch collects documents for one /v1/ingest call and records what
 // each call did in the report.
 type ingestBatch struct {
-	ctx    context.Context
 	client *mddb.Client
 	rep    *autoindexReport
 	o      autoindexOptions
@@ -255,7 +254,7 @@ type ingestBatch struct {
 
 // add queues a file's document, sending the batch first when the file
 // would take it over the document or byte limit.
-func (b *ingestBatch) add(f autoFile, content []byte) {
+func (b *ingestBatch) add(ctx context.Context, f autoFile, content []byte) {
 	isMarkdown := docExtensions[strings.ToLower(filepath.Ext(f.Rel))]
 	// The server reads the frontmatter, once, with the /v1/upload parser.
 	doc := mddb.IngestDocument{Key: f.Rel, Lang: b.o.lang, ExtractFrontmatter: isMarkdown && !b.o.noFrontmatter}
@@ -264,7 +263,7 @@ func (b *ingestBatch) add(f autoFile, content []byte) {
 	}
 	n := wireSize(f, content, doc.Images)
 	if len(b.docs) > 0 && (len(b.docs) >= autoindexBatchDocs || b.size+n > autoindexBatchBytes) {
-		b.flush()
+		b.flush(ctx)
 	}
 	doc.Meta = fileMeta(f, b.rep.Git)
 	for k, v := range b.o.extraMeta {
@@ -282,12 +281,12 @@ func (b *ingestBatch) add(f autoFile, content []byte) {
 }
 
 // flush sends the queued documents, if any, and empties the batch.
-func (b *ingestBatch) flush() {
+func (b *ingestBatch) flush(ctx context.Context) {
 	if len(b.docs) == 0 {
 		return
 	}
 	rep := b.rep
-	resp, err := b.client.Ingest(b.ctx, mddb.IngestRequest{Collection: rep.Collection, Documents: b.docs,
+	resp, err := b.client.Ingest(ctx, mddb.IngestRequest{Collection: rep.Collection, Documents: b.docs,
 		Options: mddb.IngestOptions{SkipDuplicates: true, Profile: b.o.profile, ExtractImages: b.o.images}})
 	if err != nil {
 		rep.Failed += len(b.docs)

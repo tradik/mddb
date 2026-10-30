@@ -48,9 +48,9 @@ export function RunNowButton({ rule }) {
   return (
     <span className="inline-flex items-center gap-1.5">
       {message && (
-        <span role="status" className={`text-xs ${message.ok ? 'text-green-800' : 'text-red-700'}`}>
+        <output className={`text-xs ${message.ok ? 'text-green-800' : 'text-red-700'}`}>
           {message.text}
-        </span>
+        </output>
       )}
       <button
         onClick={run}

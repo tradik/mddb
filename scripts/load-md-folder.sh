@@ -289,7 +289,7 @@ while IFS= read -r file; do
     fi
     
     # Progress indicator
-    if [ $((CURRENT % BATCH_SIZE)) -eq 0 ] || [ "$CURRENT" -eq "$FILE_COUNT" ]; then
+    if [[ $((CURRENT % BATCH_SIZE)) -eq 0 || "$CURRENT" -eq "$FILE_COUNT" ]]; then
         PROGRESS=$((CURRENT * 100 / FILE_COUNT))
         BAR=$(printf '%*s' $((PROGRESS / 2)) '' | tr ' ' '#')
         printf "\r${CYAN}Progress:${NC} [%-50s] %d%% (%d/%d files)" \

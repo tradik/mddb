@@ -560,26 +560,13 @@ func (g *GRPCServer) ListCollectionConfigs(ctx context.Context, req *proto.ListC
 
 // CrossSearch implements the CrossSearch RPC — cross-collection vector search.
 func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequest) (*proto.CrossSearchResponse, error) {
-	if len(req.TargetCollections) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "missing target_collections")
-	}
-	if req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocId == "" {
-		return nil, status.Error(codes.InvalidArgument, "one of query, query_vector, or source_doc_id is required")
-	}
-	if req.SourceDocId != "" && req.SourceCollection == "" {
-		return nil, status.Error(codes.InvalidArgument, "source_collection required when using source_doc_id")
+	if err := validateCrossSearchRequest(req); err != nil {
+		return nil, err
 	}
 	// Permission on every collection searched, after "role:" targets expand.
 	targets := g.server.expandTargets(req.TargetCollections)
-	if g.server.AuthManager != nil {
-		for _, coll := range append(append([]string(nil), targets...), req.SourceCollection) {
-			if coll == "" {
-				continue
-			}
-			if err := g.server.AuthManager.CheckPermission(ctx, coll, PermRead); err != nil {
-				return nil, status.Error(codes.PermissionDenied, err.Error())
-			}
-		}
+	if err := g.permitCrossSearch(ctx, targets, req.SourceCollection); err != nil {
+		return nil, err
 	}
 	// The cross-search MCP runs (2.18.8): text and hybrid search types,
 	// role:reference targets, filter, groupBy, passages and waits.
@@ -597,10 +584,47 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 	if err != nil {
 		return nil, searchStatus(err)
 	}
+	return crossSearchToProto(res, targets), nil
+}
+
+// validateCrossSearchRequest refuses a cross search without targets, without
+// anything to search with, or with a source document but no source collection.
+func validateCrossSearchRequest(req *proto.CrossSearchRequest) error {
+	switch {
+	case len(req.TargetCollections) == 0:
+		return status.Error(codes.InvalidArgument, "missing target_collections")
+	case req.Query == "" && len(req.QueryVector) == 0 && req.SourceDocId == "":
+		return status.Error(codes.InvalidArgument, "one of query, query_vector, or source_doc_id is required")
+	case req.SourceDocId != "" && req.SourceCollection == "":
+		return status.Error(codes.InvalidArgument, "source_collection required when using source_doc_id")
+	}
+	return nil
+}
+
+// permitCrossSearch checks read permission on every target and on the source
+// collection, when one is named.
+func (g *GRPCServer) permitCrossSearch(ctx context.Context, targets []string, source string) error {
+	if g.server.AuthManager == nil {
+		return nil
+	}
+	for _, coll := range append(append([]string(nil), targets...), source) {
+		if coll == "" {
+			continue
+		}
+		if err := g.server.AuthManager.CheckPermission(ctx, coll, PermRead); err != nil {
+			return status.Error(codes.PermissionDenied, err.Error())
+		}
+	}
+	return nil
+}
+
+// crossSearchToProto renders a cross-search answer: passages when asked for,
+// otherwise the ranked results.
+func crossSearchToProto(res *MCPCrossSearchResponse, targets []string) *proto.CrossSearchResponse {
 	if res.Passages != nil {
 		return &proto.CrossSearchResponse{Passages: passagesOf(res.Passages), Total: safeInt32(res.Passages.Total),
 			TargetCollections: targets, Indexing: indexWaitToProto(res.Passages.Indexing),
-			LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}, nil
+			LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}
 	}
 	resp := &proto.CrossSearchResponse{Total: safeInt32(res.Total), SourceCollection: res.SourceCollection,
 		SourceDocId: res.SourceDocID, TargetCollections: res.TargetCollections, Algorithm: res.Algorithm,
@@ -612,7 +636,7 @@ func (g *GRPCServer) CrossSearch(ctx context.Context, req *proto.CrossSearchRequ
 			Score: it.Score, Rank: safeInt32(it.Rank), Group: it.Group, GroupRank: safeInt32(it.GroupRank),
 			Images: imageRefsToProto(it.Images)})
 	}
-	return resp, nil
+	return resp
 }
 
 // FindDuplicates implements the FindDuplicates RPC.
