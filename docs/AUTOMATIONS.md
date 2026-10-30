@@ -778,7 +778,7 @@ curl -X POST http://localhost:11023/v1/automation \
 | `collection`, `lang` | (required) | where the documents go |
 | `url` | | `sitemap`: a sitemap or sitemap index, plain or gzipped |
 | `urls` | | `urls`: the pages |
-| `bucket` | `storageConfig.bucket` | `s3`: the bucket |
+| `bucket` | `storageConfig.bucket` | `s3`: the bucket. It must exist: a sync only reads it and never creates it |
 | `prefix` | `storageConfig.prefix` | `s3`: the objects synced are the keys under it |
 | `storageConfig` | | `s3`: `endpoint`, `region`, `accessKey`, `secretKey`, `useTLS` — the block S3-backed collections and backups use |
 | `prune` | `false` | delete the documents whose source is gone (no longer listed, or answering 404/410) |

@@ -21,29 +21,42 @@ type S3Backend struct {
 	prefix string // optional path prefix within bucket, e.g. "mddb/"
 }
 
-// NewS3Backend creates a new S3 storage backend from the given config.
-func NewS3Backend(cfg *StorageConfigDef) (*S3Backend, error) {
+// newS3Client connects to cfg's endpoint and checks cfg's bucket, which it
+// reports as missing without creating it. A sync source (INT-022) only reads,
+// so it stops here; NewS3Backend goes on to create the bucket it writes to.
+func newS3Client(cfg *StorageConfigDef) (client *minio.Client, exists bool, err error) {
 	if cfg.Endpoint == "" || cfg.Bucket == "" {
-		return nil, fmt.Errorf("s3 backend requires endpoint and bucket")
+		return nil, false, fmt.Errorf("s3 backend requires endpoint and bucket")
 	}
 
-	client, err := minio.New(cfg.Endpoint, &minio.Options{
+	client, err = minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseTLS,
 		Region: cfg.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create S3 client: %w", err)
+		return nil, false, fmt.Errorf("failed to create S3 client: %w", err)
 	}
 
-	// Ensure bucket exists
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	exists, err := client.BucketExists(ctx, cfg.Bucket)
+	exists, err = client.BucketExists(ctx, cfg.Bucket)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check S3 bucket: %w", err)
+		return nil, false, fmt.Errorf("failed to check S3 bucket: %w", err)
+	}
+	return client, exists, nil
+}
+
+// NewS3Backend creates a new S3 storage backend from the given config,
+// creating its bucket if it is missing.
+func NewS3Backend(cfg *StorageConfigDef) (*S3Backend, error) {
+	client, exists, err := newS3Client(cfg)
+	if err != nil {
+		return nil, err
 	}
 	if !exists {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 		if err := client.MakeBucket(ctx, cfg.Bucket, minio.MakeBucketOptions{Region: cfg.Region}); err != nil {
 			return nil, fmt.Errorf("failed to create S3 bucket %q: %w", cfg.Bucket, err)
 		}

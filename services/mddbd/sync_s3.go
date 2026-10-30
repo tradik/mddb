@@ -14,7 +14,8 @@ import (
 var syncS3Timeout = 5 * time.Minute
 
 // s3SyncSource reads the objects under a prefix of an S3-compatible bucket,
-// through the client S3-backed collections and S3 backups use (NewS3Backend).
+// through the client S3-backed collections and S3 backups use (newS3Client),
+// without creating the bucket: a source is only read.
 // The listing carries each object's ETag, so an unchanged object is not
 // downloaded at all.
 type s3SyncSource struct {
@@ -23,16 +24,18 @@ type s3SyncSource struct {
 	bucket string
 }
 
-// newS3SyncSource connects to the action's bucket.
+// newS3SyncSource connects to the action's bucket, which must exist.
 func newS3SyncSource(a *SyncAction) (*s3SyncSource, error) {
 	cfg := *a.StorageConfig
 	cfg.Bucket = a.Bucket
-	cfg.Prefix = "" // the action's prefix selects the objects itself
-	be, err := NewS3Backend(&cfg)
+	client, exists, err := newS3Client(&cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &s3SyncSource{action: a, client: be.client, bucket: be.bucket}, nil
+	if !exists {
+		return nil, fmt.Errorf("sync source: S3 bucket %q does not exist", a.Bucket)
+	}
+	return &s3SyncSource{action: a, client: client, bucket: a.Bucket}, nil
 }
 
 // list returns the objects under the prefix, "directory" markers left out.

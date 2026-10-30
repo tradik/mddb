@@ -115,3 +115,25 @@ func TestS3SyncSourceBounds(t *testing.T) {
 		t.Error("an empty object name was fetched")
 	}
 }
+
+// A sync only reads its source: a missing bucket fails the connection and is
+// not created, unlike the bucket of an S3 backup target or collection.
+func TestS3SyncSourceDoesNotCreateTheBucket(t *testing.T) {
+	f := newFakeS3(t)
+	a := s3SyncAction(f)
+	a.Bucket = "docs"
+	if _, err := newS3SyncSource(a); err == nil || !strings.Contains(err.Error(), `"docs" does not exist`) {
+		t.Fatalf("missing bucket: err = %v", err)
+	}
+	if keys := f.keys("docs"); f.buckets["docs"] != nil || keys != nil {
+		t.Errorf("the sync created the bucket")
+	}
+
+	f.failNext(http.MethodHead, http.StatusForbidden)
+	if _, err := newS3SyncSource(a); err == nil || !strings.Contains(err.Error(), "check S3 bucket") {
+		t.Errorf("bucket check failure: err = %v", err)
+	}
+	if _, err := newS3SyncSource(&SyncAction{Bucket: "docs", StorageConfig: &StorageConfigDef{}}); err == nil {
+		t.Error("no endpoint: want an error")
+	}
+}
