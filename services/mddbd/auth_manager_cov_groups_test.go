@@ -167,3 +167,34 @@ func TestSetGroupPermissionReplacesExisting(t *testing.T) {
 		t.Errorf("group permissions = %+v, want one replaced write grant", perms)
 	}
 }
+
+// DeleteGroup sliced each key under the group's prefix before checking its
+// length: deleting "longname" panicked when the next permission key ("z|c")
+// was shorter than "longname|". Only the group's own permissions go, the
+// other group keeps its grant.
+func TestDeleteGroupWithShorterNeighbourKey(t *testing.T) {
+	am, _, cleanup := setupTestAuthManager(t)
+	defer cleanup()
+	for _, g := range []string{"longname", "z"} {
+		if _, err := am.CreateGroup(g, "", nil); err != nil {
+			t.Fatalf("CreateGroup %s: %v", g, err)
+		}
+	}
+	for _, gp := range []*GroupPermission{{GroupName: "longname", Collection: "a", Read: true}, {GroupName: "z", Collection: "c", Read: true}} {
+		if err := am.SetGroupPermission(gp); err != nil {
+			t.Fatalf("SetGroupPermission: %v", err)
+		}
+	}
+	if err := am.DeleteGroup("longname"); err != nil {
+		t.Fatalf("DeleteGroup: %v", err)
+	}
+	if err := am.LoadAll(); err != nil {
+		t.Fatal(err)
+	}
+	if got := am.GetGroupPermissions("longname"); len(got) != 0 {
+		t.Errorf("longname's permissions survived: %+v", got)
+	}
+	if got := am.GetGroupPermissions("z"); len(got) != 1 {
+		t.Errorf("z's permission = %+v, want it kept", got)
+	}
+}

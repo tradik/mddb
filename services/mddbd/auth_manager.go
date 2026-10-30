@@ -854,7 +854,7 @@ func (am *AuthManager) DeleteGroup(name string) error {
 		b = tx.Bucket(bucketAuthGroupPerms)
 		cursor := b.Cursor()
 		prefix := []byte(name + "|")
-		for k, _ := cursor.Seek(prefix); k != nil && string(k[:len(prefix)]) == string(prefix); k, _ = cursor.Next() {
+		for k, _ := cursor.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = cursor.Next() {
 			if err := b.Delete(k); err != nil {
 				return err
 			}
