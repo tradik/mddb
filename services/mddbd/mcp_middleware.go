@@ -254,14 +254,14 @@ func (rl *MCPRateLimiter) clientID(r *http.Request) string {
 		if name := r.Header.Get("X-MCP-Key-Name"); name != "" {
 			return "key:" + name
 		}
-		return "ip:" + clientIP(r)
+		return "ip:" + ClientIP(r)
 	case "session":
 		if sid := r.Header.Get("MCP-Session-Id"); sid != "" {
 			return "session:" + sid
 		}
-		return "ip:" + clientIP(r)
+		return "ip:" + ClientIP(r)
 	default: // "ip"
-		return "ip:" + clientIP(r)
+		return "ip:" + ClientIP(r)
 	}
 }
 
@@ -297,7 +297,7 @@ func (rl *MCPRateLimiter) allow(clientID string) (remaining int, resetAt int64, 
 	return
 }
 
-// clientIP is defined in sse.go — reused here.
+// ClientIP is defined in clientip.go — reused here.
 
 // ---- MCP Request Logging / Audit Trail (#30) ----
 
@@ -348,7 +348,7 @@ func (rl *MCPRequestLogger) logRequest(r *http.Request, status int, duration tim
 	if sessionID == "" {
 		sessionID = "-"
 	}
-	ip := clientIP(r)
+	ip := ClientIP(r)
 
 	entry := MCPLogEntry{
 		Timestamp:  time.Now().UTC().Format(time.RFC3339),

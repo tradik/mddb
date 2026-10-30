@@ -357,6 +357,12 @@ func run() int {
 func runServer(srvCfg ServerConfig) int {
 	dbPath := srvCfg.Database.Path
 
+	// #366: forwarding headers count only from these proxies. A bad entry is
+	// a startup error — guessing would silently trust the wrong peers.
+	if err := configureTrustedProxies(os.Getenv(trustedProxiesEnv)); err != nil {
+		fatal("startup step failed", "step", trustedProxiesEnv, "err", err)
+	}
+
 	// GO-032: say plainly what durability this data directory can offer before
 	// accepting a single write. bbolt fsyncs every commit, but that promise is
 	// only worth what the storage under it is worth — a container started

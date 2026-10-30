@@ -368,6 +368,3 @@ func auditKey(tsNanos int64, seq uint64) []byte {
 	binary.BigEndian.PutUint64(k[8:], seq)
 	return k[:]
 }
-
-// ClientIP returns the best-effort originating IP for the request,
-// honouring X-Forwarded-For only when the direct remote is a trusted

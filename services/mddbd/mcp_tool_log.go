@@ -49,7 +49,7 @@ func withMCPCaller(ctx context.Context, r *http.Request) context.Context {
 	}
 	return context.WithValue(ctx, mcpCallerContextKey{}, mcpCaller{
 		keyName:   r.Header.Get("X-MCP-Key-Name"),
-		clientIP:  clientIP(r),
+		clientIP:  ClientIP(r),
 		sessionID: r.Header.Get("MCP-Session-Id"),
 	})
 }

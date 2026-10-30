@@ -107,7 +107,7 @@ func TestCovDRateLimiterFromEnv(t *testing.T) {
 func TestCovDRateLimiterClientID(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	req.RemoteAddr = "203.0.113.9:4000"
-	ip := "ip:" + clientIP(req)
+	ip := "ip:" + ClientIP(req)
 
 	byKey := &MCPRateLimiter{by: "api_key"}
 	if got := byKey.clientID(req); got != ip {

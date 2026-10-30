@@ -234,36 +234,3 @@ func TestSSEIPCountCleanup(t *testing.T) {
 		t.Errorf("expected IP count 0 after disconnect, got %d", count)
 	}
 }
-
-func TestClientIP(t *testing.T) {
-	tests := []struct {
-		name       string
-		remoteAddr string
-		xff        string
-		xri        string
-		want       string
-	}{
-		{"plain RemoteAddr", "192.168.1.1:1234", "", "", "192.168.1.1"},
-		{"X-Forwarded-For single", "10.0.0.1:1234", "203.0.113.5", "", "203.0.113.5"},
-		{"X-Forwarded-For chain", "10.0.0.1:1234", "203.0.113.5, 70.41.3.18", "", "203.0.113.5"},
-		{"X-Real-IP", "10.0.0.1:1234", "", "198.51.100.1", "198.51.100.1"},
-		{"XFF takes priority", "10.0.0.1:1234", "203.0.113.5", "198.51.100.1", "203.0.113.5"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/", nil)
-			req.RemoteAddr = tt.remoteAddr
-			if tt.xff != "" {
-				req.Header.Set("X-Forwarded-For", tt.xff)
-			}
-			if tt.xri != "" {
-				req.Header.Set("X-Real-IP", tt.xri)
-			}
-			got := clientIP(req)
-			if got != tt.want {
-				t.Errorf("clientIP() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}

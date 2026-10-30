@@ -140,3 +140,104 @@ func TestAuditRecordAutoFills(t *testing.T) {
 		t.Errorf("Record should default empty result to ok, got %q", got[0].Result)
 	}
 }
+
+// TestAuditRecordDropsWhenBufferFull covers Record's non-blocking drop: with no
+// writer draining the buffer, the event past its capacity is counted, not queued.
+func TestAuditRecordDropsWhenBufferFull(t *testing.T) {
+	am := NewAuditManager(newAuditTestDB(t), true, 30) // not started
+	for i := 0; i <= cap(am.ch); i++ {
+		am.Record(AuditEvent{Actor: "x"})
+	}
+	if got := am.Dropped(); got != 1 {
+		t.Errorf("Dropped() = %d, want 1", got)
+	}
+}
+
+// TestAuditWriterFlushesFullBatchAndSurvivesErrors covers the writer flushing
+// as soon as a batch reaches 64 events, and logging (not dying on) a failed flush.
+func TestAuditWriterFlushesFullBatchAndSurvivesErrors(t *testing.T) {
+	db := newAuditTestDB(t)
+	am := NewAuditManager(db, true, 30)
+	if err := am.EnsureBuckets(); err != nil {
+		t.Fatal(err)
+	}
+	am.Start()
+	now := time.Now().UnixNano()
+	for i := 0; i < 64; i++ {
+		am.Record(AuditEvent{Timestamp: now + int64(i), Action: "write"})
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		got, err := am.Query(QueryFilter{Limit: 100})
+		if err == nil && len(got) == 64 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("full batch never flushed: %d events, %v", len(got), err)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	am.Stop()
+
+	broken := NewAuditManager(newAuditTestDB(t), true, 30) // no bucket: every flush fails
+	broken.Start()
+	broken.Record(AuditEvent{Action: "write"})
+	broken.Stop() // drains, the flush fails and is logged
+}
+
+// TestWriteAuditBatchReadOnlyBucket covers the NextSequence error: a bucket
+// from a read-only transaction cannot hand out sequence numbers.
+func TestWriteAuditBatchReadOnlyBucket(t *testing.T) {
+	db := newAuditTestDB(t)
+	am := NewAuditManager(db, true, 30)
+	if err := am.EnsureBuckets(); err != nil {
+		t.Fatal(err)
+	}
+	err := db.View(func(tx *bolt.Tx) error {
+		return writeAuditBatch(tx.Bucket(bucketAudit), []AuditEvent{{Action: "write"}})
+	})
+	if err == nil {
+		t.Error("writeAuditBatch in a read-only transaction should fail")
+	}
+}
+
+// TestAuditMissingBucketAndClosedDB covers Query and PurgeOlderThan before the
+// bucket exists (no-ops) and trimOnce logging a purge that fails.
+func TestAuditMissingBucketAndClosedDB(t *testing.T) {
+	db := newAuditTestDB(t)
+	am := NewAuditManager(db, true, 30) // no EnsureBuckets
+	if got, err := am.Query(QueryFilter{}); err != nil || got != nil {
+		t.Errorf("Query without bucket = (%v, %v), want (nil, nil)", got, err)
+	}
+	if err := am.PurgeOlderThan(time.Now().UnixNano()); err != nil {
+		t.Errorf("PurgeOlderThan without bucket = %v, want nil", err)
+	}
+	_ = db.Close()
+	am.trimOnce() // the purge fails on the closed database; logged, no panic
+}
+
+// TestAuditQuerySkipsUndecodableAndFiltersResult covers Query skipping a value
+// that is not JSON and filtering on Result.
+func TestAuditQuerySkipsUndecodableAndFiltersResult(t *testing.T) {
+	db := newAuditTestDB(t)
+	am := NewAuditManager(db, true, 30)
+	if err := am.EnsureBuckets(); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixNano()
+	if err := am.flushBatch([]AuditEvent{
+		{Timestamp: now, Action: "login", Result: "ok"},
+		{Timestamp: now + 1, Action: "login", Result: "fail"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketAudit).Put(auditKey(now+2, 999), []byte("not json"))
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := am.Query(QueryFilter{Result: "fail", Limit: 10})
+	if err != nil || len(got) != 1 || got[0].Result != "fail" {
+		t.Errorf("Query(result=fail) = %+v, %v", got, err)
+	}
+}

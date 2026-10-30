@@ -389,6 +389,8 @@ services:
 
 ### Behind Reverse Proxy
 
+Set `MDDB_TRUSTED_PROXIES` to the proxy's address or its Docker network (e.g. `172.16.0.0/12`). mddbd reads `X-Forwarded-For` / `X-Real-IP` only from those peers; without it the rate limiter, SSE cap and audit log see every client as the proxy. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
+
 #### Nginx
 
 ```nginx

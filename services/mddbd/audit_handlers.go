@@ -1,42 +1,14 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"mddb/internal/audit"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	json "mddb/internal/jsonx"
 )
-
-// proxy (currently any — hardening tightens this later).
-func ClientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if comma := strings.Index(xff, ","); comma > 0 {
-			return strings.TrimSpace(xff[:comma])
-		}
-		return strings.TrimSpace(xff)
-	}
-	host, _, err := splitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
-
-func splitHostPort(addr string) (string, string, error) {
-	if addr == "" {
-		return "", "", errors.New("empty addr")
-	}
-	i := strings.LastIndex(addr, ":")
-	if i < 0 {
-		return addr, "", nil
-	}
-	return addr[:i], addr[i+1:], nil
-}
 
 // --- HTTP ---
 

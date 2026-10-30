@@ -8,13 +8,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 )
 
@@ -235,18 +233,4 @@ func grpcClientID(ctx context.Context, by string) string {
 		}
 	}
 	return "ip:" + grpcPeerIP(ctx)
-}
-
-func grpcPeerIP(ctx context.Context) string {
-	p, ok := peer.FromContext(ctx)
-	if !ok || p == nil || p.Addr == nil {
-		return "unknown"
-	}
-	addr := p.Addr.String()
-	// Strip port for tcp-style addrs. Unix sockets carry the path and
-	// are identified by the whole string — the limit still applies.
-	if i := strings.LastIndex(addr, ":"); i > 0 && !strings.HasPrefix(addr, "/") {
-		return addr[:i]
-	}
-	return addr
 }

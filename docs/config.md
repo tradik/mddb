@@ -372,8 +372,27 @@ Shared sliding-window limiter covering both HTTP and gRPC. Separate from the pre
 | `MDDB_RATE_LIMIT_WINDOW` | `60` | int seconds | Window length. |
 | `MDDB_RATE_LIMIT_BURST` | `50` | int | Additional allowance before a client is blocked. Effective ceiling = `REQUESTS + BURST`. |
 | `MDDB_RATE_LIMIT_BY` | `"ip"` | string | `"ip"` (default) or `"user"`. `user` keys on the authenticated username and falls back to IP for anonymous traffic. |
+| `MDDB_TRUSTED_PROXIES` | `""` | list | Comma-separated IPs or CIDR prefixes of reverse proxies whose `X-Forwarded-For` / `X-Real-IP` headers are believed, e.g. `127.0.0.1,10.0.0.0/8,fd00::/8`. Empty (the default) trusts nobody. An entry that is not an IP or prefix stops startup with that entry named. See [Client IP and trusted proxies](#client-ip-and-trusted-proxies). |
 
 HTTP responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`; rejected requests get `429 Too Many Requests` with `Retry-After`. gRPC rejects with `codes.ResourceExhausted`. The paths `/health`, `/v1/health`, and `/metrics` are always exempt so monitoring and load-balancer probes never trip the limiter.
+
+### Client IP and trusted proxies
+
+One rule decides the client IP for the HTTP and gRPC rate limiters, the MCP rate limiter and access log, the SSE per-IP connection cap, and the audit log (login attempts, writes, incident detection):
+
+1. If the connecting peer (`RemoteAddr`, or the gRPC peer address) is **not** in `MDDB_TRUSTED_PROXIES`, the peer is the client. `X-Forwarded-For` and `X-Real-IP` (gRPC metadata `x-forwarded-for` / `x-real-ip`) are ignored, so a client cannot pick its own rate-limit bucket or audit IP.
+2. If the peer is a trusted proxy, `X-Forwarded-For` is read **right to left**, skipping trusted proxies; the first other address is the client. A hop that is not an IP address ends the walk.
+3. If that finds nothing, `X-Real-IP` is used when it is an IP address, otherwise the peer.
+
+Addresses are canonical: the port is dropped, IPv6 is lower-case and compressed, and IPv4-mapped IPv6 (`::ffff:1.2.3.4`) becomes `1.2.3.4`. A Unix-socket peer keeps its socket name.
+
+**Behind a reverse proxy** (nginx, Traefik, Caddy, a load balancer), list the proxy's address, or else every client looks like the proxy and shares one bucket:
+
+```bash
+export MDDB_TRUSTED_PROXIES=127.0.0.1,172.16.0.0/12   # the proxy on the host or the Docker network
+```
+
+The first time forwarding headers arrive from a peer that is not trusted, mddbd logs one warning naming that peer — the sign that `MDDB_TRUSTED_PROXIES` is missing.
 
 ---
 

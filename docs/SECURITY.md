@@ -66,6 +66,8 @@ This page does not duplicate the configuration reference. Every environment vari
 
 **How to enable.** `MDDB_RATE_LIMIT_ENABLED=true`. Tuning knobs: `MDDB_RATE_LIMIT_REQUESTS` (sustained, default 100), `MDDB_RATE_LIMIT_WINDOW` seconds (default 60), `MDDB_RATE_LIMIT_BURST` (default 50), `MDDB_RATE_LIMIT_BY` (`ip` or `user`). HTTP responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`; rejections return `429 Too Many Requests` with `Retry-After`. gRPC rejects with `codes.ResourceExhausted`. Paths `/health`, `/v1/health`, and `/metrics` are exempt so monitoring never trips the limiter. The pre-existing `MDDB_MCP_RATE_LIMIT_*` budget for MCP is independent and still applies. See [config.md#rate-limiting-http--grpc](config.md#rate-limiting-http--grpc).
 
+**Client IP.** Per-IP buckets, the SSE connection cap and the audit log's IP all use one rule: `X-Forwarded-For` and `X-Real-IP` count only when the connecting peer is listed in `MDDB_TRUSTED_PROXIES` (comma-separated IPs/CIDRs, empty by default), and the chain is read right to left so the client's own entries cannot win. Behind a reverse proxy, set it to the proxy's address. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
+
 **Known limitations.** Buckets are per-process and in-memory. A multi-node replica set enforces the limit per-node, not per-cluster. For a global rate limit, front the fleet with a dedicated reverse proxy or API gateway that implements shared token buckets.
 
 ### 4. AES-256-GCM at-rest encryption
@@ -196,7 +198,7 @@ A deployment is only compliant once every one of these is done. Treat this as a 
 4. If you require mTLS, set `MDDB_TLS_CLIENT_CA` to the trusted client-CA bundle and `MDDB_TLS_CLIENT_AUTH=require`.
 5. Lock CORS down: `MDDB_CORS_ORIGINS=https://app.example.com` (never `*`).
 6. Enable the audit log: `MDDB_AUDIT_ENABLED=true`. Pick a retention window that matches your compliance obligation: `MDDB_AUDIT_RETENTION_DAYS=365` for most financial/health contexts.
-7. Enable the rate limiter: `MDDB_RATE_LIMIT_ENABLED=true`. Tune `REQUESTS`, `WINDOW`, `BURST`, `BY` to your SLOs.
+7. Enable the rate limiter: `MDDB_RATE_LIMIT_ENABLED=true`. Tune `REQUESTS`, `WINDOW`, `BURST`, `BY` to your SLOs. Behind a reverse proxy, set `MDDB_TRUSTED_PROXIES` to the proxy's address so limits and the audit log see the real client.
 8. Generate an encryption key: `MDDB_ENCRYPTION_KEY=$(openssl rand -base64 32)`. Store the key in your secret manager **and** maintain an offline escrow copy. Test the recovery procedure before going live.
 9. Flip `CollectionConfig.encrypted=true` on every collection holding sensitive content. Re-run a compliance crawl after the flip to confirm legacy plaintext is either re-written or explicitly tolerated.
 10. Register at least one incident webhook subscribed to `security.auth_failure_burst`, `security.rate_limit_exceeded`, `ops.replication_lag_high`, `ops.panic_recovered`, `ops.disk_usage_high`.

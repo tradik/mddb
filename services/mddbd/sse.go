@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	json "mddb/internal/jsonx"
-	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -110,30 +109,6 @@ func (h *SSEHub) removeClient(client *sseClient) {
 	close(client.ch)
 }
 
-// clientIP extracts the client IP from the request (X-Forwarded-For, X-Real-IP, or RemoteAddr).
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// First IP in chain is the original client
-		if idx := len(xff); idx > 0 {
-			for i, c := range xff {
-				if c == ',' {
-					return xff[:i]
-				}
-				_ = i // use i
-			}
-			return xff
-		}
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
-}
-
 // BroadcastWithAuth sends an event to all connected SSE clients, respecting auth permissions.
 // authManager may be nil (auth disabled).
 func (h *SSEHub) BroadcastWithAuth(event, collection, key, lang string, authManager *AuthManager) {
@@ -225,7 +200,7 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	// GO-030: ?job=<id> narrows the stream to one async job's events, the same
 	// way ?collection= narrows document events. Both may be combined.
 	jobID := r.URL.Query().Get("job")
-	ip := clientIP(r)
+	ip := ClientIP(r)
 
 	// Resolve auth: extract claims from context (injected by auth middleware).
 	// When auth is enabled, the middleware already rejects unauthenticated requests (401).

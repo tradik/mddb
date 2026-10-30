@@ -248,6 +248,10 @@ mddb.example.com {
 }
 ```
 
+### Client IP behind the proxy
+
+mddbd believes `X-Forwarded-For` and `X-Real-IP` only from peers listed in `MDDB_TRUSTED_PROXIES`. With a proxy in front, set it to the proxy's address (`MDDB_TRUSTED_PROXIES=127.0.0.1` for a proxy on the same host, or the Docker network's CIDR), otherwise mddbd's rate limiter, SSE cap and audit log see every client as the proxy. See [config.md#client-ip-and-trusted-proxies](config.md#client-ip-and-trusted-proxies).
+
 ## Persistence Guarantees
 
 What MDDB promises about a write that returned success, and what it does not.

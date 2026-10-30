@@ -220,33 +220,6 @@ func TestAuditHandlerTimeRangeParsing(t *testing.T) {
 	}
 }
 
-func TestClientIPExtraction(t *testing.T) {
-	cases := map[string]struct {
-		remote string
-		xff    string
-		want   string
-	}{
-		"no xff":       {remote: "203.0.113.5:5555", want: "203.0.113.5"},
-		"single xff":   {remote: "10.0.0.1:80", xff: "198.51.100.4", want: "198.51.100.4"},
-		"chained xff":  {remote: "10.0.0.1:80", xff: "198.51.100.4, 10.0.0.1", want: "198.51.100.4"},
-		"ipv6 remote":  {remote: "[::1]:80", want: "[::1]"},
-		"empty remote": {remote: "", want: ""},
-	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			r := httptest.NewRequest("GET", "/", nil)
-			r.RemoteAddr = tc.remote
-			if tc.xff != "" {
-				r.Header.Set("X-Forwarded-For", tc.xff)
-			}
-			got := ClientIP(r)
-			if got != tc.want {
-				t.Fatalf("want %q, got %q", tc.want, got)
-			}
-		})
-	}
-}
-
 func TestAuditPurgeEmptyBucket(t *testing.T) {
 	dir := t.TempDir()
 	db, err := bolt.Open(filepath.Join(dir, "a.db"), 0o600, nil)

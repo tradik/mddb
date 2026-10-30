@@ -914,6 +914,8 @@ export MDDB_RATE_LIMIT_REQUESTS=10
 export MDDB_RATE_LIMIT_WINDOW=60
 export MDDB_RATE_LIMIT_BURST=5
 export MDDB_RATE_LIMIT_BY=ip
+# Behind a reverse proxy only: whose X-Forwarded-For to believe.
+# export MDDB_TRUSTED_PROXIES=127.0.0.1,10.0.0.0/8
 ./mddbd &
 
 # Fire 20 requests back-to-back. The first 10 succeed (+5 burst);
