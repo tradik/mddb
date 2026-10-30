@@ -56,7 +56,7 @@ variables:
   # settles it, and the release version sweep has to touch this line too.
   mddbReleaseDate: "30 October 2026"
   # Counted from tools/list against a running server, not from memory.
-  mcpTools: "81"
+  mcpTools: "93"
   # A release binary: CGO_ENABLED=0, -ldflags="-s -w". A plain `go build` is
   # ~40MB because it keeps the symbol table and DWARF, which is not what
   # anyone downloads.

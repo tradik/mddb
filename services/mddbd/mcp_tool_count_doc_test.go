@@ -77,3 +77,32 @@ func TestMCPToolCountLandingInSync(t *testing.T) {
 		}
 	}
 }
+
+// siteToolCountRe matches the count where the site and the docs front matter
+// state it: the SSG variable every landing section renders ({{$.Vars.mcpTools}}),
+// the docs index description "(N tools)" and the comparison table "N tools over".
+// These three still said 81 after the code reached 93, because only the
+// landing's index.html was guarded.
+var siteToolCountRe = regexp.MustCompile(`mcpTools:\s*"(\d+)"|MCP server \((\d+) tools\)|native — (\d+) tools over`)
+
+// TestMCPToolCountSiteInSync guards the SSG variable and the two docs pages the
+// other guards do not read.
+func TestMCPToolCountSiteInSync(t *testing.T) {
+	want := strconv.Itoa(len(mcpBuiltinTools()))
+	for _, path := range []string{"../../.ssg.yaml", "../../docs/index.md", "../../docs/COMPARISON.md"} {
+		data, err := os.ReadFile(path) // #nosec G304 -- one of three hardcoded repo files, not user input
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		matches := siteToolCountRe.FindAllStringSubmatch(string(data), -1)
+		if len(matches) == 0 {
+			t.Errorf("%s: found no MCP tool-count reference — the guard regex may be stale", path)
+			continue
+		}
+		for _, m := range matches {
+			if got := m[1] + m[2] + m[3]; got != want {
+				t.Errorf("%s: tool count %q != code count %s (in %q)", path, got, want, m[0])
+			}
+		}
+	}
+}
