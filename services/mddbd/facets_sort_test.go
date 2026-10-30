@@ -14,7 +14,7 @@ import (
 // here (#368 follow-up). The order is count desc, then value asc.
 func TestSortFacetBucketsManyValues(t *testing.T) {
 	const n = 200_000
-	r := rand.New(rand.NewPCG(1, 2))
+	r := rand.New(rand.NewPCG(1, 2)) // #nosec G404 -- seeded test data, not a secret
 	buckets := make([]FacetBucket, n)
 	for i := range buckets {
 		buckets[i] = FacetBucket{Value: fmt.Sprintf("v%07d", i), Count: r.IntN(50)}
