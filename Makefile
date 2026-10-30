@@ -4,7 +4,7 @@
 # through two releases.
 MDDB_VERSION := $(shell sed -n 's/.*VERSION[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' services/mddbd/main.go | head -1)
 
-.PHONY: build build-windows soak check-source-encoding test-source-encoding test-shard test-test-shards docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
+.PHONY: build build-windows soak check-source-encoding test-source-encoding test-shard test-test-shards brand-icons test-export-brand docs-linkcheck help dev-start dev-stop dev-logs dev-build dev-clean test lint fmt fmt-check vet sec test-graphql lint-all test-all ci chat-build chat-dev chat-test widget-build widget-dev dev-logs-chat check-version test-version agent-instructions check-agent-instructions check-changelog test-changelog docs-metadata docs-dev docs-build airbyte-build airbyte-push airbyte-test airbyte-spec airbyte-check airbyte-clean gha-install gha-build gha-test gha-coverage gha-lint gha-check gha-verify-dist gha-clean chrome-install chrome-build chrome-package chrome-test chrome-coverage chrome-lint chrome-audit chrome-check chrome-clean grafana-install grafana-build grafana-test grafana-coverage grafana-lint grafana-check grafana-package grafana-docker grafana-clean
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -84,6 +84,12 @@ test-shard: ## Run one shard of the server's root package, as CI does (SHARD=2 S
 
 test-test-shards: ## Run the test-shard and coverage-merge guard test suite
 	bash scripts/tests/test-test-shards.sh
+
+brand-icons: ## Render brand/ icons, favicon and banners from the SVG masters (needs resvg, magick, oxipng)
+	bash scripts/export-brand.sh
+
+test-export-brand: ## Check brand/ rasters: exact sizes, ico frames, padding, safe zone, byte caps
+	bash scripts/tests/test-export-brand.sh
 
 test-langchain: ## Run the LangChain adapter tests (INT-017)
 	@cd integrations/langchain-mddb && python3 -m pytest -q

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+
+    <linearGradient id="hexGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00d2ff"/>
+      <stop offset="100%" stop-color="#0072ff"/>
+    </linearGradient>
+
+    <linearGradient id="triGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#00f2fe"/>
+      <stop offset="100%" stop-color="#4facfe"/>
+    </linearGradient>
+
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <rect x="32" y="32" width="448" height="448" rx="96" fill="url(#bgGrad)" />
+
+  <polygon points="256,96 394,176 394,336 256,416 118,336 118,176" 
+           fill="url(#hexGrad)" 
+           filter="url(#glow)"/>
+
+  <polygon points="256,120 373,187 373,325 256,392 139,325 139,187" 
+           fill="#0f172a" />
+
+  <polygon points="256,165 345,320 167,320" 
+           fill="url(#triGrad)" 
+           filter="url(#glow)" />
+
+  <polygon points="256,185 330,310 182,310" 
+           fill="#00bcd4" />
+
+  <polygon points="256,200 315,300 197,300" 
+           fill="url(#triGrad)" />
+
+  <path d="M 256 220 Q 256 250 226 250 Q 256 250 256 280 Q 256 250 286 250 Q 256 250 256 220 Z" 
+        fill="#ffffff" 
+        filter="url(#glow)"/>
+</svg>

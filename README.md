@@ -710,6 +710,13 @@ Both are current by construction, which a hand-written roadmap was not.
 Running mddb in something public? Open an issue or a PR to be listed here and
 on [mddb.tradik.com](https://mddb.tradik.com/).
 
+## 🎨 Brand
+
+The logo, its icons and banners live in [`brand/`](brand/). Colours, contrast
+ratios (WCAG 2.2), clear space, backgrounds and the size matrix are in
+**[brand/USAGE.md](brand/USAGE.md)**. Rasters are generated from the SVG master
+with `make brand-icons` and checked with `make test-export-brand`.
+
 ## 🤝 Contributing
 
 Contributions welcome! See **[CONTRIBUTING.md](CONTRIBUTING.md)** for guidelines.

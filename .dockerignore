@@ -6,6 +6,10 @@
 .gitignore
 .gitattributes
 
+# Brand masters and rasters — build/docs assets; integrations ship their own
+# generated copies, no runtime image needs brand/ (see brand/USAGE.md).
+brand/
+
 # Documentation (any depth)
 *.md
 **/*.md

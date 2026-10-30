@@ -45,3 +45,5 @@ Dockerfile* text eol=lf
 *.zip binary
 *.deb binary
 *.rpm binary
+*.png binary
+*.ico binary

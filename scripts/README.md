@@ -86,6 +86,19 @@ missing. External hosts are never fetched, so the check is offline and
 deterministic. Requested upstream as spagu/ssg#87; it goes away if `check_links`
 learns the deploy target.
 
+### export-brand.sh
+
+Renders the brand masters (`brand/mddb-logo.svg`, `brand/mddb-mark.svg`) into
+the icon PNGs, `favicon.ico` and banners under `brand/`. Needs `resvg` 0.49.0
+(ImageMagick's own SVG renderer breaks the master's gradients), ImageMagick 7
+and `oxipng`; it refuses to run without any of them. The size matrix and the
+consumers of each file are in [brand/USAGE.md](../brand/USAGE.md).
+
+```bash
+make brand-icons          # = bash scripts/export-brand.sh [out_dir]
+make test-export-brand    # exact sizes, ico frames, padding, byte caps
+```
+
 ## Using with Makefile
 
 ```bash
