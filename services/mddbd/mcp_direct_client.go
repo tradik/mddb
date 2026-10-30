@@ -218,7 +218,7 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 		req.IncludeContent = true
 	}
 
-	page, total, err := c.server.searchDocuments(req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit)
+	page, total, err := c.server.shapedListing(ctx, req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit, limitReport)
 	if err != nil {
 		return nil, err
 	}

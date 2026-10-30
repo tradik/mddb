@@ -1200,6 +1200,9 @@ func (s *Server) wrapHTTPHandler(mux *http.ServeMux, authEnabled bool, panelMode
 	handler = withJSON(mux)
 	// GO-044: an alias becomes its collection before any handler reads it.
 	handler = s.withAliases(handler)
+	// OPS-025: the surface (REST, GraphQL, /es) and client, for the
+	// query-shape counters; inside auth, so the user is known.
+	handler = withShapeSurface(handler)
 	// SEC-005: cap request body size globally so a single oversized JSON body
 	// can't OOM the process. Upload/import endpoints legitimately stream large
 	// files and manage their own limits, so they are exempt.
@@ -1495,9 +1498,8 @@ func (s *Server) grpcServerOptions(authEnabled bool) ([]grpc.ServerOption, strin
 		unaryChain = append(unaryChain, s.accessUnaryInterceptor())
 		streamChain = append(streamChain, s.accessStreamInterceptor())
 	}
-	if len(unaryChain) > 0 {
-		grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryChain...))
-	}
+	unaryChain = append(unaryChain, shapeUnaryInterceptor) // OPS-025: last, after auth
+	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryChain...))
 	if len(streamChain) > 0 {
 		grpcOpts = append(grpcOpts, grpc.ChainStreamInterceptor(streamChain...))
 	}

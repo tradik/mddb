@@ -4844,6 +4844,69 @@ paths:
               schema:
                 type: string
 
+  /v1/admin/diagnose:
+    get:
+      tags:
+        - Telemetry
+      summary: Diagnose bundle without user data (admin-only)
+      description: |
+        A tar.gz to attach to an issue (OPS-025), saved by `mddb-cli diagnose`.
+        `MANIFEST.json` comes first and lists every file with its size, SHA-256
+        and the redaction applied. The default bundle holds `build.json`,
+        `config.json` (configuration through the allowlist: secrets set/unset,
+        paths and hosts set/unset, URLs scheme only, listen addresses port only,
+        host lists counted), `env.json`, `stats.json`, `storage.json`,
+        `vector-stats.json`, `indexing.json`, `metrics.prom`, `query-shape.json`,
+        `errors.json` (error class and file:line, no messages) and, with the
+        audit log on, `audit-summary.json` (action × result counts). It never
+        carries document content, metadata values, document IDs, query text,
+        vectors, keys, tokens, headers, actors, IP addresses or paths;
+        collection names are `c_` plus 8 hex digits of their SHA-256 unless
+        `keepNames=true`. Read-only: works on a read-only instance and on a
+        replication follower. Admin JWT required when auth is on. See
+        docs/TELEMETRY.md, "Diagnose bundle".
+      operationId: adminDiagnose
+      security:
+        - BearerAuth: []
+        - APIKeyAuth: []
+      parameters:
+        - name: profiles
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Add goroutines.txt (stack traces) and heap.pprof
+        - name: integrity
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Add integrity.json — bbolt's consistency check of every database file; slow on a large database
+        - name: keepNames
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Keep collection names instead of hashing them
+      responses:
+        "200":
+          description: The bundle
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              description: attachment; filename="mddb-diagnose-<UTC time>.tar.gz"
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: No credentials (auth enabled)
+        "403":
+          description: Not an admin
+        "405":
+          description: Method other than GET
   /v1/audit:
     get:
       tags:

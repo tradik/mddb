@@ -348,7 +348,7 @@ func (g *GRPCServer) Search(ctx context.Context, req *proto.SearchRequest) (*pro
 	}
 	limit, limitReport := g.server.CapLimit(req.Collection, limit, 0) // #368
 	filter := mergeFilters(metaValuesFromProto(req.FilterMeta), metaFilterFromProto(req.Filter))
-	page, total, err := g.server.searchDocuments(req.Collection, filter, sortField, req.Asc, int(req.Offset), limit)
+	page, total, err := g.server.shapedListing(ctx, req.Collection, filter, sortField, req.Asc, int(req.Offset), limit, limitReport)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

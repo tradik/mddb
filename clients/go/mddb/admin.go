@@ -3,6 +3,7 @@ package mddb
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 )
 
 // --- Schema ---
@@ -75,6 +76,34 @@ func (c *Client) Restore(ctx context.Context, body any) (json.RawMessage, error)
 // Truncate deletes a collection's revision history. Returns raw JSON.
 func (c *Client) Truncate(ctx context.Context, body any) (json.RawMessage, error) {
 	return c.Do(ctx, "POST", "/v1/truncate", body)
+}
+
+// --- Diagnose ---
+
+// DiagnoseOptions selects the diagnose bundle's opt-in parts (OPS-025).
+type DiagnoseOptions struct {
+	Profiles  bool // goroutine stacks and the heap profile
+	Integrity bool // bbolt's consistency check of every database file; slow on a large one
+	KeepNames bool // keep collection names instead of hashing them
+}
+
+// Diagnose downloads the diagnose bundle, GET /v1/admin/diagnose: a tar.gz
+// describing the server — build, configuration through an allowlist, stats,
+// metrics, query-shape counters, recent error classes — without its data.
+// MANIFEST.json, its first file, lists every file and the redaction applied.
+// Admin only. With Integrity, pass a context with a long enough deadline.
+func (c *Client) Diagnose(ctx context.Context, opts DiagnoseOptions) ([]byte, error) {
+	q := url.Values{}
+	for name, on := range map[string]bool{"profiles": opts.Profiles, "integrity": opts.Integrity, "keepNames": opts.KeepNames} {
+		if on {
+			q.Set(name, "true")
+		}
+	}
+	path := "/v1/admin/diagnose"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	return c.Do(ctx, "GET", path, nil)
 }
 
 // --- Auth ---

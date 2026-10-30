@@ -51,7 +51,7 @@ func (s *Server) handleCodeGraph(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := s.CodeGraph(GraphRequest{
+	res, err := s.shapedCodeGraph(r.Context(), GraphRequest{
 		Collection:   req.Collection,
 		Key:          req.Key,
 		Direction:    direction,
@@ -92,11 +92,9 @@ func parseCodeGraphRequest(r *http.Request) (codeGraphRequest, error) {
 		return req, errors.New("method not allowed")
 	}
 
+	// A missing key is refused by CodeGraph, after it is counted (OPS-025).
 	if req.Collection == "" {
 		return req, errors.New("collection is required")
-	}
-	if req.Key == "" {
-		return req, errors.New("key is required")
 	}
 	return req, nil
 }

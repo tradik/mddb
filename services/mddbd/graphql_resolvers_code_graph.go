@@ -25,7 +25,7 @@ func (a *GraphQLAdapter) CodeGraph(ctx context.Context, input gql.CodeGraphInput
 		return nil, err
 	}
 
-	res, err := a.server.CodeGraph(GraphRequest{
+	res, err := a.server.shapedCodeGraph(ctx, GraphRequest{
 		Collection:   input.Collection,
 		Key:          input.Key,
 		Direction:    direction,

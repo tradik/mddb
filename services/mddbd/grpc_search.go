@@ -321,7 +321,7 @@ func (g *GRPCServer) FTS(ctx context.Context, req *proto.FTSRequest) (*proto.FTS
 	if err := g.server.normalizeFTSRequest(&fr); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	res, err := g.server.searchFTS(fr, time.Now())
+	res, err := g.server.shapedFTS(ctx, fr, time.Now())
 	if err != nil {
 		return nil, searchStatus(err)
 	}

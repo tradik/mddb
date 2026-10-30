@@ -1,0 +1,72 @@
+name: Bug report
+description: Something in MDDB does not work as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For a security vulnerability, do not open an issue: see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: MDDB version
+      description: "`mddbd --version`, or `version` in GET /v1/config"
+      placeholder: "2.18.10"
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      description: Where you saw it
+      multiple: true
+      options:
+        - REST
+        - gRPC
+        - MCP
+        - GraphQL
+        - Elasticsearch subset (/es)
+        - mddb-cli
+        - Panel
+        - Client library
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The request you sent and the answer you got. Remove anything private.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start mddbd with …
+        2. POST /v1/… with …
+        3. …
+  - type: textarea
+    id: diagnose
+    attributes:
+      label: Diagnose bundle
+      description: |
+        Attach the file `mddb-cli diagnose` writes (an admin login or key is needed). It holds the build,
+        the configuration through an allowlist, stats, metrics, query-shape counters and recent error classes,
+        and no document content, queries, keys, actors, IP addresses or paths; collection names are hashed.
+        Run `mddb-cli diagnose --inspect` first to see exactly what it holds. Add `--profiles` for a hang or a
+        memory problem, `--integrity` for suspected database damage. Drag the .tar.gz into this field.
+      placeholder: "mddb-diagnose-<host>-<time>.tar.gz"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server log lines
+      description: The lines around the failure, with anything private removed.
+      render: text

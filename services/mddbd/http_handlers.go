@@ -140,7 +140,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	page, total, err := s.searchDocuments(req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit)
+	page, total, err := s.shapedListing(r.Context(), req.Collection, mergeFilters(req.FilterMeta, req.Filter), req.Sort, req.Asc, req.Offset, req.Limit, limitReport)
 	if err != nil {
 		bad(w, err)
 		return
@@ -378,6 +378,7 @@ func ok(w http.ResponseWriter, v any) {
 	_, _ = w.Write(b) // #nosec G705 -- response write to http.ResponseWriter
 }
 func bad(w http.ResponseWriter, err error) {
+	diagErrors.record(err, 1) // OPS-025: the class and the caller's line, never the message
 	// GO-043: a quota refusal is 507 or 429 wherever it surfaces, so every
 	// handler that reports a write failure here maps it without knowing
 	// about quotas.

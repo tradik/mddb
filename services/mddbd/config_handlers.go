@@ -89,24 +89,33 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build configuration response
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(s.configResponse(audienceEndpoint)); err != nil {
+		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
+	}
+}
+
+// configResponse is the effective configuration, every value rendered for
+// aud through the configuration allowlist (config_allowlist.go): GET
+// /v1/config and the diagnose bundle's config.json are this one answer.
+func (s *Server) configResponse(aud configAudience) ConfigResponse {
 	response := ConfigResponse{
 		Version:      VERSION,
-		DatabasePath: s.Path,
+		DatabasePath: configValue("MDDB_PATH", s.Path, aud),
 		Mode:         string(s.Mode),
 		PanelMode:    env("MDDB_PANEL_MODE", "internal"),
 		Protocols: ProtocolsConfig{
 			HTTP: HTTPProtocolStatus{
 				Enabled: s.Config.HTTP.Enabled,
-				Addr:    s.Config.HTTP.Addr,
+				Addr:    configValue("MDDB_HTTP_ADDR", s.Config.HTTP.Addr, aud),
 			},
 			GRPC: GRPCProtocolStatus{
 				Enabled: s.Config.GRPC.Enabled,
-				Addr:    s.Config.GRPC.Addr,
+				Addr:    configValue("MDDB_GRPC_ADDR", s.Config.GRPC.Addr, aud),
 			},
 			MCP: MCPProtocolStatus{
 				Enabled:            s.Config.MCP.Enabled,
-				Addr:               s.Config.MCP.Addr,
+				Addr:               configValue("MDDB_MCP_ADDR", s.Config.MCP.Addr, aud),
 				Stdio:              s.Config.MCP.Stdio,
 				Revision:           activeMCPVersions()[0],
 				SupportedRevisions: activeMCPVersions(),
@@ -115,7 +124,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			},
 			HTTP3: HTTP3ProtocolStatus{
 				Enabled: s.Config.HTTP3.Enabled,
-				Addr:    s.Config.HTTP3.Addr,
+				Addr:    configValue("MDDB_HTTP3_ADDR", s.Config.HTTP3.Addr, aud),
 			},
 		},
 		AuthEnabled:           env("MDDB_AUTH_ENABLED", "false") == "true",
@@ -127,6 +136,9 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.VectorConfig = s.vectorConfig()
+	if response.VectorConfig != nil {
+		response.VectorConfig.APIURL = configValue("MDDB_EMBEDDING_API_URL", response.VectorConfig.APIURL, aud)
+	}
 
 	// Add chunk configuration
 	chunkEnabled := envconf.String("MDDB_EMBEDDING_CHUNK_ENABLED", "true") == "true"
@@ -135,9 +147,5 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		Enabled:   chunkEnabled,
 		ChunkSize: chunkSize,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, `{"error":"failed to encode response"}`, http.StatusInternalServerError)
-	}
+	return response
 }

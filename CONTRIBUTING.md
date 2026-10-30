@@ -138,6 +138,16 @@ docs: update API reference with new endpoints
 
 - Use [GitHub Issues](https://github.com/tradik/mddb/issues) for bugs and feature requests
 - For security vulnerabilities, see [SECURITY.md](SECURITY.md)
+- **Attach a diagnose bundle** to a bug report: `mddb-cli diagnose` (admin
+  login or key) saves a tar.gz with the build, the configuration through an
+  allowlist, stats, metrics, query-shape counters and recent error classes —
+  no document content, queries, keys, actors, IPs or paths, and collection
+  names hashed. Run `mddb-cli diagnose --inspect` first to see exactly what it
+  holds. See [docs/TELEMETRY.md, "Diagnose bundle"](docs/TELEMETRY.md#diagnose-bundle).
+- A question about code that MDDB's graph or search did not answer has its own
+  template ("Code or graph question"); paste `query-shape.json` from the bundle
+  there. Those reports, with the numbers, decide whether the graph goes deeper
+  (CODE-006) or gains a module map (CODE-007).
 
 ## License
 

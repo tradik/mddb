@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"io"
 	"math"
@@ -109,9 +110,9 @@ func (s *Server) esRun(r *http.Request, index string, spec *esSearchSpec) (*esRe
 	case spec.KNN != nil:
 		res, err = s.esVector(r, index, spec, window)
 	case q.hasText():
-		res, err = s.esFTS(index, spec, window)
+		res, err = s.esFTS(r.Context(), index, spec, window)
 	default:
-		res, err = s.esList(index, spec, window)
+		res, err = s.esList(r.Context(), index, spec, window)
 	}
 	if err != nil {
 		return nil, err
@@ -125,7 +126,7 @@ func (s *Server) esRun(r *http.Request, index string, spec *esSearchSpec) (*esRe
 }
 
 // esFTS runs a text query through searchFTS.
-func (s *Server) esFTS(index string, spec *esSearchSpec, window int) (*esResult, error) {
+func (s *Server) esFTS(ctx context.Context, index string, spec *esSearchSpec, window int) (*esResult, error) {
 	query, mode, algorithm := spec.Query.FTSQuery()
 	req := FTSSearchRequest{
 		Collection: index, Query: query, Mode: mode, Algorithm: algorithm, Limit: max(window, 1),
@@ -135,7 +136,7 @@ func (s *Server) esFTS(index string, spec *esSearchSpec, window int) (*esResult,
 	if h := spec.Highlight; h != nil {
 		req.Highlight, req.HighlightTag, req.MaxHighlights, req.FragmentSize = true, h.Tag, h.Fragments, h.FragmentSize
 	}
-	resp, err := s.searchFTS(req, time.Now())
+	resp, err := s.shapedFTS(ctx, req, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -152,14 +153,14 @@ func (s *Server) esFTS(index string, spec *esSearchSpec, window int) (*esResult,
 
 // esList answers a filter-only query from the metadata listing. Timestamp
 // ranges and aggs need every match, which the listing loads anyway to sort.
-func (s *Server) esList(index string, spec *esSearchSpec, window int) (*esResult, error) {
+func (s *Server) esList(ctx context.Context, index string, spec *esSearchSpec, window int) (*esResult, error) {
 	filter, docRanges := rangeMetaAsFilter(spec.Query.Filter, spec.Query.Ranges)
 	whole := len(docRanges) > 0 || len(spec.Aggs) > 0
 	limit := window
 	if whole {
 		limit = math.MaxInt
 	}
-	docs, total, err := s.searchDocuments(index, filter, spec.SortField, spec.SortAsc, 0, limit)
+	docs, total, err := s.shapedListing(ctx, index, filter, spec.SortField, spec.SortAsc, 0, limit, LimitReport{})
 	if err != nil {
 		return nil, err
 	}

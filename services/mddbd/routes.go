@@ -77,6 +77,7 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/stopwords", s.handleStopWords)
 	mux.HandleFunc("/v1/audit", s.handleAudit)
 	mux.HandleFunc("/v1/audit/exporters", s.handleAuditExporters)
+	mux.HandleFunc("/v1/admin/diagnose", s.handleDiagnose) // OPS-025: admin-only, read-only
 	mux.HandleFunc("/v1/encryption/status", s.handleEncryptionStatus)
 	mux.HandleFunc("/v1/encryption/rotate", s.handleEncryptionRotate)
 	mux.HandleFunc("/v1/encryption/jobs", s.handleEncryptionJob)

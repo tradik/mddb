@@ -29,6 +29,8 @@ type Metrics struct {
 	histograms map[string]*histogram // "method|path" -> histogram
 	opsCount   map[string]int64      // operation counters (e.g. "fts_search|bm25" -> count)
 	gauges     map[string]*gauge     // event-set gauges by name (gauges.go)
+
+	shape *QueryShape // query-shape counters (OPS-025), on even when metrics are off
 }
 
 // StatsProvider supplies the server/runtime gauges that the /metrics endpoint
@@ -113,6 +115,7 @@ func NewMetrics(enabled bool, stats StatsProvider) *Metrics {
 		reqCount:   make(map[string]int64),
 		histograms: make(map[string]*histogram),
 		opsCount:   make(map[string]int64),
+		shape:      NewQueryShape(),
 	}
 }
 
@@ -323,6 +326,9 @@ func (m *Metrics) HandleMetrics(w http.ResponseWriter, r *http.Request) {
 
 	// --- Gauges set by events (gauges.go) ---
 	m.writeGauges(&buf)
+
+	// --- Query shape (OPS-025) ---
+	m.shape.writeQueryShape(&buf)
 
 	// --- Database metrics (cached) ---
 	ds := m.stats.DBStats()

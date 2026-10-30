@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mddb/internal/fts"
 	"mddb/internal/geo"
+	"mddb/internal/metrics"
 	"mddb/internal/storage"
 	"mddb/internal/vector"
 	"net/http"
@@ -393,6 +394,8 @@ func (s *Server) handleHybridSearch(w http.ResponseWriter, r *http.Request) {
 		items = items[:req.TopK]
 	}
 	req.plan = plan
+	s.recordSearch(r.Context(), vectorShape(metrics.ModeHybrid, req.Collection, req.VectorAlgorithm, ranVectorAlgorithm(req.VectorAlgorithm, plan),
+		req.FilterMeta, req.Filter, plan, len(items), req.limitReport)) // OPS-025
 	imageHits := s.hybridImages(r.Context(), req, items) // RAG-010
 
 	if req.wantsPassages() {

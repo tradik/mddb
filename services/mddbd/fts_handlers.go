@@ -146,7 +146,7 @@ func (s *Server) handleFTS(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-MDDB-Cache", "miss")
 	}
 
-	resp, err := s.searchFTS(req, start)
+	resp, err := s.shapedFTS(r.Context(), req, start)
 	if err != nil {
 		bad(w, err)
 		return

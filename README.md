@@ -665,7 +665,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[Storage Tuning](docs/STORAGE-TUNING.md)** - Disks, filesystems, WSL2, macOS, FreeBSD, ZFS; fast restarts of large databases
 - **[Storage Layout](docs/STORAGE-LAYOUT.md)** - One file, or one file per collection (`MDDB_STORAGE_LAYOUT`)
 - **[Corpus Packs](docs/CORPUS-PACKS.md)** - Portable read-only collections: `mddb-cli corpus build` / `install` / `list` / `remove`
-- **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics, Grafana, OpenTelemetry traces over OTLP (`MDDB_OTEL_ENDPOINT`)
+- **[Telemetry](docs/TELEMETRY.md)** - Prometheus metrics (with query-shape counters), Grafana, OpenTelemetry traces over OTLP (`MDDB_OTEL_ENDPOINT`), and the diagnose bundle without user data (`mddb-cli diagnose`) to attach to an issue
 - **[Health Checks](docs/HEALTHCHECK.md)** - Docker & Kubernetes
 - **[Benchmarks](docs/BENCHMARK.md)** - FTS algorithm comparison, measured
 - **[Architecture](docs/ARCHITECTURE.md)** - System design

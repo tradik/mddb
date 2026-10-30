@@ -60,7 +60,7 @@ It provides an interface similar to mysql-client for managing markdown documents
 		newWebhookCmd(), newSchemaCmd(), newValidateCmd(),
 		newLoginCmd(), newAPIKeyCmd(),
 		newGraphQLCmd(), newPlaygroundCmd(), newCorpusCmd(),
-		newSelfUpdateCmd(),
+		newDiagnoseCmd(), newSelfUpdateCmd(),
 	)
 
 	return rootCmd

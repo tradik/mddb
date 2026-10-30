@@ -3366,6 +3366,55 @@ Events are returned newest-first. `dropped` reports the running total of events 
 
 ---
 
+### GET /v1/admin/diagnose
+
+> Added in 2.18.10 (OPS-025).
+
+A tar.gz describing the instance without its data, to attach to an issue.
+`mddb-cli diagnose` saves it; `mddb-cli diagnose --inspect` prints its manifest
+without writing anything.
+
+**Authentication**: admin JWT or API key required (as `/v1/audit`). Read-only:
+it works on a read-only instance and on a replication follower.
+
+**Query parameters**:
+
+| Parameter | Default | Effect |
+|---|---|---|
+| `profiles` | `false` | Add `goroutines.txt` and `heap.pprof` |
+| `integrity` | `false` | Add `integrity.json`: bbolt's consistency check of every database file (slow on a large database; the request budget becomes 30 minutes) |
+| `keepNames` | `false` | Keep collection names instead of `c_` + 8 hex digits of their SHA-256 |
+
+**Response**: `200`, `Content-Type: application/gzip`,
+`Content-Disposition: attachment; filename="mddb-diagnose-<UTC time>.tar.gz"`.
+The first file is `MANIFEST.json`:
+
+```json
+{
+  "format": 1,
+  "version": "2.18.10",
+  "createdAt": "2026-10-30T15:31:04Z",
+  "options": { "profiles": false, "integrity": false, "keepNames": false },
+  "files": [
+    { "name": "build.json", "size": 237, "sha256": "e1db…", "redaction": "none: build and runtime facts only" },
+    { "name": "query-shape.json", "size": 2336, "sha256": "b83b…", "redaction": "counters only; collections hashed (c_ + 8 hex of SHA-256)" }
+  ],
+  "omitted": [ { "name": "heap.pprof", "reason": "opt-in: profiles" } ],
+  "neverIncluded": [ "document content, metadata values, document IDs and keys", "…" ]
+}
+```
+
+The files, their sources and their redaction are listed in
+[TELEMETRY.md, "Diagnose bundle"](TELEMETRY.md#diagnose-bundle).
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" -o bundle.tar.gz \
+  "http://localhost:11023/v1/admin/diagnose?profiles=true"
+tar -xOzf bundle.tar.gz MANIFEST.json
+```
+
+---
+
 ### GET /v1/audit/exporters
 
 > Added in 2.9.16.
@@ -3898,6 +3947,11 @@ curl http://localhost:11023/v1/system/info
 ### GET /v1/config
 
 Returns server configuration overview.
+
+Values pass through the configuration allowlist the diagnose bundle uses
+(2.18.10, OPS-025): a URL is shown without credentials, query or fragment
+(`https://user:key@host/v1` → `https://host/v1`); secrets are never part of
+this answer.
 
 **Example:**
 ```bash

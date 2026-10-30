@@ -1,7 +1,7 @@
 ---
 title: "MDDB Telemetry & Monitoring"
 slug: "docs/telemetry"
-description: "MDDB's Prometheus-compatible /metrics endpoint exposing server, database and Go runtime telemetry with no external dependencies, Grafana panels, and OpenTelemetry trace export over OTLP/HTTP."
+description: "MDDB's Prometheus-compatible /metrics endpoint (server, database, query-shape and Go runtime telemetry), Grafana panels, OpenTelemetry trace export, and the diagnose bundle without user data."
 status: publish
 ---
 
@@ -193,6 +193,57 @@ so here they are.
 The counters hold counts only: no query text, no keys, no collection names.
 They are written once a minute and at shutdown. Cached full-text responses
 and evaluation runs (`POST /v1/eval`) are not counted.
+
+### Query shape (v2.18.10+)
+
+What searches and graph requests looked like, counted on every surface: REST,
+gRPC, MCP, GraphQL and the Elasticsearch subset under `/es`. The counters hold
+fixed vocabularies only (surface, mode, algorithm, operator, depth bucket),
+never query text, keys or values. They run whether or not `/metrics` is on,
+because the [diagnose bundle](#diagnose-bundle) carries them as
+`query-shape.json`, with a per-collection breakdown under hashed names.
+
+| Metric | Type | Labels | Description |
+|---|---|---|---|
+| `mddb_query_shape_searches_total` | counter | `surface`, `mode` (`fts`, `vector`, `hybrid`, `meta`) | Searches |
+| `mddb_query_shape_empty_results_total` | counter | `surface`, `mode` | Searches that returned nothing |
+| `mddb_query_shape_limit_capped_total` | counter | `surface`, `mode` | Searches the server's cap lowered (`limitCapped`, #368) |
+| `mddb_query_shape_algorithm_total` | counter | `mode`, `algorithm` | The algorithm that ran (`other` for a name outside the known set) |
+| `mddb_query_shape_auto_choice_total` | counter | `algorithm` | What the planner chose for `algorithm: auto` (SRCH-013) |
+| `mddb_query_shape_filter_operator_total` | counter | `operator` (`in`, `prefix`, `contains`, `gt`, `gte`, `lt`, `lte`, `not`, `exists`, `range`) | Searches using each filter operator |
+| `mddb_query_shape_filter_conditions_total` | counter | `conditions` (`0`…`5+`) | Searches by number of filtered metadata keys |
+| `mddb_query_shape_decomposed_total` | counter | `surface` | Searches whose query was split (`queryDecomposition`, SRCH-020) |
+| `mddb_query_shape_decomposition_parts_total` | counter | -- | Sub-queries those searches ran |
+| `mddb_query_shape_graph_requests_total` | counter | `surface`, `kind` (`code_graph`, `expand`) | `/v1/code-graph` (and its MCP and GraphQL forms) and `retrievalMode: graph` expansion |
+| `mddb_query_shape_graph_depth_total` | counter | `kind`, `depth` (`0` = default … `5+`) | Requested depth |
+| `mddb_query_shape_graph_depth_clamped_total` | counter | `surface`, `kind` | Requests whose depth was clamped to the maximum (3: `GraphMaxDepth`, `GraphExpandMaxDepth`) |
+| `mddb_query_shape_graph_truncated_total` | counter | `kind` | Walks a degree or depth limit cut short |
+| `mddb_query_shape_graph_no_start_total` | counter | `surface` | Code-graph requests without a start document (refused, counted) |
+| `mddb_query_shape_graph_whole_graph_total` | counter | `surface` | Code-graph requests at maximum depth and fan-out |
+| `mddb_query_shape_graph_chain_length` | histogram | -- | Chains of code-graph calls: the same client, each call starting at a document the previous answer reached, within 30 s |
+| `mddb_query_shape_graph_chains_open` | gauge | -- | Chains still inside their 30 s window |
+
+A family appears once it has a non-zero series, except
+`graph_depth_clamped_total` and the chain histogram, which are always there for
+a dashboard to read. The client behind a chain is the authenticated user, the
+MCP session or key, or the client address, hashed with a key made at start-up;
+neither the identity nor the hash is written anywhere. Not counted: cached
+full-text responses, evaluation runs (`POST /v1/eval`) and cross-collection
+search.
+
+Counting is atomic adds on fixed arrays: `BenchmarkQueryShapeSearch` in
+`internal/metrics` measures 15 ns and 0 allocations per counted search.
+
+```promql
+# Share of graph sessions that chained 3+ calls (the CODE-006 gate)
+1 - (mddb_query_shape_graph_chain_length_bucket{le="2"} / mddb_query_shape_graph_chain_length_count)
+
+# Graph requests clamped to depth 3, per hour
+sum(increase(mddb_query_shape_graph_depth_clamped_total[1h]))
+
+# Empty-result ratio per mode
+sum by (mode) (rate(mddb_query_shape_empty_results_total[5m])) / sum by (mode) (rate(mddb_query_shape_searches_total[5m]))
+```
 
 ### Vector Search
 
@@ -619,6 +670,77 @@ Off is the same as before, within run-to-run noise (the two ranges overlap:
 64.5–66.8 µs before, 62.9–70.5 µs after). With tracing on, a search records six
 spans and pays about 20 µs and 77 allocations for them. On a real deployment
 that is small next to a provider round trip for the query embedding.
+
+## Diagnose bundle
+
+`mddb-cli diagnose` saves one tar.gz describing a running instance, to attach
+to an issue, so a report needs no back-and-forth of `/v1/stats`, `/v1/config`,
+`/metrics` and profiles. Behind it is `GET /v1/admin/diagnose`, admin-only and
+read-only: it works on a read-only instance and on a replication follower.
+
+```bash
+mddb-cli diagnose                      # mddb-diagnose-<host>-<time>.tar.gz
+mddb-cli diagnose --inspect            # show the manifest, write nothing
+mddb-cli diagnose --profiles --integrity --out bundle.tar.gz
+```
+
+Every file is redacted as it is built, by allowlist: what is kept is named, and
+anything a handler adds later is replaced until someone classifies it.
+`MANIFEST.json` comes first and lists every file, its size, its SHA-256 and the
+redaction applied; the CLI checks each file against it.
+
+| File | Source | Redaction | When |
+|---|---|---|---|
+| `MANIFEST.json` | the bundle | — | always |
+| `build.json` | version, commit, Go, OS/arch, build tags, vector math (`avx2`, `neon`, `scalar` for `noasm`), uptime, storage layout, mode, replication role | none needed | always |
+| `config.json` | the effective configuration (`GET /v1/config`), every set `MDDB_*` variable, each collection's switches (`readOnly`, corpus, `fts.excludeMetaKeys` as a count, `retrieval.maxTopK`, quantization, quota set) | configuration allowlist, below | always |
+| `env.json` | names of the `MDDB_*` variables | values through the allowlist; an unclassified variable shows `<unclassified>` | always |
+| `stats.json`, `storage.json`, `vector-stats.json`, `indexing.json` | the handlers of `/v1/stats`, `/v1/storage`, `/v1/vector-stats`, `/v1/indexing-status`, called in process | collections hashed; strings other than enumerations and timestamps replaced by `<redacted>` | always |
+| `metrics.prom` | `/metrics` | collection labels hashed; HTTP paths cut to their endpoint (`/v1/aliases/*`); other label values kept only as lowercase identifiers | always |
+| `query-shape.json` | the [query-shape counters](#query-shape-v21810), with the CODE-006/007 gates computed | counters only; collections hashed | always |
+| `audit-summary.json` | `/v1/audit`, last 7 days | action × result counts; no actors, IPs, keys or details | audit log on |
+| `errors.json` | the last 200 errors answered | error class (`not_found`, `json`, `quota`, a Go type) and `file:line`; never the message | always |
+| `goroutines.txt`, `heap.pprof` | `runtime/pprof` | stacks and allocation sites: function names and source `file:line` of the build, no values | `--profiles` |
+| `integrity.json` | bbolt's consistency check of the main file and every collection file | problem counts per file; bbolt's messages (which can quote keys) are dropped | `--integrity` |
+
+**Never in the bundle:**
+
+- document content, metadata values, document IDs and keys;
+- query text, vectors, summaries;
+- API keys, tokens, passwords, DSNs, request headers;
+- actors, user names, IP addresses;
+- file paths and host names (the CLI puts the server's host in the file name
+  only, on your machine);
+- collection names, unless `--keep-names`: a name becomes `c_` plus the first
+  8 hex digits of its SHA-256, the same in every file so they can be joined.
+
+**Configuration allowlist.** `config_allowlist.go` classifies every variable
+the server reads, and `GET /v1/config` renders through the same table.
+`TestEveryConfigKeyIsClassified` reads the server's source and fails on a
+variable the table does not classify.
+
+| Class | `/v1/config` | Bundle | Examples |
+|---|---|---|---|
+| public | value | value | `MDDB_MODE`, `MDDB_SEARCH_MAX_LIMIT`, `MDDB_ES_COMPAT`, `MDDB_CORPUS_MAX_BYTES`, `MDDB_CLIENT_IP_HEADER`, `MDDB_PROXY_PROTOCOL` |
+| secret | `<set>` | `<set>` / `<unset>` | `MDDB_AUTH_JWT_SECRET`, `MDDB_EMBEDDING_API_KEY`, `MDDB_MCP_API_KEYS`, `MDDB_OTEL_HEADERS` |
+| listen address | value | port only (`:11023`) | `MDDB_HTTP_ADDR`, `MDDB_GRPC_ADDR` |
+| URL | without credentials, query or fragment | scheme only (`<set: https>`) | `MDDB_EMBEDDING_API_URL`, `MDDB_OTEL_ENDPOINT` |
+| host list | value | entry count (`<2 entries>`) | `MDDB_TRUSTED_PROXIES`, `MDDB_CORS_ORIGINS`, `MDDB_OUTBOUND_ALLOWLIST` |
+| hidden | value | `<set>` / `<unset>` | `MDDB_PATH`, `MDDB_BACKUP_DIR`, `MDDB_TLS_KEY`, `MDDB_REPLICATION_LEADER_ADDR`, `MDDB_MCP_INSTRUCTIONS` |
+
+`MDDB_TRUSTED_PROXIES` names the operator's internal network, so the bundle
+says how many entries it has and not which.
+
+**Bounds.** The default bundle is under 1 MB and builds in under 2 s on a
+small instance (`TestDiagnoseManifestDescribesEveryFile`); the request has a
+30 s budget, or 30 minutes with `--integrity`. A file over 8 MB is left out
+and the manifest says so; so is a part that fails, with its error class.
+
+**The privacy contract.** `TestDiagnoseBundleCarriesNoCanary` seeds unique
+strings into document content, a metadata value, a document key, query text,
+API keys, the trusted-proxy list, a path, a collection name, an audit actor and
+a client IP, in both storage layouts, then unpacks the bundle and searches every
+file, the gunzipped heap profile included. Removing any one redaction fails it.
 
 ## Existing Monitoring Endpoints
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mddb/internal/metrics"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	"time"
@@ -112,6 +113,10 @@ func (c *DirectClient) vectorSearch(ctx context.Context, req *MCPVectorSearchReq
 	}
 
 	if filtered && len(allowedIDs) == 0 {
+		if !req.noGain {
+			s.recordSearch(ctx, vectorShape(metrics.ModeVector, req.Collection, s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), algo,
+				req.FilterMeta, req.Filter, ps.Plan, 0, limitReport)) // OPS-025: the filter matched nothing
+		}
 		resp := &MCPVectorSearchResponse{
 			Results:        []MCPVectorSearchResult{},
 			Algorithm:      algo,
@@ -172,8 +177,10 @@ func (c *DirectClient) vectorSearch(ctx context.Context, req *MCPVectorSearchReq
 		}
 	}
 
-	if !req.noGain {
+	if !req.noGain { // a measurement (SRCH-019 eval) is neither gain nor query shape
 		s.Gain.Search(gainKind{Type: SearchTypeVector, Algorithm: algo}) // AGT-004
+		s.recordSearch(ctx, vectorShape(metrics.ModeVector, req.Collection, s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), algo,
+			req.FilterMeta, req.Filter, ps.Plan, len(results), limitReport)) // OPS-025
 	}
 	items := make([]MCPVectorSearchResult, 0, len(results))
 	load := s.Tracer.Stage(ctx, spanSearchLoadContent)
@@ -395,7 +402,7 @@ func (c *DirectClient) SetTTL(ctx context.Context, req *MCPSetTTLRequest) (*MCPD
 func (c *DirectClient) FTSSearch(ctx context.Context, req *MCPFTSSearchRequest) (*MCPFTSSearchResponse, error) {
 	// One implementation with POST /v1/fts (#328): filters, modes, BM25F,
 	// stemming and synonym control, curation and highlights come with it.
-	full, err := c.server.searchFTS(FTSSearchRequest{
+	full, err := c.server.shapedFTS(ctx, FTSSearchRequest{
 		Collection:        req.Collection,
 		Query:             req.Query,
 		Limit:             req.Limit,
@@ -568,7 +575,9 @@ func (c *DirectClient) HybridSearch(ctx context.Context, req *MCPHybridSearchReq
 		return nil, err
 	}
 	c.server.Gain.Search(gainKind{Type: SearchTypeHybrid, Algorithm: httpReq.VectorAlgorithm, Fusion: httpReq.Strategy}) // AGT-004
-	imageHits := c.server.hybridImages(ctx, httpReq, items)                                                              // RAG-010
+	c.server.recordSearch(ctx, vectorShape(metrics.ModeHybrid, req.Collection, httpReq.VectorAlgorithm,
+		ranVectorAlgorithm(httpReq.VectorAlgorithm, httpReq.plan), req.FilterMeta, req.Filter, httpReq.plan, len(items), httpReq.limitReport)) // OPS-025
+	imageHits := c.server.hybridImages(ctx, httpReq, items) // RAG-010
 	if req.wantsPassages() {
 		p := c.server.hybridPassages(req.Collection, req.Query, items, req.PassageOptions, waited, httpReq.plan)
 		c.server.passageImages(&p, httpReq.IncludeImages, imageHits)

@@ -1,0 +1,65 @@
+name: Code or graph question MDDB did not answer
+description: A question about a codebase that search, code-graph or symbol lookup could not answer
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports decide whether the code graph should walk deeper than three hops (CODE-006) and whether
+        MDDB should offer a module map of a whole collection (CODE-007). A described question plus the numbers
+        from `query-shape.json` is the evidence those decisions wait for. Remove anything private.
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: What you, or your agent, wanted to know about the code. In your own words.
+      placeholder: "Which handlers end up writing to the audit log, through any number of calls?"
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What was tried
+      description: The calls made, in order — tool or endpoint, depth, start document — and what each returned.
+      placeholder: |
+        1. code_graph key=internal/audit/audit.go depth=3 → 40 nodes, truncated
+        2. code_graph from one of those nodes → …
+    validations:
+      required: true
+  - type: dropdown
+    id: shape
+    attributes:
+      label: What the answer needed
+      multiple: true
+      options:
+        - More than 3 hops from one document
+        - A map of the whole collection (no start document)
+        - Following calls between symbols rather than files
+        - Something else (describe above)
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      multiple: true
+      options:
+        - MCP
+        - REST
+        - GraphQL
+        - gRPC
+        - mddb-cli
+  - type: textarea
+    id: query-shape
+    attributes:
+      label: query-shape.json
+      description: |
+        Paste `query-shape.json` from `mddb-cli diagnose` (an admin login or key is needed). It holds counters
+        only — depths asked for, depth clamps, chains of graph calls, searches per mode — and hashed collection
+        names. Its `gates` section computes the CODE-006 and CODE-007 thresholds for this instance.
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: MDDB version
+      placeholder: "2.18.10"

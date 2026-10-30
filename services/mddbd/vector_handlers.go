@@ -7,6 +7,7 @@ import (
 	"mddb/internal/embedding"
 	"mddb/internal/envconf"
 	json "mddb/internal/jsonx"
+	"mddb/internal/metrics"
 	"mddb/internal/storage"
 	vec "mddb/internal/vector"
 	"net/http"
@@ -355,6 +356,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Search: with or without metadata filter
 	if filtered && len(allowedIDs) == 0 {
+		s.recordSearch(r.Context(), vectorShape(metrics.ModeVector, req.Collection, s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), algo,
+			req.FilterMeta, req.Filter, ps.Plan, 0, limitReport)) // OPS-025: the filter matched nothing
 		ok(w, VectorSearchResponseHTTP{
 			Results:        []VectorSearchResultItem{},
 			Total:          0,
@@ -400,6 +403,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	if s.Metrics != nil {
 		s.Metrics.IncOp("vector_search", algo)
 	}
+	s.recordSearch(r.Context(), vectorShape(metrics.ModeVector, req.Collection, s.ResolveVectorAlgorithm(req.Collection, req.Algorithm), algo,
+		req.FilterMeta, req.Filter, ps.Plan, len(results), limitReport)) // OPS-025
 	s.Gain.Search(gainKind{Type: SearchTypeVector, Algorithm: algo}) // AGT-004
 
 	// Load full documents for results
@@ -479,6 +484,8 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 	// and before the response so its documents arrive with the rest.
 	var expansions []GraphExpansion
 	if mode == RetrievalModeGraph {
+		s.recordGraph(r.Context(), metrics.GraphShape{Kind: metrics.GraphExpand, Collection: req.Collection,
+			Depth: req.GraphExpand.Depth, MaxDepth: GraphExpandMaxDepth}) // OPS-025
 		expansions, items = s.appendGraphNeighbours(req.Collection, items, req.GraphExpand, includeContent)
 	}
 

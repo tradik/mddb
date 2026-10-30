@@ -263,6 +263,7 @@ func (s *Server) httpEndpointCatalogue(authEnabled bool) []HTTPEndpoint {
 		{Method: "POST", Path: "/v1/backup", Description: "Create database backup", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/restore", Description: "Restore from backup", RequiresAuth: authEnabled},
 		{Method: "POST", Path: "/v1/truncate", Description: "Truncate revision history", RequiresAuth: authEnabled},
+		{Method: "GET", Path: "/v1/admin/diagnose", Description: "Diagnose bundle without user data (tar.gz, admin)", RequiresAuth: authEnabled},
 
 		// Corpus packs (AGT-005)
 		{Method: "GET", Path: "/v1/corpus", Description: "List installed corpus packs", RequiresAuth: authEnabled},

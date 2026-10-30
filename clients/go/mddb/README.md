@@ -118,7 +118,7 @@ for {
 - **Health:** `Status` → `Health` (see above).
 - **Stats:** `Stats` → typed `Stats` (+ per-collection `CollectionStats`).
 - **Webhooks:** `RegisterWebhook`, `ListWebhooks`, `DeleteWebhook` → typed `Webhook`.
-- **Admin:** schema (`SetSchema`/`GetSchema`/`ListSchemas`/`DeleteSchema`), `ValidateDocument`, `Export`/`Restore`/`Truncate`, auth (`Login`/`CreateAPIKey`/`ListAPIKeys`/`DeleteAPIKey`), `GraphQL`.
+- **Admin:** schema (`SetSchema`/`GetSchema`/`ListSchemas`/`DeleteSchema`), `ValidateDocument`, `Export`/`Restore`/`Truncate`, auth (`Login`/`CreateAPIKey`/`ListAPIKeys`/`DeleteAPIKey`), `GraphQL`, `Diagnose(ctx, DiagnoseOptions{Profiles, Integrity, KeepNames})` → the diagnose bundle's tar.gz bytes (`GET /v1/admin/diagnose`, v2.18.10+; give `Integrity` a long context deadline).
 - **Escape hatch:** `Do(ctx, method, path, body)` for any endpoint not yet wrapped.
 
 Field names and JSON tags follow the server's own request and response

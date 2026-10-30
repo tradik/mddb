@@ -698,6 +698,43 @@ mddb-cli stats
 mddb-cli stats -j  # JSON output
 .fi
 .RE
+.SS diagnose
+Save a diagnose bundle to attach to an issue (v2.18.10+). The server builds a
+tar.gz describing itself \(em build, configuration through an allowlist, stats,
+metrics, query-shape counters, recent error classes \(em without document
+content, metadata values, document IDs, query text, keys, actors, IP addresses
+or paths. Collection names are hashed unless \fB\-\-keep\-names\fR is given.
+MANIFEST.json lists every file, its size, its SHA-256 and the redaction
+applied; the CLI checks each file against it. Needs an admin login or key.
+.PP
+.B mddb-cli diagnose
+[\fB\-\-out\fR \fIfile\fR] [\fB\-\-profiles\fR] [\fB\-\-integrity\fR] [\fB\-\-keep\-names\fR] [\fB\-\-inspect\fR]
+.TP
+.BR \-o ", " \-\-out " " \fIfile\fR
+File to write (default mddb-diagnose-<host>-<time>.tar.gz in the current
+directory).
+.TP
+.B \-\-profiles
+Include goroutine stacks and the heap profile.
+.TP
+.B \-\-integrity
+Include bbolt's consistency check of every database file. Slow on a large
+database; the CLI waits up to 30 minutes.
+.TP
+.B \-\-keep\-names
+Keep collection names instead of hashing them.
+.TP
+.B \-\-inspect
+Print the manifest \(em files, sizes, redaction, what was left out and what is
+never included \(em and write nothing.
+.PP
+Examples:
+.RS
+.nf
+mddb-cli diagnose --inspect
+mddb-cli diagnose --profiles --out bundle.tar.gz
+.fi
+.RE
 .SS login
 Authenticate with the MDDB server and obtain a JWT token (v2.4+).
 .PP

@@ -36,6 +36,7 @@ func (s *MCPToolServer) isToolReadOnly(name string) bool {
 
 // mcpCallTool invokes an MCP tool by name.
 func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[string]interface{}) (string, error) {
+	ctx = withMCPSurface(ctx) // OPS-025: what the tool runs counts as MCP
 	// Enforce read-only mode: per-protocol override takes precedence, then global mode.
 	em := effectiveMode(s.globalMode, s.mode)
 	if em == ModeRead {

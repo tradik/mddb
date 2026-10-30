@@ -296,12 +296,12 @@ func (c *DirectClient) GetChecksum(ctx context.Context, collection string) (*MCP
 //
 // Read-only and index-backed: it derives edges from the symbol meta through the
 // metadata index, loading no document content.
-func (c *DirectClient) CodeGraph(_ context.Context, req *MCPCodeGraphRequest) (*GraphResult, error) {
+func (c *DirectClient) CodeGraph(ctx context.Context, req *MCPCodeGraphRequest) (*GraphResult, error) {
 	direction, err := ParseGraphDirection(req.Direction)
 	if err != nil {
 		return nil, err
 	}
-	return c.server.CodeGraph(GraphRequest{
+	return c.server.shapedCodeGraph(ctx, GraphRequest{
 		Collection:   req.Collection,
 		Key:          req.Key,
 		Direction:    direction,

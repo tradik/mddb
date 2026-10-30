@@ -303,6 +303,24 @@ Shows:
 - Total documents, revisions, and indices
 - Per-collection statistics
 
+#### diagnose - A bundle to attach to an issue (v2.18.10+)
+
+```bash
+mddb-cli diagnose --inspect               # what it would contain; writes nothing
+mddb-cli diagnose                         # mddb-diagnose-<host>-<time>.tar.gz
+mddb-cli diagnose --profiles --integrity --out bundle.tar.gz
+```
+
+A tar.gz describing the server — build, configuration through an allowlist,
+stats, metrics, query-shape counters, recent error classes — without document
+content, metadata values, document IDs, query text, keys, actors, IP addresses
+or paths. Collection names are hashed unless `--keep-names` is given.
+`MANIFEST.json` lists every file, its size, its SHA-256 and the redaction
+applied; the CLI checks each file against it. Needs an admin login or key.
+`--profiles` adds goroutine stacks and the heap profile, `--integrity` bbolt's
+consistency check of every database file (slow on a large database). See
+[TELEMETRY.md, "Diagnose bundle"](../../docs/TELEMETRY.md#diagnose-bundle).
+
 ## Examples
 
 ### Basic Workflow
