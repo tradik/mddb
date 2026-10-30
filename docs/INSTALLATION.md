@@ -269,11 +269,12 @@ Two options, and they are not equivalent yet.
 **WSL2 is the supported route.** It runs the same Linux binary that every
 release is built and tested against, so it inherits the full test suite.
 
-**A native Windows build exists but is experimental.** As of 2.13 the server
-and CLI compile and link for `windows/amd64` from source. There are no Windows
-release artifacts, and no CI job runs the test suite on Windows yet, so nothing
-has proven the binaries behave correctly once they start — only that they
-build. Treat it as something to try, not something to run a database on.
+**A native Windows build is tested but not released.** Since 2.13 the full
+test suite runs on `windows-latest` on every push (in three parallel shards
+since 2.18.9), and the server and CLI build for `windows/amd64` from source.
+There are no Windows release artifacts: publishing them (an installer, scoop or
+winget) has not been taken on yet, so you build the binaries yourself, and
+`mddb-cli update` cannot update a Windows install.
 
 One difference is deliberate: **Unix domain sockets are refused on Windows**.
 The listener's security model is owner-only `0600` mode bits, which Windows
