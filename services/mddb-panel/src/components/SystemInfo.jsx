@@ -3,6 +3,8 @@ import { Server, Cpu, HardDrive, Clock, Package, Network } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import GainCard from './GainCard';
+import CorpusPacksCard from './CorpusPacksCard';
+import DiagnoseCard from './DiagnoseCard';
 
 export default function SystemInfo() {
   const {
@@ -231,6 +233,10 @@ export default function SystemInfo() {
         </div>
 
         <GainCard />
+
+        <CorpusPacksCard />
+
+        <DiagnoseCard />
 
         {/* Refresh Button */}
         <div className="mt-6 flex justify-end">

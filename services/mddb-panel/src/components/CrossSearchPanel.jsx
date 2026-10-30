@@ -1,7 +1,10 @@
 import { useState, useRef } from 'react';
 import { Search, Shuffle, AlertCircle, Ban } from 'lucide-react';
 import { useStore } from '../lib/store';
-import mddbClient from '../lib/mddb-client';
+import mddbClient, { planningOptions } from '../lib/mddb-client';
+import { VECTOR_ALGORITHMS, indexUnavailable } from '../lib/search-options';
+import SearchPlan from './SearchPlan';
+import SearchPlanningControls from './SearchPlanningControls';
 
 export default function CrossSearchPanel() {
   const {
@@ -23,6 +26,8 @@ export default function CrossSearchPanel() {
   const [distanceMetric, setDistanceMetric] = useState('cosine');
   const [includeContent, setIncludeContent] = useState(false);
   const [searchStats, setSearchStats] = useState(null);
+  const [explain, setExplain] = useState(false);
+  const [plan, setPlan] = useState(null);
   const abortRef = useRef(null);
 
   const collections = (stats?.collections || []).map((c) => c.name);
@@ -42,6 +47,7 @@ export default function CrossSearchPanel() {
       algorithm,
       distanceMetric,
       includeContent,
+      ...planningOptions({ explain }),
     };
 
     if (sourceMode === 'document') {
@@ -63,6 +69,7 @@ export default function CrossSearchPanel() {
     try {
       const data = await mddbClient.crossSearch(params, { signal: controller.signal });
       setCrossSearchResults(data.results || []);
+      setPlan(data.plan || null);
       setSearchStats({
         total: data.total,
         durationMs: data.durationMs,
@@ -72,9 +79,10 @@ export default function CrossSearchPanel() {
       if (error.name === 'AbortError') {
         setCrossSearchError(null);
       } else {
-        setCrossSearchError(error.message);
+        setCrossSearchError(indexUnavailable(error)?.message || error.message);
         setCrossSearchResults([]);
         setSearchStats(null);
+        setPlan(null);
       }
     } finally {
       setCrossSearchLoading(false);
@@ -232,14 +240,9 @@ export default function CrossSearchPanel() {
               onChange={(e) => setAlgorithm(e.target.value)}
               className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="flat">Flat (Exact)</option>
-              <option value="hnsw">HNSW (Approximate)</option>
-              <option value="ivf">IVF (Clustered)</option>
-              <option value="pq">PQ (Compressed)</option>
-              <option value="opq">OPQ (Optimized PQ)</option>
-              <option value="sq">SQ (int8, 4x smaller)</option>
-              <option value="sq4">SQ4 (int4, 8x smaller)</option>
-              <option value="bq">BQ (Binary Quantized)</option>
+              {VECTOR_ALGORITHMS.map((a) => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -281,6 +284,9 @@ export default function CrossSearchPanel() {
             />
           </div>
         </div>
+
+        {/* With "auto", each target collection gets its own plan. */}
+        <SearchPlanningControls explain={explain} onExplainChange={setExplain} />
 
         <div className="flex items-center justify-between">
           <label className="flex items-center space-x-2 text-sm text-gray-600">
@@ -335,6 +341,8 @@ export default function CrossSearchPanel() {
             <p className="text-sm text-red-700">{crossSearchError}</p>
           </div>
         )}
+
+        <SearchPlan plan={plan} />
 
         {crossSearchResults.length === 0 && !crossSearchLoading && !crossSearchError && (query || sourceDocID) && (
           <div className="flex items-center justify-center h-32">

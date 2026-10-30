@@ -4,8 +4,74 @@
  */
 
 import { authManager } from './auth';
+import { reportLimit, limitFromBody, limitFromHeaders } from './limit-notice';
 
 const API_BASE = '/v1';
+
+// Searches whose answers can be capped by MDDB_SEARCH_MAX_LIMIT (#368). Each
+// answer is reported to limit-notice, so the notice clears on the next search
+// that was not capped.
+const SEARCH_ENDPOINTS = new Set([
+  '/fts', '/vector-search', '/hybrid-search', '/cross-search',
+  '/geo-search', '/geo-within', '/geo-polygon',
+]);
+
+// SEC-019/SEC-020: since 2.18.10 every route checks permissions, and admin on
+// one collection no longer makes a global admin. A 403 says which rule applies.
+export const FORBIDDEN_HINT =
+  'Permission denied. A request that names no collection needs the permission on "*"; ' +
+  'server-wide operations (users, backups, diagnose, corpus packs, quotas) need admin on "*". ' +
+  'Admin on one collection covers that collection only.';
+
+/**
+ * Builds the Error for a non-2xx response. The message keeps the
+ * "API Error (<status>): <text>" form callers match on; a JSON body's `error`
+ * replaces the raw text. The error carries `status`, the body's `code`
+ * (e.g. READ_ONLY for a corpus-pack collection) and the parsed `body`.
+ */
+export async function apiError(response, prefix = 'API Error') {
+  const text = await response.text();
+  let body = null;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    // A plain-text error page.
+  }
+  const detail = typeof body?.error === 'string' ? body.error : text;
+  let message = response.status === 401
+    ? `Unauthorized: ${detail}`
+    : `${prefix} (${response.status}): ${detail}`;
+  if (response.status === 403 && body?.code !== 'READ_ONLY') {
+    message += ` — ${FORBIDDEN_HINT}`;
+  }
+  const error = new Error(message);
+  error.status = response.status;
+  error.code = body?.code;
+  error.body = body;
+  return error;
+}
+
+/**
+ * The optional fields of a vector-backed search, sent only when set so a
+ * request without them is byte-for-byte what it was before:
+ * `explain` (SRCH-013), `queryDecomposition: "auto"` (SRCH-020) and
+ * relevance feedback as document keys (SRCH-015).
+ */
+export function planningOptions({ explain, queryDecomposition, positive, negative, feedbackMode } = {}) {
+  const out = {};
+  if (explain) out.explain = true;
+  if (queryDecomposition && queryDecomposition !== 'off') out.queryDecomposition = queryDecomposition;
+  if (positive?.length) out.positive = positive;
+  if (negative?.length) out.negative = negative;
+  if (out.positive || out.negative) out.feedbackMode = feedbackMode || 'query';
+  return out;
+}
+
+/** The file name a Content-Disposition header names, or null. */
+export function dispositionFilename(header) {
+  const match = /filename="?([^";]+)"?/.exec(header || '');
+  return match ? match[1] : null;
+}
 
 class MDDBClient {
   constructor(baseUrl = API_BASE) {
@@ -35,18 +101,18 @@ class MDDBClient {
     try {
       const response = await fetch(url, config);
 
-      // Handle 401 Unauthorized - just throw error, let App.jsx handle login
-      if (response.status === 401) {
-        const error = await response.text();
-        throw new Error(`Unauthorized: ${error}`);
-      }
-
+      // 401 becomes "Unauthorized: …"; App.jsx shows the login on it.
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`API Error (${response.status}): ${error}`);
+        throw await apiError(response);
       }
 
-      return await response.json();
+      const body = await response.json();
+      const path = endpoint.split('?')[0];
+      if (SEARCH_ENDPOINTS.has(path)) {
+        const capped = limitFromBody(body);
+        reportLimit(capped && { endpoint: path, ...capped });
+      }
+      return body;
     } catch (error) {
       if (error.name === 'AbortError') {
         throw error;
@@ -54,6 +120,46 @@ class MDDBClient {
       console.error('MDDB API Error:', error);
       throw error;
     }
+  }
+
+  /** The Authorization header for a request the client builds itself. */
+  authHeaders() {
+    const token = authManager.getToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  /**
+   * A request answered with a file: `{ blob, filename }`, the name taken from
+   * Content-Disposition. Used for the diagnose bundle and corpus packs.
+   */
+  async requestBlob(endpoint, { method = 'GET', body, headers = {}, signal } = {}) {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method,
+      body,
+      signal,
+      headers: { ...headers, ...this.authHeaders() },
+    });
+    if (!response.ok) {
+      throw await apiError(response);
+    }
+    return {
+      blob: await response.blob(),
+      filename: dispositionFilename(response.headers.get('Content-Disposition')),
+    };
+  }
+
+  /** POSTs multipart form data and returns the parsed JSON answer. */
+  async postForm(endpoint, formData, { signal, errorPrefix } = {}) {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'POST',
+      headers: this.authHeaders(),
+      body: formData,
+      signal,
+    });
+    if (!response.ok) {
+      throw await apiError(response, errorPrefix);
+    }
+    return response.json();
   }
 
   /**
@@ -74,21 +180,18 @@ class MDDBClient {
    * Search documents in a collection
    */
   async search({ collection, filterMeta = {}, sort = 'addedAt', asc = false, limit = 100, offset = 0 }) {
-    const url = `${this.baseUrl}/search`;
-    const token = authManager.getToken();
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    const response = await fetch(url, {
+    const response = await fetch(`${this.baseUrl}/search`, {
       method: 'POST',
-      headers,
+      headers: { 'Content-Type': 'application/json', ...this.authHeaders() },
       body: JSON.stringify({ collection, filterMeta, sort, asc, limit, offset }),
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`API Error (${response.status}): ${error}`);
+      throw await apiError(response);
     }
     const totalCount = parseInt(response.headers.get('X-Total-Count') || '0', 10);
+    // The body is an array, so a cap (#368) comes in headers.
+    const capped = limitFromHeaders(response.headers);
+    reportLimit(capped && { endpoint: '/search', ...capped });
     const documents = await response.json();
     return { documents: Array.isArray(documents) ? documents : [], totalCount };
   }
@@ -179,7 +282,7 @@ class MDDBClient {
   /**
    * Vector/semantic search
    */
-  async vectorSearch({ collection, query, topK = 5, threshold = 0.0, filterMeta = {}, includeContent = false, algorithm = 'flat', distanceMetric = 'cosine', signal }) {
+  async vectorSearch({ collection, query, topK = 5, threshold = 0.0, filterMeta = {}, includeContent = false, algorithm = 'flat', distanceMetric = 'cosine', signal, ...options }) {
     return this.request('/vector-search', {
       method: 'POST',
       body: JSON.stringify({
@@ -191,6 +294,7 @@ class MDDBClient {
         includeContent,
         algorithm,
         distanceMetric,
+        ...planningOptions(options),
       }),
       signal,
     });
@@ -413,7 +517,7 @@ class MDDBClient {
   /**
    * Hybrid search (sparse + dense)
    */
-  async hybridSearch({ collection, query, topK = 10, algorithm = 'bm25', vectorAlgorithm = 'flat', alpha = 0.5, strategy = 'alpha', rrfK = 60, fuzzy = 0, threshold = 0.0, filterMeta = {}, includeContent = false, distanceMetric = 'cosine', lang, boost, geo, sort, signals, signal }) {
+  async hybridSearch({ collection, query, topK = 10, algorithm = 'bm25', vectorAlgorithm = 'flat', alpha = 0.5, strategy = 'alpha', rrfK = 60, fuzzy = 0, threshold = 0.0, filterMeta = {}, includeContent = false, distanceMetric = 'cosine', lang, boost, geo, sort, signals, signal, ...options }) {
     const body = {
       collection,
       query,
@@ -428,6 +532,7 @@ class MDDBClient {
       filterMeta,
       includeContent,
       distanceMetric,
+      ...planningOptions(options),
     };
     if (lang) {
       body.lang = lang;
@@ -963,9 +1068,6 @@ class MDDBClient {
    * Upload files via multipart/form-data (supports md/txt/html/pdf/docx)
    */
   async uploadFile({ files, collection, lang, key, signal }) {
-    const url = `${this.baseUrl}/upload`;
-    const token = authManager.getToken();
-
     const formData = new FormData();
     if (Array.isArray(files)) {
       files.forEach((f) => formData.append('files[]', f));
@@ -975,26 +1077,60 @@ class MDDBClient {
     if (collection) formData.append('collection', collection);
     if (lang) formData.append('lang', lang);
     if (key) formData.append('key', key);
+    return this.postForm('/upload', formData, { signal, errorPrefix: 'Upload Error' });
+  }
 
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+  // ---- Corpus packs (AGT-005, 2.18.10+) ----
 
-    const response = await fetch(url, {
+  /** Installed packs: `{ packs: [{ collection, readOnly, corpus }], total }`. */
+  async listCorpus() {
+    return this.request('/corpus', { method: 'GET' });
+  }
+
+  /** Installs a `.mddbpack` file as a read-only collection (admin on "*"). */
+  async installCorpus(file, { signal } = {}) {
+    const formData = new FormData();
+    formData.append('pack', file);
+    return this.postForm('/corpus/install', formData, { signal });
+  }
+
+  /** Removes an installed pack and its collection (admin on "*"). */
+  async removeCorpus(name) {
+    return this.request('/corpus/remove', {
       method: 'POST',
-      headers,
-      body: formData,
-      signal,
+      body: JSON.stringify({ name }),
     });
+  }
 
-    if (response.status === 401) {
-      const error = await response.text();
-      throw new Error(`Unauthorized: ${error}`);
-    }
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Upload Error (${response.status}): ${error}`);
-    }
-    return response.json();
+  /**
+   * Builds a pack of a collection and returns it as `{ blob, filename }`.
+   * The server refuses a pack without a licence.
+   */
+  async buildCorpus({ collection, license, version, description }) {
+    const body = { collection, license };
+    if (version) body.version = version;
+    if (description) body.description = description;
+    return this.requestBlob('/corpus/build', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+
+  // ---- Diagnose bundle (OPS-025, 2.18.10+) ----
+
+  /**
+   * The diagnose bundle (tar.gz, admin on "*") as `{ blob, filename }`.
+   * Opt-in parts: goroutine/heap profiles, a bbolt integrity check, and real
+   * collection names instead of hashes.
+   */
+  async downloadDiagnose({ profiles = false, integrity = false, keepNames = false } = {}) {
+    const params = new URLSearchParams();
+    if (profiles) params.set('profiles', 'true');
+    if (integrity) params.set('integrity', 'true');
+    if (keepNames) params.set('keepNames', 'true');
+    const query = params.toString();
+    return this.requestBlob(`/admin/diagnose${query ? `?${query}` : ''}`);
   }
 
   async getRevisions({ collection, key, lang }) {

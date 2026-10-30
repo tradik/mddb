@@ -3,6 +3,8 @@ import { Users, Shield, Clock, Plus, Trash2, Key, X } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import { formatDistanceToNow } from 'date-fns';
+import { adminScopeLabel } from '../lib/permissions';
+import PermissionScopeHint from './PermissionScopeHint';
 
 export default function UsersPanel() {
   const {
@@ -340,7 +342,7 @@ function CreateUserModal({ onClose, onSuccess }) {
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="isAdmin" className="ml-2 block text-sm text-gray-700">
-                Administrator privileges
+                Administrator privileges (admin on &quot;*&quot;, server-wide)
               </label>
             </div>
 
@@ -506,7 +508,7 @@ function PermissionsModal({ user, onClose }) {
                       )}
                       {perm.admin && (
                         <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
-                          Admin
+                          {adminScopeLabel(perm.collection)}
                         </span>
                       )}
                     </div>
@@ -572,6 +574,7 @@ function PermissionsModal({ user, onClose }) {
                   Admin
                 </label>
               </div>
+              <PermissionScopeHint collection={collection} admin={admin} />
             </div>
 
             {success && (

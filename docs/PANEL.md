@@ -59,6 +59,45 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 - Optional query overlay: project a natural-language query into the map to
   see why results match ("Vector Space" in the sidebar)
 
+### Server features of 2.18.9 and 2.18.10
+
+- **Corpus packs** (System page): installed packs with version, licence,
+  document count and a read-only badge, a warning when a pack's vectors are
+  disabled (another embedding model), install from a `.mddbpack` file,
+  remove after a confirm, and build-and-download of a collection's pack.
+  A read-only collection shows a notice in its document list and settings,
+  and its Upload and delete controls are off. Needs admin on `"*"`.
+- **Diagnose bundle** (System page): downloads `GET /v1/admin/diagnose` with
+  the opt-in profiles, integrity check and real collection names.
+- **Automations**: a cron rule's action is a webhook, a scheduled backup
+  (local or S3, retention) or a synced source (sitemap, URL list, S3 prefix);
+  the log shows backup targets and sync counts.
+- **Search playground**: vector index `Auto (server chooses)` on vector,
+  hybrid and cross-collection search; *Explain plan* shows how the search ran
+  (index, filter strategy, candidates, reasons, feedback, query parts);
+  *Split multi-part questions* sends `queryDecomposition: "auto"`; vector
+  results can be marked relevant / not relevant and the next search sends
+  them as relevance feedback.
+- **Result cap**: when a search answer says `limitCapped` (or `/v1/search`
+  sends `X-Limit-Capped`), a notice names the endpoint and the limit.
+- **Collection settings**: vector index, summary mode and weight, result cap
+  (`maxTopK`), meta keys kept out of full-text search
+  (`fts.excludeMetaKeys`) and the quota. Saving starts from the stored
+  config, so settings the dialog does not show are kept.
+- **Vector Search page**: the background training queue (`indexTraining`) and
+  a per-collection training badge; a search naming an index still training
+  gets the server's 503 message and is not retried.
+- **Permissions**: admin badges read *Admin (global)* on `"*"` and *Admin
+  (this collection)* elsewhere, and the permission forms explain that only
+  admin on `"*"` is server-wide. A `403` names that rule; a `READ_ONLY`
+  refusal shows the server's message.
+- **Search advisor**: recommended summary mode, the share of documents with a
+  summary, and *Matches by meaning: No* for the lexical provider.
+
+Server settings with no API to read them (PROXY protocol, trusted proxies,
+OpenTelemetry export, the Elasticsearch-compatible `/es` subset,
+`MDDB_SEARCH_MAX_LIMIT`) are not shown.
+
 ### 🎨 Modern UI
 - Clean, responsive design
 - TailwindCSS styling
@@ -571,7 +610,14 @@ npm run lint
 
 # Fix linting issues
 npm run lint -- --fix
+
+# Every suite once, with the per-file coverage check (97%)
+npm test
 ```
+
+Files listed in `coverageFiles` in `vitest.config.js` must keep at least 97% of
+their statements, branches, functions and lines covered, per file. See the
+panel's README for how the suites are written.
 
 ## Roadmap
 

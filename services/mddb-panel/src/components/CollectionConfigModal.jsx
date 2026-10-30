@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { X, Settings2, Plus, Trash2 } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
+import { advancedFromConfig, applyAdvanced, preservedConfig } from '../lib/collection-config';
+import CollectionAdvancedSettings from './CollectionAdvancedSettings';
+import ReadOnlyNotice from './ReadOnlyNotice';
 
 const COLLECTION_TYPES = [
   { value: 'default', label: 'Default', icon: '\uD83D\uDCC1' },
@@ -46,6 +49,10 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
   const [hybridAlpha, setHybridAlpha] = useState('');
   const [contextTokenBudget, setContextTokenBudget] = useState('');
   const [responsePrompt, setResponsePrompt] = useState('');
+  // The config as stored: fields the dialog does not show are sent back as
+  // they are, so saving never erases them (see lib/collection-config.js).
+  const [stored, setStored] = useState({});
+  const [advanced, setAdvanced] = useState(() => advancedFromConfig());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -90,6 +97,8 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         setHybridAlpha(r.hybridAlphaSet ? String(r.hybridAlpha ?? 0) : '');
         setContextTokenBudget(r.contextTokenBudget || '');
         setResponsePrompt(cfg.responsePrompt || '');
+        setStored(cfg);
+        setAdvanced(advancedFromConfig(cfg));
       }
     } catch (err) {
       setError(err.message);
@@ -108,7 +117,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
           metaObj[key.trim()] = value;
         }
       });
+      const kept = preservedConfig(stored);
       const payload = {
+        ...kept,
         collection,
         type,
         description,
@@ -125,9 +136,13 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         encrypted: encrypted || undefined,
       };
 
+      // diskOnlyVectors needs quantization; the server refuses it on float32.
+      if (!payload.quantization) delete payload.diskOnlyVectors;
+
       // Send the retrieval block only when something in it is set: an empty
       // profile and no profile must mean the same thing to the server.
-      const retrieval = {};
+      // Stored keys this dialog does not edit (oversample, groupBy, …) stay.
+      const retrieval = { ...kept.retrieval };
       if (retrievalSearchType) retrieval.defaultSearchType = retrievalSearchType;
       if (Number(retrievalTopK) > 0) retrieval.topK = Number(retrievalTopK);
       if (retrievalMode) retrieval.retrievalMode = retrievalMode;
@@ -137,10 +152,14 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
         retrieval.hybridAlphaSet = true;
       }
       if (Number(contextTokenBudget) > 0) retrieval.contextTokenBudget = Number(contextTokenBudget);
-      if (Object.keys(retrieval).length > 0) payload.retrieval = retrieval;
-      if (responsePrompt.trim()) payload.responsePrompt = responsePrompt.trim();
+      payload.retrieval = retrieval;
+      applyAdvanced(payload, advanced, stored);
+      payload.responsePrompt = responsePrompt.trim() || undefined;
       if (storageBackend === 's3') {
-        payload.storageConfig = storageConfig;
+        const { secretKeySet: _set, ...s3 } = storageConfig;
+        payload.storageConfig = s3;
+      } else {
+        delete payload.storageConfig;
       }
       await mddbClient.setCollectionConfig(payload);
       onSave();
@@ -190,6 +209,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* AGT-005: settings still apply to a pack; its documents stay read-only. */}
+              <ReadOnlyNotice config={stored} />
+
               {/* Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
@@ -581,6 +603,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                   </div>
                 </div>
               </div>
+
+              {/* 2.18.9/2.18.10: index, summaries, result cap, FTS exclusions, quota */}
+              <CollectionAdvancedSettings value={advanced} onChange={setAdvanced} />
 
               {/* Response prompt (RAG-002, v2.12.0+) */}
               <div>

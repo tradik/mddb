@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Database, RefreshCw, AlertCircle, CheckCircle, Zap } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
+import IndexTrainingNotice from './IndexTrainingNotice';
 
 export default function VectorPanel() {
   const [stats, setStats] = useState(null);
@@ -154,6 +155,7 @@ export default function VectorPanel() {
   const collections = Object.keys(collectionsMap);
   const totalDocs = collections.reduce((a, c) => a + (collectionsMap[c]?.total_documents || 0), 0);
   const totalVectors = collections.reduce((a, c) => a + (collectionsMap[c]?.embedded_documents || 0), 0);
+  const trainingSet = new Set(stats.indexTraining?.pending || []);
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -175,6 +177,8 @@ export default function VectorPanel() {
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-6xl mx-auto space-y-6">
+          <IndexTrainingNotice training={stats.indexTraining} />
+
           {/* Provider Info */}
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -244,7 +248,14 @@ export default function VectorPanel() {
                     <div key={collection} className="p-6">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h3 className="text-lg font-medium text-gray-900 mb-2">{collection}</h3>
+                          <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center gap-2">
+                            {collection}
+                            {trainingSet.has(collection) && (
+                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                                {stats.indexTraining.current === collection ? 'training now' : 'waiting to train'}
+                              </span>
+                            )}
+                          </h3>
 
                           <div className="grid grid-cols-3 gap-4 mb-3">
                             <div>

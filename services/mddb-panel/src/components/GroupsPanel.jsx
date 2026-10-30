@@ -3,6 +3,8 @@ import { Users, Clock, Plus, Edit2, Trash2, Key, X } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import { formatDistanceToNow } from 'date-fns';
+import { adminScopeLabel } from '../lib/permissions';
+import PermissionScopeHint from './PermissionScopeHint';
 
 export default function GroupsPanel() {
   const {
@@ -658,7 +660,7 @@ function GroupPermissionsModal({ group, onClose }) {
                       )}
                       {perm.admin && (
                         <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">
-                          Admin
+                          {adminScopeLabel(perm.collection)}
                         </span>
                       )}
                     </div>
@@ -724,6 +726,7 @@ function GroupPermissionsModal({ group, onClose }) {
                   Admin
                 </label>
               </div>
+              <PermissionScopeHint collection={collection} admin={admin} />
             </div>
 
             {success && (

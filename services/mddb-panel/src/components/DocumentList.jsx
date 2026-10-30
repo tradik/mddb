@@ -5,6 +5,7 @@ import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import UploadModal from './UploadModal';
 import CommandModal from './CommandModal';
+import ReadOnlyNotice from './ReadOnlyNotice';
 
 export default function DocumentList({ sseRefreshKey } = {}) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -30,7 +31,12 @@ export default function DocumentList({ sseRefreshKey } = {}) {
     deleteDocument,
     setStats,
     setCurrentCollection,
+    collectionConfigs,
   } = useStore();
+  // AGT-005: a corpus-pack collection refuses writes; its upload and delete
+  // controls are off and the notice says why.
+  const collectionConfig = collectionConfigs?.[currentCollection];
+  const readOnly = collectionConfig?.readOnly === true;
 
   useEffect(() => {
     setOffset(0);
@@ -171,7 +177,9 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             </button>
             <button
               onClick={() => setShowUploadModal(true)}
-              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1.5"
+              disabled={readOnly}
+              title={readOnly ? 'Read-only collection: uploads are refused' : undefined}
+              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Upload className="w-3.5 h-3.5" />
               Upload
@@ -194,6 +202,11 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
+        {readOnly && (
+          <div className="mt-2">
+            <ReadOnlyNotice config={collectionConfig} compact />
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -222,13 +235,13 @@ export default function DocumentList({ sseRefreshKey } = {}) {
                   </h4>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">{doc.lang}</span>
-                    <button
+                    {!readOnly && <button
                       onClick={(e) => handleDelete(doc, e)}
                       className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                       title="Delete document"
                     >
                       <Trash2 className="w-4 h-4" />
-                    </button>
+                    </button>}
                   </div>
                 </div>
                 

@@ -1,6 +1,7 @@
 import { Database, RefreshCw, Search, Brain, Type, Layers, LogOut } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { authManager } from '../lib/auth';
+import LimitCappedNotice from './LimitCappedNotice';
 
 export default function Header({ onRefresh }) {
   const { searchMode, setSearchMode } = useStore();
@@ -86,6 +87,8 @@ export default function Header({ onRefresh }) {
           )}
         </div>
       </div>
+      {/* Fixed-position, so the 64px header height the layout relies on stays. */}
+      <LimitCappedNotice />
     </header>
   );
 }

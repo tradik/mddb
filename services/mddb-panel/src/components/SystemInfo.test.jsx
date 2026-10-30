@@ -5,6 +5,9 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({ default: { getSystemInfo: vi.fn(), getGain: vi.fn() } }));
+// The corpus-pack and diagnose cards have their own suites.
+vi.mock('./CorpusPacksCard', () => ({ default: () => <div>corpus packs card</div> }));
+vi.mock('./DiagnoseCard', () => ({ default: () => <div>diagnose card</div> }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
@@ -101,6 +104,8 @@ describe('SystemInfo', () => {
     expect(valueOf('Go Version')).toBe('go1.26.0');
     expect(valueOf('MDDB Version')).toBe('2.18.8');
     expect(await screen.findByText('Retrieval gain, last 30 days')).toBeTruthy();
+    expect(screen.getByText('corpus packs card')).toBeTruthy();
+    expect(screen.getByText('diagnose card')).toBeTruthy();
   });
 
   test.each([

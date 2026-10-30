@@ -851,6 +851,8 @@ The MDDB Panel (React web UI) includes an **Automations** section under the Admi
 - **Test** triggers with a single click, viewing matched documents and scores in a results table.
 - **Toggle** enabled/disabled state per rule.
 - **View** cron metadata including `lastRun`, `nextRun`, and the human-readable schedule description.
+- **Choose a cron rule's action** (2.18.10): call a webhook, take a [scheduled backup](BACKUP.md) (local directory or S3, retention `keep`, collections) or [sync a source](#synced-sources) (sitemap, URL list or S3 prefix, `prune`, `maxDocuments`, max MiB per document). A stored S3 secret is never shown: leave the field blank to keep it.
+- **Read the log** (Logs tab): rule type, status, HTTP status, and per run what it did — the webhook URL, the backup's target and how many old backups retention removed, or a sync's added / updated / unchanged / deleted / failed counts.
 
 The Panel communicates with the same `/v1/automation` REST API documented above. No additional configuration is required.
 

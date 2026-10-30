@@ -40,6 +40,31 @@ const TypeBadge = ({ type }) => {
   );
 };
 
+// What a run did: a webhook call, a backup (OPS-023: where it went and what
+// retention removed) or a synced source (INT-022: the five counts).
+const ActionCell = ({ log }) => {
+  if (log.action === 'sync') {
+    const s = log.sync || {};
+    return (
+      <span>
+        <span className="font-medium text-gray-900">sync</span>{' '}
+        +{s.added ?? 0} added, {s.updated ?? 0} updated, {s.unchanged ?? 0} unchanged, {s.deleted ?? 0} deleted
+        {s.failed > 0 && <span className="text-red-700">, {s.failed} failed</span>}
+      </span>
+    );
+  }
+  if (log.action === 'backup') {
+    return (
+      <span>
+        <span className="font-medium text-gray-900">backup</span>{' '}
+        <span className="font-mono">{log.target || '-'}</span>
+        {log.removed?.length > 0 && `, ${log.removed.length} old removed`}
+      </span>
+    );
+  }
+  return <span className="font-mono">{log.webhookUrl || '-'}</span>;
+};
+
 export default function AutomationLogsTab() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -171,7 +196,7 @@ export default function AutomationLogsTab() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Rule Name</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Webhook URL</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">HTTP Code</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
@@ -189,16 +214,16 @@ export default function AutomationLogsTab() {
                       {log.ruleName || '-'}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <TypeBadge type={log.type} />
+                      <TypeBadge type={log.ruleType} />
                     </td>
-                    <td className="px-4 py-3 text-xs font-mono text-gray-600 max-w-[200px] truncate" title={log.webhookUrl}>
-                      {log.webhookUrl || '-'}
+                    <td className="px-4 py-3 text-xs text-gray-700 max-w-[320px]" title={log.target || log.webhookUrl}>
+                      <ActionCell log={log} />
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <StatusBadge status={log.status} />
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
-                      {log.httpCode || '-'}
+                      {log.httpStatus || '-'}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
                       {log.durationMs != null ? `${log.durationMs}ms` : '-'}

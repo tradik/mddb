@@ -2,8 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { Search, AlertCircle, Tag, Terminal, Ban, ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
+import { VECTOR_ALGORITHMS, indexUnavailable } from '../lib/search-options';
 import CommandModal from './CommandModal';
 import MetaFilterBar from './MetaFilterBar';
+import SearchPlan from './SearchPlan';
+import SearchPlanningControls from './SearchPlanningControls';
 
 export default function HybridSearchPanel() {
   const {
@@ -35,6 +38,9 @@ export default function HybridSearchPanel() {
   const [boostOpen, setBoostOpen] = useState(false);
   const [newBoostKey, setNewBoostKey] = useState('');
   const [newBoostValue, setNewBoostValue] = useState('1');
+  const [explain, setExplain] = useState(false);
+  const [decomposition, setDecomposition] = useState('off');
+  const [plan, setPlan] = useState(null);
   const abortRef = useRef(null);
 
   const handleAddBoost = () => {
@@ -87,17 +93,22 @@ export default function HybridSearchPanel() {
         filterMeta: searchFilterMeta,
         lang: hybridLang || undefined,
         boost: hybridBoost,
+        explain,
+        queryDecomposition: decomposition,
         signal: controller.signal,
       });
       setHybridResults(data.results || []);
       setHybridSearchStats(data.searchStats || null);
+      setPlan(data.plan || null);
     } catch (error) {
       if (error.name === 'AbortError') {
         setHybridError(null);
       } else {
-        setHybridError(error.message);
+        // GO-047: a training vector index answers 503 with the reason.
+        setHybridError(indexUnavailable(error)?.message || error.message);
         setHybridResults([]);
         setHybridSearchStats(null);
+        setPlan(null);
       }
     } finally {
       setHybridLoading(false);
@@ -315,14 +326,9 @@ export default function HybridSearchPanel() {
               onChange={(e) => setHybridVectorAlgorithm(e.target.value)}
               className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="flat">Flat (Exact)</option>
-              <option value="hnsw">HNSW (Approximate)</option>
-              <option value="ivf">IVF (Clustered)</option>
-              <option value="pq">PQ (Compressed)</option>
-              <option value="opq">OPQ (Optimized PQ)</option>
-              <option value="sq">SQ (int8, 4x smaller)</option>
-              <option value="sq4">SQ4 (int4, 8x smaller)</option>
-              <option value="bq">BQ (Binary Quantized)</option>
+              {VECTOR_ALGORITHMS.map((a) => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -451,6 +457,14 @@ export default function HybridSearchPanel() {
           )}
         </div>
 
+        {/* For the vector half: the full-text half is not planned or split. */}
+        <SearchPlanningControls
+          explain={explain}
+          onExplainChange={setExplain}
+          decomposition={decomposition}
+          onDecompositionChange={setDecomposition}
+        />
+
         <MetaFilterBar collection={currentCollection} />
 
         <div className="flex items-center justify-between">
@@ -514,6 +528,8 @@ export default function HybridSearchPanel() {
             <p className="text-sm text-red-700">{hybridError}</p>
           </div>
         )}
+
+        <SearchPlan plan={plan} />
 
         {hybridResults.length === 0 && !hybridLoading && !hybridError && hybridQuery && (
           <div className="flex items-center justify-center h-32">

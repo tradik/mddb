@@ -1,9 +1,17 @@
 import { useState, useRef } from 'react';
-import { Search, RotateCcw, AlertCircle, Terminal, Ban } from 'lucide-react';
+import { Search, RotateCcw, AlertCircle, Terminal, Ban, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
+import { VECTOR_ALGORITHMS, indexUnavailable } from '../lib/search-options';
 import CommandModal from './CommandModal';
 import MetaFilterBar from './MetaFilterBar';
+import SearchPlan from './SearchPlan';
+import SearchPlanningControls from './SearchPlanningControls';
+
+/** Document keys marked as `mark` ('positive' or 'negative'). */
+function keysMarked(feedback, mark) {
+  return Object.keys(feedback).filter((key) => feedback[key] === mark);
+}
 
 export default function VectorSearchPanel() {
   const {
@@ -25,9 +33,33 @@ export default function VectorSearchPanel() {
   const [reindexing, setReindexing] = useState(false);
   const [reindexResult, setReindexResult] = useState(null);
   const [showCommand, setShowCommand] = useState(false);
+  const [explain, setExplain] = useState(false);
+  const [decomposition, setDecomposition] = useState('off');
+  const [plan, setPlan] = useState(null);
+  // SRCH-015: results marked relevant or not, sent as feedback examples.
+  const [feedback, setFeedback] = useState({});
   const abortRef = useRef(null);
+  // The timer of a retry scheduled while the index loads; Cancel clears it.
+  const retryRef = useRef(null);
+
+  const toggleFeedback = (key, mark) => {
+    setFeedback((prev) => {
+      const next = { ...prev };
+      if (next[key] === mark) delete next[key];
+      else next[key] = mark;
+      return next;
+    });
+  };
+  const positive = keysMarked(feedback, 'positive');
+  const negative = keysMarked(feedback, 'negative');
 
   const handleCancel = () => {
+    if (retryRef.current) {
+      clearTimeout(retryRef.current);
+      retryRef.current = null;
+      setVectorLoading(false);
+      setVectorError(null);
+    }
     if (abortRef.current) {
       abortRef.current.abort();
       abortRef.current = null;
@@ -44,6 +76,7 @@ export default function VectorSearchPanel() {
     setVectorLoading(true);
     setVectorError(null);
     setReindexResult(null);
+    let retrying = false;
     try {
       const data = await mddbClient.vectorSearch({
         collection: currentCollection,
@@ -54,10 +87,15 @@ export default function VectorSearchPanel() {
         algorithm: vectorAlgorithm,
         distanceMetric: vectorDistanceMetric,
         filterMeta: searchFilterMeta,
+        explain,
+        queryDecomposition: decomposition,
+        positive,
+        negative,
         signal: controller.signal,
       });
       setVectorResults(data.results || []);
       setVectorSearchStats(data.searchStats || null);
+      setPlan(data.plan || null);
     } catch (error) {
       if (error.name === 'AbortError') {
         setVectorError(null);
@@ -65,21 +103,26 @@ export default function VectorSearchPanel() {
         abortRef.current = null;
         return;
       }
-      const isIndexLoading = error.message && error.message.includes('vector index is loading');
-      if (isIndexLoading && retryCount < 3) {
+      // GO-047: a loading index is retried; a training one is not — flat,
+      // hnsw and auto answer now, and the server's message says so.
+      const unavailable = indexUnavailable(error);
+      if (unavailable && !unavailable.training && retryCount < 3) {
         setVectorError(`Vector index is loading... retrying (${retryCount + 1}/3)`);
-        setTimeout(() => handleSearch(retryCount + 1), 2000);
+        retrying = true;
+        retryRef.current = setTimeout(() => {
+          retryRef.current = null;
+          handleSearch(retryCount + 1);
+        }, 2000);
         return;
       }
-      setVectorError(isIndexLoading
-        ? 'Vector index is still loading. Please wait a moment and try again.'
-        : error.message);
+      setVectorError(unavailable ? unavailable.message : error.message);
       setVectorResults([]);
       setVectorSearchStats(null);
+      setPlan(null);
     } finally {
-      if (retryCount === 0 || retryCount >= 3) {
-        setVectorLoading(false);
-      }
+      // Loading stays on while a retry waits (Cancel stops it), and ends on
+      // any answer — including a retry that succeeds.
+      if (!retrying) setVectorLoading(false);
       abortRef.current = null;
     }
   };
@@ -126,6 +169,9 @@ export default function VectorSearchPanel() {
       });
     }
   };
+
+  // A loading or training index: shown in amber, not as a failure.
+  const indexPending = /loading|training/.test(vectorError || '');
 
   if (!currentCollection) {
     return (
@@ -193,14 +239,9 @@ export default function VectorSearchPanel() {
               onChange={(e) => setVectorAlgorithm(e.target.value)}
               className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="flat">Flat (Exact)</option>
-              <option value="hnsw">HNSW (Approximate)</option>
-              <option value="ivf">IVF (Clustered)</option>
-              <option value="pq">PQ (Compressed)</option>
-              <option value="opq">OPQ (Optimized PQ)</option>
-              <option value="sq">SQ (int8, 4x smaller)</option>
-              <option value="sq4">SQ4 (int4, 8x smaller)</option>
-              <option value="bq">BQ (Binary Quantized)</option>
+              {VECTOR_ALGORITHMS.map((a) => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -226,7 +267,25 @@ export default function VectorSearchPanel() {
           </label>
         </div>
 
+        <SearchPlanningControls
+          explain={explain}
+          onExplainChange={setExplain}
+          decomposition={decomposition}
+          onDecompositionChange={setDecomposition}
+        />
+
         <MetaFilterBar collection={currentCollection} />
+
+        {(positive.length > 0 || negative.length > 0) && (
+          <div className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-700">
+            <span>
+              Feedback for the next search: {positive.length} relevant, {negative.length} not relevant
+            </span>
+            <button type="button" onClick={() => setFeedback({})} className="font-medium text-primary-700 hover:underline">
+              Clear
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center justify-end space-x-2">
           <button
@@ -246,7 +305,7 @@ export default function VectorSearchPanel() {
             </button>
           ) : (
             <button
-              onClick={handleSearch}
+              onClick={() => handleSearch()}
               disabled={!vectorQuery.trim()}
               className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -274,20 +333,22 @@ export default function VectorSearchPanel() {
 
         {vectorError && (
           <div className={`m-4 p-3 rounded-lg flex items-start space-x-2 ${
-            vectorError.includes('loading')
+            indexPending
               ? 'bg-amber-50 border border-amber-200'
               : 'bg-red-50 border border-red-200'
           }`}>
-            {vectorError.includes('loading') ? (
+            {indexPending ? (
               <RotateCcw className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0 animate-spin" />
             ) : (
               <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
             )}
-            <p className={`text-sm ${vectorError.includes('loading') ? 'text-amber-700' : 'text-red-700'}`}>
+            <p className={`text-sm ${indexPending ? 'text-amber-800' : 'text-red-700'}`}>
               {vectorError}
             </p>
           </div>
         )}
+
+        <SearchPlan plan={plan} />
 
         {vectorResults.length === 0 && !vectorLoading && !vectorError && vectorQuery && (
           <div className="flex items-center justify-center h-32">
@@ -300,11 +361,36 @@ export default function VectorSearchPanel() {
             {vectorResults.map((result, idx) => {
               const doc = result.document;
               const pct = Math.round(result.score * 100);
+              const mark = doc?.key ? feedback[doc.key] : undefined;
               return (
+                <div key={`${doc?.key}-${doc?.lang}-${idx}`} className="relative">
+                {doc?.key && (
+                  <div className="absolute right-3 bottom-3 flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleFeedback(doc.key, 'positive')}
+                      aria-pressed={mark === 'positive'}
+                      aria-label={`Mark ${doc.key} relevant`}
+                      title="Relevant: pull the next search towards it"
+                      className={`rounded p-1 ${mark === 'positive' ? 'bg-green-100 text-green-800' : 'text-gray-500 hover:bg-gray-100'}`}
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleFeedback(doc.key, 'negative')}
+                      aria-pressed={mark === 'negative'}
+                      aria-label={`Mark ${doc.key} not relevant`}
+                      title="Not relevant: push the next search away from it"
+                      className={`rounded p-1 ${mark === 'negative' ? 'bg-red-100 text-red-800' : 'text-gray-500 hover:bg-gray-100'}`}
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
                 <button
-                  key={`${doc?.key}-${doc?.lang}-${idx}`}
                   onClick={() => handleResultClick(result)}
-                  className="w-full text-left p-4 hover:bg-gray-50 transition-colors"
+                  className="w-full text-left p-4 pb-9 hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-2">
@@ -343,6 +429,7 @@ export default function VectorSearchPanel() {
                     </div>
                   )}
                 </button>
+                </div>
               );
             })}
           </div>

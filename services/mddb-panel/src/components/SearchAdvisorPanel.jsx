@@ -201,6 +201,18 @@ export default function SearchAdvisorPanel() {
               value={(profile.termsPerDocument ?? 0).toFixed(2)}
               hint={vocabularyVerdict(profile.termsPerDocument)}
             />
+            {/* RAG-009: documents carrying a client-written meta.summary. */}
+            {profile.summaryDocuments > 0 && (
+              <Stat
+                label="Summaries"
+                value={profile.summaryDocuments}
+                hint={`${Math.round((profile.summaryRatio ?? 0) * 100)}% of documents`}
+              />
+            )}
+            {/* SRCH-014: the lexical provider matches spelling, not meaning. */}
+            {profile.semantic === false && (
+              <Stat label="Matches by meaning" value="No" hint="lexical vectors match spelling, not meaning" />
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -220,6 +232,7 @@ export default function SearchAdvisorPanel() {
               />
               <Setting label="Retrieval mode" value={advice.retrievalMode} />
               <Setting label="Top K" value={advice.topK} />
+              <Setting label="Summary mode" value={advice.summaryMode} />
               {advice.signals?.diversity ? (
                 <Setting label="Diversity signal" value={advice.signals.diversity} />
               ) : null}

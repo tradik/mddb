@@ -18,6 +18,12 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 📜 **Audit Log Panel** - Stream `GET /v1/audit` with actor / action / result / time filters and a visible dropped-buffer counter
 - 🪝 **Webhooks Panel** - Register, list, and delete webhooks with one-click subscription to incident events
 - 📉 **Retrieval Gain** (2.18.8+) - On the System page: searches, tokens returned and tokens saved by passages over the last 30 days, from `GET /v1/gain`
+- 📦 **Corpus Packs** (2.18.10+) - On the System page: list, install (`.mddbpack` upload), remove and build read-only packs (`/v1/corpus*`); a read-only collection is marked in its document list and settings, with Upload and delete off
+- 🩺 **Diagnose Bundle** (2.18.10+) - On the System page: download `GET /v1/admin/diagnose` with the opt-in profiles, integrity check and real collection names
+- ⏰ **Cron actions** (2.18.9+/2.18.10+) - A cron rule calls a webhook, takes a backup (local or S3, retention) or syncs a sitemap / URL list / S3 prefix; the automation log shows backup targets and sync counts
+- 🧭 **Search planning** (2.18.9+/2.18.10+) - `Auto` vector index, *Explain plan*, *Split multi-part questions* (`queryDecomposition`), relevance feedback from vector results, and a notice when the server capped a result list (`limitCapped`)
+- ⚙️ **Collection settings** (2.18.10+) - Vector index, summary mode/weight, `maxTopK`, `fts.excludeMetaKeys` and quota; saving keeps every stored setting the dialog does not show
+- 🔑 **Permission scope** (2.18.10+) - Admin badges say *global* (on `"*"`) or *this collection*; a 403 says which permission the request needed
 
 ## Screenshots
 
@@ -220,8 +226,22 @@ below that the run fails. The text summary prints to the terminal and the
 HTML report is written to `coverage/index.html` (ignored by git and Docker).
 A file a release touches is added to `coverageFiles` with its tests.
 
-Covered today, all at 100%: `src/lib/mddb-client.js`, `src/lib/gain-format.js`,
-`src/components/GainCard.jsx`, `src/components/SystemInfo.jsx`.
+`coverageFiles` lists 33 files today: the API client and the lib modules
+(`limit-notice`, `search-options`, `automation-form`, `collection-config`,
+`permissions`, `download`, `gain-format`) and every component 2.18.8–2.18.10
+touched, the large ones included (`AutomationPanel`, `CollectionConfigModal`,
+`DocumentList`, `UsersPanel`, `GroupsPanel`, the vector/hybrid/cross search
+panels). Pure logic lives in `src/lib/*.js` so it can be tested without a DOM.
+
+### Error handling
+
+`mddb-client.js` turns every non-2xx answer into an `Error` whose message
+keeps the `API Error (<status>): <text>` form, with a JSON body's `error`
+in place of the raw text, and which carries `status`, `code` and `body`.
+A 403 appends the permission rule (SEC-019/020: a request naming no
+collection needs `"*"`; server-wide operations need admin on `"*"`); a
+`READ_ONLY` refusal keeps the server's message. A vector search refused with
+`503` and `training: true` (GO-047) is not retried.
 
 ## Docker Support
 
@@ -268,6 +288,12 @@ The panel connects to MDDB HTTP API at `/v1` endpoints:
 - `POST /v1/export` - Export documents
 - `GET /v1/backup` - Create backup
 - `POST /v1/truncate` - Truncate revisions
+- `GET /v1/corpus`, `POST /v1/corpus/install|remove|build` - Corpus packs
+- `GET /v1/admin/diagnose` - Diagnose bundle
+- `GET|POST|PUT|DELETE /v1/automation`, `GET /v1/automation-logs` - Automations (webhook, backup and sync actions)
+- `GET|PUT /v1/collection-config` - Collection settings
+
+The full list is the API client, `src/lib/mddb-client.js`.
 
 ## Browser Support
 

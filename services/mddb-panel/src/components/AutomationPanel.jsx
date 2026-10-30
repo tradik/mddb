@@ -15,34 +15,13 @@ import {
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import AutomationLogsTab from './AutomationLogsTab';
+import CronActionFields from './CronActionFields';
+import { EMPTY_RULE, buildPayload, ruleToForm, describeCronAction } from '../lib/automation-form';
 
 const TYPE_CONFIG = {
   webhook: { icon: Webhook, label: 'Webhook', badgeClass: 'bg-blue-100 text-blue-800' },
   trigger: { icon: Zap, label: 'Trigger', badgeClass: 'bg-amber-100 text-amber-800' },
   cron: { icon: Clock, label: 'Cron', badgeClass: 'bg-purple-100 text-purple-800' },
-};
-
-const EMPTY_RULE = {
-  type: 'webhook',
-  name: '',
-  enabled: true,
-  // webhook fields
-  url: '',
-  method: 'POST',
-  headers: '',
-  // trigger fields
-  collection: '',
-  searchType: 'fts',
-  query: '',
-  threshold: 50,
-  webhookId: '',
-  events: ['insert', 'update'],
-  sentimentEnabled: false,
-  sentimentMin: -1.0,
-  sentimentMax: 1.0,
-  conditionLogic: 'and',
-  // cron fields
-  schedule: '',
 };
 
 const EVENT_OPTIONS = [
@@ -124,66 +103,6 @@ export default function AutomationPanel() {
   const webhookCount = allRules.filter((r) => r.type === 'webhook').length;
   const triggerCount = allRules.filter((r) => r.type === 'trigger').length;
   const cronCount = allRules.filter((r) => r.type === 'cron').length;
-
-  // ---- Build payload from form state ----
-  const buildPayload = (form) => {
-    const payload = {
-      type: form.type,
-      name: form.name,
-      enabled: form.enabled,
-    };
-    if (form.type === 'webhook') {
-      payload.url = form.url;
-      payload.method = form.method;
-      if (form.headers.trim()) {
-        try {
-          payload.headers = JSON.parse(form.headers);
-        } catch {
-          payload.headers = {};
-        }
-      }
-    } else if (form.type === 'trigger') {
-      payload.collection = form.collection;
-      payload.searchType = form.searchType;
-      payload.query = form.query;
-      payload.threshold = form.threshold;
-      payload.events = form.events && form.events.length > 0 ? form.events : ['insert', 'update'];
-      if (form.webhookId) payload.webhookId = form.webhookId;
-      payload.sentimentEnabled = form.sentimentEnabled;
-      if (form.sentimentEnabled) {
-        payload.sentimentMin = form.sentimentMin;
-        payload.sentimentMax = form.sentimentMax;
-      }
-      if (form.query && form.sentimentEnabled) {
-        payload.conditionLogic = form.conditionLogic;
-      }
-    } else if (form.type === 'cron') {
-      payload.schedule = form.schedule;
-      if (form.webhookId) payload.webhookId = form.webhookId;
-    }
-    return payload;
-  };
-
-  // ---- Populate edit form from a rule ----
-  const ruleToForm = (rule) => ({
-    type: rule.type || 'webhook',
-    name: rule.name || '',
-    enabled: rule.enabled ?? true,
-    url: rule.url || '',
-    method: rule.method || 'POST',
-    headers: rule.headers ? JSON.stringify(rule.headers, null, 2) : '',
-    collection: rule.collection || '',
-    searchType: rule.searchType || 'fts',
-    query: rule.query || '',
-    threshold: rule.threshold ?? 50,
-    webhookId: rule.webhookId || '',
-    events: rule.events && rule.events.length > 0 ? [...rule.events] : ['insert', 'update'],
-    sentimentEnabled: rule.sentimentEnabled ?? false,
-    sentimentMin: rule.sentimentMin ?? -1.0,
-    sentimentMax: rule.sentimentMax ?? 1.0,
-    conditionLogic: rule.conditionLogic || 'and',
-    schedule: rule.schedule || '',
-  });
 
   // ---- CRUD handlers ----
   const handleCreate = async (e) => {
@@ -527,40 +446,10 @@ export default function AutomationPanel() {
       );
     }
 
-    if (form.type === 'cron') {
-      return (
-        <>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Schedule (cron expression)</label>
-            <input
-              type="text"
-              value={form.schedule}
-              onChange={(e) => setForm({ ...form, schedule: e.target.value })}
-              placeholder="0 0 9 * * *"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-mono"
-            />
-            <p className="text-xs text-gray-400 mt-1">6 fields: sec min hour day month weekday</p>
-          </div>
-          <div>
-            <label className="block text-xs text-gray-500 mb-1">Webhook</label>
-            <select
-              value={form.webhookId}
-              onChange={(e) => setForm({ ...form, webhookId: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="">Select webhook</option>
-              {allWebhooks.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name} ({w.method || 'POST'} {w.url})
-                </option>
-              ))}
-            </select>
-          </div>
-        </>
-      );
-    }
-
-    return null;
+    // cron: a webhook, a backup (OPS-023) or a sync (INT-022)
+    return (
+      <CronActionFields form={form} setForm={setForm} webhooks={allWebhooks} collections={collections} />
+    );
   };
 
   return (
@@ -570,7 +459,7 @@ export default function AutomationPanel() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Automation</h1>
-            <p className="text-gray-600">Manage webhooks, triggers, and cron schedules</p>
+            <p className="text-gray-600">Manage webhooks, triggers, and cron schedules that call a webhook, take a backup or sync a source</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -845,9 +734,10 @@ export default function AutomationPanel() {
                                   )}
                                 </div>
                               )}
-                              {rule.type === 'cron' && rule.schedule && (
-                                <div className="text-xs text-gray-500 font-mono mt-0.5">
-                                  {rule.schedule}
+                              {rule.type === 'cron' && (
+                                <div className="text-xs text-gray-600 mt-0.5">
+                                  <span className="font-mono">{rule.schedule}</span>
+                                  <span className="ml-1.5">{describeCronAction(rule)}</span>
                                 </div>
                               )}
                             </td>
