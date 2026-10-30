@@ -384,69 +384,75 @@ func (f *FTSIndex) IndexFieldsWithLang(collection, docID string, fields map[stri
 
 // indexFieldTokensInTx writes one document's per-field index entries inside a
 // caller's transaction — the shared body behind IndexFieldsWithLang and the
-// bulk path (GO-027).
+// bulk path (GO-027). It replaces every field the document had.
 func (f *FTSIndex) indexFieldTokensInTx(tx *bolt.Tx, put putFunc, collection, docID string, fieldTokens map[string]map[string]int) error {
-	{
-		if err := f.removeFieldData(tx, collection, docID); err != nil {
-			return err
-		}
-
-		bF := tx.Bucket(bucketFTSF)
-		bMeta := tx.Bucket(bucketFTSFMeta)
-		bStat := tx.Bucket(bucketFTSFStat)
-		bRev := tx.Bucket(bucketFTSFRev)
-		if bF == nil || bMeta == nil || bStat == nil || bRev == nil {
-			return nil
-		}
-
-		var allEntries []fieldTermEntry
-		for field, tokens := range fieldTokens {
-			if field == contentField {
-				continue // read from the main index (#317)
-			}
-			var docLength uint32
-			for term, count := range tokens {
-				var buf [4]byte
-				binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
-				if err := put(bF, ftsfKey(collection, field, term, docID), buf[:]); err != nil {
-					return err
-				}
-				allEntries = append(allEntries, fieldTermEntry{Field: field, Term: term})
-				docLength += uint32(count) // #nosec G115 -- value always positive and bounded
-			}
-
-			var buf [4]byte
-			binary.LittleEndian.PutUint32(buf[:], docLength)
-			if err := bMeta.Put(ftsfMetaKey(collection, field, docID), buf[:]); err != nil {
-				return err
-			}
-
-			sk := ftsfStatKey(collection, field)
-			stats := collectionStats{}
-			if sraw := bStat.Get(sk); sraw != nil {
-				stats = decodeCollectionStats(sraw)
-			}
-			stats.TotalDocs++
-			stats.TotalTerms += uint64(docLength)
-			if err := bStat.Put(sk, encodeCollectionStats(stats)); err != nil {
-				return err
-			}
-		}
-
-		// Sorted for the same reason as the term lists: identical input must
-		// produce identical bytes.
-		sort.Slice(allEntries, func(i, j int) bool {
-			if allEntries[i].Field != allEntries[j].Field {
-				return allEntries[i].Field < allEntries[j].Field
-			}
-			return allEntries[i].Term < allEntries[j].Term
-		})
-		revData, err := json.Marshal(allEntries)
+	if err := f.removeFieldData(tx, collection, docID); err != nil {
+		return err
+	}
+	bF, bMeta, bStat, bRev := tx.Bucket(bucketFTSF), tx.Bucket(bucketFTSFMeta), tx.Bucket(bucketFTSFStat), tx.Bucket(bucketFTSFRev)
+	if bF == nil || bMeta == nil || bStat == nil || bRev == nil {
+		return nil
+	}
+	var allEntries []fieldTermEntry
+	for field, tokens := range fieldTokens {
+		entries, err := writeFieldInTx(put, bF, bMeta, bStat, collection, field, docID, tokens)
 		if err != nil {
 			return err
 		}
-		return bRev.Put(ftsfRevKey(collection, docID), revData)
+		allEntries = append(allEntries, entries...)
 	}
+	return putFieldRev(bRev, ftsfRevKey(collection, docID), allEntries)
+}
+
+// writeFieldInTx writes one field of one document: its postings, its length
+// and its share of the field's collection statistics. It returns the field's
+// reverse-index entries. The content field is skipped: BM25F reads it from
+// the main index (#317).
+func writeFieldInTx(put putFunc, bF, bMeta, bStat *bolt.Bucket, collection, field, docID string, tokens map[string]int) ([]fieldTermEntry, error) {
+	if field == contentField || len(tokens) == 0 {
+		return nil, nil
+	}
+	entries := make([]fieldTermEntry, 0, len(tokens))
+	var docLength uint32
+	for term, count := range tokens {
+		var buf [4]byte
+		binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
+		if err := put(bF, ftsfKey(collection, field, term, docID), buf[:]); err != nil {
+			return nil, err
+		}
+		entries = append(entries, fieldTermEntry{Field: field, Term: term})
+		docLength += uint32(count) // #nosec G115 -- value always positive and bounded
+	}
+
+	var buf [4]byte
+	binary.LittleEndian.PutUint32(buf[:], docLength)
+	if err := bMeta.Put(ftsfMetaKey(collection, field, docID), buf[:]); err != nil {
+		return nil, err
+	}
+
+	sk := ftsfStatKey(collection, field)
+	stats := decodeCollectionStats(bStat.Get(sk))
+	stats.TotalDocs++
+	stats.TotalTerms += uint64(docLength)
+	return entries, bStat.Put(sk, encodeCollectionStats(stats))
+}
+
+// putFieldRev stores a document's field reverse index, sorted so identical
+// input produces identical bytes, as the term lists are. A document with no
+// field postings has no entry at all, so a document whose last meta field
+// went away looks exactly like one that never had any.
+func putFieldRev(bRev *bolt.Bucket, revKey []byte, entries []fieldTermEntry) error {
+	if len(entries) == 0 {
+		return bRev.Delete(revKey)
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Field != entries[j].Field {
+			return entries[i].Field < entries[j].Field
+		}
+		return entries[i].Term < entries[j].Term
+	})
+	revData, _ := json.Marshal(entries) // pairs of strings always encode
+	return bRev.Put(revKey, revData)
 }
 
 // Index adds or updates the FTS index for a document.
@@ -571,6 +577,9 @@ func (f *FTSIndex) removeInTx(tx *bolt.Tx, bo *binlog.BinlogOps, collection, doc
 	}
 	// Clean up positional index
 	f.removePositionsInTx(tx, collection, docID)
+	// The signature goes with the postings it describes (#367); it is not
+	// in the binlog, see fts_incremental.go.
+	_ = bRev.Delete(ftsSigKey(collection, docID))
 	bo.Delete("ftsrev", revKey)
 	return bRev.Delete(revKey)
 }
@@ -708,35 +717,39 @@ func (f *FTSIndex) removeFieldData(tx *bolt.Tx, collection, docID string) error 
 		_ = bF.Delete(ftsfKey(collection, e.Field, e.Term, docID))
 		fields[e.Field] = true
 	}
-
-	// Update per-field stats and delete metadata
-	bMeta := tx.Bucket(bucketFTSFMeta)
-	bStat := tx.Bucket(bucketFTSFStat)
-	if bMeta != nil && bStat != nil {
-		for field := range fields {
-			mk := ftsfMetaKey(collection, field, docID)
-			if raw := bMeta.Get(mk); len(raw) >= 4 {
-				oldLen := binary.LittleEndian.Uint32(raw)
-				sk := ftsfStatKey(collection, field)
-				stats := collectionStats{}
-				if sraw := bStat.Get(sk); sraw != nil {
-					stats = decodeCollectionStats(sraw)
-				}
-				if stats.TotalDocs > 0 {
-					stats.TotalDocs--
-				}
-				if stats.TotalTerms >= uint64(oldLen) {
-					stats.TotalTerms -= uint64(oldLen)
-				} else {
-					stats.TotalTerms = 0
-				}
-				_ = bStat.Put(sk, encodeCollectionStats(stats))
-			}
-			_ = bMeta.Delete(mk)
-		}
+	for field := range fields {
+		dropFieldLength(tx, collection, field, docID)
 	}
-
 	return bRev.Delete(revKey)
+}
+
+// dropFieldLength removes one field's length entry for a document and takes
+// it out of the field's collection statistics. A field no document holds any
+// more loses its statistics key, so the index matches one built without it.
+func dropFieldLength(tx *bolt.Tx, collection, field, docID string) {
+	bMeta, bStat := tx.Bucket(bucketFTSFMeta), tx.Bucket(bucketFTSFStat)
+	if bMeta == nil || bStat == nil {
+		return
+	}
+	mk := ftsfMetaKey(collection, field, docID)
+	raw := bMeta.Get(mk)
+	if len(raw) < 4 {
+		_ = bMeta.Delete(mk)
+		return
+	}
+	oldLen := uint64(binary.LittleEndian.Uint32(raw))
+	sk := ftsfStatKey(collection, field)
+	stats := decodeCollectionStats(bStat.Get(sk))
+	if stats.TotalDocs > 0 {
+		stats.TotalDocs--
+	}
+	stats.TotalTerms -= min(stats.TotalTerms, oldLen)
+	if stats.TotalDocs == 0 {
+		_ = bStat.Delete(sk)
+	} else {
+		_ = bStat.Put(sk, encodeCollectionStats(stats))
+	}
+	_ = bMeta.Delete(mk)
 }
 
 // IndexFields indexes a document's fields separately for BM25F scoring.
@@ -752,71 +765,8 @@ func (f *FTSIndex) IndexFields(collection, docID string, fields map[string]strin
 	if len(fieldTokens) == 0 {
 		return nil
 	}
-
 	return f.update(collection, func(tx *bolt.Tx) error {
-		// Remove old field data first (handles re-indexing)
-		if err := f.removeFieldData(tx, collection, docID); err != nil {
-			return err
-		}
-
-		bF := tx.Bucket(bucketFTSF)
-		bMeta := tx.Bucket(bucketFTSFMeta)
-		bStat := tx.Bucket(bucketFTSFStat)
-		bRev := tx.Bucket(bucketFTSFRev)
-		if bF == nil || bMeta == nil || bStat == nil || bRev == nil {
-			return nil
-		}
-
-		var allEntries []fieldTermEntry
-		for field, tokens := range fieldTokens {
-			if field == contentField {
-				continue // read from the main index (#317)
-			}
-			var docLength uint32
-			for term, count := range tokens {
-				var buf [4]byte
-				binary.LittleEndian.PutUint32(buf[:], uint32(count)) // #nosec G115 -- value always positive and bounded
-				if err := bF.Put(ftsfKey(collection, field, term, docID), buf[:]); err != nil {
-					return err
-				}
-				allEntries = append(allEntries, fieldTermEntry{Field: field, Term: term})
-				docLength += uint32(count) // #nosec G115 -- value always positive and bounded
-			}
-
-			// Store per-field doc length
-			var buf [4]byte
-			binary.LittleEndian.PutUint32(buf[:], docLength)
-			if err := bMeta.Put(ftsfMetaKey(collection, field, docID), buf[:]); err != nil {
-				return err
-			}
-
-			// Update per-field stats
-			sk := ftsfStatKey(collection, field)
-			stats := collectionStats{}
-			if sraw := bStat.Get(sk); sraw != nil {
-				stats = decodeCollectionStats(sraw)
-			}
-			stats.TotalDocs++
-			stats.TotalTerms += uint64(docLength)
-			if err := bStat.Put(sk, encodeCollectionStats(stats)); err != nil {
-				return err
-			}
-		}
-
-		// Store reverse index for cleanup
-		// Sorted for the same reason as the term lists: identical input must
-		// produce identical bytes.
-		sort.Slice(allEntries, func(i, j int) bool {
-			if allEntries[i].Field != allEntries[j].Field {
-				return allEntries[i].Field < allEntries[j].Field
-			}
-			return allEntries[i].Term < allEntries[j].Term
-		})
-		revData, err := json.Marshal(allEntries)
-		if err != nil {
-			return err
-		}
-		return bRev.Put(ftsfRevKey(collection, docID), revData)
+		return f.indexFieldTokensInTx(tx, putNow, collection, docID, fieldTokens)
 	})
 }
 

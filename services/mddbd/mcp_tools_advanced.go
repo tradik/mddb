@@ -58,8 +58,14 @@ func (s *MCPToolServer) toolSetCollectionConfig(ctx context.Context, args map[st
 		req.Code = &CodeConfigDef{IncludePaths: mcpGetStringSlice(code, "include_paths")}
 	}
 	if f, ok := args["fts"].(map[string]interface{}); ok {
+		def := &CollectionFTSDef{ExcludeMetaKeys: mcpGetStringSlice(f, "exclude_meta_keys")}
 		if v, set := f["enabled"].(bool); set {
-			req.FTS = &CollectionFTSDef{Enabled: &v}
+			def.Enabled = &v
+		}
+		// The block replaces the stored one: an empty exclude_meta_keys
+		// clears the list.
+		if _, listed := f["exclude_meta_keys"]; listed || def.Enabled != nil {
+			req.FTS = def
 		}
 	}
 	if emb, ok := args["embedding"].(map[string]interface{}); ok {

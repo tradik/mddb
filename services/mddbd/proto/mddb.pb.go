@@ -8524,10 +8524,15 @@ func (x *CodeConfigProto) GetRole() string {
 
 // CollectionFTSProto mirrors CollectionFTSDef (#335).
 type CollectionFTSProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enabled       *bool                  `protobuf:"varint,1,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"` // unset = on
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Enabled *bool                  `protobuf:"varint,1,opt,name=enabled,proto3,oneof" json:"enabled,omitempty"` // unset = on
+	// (v2.18.10+, #367) Meta keys kept out of full-text search: no meta.<key>
+	// field postings, so changing them costs no FTS work. filterMeta and facets
+	// still work on them. Takes effect for documents written afterwards; run
+	// FTSReindex to apply it to the ones already indexed.
+	ExcludeMetaKeys []string `protobuf:"bytes,2,rep,name=exclude_meta_keys,json=excludeMetaKeys,proto3" json:"exclude_meta_keys,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CollectionFTSProto) Reset() {
@@ -8565,6 +8570,13 @@ func (x *CollectionFTSProto) GetEnabled() bool {
 		return *x.Enabled
 	}
 	return false
+}
+
+func (x *CollectionFTSProto) GetExcludeMetaKeys() []string {
+	if x != nil {
+		return x.ExcludeMetaKeys
+	}
+	return nil
 }
 
 // EmbeddingChunkingProto mirrors EmbeddingChunkingDef (#325): a collection's
@@ -17192,9 +17204,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\vapi_key_set\x18\x03 \x01(\bR\tapiKeySet\"J\n" +
 	"\x0fCodeConfigProto\x12#\n" +
 	"\rinclude_paths\x18\x01 \x03(\tR\fincludePaths\x12\x12\n" +
-	"\x04role\x18\x02 \x01(\tR\x04role\"?\n" +
+	"\x04role\x18\x02 \x01(\tR\x04role\"k\n" +
 	"\x12CollectionFTSProto\x12\x1d\n" +
-	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01B\n" +
+	"\aenabled\x18\x01 \x01(\bH\x00R\aenabled\x88\x01\x01\x12*\n" +
+	"\x11exclude_meta_keys\x18\x02 \x03(\tR\x0fexcludeMetaKeysB\n" +
 	"\n" +
 	"\b_enabled\"V\n" +
 	"\x16EmbeddingChunkingProto\x12\x1d\n" +

@@ -1247,6 +1247,11 @@ message CodeConfigProto {
 // CollectionFTSProto mirrors CollectionFTSDef (#335).
 message CollectionFTSProto {
   optional bool enabled = 1;                     // unset = on
+  // (v2.18.10+, #367) Meta keys kept out of full-text search: no meta.<key>
+  // field postings, so changing them costs no FTS work. filterMeta and facets
+  // still work on them. Takes effect for documents written afterwards; run
+  // FTSReindex to apply it to the ones already indexed.
+  repeated string exclude_meta_keys = 2;
 }
 
 // EmbeddingChunkingProto mirrors EmbeddingChunkingDef (#325): a collection's

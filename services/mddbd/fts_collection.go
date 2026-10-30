@@ -19,15 +19,50 @@ import (
 type CollectionFTSDef struct {
 	// Enabled is nil when not set, which means on.
 	Enabled *bool `json:"enabled,omitempty"`
+	// ExcludeMetaKeys are meta keys kept out of full-text search (#367).
+	// Keys used only as filters — url, license, a vulnerability flag — then
+	// write no meta.<key> postings, and changing them costs no FTS work at
+	// all. filterMeta and facets still work on them: they read the metadata
+	// index, not FTS.
+	//
+	// An exclusion list rather than an allowlist: every meta key is
+	// searchable by default, as it always was, so the list names only the
+	// exceptions, and a meta key a writer adds later is found without a
+	// config change. An allowlist would make a new key silently unsearchable.
+	//
+	// It applies to documents indexed afterwards. A change does not touch
+	// postings already written: run an fts-reindex to apply it to them.
+	ExcludeMetaKeys []string `json:"excludeMetaKeys,omitempty"`
+}
+
+// collectionFTS is a collection's full-text setting; nil when it has none.
+func (s *Server) collectionFTS(collection string) *CollectionFTSDef {
+	if s.CollectionManager == nil {
+		return nil
+	}
+	if cfg, ok := s.CollectionManager.Get(collection); ok {
+		return cfg.FTS
+	}
+	return nil
 }
 
 // ftsEnabledFor reports whether a collection's documents get postings.
 func (s *Server) ftsEnabledFor(collection string) bool {
-	if s.CollectionManager == nil {
-		return true
+	f := s.collectionFTS(collection)
+	return f == nil || f.Enabled == nil || *f.Enabled
+}
+
+// ftsExcludedMetaKeys is the set of meta keys a collection keeps out of FTS.
+func (s *Server) ftsExcludedMetaKeys(collection string) map[string]bool {
+	f := s.collectionFTS(collection)
+	if f == nil || len(f.ExcludeMetaKeys) == 0 {
+		return nil
 	}
-	cfg, ok := s.CollectionManager.Get(collection)
-	return !ok || cfg.FTS == nil || cfg.FTS.Enabled == nil || *cfg.FTS.Enabled
+	out := make(map[string]bool, len(f.ExcludeMetaKeys))
+	for _, k := range f.ExcludeMetaKeys {
+		out[k] = true
+	}
+	return out
 }
 
 // ftsReindexResult is what an fts-reindex did, for every transport.
@@ -39,6 +74,9 @@ type ftsReindexResult struct {
 // reindexCollectionFTS rebuilds a collection's postings from its documents,
 // or removes them when the collection has full-text indexing off. HTTP,
 // gRPC and MCP had a copy each; two of them reported "ok" whatever failed.
+// Every document is rebuilt from scratch, not only the changed ones (#367):
+// this is how a new stemmer, stop word list or excludeMetaKeys reaches
+// documents that did not change.
 func (s *Server) reindexCollectionFTS(collection string) (ftsReindexResult, error) {
 	var docs []*storage.Doc
 	var all []string
@@ -67,7 +105,7 @@ func (s *Server) reindexCollectionFTS(collection string) (ftsReindexResult, erro
 		return res, s.FTSIndex.RemoveDocs(collection, all)
 	}
 	for _, d := range docs {
-		if err := s.indexDocumentFTS(collection, d); err != nil {
+		if err := s.indexDocumentFTS(collection, d, true); err != nil {
 			res.Failed++
 			slog.Warn("FTS reindex failed", "collection", collection, "docID", d.ID, "err", err)
 			continue

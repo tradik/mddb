@@ -107,8 +107,7 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 	now := time.Now().Unix()
 	var saved storage.Doc
 	var bo binlog.BinlogOps
-	summaryChanged := false // RAG-009: a new summary is embedded and indexed like new content
-	metaChanged := false    // every meta key is a BM25F field, so FTS is re-indexed
+	summaryChanged := false // RAG-009: a new summary is embedded like new content
 	err := s.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		bDocs, bIdx, bByK := tx.Bucket([]byte("docs")), tx.Bucket([]byte("idxmeta")), tx.Bucket([]byte("bykey"))
 		docID := bByK.Get(storage.ByKeyKey(collection, key, lang))
@@ -140,8 +139,7 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 			return err
 		}
 		bo.Put("docs", docKey, buf)
-		metaChanged = metadataChanged(existing.Meta, doc.Meta)
-		if metaChanged {
+		if metadataChanged(existing.Meta, doc.Meta) {
 			if err := reindexMeta(bIdx, &bo, collection, doc.ID, existing.Meta, doc.Meta); err != nil {
 				return err
 			}
@@ -153,7 +151,7 @@ func (s *Server) updateDocument(collection, key, lang string, p DocPatch) (stora
 		return storage.Doc{}, err
 	}
 	bo.FlushTo(s.Binlog)
-	s.runPostUpdateHooks(collection, key, lang, saved, p.Content != nil || summaryChanged, p.Content != nil || metaChanged, p.TTL != nil)
+	s.runPostUpdateHooks(collection, key, lang, saved, p.Content != nil || summaryChanged, p.TTL != nil)
 	return saved, nil
 }
 

@@ -1773,6 +1773,8 @@ paths:
       description: |
         Re-indexes all documents in a collection using their stored `lang` field for language-aware stemming and stop words.
         Use this after enabling multi-language support to update existing documents indexed with the default English pipeline.
+        Every document is rebuilt from scratch, unlike a write, which since v2.18.10 re-indexes only what changed (#367):
+        run it after changing stop words, stemming or the collection's `fts.excludeMetaKeys`.
       operationId: ftsReindex
       requestBody:
         required: true
@@ -11527,12 +11529,24 @@ components:
       description: >
         (v2.18.2+) Full-text indexing for the collection (#335). With
         enabled=false no postings are written; fts-reindex removes existing
-        ones and reports status "removed".
+        ones and reports status "removed". The block is replaced as a whole.
       properties:
         enabled:
           type: boolean
           description: Unset means on.
           example: false
+        excludeMetaKeys:
+          type: array
+          items:
+            type: string
+          description: >
+            (v2.18.10+, #367) Meta keys kept out of full-text search: they get
+            no meta.<key> field postings, so changing them costs no full-text
+            work. filterMeta and facets still work on them; they read the
+            metadata index. Applies to documents written afterwards; after
+            changing the list, run fts-reindex to apply it to documents
+            already indexed.
+          example: ["url", "license", "vulnerable"]
     EmbeddingChunking:
       type: object
       description: >

@@ -182,6 +182,14 @@ Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blo
 
 ### New in v2.18.10
 
+`CollectionFTSProto.exclude_meta_keys` (2) lists meta keys kept out of
+full-text search (#367): no `meta.<key>` postings, so changing them costs no
+full-text work, while metadata filters and facets still use them. It applies
+to documents written afterwards; call `FTSReindex` after changing it. Every
+write path — `Add`, `AddBatch`, `UpdateDocument` and `UpdateBatch` — now
+re-indexes only what changed; `UpdateBatch` did not re-index full text at all
+before.
+
 `AutomationRuleProto.sync` (26, `SyncActionProto`) is a cron rule's third
 action: keep a collection in step with a sitemap, a URL list or an S3
 prefix (`source`, `collection`, `lang`, `url`, `urls`, `bucket`, `prefix`,

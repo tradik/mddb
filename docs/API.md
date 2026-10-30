@@ -1258,7 +1258,7 @@ When `highlight: true`, each result gains a `highlights` array:
 
 ### POST /v1/fts-reindex
 
-Reindex all documents in a collection using their stored `lang` field for language-aware FTS processing. A collection with `fts: {enabled: false}` has its postings removed instead (v2.18.2+).
+Reindex all documents in a collection using their stored `lang` field for language-aware FTS processing. A collection with `fts: {enabled: false}` has its postings removed instead (v2.18.2+). Every document is rebuilt from scratch, while a write re-indexes only what it changed (v2.18.10+, see [incremental indexing](SEARCH.md#incremental-indexing-v21810)): run it after changing stop words, stemming or `fts.excludeMetaKeys`.
 
 **Request Body**:
 ```json
@@ -4427,6 +4427,27 @@ off; `POST /v1/fts-reindex` then removes the ones it has (`"status":
 curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' \
   -d '{"collection":"vectors-only","fts":{"enabled":false}}'
 ```
+
+**Meta keys kept out of full-text search (v2.18.10+, #367).** Every meta key
+is a BM25F field `meta.<key>` with its own postings. Keys that are only ever
+filters can stay out: `fts.excludeMetaKeys` lists them, and changing them
+then costs no full-text work at all. `filterMeta`, `filter` and facets still
+work on them; they read the metadata index, not the full-text one. The list
+names exceptions rather than the keys to index, so a meta key added later is
+searchable without a config change.
+
+```bash
+curl -X PUT "$MDDB/v1/collection-config" -H 'Content-Type: application/json' \
+  -d '{"collection":"ports","fts":{"excludeMetaKeys":["url","license","vulnerable"]}}'
+curl -X POST "$MDDB/v1/fts-reindex" -d '{"collection":"ports"}'
+```
+
+The list applies to documents written after it is set. **After changing it,
+run `POST /v1/fts-reindex`**: postings already written stay until then, and a
+key taken off the list is not indexed for existing documents until then. The
+`fts` block is replaced as a whole, so send `enabled` and `excludeMetaKeys`
+together. MCP `set_collection_config` takes it as `fts.exclude_meta_keys`,
+gRPC as `CollectionFTSProto.exclude_meta_keys`.
 
 Three deliberate limits:
 

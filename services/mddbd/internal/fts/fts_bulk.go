@@ -33,15 +33,27 @@ type BulkDoc struct {
 	// document type.
 	Kind string
 	// Fields are the named, separately-searchable texts (content plus
-	// meta.<key>); nil skips field indexing for this document.
+	// meta.<key>); nil means the document has none, and a re-index removes
+	// any it had.
 	Fields map[string]string
+	// Rebuild indexes the document from scratch even when the index says
+	// nothing changed (#367). An fts-reindex sets it: a new stemmer, stop
+	// word list or field exclusion changes the postings without changing
+	// the document.
+	Rebuild bool
 }
 
-// IndexDocs indexes a batch of documents in a single write transaction.
+// IndexDocs indexes a batch of documents in a single write transaction,
+// writing for each only what changed since it was last indexed (#367, see
+// fts_incremental.go).
 //
-// Tokenisation happens before the transaction opens: it is pure CPU work on
-// the caller's data and holding the write lock through it would serialise
-// every other writer behind the import for no reason.
+// The plan is made in a read transaction first, so a batch in which nothing
+// indexed changed never opens a write transaction. Tokenisation then happens
+// before the write transaction opens: it is pure CPU work on the caller's
+// data and holding the write lock through it would serialise every other
+// writer behind the import for no reason. Inside the write transaction each
+// document is planned again, because another writer may have indexed it in
+// between; the tokens already computed are reused.
 //
 // The batch is atomic. A failure part-way rolls the whole batch back rather
 // than leaving some documents indexed, which keeps a failed import from
@@ -50,71 +62,40 @@ func (f *FTSIndex) IndexDocs(collection string, docs []BulkDoc) error {
 	if len(docs) == 0 {
 		return nil
 	}
-
-	type prepared struct {
-		docID     string
-		terms     map[string]int
-		positions map[string][]uint32
-		fields    map[string]map[string]int
+	work := make([]*pendingDoc, len(docs))
+	changed := false
+	err := f.view(collection, func(tx *bolt.Tx) error {
+		for i := range docs {
+			work[i] = newPendingDoc(&docs[i])
+			work[i].plan = planFor(tx, collection, work[i])
+			changed = changed || !work[i].plan.skip()
+		}
+		return nil
+	})
+	if err != nil || !changed {
+		return err
 	}
-
-	batch := make([]prepared, 0, len(docs))
-	for _, d := range docs {
-		p := prepared{docID: d.DocID}
-		isCode := d.Kind == KindCode
-		if d.Content != "" {
-			if isCode {
-				p.terms = TokenizeCode(d.Content)
-				p.positions = f.TokenizePositionsCode(d.Content)
-			} else {
-				p.terms = f.TokenizeLang(d.Content, d.Lang)
-				p.positions = f.TokenizePositionsLang(d.Content, d.Lang)
-			}
-		}
-		if len(d.Fields) > 0 {
-			p.fields = make(map[string]map[string]int, len(d.Fields))
-			for field, text := range d.Fields {
-				var tokens map[string]int
-				if isCode {
-					tokens = TokenizeCode(text)
-				} else {
-					tokens = f.TokenizeLang(text, d.Lang)
-				}
-				if len(tokens) > 0 {
-					p.fields[field] = tokens
-				}
-			}
-		}
-		batch = append(batch, p)
+	for _, w := range work {
+		f.prepare(w, w.plan)
 	}
 
 	var bo binlog.BinlogOps
-	err := f.update(collection, func(tx *bolt.Tx) error {
+	err = f.update(collection, func(tx *bolt.Tx) error {
 		var deferred sortedPuts
-		seen := make(map[string]bool, len(batch))
-		for _, p := range batch {
+		seen := make(map[string]bool, len(work))
+		for _, w := range work {
 			// A document listed twice deletes its earlier postings through
 			// the reverse index; they must be in the tree before it does.
-			if seen[p.docID] {
+			// Its later entry is planned against the earlier one, which is
+			// why a document planned as unchanged above is not dropped.
+			if seen[w.doc.DocID] {
 				if err := deferred.flush(); err != nil {
 					return err
 				}
 			}
-			seen[p.docID] = true
-			if len(p.terms) > 0 {
-				if err := f.indexTermsInTx(tx, &bo, deferred.put, collection, p.docID, p.terms); err != nil {
-					return err
-				}
-			}
-			if len(p.positions) > 0 {
-				if err := f.indexPositionsInTx(tx, deferred.put, collection, p.docID, p.positions); err != nil {
-					return err
-				}
-			}
-			if len(p.fields) > 0 {
-				if err := f.indexFieldTokensInTx(tx, deferred.put, collection, p.docID, p.fields); err != nil {
-					return err
-				}
+			seen[w.doc.DocID] = true
+			if err := f.applyInTx(tx, &bo, deferred.put, collection, w, planFor(tx, collection, w)); err != nil {
+				return err
 			}
 		}
 		return deferred.flush()

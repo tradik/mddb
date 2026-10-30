@@ -17,11 +17,12 @@ import (
 // written. Every path now builds the same BulkDoc and goes through IndexDocs.
 
 // ftsBulkDoc describes a document for the full-text index: its content, its
-// fields for BM25F, and its kind, which selects the tokeniser.
-func ftsBulkDoc(doc *storage.Doc) fts.BulkDoc {
+// fields for BM25F, and its kind, which selects the tokeniser. Meta keys in
+// exclude get no field (#367).
+func ftsBulkDoc(doc *storage.Doc, exclude map[string]bool) fts.BulkDoc {
 	fields := map[string]string{"content": doc.ContentMD}
 	for k, vals := range doc.Meta {
-		if len(vals) > 0 {
+		if len(vals) > 0 && !exclude[k] {
 			fields["meta."+k] = strings.Join(vals, " ")
 		}
 	}
@@ -36,10 +37,14 @@ func ftsBulkDoc(doc *storage.Doc) fts.BulkDoc {
 	}
 }
 
-// indexDocumentFTS (re)indexes one document.
-func (s *Server) indexDocumentFTS(collection string, doc *storage.Doc) error {
+// indexDocumentFTS indexes one document. The index writes only what changed
+// since it last indexed the document, and nothing when nothing did (#367);
+// rebuild re-indexes it from scratch, for an fts-reindex.
+func (s *Server) indexDocumentFTS(collection string, doc *storage.Doc, rebuild bool) error {
 	if s.FTSIndex == nil || doc.ContentMD == "" || !s.ftsEnabledFor(collection) {
 		return nil
 	}
-	return s.FTSIndex.IndexDocs(collection, []fts.BulkDoc{ftsBulkDoc(doc)})
+	bd := ftsBulkDoc(doc, s.ftsExcludedMetaKeys(collection))
+	bd.Rebuild = rebuild
+	return s.FTSIndex.IndexDocs(collection, []fts.BulkDoc{bd})
 }

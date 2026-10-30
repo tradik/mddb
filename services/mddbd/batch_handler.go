@@ -156,6 +156,7 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 	// 3N commits per batch — measured at 238 docs/s against 46k docs/s for the
 	// same writes without indexing.
 	var ftsBatch []fts.BulkDoc
+	ftsExclude := s.ftsExcludedMetaKeys(collection)
 	embeddingDropped := 0
 
 	for _, p := range processed {
@@ -204,9 +205,10 @@ func (s *Server) firePostBatchHooks(collection string, processed []*ProcessedDoc
 		}
 
 		// FTS indexing is collected here and written once for the whole batch
-		// below (GO-027) — see indexBatchFTS.
+		// below (GO-027) — see indexBatchFTS. An update writes only what it
+		// changed, and a resent identical document nothing (#367).
 		if !opts.SkipFTS && s.FTSIndex != nil && p.Doc.ContentMD != "" {
-			bd := ftsBulkDoc(&p.Doc)
+			bd := ftsBulkDoc(&p.Doc, ftsExclude)
 			bd.DocID = p.DocID
 			ftsBatch = append(ftsBatch, bd)
 		}

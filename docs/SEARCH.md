@@ -45,6 +45,35 @@ Configure default language: `MDDB_FTS_DEFAULT_LANG=en` (default). Query supporte
 
 **Protocol parity:** The `lang` parameter, FTS reindex, and FTS languages endpoints are available across all protocols: REST API, gRPC (`FTS`, `FTSReindex`, `FTSLanguages` RPCs), and MCP tools (`full_text_search` with `lang`, `fts_reindex`, `fts_languages`).
 
+### Incremental indexing (v2.18.10+)
+
+A write re-indexes only what it changed (#367). The index keeps a signature
+of each document: a hash of its content, language and kind, and one of each
+meta field's text. Every write path — add, update, batch, ingest, the
+scheduled sync, gRPC and MCP — compares the document with it:
+
+| What changed | What is written |
+|---|---|
+| nothing indexed (a resent document, a TTL-only update) | nothing |
+| meta values only | the postings of the changed `meta.<key>` fields; the fields that are gone lose theirs |
+| content, `lang` or the document's kind | the whole document, as before |
+
+The result is the index a full rebuild would produce, byte for byte,
+statistics included, so ranking does not change. On a database larger than
+memory this is what makes a metadata-only update cheap: adding one meta key
+to a document of a few hundred words writes 5 keys instead of rewriting about
+300, and 15 pages instead of about 580.
+
+`POST /v1/fts-reindex` still rebuilds every document from scratch. Run it
+after changing stop words, stemming or `fts.excludeMetaKeys`: those change
+the postings without changing the documents.
+
+**Keeping filter keys out of FTS.** A collection's
+`fts.excludeMetaKeys` names meta keys that get no full-text postings — keys
+such as `url` or `license` that are filtered on but never searched as text.
+Changing them then costs no full-text work, and `filterMeta` and facets still
+work on them. See [API.md](API.md#put-v1collection-config).
+
 ### Text Processing Pipeline
 
 1. **Lowercasing** - All text converted to lowercase

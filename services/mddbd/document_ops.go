@@ -205,7 +205,7 @@ func (s *Server) runPostWriteHooks(collection string, saved storage.Doc, isNew b
 
 	// FTS indexing: terms, positions and fields, with the tokeniser the
 	// document's kind calls for (#326).
-	_ = s.indexDocumentFTS(collection, &saved)
+	_ = s.indexDocumentFTS(collection, &saved, false)
 
 	// Geo indexing: persist resolved lat/lng to BoltDB and mirror into
 	// BOTH in-memory indexes (R-tree + geohash). Coordinates are extracted
@@ -410,9 +410,8 @@ func (s *Server) invalidateDocReadCaches(collection, key, lang string) {
 // pre-update document for up to the cache TTL and FTS kept matching the old
 // content. One pipeline, like runPostWriteHooks for Add (GO-001), keeps the
 // transports from drifting again. contentChanged re-embeds the document; it
-// is also true when only the summary changed (RAG-009). textChanged re-indexes
-// FTS, for new content or new metadata.
-func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.Doc, contentChanged, textChanged, ttlChanged bool) {
+// is also true when only the summary changed (RAG-009).
+func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.Doc, contentChanged, ttlChanged bool) {
 	s.invalidateDocReadCaches(collection, key, lang)
 
 	if contentChanged && s.EmbeddingWorker != nil && saved.ContentMD != "" {
@@ -431,11 +430,10 @@ func (s *Server) runPostUpdateHooks(collection, key, lang string, saved storage.
 		}
 	}
 
-	// Content or metadata: a metadata-only PATCH used to leave the BM25F
-	// meta.* fields stale.
-	if textChanged {
-		_ = s.indexDocumentFTS(collection, &saved)
-	}
+	// The index decides what changed (#367): new content re-indexes the
+	// document, new metadata only its meta.* fields (a metadata-only PATCH
+	// used to leave them stale, #362), and a TTL-only PATCH writes nothing.
+	_ = s.indexDocumentFTS(collection, &saved, false)
 
 	// Geo re-index on partial update. Mirrors the Add/Upsert path: if meta now
 	// contains a usable point, upsert it into both indexes; otherwise drop any

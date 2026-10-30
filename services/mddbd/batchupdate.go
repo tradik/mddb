@@ -8,6 +8,7 @@ import (
 
 	"mddb/internal/binlog"
 	"mddb/internal/cache"
+	"mddb/internal/fts"
 	"mddb/internal/indexqueue"
 	"mddb/internal/storage"
 	proto "mddb/proto"
@@ -202,6 +203,8 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 	// Enqueue's full-queue fallback opens its own write transaction, so it must
 	// never run inside this one (GO-010 — would deadlock BoltDB's single writer).
 	var indexJobs []*indexqueue.IndexJob
+	// The documents written, for full-text indexing after the commit.
+	var written []*UpdatedDoc
 	// Single transaction for all updates
 	err := bu.server.DBUpdateC(collection, func(tx *bolt.Tx) error {
 		if err := bu.server.checkWriteQuota(tx, collection, updateQuotaWrites(collection, updated)); err != nil {
@@ -230,6 +233,7 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 				failed(u, fmt.Errorf("update error: %w", err))
 				continue
 			}
+			written = append(written, u)
 
 			// Collect metadata reindex job; enqueued after the tx commits.
 			// Queued once the document is written, whatever happens to its
@@ -271,6 +275,7 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 		return resp, nil
 	}
 	bo.FlushTo(bu.server.Binlog)
+	bu.server.indexUpdatedFTS(collection, written)
 
 	// Enqueue metadata reindex jobs now that the write tx has committed.
 	// Enqueue never drops (synchronous fallback on a full queue); a returned
@@ -285,4 +290,21 @@ func (bu *BatchUpdater) commitUpdate(collection string, updated []*UpdatedDoc, n
 	}
 
 	return resp, nil
+}
+
+// indexUpdatedFTS brings the full-text index in line with a committed batch
+// update. UpdateBatch (gRPC, and MCP update_batch) never re-indexed: search
+// kept matching the old content and metadata until an fts-reindex (#367).
+// Like every other write path it goes through IndexDocs, which writes only
+// what each update changed. A search cached before the update is dropped too.
+func (s *Server) indexUpdatedFTS(collection string, written []*UpdatedDoc) {
+	exclude := s.ftsExcludedMetaKeys(collection)
+	batch := make([]fts.BulkDoc, 0, len(written))
+	for _, u := range written {
+		if u.Doc.ContentMD != "" {
+			batch = append(batch, ftsBulkDoc(&u.Doc, exclude))
+		}
+	}
+	s.indexBatchFTS(collection, batch)
+	s.invalidateSearchCache(collection)
 }

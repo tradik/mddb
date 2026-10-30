@@ -969,9 +969,10 @@ func mcpBuiltinToolsAdvanced() []MCPTool {
 					},
 					"fts": map[string]interface{}{
 						"type":        "object",
-						"description": "(v2.18.2+) Full-text indexing for this collection. enabled=false stops postings being written (they are most of a database's size); run fts_reindex afterwards to remove the ones already there. Full-text and hybrid search then find nothing in it.",
+						"description": "(v2.18.2+) Full-text indexing for this collection; the block replaces the stored one. enabled=false stops postings being written (they are most of a database's size); run fts_reindex afterwards to remove the ones already there. Full-text and hybrid search then find nothing in it. (v2.18.10+) exclude_meta_keys keeps those meta keys out of full-text search — filters such as url or license — so changing them costs no FTS work; filter_meta and facets still use them. Run fts_reindex after changing the list to apply it to documents already indexed.",
 						"properties": map[string]interface{}{
-							"enabled": map[string]interface{}{"type": "boolean"},
+							"enabled":           map[string]interface{}{"type": "boolean"},
+							"exclude_meta_keys": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Meta keys with no full-text postings; [] clears the list"},
 						},
 					},
 					"embedding": map[string]interface{}{

@@ -87,6 +87,18 @@ func TestIndexDocsMatchesPerDocumentIndexing(t *testing.T) {
 	}
 
 	want, got := dumpBuckets(t, single), dumpBuckets(t, bulk)
+	// IndexDocs also records what it indexed (#367); the per-index entry
+	// points do not, and nothing else may differ.
+	sigs := 0
+	for k := range got {
+		if strings.HasPrefix(k, "ftsrev|ftssig|") {
+			delete(got, k)
+			sigs++
+		}
+	}
+	if sigs != len(docs) {
+		t.Errorf("signatures = %d, want one per document (%d)", sigs, len(docs))
+	}
 	if len(want) != len(got) {
 		t.Fatalf("bucket entry counts differ: per-document %d, bulk %d", len(want), len(got))
 	}
