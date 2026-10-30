@@ -466,6 +466,8 @@ curl -X POST http://localhost:11023/v1/export \
 
 ### Creating Backups
 
+The `to` and `from` names are resolved inside the server's backup directory (`MDDB_BACKUP_DIR`, default `./backups`); a path outside it is refused. With auth on, backup and restore need the admin permission on `*`.
+
 ```bash
 # Automatic timestamp
 curl "http://localhost:11023/v1/backup?to=backup-$(date +%s).db"
@@ -554,12 +556,14 @@ curl -X POST http://localhost:11023/v1/export \
 #!/bin/bash
 # backup.sh - Add to crontab for daily backups
 
+# The server must run with MDDB_BACKUP_DIR=/backups/mddb; `to` is a name
+# inside that directory.
 BACKUP_DIR="/backups/mddb"
 DATE=$(date +%Y-%m-%d-%H%M%S)
 KEEP_DAYS=7
 
 # Create backup
-curl "http://localhost:11023/v1/backup?to=${BACKUP_DIR}/backup-${DATE}.db"
+curl "http://localhost:11023/v1/backup?to=backup-${DATE}.db"
 
 # Remove old backups
 find ${BACKUP_DIR} -name "backup-*.db" -mtime +${KEEP_DAYS} -delete
@@ -671,6 +675,7 @@ package main
 import (
     "bytes"
     "encoding/json"
+    "fmt"
     "net/http"
 )
 
@@ -718,20 +723,13 @@ Schema validation enforces structure on document metadata per collection. It is 
 ### Setting Up a Schema
 
 ```bash
-# Define a schema for the "products" collection
+# Define a schema for the "products" collection.
+# "schema" is a string holding the schema JSON, not a nested object.
 curl -X POST http://localhost:11023/v1/schema/set \
   -H 'Content-Type: application/json' \
   -d '{
     "collection": "products",
-    "schema": {
-      "required": ["sku", "price", "category"],
-      "properties": {
-        "sku":      { "type": "string", "pattern": "^SKU-[0-9]+$" },
-        "price":    { "type": "number" },
-        "category": { "type": "string", "enum": ["electronics", "clothing", "books"] },
-        "tags":     { "type": "string", "minItems": 1, "maxItems": 10 }
-      }
-    }
+    "schema": "{\"required\": [\"sku\", \"price\", \"category\"], \"properties\": {\"sku\": {\"type\": \"string\", \"pattern\": \"^SKU-[0-9]+$\"}, \"price\": {\"type\": \"number\"}, \"category\": {\"type\": \"string\", \"enum\": [\"electronics\", \"clothing\", \"books\"]}, \"tags\": {\"type\": \"string\", \"minItems\": 1, \"maxItems\": 10}}}"
   }'
 ```
 
@@ -767,9 +765,9 @@ curl -X POST http://localhost:11023/v1/add \
     },
     "contentMd": "# Bad Product"
   }'
-# Error: schema validation failed: missing required metadata key "price";
-#   value "INVALID" for key "sku" does not match pattern "^SKU-[0-9]+$";
-#   value "furniture" for key "category" is not in allowed enum values [electronics, clothing, books]
+# 400, error: schema validation failed: missing required field "price";
+#   field "sku" value "INVALID" does not match pattern "^SKU-[0-9]+$";
+#   field "category" value "furniture" not in allowed values [electronics clothing books]
 ```
 
 ### Dry-Run Validation
@@ -786,7 +784,7 @@ curl -X POST http://localhost:11023/v1/validate \
       "category": ["books"]
     }
   }'
-# Response: {"valid": true, "errors": []}
+# Response: {"valid": true, "errors": [], "warnings": []}
 ```
 
 ### Listing and Managing Schemas
@@ -816,16 +814,7 @@ curl -X POST http://localhost:11023/v1/schema/set \
   -H 'Content-Type: application/json' \
   -d '{
     "collection": "blog",
-    "schema": {
-      "required": ["category", "author", "status"],
-      "properties": {
-        "category": { "type": "string", "enum": ["blog", "tutorial", "news", "changelog"] },
-        "author":   { "type": "string" },
-        "status":   { "type": "string", "enum": ["draft", "published", "archived"] },
-        "tags":     { "type": "string", "maxItems": 5 },
-        "featured": { "type": "boolean", "maxItems": 1 }
-      }
-    }
+    "schema": "{\"required\": [\"category\", \"author\", \"status\"], \"properties\": {\"category\": {\"type\": \"string\", \"enum\": [\"blog\", \"tutorial\", \"news\", \"changelog\"]}, \"author\": {\"type\": \"string\"}, \"status\": {\"type\": \"string\", \"enum\": [\"draft\", \"published\", \"archived\"]}, \"tags\": {\"type\": \"string\", \"maxItems\": 5}, \"featured\": {\"type\": \"boolean\", \"maxItems\": 1}}}"
   }'
 
 # Add a valid blog post
@@ -894,15 +883,18 @@ export MDDB_AUTH_JWT_SECRET=$(openssl rand -hex 32)      # >= 32 bytes
 export MDDB_TLS_ENABLED=true
 export MDDB_TLS_CERT=/etc/mddb/server.crt
 export MDDB_TLS_KEY=/etc/mddb/server.key
-export MDDB_CORS_ORIGIN=https://app.example.com          # not "*"
+export MDDB_CORS_ORIGINS=https://app.example.com         # not "*"
 export MDDB_AUDIT_ENABLED=true
 export MDDB_RATE_LIMIT_ENABLED=true
 
 ./mddbd
-# On success:  ✓ Production guards satisfied (ISO 27001 / SOC 2)
+# On success the log says: production guards satisfied (ISO 27001 / SOC 2)
 
-# Operator-facing health probe — no auth required
-curl -s http://localhost:11023/v1/compliance-status | jq .
+# Operator-facing health probe. It needs an authenticated caller (any user)
+# while auth is on; the server now speaks HTTPS.
+curl -s --cacert /etc/mddb/server.crt \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  https://localhost:11023/v1/compliance-status | jq .
 # { "production": true, "compliant": true, "missing": [], "missingCount": 0 }
 ```
 
@@ -920,7 +912,7 @@ export MDDB_RATE_LIMIT_BY=ip
 # export MDDB_CLIENT_IP_HEADER=X-Forwarded-For
 ./mddbd &
 
-# Fire 20 requests back-to-back. The first 10 succeed (+5 burst);
+# Fire 20 requests back-to-back. The first 15 succeed (10 requests + 5 burst);
 # the rest return 429 with a Retry-After header.
 for i in $(seq 1 20); do
   printf "req %02d -> " "$i"
@@ -940,7 +932,7 @@ done
 export MDDB_ENCRYPTION_KEY="$(openssl rand -base64 32)"
 ./mddbd &
 
-# 2) Flip the target collection to encrypted=true (admin only)
+# 2) Flip the target collection to encrypted=true (needs write on the collection)
 curl -s -X PUT http://localhost:11023/v1/collection-config \
   -H "Authorization: Bearer $ADMIN_JWT" \
   -H "Content-Type: application/json" \
@@ -960,13 +952,14 @@ curl -s -X POST http://localhost:11023/v1/get \
   -d '{"collection":"secrets","key":"api-key-1","lang":"en_US"}' | jq -r .contentMd
 
 # 5) Verify the on-disk value is ciphertext by inspecting the BoltDB file.
-#    The wire format is:  "MDDB_ENC_V1\x00" (12 B magic) + 12 B nonce + AES-GCM ct + tag.
-#    Any hex dumper works; the magic prefix is grep-able:
-strings mddb.db | grep -a MDDB_ENC_V1 | head -3
-# Output (three-ish matches per encrypted value, binary-obscured after the magic):
-# MDDB_ENC_V1
-# MDDB_ENC_V1
-# MDDB_ENC_V1
+#    New values are written as:  "MDDB_ENC_V2\x00" (12 B magic) + 1 B key ID
+#    + 12 B nonce + AES-GCM ct + tag (MDDB_ENC_V1, without the key ID, is the
+#    pre-2.9.16 format, still read). The magic prefix is grep-able:
+strings mddb.db | grep -a MDDB_ENC_V | head -3
+# Output (one line per stored encrypted value, binary after the magic):
+# MDDB_ENC_V2
+# MDDB_ENC_V2
+# MDDB_ENC_V2
 
 # NB: losing $MDDB_ENCRYPTION_KEY is terminal — escrow it offline.
 ```
@@ -974,7 +967,8 @@ strings mddb.db | grep -a MDDB_ENC_V1 | head -3
 ### Subscribe to `security.auth_failure_burst` and trigger it
 
 ```bash
-# 1) Tune the detector — 5 failures in 30s fires one event, then 60s cooldown.
+# 1) Tune the detector — 5 failures in 30s for one user+IP fires one event,
+#    then 60s cooldown.
 export MDDB_INCIDENT_AUTH_THRESHOLD=5
 export MDDB_INCIDENT_AUTH_WINDOW_SEC=30
 export MDDB_INCIDENT_AUTH_COOLDOWN_SEC=60
@@ -1001,12 +995,14 @@ done
 #    X-MDDB-Webhook-ID: wh_abc123
 #
 #    { "event": "security.auth_failure_burst",
-#      "ts": 1740000000000000000,
+#      "collection": "", "key": "", "lang": "",
+#      "timestamp": 1740000000,
 #      "detail": {
 #        "actor": "alice",
 #        "ip": "203.0.113.5",
-#        "count": 10,
+#        "count": 5,
 #        "windowSec": 30
 #      } }
+#    "count" is the threshold that was reached; "timestamp" is Unix seconds.
 ```
 

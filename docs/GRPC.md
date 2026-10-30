@@ -614,56 +614,29 @@ Schema validation enforces structure on document metadata per collection. See th
 
 ### Message Types
 
-#### SchemaPropertyRule
-
-```protobuf
-message SchemaPropertyRule {
-  string type = 1;
-  repeated string enum_values = 2;
-  string pattern = 3;
-  int32 min_items = 4;
-  int32 max_items = 5;
-}
-```
-
-#### Schema
-
-```protobuf
-message Schema {
-  repeated string required = 1;
-  map<string, SchemaPropertyRule> properties = 2;
-}
-```
-
-#### SetSchemaRequest / SetSchemaResponse
+The schema travels as a JSON **string** (the same document `/v1/schema/set`
+takes), not as a structured message.
 
 ```protobuf
 message SetSchemaRequest {
   string collection = 1;
-  Schema schema = 2;
+  string schema = 2;  // JSON Schema string
 }
 
 message SetSchemaResponse {
   string status = 1;
 }
-```
 
-#### GetSchemaRequest / GetSchemaResponse
-
-```protobuf
 message GetSchemaRequest {
   string collection = 1;
 }
 
 message GetSchemaResponse {
   string collection = 1;
-  Schema schema = 2;
+  string schema = 2;
+  bool enabled = 3;
 }
-```
 
-#### DeleteSchemaRequest / DeleteSchemaResponse
-
-```protobuf
 message DeleteSchemaRequest {
   string collection = 1;
 }
@@ -671,26 +644,18 @@ message DeleteSchemaRequest {
 message DeleteSchemaResponse {
   string status = 1;
 }
-```
 
-#### ListSchemasRequest / ListSchemasResponse
-
-```protobuf
 message ListSchemasRequest {}
 
 message ListSchemasResponse {
-  repeated CollectionSchema schemas = 1;
+  repeated SchemaInfo schemas = 1;
 }
 
-message CollectionSchema {
+message SchemaInfo {
   string collection = 1;
-  Schema schema = 2;
+  string schema = 2;
 }
-```
 
-#### ValidateDocumentRequest / ValidateDocumentResponse
-
-```protobuf
 message ValidateDocumentRequest {
   string collection = 1;
   map<string, MetaValues> meta = 2;
@@ -699,6 +664,7 @@ message ValidateDocumentRequest {
 message ValidateDocumentResponse {
   bool valid = 1;
   repeated string errors = 2;
+  repeated string warnings = 3;  // advisory, never fail validation (DOC-012)
 }
 ```
 
@@ -708,13 +674,7 @@ message ValidateDocumentResponse {
 # Set a schema for a collection
 grpcurl -plaintext -d '{
   "collection": "blog",
-  "schema": {
-    "required": ["category", "author"],
-    "properties": {
-      "category": {"type": "string", "enum_values": ["blog", "tutorial", "news"]},
-      "author": {"type": "string"}
-    }
-  }
+  "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"}}}"
 }' localhost:11024 mddb.MDDB/SetSchema
 
 # Get schema for a collection
@@ -745,18 +705,10 @@ grpcurl -plaintext -d '{
 // Set a schema
 _, err := client.SetSchema(ctx, &pb.SetSchemaRequest{
     Collection: "blog",
-    Schema: &pb.Schema{
-        Required: []string{"category", "author"},
-        Properties: map[string]*pb.SchemaPropertyRule{
-            "category": {
-                Type:       "string",
-                EnumValues: []string{"blog", "tutorial", "news"},
-            },
-            "author": {
-                Type: "string",
-            },
-        },
-    },
+    // The schema is a JSON document in a string.
+    Schema: `{"required":["category","author"],
+              "properties":{"category":{"type":"string","enum":["blog","tutorial","news"]},
+                            "author":{"type":"string"}}}`,
 })
 
 // Validate a document before adding

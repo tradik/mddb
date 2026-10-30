@@ -36,7 +36,8 @@ import (
 
 // verifyChildEnv names the file a child process should verify. Set only by
 // verifyDatabase; the child is this binary (or the test binary, whose TestMain
-// honours it too).
+// honours it too). It is internal plumbing, not a setting, so docs/config.md
+// leaves it out on purpose (configDocNotSettings in config_doc_test.go).
 const verifyChildEnv = "MDDB_INTERNAL_VERIFY_DB"
 
 // verifyTimeout bounds a check. Large databases on slow disks are slow to

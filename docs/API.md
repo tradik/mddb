@@ -23,6 +23,7 @@ status: publish
   - [POST /v1/vector-search](#post-v1vector-search)
   - [POST /v1/vector-reindex](#post-v1vector-reindex)
   - [GET /v1/vector-stats](#get-v1vector-stats)
+  - [POST /v1/vector-projection](#post-v1vector-projection)
   - [POST /v1/classify](#post-v1classify)
   - [PATCH /v1/update](#patch-v1update)
   - [GET /v1/doc-meta](#get-v1doc-meta)
@@ -77,6 +78,8 @@ status: publish
   - [GET /v1/system/info](#get-v1systeminfo)
   - [GET /v1/config](#get-v1config)
   - [GET /v1/endpoints](#get-v1endpoints)
+  - [GET /v1/mcp/config](#get-v1mcpconfig)
+  - [Endpoints documented on topic pages](#endpoints-documented-on-topic-pages)
   - [POST /v1/memory/session](#post-v1memorysession)
   - [POST /v1/memory/message](#post-v1memorymessage)
   - [POST /v1/memory/recall](#post-v1memoryrecall)
@@ -1037,6 +1040,50 @@ curl http://localhost:11023/v1/vector-stats
 
 ---
 
+### POST /v1/vector-projection
+
+Project a collection's embeddings onto two dimensions with PCA, computed on
+the server, to show cluster structure and outliers (the panel's vector map).
+The sample is deterministic: the index keys are sorted and an evenly spaced
+subset is taken, so the same collection gives the same picture.
+
+**Permission:** with auth on, `read` on `collection`.
+
+**Request body:**
+
+| Field | Type | Meaning |
+|---|---|---|
+| `collection` | string | Required |
+| `sample` | int | Points to project; default 1000, at most 2000 |
+| `query` | string | Optional: embedded with the server's provider and projected as one more point |
+| `queryVector` | float[] | Optional: a vector to project instead of `query`; ignored unless its length matches the collection's |
+
+```bash
+curl -X POST http://localhost:11023/v1/vector-projection \
+  -H "Content-Type: application/json" \
+  -d '{"collection": "docs", "sample": 500, "query": "how to reset a password"}'
+```
+
+**Response:**
+```json
+{
+  "points": [
+    {"id": "a1b2c3#0", "key": "guide/reset", "docId": "a1b2c3", "chunkIndex": 0, "x": 0.41, "y": -0.12}
+  ],
+  "query": {"id": "query", "key": "", "docId": "", "chunkIndex": 0, "x": 0.38, "y": -0.09},
+  "total": 5210,
+  "sampled": 500,
+  "dimensions": 1536
+}
+```
+
+`id` is the vector's index key: a document ID, or `docID#N` for chunk `N`.
+`total` counts the collection's vectors, `sampled` the points returned.
+Vectors whose length differs from the first one are skipped. A collection
+without vectors answers `{"points": [], ...}`; a missing `collection` is a 400.
+
+---
+
 ### Vector Search Configuration
 
 #### Embedding Providers
@@ -1898,27 +1945,21 @@ mddb-cli stats
 
 ### POST /v1/schema/set
 
-Set or update the validation schema for a collection. Schema validation is opt-in per collection. See the [Schema Validation Guide](SCHEMA-VALIDATION.md) for full details on supported rules.
+Set or update the validation schema for a collection. `schema` is the schema document as a **JSON string**, not a nested object: an object is a 400. `schema/get` and `schema/list` return it the same way. Schema validation is opt-in per collection. See the [Schema Validation Guide](SCHEMA-VALIDATION.md) for full details on supported rules.
 
 **Request Body**:
 ```json
 {
   "collection": "blog",
-  "schema": {
-    "required": ["category", "author"],
-    "properties": {
-      "category": { "type": "string", "enum": ["blog", "tutorial", "news"] },
-      "author":   { "type": "string" },
-      "tags":     { "type": "string", "minItems": 1, "maxItems": 5 }
-    }
-  }
+  "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"},\"tags\":{\"type\":\"string\",\"minItems\":1,\"maxItems\":5}}}"
 }
 ```
 
 **Response**:
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "collection": "blog"
 }
 ```
 
@@ -1928,12 +1969,7 @@ curl -X POST http://localhost:11023/v1/schema/set \
   -H 'Content-Type: application/json' \
   -d '{
     "collection": "blog",
-    "schema": {
-      "required": ["category"],
-      "properties": {
-        "category": { "type": "string", "enum": ["blog", "tutorial"] }
-      }
-    }
+    "schema": "{\"required\":[\"category\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\"]}}}"
   }'
 ```
 
@@ -1954,14 +1990,8 @@ Retrieve the current validation schema for a collection.
 ```json
 {
   "collection": "blog",
-  "schema": {
-    "required": ["category", "author"],
-    "properties": {
-      "category": { "type": "string", "enum": ["blog", "tutorial", "news"] },
-      "author":   { "type": "string" },
-      "tags":     { "type": "string", "minItems": 1, "maxItems": 5 }
-    }
-  }
+  "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"},\"tags\":{\"type\":\"string\",\"minItems\":1,\"maxItems\":5}}}",
+  "enabled": true
 }
 ```
 
@@ -1969,7 +1999,8 @@ Retrieve the current validation schema for a collection.
 ```json
 {
   "collection": "blog",
-  "schema": null
+  "schema": "",
+  "enabled": false
 }
 ```
 
@@ -1996,7 +2027,8 @@ Delete the validation schema for a collection, disabling validation. Existing do
 **Response**:
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "collection": "blog"
 }
 ```
 
@@ -2021,23 +2053,11 @@ List all collections that have a validation schema defined.
   "schemas": [
     {
       "collection": "blog",
-      "schema": {
-        "required": ["category", "author"],
-        "properties": {
-          "category": { "type": "string", "enum": ["blog", "tutorial", "news"] },
-          "author":   { "type": "string" }
-        }
-      }
+      "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"}}}"
     },
     {
       "collection": "products",
-      "schema": {
-        "required": ["price", "sku"],
-        "properties": {
-          "price": { "type": "number" },
-          "sku":   { "type": "string", "pattern": "^SKU-[0-9]+$" }
-        }
-      }
+      "schema": "{\"required\":[\"price\",\"sku\"],\"properties\":{\"price\":{\"type\":\"number\"},\"sku\":{\"type\":\"string\",\"pattern\":\"^SKU-[0-9]+$\"}}}"
     }
   ]
 }
@@ -2072,7 +2092,8 @@ Validate a document's metadata against the collection schema without persisting 
 ```json
 {
   "valid": true,
-  "errors": []
+  "errors": [],
+  "warnings": []
 }
 ```
 
@@ -2081,9 +2102,10 @@ Validate a document's metadata against the collection schema without persisting 
 {
   "valid": false,
   "errors": [
-    "value \"pending\" for key \"status\" is not in allowed enum values [draft, published, archived]",
-    "key \"tags\" has 6 values, exceeds maxItems 5"
-  ]
+    "schema validation failed: field \"tags\" has 6 values, maximum 5 allowed",
+    "field \"status\" value \"pending\" not in allowed values [draft published archived]"
+  ],
+  "warnings": []
 }
 ```
 
@@ -2477,11 +2499,15 @@ Delete multiple documents in a single request.
 
 ---
 
-### POST /v1/documents:deleteWhere, :updateWhere, :setTTLWhere
+### POST /v1/documents:deleteWhere, /v1/documents:updateWhere, /v1/documents:setTTLWhere
 
 Act on every document a metadata filter matches (v2.18.8, GO-045). The
 alternative is listing keys and sending them back in batches, with a race
-between the list and the write.
+between the list and the write. All three take `POST` and the same body.
+
+**Permission:** with auth on, `write` on `collection`; a `dryRun` needs only
+`read`. The SEC-019 gate checks `read` and the handler raises it to `write`
+for a real run.
 
 ```bash
 # first, what would go
@@ -2489,6 +2515,16 @@ curl -X POST "http://localhost:11023/v1/documents:deleteWhere" -d '{
   "collection": "repo", "filter": {"gitCommit": {"not": ["9f2c1e0"]}}, "dryRun": true
 }'
 # {"matched": 42, "affected": 42, "sample": ["src/old.go", "..."], "dryRun": true}
+
+# merge metadata into every match
+curl -X POST "http://localhost:11023/v1/documents:updateWhere" -d '{
+  "collection": "repo", "filter": {"branch": {"in": ["main"]}}, "meta": {"status": ["archived"]}
+}'
+
+# expire every match in one hour
+curl -X POST "http://localhost:11023/v1/documents:setTTLWhere" -d '{
+  "collection": "repo", "filter": {"status": {"in": ["archived"]}}, "ttl": 3600
+}'
 ```
 
 | Field | Meaning |
@@ -3565,7 +3601,7 @@ Without an ID — list every rotation job ever queued in this process (newest fi
 { "jobs": [ { "id": "rot-...", "status": "completed", ... } ] }
 ```
 
-With an ID — single job snapshot:
+With an ID (`GET /v1/encryption/jobs/:id`) — single job snapshot:
 
 ```json
 {
@@ -3587,7 +3623,7 @@ With an ID — single job snapshot:
 
 ### GET /v1/compliance-status
 
-Report the live state of the production-hardening guard. **No authentication required** — this endpoint is designed to be called by operator-facing liveness / readiness probes and by external monitoring that must detect a drifted configuration before production traffic hits a non-compliant server.
+Report the live state of the production-hardening guard, for operator-facing liveness / readiness probes and for external monitoring that must detect a drifted configuration before production traffic hits a non-compliant server. With auth on, it needs an authenticated caller (any valid token or API key; since v2.18.10, SEC-019), so give the probe a read-only API key.
 
 **Query parameters**: none.
 
@@ -4056,6 +4092,86 @@ curl http://localhost:11023/v1/endpoints
   ]
 }
 ```
+
+---
+
+### GET /v1/mcp/config
+
+A starting MCP configuration file for this server, as YAML
+(`Content-Type: text/yaml`). The panel's LLM Connections page offers it as a
+download. It fills in the listen addresses from `MDDB_ADDR` and
+`MDDB_GRPC_ADDR`, and lists the `custom_tools` block commented out. Only
+`GET` is accepted; other methods get 405.
+
+**Permission:** with auth on, any authenticated caller.
+
+```bash
+curl http://localhost:11023/v1/mcp/config -o mcp-config.yaml
+```
+
+**Response** (abridged):
+```yaml
+mcp:
+  # Set listenAddress to run MCP on a dedicated port.
+  # Omit to embed MCP on the HTTP API port (:11023).
+  # listenAddress: "0.0.0.0:9000"
+
+mddb:
+  grpcAddress: "localhost:11024"
+  restBaseUrl: "http://localhost:11023"
+  # grpc_only | rest_only | grpc_with_rest_fallback | rest_with_grpc_fallback
+  transportMode: "grpc_with_rest_fallback"
+  timeoutSeconds: 2
+  maxRetries: 1
+
+# custom_tools:
+#   - name: "semantic_search"
+#     ...
+```
+
+The custom tools format is in [CUSTOM-TOOLS.md](CUSTOM-TOOLS.md).
+
+---
+
+### Endpoints documented on topic pages
+
+These routes are served by the same HTTP listener and pass the same access
+gate, but their full reference lives with the feature. The machine-readable
+contract for all of them is [openapi.yaml](openapi.yaml). "Permission" is what
+the SEC-019 gate requires when `MDDB_AUTH_ENABLED=true`: `read`/`write` on the
+collection the request names (on `*` when it names none), "global admin" for
+admin on `*`, "authenticated" for any valid token or API key. See
+[AUTHENTICATION.md](AUTHENTICATION.md) for the rules.
+
+| Method | Path | Permission | Reference |
+|---|---|---|---|
+| GET | `/v1/events` | authenticated; each event is filtered by `read` on its collection | [SSE.md](SSE.md#endpoints) |
+| POST | `/v1/geo-search` | `read` | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-search) |
+| POST | `/v1/geo-within` | `read` | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-within) |
+| POST | `/v1/geo-polygon` | `read` | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-polygon-v2913) |
+| POST | `/v1/geo-reindex` | global admin | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-reindex) |
+| GET | `/v1/geo-stats` | `read` on `*` (reports every collection) | [GEOSEARCH.md](GEOSEARCH.md#get-v1geo-stats) |
+| POST | `/v1/geo-encode` | authenticated (no collection) | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-encode--post-v1geo-decode) |
+| POST | `/v1/geo-decode` | authenticated (no collection) | [GEOSEARCH.md](GEOSEARCH.md#post-v1geo-encode--post-v1geo-decode) |
+| GET, POST, DELETE | `/v1/mcp/keys` | global admin | [MCP.md](MCP.md#dynamic-key-management-api) |
+| POST | `/v1/mcp/keys/disable` | global admin | [MCP.md](MCP.md#dynamic-key-management-api) |
+| GET | `/v1/replication/status` | authenticated | [REPLICATION.md](REPLICATION.md#http-endpoint) |
+| POST | `/v1/spell-suggest` | `read` | [SYMSPELL.md](SYMSPELL.md#spell-suggestions) (needs `MDDB_SPELL=true`) |
+| POST | `/v1/spell-cleanup` | `read` | [SYMSPELL.md](SYMSPELL.md#apply-corrections) (needs `MDDB_SPELL=true`) |
+| GET, PUT, DELETE | `/v1/spell-dictionary` | `read` for GET, `write` otherwise | [SYMSPELL.md](SYMSPELL.md#custom-dictionary) (needs `MDDB_SPELL=true`) |
+| POST | `/v1/temporal/query` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#query-event-history) (needs `MDDB_TEMPORAL=true`) |
+| POST | `/v1/temporal/hot` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#hot-documents-leaderboard) (needs `MDDB_TEMPORAL=true`) |
+| POST | `/v1/temporal/histogram` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#activity-histogram) (needs `MDDB_TEMPORAL=true`) |
+
+Without `MDDB_SPELL` or `MDDB_TEMPORAL` the spell and temporal routes are not
+registered and answer 404.
+
+Two more groups are off by default and registered only when switched on:
+
+| Method | Path | Permission | Reference |
+|---|---|---|---|
+| GET, POST, PUT, DELETE | `/es`, `/es/` (the Elasticsearch-compatible subset) | per index in the path, as the matching `/v1` call | [ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md#endpoints) (needs `MDDB_ES_COMPAT=true`) |
+| GET | `/debug/pprof/`, `/debug/pprof/cmdline`, `/debug/pprof/profile`, `/debug/pprof/symbol`, `/debug/pprof/trace` | global admin | Go's `net/http/pprof`; [config.md](config.md#profiling) (needs `MDDB_PPROF_ENABLED=true`) |
 
 ---
 

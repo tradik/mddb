@@ -93,29 +93,34 @@ npm run build
 
 ### Chat Server Environment Variables
 
-```bash
-# LLM Provider
-MDDB_CHAT_LLM_PROVIDER=openai        # openai | anthropic | ollama | groq | mistral
-MDDB_CHAT_LLM_API_KEY=sk-...         # API key (not needed for Ollama)
-MDDB_CHAT_LLM_MODEL=gpt-4o-mini      # Model name
-MDDB_CHAT_LLM_BASE_URL=              # Custom base URL (optional)
+The chat server (`services/mddb-chat`) is configured by its TOML file, see
+`services/mddb-chat/config.example.toml`. It reads five environment variables;
+the four secrets apply only when the matching TOML value is empty:
 
-# MDDB connection
-MDDB_GRPC_ADDRESS=localhost:11024
-MDDB_COLLECTION=docs                 # Default collection to search
+```bash
+MDDB_CHAT_CONFIG=config.toml         # path of the TOML file (default: config.toml)
+MDDB_CHAT_LLM_API_KEY=sk-...         # [llm] api_key (not needed for Ollama)
+MDDB_CHAT_WEBHOOK_SECRET=            # [security] webhook_secret
 
 # Auth to mddbd (SEC-007): keep these OUT of config.toml (it is gitignored).
-# When the config's auth_username/auth_password are blank, these env vars are
-# used instead. In docker-compose.dev.yml they default to the mddbd admin
-# credentials from your .env (copy .env.example to .env first).
-MDDB_CHAT_AUTH_USERNAME=admin
-MDDB_CHAT_AUTH_PASSWORD=             # set in .env — never commit a real password
-
-# Server
-MDDB_CHAT_PORT=11030
-MDDB_CHAT_MAX_SESSIONS=100
-MDDB_CHAT_RATE_LIMIT=10              # Messages per minute per session
+# In docker-compose.dev.yml they default to the mddbd admin credentials from
+# your .env (copy .env.example to .env first).
+MDDB_CHAT_AUTH_USERNAME=admin        # [mddb] auth_username
+MDDB_CHAT_AUTH_PASSWORD=             # [mddb] auth_password; never commit a real password
 ```
+
+Everything else is a TOML key, not an environment variable:
+
+| Setting | TOML key | Example default |
+|---------|----------|-----------------|
+| LLM provider | `[llm] provider` | `"openai"` (`openai`, `anthropic`, or any OpenAI-compatible service) |
+| LLM model | `[llm] model` | `"gpt-4o-mini"` |
+| LLM base URL | `[llm] api_url` | `"https://api.openai.com/v1"` |
+| MDDB gRPC address | `[mddb] grpc_addr` | `"http://localhost:11024"` |
+| Default collection | `[mddb] default_collection` | `"docs"` |
+| Listen port | `[server] port` | `11030` |
+| Concurrent sessions | `[session] max_concurrent` | `2` |
+| Messages per minute | `[security] rate_limit_per_minute` | `30` |
 
 ### Widget Configuration
 
@@ -134,34 +139,42 @@ window.MDDB_CHAT_CONFIG = {
 
 ### OpenAI
 
-```bash
-MDDB_CHAT_LLM_PROVIDER=openai
-MDDB_CHAT_LLM_API_KEY=sk-...
-MDDB_CHAT_LLM_MODEL=gpt-4o-mini
+The `[llm]` table of `config.toml`; the key can come from `MDDB_CHAT_LLM_API_KEY`
+instead. Any provider other than `anthropic` (or `claude`) is spoken to over
+the OpenAI-compatible API at `api_url`.
+
+```toml
+[llm]
+provider = "openai"
+api_url = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
 ```
 
 ### Anthropic Claude
 
-```bash
-MDDB_CHAT_LLM_PROVIDER=anthropic
-MDDB_CHAT_LLM_API_KEY=sk-ant-...
-MDDB_CHAT_LLM_MODEL=claude-haiku-4-5-20251001
+```toml
+[llm]
+provider = "anthropic"
+api_url = "https://api.anthropic.com/v1"
+model = "claude-haiku-4-5-20251001"
 ```
 
 ### Ollama (Local, Free)
 
-```bash
-MDDB_CHAT_LLM_PROVIDER=ollama
-MDDB_CHAT_LLM_BASE_URL=http://localhost:11434
-MDDB_CHAT_LLM_MODEL=llama3.2
+```toml
+[llm]
+provider = "openai"
+api_url = "http://localhost:11434/v1"
+model = "llama3.2"
 ```
 
 ### Bielik (Polish)
 
-```bash
-MDDB_CHAT_LLM_PROVIDER=ollama
-MDDB_CHAT_LLM_BASE_URL=http://localhost:11434
-MDDB_CHAT_LLM_MODEL=bielik-11b-v2.3-instruct
+```toml
+[llm]
+provider = "openai"
+api_url = "http://localhost:11434/v1"
+model = "bielik-11b-v2.3-instruct"
 ```
 
 ## How RAG Works

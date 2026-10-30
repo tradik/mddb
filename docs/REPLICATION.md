@@ -57,7 +57,7 @@ sequenceDiagram
 
 ```bash
 MDDB_REPLICATION_ROLE=leader \
-MDDB_DB_PATH=/data/leader.db \
+MDDB_PATH=/data/leader.db \
 MDDB_HTTP_PORT=11023 \
 MDDB_GRPC_PORT=11024 \
 ./mddbd
@@ -70,7 +70,7 @@ The leader automatically enables the binlog and exposes the `MDDBReplication` gR
 ```bash
 MDDB_REPLICATION_ROLE=follower \
 MDDB_REPLICATION_LEADER_ADDR=leader-host:11024 \
-MDDB_DB_PATH=/data/follower.db \
+MDDB_PATH=/data/follower.db \
 MDDB_HTTP_PORT=11033 \
 MDDB_GRPC_PORT=11034 \
 ./mddbd
@@ -141,7 +141,7 @@ services:
       - leader-data:/data
     environment:
       MDDB_REPLICATION_ROLE: leader
-      MDDB_DB_PATH: /data/mddb.db
+      MDDB_PATH: /data/mddb.db
 
   follower-1:
     image: tradik/mddb:latest
@@ -153,7 +153,7 @@ services:
     environment:
       MDDB_REPLICATION_ROLE: follower
       MDDB_REPLICATION_LEADER_ADDR: leader:11024
-      MDDB_DB_PATH: /data/mddb.db
+      MDDB_PATH: /data/mddb.db
     depends_on:
       leader:
         condition: service_healthy
@@ -168,7 +168,7 @@ services:
     environment:
       MDDB_REPLICATION_ROLE: follower
       MDDB_REPLICATION_LEADER_ADDR: leader:11024
-      MDDB_DB_PATH: /data/mddb.db
+      MDDB_PATH: /data/mddb.db
     depends_on:
       leader:
         condition: service_healthy
@@ -176,9 +176,9 @@ services:
   panel:
     image: tradik/mddb:panel
     ports:
-      - "3000:80"
+      - "3000:3000"
     environment:
-      MDDB_API_URL: http://leader:11023
+      MDDB_SERVER: http://leader:11023 # read by the panel's proxy (server.js)
 
 volumes:
   leader-data:
@@ -197,11 +197,11 @@ volumes:
 | `MDDB_NODE_ID` | auto-generated | Unique node identifier |
 | `MDDB_BINLOG_ENABLED` | `false` | Enable binlog without replication (standalone mode). Auto-enabled for `leader` role |
 | `MDDB_BINLOG_PATH` | alongside DB file | Custom binlog file path |
-| `MDDB_BINLOG_MAX_SIZE` | `256MB` | Maximum binlog segment size |
-| `MDDB_BINLOG_MAX_AGE` | `24h` | Maximum binlog retention time |
-| `MDDB_REPLICATION_RETRY_INTERVAL` | `5s` | Follower reconnection interval |
-| `MDDB_REPLICATION_MAX_LAG` | `30s` | Maximum lag before follower reports unhealthy |
 | `MDDB_REPLICATION_SECRET` | `""` | Shared secret authenticating the snapshot/binlog streams (SEC-001). Set the **same** value on leader and follower. See [Securing replication](#securing-replication). |
+
+These limits are fixed in the code and have no setting: a binlog segment is
+rotated at 256 MB and kept for 24 hours, a follower reconnects every 5 seconds,
+and a follower more than 30 seconds behind reports unhealthy.
 
 ### Securing replication
 
@@ -307,7 +307,7 @@ flowchart TD
 
 ### Reconnection
 
-- Follower retries every `MDDB_REPLICATION_RETRY_INTERVAL` (default 5s)
+- Follower retries every 5 seconds (fixed)
 - If binlog still has the needed LSN: incremental catch-up
 - If LSN is too old (binlog rotated): full snapshot re-sync
 
@@ -392,7 +392,7 @@ GET /v1/replication/status
 
 ### Health Check
 
-The `/health` endpoint includes replication status. A follower reports unhealthy if lag exceeds `MDDB_REPLICATION_MAX_LAG` (default 30s).
+The `/health` endpoint includes replication status. A follower reports unhealthy if lag exceeds 30 seconds (fixed).
 
 ### Web Panel
 
@@ -482,7 +482,7 @@ spec:
               value: "follower"
             - name: MDDB_REPLICATION_LEADER_ADDR
               value: "mddb-leader.default.svc.cluster.local:11024"
-            - name: MDDB_DB_PATH
+            - name: MDDB_PATH
               value: "/data/mddb.db"
           ports:
             - containerPort: 11023
@@ -509,7 +509,7 @@ If the leader goes down:
 
 # 2. Promote a follower to leader
 MDDB_REPLICATION_ROLE=leader \
-MDDB_DB_PATH=/data/mddb.db \
+MDDB_PATH=/data/mddb.db \
 MDDB_HTTP_PORT=11023 \
 MDDB_GRPC_PORT=11024 \
 ./mddbd
@@ -523,9 +523,9 @@ MDDB_GRPC_PORT=11024 \
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Follower stuck at LSN 0 | Can't connect to leader | Check `MDDB_REPLICATION_LEADER_ADDR` and firewall rules |
-| "full snapshot required" | Binlog rotated | Follower will auto-snapshot; increase `MDDB_BINLOG_MAX_SIZE` |
+| "full snapshot required" | Binlog rotated | Follower will auto-snapshot; the binlog keeps 256 MB per segment and 24 hours (fixed) |
 | High replication lag | Slow network or overloaded follower | Check network, reduce write load, add followers |
-| Follower reports unhealthy | Lag > `MDDB_REPLICATION_MAX_LAG` | Investigate lag cause; increase max lag if acceptable |
+| Follower reports unhealthy | Lag > 30 seconds (fixed) | Investigate lag cause |
 | "binlog not enabled" | Leader not configured | Set `MDDB_REPLICATION_ROLE=leader` |
 
 **[Back to Documentation](README.md)**

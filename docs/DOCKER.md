@@ -284,7 +284,7 @@ services:
   app:
     networks:
       - mddb-network
-    environment:
+    environment: # your application's own variables; mddbd does not read them
       - MDDB_HTTP_URL=http://mddb:11023
       - MDDB_GRPC_URL=mddb:11024
 ```

@@ -750,6 +750,14 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
+## Corpus Packs (v2.18.10+)
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_CORPUS_MAX_BYTES` | `68719476736` (64 GiB) | int64 | The largest `collection.db` that `POST /v1/corpus/install` unpacks from a pack; a larger one is refused before it is written. See [CORPUS-PACKS.md](CORPUS-PACKS.md) |
+
+---
+
 ## Quotas and Reserves (v2.18.9+)
 
 Server-wide limits that protect the node, next to the per-collection `quota`

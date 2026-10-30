@@ -53,14 +53,7 @@ curl -X POST http://localhost:11023/v1/schema/set \
   -H 'Content-Type: application/json' \
   -d '{
     "collection": "blog",
-    "schema": {
-      "required": ["category", "author"],
-      "properties": {
-        "category": { "type": "string", "enum": ["blog", "tutorial", "news"] },
-        "author":   { "type": "string" },
-        "tags":     { "type": "string", "minItems": 1, "maxItems": 5 }
-      }
-    }
+    "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"},\"tags\":{\"type\":\"string\",\"minItems\":1,\"maxItems\":5}}}"
   }'
 ```
 
@@ -104,7 +97,7 @@ Response:
 
 ```json
 {
-  "error": "schema validation failed: missing required metadata key \"category\"; missing required metadata key \"author\""
+  "error": "schema validation failed: missing required field \"category\"; missing required field \"author\""
 }
 ```
 
@@ -212,27 +205,21 @@ A document with `"tags": []` would fail the `minItems: 1` check. A document with
 
 ### POST /v1/schema/set
 
-Set or update the validation schema for a collection.
+Set or update the validation schema for a collection. `schema` is the schema document as a **JSON string**, not a nested object: an object is a 400. `schema/get` and `schema/list` return it the same way.
 
 **Request Body**:
 ```json
 {
   "collection": "blog",
-  "schema": {
-    "required": ["category", "author"],
-    "properties": {
-      "category": { "type": "string", "enum": ["blog", "tutorial", "news"] },
-      "author":   { "type": "string" },
-      "tags":     { "type": "string", "minItems": 1, "maxItems": 5 }
-    }
-  }
+  "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"},\"tags\":{\"type\":\"string\",\"minItems\":1,\"maxItems\":5}}}"
 }
 ```
 
 **Response**:
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "collection": "blog"
 }
 ```
 
@@ -242,12 +229,7 @@ curl -X POST http://localhost:11023/v1/schema/set \
   -H 'Content-Type: application/json' \
   -d '{
     "collection": "blog",
-    "schema": {
-      "required": ["category"],
-      "properties": {
-        "category": { "type": "string", "enum": ["blog", "tutorial"] }
-      }
-    }
+    "schema": "{\"required\":[\"category\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\"]}}}"
   }'
 ```
 
@@ -268,14 +250,8 @@ Retrieve the current schema for a collection.
 ```json
 {
   "collection": "blog",
-  "schema": {
-    "required": ["category", "author"],
-    "properties": {
-      "category": { "type": "string", "enum": ["blog", "tutorial", "news"] },
-      "author":   { "type": "string" },
-      "tags":     { "type": "string", "minItems": 1, "maxItems": 5 }
-    }
-  }
+  "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"},\"tags\":{\"type\":\"string\",\"minItems\":1,\"maxItems\":5}}}",
+  "enabled": true
 }
 ```
 
@@ -283,7 +259,8 @@ Retrieve the current schema for a collection.
 ```json
 {
   "collection": "blog",
-  "schema": null
+  "schema": "",
+  "enabled": false
 }
 ```
 
@@ -310,7 +287,8 @@ Delete the schema for a collection, disabling validation.
 **Response**:
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "collection": "blog"
 }
 ```
 
@@ -335,23 +313,11 @@ List all collections that have a schema defined.
   "schemas": [
     {
       "collection": "blog",
-      "schema": {
-        "required": ["category", "author"],
-        "properties": {
-          "category": { "type": "string", "enum": ["blog", "tutorial", "news"] },
-          "author":   { "type": "string" }
-        }
-      }
+      "schema": "{\"required\":[\"category\",\"author\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\",\"news\"]},\"author\":{\"type\":\"string\"}}}"
     },
     {
       "collection": "products",
-      "schema": {
-        "required": ["price", "sku"],
-        "properties": {
-          "price": { "type": "number" },
-          "sku":   { "type": "string", "pattern": "^SKU-[0-9]+$" }
-        }
-      }
+      "schema": "{\"required\":[\"price\",\"sku\"],\"properties\":{\"price\":{\"type\":\"number\"},\"sku\":{\"type\":\"string\",\"pattern\":\"^SKU-[0-9]+$\"}}}"
     }
   ]
 }
@@ -386,7 +352,8 @@ Validate a document's metadata against the collection schema without persisting 
 ```json
 {
   "valid": true,
-  "errors": []
+  "errors": [],
+  "warnings": []
 }
 ```
 
@@ -395,9 +362,10 @@ Validate a document's metadata against the collection schema without persisting 
 {
   "valid": false,
   "errors": [
-    "value \"pending\" for key \"status\" is not in allowed enum values [draft, published, archived]",
-    "key \"tags\" has 6 values, exceeds maxItems 5"
-  ]
+    "schema validation failed: field \"tags\" has 6 values, maximum 5 allowed",
+    "field \"status\" value \"pending\" not in allowed values [draft published archived]"
+  ],
+  "warnings": []
 }
 ```
 
@@ -405,7 +373,8 @@ Validate a document's metadata against the collection schema without persisting 
 ```json
 {
   "valid": true,
-  "errors": []
+  "errors": [],
+  "warnings": []
 }
 ```
 
@@ -442,12 +411,7 @@ The following RPCs are available on the `mddb.MDDB` service (port `11024`):
 # Set schema
 grpcurl -plaintext -d '{
   "collection": "blog",
-  "schema": {
-    "required": ["category"],
-    "properties": {
-      "category": {"type": "string", "enum_values": ["blog", "tutorial"]}
-    }
-  }
+  "schema": "{\"required\":[\"category\"],\"properties\":{\"category\":{\"type\":\"string\",\"enum\":[\"blog\",\"tutorial\"]}}}"
 }' localhost:11024 mddb.MDDB/SetSchema
 
 # Get schema
@@ -570,7 +534,7 @@ When validation fails on `/v1/add`, the response includes a descriptive error:
 
 ```json
 {
-  "error": "schema validation failed: missing required metadata key \"category\""
+  "error": "schema validation failed: missing required field \"category\""
 }
 ```
 
@@ -578,7 +542,7 @@ When validation fails on `/v1/add`, the response includes a descriptive error:
 
 ```json
 {
-  "error": "schema validation failed: value \"not-a-number\" for key \"priority\" is not a valid integer"
+  "error": "schema validation failed: field \"priority\" value \"not-a-number\" is not a valid integer"
 }
 ```
 
@@ -586,7 +550,7 @@ When validation fails on `/v1/add`, the response includes a descriptive error:
 
 ```json
 {
-  "error": "schema validation failed: value \"pending\" for key \"status\" is not in allowed enum values [draft, published, archived]"
+  "error": "schema validation failed: field \"status\" value \"pending\" not in allowed values [draft published archived]"
 }
 ```
 
@@ -594,7 +558,7 @@ When validation fails on `/v1/add`, the response includes a descriptive error:
 
 ```json
 {
-  "error": "schema validation failed: value \"Hello World\" for key \"slug\" does not match pattern \"^[a-z0-9-]+$\""
+  "error": "schema validation failed: field \"slug\" value \"Hello World\" does not match pattern \"^[a-z0-9-]+$\""
 }
 ```
 
@@ -602,13 +566,13 @@ When validation fails on `/v1/add`, the response includes a descriptive error:
 
 ```json
 {
-  "error": "schema validation failed: key \"tags\" has 0 values, below minItems 1"
+  "error": "schema validation failed: field \"tags\" has 0 values, minimum 1 required"
 }
 ```
 
 ```json
 {
-  "error": "schema validation failed: key \"category\" has 3 values, exceeds maxItems 1"
+  "error": "schema validation failed: field \"category\" has 3 values, maximum 1 allowed"
 }
 ```
 
@@ -618,7 +582,7 @@ When multiple rules are violated, all errors are combined:
 
 ```json
 {
-  "error": "schema validation failed: missing required metadata key \"author\"; value \"invalid\" for key \"status\" is not in allowed enum values [draft, published, archived]; key \"tags\" has 6 values, exceeds maxItems 5"
+  "error": "schema validation failed: missing required field \"author\"; field \"tags\" has 6 values, maximum 5 allowed; field \"status\" value \"invalid\" not in allowed values [draft published archived]"
 }
 ```
 

@@ -149,7 +149,7 @@ ExecStart=/usr/local/bin/mddbd
 Restart=on-failure
 RestartSec=5s
 
-Environment=MDDB_DB_PATH=/var/lib/mddb/mddb.db
+Environment=MDDB_PATH=/var/lib/mddb/mddb.db
 Environment=MDDB_HTTP_PORT=11023
 Environment=MDDB_GRPC_PORT=11024
 
@@ -414,7 +414,7 @@ mddb-cli stats
 Create `/etc/mddb/mddb.env`:
 
 ```bash
-MDDB_DB_PATH=/var/lib/mddb/mddb.db
+MDDB_PATH=/var/lib/mddb/mddb.db
 MDDB_HTTP_PORT=11023
 MDDB_GRPC_PORT=11024
 MDDB_GRAPHQL_ENABLED=true
@@ -428,7 +428,7 @@ MDDB_EMBEDDING_DIMENSIONS=1536
 
 # Authentication (optional)
 MDDB_AUTH_ENABLED=true
-MDDB_JWT_SECRET=your-secret-key-here
+MDDB_AUTH_JWT_SECRET=your-secret-key-here
 ```
 
 **CLI Configuration:**

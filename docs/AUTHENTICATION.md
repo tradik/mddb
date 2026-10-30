@@ -531,30 +531,26 @@ mddb-cli --token YOUR_TOKEN add docs readme en -f README.md
 mddb-cli --api-key mddb_live_... stats
 ```
 
-### MCP Server (mddb-mcp)
+### MCP Server
 
-#### config.yaml
+The MCP server is built into `mddbd`; there is no separate process to give a
+key to. With `MDDB_AUTH_ENABLED=true` an MCP client sends the same credentials
+as a REST client, in the `X-API-Key` header or as `Authorization: Bearer`:
 
-```yaml
-mddb:
-  grpcAddress: "localhost:11024"
-  restBaseURL: "http://localhost:11023/v1"
-  transportMode: "rest-only"
-  timeout: 30s
-  apiKey: "mddb_live_your-api-key-here"  # Add this line
-
-server:
-  httpPort: 8080
-  enableHTTP: true
-  enableStdio: true
+```json
+{
+  "mcpServers": {
+    "mddb": {
+      "transport": "streamable-http",
+      "url": "http://localhost:9000/mcp",
+      "headers": { "X-API-Key": "mddb_live_your-api-key-here" }
+    }
+  }
+}
 ```
 
-#### Environment Variable
-
-```bash
-export MDDB_API_KEY=mddb_live_...
-mddb-mcp --config config.yaml
-```
+MCP-only keys (`MDDB_MCP_API_KEY_ENABLED`, `/v1/mcp/keys`) are described in
+[MCP.md](MCP.md#api-key-authentication).
 
 ### Panel (React UI)
 
@@ -803,21 +799,14 @@ curl -H "Authorization: Bearer $ADMIN_TOKEN" \
    # Restart server to recreate bootstrap admin
    ```
 
-### Problem: MCP service can't authenticate
+### Problem: MCP client can't authenticate
 
-**Cause:** API key not configured.
+**Cause:** the MCP client sends no key, or a key the server does not accept.
 
-**Solution:**
-```yaml
-# config.yaml
-mddb:
-  apiKey: "mddb_live_your-key-here"
-```
-
-Or use environment variable:
-```bash
-export MDDB_API_KEY=mddb_live_your-key-here
-```
+**Solution:** add the key to the client's MCP configuration as a header,
+`"headers": {"X-API-Key": "mddb_live_your-key-here"}` (or
+`Authorization: Bearer …`); see [MCP Server](#mcp-server). With
+`MDDB_MCP_API_KEY_ENABLED=true`, use an MCP key from `/v1/mcp/keys` instead.
 
 ---
 

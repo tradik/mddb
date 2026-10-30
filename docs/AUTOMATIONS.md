@@ -30,11 +30,11 @@ The automation system has three rule types:
 
 | Type | Purpose | Env Var |
 |------|---------|---------|
-| **Webhook** | Named HTTP endpoint target (URL, method, headers) | `MDDB_WEBHOOKS=true` |
+| **Webhook** | Named HTTP endpoint target (URL, method, headers) | none: on with the automation system (`MDDB_AUTOMATIONS`, default `enable`) |
 | **Trigger** | Fire a webhook when a new document matches a search query above a threshold | `MDDB_TRIGGERS=true` |
 | **Cron** | Execute a trigger on a recurring schedule | `MDDB_CRONS=true` |
 
-All three types share the same API endpoints and are distinguished by the `type` field. Each type can be independently enabled or disabled via environment variables.
+All three types share the same API endpoints and are distinguished by the `type` field. Triggers and crons each have their own switch; webhook targets run whenever a trigger or cron fires them.
 
 ### How It Fits Together
 
@@ -139,18 +139,17 @@ If the new document appears in the trigger's search results with a BM25 score >=
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MDDB_WEBHOOKS` | `false` | Enable the webhook subsystem (required for any webhook to fire) |
+| `MDDB_AUTOMATIONS` | `enable` | `disable` turns the whole automation system off: webhook targets, triggers and crons. Webhook targets have no switch of their own; a trigger or cron fires them |
 | `MDDB_TRIGGERS` | `false` | Enable real-time trigger evaluation after document add |
 | `MDDB_CRONS` | `false` | Enable the cron scheduler for periodic trigger execution |
 
-All three are opt-in. You can create automation rules via the API regardless of these flags, but the rules will only execute when the corresponding flag is enabled.
+Triggers and crons are opt-in. You can create automation rules via the API regardless of these flags (unless `MDDB_AUTOMATIONS=disable`), but triggers and crons only execute when their flag is enabled.
 
 ### Docker Example
 
 ```bash
 docker run -d \
   -p 11023:11023 \
-  -e MDDB_WEBHOOKS=true \
   -e MDDB_TRIGGERS=true \
   -e MDDB_CRONS=true \
   -v /data:/data \
@@ -168,7 +167,6 @@ services:
     volumes:
       - mddb-data:/data
     environment:
-      MDDB_WEBHOOKS: "true"
       MDDB_TRIGGERS: "true"
       MDDB_CRONS: "true"
 

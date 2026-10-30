@@ -17,12 +17,11 @@ import (
 // encryption format's magic bytes.
 var notConfigKeys = map[string]bool{"MDDB_ENC_V": true, "MDDB_ENC_V1": true, "MDDB_ENC_V2": true}
 
-// TestEveryConfigKeyIsClassified reads the server's source for every
-// MDDB_* variable name it mentions and fails on one the allowlist does not
-// classify — before it can leak into a diagnose bundle (OPS-025). Classify a
-// new variable in config_allowlist.go: public only when its value can never
-// name a host, a path, a person or a secret.
-func TestEveryConfigKeyIsClassified(t *testing.T) {
+// serverEnvNames returns every "MDDB_…" string literal in this package's
+// non-test source, internal packages included: the variables the server
+// reads, plus the few literals notConfigKeys names.
+func serverEnvNames(t *testing.T) map[string]bool {
+	t.Helper()
 	keyRe := regexp.MustCompile(`"(MDDB_[A-Z0-9_]+)`)
 	found := map[string]bool{}
 	err := filepath.WalkDir(".", func(path string, d os.DirEntry, err error) error {
@@ -44,6 +43,16 @@ func TestEveryConfigKeyIsClassified(t *testing.T) {
 	if len(found) < 150 {
 		t.Fatalf("found %d variables: the scan is broken", len(found))
 	}
+	return found
+}
+
+// TestEveryConfigKeyIsClassified reads the server's source for every
+// MDDB_* variable name it mentions and fails on one the allowlist does not
+// classify — before it can leak into a diagnose bundle (OPS-025). Classify a
+// new variable in config_allowlist.go: public only when its value can never
+// name a host, a path, a person or a secret.
+func TestEveryConfigKeyIsClassified(t *testing.T) {
+	found := serverEnvNames(t)
 	var missing, stale []string
 	for k := range found {
 		if _, ok := configKeys[k]; !ok && !notConfigKeys[k] {
