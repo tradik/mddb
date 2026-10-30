@@ -205,6 +205,17 @@ Key settings:
 
 ## Step 4: Start the stack with Docker Compose
 
+The compose file runs mddbd with authentication on and reads its secrets from
+`.env`; it refuses to start until they are set:
+
+```bash
+cp .env.example .env
+# In .env, set MDDB_AUTH_JWT_SECRET (32+ random characters) and MDDB_AUTH_ADMIN_PASSWORD
+```
+
+mddb-chat logs in to mddbd with the same admin credentials, so nothing else
+needs a password.
+
 ```bash
 docker compose -f docker-compose.dev.yml up -d mddbd mddb-chat mddb-chat-widget
 ```
@@ -240,41 +251,64 @@ mkdir -p content
 # Each file becomes a document in MDDB
 ```
 
-### 5b. Load the content
+### 5b. Log in
+
+Writes need a credential. Log in as the admin from `.env`:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:11023/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"<MDDB_AUTH_ADMIN_PASSWORD>"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+```
+
+### 5c. Load the content
+
+The loader script calls [mddb-cli](INSTALLATION.md) and turns each file's YAML
+frontmatter into metadata:
 
 ```bash
 # Download the loader script
 curl -sO https://raw.githubusercontent.com/tradik/mddb/main/scripts/load-md-folder.sh
 chmod +x load-md-folder.sh
 
-# Load all .md files into the "docs" collection
-./load-md-folder.sh content/ docs --lang en_US --verbose
+# Load all .md files into the "docs" collection (-r for subfolders)
+MDDB_CLI="mddb-cli --token $TOKEN" ./load-md-folder.sh content/ docs --lang en_US --verbose
 ```
 
-Or use the HTTP API directly:
+Or use the HTTP API directly. `/v1/upload` also takes PDF, DOCX, HTML and
+other formats and converts them to Markdown:
 
 ```bash
 for md_file in content/*.md; do
   curl -s -X POST http://localhost:11023/v1/upload \
+    -H "Authorization: Bearer $TOKEN" \
     -F "file=@$md_file" \
     -F "collection=docs" \
-    -F "lang=en"
-  echo " -> $(basename $md_file)"
+    -F "lang=en_US"
+  echo " -> $(basename "$md_file")"
 done
 ```
 
-### 5c. Generate vector embeddings
+For a folder of mixed files, `mddb-cli --token "$TOKEN" autoindex content/ --collection docs`
+does the same in one command and rewrites only changed files on the next run.
 
-Reindex the collection so that semantic search works:
+### 5d. Check the embeddings
+
+mddbd embeds each document in the background as it arrives, with the Ollama
+model the compose file names. Documents loaded before an embedding provider was
+configured need a reindex:
 
 ```bash
-curl -X POST "http://localhost:11023/v1/vector-reindex?collection=docs"
+curl -X POST http://localhost:11023/v1/vector-reindex \
+  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"collection":"docs"}'
 ```
 
 Check that documents and vectors are loaded:
 
 ```bash
-curl -s http://localhost:11023/v1/stats | python3 -m json.tool
+curl -s http://localhost:11023/v1/stats -H "Authorization: Bearer $TOKEN" | python3 -m json.tool
 ```
 
 ---
@@ -294,11 +328,16 @@ Or test via the WebSocket API directly:
 websocat ws://localhost:11030/ws
 ```
 
-Then type a JSON message:
+Join a session first, then send a message:
 
 ```json
+{"type":"join","name":"Test","scenario":"assistant"}
 {"type":"message","content":"What is this website about?"}
 ```
+
+The server answers the join with `{"type":"session",...}`, streams the reply
+as `chunk` messages and ends it with `done`. A message sent before the join is
+refused with `must join first`.
 
 The chat service will:
 1. Search your MDDB collection for relevant documents
@@ -313,10 +352,8 @@ Add one script tag to any HTML page:
 
 ```html
 <script
-  src="http://localhost:11032/mddb-chat-widget.js"
+  src="http://localhost:11032/mddb-chat.min.js"
   data-server="ws://localhost:11030/ws"
-  data-title="Ask a question"
-  data-placeholder="Type your question..."
   data-theme="light"
 ></script>
 ```
@@ -327,24 +364,31 @@ That's it. A chat bubble appears in the bottom-right corner.
 
 | Attribute | Default | Description |
 |-----------|---------|-------------|
-| `data-server` | `ws://localhost:11030/ws` | WebSocket URL of mddb-chat |
-| `data-title` | `"Chat"` | Widget header title |
-| `data-placeholder` | `"Type a message..."` | Input placeholder text |
-| `data-theme` | `"light"` | `"light"` or `"dark"` |
-| `data-position` | `"bottom-right"` | Widget position on page |
+| `data-server` | (required) | WebSocket URL of mddb-chat. Must be `wss://`; `ws://` is accepted only for `localhost`, `127.0.0.1` and `[::1]` |
 | `data-scenario` | `"assistant"` | Scenario from config.toml |
+| `data-theme` | `"light"` | `"light"` or `"dark"` |
+| `data-accent` | — | Accent colour, any CSS colour |
+| `data-position` | `"bottom-right"` | `"bottom-right"` or `"bottom-left"` |
+| `data-session-ttl` | — | Hours the session survives a page reload |
+
+The widget's title and placeholder are not attributes; the full reference is
+in the [widget README](https://github.com/tradik/mddb/blob/main/services/mddb-chat-widget/README.md).
 
 ### Production deployment
 
-For production, replace `localhost` with your server addresses:
+For production, replace `localhost` with your server addresses. A public page
+must use `wss://`; the widget refuses to start with a `ws://` URL to any other
+host:
 
 ```html
 <script
-  src="https://your-domain.com/mddb-chat-widget.js"
+  src="https://your-domain.com/mddb-chat.min.js"
   data-server="wss://your-domain.com/ws"
-  data-title="Help"
 ></script>
 ```
+
+With mddb-chat behind nginx or cloudflared, set `trusted_proxies` (Step 3) so
+the rate limit is charged per visitor, not to the proxy.
 
 ---
 
@@ -376,7 +420,7 @@ Select a scenario in the widget:
 
 ```html
 <script
-  src="http://localhost:11032/mddb-chat-widget.js"
+  src="http://localhost:11032/mddb-chat.min.js"
   data-server="ws://localhost:11030/ws"
   data-scenario="support"
 ></script>
@@ -415,7 +459,7 @@ docker compose -f docker-compose.dev.yml up -d mddb-chat
 ### Chat returns empty responses
 
 Check that:
-1. Documents are loaded: `curl http://localhost:11023/v1/stats`
+1. Documents are loaded: `curl -H "Authorization: Bearer $TOKEN" http://localhost:11023/v1/stats`
 2. Ollama is running: `curl http://localhost:11434/api/tags`
 3. The collection name in `config.toml` matches the one you loaded data into
 
@@ -440,7 +484,7 @@ Check the browser console for errors. Common issues:
 | 1 | `ollama pull qwen3:8b` | Install local LLM |
 | 2 | `git clone .../mddb` | Get the source code |
 | 3 | Edit `config.toml` | Configure chat + LLM |
-| 4 | `docker compose up -d` | Start all services |
+| 4 | `.env` + `docker compose up -d` | Set the secrets, start all services |
 | 5 | `load-md-folder.sh content/ docs` | Load your content |
 | 6 | Open `localhost:11032` | Test the chat |
 | 7 | Add `<script>` tag | Embed on your site |

@@ -53,19 +53,26 @@ Scrape transcripts from an entire YouTube channel, load them into MDDB, then que
 
 ### AI Agent Memory
 
-Store conversation sessions, recall context with semantic search, and summarize past interactions. MDDB provides 6 dedicated MCP tools for conversational memory.
+Store conversation sessions, recall context with semantic search, and summarize past interactions. The `/v1/memory/*` endpoints do this over REST, and 6 MCP tools (`memory_start_session`, `memory_add_message`, `memory_recall` and three more) do it for agents.
 
 ```bash
-# Store a memory
-curl -X POST http://localhost:11023/v1/add \
-  -d '{"collection":"memory","key":"session-abc","lang":"en_US",
-       "meta":{"session":["abc"],"type":["conversation"]},
-       "contentMd":"User asked about billing..."}'
+# Start a session; the answer carries its sessionId
+curl -X POST http://localhost:11023/v1/memory/session \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"user-1","scenario":"support"}'
 
-# Recall relevant memories
-curl -X POST http://localhost:11023/v1/vector-search \
-  -d '{"collection":"memory","query":"billing questions","topK":5}'
+# Store a message (embedded for recall)
+curl -X POST http://localhost:11023/v1/memory/message \
+  -H "Content-Type: application/json" \
+  -d '{"sessionId":"<sessionId>","role":"user","content":"I was charged twice for the annual plan."}'
+
+# Recall relevant messages from this user's past sessions
+curl -X POST http://localhost:11023/v1/memory/recall \
+  -H "Content-Type: application/json" \
+  -d '{"query":"billing problems","userId":"user-1","topK":5,"includeContent":true}'
 ```
+
+With authentication on, the memory endpoints need the permission on the three collections they keep: `memory_sessions`, `memory_messages` and `memory_summaries`.
 
 See [MCP Server Config](/docs/mcp/) for the full memory MCP tools reference.
 
@@ -73,18 +80,20 @@ See [MCP Server Config](/docs/mcp/) for the full memory MCP tools reference.
 
 ### RAG Pipeline
 
-Auto-embed documents on ingest, retrieve context via hybrid search, expose to LLMs through MCP.
+Auto-embed documents on upload, retrieve passages via hybrid search, expose to LLMs through MCP.
 
 ```bash
-# 1. Ingest with auto-embedding
-curl -X POST http://localhost:11023/v1/ingest \
-  -F "file=@docs.pdf" \
-  -F 'meta={"collection":"kb","key":"docs","lang":"en_US"}'
+# 1. Upload: the PDF is converted to Markdown and embedded in the background
+curl -X POST http://localhost:11023/v1/upload \
+  -F "file=@docs.pdf" -F "collection=kb" -F "lang=en_US"
 
-# 2. Hybrid search for RAG context
+# 2. Hybrid search for RAG context: matching passages, not whole documents
 curl -X POST http://localhost:11023/v1/hybrid-search \
-  -d '{"collection":"kb","query":"how to configure auth","topK":5,"alpha":0.5}'
+  -H "Content-Type: application/json" \
+  -d '{"collection":"kb","query":"how to configure auth","topK":5,"format":"passages"}'
 ```
+
+For a whole folder, `mddb-cli autoindex ./docs --collection kb` sends every file and the server converts PDF, DOCX, XLSX, PPTX, EPUB and EML on the way.
 
 See [RAG Pipeline](/docs/rag-pipeline/) for the complete guide.
 
@@ -94,7 +103,7 @@ See [RAG Pipeline](/docs/rag-pipeline/) for the complete guide.
 
 Import documentation, embed automatically, expose via MCP — instant AI-powered support for your docs.
 
-1. Upload your docs: `POST /v1/upload` (supports .md, .pdf, .docx, .html)
+1. Upload your docs: `POST /v1/upload` for one file, `mddb-cli autoindex` for a folder (Markdown, PDF, DOCX, PPTX, HTML and more)
 2. Enable embeddings: set `MDDB_EMBEDDING_PROVIDER=openai`
 3. Connect via MCP: add MDDB to your Claude/Cursor/Windsurf config
 4. Ask questions directly in your AI client
@@ -110,14 +119,17 @@ Store the same document in multiple languages using the same key, different `lan
 ```bash
 # Store in English
 curl -X POST http://localhost:11023/v1/add \
+  -H "Content-Type: application/json" \
   -d '{"collection":"blog","key":"hello-world","lang":"en_US","contentMd":"# Hello World"}'
 
 # Store in Polish
 curl -X POST http://localhost:11023/v1/add \
+  -H "Content-Type: application/json" \
   -d '{"collection":"blog","key":"hello-world","lang":"pl_PL","contentMd":"# Witaj Świecie"}'
 
 # Retrieve by language
 curl -X POST http://localhost:11023/v1/get \
+  -H "Content-Type: application/json" \
   -d '{"collection":"blog","key":"hello-world","lang":"pl_PL"}'
 ```
 

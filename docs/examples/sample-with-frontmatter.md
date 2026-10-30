@@ -36,7 +36,7 @@ docker run -d -p 11023:11023 -p 11024:11024 tradik/mddb:latest
 git clone https://github.com/tradik/mddb.git
 cd mddb
 make build
-make run
+./services/mddbd/mddbd
 ```
 
 ### Basic Usage

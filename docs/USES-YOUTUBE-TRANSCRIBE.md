@@ -50,8 +50,8 @@ The simplest way — Docker:
 ```bash
 docker run -d \
   --name mddb \
-  -p 11023:11023 \
-  -v mddb-data:/data \
+  -p 11023:11023 -p 9000:9000 \
+  -v mddb-data:/app/data \
   tradik/mddb:latest
 ```
 
@@ -61,7 +61,7 @@ Check that it's running:
 curl http://localhost:11023/v1/health
 ```
 
-Expected response: `{"status":"ok"}`
+Expected response: a JSON object with `"status":"healthy"`.
 
 ---
 
@@ -153,18 +153,16 @@ chmod +x load-md-folder.sh
 
 ### Option B: Use mddb-cli
 
-```bash
-# Install the CLI
-go install github.com/tradik/mddb/services/mddb-cli@latest
-```
-
-Load files one by one:
+Install the CLI from a release package (`.deb`, `.rpm` or a tarball; see
+[INSTALLATION.md](INSTALLATION.md)), then load files
+one by one. The key is the video ID, so the link to the video can go in the
+metadata:
 
 ```bash
 for md_file in transcripts_md/*.md; do
   key=$(basename "$md_file" .md)
-  mddb-cli add youtube "$key" en -f "$md_file" \
-    -m "source=youtube,type=transcript"
+  mddb-cli add youtube "$key" en_US -f "$md_file" \
+    -m "source=youtube,type=transcript,url=https://www.youtube.com/watch?v=$key"
   echo "Loaded: $key"
 done
 ```
@@ -176,8 +174,8 @@ for md_file in transcripts_md/*.md; do
   curl -s -X POST http://localhost:11023/v1/upload \
     -F "file=@$md_file" \
     -F "collection=youtube" \
-    -F "lang=en"
-  echo " -> $(basename $md_file)"
+    -F "lang=en_US"
+  echo " -> $(basename "$md_file")"
 done
 ```
 
@@ -191,45 +189,22 @@ curl -s http://localhost:11023/v1/stats | python3 -m json.tool
 
 ## Step 5: Configure Claude CLI (MCP)
 
-Claude CLI connects to MDDB via the MCP protocol. Create the config file:
+Claude CLI connects to MDDB via the MCP protocol. The container started in
+Step 2 serves it on port 9000 (Streamable HTTP at `/mcp`):
 
 ```bash
-# macOS
-mkdir -p ~/Library/Application\ Support/Claude
-cat > ~/Library/Application\ Support/Claude/claude_desktop_config.json << 'EOF'
-{
-  "mcpServers": {
-    "mddb": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm", "--network", "host",
-        "-e", "MDDB_MCP_STDIO=true",
-        "-e", "MDDB_SERVER=http://localhost:11023",
-        "tradik/mddb:latest"
-      ]
-    }
-  }
-}
-EOF
+claude mcp add --transport http mddb http://localhost:9000/mcp
+claude mcp list        # mddb should be listed as connected
 ```
 
-If you have the `mddbd` binary locally:
+Claude Desktop and other clients take the same URL; see [MCP.md](MCP.md). The
+MCP port has no authentication unless you turn it on, so keep it on
+`localhost` or set `MDDB_MCP_API_KEY_ENABLED=true`.
 
-```bash
-cat > ~/Library/Application\ Support/Claude/claude_desktop_config.json << 'EOF'
-{
-  "mcpServers": {
-    "mddb": {
-      "command": "/usr/local/bin/mddbd",
-      "env": {
-        "MDDB_MCP_STDIO": "true",
-        "MDDB_PATH": "/path/to/mddb.db"
-      }
-    }
-  }
-}
-EOF
-```
+Without a running server, a local `mddbd` binary can serve MCP over stdio,
+opening the database file itself (`MDDB_MCP_STDIO=true`,
+`MDDB_PATH=/path/to/mddb.db`). It cannot open a file another `mddbd` already
+has open, so use one or the other.
 
 ---
 
@@ -278,8 +253,8 @@ docker stop mddb
 docker rm mddb
 docker run -d \
   --name mddb \
-  -p 11023:11023 \
-  -v mddb-data:/data \
+  -p 11023:11023 -p 9000:9000 \
+  -v mddb-data:/app/data \
   -e MDDB_EMBEDDING_PROVIDER=ollama \
   -e MDDB_EMBEDDING_API_URL=http://host.docker.internal:11434 \
   -e MDDB_EMBEDDING_MODEL=nomic-embed-text \
@@ -291,7 +266,8 @@ docker run -d \
 Reindex the collection:
 
 ```bash
-curl -X POST "http://localhost:11023/v1/vector-reindex?collection=youtube"
+curl -X POST http://localhost:11023/v1/vector-reindex \
+  -H "Content-Type: application/json" -d '{"collection":"youtube"}'
 ```
 
 Now `semantic_search` in Claude CLI will return semantically similar transcript fragments.
@@ -306,6 +282,6 @@ Now `semantic_search` in Claude CLI will return semantically similar transcript 
 | 2 | `docker run tradik/mddb` | Start the database |
 | 3 | `yt-dlp --write-subs` | Download transcripts |
 | 4 | `load-md-folder.sh` | Load into MDDB |
-| 5 | `claude_desktop_config.json` | Configure MCP |
+| 5 | `claude mcp add --transport http mddb ...` | Configure MCP |
 | 6 | `claude` | Ask questions |
 | 7 | `ollama pull nomic-embed-text` | Add semantic search |
