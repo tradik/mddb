@@ -218,9 +218,17 @@ Use `"*"` to grant database-wide permissions:
 }
 ```
 
+### Collection admin vs global admin
+
+`"admin": true` on one collection lets the user manage that collection only.
+Only `"admin": true` on `"*"` makes a **global admin**: the `admin` flag in
+login and API-key tokens, which passes every permission check, manages
+users and permissions, and reaches admin-only endpoints. Before v2.18.10 admin
+on any single collection set that flag too (SEC-020).
+
 ### Permission Lookup Order
 
-1. Check if user is admin (bypasses all checks)
+1. Check if user is a global admin (admin on `"*"`; bypasses all checks)
 2. Check collection-specific permission
 3. Check wildcard (`"*"`) permission
 4. Deny by default

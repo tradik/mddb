@@ -715,18 +715,19 @@ func (am *AuthManager) UserTenant(username string) string {
 	return ""
 }
 
-// IsAdmin checks if user has admin privileges
+// IsAdmin reports whether username is a global admin: admin on "*".
 func (am *AuthManager) IsAdmin(username string) bool {
 	am.mu.RLock()
 	defer am.mu.RUnlock()
 
-	perms := am.permissions[username]
-	for _, p := range perms {
-		if p.Admin {
+	// Only admin on "*" is global. It becomes the Admin flag of login and
+	// API-key tokens, which CheckPermission lets through on every collection;
+	// admin on one collection used to set it too (SEC-020).
+	for _, p := range am.permissions[username] {
+		if p.Admin && p.Collection == "*" {
 			return true
 		}
 	}
-
 	return false
 }
 
