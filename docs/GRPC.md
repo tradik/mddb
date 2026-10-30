@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (81 implemented)
+### Available RPCs (85 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -175,11 +175,40 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `CreateCurationRule` | `CreateCurationRuleRequest` → `CurationRuleProto` |
 | | `UpdateCurationRule` | `UpdateCurationRuleRequest` → `CurationRuleProto` |
 | | `DeleteCurationRule` | `DeleteCurationRuleRequest` → `DeleteCurationRuleResponse` |
+| **Corpus Packs** | `ListCorpusPacks` | `ListCorpusPacksRequest` → `ListCorpusPacksResponse` |
+| | `InstallCorpusPack` | `stream InstallCorpusPackRequest` → `InstallCorpusPackResponse` |
+| | `RemoveCorpusPack` | `RemoveCorpusPackRequest` → `RemoveCorpusPackResponse` |
+| | `BuildCorpusPack` | `BuildCorpusPackRequest` → `stream CorpusPackChunk` |
 | **System** | `Stats` | `StatsRequest` → `StatsResponse` |
 
 A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/follower replication — see [Replication Service](#replication-service).
 
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
+
+### New in v2.18.11
+
+#### Corpus packs (v2.18.11)
+
+The corpus pack endpoints (`/v1/corpus/*`, AGT-005) over gRPC, calling the
+same server functions and gated with the same permissions:
+
+| RPC | Permission | |
+|---|---|---|
+| `ListCorpusPacks` | read, filtered to the caller's tenant | `packs` (`CorpusPackProto`: `collection`, `read_only`, `corpus` as `CorpusInfoProto`) and `total` |
+| `InstallCorpusPack` | admin, writable server | client stream. The first message holds either `url` (an `https://` URL the server downloads through its SSRF guard, no redirect out of TLS) or the first `data` chunk; `sha256`, in the first message, is the pack file's checksum, checked before anything is installed. Capped at `MDDB_CORPUS_MAX_BYTES` |
+| `RemoveCorpusPack` | admin, writable server | `{name}` → `{status, name, deleted}` |
+| `BuildCorpusPack` | admin | `{collection, version, description, license, sources}` → a stream of `CorpusPackChunk` (at most 1 MiB of `data` each); the first also carries `filename` and `doc_count` |
+
+Errors map as on REST: `INVALID_ARGUMENT` (400), `NOT_FOUND` (404),
+`ALREADY_EXISTS` (409), `PERMISSION_DENIED` (403), `INTERNAL` (500).
+
+```bash
+grpcurl -plaintext localhost:11024 mddb.MDDB/ListCorpusPacks
+grpcurl -plaintext -d '{"url":"https://example.org/k8s-docs-1.31.mddbpack","sha256":"<sum>"}' \
+  localhost:11024 mddb.MDDB/InstallCorpusPack
+```
+
+See [CORPUS-PACKS.md](CORPUS-PACKS.md).
 
 ### New in v2.18.10
 

@@ -9,9 +9,9 @@
 [![codecov](https://codecov.io/gh/tradik/mddb/branch/main/graph/badge.svg)](https://codecov.io/gh/tradik/mddb)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=tradik_mddb&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=tradik_mddb)
 
-**AI-native document database with built-in MCP server, file upload (PDF/DOCX/XLSX/PPTX/EPUB/EML/HTML/ODT/RTF/TEX/YAML/Wikipedia XML to Markdown), vector search, RAG pipelines, and 94 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
+**AI-native document database with built-in MCP server, file upload (PDF/DOCX/XLSX/PPTX/EPUB/EML/HTML/ODT/RTF/TEX/YAML/Wikipedia XML to Markdown), vector search, RAG pipelines, and 97 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
 
-MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 94 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~32MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
+MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 97 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~32MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
 
 ## 🎯 What is MDDB?
 
@@ -19,7 +19,7 @@ MDDB gives your AI agents a persistent, searchable knowledge base:
 
 - **File Upload** - Upload PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT files, auto-converted to Markdown and indexed, each with a conversion confidence score
 - **Wikipedia Import** - Stream and import MediaWiki XML dumps (`.xml.bz2`). Wikitext is auto-converted to Markdown, with namespace filtering, and multi-GB files are handled
-- **Built-in MCP Server** - 94 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
+- **Built-in MCP Server** - 97 tools for Claude Desktop, Cursor, Windsurf, or any MCP client
 - **Vector Search** - Auto-embed documents, semantic similarity with 8 index algorithms (Flat, HNSW, IVF, PQ, OPQ, SQ, SQ4, BQ, or `auto` to let the server choose) + per-collection quantization (int8/int4) + [disk-only low-memory mode](docs/QUANTIZATION.md#disk-only-vectors--low-memory-mode-v2114) + ARM NEON/SME hardware acceleration + goroutine parallel search
 - **Embedding Providers** - Pluggable: OpenAI, Ollama, Voyage, Cohere, plus an offline lexical provider (spelling, not meaning), configured per server or per collection ([guide](docs/EMBEDDING_PROVIDERS.md))
 - **[Geo Search](docs/GEOSEARCH.md)** - R-tree and geohash indexes for radius/bounding-box queries, composable with FTS/vector via `hybrid-search`, optional postcode lookup
@@ -143,7 +143,7 @@ MDDB has a built-in MCP server, so no extra service is needed. Add to your MCP c
 }
 ```
 
-That is it. Your AI agent now has full access to your knowledge base with 94 built-in tools (add, search, vector search, classify, and more).
+That is it. Your AI agent now has full access to your knowledge base with 97 built-in tools (add, search, vector search, classify, and more).
 
 **[Full MCP setup guide](docs/LLM_CONNECTIONS.md)** | **[MCP server config](docs/MCP.md)** | **[Custom MCP tools](docs/CUSTOM-TOOLS.md)**
 
@@ -354,7 +354,7 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 ## 💡 Key Features
 
 ### AI & Search
-- ✅ **MCP Server** - 94 built-in tools via Model Context Protocol 2026-07-28 and 2025-11-25, served side by side (stdio + Streamable HTTP + SSE) with `server/discover`, tool annotations, prompts, completion, and structured output
+- ✅ **MCP Server** - 97 built-in tools via Model Context Protocol 2026-07-28 and 2025-11-25, served side by side (stdio + Streamable HTTP + SSE) with `server/discover`, tool annotations, prompts, completion, and structured output
 - ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md), including tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools-v2110))
 - ✅ **File Upload** - Upload PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT, auto-converted to Markdown (single, batch, ingest and `mddb-cli autoindex`; `meta.conversionConfidence` flags scans and broken files)
 - ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext to Markdown conversion, namespace filtering, batch processing

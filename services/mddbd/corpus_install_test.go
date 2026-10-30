@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -139,20 +140,28 @@ func TestInstallOverAWrittenCollectionPutsTheConfigBack(t *testing.T) {
 
 			dst := corpusServer(t, 256)
 			addTestDoc(t, dst, "docs", "mine", "en", "written here", nil)
-			if _, err := dst.installCorpus(bytes.NewReader(pack)); !errors.Is(err, errCorpusConflict) {
-				t.Fatalf("err = %v, want a conflict", err)
-			}
-			if _, found := dst.CollectionManager.Get("docs"); found {
-				t.Fatal("the failed install left a config behind")
-			}
-			_ = dst.CollectionManager.Set("docs", &CollectionConfig{Description: "kept"})
-			if _, err := dst.installCorpus(bytes.NewReader(pack)); !errors.Is(err, errCorpusConflict) {
-				t.Fatalf("err = %v, want a conflict", err)
-			}
-			if cfg, _ := dst.CollectionManager.Get("docs"); cfg.Description != "kept" || cfg.ReadOnly {
-				t.Fatalf("config after the failed install: %+v", cfg)
-			}
+			assertInstallConflictKeepsConfig(t, dst, pack)
 		})
+	}
+}
+
+// assertInstallConflictKeepsConfig installs pack over a collection holding
+// data, without a config and then with one, and checks the config is as
+// it was each time.
+func assertInstallConflictKeepsConfig(t *testing.T, dst *Server, pack []byte) {
+	t.Helper()
+	if _, err := dst.installCorpus(bytes.NewReader(pack)); !errors.Is(err, errCorpusConflict) {
+		t.Fatalf("err = %v, want a conflict", err)
+	}
+	if _, found := dst.CollectionManager.Get("docs"); found {
+		t.Fatal("the failed install left a config behind")
+	}
+	_ = dst.CollectionManager.Set("docs", &CollectionConfig{Description: "kept"})
+	if _, err := dst.installCorpus(bytes.NewReader(pack)); !errors.Is(err, errCorpusConflict) {
+		t.Fatalf("err = %v, want a conflict", err)
+	}
+	if cfg, _ := dst.CollectionManager.Get("docs"); cfg.Description != "kept" || cfg.ReadOnly {
+		t.Fatalf("config after the failed install: %+v", cfg)
 	}
 }
 
@@ -235,7 +244,7 @@ func TestRemoveCorpusFailures(t *testing.T) {
 	if _, err := dst.removeCorpus("docs"); err == nil {
 		t.Fatal("removed with a closed database")
 	}
-	if got := (&Server{}).corpusList(func(string) bool { return true }); len(got) != 0 {
+	if got := (&Server{}).corpusPacks(context.Background()); len(got) != 0 {
 		t.Fatalf("a server without configs lists %v", got)
 	}
 }

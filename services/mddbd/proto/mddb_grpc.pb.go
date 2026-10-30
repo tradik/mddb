@@ -101,6 +101,10 @@ const (
 	MDDB_UpdateCurationRule_FullMethodName    = "/mddb.MDDB/UpdateCurationRule"
 	MDDB_DeleteCurationRule_FullMethodName    = "/mddb.MDDB/DeleteCurationRule"
 	MDDB_RunAutomation_FullMethodName         = "/mddb.MDDB/RunAutomation"
+	MDDB_ListCorpusPacks_FullMethodName       = "/mddb.MDDB/ListCorpusPacks"
+	MDDB_InstallCorpusPack_FullMethodName     = "/mddb.MDDB/InstallCorpusPack"
+	MDDB_RemoveCorpusPack_FullMethodName      = "/mddb.MDDB/RemoveCorpusPack"
+	MDDB_BuildCorpusPack_FullMethodName       = "/mddb.MDDB/BuildCorpusPack"
 )
 
 // MDDBClient is the client API for MDDB service.
@@ -276,6 +280,15 @@ type MDDBClient interface {
 	// (v2.18.11+) Run a cron rule's sync or backup now, through the code its
 	// schedule fires; returns the run's job id (#377).
 	RunAutomation(ctx context.Context, in *RunAutomationRequest, opts ...grpc.CallOption) (*RunAutomationResponse, error)
+	// (v2.18.11+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
+	// every collection in the caller's tenant; the rest need admin.
+	ListCorpusPacks(ctx context.Context, in *ListCorpusPacksRequest, opts ...grpc.CallOption) (*ListCorpusPacksResponse, error)
+	// The pack as a stream of chunks, or an https URL the server fetches
+	// through its SSRF guard, in the first message.
+	InstallCorpusPack(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[InstallCorpusPackRequest, InstallCorpusPackResponse], error)
+	RemoveCorpusPack(ctx context.Context, in *RemoveCorpusPackRequest, opts ...grpc.CallOption) (*RemoveCorpusPackResponse, error)
+	// The pack of a collection, streamed as tar.zst chunks.
+	BuildCorpusPack(ctx context.Context, in *BuildCorpusPackRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CorpusPackChunk], error)
 }
 
 type mDDBClient struct {
@@ -1115,6 +1128,58 @@ func (c *mDDBClient) RunAutomation(ctx context.Context, in *RunAutomationRequest
 	return out, nil
 }
 
+func (c *mDDBClient) ListCorpusPacks(ctx context.Context, in *ListCorpusPacksRequest, opts ...grpc.CallOption) (*ListCorpusPacksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCorpusPacksResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListCorpusPacks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) InstallCorpusPack(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[InstallCorpusPackRequest, InstallCorpusPackResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &MDDB_ServiceDesc.Streams[1], MDDB_InstallCorpusPack_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[InstallCorpusPackRequest, InstallCorpusPackResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDB_InstallCorpusPackClient = grpc.ClientStreamingClient[InstallCorpusPackRequest, InstallCorpusPackResponse]
+
+func (c *mDDBClient) RemoveCorpusPack(ctx context.Context, in *RemoveCorpusPackRequest, opts ...grpc.CallOption) (*RemoveCorpusPackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveCorpusPackResponse)
+	err := c.cc.Invoke(ctx, MDDB_RemoveCorpusPack_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) BuildCorpusPack(ctx context.Context, in *BuildCorpusPackRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CorpusPackChunk], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &MDDB_ServiceDesc.Streams[2], MDDB_BuildCorpusPack_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[BuildCorpusPackRequest, CorpusPackChunk]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDB_BuildCorpusPackClient = grpc.ServerStreamingClient[CorpusPackChunk]
+
 // MDDBServer is the server API for MDDB service.
 // All implementations must embed UnimplementedMDDBServer
 // for forward compatibility.
@@ -1288,6 +1353,15 @@ type MDDBServer interface {
 	// (v2.18.11+) Run a cron rule's sync or backup now, through the code its
 	// schedule fires; returns the run's job id (#377).
 	RunAutomation(context.Context, *RunAutomationRequest) (*RunAutomationResponse, error)
+	// (v2.18.11+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
+	// every collection in the caller's tenant; the rest need admin.
+	ListCorpusPacks(context.Context, *ListCorpusPacksRequest) (*ListCorpusPacksResponse, error)
+	// The pack as a stream of chunks, or an https URL the server fetches
+	// through its SSRF guard, in the first message.
+	InstallCorpusPack(grpc.ClientStreamingServer[InstallCorpusPackRequest, InstallCorpusPackResponse]) error
+	RemoveCorpusPack(context.Context, *RemoveCorpusPackRequest) (*RemoveCorpusPackResponse, error)
+	// The pack of a collection, streamed as tar.zst chunks.
+	BuildCorpusPack(*BuildCorpusPackRequest, grpc.ServerStreamingServer[CorpusPackChunk]) error
 	mustEmbedUnimplementedMDDBServer()
 }
 
@@ -1543,6 +1617,18 @@ func (UnimplementedMDDBServer) DeleteCurationRule(context.Context, *DeleteCurati
 }
 func (UnimplementedMDDBServer) RunAutomation(context.Context, *RunAutomationRequest) (*RunAutomationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RunAutomation not implemented")
+}
+func (UnimplementedMDDBServer) ListCorpusPacks(context.Context, *ListCorpusPacksRequest) (*ListCorpusPacksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCorpusPacks not implemented")
+}
+func (UnimplementedMDDBServer) InstallCorpusPack(grpc.ClientStreamingServer[InstallCorpusPackRequest, InstallCorpusPackResponse]) error {
+	return status.Error(codes.Unimplemented, "method InstallCorpusPack not implemented")
+}
+func (UnimplementedMDDBServer) RemoveCorpusPack(context.Context, *RemoveCorpusPackRequest) (*RemoveCorpusPackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveCorpusPack not implemented")
+}
+func (UnimplementedMDDBServer) BuildCorpusPack(*BuildCorpusPackRequest, grpc.ServerStreamingServer[CorpusPackChunk]) error {
+	return status.Error(codes.Unimplemented, "method BuildCorpusPack not implemented")
 }
 func (UnimplementedMDDBServer) mustEmbedUnimplementedMDDBServer() {}
 func (UnimplementedMDDBServer) testEmbeddedByValue()              {}
@@ -3034,6 +3120,60 @@ func _MDDB_RunAutomation_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_ListCorpusPacks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCorpusPacksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListCorpusPacks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListCorpusPacks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListCorpusPacks(ctx, req.(*ListCorpusPacksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_InstallCorpusPack_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(MDDBServer).InstallCorpusPack(&grpc.GenericServerStream[InstallCorpusPackRequest, InstallCorpusPackResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDB_InstallCorpusPackServer = grpc.ClientStreamingServer[InstallCorpusPackRequest, InstallCorpusPackResponse]
+
+func _MDDB_RemoveCorpusPack_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveCorpusPackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).RemoveCorpusPack(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_RemoveCorpusPack_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).RemoveCorpusPack(ctx, req.(*RemoveCorpusPackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_BuildCorpusPack_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(BuildCorpusPackRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(MDDBServer).BuildCorpusPack(m, &grpc.GenericServerStream[BuildCorpusPackRequest, CorpusPackChunk]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDB_BuildCorpusPackServer = grpc.ServerStreamingServer[CorpusPackChunk]
+
 // MDDB_ServiceDesc is the grpc.ServiceDesc for MDDB service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -3365,11 +3505,29 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "RunAutomation",
 			Handler:    _MDDB_RunAutomation_Handler,
 		},
+		{
+			MethodName: "ListCorpusPacks",
+			Handler:    _MDDB_ListCorpusPacks_Handler,
+		},
+		{
+			MethodName: "RemoveCorpusPack",
+			Handler:    _MDDB_RemoveCorpusPack_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "Export",
 			Handler:       _MDDB_Export_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "InstallCorpusPack",
+			Handler:       _MDDB_InstallCorpusPack_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "BuildCorpusPack",
+			Handler:       _MDDB_BuildCorpusPack_Handler,
 			ServerStreams: true,
 		},
 	},

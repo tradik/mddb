@@ -125,8 +125,12 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	// --- Autocomplete (prefix search over FTS index) ---
 	"autocomplete": readOnly(),
 
+	// --- Corpus packs (#378) ---
+	"corpus_list": readOnly(),
+
 	// --- Write, open world (network calls) ---
 	"import_url":     writeOpenWorld(),
+	"corpus_install": writeOpenWorld(), // #378: the server downloads the pack
 	"upload_file":    writeNonIdempotent(),
 	"vector_reindex": writeOpenWorld(),
 	"fts_reindex":    writeNonIdempotent(),
@@ -148,6 +152,7 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"delete_collection":      destructive(),
 	"truncate_revisions":     destructive(),
 	"restore_backup":         destructive(),
+	"corpus_remove":          destructive(), // #378: drops the pack's collection; MCP-004 asks for its name
 
 	// --- Memory (conversation memory / RAG) — GO-016 ---
 	"memory_start_session":   writeNonIdempotent(),

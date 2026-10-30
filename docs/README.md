@@ -92,7 +92,7 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 MDDB (Markdown Database) is an **AI-native embedded document database** for markdown content. Single ~32MB binary, embedded BoltDB storage, zero external dependencies. Core capabilities at a glance (full list in [FEATURES.md](FEATURES.md) and the root [README.md](../README.md)):
 
 - **Triple protocol** — HTTP/JSON REST, gRPC/Protobuf, GraphQL, all over TCP or Unix Domain Sockets
-- **Built-in [MCP server](MCP.md)** — 94 MCP tools, [MCP 2026-07-28 and 2025-11-25](MCP-REVISIONS.md) served side by side, stdio + Streamable HTTP + SSE transports for Claude / Cursor / Windsurf / ChatGPT / Ollama / DeepSeek
+- **Built-in [MCP server](MCP.md)** — 97 MCP tools, [MCP 2026-07-28 and 2025-11-25](MCP-REVISIONS.md) served side by side, stdio + Streamable HTTP + SSE transports for Claude / Cursor / Windsurf / ChatGPT / Ollama / DeepSeek
 - **[Vector / semantic search](SEARCH.md)** — 8 index algorithms (Flat / HNSW / IVF / PQ / OPQ / SQ / SQ4 / BQ), or `auto` to let the server choose, with per-collection int8/int4 quantization; OpenAI / Ollama / Cohere / Voyage embeddings or the offline lexical provider
 - **[Reference coding](REFERENCE-CODING.md)** — index other projects' code as reference collections and ask how they solved it (`mddb-cli reference`, `reference_*` MCP tools)
 - **[Full-text search](SEARCH.md)** — TF-IDF / BM25 / BM25F / PMISparse, 8 modes (simple / boolean / phrase / wildcard / proximity / expression / range / fuzzy), 17-language stemming, typo tolerance

@@ -6,7 +6,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"sort"
 	"time"
 
 	json "mddb/internal/jsonx"
@@ -14,8 +13,12 @@ import (
 
 // HTTP endpoints of corpus packs (AGT-005). Building, installing and removing
 // a pack are database-wide operations: they need the admin permission, as
-// backup and restore do. An install takes the pack as an upload, never as a
-// path or a URL for the server to fetch (SEC-004): fetching is the client's.
+// backup and restore do. An install here takes the pack as an upload, never
+// as a server path. A client that cannot upload — an MCP agent — names an
+// https URL instead, which the server fetches through its SSRF guard
+// (corpus_fetch.go, #378). The handlers, the MCP tools and the gRPC methods
+// call the same functions: corpusPacks, installCorpus, removeCorpus and
+// prepareCorpus.
 
 // corpusUploadField is the multipart field holding the pack.
 const corpusUploadField = "pack"
@@ -41,9 +44,7 @@ func (s *Server) handleCorpusList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	tenant := TenantFromContext(r.Context())
-	packs := s.corpusList(func(c string) bool { return CollectionInTenant(tenant, c) })
-	sort.Slice(packs, func(i, j int) bool { return packs[i].Collection < packs[j].Collection })
+	packs := s.corpusPacks(r.Context())
 	ok(w, map[string]any{"packs": packs, "total": len(packs)})
 }
 

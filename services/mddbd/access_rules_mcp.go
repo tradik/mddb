@@ -92,6 +92,7 @@ var mcpToolAccessRules = map[string]accessRule{
 	"list_schemas":            ruleAllRead,
 	"list_collection_configs": ruleAllRead,
 	"get_gain":                ruleAllRead,
+	"corpus_list":             ruleAllListing, // as GET /v1/corpus: filtered to the tenant
 	"bulk_ingest_status":      ruleAllRead,
 	"bulk_ingest_cancel":      ruleAllWrite,
 	"delete_webhook":          ruleAllWrite,
@@ -115,6 +116,8 @@ var mcpToolAccessRules = map[string]accessRule{
 	// Global administration.
 	"create_backup":       ruleAdmin,
 	"restore_backup":      ruleAdmin,
+	"corpus_install":      ruleAdmin, // as POST /v1/corpus/install
+	"corpus_remove":       ruleAdmin, // as POST /v1/corpus/remove
 	"list_webhooks":       ruleAdmin,
 	"list_automation":     ruleAdmin,
 	"create_automation":   ruleAdmin,

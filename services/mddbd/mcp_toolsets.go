@@ -57,7 +57,7 @@ var mcpToolsets = map[string][]string{
 		"delete_collection", "truncate_revisions", "get_checksum", "list_synonyms", "add_synonym", "delete_synonym",
 		"list_stopwords", "add_stopwords", "delete_stopwords", "get_collection_config", "set_collection_config",
 		"list_collection_configs", "list_curation_rules", "create_curation_rule", "update_curation_rule",
-		"delete_curation_rule"},
+		"delete_curation_rule", "corpus_list", "corpus_install", "corpus_remove"},
 	ToolsetGeo:        {"geo_search", "geo_within", "geo_polygon", "geo_stats", "geo_encode", "geo_decode"},
 	ToolsetAutomation: {"list_automation", "create_automation", "get_automation", "update_automation", "delete_automation", "test_automation", "get_automation_logs", "run_automation"},
 	ToolsetWebhooks:   {"register_webhook", "list_webhooks", "delete_webhook"},

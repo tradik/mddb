@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"mddb/internal/boltx"
@@ -247,17 +249,20 @@ func (s *Server) removeCorpus(name string) (int, error) {
 	return n, nil
 }
 
-// corpusList is every installed pack, by collection, for GET /v1/corpus.
-func (s *Server) corpusList(inTenant func(string) bool) []corpusListEntry {
+// corpusPacks is every installed pack in the caller's tenant, by collection:
+// GET /v1/corpus, the corpus_list MCP tool and the ListCorpusPacks RPC.
+func (s *Server) corpusPacks(ctx context.Context) []corpusListEntry {
 	out := []corpusListEntry{}
 	if s.CollectionManager == nil {
 		return out
 	}
+	tenant := TenantFromContext(ctx)
 	for name, cfg := range s.CollectionManager.ListAll() {
-		if cfg.Corpus != nil && inTenant(name) {
+		if cfg.Corpus != nil && CollectionInTenant(tenant, name) {
 			out = append(out, corpusListEntry{Collection: name, ReadOnly: cfg.ReadOnly, Corpus: cfg.Corpus})
 		}
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Collection < out[j].Collection })
 	return out
 }
 

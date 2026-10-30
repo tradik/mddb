@@ -260,7 +260,7 @@ MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVI
 
 | Feature | Description |
 |---------|-------------|
-| **Tool Annotations** | All 94 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
+| **Tool Annotations** | All 97 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
 | **Structured Output** | `outputSchema` on key tools (stats, search, classification, aggregation) for client-side validation |
 | **5 Built-in Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
@@ -327,7 +327,7 @@ Use the `mddbd` binary directly:
 }
 ```
 
-### Available MCP Tools (94)
+### Available MCP Tools (97)
 
 Once connected, your LLM agent has access to all built-in tools (with annotations for auto-approve). They come in eleven toolsets; `MDDB_MCP_TOOLSETS` or a per-key `toolsets` list exposes only some of them ([MCP.md](MCP.md#toolsets-v2188)):
 
@@ -350,7 +350,7 @@ Once connected, your LLM agent has access to all built-in tools (with annotation
 `set_schema` `get_schema` `delete_schema` `list_schemas` `validate_document`
 
 **admin**
-`get_stats` `vector_stats` `vector_reindex` `fts_reindex` `create_backup` `restore_backup` `delete_collection` `truncate_revisions` `get_checksum` `list_synonyms` `add_synonym` `delete_synonym` `list_stopwords` `add_stopwords` `delete_stopwords` `get_collection_config` `set_collection_config` `list_collection_configs` `list_curation_rules` `create_curation_rule` `update_curation_rule` `delete_curation_rule`
+`get_stats` `vector_stats` `vector_reindex` `fts_reindex` `create_backup` `restore_backup` `delete_collection` `truncate_revisions` `get_checksum` `list_synonyms` `add_synonym` `delete_synonym` `list_stopwords` `add_stopwords` `delete_stopwords` `get_collection_config` `set_collection_config` `list_collection_configs` `list_curation_rules` `create_curation_rule` `update_curation_rule` `delete_curation_rule` `corpus_list` `corpus_install` `corpus_remove`
 
 **geo**
 `geo_search` `geo_within` `geo_polygon` `geo_stats` `geo_encode` `geo_decode`

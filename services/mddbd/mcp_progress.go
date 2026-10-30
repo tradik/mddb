@@ -54,6 +54,7 @@ var LongRunningTools = map[string]bool{
 	"delete_documents_batch": true,
 	"create_backup":          true,
 	"restore_backup":         true,
+	"corpus_install":         true,
 	"find_duplicates":        true,
 	"cross_search":           true,
 }

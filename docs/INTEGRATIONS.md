@@ -421,7 +421,7 @@ tool, how to move between them, and how to run both.
 | Full text | TF-IDF, BM25, BM25F, PMISparse; 8 query modes (simple, boolean, phrase, wildcard, proximity, range, fuzzy, expression); stemming for 17 languages; synonyms, stop words, typo tolerance, per-query BM25 `k1`/`b`. One index per document, covering the body and metadata values; no custom analyzers | Analyzer chains per field (tokenizers, token filters, ICU, language analyzers), per-field mappings |
 | Aggregations | Facet counts (`facetBy`, `facetScope: "all"`) and date histograms (`/v1/aggregate`) | The full aggregation framework: metrics, buckets, pipelines, nested |
 | Hybrid search | Built in: `/v1/hybrid-search` with alpha blending or RRF | Hybrid query with a search pipeline that normalises and combines scores |
-| For agents | 94 MCP tools, passages with path and line ranges, code symbols and graph, conversation memory ([AGENTS.md](AGENTS.md)) | Not built in |
+| For agents | 97 MCP tools, passages with path and line ranges, code symbols and graph, conversation memory ([AGENTS.md](AGENTS.md)) | Not built in |
 | Around it | One binary, embedded storage, web panel, Prometheus metrics | Dashboards, ingest pipelines, alerting, security plugin, a large client and tooling ecosystem |
 
 ### When MDDB alone is enough
@@ -1415,7 +1415,7 @@ graph TB
 4. **Search** — Langflow orchestrates RAG over MDDB's hybrid search (BM25 + vectors in one call); OpenSearch only where it holds what MDDB does not
 5. **Answer** — LLM generates answers from retrieved context, cites sources
 6. **Publish** — SSG renders static sites from MDDB collections, deploys to CDN
-7. **Manage** — Claude Desktop via MCP (94 tools), Panel UI, REST/gRPC APIs
+7. **Manage** — Claude Desktop via MCP (97 tools), Panel UI, REST/gRPC APIs
 
 ### When to Use What
 
@@ -1428,7 +1428,7 @@ graph TB
 | One index larger than a machine, custom analyzers, full aggregations | MDDB + OpenSearch ([§3](#3-opensearch--mddb)) |
 | Existing Elasticsearch-style client code | MDDB `/es` subset ([ELASTICSEARCH-COMPAT.md](ELASTICSEARCH-COMPAT.md)) |
 | Visual workflow building | MDDB + Langflow |
-| AI agent integration | MDDB MCP (94 tools, [AGENTS.md](AGENTS.md)) |
+| AI agent integration | MDDB MCP (97 tools, [AGENTS.md](AGENTS.md)) |
 | AI-assisted migration | wpmcp + mddb-mcp via Claude |
 | Full production pipeline | All together |
 

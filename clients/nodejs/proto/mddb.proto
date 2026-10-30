@@ -249,6 +249,15 @@ service MDDB {
   // (v2.18.11+) Run a cron rule's sync or backup now, through the code its
   // schedule fires; returns the run's job id (#377).
   rpc RunAutomation(RunAutomationRequest) returns (RunAutomationResponse);
+  // (v2.18.11+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
+  // every collection in the caller's tenant; the rest need admin.
+  rpc ListCorpusPacks(ListCorpusPacksRequest) returns (ListCorpusPacksResponse);
+  // The pack as a stream of chunks, or an https URL the server fetches
+  // through its SSRF guard, in the first message.
+  rpc InstallCorpusPack(stream InstallCorpusPackRequest) returns (InstallCorpusPackResponse);
+  rpc RemoveCorpusPack(RemoveCorpusPackRequest) returns (RemoveCorpusPackResponse);
+  // The pack of a collection, streamed as tar.zst chunks.
+  rpc BuildCorpusPack(BuildCorpusPackRequest) returns (stream CorpusPackChunk);
 }
 
 // Document represents a markdown document
@@ -2207,4 +2216,67 @@ message WhereResponse {
   string next_cursor = 4;
   bool dry_run = 5;
   repeated string errors = 6;
+}
+
+// ---- v2.18.11: corpus packs over gRPC (AGT-005, #378) ----
+
+message ListCorpusPacksRequest {}
+
+message CorpusPackProto {
+  string collection = 1;
+  bool read_only = 2;
+  CorpusInfoProto corpus = 3;
+}
+
+message ListCorpusPacksResponse {
+  repeated CorpusPackProto packs = 1;
+  int32 total = 2;
+}
+
+// The first message names the pack: url, or the first data chunk. sha256,
+// when set in the first message, is checked before anything is installed.
+message InstallCorpusPackRequest {
+  string url = 1;                                // https only; nothing else is sent after it
+  string sha256 = 2;                             // expected sha256 of the pack file (hex)
+  bytes data = 3;                                // the next chunk of the .mddbpack file
+}
+
+message InstallCorpusPackResponse {
+  string name = 1;
+  string version = 2;
+  string license = 3;
+  int64 doc_count = 4;
+  bool vectors_disabled = 5;                     // the pack's model differs from the server's
+  repeated string warnings = 6;
+}
+
+message RemoveCorpusPackRequest {
+  string name = 1;
+}
+
+message RemoveCorpusPackResponse {
+  string status = 1;
+  string name = 2;
+  int64 deleted = 3;
+}
+
+message CorpusSourceProto {
+  string repo = 1;
+  string commit = 2;
+  string license = 3;
+}
+
+message BuildCorpusPackRequest {
+  string collection = 1;
+  string version = 2;
+  string description = 3;
+  string license = 4;                            // SPDX identifier, required
+  repeated CorpusSourceProto sources = 5;
+}
+
+// The first chunk also carries the file name and document count.
+message CorpusPackChunk {
+  bytes data = 1;
+  string filename = 2;
+  int64 doc_count = 3;
 }

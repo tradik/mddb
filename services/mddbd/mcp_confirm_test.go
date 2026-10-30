@@ -246,3 +246,29 @@ func TestInputRequiredErrorNamesTheTool(t *testing.T) {
 		t.Errorf("Error() = %q", e.Error())
 	}
 }
+
+// #378: removing a corpus pack drops its collection, so it is gated and asks
+// for the pack's name to be typed, as delete_collection asks for its own.
+func TestConfirmCorpusRemoveAsksForTheName(t *testing.T) {
+	if !mcpNeedsConfirmation("corpus_remove") {
+		t.Fatal("corpus_remove must be gated")
+	}
+	for _, name := range []string{"corpus_list", "corpus_install"} {
+		if mcpNeedsConfirmation(name) {
+			t.Errorf("%s must not be gated", name)
+		}
+	}
+	q := newMCPConfirmRequest("corpus_remove", map[string]interface{}{"name": "k8s-docs"})
+	props := q.Params["requestedSchema"].(map[string]interface{})["properties"].(map[string]interface{})
+	name, _ := props["name"].(map[string]interface{})
+	if name == nil || !strings.Contains(name["description"].(string), `"k8s-docs"`) {
+		t.Errorf("corpus_remove schema = %v", props)
+	}
+	args := map[string]interface{}{"name": "k8s-docs"}
+	if err := checkMCPConfirmation("corpus_remove", args, accept(map[string]interface{}{"confirm": true, "name": "other"})); err == nil {
+		t.Error("a wrong pack name was accepted")
+	}
+	if err := checkMCPConfirmation("corpus_remove", args, accept(map[string]interface{}{"confirm": true, "name": "k8s-docs"})); err != nil {
+		t.Errorf("the right pack name was refused: %v", err)
+	}
+}

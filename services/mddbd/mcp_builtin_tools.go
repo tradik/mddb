@@ -37,6 +37,7 @@ func mcpBuiltinTools() []MCPTool {
 	t = append(t, mcpReferenceTools()...)
 	t = append(t, mcpEvalTools()...)
 	t = append(t, mcpGainTool())
+	t = append(t, mcpCorpusTools()...)
 	return append(t, mcpWhereTools()...)
 }
 

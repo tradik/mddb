@@ -122,18 +122,7 @@ type outboundResponse struct {
 // images and synced sources (INT-022). A status other than 200 is no error
 // here: a synced source tells 304 and 404 apart.
 func fetchOutbound(ctx context.Context, rawURL string, limit int64, timeout time.Duration, header http.Header) (outboundResponse, error) {
-	safeURL, err := httpclient.ValidateOutboundURL(rawURL)
-	if err != nil {
-		return outboundResponse{}, err
-	}
-
-	// GET of a URL ValidateOutboundURL has just parsed: building the request
-	// cannot fail.
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, safeURL, nil)
-	for k, v := range header {
-		req.Header[k] = v
-	}
-	resp, err := httpclient.NewPooledClientWithTimeout(timeout).Do(req) // #nosec G107 -- SSRF-guarded by httpclient.SafeDialContext
+	resp, err := openOutbound(ctx, httpclient.NewPooledClientWithTimeout(timeout), rawURL, header)
 	if err != nil {
 		return outboundResponse{}, err
 	}
@@ -150,6 +139,25 @@ func fetchOutbound(ctx context.Context, rawURL string, limit int64, timeout time
 	out.overLimit = int64(len(body)) > limit
 	out.body = body[:min(int64(len(body)), limit)]
 	return out, nil
+}
+
+// openOutbound validates a URL against the SSRF policy and GETs it with
+// client, leaving the body to the caller: fetchOutbound reads it into memory,
+// a corpus pack (AGT-005) is streamed to disk. client is the pooled client or
+// one built on it, so its dialer refuses the same destinations.
+func openOutbound(ctx context.Context, client *http.Client, rawURL string, header http.Header) (*http.Response, error) {
+	safeURL, err := httpclient.ValidateOutboundURL(rawURL)
+	if err != nil {
+		return nil, err
+	}
+
+	// GET of a URL ValidateOutboundURL has just parsed: building the request
+	// cannot fail.
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, safeURL, nil)
+	for k, v := range header {
+		req.Header[k] = v
+	}
+	return client.Do(req) // #nosec G107 G704 -- SSRF-guarded by ValidateOutboundURL and httpclient.SafeDialContext
 }
 
 // deriveKeyFromURL extracts a document key from the URL path.

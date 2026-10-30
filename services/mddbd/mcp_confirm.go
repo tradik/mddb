@@ -145,9 +145,17 @@ func confirmDestructive(ctx context.Context, name string, args map[string]interf
 	return checkMCPConfirmation(name, args, answer)
 }
 
+// mcpConfirmTypedArg names, for the tools that drop a whole collection, the
+// argument whose value the human must type: a yes clicked out of habit is not
+// enough to lose one.
+var mcpConfirmTypedArg = map[string]struct{ arg, title string }{
+	"delete_collection": {"collection", "Collection name"},
+	"corpus_remove":     {"name", "Pack name"}, // #378: the pack's collection goes with it
+}
+
 // newMCPConfirmRequest builds the question for one call. Every gated tool is
-// asked for confirm: true; dropping a collection also asks for its name to be
-// typed, so a yes clicked out of habit is not enough to lose one.
+// asked for confirm: true; a tool in mcpConfirmTypedArg also asks for the
+// name of what it drops.
 func newMCPConfirmRequest(name string, args map[string]interface{}) mcpConfirmRequest {
 	encoded, _ := json.Marshal(args) // map keys sort, so the encoding is canonical
 	sum := sha256.Sum256(append([]byte(name+"\x00"), encoded...))
@@ -166,14 +174,14 @@ func newMCPConfirmRequest(name string, args map[string]interface{}) mcpConfirmRe
 		},
 	}
 	required := []string{"confirm"}
-	if name == "delete_collection" {
-		collection, _ := args["collection"].(string)
-		props["collection"] = map[string]interface{}{
+	if typed, ok := mcpConfirmTypedArg[name]; ok {
+		want, _ := args[typed.arg].(string)
+		props[typed.arg] = map[string]interface{}{
 			"type":        "string",
-			"title":       "Collection name",
-			"description": fmt.Sprintf("Type %q to confirm it should be deleted.", collection),
+			"title":       typed.title,
+			"description": fmt.Sprintf("Type %q to confirm it should be deleted.", want),
 		}
-		required = append(required, "collection")
+		required = append(required, typed.arg)
 	}
 
 	return mcpConfirmRequest{
@@ -191,7 +199,7 @@ func newMCPConfirmRequest(name string, args map[string]interface{}) mcpConfirmRe
 }
 
 // checkMCPConfirmation reads an ElicitResult. Only an accepted answer with
-// confirm: true — and, for delete_collection, the collection's own name —
+// confirm: true — and, for a tool in mcpConfirmTypedArg, the name typed —
 // lets the call through. Declining, cancelling and anything malformed refuse.
 func checkMCPConfirmation(name string, args, answer map[string]interface{}) error {
 	action, _ := answer["action"].(string)
@@ -202,11 +210,11 @@ func checkMCPConfirmation(name string, args, answer map[string]interface{}) erro
 	if yes, _ := content["confirm"].(bool); !yes {
 		return fmt.Errorf("%s was not confirmed; nothing was changed", name)
 	}
-	if name == "delete_collection" {
-		want, _ := args["collection"].(string)
-		got, _ := content["collection"].(string)
+	if typed, ok := mcpConfirmTypedArg[name]; ok {
+		want, _ := args[typed.arg].(string)
+		got, _ := content[typed.arg].(string)
 		if strings.TrimSpace(got) != want {
-			return fmt.Errorf("delete_collection was not confirmed: the name typed (%q) is not %q; nothing was changed", got, want)
+			return fmt.Errorf("%s was not confirmed: the name typed (%q) is not %q; nothing was changed", name, got, want)
 		}
 	}
 	return nil

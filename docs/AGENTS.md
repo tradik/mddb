@@ -15,7 +15,7 @@ measure.
 
 ## 1. Connect over MCP
 
-`mddbd` has a built-in MCP server with 94 tools ([MCP.md](MCP.md)). It serves
+`mddbd` has a built-in MCP server with 97 tools ([MCP.md](MCP.md)). It serves
 the 2026-07-28 and 2025-11-25 revisions side by side
 ([MCP-REVISIONS.md](MCP-REVISIONS.md)).
 
@@ -43,7 +43,7 @@ key ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)).
 
 Each built-in tool belongs to one of eleven toolsets: `search` (16 tools),
 `code` (6), `documents` (13), `ingest` (7), `memory` (6), `schema` (5),
-`admin` (22), `geo` (6), `automation` (8), `webhooks` (3), `wordpress` (2).
+`admin` (25), `geo` (6), `automation` (8), `webhooks` (3), `wordpress` (2).
 Every tool schema is in the model's context on every turn, so give an agent
 only what its work needs:
 
@@ -55,7 +55,7 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
 ```
 
 With `search,code` the 22 tool schemas take about 43 KB per turn, against
-94 KB for all 93 of them. A tool outside the caller's toolsets is not listed,
+94 KB for all 93 tools of 2.18.10 (96 since 2.18.11). A tool outside the caller's toolsets is not listed,
 and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets-v2188)).
 
 Operators can add their own tools and prompts in YAML
@@ -202,6 +202,16 @@ mddb-cli corpus install k8s-docs-1.31.mddbpack --sha256 <sum>
 mddb-cli corpus list
 ```
 
+An agent does the same over MCP (v2.18.11, `admin` toolset): `corpus_list`
+lists the installed packs, `corpus_install` installs one the server downloads
+from an `https://` URL (optional `sha256`), and `corpus_remove` removes one,
+after the confirmation below. Building is left to the CLI, REST and gRPC: a
+pack is a file, and a tool answer cannot carry it.
+
+```json
+{"name": "corpus_install", "arguments": {"url": "https://example.org/k8s-docs-1.31.mddbpack", "sha256": "<sum>"}}
+```
+
 An installed pack is read-only: writes to it are refused with `READ_ONLY`, so
 an agent keeps its own notes in another collection. A pack embedded with a
 different model than the server's is installed with vectors disabled, and
@@ -231,9 +241,9 @@ hybrid search on it uses full text.
 `destructiveHint` is advice a client may ignore. With
 `MDDB_MCP_CONFIRM_DESTRUCTIVE=elicit` or `require`, MDDB itself asks the human
 behind the client, through MCP elicitation, before `delete_collection`,
-`delete_documents_batch`, `delete_where`, `truncate_revisions` or
-`restore_backup` runs; `delete_collection` also asks for the collection name
-to be typed. Nothing happens unless the answer is yes. Under `elicit`, a
+`delete_documents_batch`, `delete_where`, `truncate_revisions`,
+`restore_backup` or `corpus_remove` runs; `delete_collection` and
+`corpus_remove` also ask for the collection or pack name to be typed. Nothing happens unless the answer is yes. Under `elicit`, a
 client without elicitation support runs the tool as before; under `require`
 it is refused with `-32021`. The default, `off`, changes nothing
 ([MCP.md](MCP.md#confirming-destructive-tools-v2189)).

@@ -779,7 +779,7 @@ claude mcp add mddb --transport http https://mddb.your-site.com/mcp \
   --header "X-API-Key: mcp_..."
 ```
 
-Claude gets the 94 built-in tools, or the toolsets the key allows, plus your
+Claude gets the 97 built-in tools, or the toolsets the key allows, plus your
 custom tools. claude.ai custom connectors sign in with OAuth 2.1 instead of a
 header ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)).
 

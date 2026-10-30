@@ -99,9 +99,19 @@ live in **S3 or memory** (`storageBackend`) rather than in its bbolt file.
 
 `mddb-cli corpus install <file|https-url>` uploads the pack to
 `POST /v1/corpus/install` (multipart, field `pack`, admin permission, refused
-in read-only mode). The server never takes a path or a URL to fetch — that is
-the client's job (SEC-004). A URL must be `https://`, and a redirect may not
-leave TLS. `--sha256` checks the whole pack file before anything is sent.
+in read-only mode). The server never takes a path to read. A URL must be
+`https://`, and a redirect may not leave TLS. `--sha256` checks the whole pack
+file before anything is sent.
+
+A client that cannot upload a file — an MCP agent — names an `https://` URL
+instead, and the server downloads the pack itself (v2.18.11): the
+`corpus_install` MCP tool, or the `InstallCorpusPack` RPC with `url` in its
+first message. The same rules apply as in the CLI: https only, no redirect out
+of TLS, and an optional `sha256` of the pack file, checked on a staged copy
+before anything is installed. The download goes through the server's SSRF
+guard (private, loopback and link-local addresses are refused unless
+`MDDB_OUTBOUND_ALLOW_PRIVATE` or `MDDB_OUTBOUND_ALLOWLIST` says otherwise) and
+is refused past `MDDB_CORPUS_MAX_BYTES`.
 
 The server then, before anything changes:
 
@@ -210,7 +220,7 @@ name the terms. An install refuses a pack without them.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MDDB_CORPUS_MAX_BYTES` | `68719476736` (64 GiB) | The largest `collection.db` an install unpacks |
+| `MDDB_CORPUS_MAX_BYTES` | `68719476736` (64 GiB) | The largest `collection.db` an install unpacks, and the largest pack the server downloads or receives over gRPC |
 
 ## API
 
@@ -222,3 +232,29 @@ name the terms. An install refuses a pack without them.
 | `POST` | `/v1/corpus/remove` | `{"name"}` |
 
 See the [REST API reference](/docs/api/reference/), generated from `openapi.yaml`, for the full schemas.
+
+### MCP (v2.18.11)
+
+| Tool | Permission | |
+|---|---|---|
+| `corpus_list` | read, filtered to the caller's tenant (as `GET /v1/corpus`) | read-only |
+| `corpus_install` | admin | `{"url": "https://…", "sha256": "…"}`; open-world, not destructive |
+| `corpus_remove` | admin | `{"name"}`; destructive, confirmed under `MDDB_MCP_CONFIRM_DESTRUCTIVE`, which asks for the name to be typed |
+
+All three are in the `admin` toolset. There is no build tool: a build's
+product is the pack file, which a tool answer would have to carry base64 in
+the model's context. Build with the CLI, REST or gRPC.
+
+### gRPC (v2.18.11)
+
+| RPC | Permission | |
+|---|---|---|
+| `ListCorpusPacks` | read, filtered to the tenant | `ListCorpusPacksResponse{packs, total}` |
+| `InstallCorpusPack` | admin | client stream: the first message holds `url` (+ `sha256`), or the pack as `data` chunks with an optional `sha256` |
+| `RemoveCorpusPack` | admin | `{name}` → `{status, name, deleted}` |
+| `BuildCorpusPack` | admin | server stream of `CorpusPackChunk`; the first carries `filename` and `doc_count` |
+
+Errors: `INVALID_ARGUMENT` for a pack or request refused as it is,
+`NOT_FOUND`, `ALREADY_EXISTS` for a name already holding data,
+`PERMISSION_DENIED` for a non-admin or a read-only server. See
+[GRPC.md](GRPC.md#corpus-packs-v21811).

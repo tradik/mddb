@@ -1059,6 +1059,10 @@ type MCPClient interface {
 	UploadFile(ctx context.Context, req *MCPUploadFileRequest) (map[string]interface{}, error)
 	// Aggregations
 	Aggregate(ctx context.Context, req *AggregateRequest) (*AggregateResponse, error)
+	// Corpus packs (AGT-005, #378)
+	CorpusList(ctx context.Context) ([]corpusListEntry, error)
+	CorpusInstall(ctx context.Context, url, sha256 string) (*corpusInstallResult, error)
+	CorpusRemove(ctx context.Context, name string) (int, error)
 	Close() error
 }
 

@@ -204,6 +204,12 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolUpdateCurationRule(ctx, args)
 	case "delete_curation_rule":
 		return s.toolDeleteCurationRule(ctx, args)
+	case "corpus_list":
+		return s.toolCorpusList(ctx, args)
+	case "corpus_install":
+		return s.toolCorpusInstall(ctx, args)
+	case "corpus_remove":
+		return s.toolCorpusRemove(ctx, args)
 	case "cross_search":
 		return s.toolCrossSearch(ctx, args)
 	case "find_duplicates":
@@ -380,27 +386,30 @@ func mcpGetStringSlice(m map[string]interface{}, key string) []string {
 
 func mcpGetMetaMap(m map[string]interface{}, key string) map[string][]string {
 	result := make(map[string][]string)
-	if meta, ok := m[key].(map[string]interface{}); ok {
-		for k, v := range meta {
-			switch val := v.(type) {
-			case string:
-				result[k] = []string{val}
-			case []interface{}:
-				// Non-strings are skipped rather than left as empty
-				// entries: an empty metadata value is indexed and
-				// searchable, so blanking one invents a value the caller
-				// never wrote (TEST-002).
-				strs := make([]string, 0, len(val))
-				for _, item := range val {
-					if s, ok := item.(string); ok {
-						strs = append(strs, s)
-					}
-				}
-				result[k] = strs
-			}
+	meta, _ := m[key].(map[string]interface{})
+	for k, v := range meta {
+		switch val := v.(type) {
+		case string:
+			result[k] = []string{val}
+		case []interface{}:
+			result[k] = mcpStringsOf(val)
 		}
 	}
 	return result
+}
+
+// mcpStringsOf keeps the strings of a JSON array. Non-strings are skipped
+// rather than left as empty entries: an empty metadata value is indexed and
+// searchable, so blanking one invents a value the caller never wrote
+// (TEST-002).
+func mcpStringsOf(items []interface{}) []string {
+	strs := make([]string, 0, len(items))
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			strs = append(strs, s)
+		}
+	}
+	return strs
 }
 
 // mcpGetFilter reads the operator filter (SRCH-017) from a tool argument.

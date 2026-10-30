@@ -81,6 +81,7 @@ var grpcAccessRules = map[string]accessRule{
 	// Every collection at once.
 	"/mddb.MDDB/ListSchemas":           ruleAllListing,
 	"/mddb.MDDB/ListCollectionConfigs": ruleAllListing,
+	"/mddb.MDDB/ListCorpusPacks":       ruleAllListing, // as GET /v1/corpus
 	"/mddb.MDDB/GeoStats":              ruleAllRead,
 	"/mddb.MDDB/GetGain":               ruleAllRead,
 	"/mddb.MDDB/DeleteWebhook":         ruleAllWrite,
@@ -104,6 +105,10 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/TestAutomation":    ruleAdmin,
 	"/mddb.MDDB/GetAutomationLogs": ruleAdmin,
 	"/mddb.MDDB/RunAutomation":     ruleAdmin,
+	// Corpus packs (#378), as /v1/corpus/install, /remove and /build.
+	"/mddb.MDDB/InstallCorpusPack": ruleAdmin,
+	"/mddb.MDDB/RemoveCorpusPack":  ruleAdmin,
+	"/mddb.MDDB/BuildCorpusPack":   ruleAdmin,
 
 	// Replication authorizes itself: a replication secret, a verified mTLS
 	// certificate or an administrator (authorizeReplication, SEC-001).
