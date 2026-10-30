@@ -47,6 +47,10 @@ func covEAdvancedGuarded(gs *GRPCServer) []covERPC {
 			_, err := gs.GetAutomationLogs(ctx, &pb.GetAutomationLogsRequest{})
 			return err
 		}},
+		{"RunAutomation", func(ctx context.Context) error {
+			_, err := gs.RunAutomation(ctx, &pb.RunAutomationRequest{Id: "x"})
+			return err
+		}},
 		{"GetCollectionConfig", func(ctx context.Context) error {
 			_, err := gs.GetCollectionConfig(ctx, &pb.GetCollectionConfigRequest{Collection: "c"})
 			return err

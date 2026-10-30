@@ -248,7 +248,7 @@ the coupling is invisible until it matters.
 | Who owns the storage format | this project | the upstream engine |
 | Who decides the release cadence | this project | upstream, then the wrapper |
 | Deployment | one binary | Python runtime, the engine, its dependencies |
-| MCP | native — 93 tools over the same core the HTTP API uses | an adapter layer over an engine that predates MCP |
+| MCP | native — 94 tools over the same core the HTTP API uses | an adapter layer over an engine that predates MCP |
 | Per-collection retrieval config | [built in](RAG-PIPELINE.md) | whatever upstream exposes |
 | Replication | binlog-based, built in | whatever upstream exposes |
 | Upgrade risk | one project's decisions | two projects' decisions, in sequence |

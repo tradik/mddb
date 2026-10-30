@@ -45,6 +45,7 @@ func automationRuleToProto(r *AutomationRule) *proto.AutomationRuleProto {
 		NextRun:          r.NextRun,
 		Backup:           backupActionToProto(r.Backup),
 		Sync:             syncActionToProto(r.Sync),
+		LastResult:       automationRunResultToProto(r.LastResult),
 	}
 	if r.SearchParams != nil {
 		if b, err := json.Marshal(r.SearchParams); err == nil {
@@ -182,7 +183,7 @@ func (g *GRPCServer) ListAutomation(ctx context.Context, req *proto.ListAutomati
 	if g.server.AutomationManager == nil {
 		return nil, status.Error(codes.FailedPrecondition, automationNotInitialized)
 	}
-	rules := g.server.AutomationManager.List(req.Type)
+	rules := g.server.automationRules(req.GetType(), req.GetCollection())
 	protoRules := make([]*proto.AutomationRuleProto, len(rules))
 	for i := range rules {
 		protoRules[i] = automationRuleToProto(&rules[i])

@@ -209,8 +209,7 @@ func (s *MCPToolServer) toolGetChecksum(ctx context.Context, args map[string]int
 // --- automation ---
 
 func (s *MCPToolServer) toolListAutomation(ctx context.Context, args map[string]interface{}) (string, error) {
-	filterType := mcpGetString(args, "type")
-	resp, err := s.client.ListAutomation(ctx, filterType)
+	resp, err := s.client.ListAutomation(ctx, mcpGetString(args, "type"), mcpGetString(args, "collection"))
 	if err != nil {
 		return "", err
 	}
@@ -282,6 +281,20 @@ func (s *MCPToolServer) toolTestAutomation(ctx context.Context, args map[string]
 		return "", err
 	}
 	return result, nil
+}
+
+// toolRunAutomation runs a cron rule's sync or backup now (#377).
+func (s *MCPToolServer) toolRunAutomation(ctx context.Context, args map[string]interface{}) (string, error) {
+	id := mcpGetString(args, "id")
+	if id == "" {
+		return "", fmt.Errorf("id is required")
+	}
+	run, err := s.client.RunAutomation(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	data, _ := json.MarshalIndent(run, "", "  ")
+	return string(data), nil
 }
 
 func (s *MCPToolServer) toolGetAutomationLogs(ctx context.Context, args map[string]interface{}) (string, error) {

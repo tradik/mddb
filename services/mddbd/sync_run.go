@@ -57,7 +57,7 @@ func (s *Server) runSourceSync(rule AutomationRule, now time.Time) (syncOutcome,
 	defer syncRuns.Delete(rule.ID)
 
 	r := &syncRun{server: s, rule: rule, action: rule.Sync, job: &BulkIngestJob{
-		ID:          "sync-" + rule.ID + "-" + now.UTC().Format(backupStampLayout),
+		ID:          actionJobID(actionSync, rule.ID, now),
 		Collection:  rule.Sync.Collection,
 		Status:      BulkJobProcessing,
 		SubmittedAt: start.Unix(),

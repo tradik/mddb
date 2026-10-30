@@ -53,6 +53,8 @@ const coverageFiles = [
   'src/components/QuotaUsage.jsx',
   'src/components/ServerEdgeCard.jsx',
   'src/components/ConfigPanel.jsx',
+  // 2.18.11: run a sync or backup now, and its last result (#377).
+  'src/components/CronRunNow.jsx',
 ];
 
 export default mergeConfig(

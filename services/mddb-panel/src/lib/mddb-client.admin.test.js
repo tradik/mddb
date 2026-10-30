@@ -73,6 +73,7 @@ describe('automation', () => {
     ['updateAutomation', (c) => c.updateAutomation('r1', rule), '/v1/automation/r1', PUT, rule],
     ['deleteAutomation', (c) => c.deleteAutomation('r1'), '/v1/automation/r1', DELETE],
     ['testAutomation', (c) => c.testAutomation(odd), `/v1/automation/${oddEnc}/test`, POST],
+    ['runAutomation', (c) => c.runAutomation(odd), `/v1/automation/${oddEnc}/run`, POST],
     ['listAutomationLogs defaults', (c) => c.listAutomationLogs(), '/v1/automation-logs?limit=50', GET],
     ['listAutomationLogs every filter', (c) => c.listAutomationLogs({ limit: 0, cursor: 'x', ruleId: 'r', status: 'ok' }), '/v1/automation-logs?cursor=x&ruleId=r&status=ok', GET],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));

@@ -949,6 +949,15 @@ class MDDBClient {
   }
 
   /**
+   * Run a cron rule's sync or backup now (2.18.11): resolves to the run,
+   * { ruleId, action, status, jobId, startedAt }; a 409 while its previous
+   * run is still going.
+   */
+  async runAutomation(id) {
+    return this.request(`/automation/${encodeURIComponent(id)}/run`, { method: 'POST' });
+  }
+
+  /**
    * List automation logs
    */
   async listAutomationLogs({ limit = 50, cursor = '', ruleId = '', status = '' } = {}) {

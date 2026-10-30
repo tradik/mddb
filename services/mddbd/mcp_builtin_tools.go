@@ -823,11 +823,12 @@ func mcpBuiltinToolsCore() []MCPTool {
 		},
 		{
 			Name:        "list_automation",
-			Description: "List all automation rules (webhooks, triggers, crons). Optionally filter by type.",
+			Description: "List all automation rules (webhooks, triggers, crons). Optionally filter by type, or by collection to see the sources that sync into it; each sync and backup carries lastResult (status, counts, error).",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
-					"type": map[string]interface{}{"type": "string", "description": "Filter by rule type: webhook, trigger, or cron"},
+					"type":       map[string]interface{}{"type": "string", "description": "Filter by rule type: webhook, trigger, or cron"},
+					"collection": map[string]interface{}{"type": "string", "description": "Only the rules acting on this collection: the triggers watching it and the syncs writing to it"},
 				},
 			},
 		},
@@ -903,6 +904,17 @@ func mcpBuiltinToolsCore() []MCPTool {
 				"type": "object",
 				"properties": map[string]interface{}{
 					"id": map[string]interface{}{"type": "string", "description": "Trigger rule ID to test"},
+				},
+				"required": []string{"id"},
+			},
+		},
+		{
+			Name:        "run_automation",
+			Description: "Run a cron rule's sync or backup now, as its schedule would (logged, announced on the jobs stream, fires its webhook). Returns the run's jobId; fails while the previous run is still going.",
+			InputSchema: map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"id": map[string]interface{}{"type": "string", "description": "Cron rule ID (a rule with a sync or backup)"},
 				},
 				"required": []string{"id"},
 			},

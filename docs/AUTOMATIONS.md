@@ -836,6 +836,55 @@ action keeps the rule's `sync`. Over gRPC the block is
 `AutomationRuleProto.sync` (26, `SyncActionProto`); over MCP it is the
 `sync` argument of `create_automation` / `update_automation`.
 
+**Run now** (2.18.11). `POST /v1/automation/{id}/run` runs a cron rule's
+sync — or its backup — at once, through the code its schedule fires: the
+run is logged, announced on the jobs SSE stream and fires `source.synced`
+(a backup: `backup.failed` when it fails), and it sets `lastRun`. A
+disabled rule runs too, so a rule can be tried before it is enabled. The
+answer is `202` with the run; the work goes on in the background:
+
+```bash
+curl -X POST http://localhost:11023/v1/automation/3f9c2a1b7d4e5f60/run
+# {"ruleId":"3f9c2a1b7d4e5f60","action":"sync","status":"started",
+#  "jobId":"sync-3f9c2a1b7d4e5f60-20261030T120000Z","startedAt":1793361600}
+```
+
+Follow `jobId` on `GET /v1/jobs/stream?job=<jobId>`. While the previous run
+of the rule is still going the answer is `409` and the skip is logged, as a
+scheduled skip is; `404` for no such rule, `400` for a rule with no sync or
+backup, `503` when the server runs no cron scheduler (`MDDB_CRONS` off).
+Over gRPC it is `RunAutomation` (`Aborted` while running, `Unavailable`
+without a scheduler), over MCP `run_automation`, from the CLI
+`mddb-cli sync run <id>`. It needs what editing the rule needs: a global
+administrator.
+
+**The sources of a collection** (2.18.11). `GET /v1/automation?collection=docs`
+lists the rules acting on `docs` — the syncs writing to it and the triggers
+watching it — and every sync and backup in a listing carries `lastResult`,
+the newest automation log entry of the rule:
+
+```json
+{
+  "id": "3f9c2a1b7d4e5f60", "type": "cron", "schedule": "0 */6 * * *",
+  "lastRun": 1793361600,
+  "sync": {"source": "s3", "collection": "docs", "bucket": "kb", "prefix": "articles/",
+           "storageConfig": {"endpoint": "s3.example.com", "accessKey": "AK", "secretKeySet": true}},
+  "lastResult": {"at": 1793361600, "status": "error", "durationMs": 2140,
+                 "error": "1 of 40 sources failed",
+                 "added": 3, "updated": 1, "unchanged": 35, "deleted": 0, "failed": 1}
+}
+```
+
+`status` is `success`, `error` or `skipped`; the secret is blanked as on
+every read. `lastResult` is read from the log, never stored, so it is gone
+once the log's retention (`MDDB_AUTOMATION_LOGS_TTL`) drops the entry. Over
+gRPC: `ListAutomationRequest.collection` (2) and
+`AutomationRuleProto.last_result` (27, `AutomationRunResultProto`); over MCP
+the `collection` argument of `list_automation`; from the CLI
+`mddb-cli sync list --collection docs`. Automations are global
+administration: a tenant user is refused, so a listing never crosses
+tenants.
+
 ---
 
 ## Panel UI
@@ -850,6 +899,7 @@ The MDDB Panel (React web UI) includes an **Automations** section under the Admi
 - **Toggle** enabled/disabled state per rule.
 - **View** cron metadata including `lastRun`, `nextRun`, and the human-readable schedule description.
 - **Choose a cron rule's action** (2.18.10): call a webhook, take a [scheduled backup](BACKUP.md) (local directory or S3, retention `keep`, collections) or [sync a source](#synced-sources) (sitemap, URL list or S3 prefix, `prune`, `maxDocuments`, max MiB per document). A stored S3 secret is never shown: leave the field blank to keep it.
+- **Run a sync or backup now** (2.18.11): the Run now button of a sync or backup rule starts it and shows the job id; the rule's row shows its last result (status, the sync's counts, the error).
 - **Read the log** (Logs tab): rule type, status, HTTP status, and per run what it did — the webhook URL, the backup's target and how many old backups retention removed, or a sync's added / updated / unchanged / deleted / failed counts.
 
 The Panel communicates with the same `/v1/automation` REST API documented above. No additional configuration is required.

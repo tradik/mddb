@@ -188,6 +188,8 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolTestAutomation(ctx, args)
 	case "get_automation_logs":
 		return s.toolGetAutomationLogs(ctx, args)
+	case "run_automation":
+		return s.toolRunAutomation(ctx, args)
 	case "get_collection_config":
 		return s.toolGetCollectionConfig(ctx, args)
 	case "set_collection_config":

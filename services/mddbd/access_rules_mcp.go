@@ -123,6 +123,7 @@ var mcpToolAccessRules = map[string]accessRule{
 	"delete_automation":   ruleAdmin,
 	"test_automation":     ruleAdmin,
 	"get_automation_logs": ruleAdmin,
+	"run_automation":      ruleAdmin,
 }
 
 // referenceRule reads the named collections, or every reference collection.

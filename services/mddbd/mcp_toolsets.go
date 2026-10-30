@@ -59,7 +59,7 @@ var mcpToolsets = map[string][]string{
 		"list_collection_configs", "list_curation_rules", "create_curation_rule", "update_curation_rule",
 		"delete_curation_rule"},
 	ToolsetGeo:        {"geo_search", "geo_within", "geo_polygon", "geo_stats", "geo_encode", "geo_decode"},
-	ToolsetAutomation: {"list_automation", "create_automation", "get_automation", "update_automation", "delete_automation", "test_automation", "get_automation_logs"},
+	ToolsetAutomation: {"list_automation", "create_automation", "get_automation", "update_automation", "delete_automation", "test_automation", "get_automation_logs", "run_automation"},
 	ToolsetWebhooks:   {"register_webhook", "list_webhooks", "delete_webhook"},
 	ToolsetWordPress:  {"wordpress_publish", "wordpress_set_status"},
 }

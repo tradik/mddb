@@ -178,7 +178,7 @@ curl -X POST http://localhost:9000/mcp \
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 93 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 94 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 | `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 
@@ -595,7 +595,7 @@ stored when a write asks for them: `extract_images` on `upload_file` and
 
 ## Built-in Tool Catalog
 
-All 93 built-in tools, grouped by area. Tool inputs are self-describing via
+All 94 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -689,13 +689,14 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 
 | Tool | Description |
 |------|-------------|
-| `list_automation` | List all automation rules (webhooks, triggers, crons). |
+| `list_automation` | List all automation rules (webhooks, triggers, crons). `type` filters by kind; `collection` (2.18.11) lists the rules acting on a collection — the sources syncing into it — each sync and backup with `lastResult`. |
 | `create_automation` | Create a new automation rule (webhook target, search trigger, or cron schedule). |
 | `get_automation` | Get a specific automation rule by ID. |
 | `update_automation` | Update an existing automation rule. |
 | `delete_automation` | Delete an automation rule by ID. |
 | `test_automation` | Test a trigger rule by running its search and returning matches (dry run, no webhook fired). |
 | `get_automation_logs` | List automation execution logs with optional filtering by rule ID and status. |
+| `run_automation` | (2.18.11) Run a cron rule's sync or backup now, as its schedule would; returns the run's `jobId`. Fails while the previous run is still going. |
 
 ### Webhooks
 

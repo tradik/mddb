@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"os"
 	"path"
 	"strings"
 
@@ -101,15 +100,7 @@ func scheduleRuleFromFlags(cmd *cobra.Command) (map[string]interface{}, error) {
 		backup["collections"] = strings.Split(c, ",")
 	}
 	if str("target") == "s3" {
-		secret := str("secret-key")
-		if secret == "" {
-			secret = os.Getenv(secretKeyEnv)
-		}
-		useTLS, _ := f.GetBool("tls")
-		backup["storageConfig"] = map[string]interface{}{
-			"endpoint": str("endpoint"), "region": str("region"),
-			"accessKey": str("access-key"), "secretKey": secret, "useTLS": useTLS,
-		}
+		backup["storageConfig"] = s3ConfigFromFlags(cmd, secretKeyEnv)
 	}
 	return map[string]interface{}{
 		"type": "cron", "name": name, "schedule": schedule, "enabled": !disabled, "backup": backup,
@@ -122,21 +113,9 @@ func newBackupScheduleListCmd() *cobra.Command {
 		Short: "List scheduled backups",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			resp, err := newClient().Do(context.Background(), "GET", "/v1/automation?type=cron", nil)
+			schedules, err := listCronRules(url.Values{"type": {"cron"}}, "backup")
 			if err != nil {
 				return err
-			}
-			var list struct {
-				Rules []map[string]interface{} `json:"rules"`
-			}
-			if err := json.Unmarshal(resp, &list); err != nil {
-				return fmt.Errorf("parse response: %w", err)
-			}
-			schedules := []map[string]interface{}{}
-			for _, r := range list.Rules {
-				if r["backup"] != nil {
-					schedules = append(schedules, r)
-				}
 			}
 			if outputJSON {
 				out, _ := json.Marshal(schedules)
@@ -174,30 +153,7 @@ func newBackupScheduleRemoveCmd() *cobra.Command {
 		Short: "Remove a scheduled backup (the backups it took stay)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client := newClient()
-			rulePath := "/v1/automation/" + url.PathEscape(args[0])
-			resp, err := client.Do(context.Background(), "GET", rulePath, nil)
-			if err != nil {
-				return err
-			}
-			var rule map[string]interface{}
-			if err := json.Unmarshal(resp, &rule); err != nil {
-				return fmt.Errorf("parse response: %w", err)
-			}
-			// Only a backup schedule: the ID of a webhook or trigger must not
-			// remove it through this command.
-			if rule["backup"] == nil {
-				return fmt.Errorf("%s is not a scheduled backup (type %s)", args[0], asString(rule["type"]))
-			}
-			if resp, err = client.Do(context.Background(), "DELETE", rulePath, nil); err != nil {
-				return err
-			}
-			if outputJSON {
-				fmt.Println(string(resp))
-				return nil
-			}
-			fmt.Printf("✓ Backup schedule removed: %s\n", args[0])
-			return nil
+			return removeCronRule(args[0], "backup", "a scheduled backup", "Backup schedule removed")
 		},
 	}
 }

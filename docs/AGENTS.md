@@ -15,7 +15,7 @@ measure.
 
 ## 1. Connect over MCP
 
-`mddbd` has a built-in MCP server with 93 tools ([MCP.md](MCP.md)). It serves
+`mddbd` has a built-in MCP server with 94 tools ([MCP.md](MCP.md)). It serves
 the 2026-07-28 and 2025-11-25 revisions side by side
 ([MCP-REVISIONS.md](MCP-REVISIONS.md)).
 
@@ -43,7 +43,7 @@ key ([MCP.md](MCP.md#oauth-21-for-claudeai-connectors-v2181)).
 
 Each built-in tool belongs to one of eleven toolsets: `search` (16 tools),
 `code` (6), `documents` (13), `ingest` (7), `memory` (6), `schema` (5),
-`admin` (22), `geo` (6), `automation` (7), `webhooks` (3), `wordpress` (2).
+`admin` (22), `geo` (6), `automation` (8), `webhooks` (3), `wordpress` (2).
 Every tool schema is in the model's context on every turn, so give an agent
 only what its work needs:
 

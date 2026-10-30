@@ -103,6 +103,7 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/DeleteAutomation":  ruleAdmin,
 	"/mddb.MDDB/TestAutomation":    ruleAdmin,
 	"/mddb.MDDB/GetAutomationLogs": ruleAdmin,
+	"/mddb.MDDB/RunAutomation":     ruleAdmin,
 
 	// Replication authorizes itself: a replication secret, a verified mTLS
 	// certificate or an administrator (authorizeReplication, SEC-001).

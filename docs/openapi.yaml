@@ -3791,7 +3791,8 @@ paths:
       summary: List automation rules
       operationId: listAutomationRules
       description: Returns all automation rules (webhooks, triggers, crons).
-        Optionally filter by type.
+        Optionally filter by type, or (2.18.11) by collection to list the
+        sources syncing into it. Every sync and backup carries lastResult.
       parameters:
         - name: type
           in: query
@@ -3799,6 +3800,12 @@ paths:
             type: string
             enum: [ webhook, trigger, cron ]
           description: Filter by rule type
+        - name: collection
+          in: query
+          schema:
+            type: string
+          description: (2.18.11) Only the rules acting on this collection — the
+            syncs writing to it and the triggers watching it
       responses:
         "200":
           description: List of automation rules
@@ -3913,6 +3920,38 @@ paths:
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/NotFound"}
         "429": {$ref: "#/components/responses/RateLimited"}
+
+  /v1/automation/{id}/run:
+    post:
+      tags: [ Automation ]
+      summary: Run a sync or backup rule now
+      operationId: runAutomationRule
+      description: (2.18.11) Runs a cron rule's sync or backup at once, through
+        the code its schedule fires — logged in the automation log, announced
+        on the jobs SSE stream, firing its webhook — and sets lastRun. A
+        disabled rule runs too. The run goes on in the background; follow
+        jobId on GET /v1/jobs/stream. Needs a global administrator.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "202":
+          description: The run started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AutomationRun"
+        "400": {description: "The rule has no sync or backup", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {description: "No such rule", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "405": {description: "Method not allowed (POST only)", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "409": {description: "The previous run of the rule is still going; the skip is logged", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
+        "429": {$ref: "#/components/responses/RateLimited"}
+        "503": {description: "The server runs no cron scheduler (MDDB_CRONS is off)", content: {application/json: {schema: {$ref: "#/components/schemas/ErrorResponse"}}}}
 
   /v1/automation/{id}/test:
     post:
@@ -12065,6 +12104,55 @@ components:
           $ref: "#/components/schemas/BackupAction"
         sync:
           $ref: "#/components/schemas/SyncAction"
+        lastResult:
+          $ref: "#/components/schemas/AutomationRunResult"
+
+    AutomationRunResult:
+      type: object
+      readOnly: true
+      description: (2.18.11) What the latest run of a cron rule's sync or backup
+        did — the newest automation log entry of the rule. Set on listings,
+        never stored; absent before the first run.
+      properties:
+        at:
+          type: integer
+          description: When the run started (unix seconds)
+        status:
+          type: string
+          enum: [ success, error, skipped ]
+        durationMs:
+          type: integer
+        error:
+          type: string
+        added:
+          type: integer
+        updated:
+          type: integer
+        unchanged:
+          type: integer
+        deleted:
+          type: integer
+        failed:
+          type: integer
+
+    AutomationRun:
+      type: object
+      description: (2.18.11) A run POST /v1/automation/{id}/run started.
+      properties:
+        ruleId:
+          type: string
+        action:
+          type: string
+          enum: [ sync, backup ]
+        status:
+          type: string
+          enum: [ started ]
+        jobId:
+          type: string
+          description: The run's id on the jobs SSE stream, e.g.
+            sync-<ruleId>-20261030T120000Z
+        startedAt:
+          type: integer
 
     SyncAction:
       type: object

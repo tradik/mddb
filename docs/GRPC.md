@@ -167,6 +167,7 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `DeleteAutomation` | `DeleteAutomationRequest` → `DeleteAutomationResponse` |
 | | `TestAutomation` | `TestAutomationRequest` → `TestAutomationResponse` |
 | | `GetAutomationLogs` | `GetAutomationLogsRequest` → `GetAutomationLogsResponse` |
+| | `RunAutomation` | `RunAutomationRequest` → `RunAutomationResponse` (2.18.11: run a sync or backup rule now; `job_id`; `Aborted` while its previous run is going) |
 | **Collection Config** | `GetCollectionConfig` | `GetCollectionConfigRequest` → `GetCollectionConfigResponse` |
 | | `SetCollectionConfig` | `SetCollectionConfigRequest` → `SetCollectionConfigResponse` |
 | | `ListCollectionConfigs` | `ListCollectionConfigsRequest` → `ListCollectionConfigsResponse` |

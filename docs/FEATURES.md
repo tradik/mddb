@@ -219,8 +219,9 @@ Complete list of MDDB features organized by category.
 - **Template Variables** - Dynamic `{{variable}}` substitution in webhook URLs and headers with document fields, meta, scores, and context
 - **Retry Logic** - Exponential backoff (0s, 1s, 5s, 15s) with custom X-MDDB headers
 - **Unified Storage** - All rules (webhooks, triggers, crons) in single `automation` BoltDB bucket
-- **HTTP API** - `GET/POST /v1/automation`, `GET/PUT/DELETE /v1/automation/{id}`, `POST /v1/automation/{id}/test`
-- **MCP Tools** - `list_automation`, `create_automation`, `get_automation`, `update_automation`, `delete_automation`, `test_automation`, `get_automation_logs`
+- **Run now and source status** (v2.18.11+) - `POST /v1/automation/{id}/run` runs a sync or backup rule at once through the scheduled path (409 while its previous run is going); `GET /v1/automation?collection=` lists the sources feeding a collection, each with `lastResult` (status, counts, error); gRPC `RunAutomation`, MCP `run_automation`, `mddb-cli sync`, the panel's Run now button
+- **HTTP API** - `GET/POST /v1/automation`, `GET/PUT/DELETE /v1/automation/{id}`, `POST /v1/automation/{id}/test`, `POST /v1/automation/{id}/run`
+- **MCP Tools** - `list_automation`, `create_automation`, `get_automation`, `update_automation`, `delete_automation`, `test_automation`, `get_automation_logs`, `run_automation`
 - **Configurable** - `MDDB_AUTOMATIONS`, `MDDB_AUTOMATION_LOGS`, `MDDB_AUTOMATION_LOGS_TTL`, `MDDB_TRIGGERS`, `MDDB_CRONS`
 
 ### Import from URL

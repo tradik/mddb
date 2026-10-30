@@ -1030,13 +1030,14 @@ type MCPClient interface {
 	GetMetaKeys(ctx context.Context, collection string) (*MCPMetaKeysResponse, error)
 	GetChecksum(ctx context.Context, collection string) (*MCPChecksumResponse, error)
 	// Automation
-	ListAutomation(ctx context.Context, filterType string) (*MCPAutomationListResponse, error)
+	ListAutomation(ctx context.Context, filterType, collection string) (*MCPAutomationListResponse, error)
 	CreateAutomation(ctx context.Context, rule AutomationRule) (*AutomationRule, error)
 	GetAutomation(ctx context.Context, id string) (*AutomationRule, error)
 	UpdateAutomation(ctx context.Context, id string, rule AutomationRule) (*AutomationRule, error)
 	DeleteAutomation(ctx context.Context, id string) error
 	TestAutomation(ctx context.Context, id string) (string, error)
 	ListAutomationLogs(ctx context.Context, limit int, cursor, ruleID, status string) (*MCPAutomationLogListResponse, error)
+	RunAutomation(ctx context.Context, id string) (*AutomationRun, error)
 	// Revisions
 	ListRevisions(ctx context.Context, collection, key, lang string) (*RevisionListResponse, error)
 	RestoreRevision(ctx context.Context, collection, key, lang string, timestamp int64) (*MCPDocument, error)

@@ -68,7 +68,7 @@ status: publish
   - [POST /v1/revisions](#post-v1revisions)
   - [POST /v1/revisions/restore](#post-v1revisionsrestore)
   - [GET/POST /v1/automation](#getpost-v1automation)
-  - [GET/PUT/DELETE /v1/automation/:id](#getputdelete-v1automationid)
+  - [GET/PUT/DELETE /v1/automation/:id](#getputdelete-v1automationid) (and `POST /v1/automation/:id/run`)
   - [GET /v1/automation-logs](#get-v1automation-logs)
   - [POST /v1/import-url](#post-v1import-url)
   - [POST /v1/import-wiki](#post-v1import-wiki)
@@ -3787,6 +3787,25 @@ Manage a specific automation rule.
 - **GET** returns the rule object
 - **PUT** updates the rule
 - **DELETE** removes the rule
+
+**GET** takes `type` (`webhook`, `trigger`, `cron`) and, since 2.18.11,
+`collection`: only the rules acting on that collection — the syncs writing
+to it and the triggers watching it. Every sync and backup in a listing
+carries `lastResult` (`at`, `status`, `durationMs`, `error`, and a sync's
+`added`, `updated`, `unchanged`, `deleted`, `failed`), the newest automation
+log entry of the rule. See
+[AUTOMATIONS.md](AUTOMATIONS.md#synced-sources).
+
+**POST /v1/automation/:id/run** (2.18.11) — Run a cron rule's sync or backup
+now, through the code its schedule fires (logged, announced on the jobs SSE
+stream, firing its webhook). `202`:
+```json
+{"ruleId": "3f9c2a1b7d4e5f60", "action": "sync", "status": "started",
+ "jobId": "sync-3f9c2a1b7d4e5f60-20261030T120000Z", "startedAt": 1793361600}
+```
+`409` while the previous run of the rule is still going (the skip is
+logged), `404` for no such rule, `400` for a rule with no sync or backup,
+`503` without a cron scheduler (`MDDB_CRONS` off). Global administrator.
 
 **POST /v1/automation/:id/test** — Test a trigger rule:
 ```json

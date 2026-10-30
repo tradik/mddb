@@ -100,6 +100,7 @@ const (
 	MDDB_CreateCurationRule_FullMethodName    = "/mddb.MDDB/CreateCurationRule"
 	MDDB_UpdateCurationRule_FullMethodName    = "/mddb.MDDB/UpdateCurationRule"
 	MDDB_DeleteCurationRule_FullMethodName    = "/mddb.MDDB/DeleteCurationRule"
+	MDDB_RunAutomation_FullMethodName         = "/mddb.MDDB/RunAutomation"
 )
 
 // MDDBClient is the client API for MDDB service.
@@ -272,6 +273,9 @@ type MDDBClient interface {
 	UpdateCurationRule(ctx context.Context, in *UpdateCurationRuleRequest, opts ...grpc.CallOption) (*CurationRuleProto, error)
 	// (v2.9.14+) Curation: remove a rule by id
 	DeleteCurationRule(ctx context.Context, in *DeleteCurationRuleRequest, opts ...grpc.CallOption) (*DeleteCurationRuleResponse, error)
+	// (v2.18.11+) Run a cron rule's sync or backup now, through the code its
+	// schedule fires; returns the run's job id (#377).
+	RunAutomation(ctx context.Context, in *RunAutomationRequest, opts ...grpc.CallOption) (*RunAutomationResponse, error)
 }
 
 type mDDBClient struct {
@@ -1101,6 +1105,16 @@ func (c *mDDBClient) DeleteCurationRule(ctx context.Context, in *DeleteCurationR
 	return out, nil
 }
 
+func (c *mDDBClient) RunAutomation(ctx context.Context, in *RunAutomationRequest, opts ...grpc.CallOption) (*RunAutomationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RunAutomationResponse)
+	err := c.cc.Invoke(ctx, MDDB_RunAutomation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MDDBServer is the server API for MDDB service.
 // All implementations must embed UnimplementedMDDBServer
 // for forward compatibility.
@@ -1271,6 +1285,9 @@ type MDDBServer interface {
 	UpdateCurationRule(context.Context, *UpdateCurationRuleRequest) (*CurationRuleProto, error)
 	// (v2.9.14+) Curation: remove a rule by id
 	DeleteCurationRule(context.Context, *DeleteCurationRuleRequest) (*DeleteCurationRuleResponse, error)
+	// (v2.18.11+) Run a cron rule's sync or backup now, through the code its
+	// schedule fires; returns the run's job id (#377).
+	RunAutomation(context.Context, *RunAutomationRequest) (*RunAutomationResponse, error)
 	mustEmbedUnimplementedMDDBServer()
 }
 
@@ -1523,6 +1540,9 @@ func (UnimplementedMDDBServer) UpdateCurationRule(context.Context, *UpdateCurati
 }
 func (UnimplementedMDDBServer) DeleteCurationRule(context.Context, *DeleteCurationRuleRequest) (*DeleteCurationRuleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteCurationRule not implemented")
+}
+func (UnimplementedMDDBServer) RunAutomation(context.Context, *RunAutomationRequest) (*RunAutomationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RunAutomation not implemented")
 }
 func (UnimplementedMDDBServer) mustEmbedUnimplementedMDDBServer() {}
 func (UnimplementedMDDBServer) testEmbeddedByValue()              {}
@@ -2996,6 +3016,24 @@ func _MDDB_DeleteCurationRule_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_RunAutomation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RunAutomationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).RunAutomation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_RunAutomation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).RunAutomation(ctx, req.(*RunAutomationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MDDB_ServiceDesc is the grpc.ServiceDesc for MDDB service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -3322,6 +3360,10 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteCurationRule",
 			Handler:    _MDDB_DeleteCurationRule_Handler,
+		},
+		{
+			MethodName: "RunAutomation",
+			Handler:    _MDDB_RunAutomation_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

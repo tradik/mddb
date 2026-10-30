@@ -16,7 +16,8 @@ import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import AutomationLogsTab from './AutomationLogsTab';
 import CronActionFields from './CronActionFields';
-import { EMPTY_RULE, buildPayload, ruleToForm, describeCronAction } from '../lib/automation-form';
+import { EMPTY_RULE, buildPayload, ruleToForm, describeCronAction, isRunnable } from '../lib/automation-form';
+import { LastRunResult, RunNowButton } from './CronRunNow';
 
 const TYPE_CONFIG = {
   webhook: { icon: Webhook, label: 'Webhook', badgeClass: 'bg-blue-100 text-blue-800' },
@@ -738,6 +739,7 @@ export default function AutomationPanel() {
                                 <div className="text-xs text-gray-600 mt-0.5">
                                   <span className="font-mono">{rule.schedule}</span>
                                   <span className="ml-1.5">{describeCronAction(rule)}</span>
+                                  <LastRunResult rule={rule} />
                                 </div>
                               )}
                             </td>
@@ -765,6 +767,7 @@ export default function AutomationPanel() {
                             </td>
                             <td className="px-6 py-4 text-right whitespace-nowrap">
                               <div className="flex items-center justify-end gap-2">
+                                {isRunnable(rule) && <RunNowButton rule={rule} />}
                                 {rule.type === 'trigger' && (
                                   <button
                                     onClick={() => handleTest(rule.id)}

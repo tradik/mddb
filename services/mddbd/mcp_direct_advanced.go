@@ -14,12 +14,14 @@ import (
 
 // --- Automation ---
 
-// ListAutomation returns automation rules via the direct client.
-func (c *DirectClient) ListAutomation(ctx context.Context, filterType string) (*MCPAutomationListResponse, error) {
+// ListAutomation returns automation rules via the direct client: of a type
+// and acting on a collection when they are given, each sync and backup with
+// its last result.
+func (c *DirectClient) ListAutomation(ctx context.Context, filterType, collection string) (*MCPAutomationListResponse, error) {
 	if c.server.AutomationManager == nil {
 		return nil, errors.New(automationNotInitialized)
 	}
-	rules := c.server.AutomationManager.List(filterType)
+	rules := c.server.automationRules(filterType, collection)
 	return &MCPAutomationListResponse{Rules: rules, Total: len(rules)}, nil
 }
 
@@ -88,6 +90,15 @@ func (c *DirectClient) TestAutomation(ctx context.Context, id string) (string, e
 	}
 	data, _ := json.MarshalIndent(resp, "", "  ")
 	return string(data), nil
+}
+
+// RunAutomation runs a cron rule's sync or backup now via the direct client.
+func (c *DirectClient) RunAutomation(ctx context.Context, id string) (*AutomationRun, error) {
+	if c.server.AutomationManager == nil {
+		return nil, errors.New(automationNotInitialized)
+	}
+	c.server.Metrics.IncOp("automation_run", id)
+	return c.server.runAutomationNow(id)
 }
 
 // ListAutomationLogs returns automation execution logs via the direct client.

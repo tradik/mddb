@@ -14,6 +14,7 @@ vi.mock('../lib/mddb-client', () => ({
     updateAutomation: vi.fn(),
     deleteAutomation: vi.fn(),
     testAutomation: vi.fn(),
+    runAutomation: vi.fn(),
     listAutomationLogs: vi.fn(),
   },
 }));
@@ -33,7 +34,10 @@ const news = {
   sentimentMin: -0.5, sentimentMax: 0.5, conditionLogic: 'or', events: ['insert', 'delete'], enabled: true,
 };
 const bare = { id: 't2', type: 'trigger', name: 'Bare', query: 'q', sentimentEnabled: true, events: [], enabled: false };
-const nightly = { id: 'c1', type: 'cron', name: 'Nightly', schedule: '0 0 3 * * *', backup: { target: 'local', keep: 7 }, enabled: true };
+const nightly = {
+  id: 'c1', type: 'cron', name: 'Nightly', schedule: '0 0 3 * * *', backup: { target: 'local', keep: 7 }, enabled: true,
+  lastResult: { status: 'success', at: 1793336400 },
+};
 const mirror = {
   id: 'c2', type: 'cron', name: 'Mirror', schedule: '0 0 * * * *', enabled: true,
   sync: {
@@ -457,5 +461,23 @@ describe('AutomationPanel: logs tab', () => {
     await renderLoaded();
     expect(screen.queryByRole('button', { name: 'Logs' })).toBeNull();
     expect(client.listAutomationLogs).not.toHaveBeenCalled();
+  });
+});
+
+describe('run now (2.18.11)', () => {
+  beforeEach(() => {
+    client.listAutomation.mockImplementation(serve(rules));
+  });
+
+  test('a sync or backup rule has Run now and its last result; a webhook or trigger has not', async () => {
+    client.runAutomation.mockResolvedValue({ jobId: 'backup-c1-20261030T120000Z' });
+    await renderLoaded();
+    expect(within(rowOf('Nightly')).getByText('Last run: success')).toBeTruthy();
+    expect(within(rowOf('Mirror')).getByRole('button', { name: 'Run Mirror now' })).toBeTruthy();
+    expect(within(rowOf('Slack')).queryByTitle('Run now')).toBeNull();
+    expect(within(rowOf('News')).queryByTitle('Run now')).toBeNull();
+    fireEvent.click(within(rowOf('Nightly')).getByRole('button', { name: 'Run Nightly now' }));
+    expect((await within(rowOf('Nightly')).findByRole('status')).textContent).toContain('job backup-c1-20261030T120000Z');
+    expect(client.runAutomation).toHaveBeenCalledWith('c1');
   });
 });

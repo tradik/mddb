@@ -656,6 +656,87 @@ mddb-cli backup schedule remove 3f9c2a1b7d4e5f60
 .fi
 .RE
 
+.SS sync create|list|run|delete
+Synced sources (v2.18.11+): cron automations whose action is a sync, keeping
+a collection in step with a sitemap, a list of URLs or the objects under an
+S3 prefix. The server runs them when
+.B MDDB_CRONS=true
+is set.
+.PP
+.B mddb-cli sync create
+\fB\-\-name\fR \fINAME\fR \fB\-\-cron\fR \fIEXPR\fR \fB\-\-source\fR \fIsitemap|urls|s3\fR \fB\-\-collection\fR \fICOLL\fR [\fIOPTIONS\fR]
+.PP
+.B mddb-cli sync list
+[\fB\-\-collection\fR \fICOLL\fR]
+.PP
+.B mddb-cli sync run
+\fIID\fR
+.PP
+.B mddb-cli sync delete
+\fIID\fR
+.PP
+Options for create:
+.TP
+.BI \-\-name " NAME" ", \-\-cron " EXPR
+Rule name and cron expression (required).
+.TP
+.BI \-\-source " sitemap|urls|s3"
+What to read (required).
+.TP
+.BI \-\-collection " COLL" ", \-\-lang " LANG
+Where the documents go (collection required; lang default en).
+.TP
+.BI \-\-url " URL"
+sitemap: the sitemap or sitemap index.
+.TP
+.BI \-\-urls " A,B"
+urls: the pages.
+.TP
+.BI \-\-bucket " NAME" ", \-\-prefix " PREFIX
+s3: the objects to read.
+.TP
+.BI \-\-endpoint " HOST[:PORT]" ", \-\-region " REGION ", \-\-access\-key " KEY
+s3: connection.
+.TP
+.BI \-\-secret\-key " KEY"
+s3: secret key (default
+.BR $MDDB_SYNC_SECRET_KEY ).
+.TP
+.B \-\-tls
+s3: connect over HTTPS.
+.TP
+.B \-\-prune
+Delete the documents whose source is gone.
+.TP
+.BI \-\-max\-documents " N" ", \-\-max\-bytes " N
+Sources per run and bytes per document (0 takes the server default).
+.TP
+.B \-\-disabled
+Create the rule disabled.
+.PP
+.B list
+shows each source's schedule, last run and last result (status, then added
++, updated ~, unchanged =, deleted \-, failed !, and the error); with
+.B \-\-collection
+only the sources feeding that collection. The S3 secret is never shown.
+.B run
+runs a rule now, as its schedule would (logged, announced on the jobs stream,
+firing source.synced), and prints the job id; it fails while the previous run
+is still going.
+.B delete
+refuses an ID that is not a synced source; the documents it wrote stay.
+.PP
+Examples:
+.RS
+.nf
+mddb-cli sync create --name docs --cron "0 * * * *" --source sitemap \\
+  --url https://docs.example.com/sitemap.xml --collection docs --prune
+mddb-cli sync list --collection docs
+mddb-cli sync run 3f9c2a1b7d4e5f60
+mddb-cli sync delete 3f9c2a1b7d4e5f60
+.fi
+.RE
+
 .SS restore
 Restore the database from a backup file.
 .PP

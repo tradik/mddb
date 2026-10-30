@@ -250,3 +250,26 @@ export function describeCronAction(rule) {
   }
   return rule.webhookId ? `webhook ${rule.webhookId}` : '';
 }
+
+/**
+ * Whether a rule can be run now: a cron rule with a sync or a backup (2.18.11).
+ */
+export function isRunnable(rule) {
+  return rule.type === 'cron' && Boolean(rule.sync || rule.backup);
+}
+
+/**
+ * describeLastResult renders a rule's lastResult (2.18.11): the status, a
+ * sync's counts and the error, e.g. "error · +2 ~1 =35 −0 ✕1 · 1 of 40
+ * sources failed". Empty when the rule has not run.
+ */
+export function describeLastResult(rule) {
+  const r = rule.lastResult;
+  if (!r) return '';
+  const parts = [r.status];
+  if (rule.sync) {
+    parts.push(`+${r.added || 0} ~${r.updated || 0} =${r.unchanged || 0} −${r.deleted || 0} ✕${r.failed || 0}`);
+  }
+  if (r.error) parts.push(r.error);
+  return parts.join(' · ');
+}

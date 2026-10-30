@@ -288,6 +288,37 @@ first), `--target local|s3`, `--path`, `--bucket`, `--prefix`, `--keep`,
 `--access-key`, `--secret-key` (default `$MDDB_BACKUP_SECRET_KEY`), `--tls`,
 `--disabled`. `remove` refuses an ID that is not a backup schedule.
 
+#### sync - Synced sources (v2.18.11+)
+
+A synced source keeps a collection in step with a sitemap, a list of URLs
+or the objects under an S3 prefix, on a cron schedule. It is a cron
+automation with a sync action and runs when the server has
+`MDDB_CRONS=true` (see `docs/AUTOMATIONS.md#synced-sources`).
+
+```bash
+mddb-cli sync create --name docs --cron "0 * * * *" --source sitemap \
+  --url https://docs.example.com/sitemap.xml --collection docs --prune
+
+# S3 (or MinIO, R2...); the secret comes from MDDB_SYNC_SECRET_KEY
+export MDDB_SYNC_SECRET_KEY=...
+mddb-cli sync create --name kb --cron "*/30 * * * *" --source s3 --collection kb \
+  --endpoint s3.example.com --tls --bucket kb --prefix articles/ --access-key AKIA...
+
+mddb-cli sync list                      # every source, its last run and result
+mddb-cli sync list --collection docs    # the sources feeding docs
+mddb-cli sync run <id>                  # run now; prints the job id
+mddb-cli sync delete <id>               # the documents it wrote stay
+```
+
+`create` flags: `--name`, `--cron`, `--source sitemap|urls|s3`,
+`--collection` (all required), `--lang` (default `en`), `--url`, `--urls a,b`,
+`--bucket`, `--prefix`, `--endpoint`, `--region`, `--access-key`,
+`--secret-key` (default `$MDDB_SYNC_SECRET_KEY`), `--tls`, `--prune`,
+`--max-documents`, `--max-bytes`, `--disabled`. `list` shows the last result
+as `status +added ~updated =unchanged -deleted !failed: error`; the S3 secret
+is never shown. `run` fails (409) while the previous run is still going.
+`delete` refuses an ID that is not a synced source.
+
 #### restore - Restore from backup
 
 ```bash

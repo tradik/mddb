@@ -260,7 +260,7 @@ MDDB implements both MCP revisions in full — see [Protocol revisions](MCP-REVI
 
 | Feature | Description |
 |---------|-------------|
-| **Tool Annotations** | All 93 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
+| **Tool Annotations** | All 94 built-in tools have `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` — enables AI clients to auto-approve safe tools |
 | **Structured Output** | `outputSchema` on key tools (stats, search, classification, aggregation) for client-side validation |
 | **5 Built-in Prompts** | `analyze-collection`, `search-help`, `summarize-collection`, `import-guide`, `rag-pipeline` |
 | **Completion** | Autocomplete for collection names and prompt arguments |
@@ -327,7 +327,7 @@ Use the `mddbd` binary directly:
 }
 ```
 
-### Available MCP Tools (93)
+### Available MCP Tools (94)
 
 Once connected, your LLM agent has access to all built-in tools (with annotations for auto-approve). They come in eleven toolsets; `MDDB_MCP_TOOLSETS` or a per-key `toolsets` list exposes only some of them ([MCP.md](MCP.md#toolsets-v2188)):
 
@@ -356,7 +356,7 @@ Once connected, your LLM agent has access to all built-in tools (with annotation
 `geo_search` `geo_within` `geo_polygon` `geo_stats` `geo_encode` `geo_decode`
 
 **automation**
-`list_automation` `create_automation` `get_automation` `update_automation` `delete_automation` `test_automation` `get_automation_logs`
+`list_automation` `create_automation` `get_automation` `update_automation` `delete_automation` `test_automation` `get_automation_logs` `run_automation`
 
 **webhooks**
 `register_webhook` `list_webhooks` `delete_webhook`

@@ -443,7 +443,7 @@ func (c *covBAllErrClient) GetMetaKeys(context.Context, string) (*MCPMetaKeysRes
 func (c *covBAllErrClient) GetChecksum(context.Context, string) (*MCPChecksumResponse, error) {
 	return nil, errCovBClient
 }
-func (c *covBAllErrClient) ListAutomation(context.Context, string) (*MCPAutomationListResponse, error) {
+func (c *covBAllErrClient) ListAutomation(context.Context, string, string) (*MCPAutomationListResponse, error) {
 	return nil, errCovBClient
 }
 func (c *covBAllErrClient) CreateAutomation(context.Context, AutomationRule) (*AutomationRule, error) {
@@ -458,6 +458,9 @@ func (c *covBAllErrClient) UpdateAutomation(context.Context, string, AutomationR
 func (c *covBAllErrClient) DeleteAutomation(context.Context, string) error { return errCovBClient }
 func (c *covBAllErrClient) TestAutomation(context.Context, string) (string, error) {
 	return "", errCovBClient
+}
+func (c *covBAllErrClient) RunAutomation(context.Context, string) (*AutomationRun, error) {
+	return nil, errCovBClient
 }
 func (c *covBAllErrClient) ListAutomationLogs(context.Context, int, string, string, string) (*MCPAutomationLogListResponse, error) {
 	return nil, errCovBClient

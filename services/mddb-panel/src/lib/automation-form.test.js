@@ -13,6 +13,8 @@ import {
   buildPayload,
   ruleToForm,
   describeCronAction,
+  isRunnable,
+  describeLastResult,
 } from './automation-form';
 
 const MIB = 1024 * 1024;
@@ -202,5 +204,29 @@ describe('describeCronAction', () => {
     ['nothing', {}, ''],
   ])('%s', (_label, rule, want) => {
     expect(describeCronAction(rule)).toBe(want);
+  });
+});
+
+describe('isRunnable', () => {
+  test.each([
+    ['a sync cron', { type: 'cron', sync: {} }, true],
+    ['a backup cron', { type: 'cron', backup: {} }, true],
+    ['a webhook cron', { type: 'cron', webhookId: 'w' }, false],
+    ['a trigger', { type: 'trigger' }, false],
+  ])('%s', (_label, rule, want) => {
+    expect(isRunnable(rule)).toBe(want);
+  });
+});
+
+describe('describeLastResult', () => {
+  test.each([
+    ['never ran', { sync: {} }, ''],
+    ['a sync with every count', { sync: {}, lastResult: { status: 'success', added: 1, updated: 2, unchanged: 3, deleted: 4, failed: 0 } },
+      'success · +1 ~2 =3 −4 ✕0'],
+    ['a sync with no counts sent', { sync: {}, lastResult: { status: 'skipped', error: 'still going' } },
+      'skipped · +0 ~0 =0 −0 ✕0 · still going'],
+    ['a backup', { backup: {}, lastResult: { status: 'error', error: 'disk full' } }, 'error · disk full'],
+  ])('%s', (_label, rule, want) => {
+    expect(describeLastResult(rule)).toBe(want);
   });
 });

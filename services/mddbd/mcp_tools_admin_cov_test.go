@@ -41,7 +41,7 @@ func (f *mcpAdminFake) GetMetaKeys(context.Context, string) (*MCPMetaKeysRespons
 func (f *mcpAdminFake) GetChecksum(context.Context, string) (*MCPChecksumResponse, error) {
 	return &MCPChecksumResponse{}, f.err
 }
-func (f *mcpAdminFake) ListAutomation(context.Context, string) (*MCPAutomationListResponse, error) {
+func (f *mcpAdminFake) ListAutomation(context.Context, string, string) (*MCPAutomationListResponse, error) {
 	return &MCPAutomationListResponse{}, f.err
 }
 func (f *mcpAdminFake) CreateAutomation(_ context.Context, r AutomationRule) (*AutomationRule, error) {
@@ -56,6 +56,9 @@ func (f *mcpAdminFake) UpdateAutomation(_ context.Context, _ string, r Automatio
 func (f *mcpAdminFake) DeleteAutomation(context.Context, string) error { return f.err }
 func (f *mcpAdminFake) TestAutomation(context.Context, string) (string, error) {
 	return "{}", f.err
+}
+func (f *mcpAdminFake) RunAutomation(context.Context, string) (*AutomationRun, error) {
+	return &AutomationRun{}, f.err
 }
 func (f *mcpAdminFake) ListAutomationLogs(context.Context, int, string, string, string) (*MCPAutomationLogListResponse, error) {
 	return &MCPAutomationLogListResponse{}, f.err
@@ -84,6 +87,7 @@ var mcpAdminToolArgs = map[string]map[string]interface{}{
 	"delete_automation":   {"id": "a", "confirm": true},
 	"test_automation":     {"id": "a"},
 	"get_automation_logs": {"limit": 5.0, "rule_id": "a"},
+	"run_automation":      {"id": "a"},
 }
 
 // Every admin tool: refused without its arguments (where it takes any),
@@ -111,7 +115,7 @@ func TestMCPAdminToolsCoverage(t *testing.T) {
 	}
 	for _, name := range []string{"delete_collection", "list_revisions", "restore_revision", "list_synonyms", "add_synonym",
 		"delete_synonym", "list_stopwords", "add_stopwords", "delete_stopwords", "get_meta_keys", "get_checksum",
-		"get_automation", "update_automation", "delete_automation", "test_automation"} {
+		"get_automation", "update_automation", "delete_automation", "test_automation", "run_automation"} {
 		ts := &MCPToolServer{client: &mcpAdminFake{}, globalMode: ModeRW}
 		if _, err := ts.mcpCallTool(ctx, name, map[string]interface{}{"confirm": true}); err == nil {
 			t.Errorf("%s without its arguments succeeded", name)

@@ -245,6 +245,10 @@ service MDDB {
 
   // (v2.9.14+) Curation: remove a rule by id
   rpc DeleteCurationRule(DeleteCurationRuleRequest) returns (DeleteCurationRuleResponse);
+
+  // (v2.18.11+) Run a cron rule's sync or backup now, through the code its
+  // schedule fires; returns the run's job id (#377).
+  rpc RunAutomation(RunAutomationRequest) returns (RunAutomationResponse);
 }
 
 // Document represents a markdown document
@@ -1074,6 +1078,22 @@ message AutomationRuleProto {
   // sitemap, a list of URLs or an S3 prefix. Unset on an update that names
   // no action keeps the stored one.
   SyncActionProto sync = 26;
+  // (v2.18.11+) What the latest run of a cron rule's sync or backup did,
+  // from the automation log; set on listings, never stored (#377).
+  AutomationRunResultProto last_result = 27;
+}
+
+// AutomationRunResultProto is the latest run of a cron rule's action.
+message AutomationRunResultProto {
+  int64 at = 1;              // unix seconds the run started
+  string status = 2;         // "success", "error" or "skipped"
+  int64 duration_ms = 3;
+  string error = 4;
+  int32 added = 5;           // sync counts
+  int32 updated = 6;
+  int32 unchanged = 7;
+  int32 deleted = 8;
+  int32 failed = 9;
 }
 
 // SyncActionProto is what a cron rule with a sync does on each run
@@ -1109,6 +1129,9 @@ message BackupActionProto {
 
 message ListAutomationRequest {
   string type = 1; // optional filter: "trigger", "cron", "webhook"
+  // (v2.18.11+) Optional: only the rules acting on this collection — the
+  // triggers watching it and the syncs writing to it (#377).
+  string collection = 2;
 }
 
 message ListAutomationResponse {
@@ -1146,6 +1169,20 @@ message TestAutomationResponse {
   AutomationRuleProto trigger = 1;
   repeated Document matches = 2;
   int32 total = 3;
+}
+
+// RunAutomationRequest names the cron rule to run now (#377).
+message RunAutomationRequest {
+  string id = 1;
+}
+
+// RunAutomationResponse is the run that started.
+message RunAutomationResponse {
+  string rule_id = 1;
+  string action = 2;    // "sync" or "backup"
+  string status = 3;    // "started"
+  string job_id = 4;    // the jobs SSE stream's id, e.g. sync-<rule>-<stamp>
+  int64 started_at = 5;
 }
 
 message AutomationLogEntryProto {

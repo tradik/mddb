@@ -29,7 +29,7 @@ func TestCovCAutomationToolsReportAMissingSubsystem(t *testing.T) {
 	c := NewDirectClient(&Server{})
 	ctx := context.Background()
 	errs := map[string]error{}
-	_, errs["ListAutomation"] = c.ListAutomation(ctx, "")
+	_, errs["ListAutomation"] = c.ListAutomation(ctx, "", "")
 	_, errs["CreateAutomation"] = c.CreateAutomation(ctx, AutomationRule{})
 	_, errs["GetAutomation"] = c.GetAutomation(ctx, "x")
 	_, errs["UpdateAutomation"] = c.UpdateAutomation(ctx, "x", AutomationRule{})
@@ -64,7 +64,7 @@ func TestCovCAutomationLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if list, err := c.ListAutomation(ctx, "webhook"); err != nil || list.Total != 1 || list.Rules[0].ID != hook.ID {
+	if list, err := c.ListAutomation(ctx, "webhook", ""); err != nil || list.Total != 1 || list.Rules[0].ID != hook.ID {
 		t.Fatalf("ListAutomation = %+v, %v", list, err)
 	}
 	if got, err := c.GetAutomation(ctx, hook.ID); err != nil || got.Name != "hook" {

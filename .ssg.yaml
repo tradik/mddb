@@ -56,7 +56,7 @@ variables:
   # settles it, and the release version sweep has to touch this line too.
   mddbReleaseDate: "30 October 2026"
   # Counted from tools/list against a running server, not from memory.
-  mcpTools: "93"
+  mcpTools: "94"
   # The release binary, measured the way release.yml builds it:
   #   cd services/mddbd && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
   #     go build -ldflags="-s -w" -o /tmp/mddbd . && ls -l /tmp/mddbd

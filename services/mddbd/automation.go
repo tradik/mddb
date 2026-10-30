@@ -58,6 +58,10 @@ type AutomationRule struct {
 	// step with a sitemap, a list of URLs or an S3 prefix. See
 	// automation_sync.go.
 	Sync *SyncAction `json:"sync,omitempty"`
+
+	// LastResult is what the latest run of the sync or backup did (#377).
+	// Listings fill it from the automation log; it is never stored.
+	LastResult *AutomationRunResult `json:"lastResult,omitempty"`
 }
 
 // AutomationManager manages automation rules (webhooks, triggers, crons).

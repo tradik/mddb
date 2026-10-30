@@ -49,7 +49,7 @@ func (s *Server) runScheduledBackup(rule AutomationRule, now time.Time) (backupO
 	defer backupRuns.Delete(rule.ID)
 
 	job := &BulkIngestJob{
-		ID:          "backup-" + rule.ID + "-" + now.UTC().Format(backupStampLayout),
+		ID:          actionJobID(actionBackup, rule.ID, now),
 		Collection:  "*",
 		Status:      BulkJobProcessing,
 		Total:       backupRunSteps,
