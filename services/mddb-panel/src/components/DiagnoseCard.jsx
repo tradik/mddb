@@ -8,7 +8,7 @@ import { saveBlob } from '../lib/download';
 // with no document content, metadata values, keys, queries, tokens or IPs.
 // Collection names are hashed unless keepNames is set. Admin on "*" only.
 const OPTIONS = [
-  { name: 'profiles', label: 'Goroutine and heap profiles' },
+  { name: 'profiles', label: 'Runtime counters (goroutines, heap, GC)' },
   { name: 'integrity', label: 'Integrity check of every database file (slow on large databases)' },
   { name: 'keepNames', label: 'Keep collection names (otherwise c_ + hash)' },
 ];

@@ -1121,7 +1121,7 @@ class MDDBClient {
 
   /**
    * The diagnose bundle (tar.gz, admin on "*") as `{ blob, filename }`.
-   * Opt-in parts: goroutine/heap profiles, a bbolt integrity check, and real
+   * Opt-in parts: runtime counters (goroutines, heap, GC), a bbolt integrity check, and real
    * collection names instead of hashes.
    */
   async downloadDiagnose({ profiles = false, integrity = false, keepNames = false } = {}) {

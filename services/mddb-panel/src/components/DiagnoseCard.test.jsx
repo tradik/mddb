@@ -32,7 +32,7 @@ describe('DiagnoseCard', () => {
     let resolve;
     vi.mocked(mddbClient.downloadDiagnose).mockReturnValue(new Promise((r) => { resolve = r; }));
     render(<DiagnoseCard />);
-    fireEvent.click(screen.getByLabelText('Goroutine and heap profiles'));
+    fireEvent.click(screen.getByLabelText('Runtime counters (goroutines, heap, GC)'));
     fireEvent.click(screen.getByLabelText(/Keep collection names/));
     fireEvent.click(screen.getByRole('button', { name: 'Download diagnose bundle' }));
     expect(screen.getByRole('button', { name: 'Collecting…' }).disabled).toBe(true);
