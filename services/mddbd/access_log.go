@@ -60,7 +60,8 @@ func accessLogLevel(status int) slog.Level {
 
 // withAccessLog logs one line per request. The query string is deliberately
 // omitted: search endpoints carry user content there, and an access log is not
-// the place for it.
+// the place for it. "remote" is the transport peer; "client" is the address
+// ClientIP resolves, which differs behind a trusted proxy.
 func withAccessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -73,6 +74,7 @@ func withAccessLog(next http.Handler) http.Handler {
 			"bytes", rec.bytes,
 			"elapsed", time.Since(start),
 			"remote", r.RemoteAddr,
+			"client", ClientIP(r),
 		)
 	})
 }

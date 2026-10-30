@@ -378,7 +378,7 @@ HTTP responses carry `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-
 
 ### Client IP and trusted proxies
 
-One rule decides the client IP for the HTTP and gRPC rate limiters, the MCP rate limiter and access log, the SSE per-IP connection cap, and the audit log (login attempts, writes, incident detection):
+One rule decides the client IP for the HTTP and gRPC rate limiters, the MCP rate limiter and access log, the HTTP access log (`client` field), the SSE per-IP connection cap, and the audit log (login attempts, writes, incident detection):
 
 1. If the connecting peer (`RemoteAddr`, or the gRPC peer address) is **not** in `MDDB_TRUSTED_PROXIES`, the peer is the client. `X-Forwarded-For` and `X-Real-IP` (gRPC metadata `x-forwarded-for` / `x-real-ip`) are ignored, so a client cannot pick its own rate-limit bucket or audit IP.
 2. If the peer is a trusted proxy, `X-Forwarded-For` is read **right to left**, skipping trusted proxies; the first other address is the client. A hop that is not an IP address ends the walk.
@@ -561,7 +561,7 @@ RFC 5424 syslog export and SIEM webhooks — see
 |---------|---------|------|-------------|
 | `MDDB_LOG_FORMAT` | `text` (`json` in the Docker image) | string | Output encoding: `text` or `json` |
 | `MDDB_LOG_LEVEL` | `info` | string | Minimum level emitted: `debug`, `info`, `warn`, `error` |
-| `MDDB_ACCESS_LOG` | `false` | bool | One line per HTTP request: method, path, status, bytes, elapsed, remote address. The query string is deliberately omitted — search endpoints carry user content there |
+| `MDDB_ACCESS_LOG` | `false` | bool | One line per HTTP request: method, path, status, bytes, elapsed, remote address (the transport peer) and client (the address resolved by the trusted-proxy rule below; differs from remote behind a proxy). The query string is deliberately omitted — search endpoints carry user content there |
 
 Access log lines take their level from the status: 5xx is `error`, 4xx is
 `warn`, everything else `info`.

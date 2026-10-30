@@ -141,3 +141,38 @@ func TestAccessLogRecorderKeepsFlushReachable(t *testing.T) {
 		t.Error("handler could not flush through the access log wrapper")
 	}
 }
+
+// TestAccessLogRecordsTheClientBehindATrustedProxy: "remote" stays the
+// transport peer, and "client" is the address ClientIP resolves, so a log
+// behind a reverse proxy still shows who made the request (#366).
+func TestAccessLogRecordsTheClientBehindATrustedProxy(t *testing.T) {
+	withTrustedProxies(t, "10.0.0.0/8")
+	handler := withAccessLog(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+
+	recs := captureLogs(t, func() {
+		req := httptest.NewRequest(http.MethodGet, "/v1/health", nil)
+		req.RemoteAddr = "10.0.0.7:5555"
+		req.Header.Set("X-Forwarded-For", "203.0.113.9")
+		handler.ServeHTTP(httptest.NewRecorder(), req)
+	})
+
+	if len(recs) != 1 {
+		t.Fatalf("expected one access log line, got %d", len(recs))
+	}
+	if recs[0]["remote"] != "10.0.0.7:5555" {
+		t.Errorf("remote = %v, want the proxy", recs[0]["remote"])
+	}
+	if recs[0]["client"] != "203.0.113.9" {
+		t.Errorf("client = %v, want the forwarded client", recs[0]["client"])
+	}
+}
+
+// TestAccessLogRecorderUnwraps: http.ResponseController reaches the real
+// writer through the recorder (deadlines, hijacking).
+func TestAccessLogRecorderUnwraps(t *testing.T) {
+	w := httptest.NewRecorder()
+	rec := &accessLogRecorder{ResponseWriter: w}
+	if rec.Unwrap() != w {
+		t.Error("Unwrap does not return the wrapped writer")
+	}
+}
