@@ -54,6 +54,27 @@ make test-shard SHARD=2                                       # single-file layo
 MDDB_STORAGE_LAYOUT=per-collection make test-shard SHARD=2    # per-collection layout
 ```
 
+### SonarCloud
+
+Pull requests and pushes to `main` are analysed by the SonarCloud scanner
+(OPS-021). The scan is the last job of the Tests workflow, so it can hand
+SonarCloud the coverage of the suites that run there: the Go server, CLI and
+client, the panel, the Node.js client, the Python client and the LangChain
+adapter. A change the Tests workflow does not run for (an integration with its
+own workflow, docs) is scanned by `.github/workflows/sonarcloud.yml` instead,
+never by both. Code tested only in its own workflow is listed in
+`sonar.coverage.exclusions` in `sonar-project.properties`, next to the
+workflow that enforces its coverage floor.
+
+`sonar-project.properties` (the scanner) and `.sonarcloud.properties`
+(Automatic Analysis, off; kept in case it is turned back on) must exclude the
+same files. Add an exclusion to both, with its reason, and check:
+
+```bash
+make check-sonar-exclusions   # the two lists are in step
+make test-sonar               # the scan helpers' own tests
+```
+
 ## Development Workflow
 
 1. **Fork** the repository

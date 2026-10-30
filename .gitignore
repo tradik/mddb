@@ -191,3 +191,9 @@ services/mddb-cli/snapbuild/
 # Tools built by scripts/build-deadcode.sh (default output ./bin); one was
 # committed by mistake with GO-021 (18cffbd).
 /bin/
+
+# Coverage reports the Tests workflow hands to the SonarCloud scan (OPS-021).
+clients/nodejs/lcov.info
+services/mddb-panel/coverage/
+.scannerwork/
+sonar-reports/

@@ -71,7 +71,7 @@ export default mergeConfig(
       coverage: {
         provider: 'v8',
         include: coverageFiles,
-        reporter: ['text', 'html', 'json-summary'],
+        reporter: ['text', 'html', 'json-summary', 'lcov'],
         thresholds: {
           perFile: true,
           lines: 97,

@@ -7,6 +7,7 @@
 [![Docker Pulls](https://img.shields.io/docker/pulls/tradik/mddb)](https://hub.docker.com/r/tradik/mddb)
 [![Tests](https://github.com/tradik/mddb/workflows/Tests/badge.svg)](https://github.com/tradik/mddb/actions)
 [![codecov](https://codecov.io/gh/tradik/mddb/branch/main/graph/badge.svg)](https://codecov.io/gh/tradik/mddb)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=tradik_mddb&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=tradik_mddb)
 
 **AI-native document database with built-in MCP server, file upload (PDF/DOCX/XLSX/PPTX/EPUB/EML/HTML/ODT/RTF/TEX/YAML/Wikipedia XML to Markdown), vector search, RAG pipelines, and 93 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
 

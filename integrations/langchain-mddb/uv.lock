@@ -1355,6 +1355,7 @@ requires-dist = [
     { name = "grpcio", specifier = ">=1.62" },
     { name = "protobuf", specifier = ">=4.25" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0" },
+    { name = "pytest-cov", marker = "extra == 'test'", specifier = ">=7.1" },
 ]
 provides-extras = ["test"]
 

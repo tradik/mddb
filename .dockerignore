@@ -36,6 +36,11 @@ LICENSE
 **/coverage-*.html
 **/coverage.out
 **/coverage/
+**/coverage.xml
+**/.coverage
+.scannerwork/
+sonar-reports/
+**/lcov.info
 
 # Go binaries built in place (`go build -o mddb` and friends) and the tools
 # scripts/build-deadcode.sh writes to ./bin — never part of an image's source.

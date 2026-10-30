@@ -1,12 +1,21 @@
-# SonarCloud through the sonar-scanner (OPS-021).
+# SonarCloud through the sonar-scanner (OPS-021) — for changes the Tests
+# workflow does not run for.
 #
-# Automatic Analysis ignores sonar.issue.ignore.* in sonar-project.properties,
-# so per-rule exceptions never applied. This job runs the scanner, which
-# honours them. It does nothing until the owner:
-#   1. adds the repository secret SONAR_TOKEN (SonarCloud → My Account →
-#      Security), and
-#   2. turns off Automatic Analysis in the SonarCloud project (Administration
-#      → Analysis Method) — both at once make the scanner fail.
+# The scan normally runs as the last job of .github/workflows/test.yml, which
+# has the coverage reports (Go, the panel and Node client's lcov, the Python
+# packages' coverage.xml). That workflow has a path filter, though: a change to
+# the WordPress plugin, an integration or the docs does not start it, and that
+# change still needs a scan and a quality gate. This workflow starts on every
+# push to main and every pull request, asks scripts/sonar-scan-owner.py whether
+# Tests will run for the same change, and scans only when it will not — so a
+# push is scanned once, never twice (a second scan would replace the first, and
+# whichever finished last would set the coverage on the pull request).
+#
+# The code such a change can touch is either not code (docs, YAML) or tested
+# in its own workflow with its own coverage floor; sonar-project.properties
+# lists the latter in sonar.coverage.exclusions with where each is enforced.
+#
+# Without SONAR_TOKEN (pull requests from forks) every step is skipped.
 name: SonarCloud
 
 on:
@@ -27,21 +36,52 @@ concurrency:
 
 jobs:
   scan:
-    name: SonarCloud scan
+    name: SonarCloud scan (outside the Tests workflow)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - name: Without SONAR_TOKEN, Automatic Analysis stays in use
+      - name: Without SONAR_TOKEN there is nothing to scan
         if: env.SONAR_TOKEN == ''
-        run: echo "SONAR_TOKEN is not set; nothing to do (OPS-021)."
+        run: echo "SONAR_TOKEN is not set (a pull request from a fork); skipping the scan (OPS-021)."
 
       - name: Checkout code
         if: env.SONAR_TOKEN != ''
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          fetch-depth: 0 # blame data for new-code detection
+          fetch-depth: 0 # blame data for new-code detection, and the diff below
+
+      # The same comparison GitHub makes for test.yml's path filter: the whole
+      # pull request (three dots), or the commits of the push. If the range
+      # cannot be read (a force push), scan here rather than not at all.
+      - name: Does the Tests workflow scan this change?
+        id: owner
+        if: env.SONAR_TOKEN != ''
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [[ "${EVENT}" == pull_request ]]; then
+            range="${BASE_SHA}...${HEAD_SHA}"; branch="${BASE_REF}"
+          else
+            range="${BEFORE}..${GITHUB_SHA}"; branch="${GITHUB_REF_NAME}"
+          fi
+          if files="$(git diff --name-only "${range}")"; then
+            owner="$(python3 scripts/sonar-scan-owner.py "${EVENT}" "${branch}" <<<"${files}")"
+          else
+            owner=sonarcloud
+          fi
+          echo "The scan for this change runs in: ${owner}"
+          echo "owner=${owner}" >>"${GITHUB_OUTPUT}"
+
+      - name: The two Sonar configurations exclude the same files
+        if: env.SONAR_TOKEN != '' && steps.owner.outputs.owner == 'sonarcloud'
+        run: python3 scripts/check-sonar-exclusions.py --print
 
       - name: Scan
-        if: env.SONAR_TOKEN != ''
+        if: env.SONAR_TOKEN != '' && steps.owner.outputs.owner == 'sonarcloud'
         uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0

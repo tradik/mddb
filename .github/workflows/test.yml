@@ -23,6 +23,9 @@ on:
       - 'scripts/check-coverage-areas.sh'
       - 'scripts/go-test-shard.py'
       - 'scripts/merge-coverprofiles.sh'
+      - 'scripts/sonar-*.py'
+      - 'scripts/check-sonar-exclusions.py'
+      - 'scripts/tests/test-sonar.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
       # These jobs exist in this workflow and were unreachable: the filter
@@ -55,6 +58,9 @@ on:
       - 'scripts/check-coverage-areas.sh'
       - 'scripts/go-test-shard.py'
       - 'scripts/merge-coverprofiles.sh'
+      - 'scripts/sonar-*.py'
+      - 'scripts/check-sonar-exclusions.py'
+      - 'scripts/tests/test-sonar.sh'
       - 'buf.gen.yaml'
       - '.github/workflows/test.yml'
       # These jobs exist in this workflow and were unreachable: the filter
@@ -128,7 +134,7 @@ jobs:
       # server's HTTP contract.
       - name: Test shared Go client
         working-directory: clients/go/mddb
-        run: go test -race ./...
+        run: go test -race -coverprofile=coverage.out ./...
 
       # #333: bbolt is vendored with a patch (third_party/bbolt/MDDB-PATCH.md).
       # Its own module, so the server's ./... does not reach it.
@@ -151,6 +157,18 @@ jobs:
           pct=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
           echo "mddb-cli coverage: ${pct}%"
           awk -v p="$pct" 'BEGIN { if (p+0 < 88) { print "coverage " p "% is below the 88% floor"; exit 1 } }'
+
+      # For the SonarCloud scan at the end of this workflow (OPS-021). The
+      # sonar- prefix keeps these out of the coverage job's coverage-* merge:
+      # they are other modules, and the merge refuses mixed profiles.
+      - name: Keep the CLI and client coverage for the scan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sonar-go-modules
+          path: |
+            services/mddb-cli/coverage.out
+            clients/go/mddb/coverage.out
+          retention-days: 1
 
       # TEST-003: every saved crasher is replayed on every run — that is what
       # `go test` does with testdata/fuzz corpora, so a bug found once can
@@ -182,6 +200,11 @@ jobs:
 
       - name: Run test-shard and coverage-merge guard test suite
         run: bash scripts/tests/test-test-shards.sh
+
+      # OPS-021: the scan's helpers — the exclusion lists of the two Sonar
+      # configurations, the report path rewrite, and which workflow scans.
+      - name: Run SonarCloud configuration guard test suite
+        run: bash scripts/tests/test-sonar.sh
 
       # OPS-018: a tag is a mutable pointer. tj-actions/changed-files had every
       # one of its tags repointed at a secret-dumping commit in March 2025, and
@@ -303,6 +326,13 @@ jobs:
           files: ./services/mddbd/coverage.out
           flags: unittests
           name: codecov-umbrella
+
+      - name: Keep the merged profile for the scan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sonar-go-mddbd
+          path: services/mddbd/coverage.out
+          retention-days: 1
 
   # WIN-004: the gate for the native Windows port. Until this job existed,
   # everything known about MDDB on Windows came from `GOOS=windows go vet` on a
@@ -585,9 +615,17 @@ jobs:
       # TEST-001: the package had no tests and no importable client — `main`
       # pointed at example.js, so requiring it ran a demo against localhost.
       # These start a gRPC server in-process; no MDDB instance is needed.
+      # test:coverage is `npm test` plus an lcov report; no threshold.
       - name: Run client tests
         working-directory: clients/nodejs
-        run: npm test
+        run: npm run test:coverage
+
+      - name: Keep the coverage for the scan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sonar-lcov-nodejs
+          path: clients/nodejs/lcov.info
+          retention-days: 1
 
   clients-python:
     name: Python client
@@ -643,9 +681,17 @@ jobs:
         working-directory: clients/python
         run: uv run --no-sync python -c "from mddb_client import MddbClient, mddb_pb2; print(MddbClient)"
 
+      # --cov reports and enforces nothing (no --cov-fail-under).
       - name: Run client tests
         working-directory: clients/python
-        run: uv run --no-sync pytest -q
+        run: uv run --no-sync pytest -q --cov=mddb_client --cov-report=xml:coverage.xml
+
+      - name: Keep the coverage for the scan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sonar-cobertura-python
+          path: clients/python/coverage.xml
+          retention-days: 1
 
   panel:
     name: Panel (build + tests)
@@ -673,9 +719,18 @@ jobs:
         working-directory: services/mddb-panel
         run: npm run lint
 
+      # vitest.config.js writes coverage/lcov.info next to its 97% per-file
+      # floors.
       - name: Test
         working-directory: services/mddb-panel
         run: npm test
+
+      - name: Keep the coverage for the scan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sonar-lcov-panel
+          path: services/mddb-panel/coverage/lcov.info
+          retention-days: 1
 
       # A panel that does not build is a release with no UI, and nothing was
       # checking it.
@@ -713,7 +768,14 @@ jobs:
 
       - name: Run tests
         working-directory: integrations/langchain-mddb
-        run: uv run --no-sync pytest -q
+        run: uv run --no-sync pytest -q --cov=langchain_mddb --cov-report=xml:coverage.xml
+
+      - name: Keep the coverage for the scan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: sonar-cobertura-langchain
+          path: integrations/langchain-mddb/coverage.xml
+          retention-days: 1
 
   es-compat:
     name: Elasticsearch client compatibility
@@ -884,3 +946,73 @@ jobs:
               exit 1
             }
           }'
+
+  # OPS-021: SonarCloud, through the scanner, with the coverage of every suite
+  # above. It runs here rather than in its own workflow because the reports
+  # exist only here; .github/workflows/sonarcloud.yml scans the changes this
+  # workflow's path filter does not start for, and stands down for the rest
+  # (scripts/sonar-scan-owner.py), so a push is scanned once.
+  #
+  # It waits for the jobs that write coverage. If one of them fails the scan
+  # is skipped: the pull request is red already, and a scan with a report
+  # missing would post a coverage figure that is wrong.
+  #
+  # Without SONAR_TOKEN (pull requests from forks) every step is skipped.
+  sonarcloud:
+    name: SonarCloud scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [test, coverage, clients-nodejs, clients-python, panel, langchain-adapter]
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Without SONAR_TOKEN there is nothing to scan
+        if: env.SONAR_TOKEN == ''
+        run: echo "SONAR_TOKEN is not set (a pull request from a fork); skipping the scan (OPS-021)."
+
+      - name: Checkout code
+        if: env.SONAR_TOKEN != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0 # blame data for new-code detection
+
+      - name: The two Sonar configurations exclude the same files
+        if: env.SONAR_TOKEN != ''
+        run: python3 scripts/check-sonar-exclusions.py --print
+
+      - name: Fetch the coverage reports
+        if: env.SONAR_TOKEN != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: sonar-*
+          path: ${{ runner.temp }}/sonar-in
+
+      # Every file path made absolute in this checkout — see the script for
+      # what each tool writes. A missing report fails the step.
+      - name: Point the reports at this checkout
+        if: env.SONAR_TOKEN != ''
+        run: |
+          in="${RUNNER_TEMP}/sonar-in"
+          REPORTS="${RUNNER_TEMP}/sonar-reports"
+          fix="python3 scripts/sonar-coverage-paths.py"
+          mkdir -p "${REPORTS}"
+          $fix go "$PWD" "${in}/sonar-go-mddbd/coverage.out" "${REPORTS}/go-mddbd.out"
+          $fix go "$PWD" "${in}/sonar-go-modules/services/mddb-cli/coverage.out" "${REPORTS}/go-cli.out"
+          $fix go "$PWD" "${in}/sonar-go-modules/clients/go/mddb/coverage.out" "${REPORTS}/go-client.out"
+          $fix lcov "$PWD" "${in}/sonar-lcov-panel/lcov.info" "${REPORTS}/panel.lcov" services/mddb-panel
+          $fix lcov "$PWD" "${in}/sonar-lcov-nodejs/lcov.info" "${REPORTS}/nodejs.lcov" clients/nodejs
+          $fix cobertura "$PWD" "${in}/sonar-cobertura-python/coverage.xml" "${REPORTS}/python.xml" clients/python
+          $fix cobertura "$PWD" "${in}/sonar-cobertura-langchain/coverage.xml" "${REPORTS}/langchain.xml" integrations/langchain-mddb
+
+      - name: Scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        with:
+          args: >
+            -Dsonar.go.coverage.reportPaths=${{ runner.temp }}/sonar-reports/go-mddbd.out,${{ runner.temp }}/sonar-reports/go-cli.out,${{ runner.temp }}/sonar-reports/go-client.out
+            -Dsonar.javascript.lcov.reportPaths=${{ runner.temp }}/sonar-reports/panel.lcov,${{ runner.temp }}/sonar-reports/nodejs.lcov
+            -Dsonar.python.coverage.reportPaths=${{ runner.temp }}/sonar-reports/python.xml,${{ runner.temp }}/sonar-reports/langchain.xml
