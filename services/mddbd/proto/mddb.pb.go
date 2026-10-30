@@ -13914,11 +13914,12 @@ type IndexingStatusResponse struct {
 	FailedEmbeddings    uint64                 `protobuf:"varint,3,opt,name=failed_embeddings,json=failedEmbeddings,proto3" json:"failed_embeddings,omitempty"`
 	CompletedEmbeddings uint64                 `protobuf:"varint,4,opt,name=completed_embeddings,json=completedEmbeddings,proto3" json:"completed_embeddings,omitempty"`
 	PendingMetadata     int32                  `protobuf:"varint,5,opt,name=pending_metadata,json=pendingMetadata,proto3" json:"pending_metadata,omitempty"`
-	Progress            float64                `protobuf:"fixed64,6,opt,name=progress,proto3" json:"progress,omitempty"`                                       // completed / (completed + pending); 1 when nothing is pending
-	OldestPendingAt     int64                  `protobuf:"varint,7,opt,name=oldest_pending_at,json=oldestPendingAt,proto3" json:"oldest_pending_at,omitempty"` // unix seconds; 0 when nothing is pending
-	Provider            string                 `protobuf:"bytes,8,opt,name=provider,proto3" json:"provider,omitempty"`                                         // embedding model; empty when none
-	Indexed             bool                   `protobuf:"varint,9,opt,name=indexed,proto3" json:"indexed,omitempty"`                                          // nothing pending
-	Images              *ImageIndexingStatus   `protobuf:"bytes,10,opt,name=images,proto3" json:"images,omitempty"`                                            // (v2.18.9, RAG-010) unset when the collection holds no images
+	Progress            float64                `protobuf:"fixed64,6,opt,name=progress,proto3" json:"progress,omitempty"`                                                 // completed / (completed + pending); 1 when nothing is pending
+	OldestPendingAt     int64                  `protobuf:"varint,7,opt,name=oldest_pending_at,json=oldestPendingAt,proto3" json:"oldest_pending_at,omitempty"`           // unix seconds; 0 when nothing is pending
+	Provider            string                 `protobuf:"bytes,8,opt,name=provider,proto3" json:"provider,omitempty"`                                                   // embedding model; empty when none
+	Indexed             bool                   `protobuf:"varint,9,opt,name=indexed,proto3" json:"indexed,omitempty"`                                                    // nothing pending
+	Images              *ImageIndexingStatus   `protobuf:"bytes,10,opt,name=images,proto3" json:"images,omitempty"`                                                      // (v2.18.9, RAG-010) unset when the collection holds no images
+	TrainingCollections []string               `protobuf:"bytes,11,rep,name=training_collections,json=trainingCollections,proto3" json:"training_collections,omitempty"` // (v2.18.10, GO-047) collections whose ivf/pq/opq/sq/sq4 are still training; flat and hnsw already answer
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -14019,6 +14020,13 @@ func (x *IndexingStatusResponse) GetIndexed() bool {
 func (x *IndexingStatusResponse) GetImages() *ImageIndexingStatus {
 	if x != nil {
 		return x.Images
+	}
+	return nil
+}
+
+func (x *IndexingStatusResponse) GetTrainingCollections() []string {
+	if x != nil {
+		return x.TrainingCollections
 	}
 	return nil
 }
@@ -17617,7 +17625,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x15IndexingStatusRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
-	"collection\"\xa3\x03\n" +
+	"collection\"\xd6\x03\n" +
 	"\x16IndexingStatusResponse\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
@@ -17631,7 +17639,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\bprovider\x18\b \x01(\tR\bprovider\x12\x18\n" +
 	"\aindexed\x18\t \x01(\bR\aindexed\x121\n" +
 	"\x06images\x18\n" +
-	" \x01(\v2\x19.mddb.ImageIndexingStatusR\x06images\"y\n" +
+	" \x01(\v2\x19.mddb.ImageIndexingStatusR\x06images\x121\n" +
+	"\x14training_collections\x18\v \x03(\tR\x13trainingCollections\"y\n" +
 	"\x13ImageIndexingStatus\x12\x1c\n" +
 	"\tdocuments\x18\x01 \x01(\x05R\tdocuments\x12\x1a\n" +
 	"\bembedded\x18\x02 \x01(\x05R\bembedded\x12\x14\n" +

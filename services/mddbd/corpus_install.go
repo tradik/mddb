@@ -197,7 +197,9 @@ func (s *Server) collectionHasData(name string) bool {
 func (s *Server) loadInstalledCorpus(name string, vectorsDisabled bool) {
 	if !vectorsDisabled && s.VectorIndex != nil && s.VectorStore != nil {
 		if counts, err := s.VectorStore.CountByCollection(); err == nil && counts[name] > 0 {
-			s.loadCollectionVectors(name, newVectorLoadState(map[string]int{name: counts[name]}))
+			if vectors, loaded := s.loadCollectionVectors(name, newVectorLoadState(map[string]int{name: counts[name]})); loaded {
+				s.trainCollection(name, vectors)
+			}
 		}
 	}
 	if s.GeoStore != nil && s.GeoIndex != nil && s.GeoHashIndex != nil {

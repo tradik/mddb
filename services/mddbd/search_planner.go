@@ -98,6 +98,9 @@ type PlanInput struct {
 	SearchTopK int             // topK × oversample (SRCH-005)
 	// LatencyTargetMs is the request's optional latency goal; 0 = none.
 	LatencyTargetMs int
+	// Training lists the trainable indexes still training the collection
+	// (GO-047); none of them is in Built.
+	Training []string
 }
 
 // bytes is the collection's footprint at float32.

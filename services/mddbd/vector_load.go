@@ -161,10 +161,17 @@ var errUnknownAlgorithm = errors.New("unknown algorithm")
 
 type vectorLoadingError struct {
 	Collection string
-	Progress   *vectorLoadProgress
+	// Algorithm is set when the vectors are in but this trainable index has
+	// not trained the collection yet (GO-047).
+	Algorithm string
+	Progress  *vectorLoadProgress
 }
 
 func (e *vectorLoadingError) Error() string {
+	if e.Algorithm != "" {
+		return fmt.Sprintf("the %s index for collection %q is still training, please retry; flat and hnsw answer now",
+			e.Algorithm, e.Collection)
+	}
 	if e.Progress == nil {
 		return fmt.Sprintf("the vector index for collection %q is loading, please retry", e.Collection)
 	}
@@ -172,8 +179,12 @@ func (e *vectorLoadingError) Error() string {
 		e.Collection, e.Progress.Percent, max(e.Progress.EtaSeconds, 0))
 }
 
-// vectorCollectionReady reports whether searcher can answer for collection.
+// vectorCollectionReady reports whether searcher can answer for collection:
+// its vectors are in and, for a trainable index, it has trained it (GO-047).
 func (s *Server) vectorCollectionReady(collection string, searcher vec.VectorSearcher) bool {
+	if s.vectorTraining(collection, searcher) {
+		return false
+	}
 	if searcher.IsReady() {
 		return true
 	}
@@ -183,9 +194,11 @@ func (s *Server) vectorCollectionReady(collection string, searcher vec.VectorSea
 	return false
 }
 
-// readySearcher is the searcher for algo, or flat when algo's index is not
-// ready for the collection, or why neither can answer. Every vector search
-// path asks it; there were five copies of this choice.
+// readySearcher is the searcher for algo, or flat when algo's index is still
+// loading the collection, or why neither can answer. An index still training
+// the collection is refused rather than replaced (GO-047): the caller named
+// it, and flat is no stand-in for what it asked. Every vector search path
+// asks it; there were five copies of this choice.
 func (s *Server) readySearcher(collection, algo string) (vec.VectorSearcher, string, error) {
 	searcher, ok := s.VectorSearchers[algo]
 	if !ok {
@@ -193,6 +206,9 @@ func (s *Server) readySearcher(collection, algo string) (vec.VectorSearcher, str
 	}
 	if s.vectorCollectionReady(collection, searcher) {
 		return searcher, algo, nil
+	}
+	if s.vectorTraining(collection, searcher) {
+		return nil, algo, &vectorLoadingError{Collection: collection, Algorithm: algo}
 	}
 	if flat, ok := s.VectorSearchers["flat"]; ok && s.vectorCollectionReady(collection, flat) {
 		return flat, "flat", nil
@@ -221,6 +237,7 @@ func (s *Server) writeVectorUnavailable(w http.ResponseWriter, err error, availa
 	w.WriteHeader(http.StatusServiceUnavailable)
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"error": loading.Error(), "collection": loading.Collection, "progress": loading.Progress,
+		"training": loading.Algorithm != "",
 	})
 }
 

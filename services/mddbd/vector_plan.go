@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	vec "mddb/internal/vector"
 )
@@ -100,7 +101,11 @@ func (s *Server) planSearch(r planRequest) (plannedSearch, error) {
 		return plannedSearch{Searcher: searcher, Algorithm: ran, Plan: explicitPlan(ran, requested, r.SearchTopK)}, nil
 	}
 
-	plan := planVector(s.planInput(r))
+	in := s.planInput(r)
+	plan := planVector(in)
+	if len(in.Training) > 0 { // GO-047
+		plan.reason("%s: training for this collection; not a candidate until it ends", strings.Join(in.Training, ", "))
+	}
 	searcher, ran, err := s.readySearcher(r.Collection, plan.Algorithm)
 	if err != nil {
 		return plannedSearch{}, err
@@ -118,6 +123,7 @@ func (s *Server) planInput(r planRequest) PlanInput {
 	in := PlanInput{
 		Filtered: r.Filtered, Allowed: len(r.Allowed), SearchTopK: r.SearchTopK,
 		Dimensions: r.Dimensions, LatencyTargetMs: r.LatencyTargetMs, Built: map[string]bool{},
+		Training: s.trainingIndexes(r.Collection),
 	}
 	if flat, ok := s.VectorSearchers["flat"]; ok {
 		in.Vectors = flat.CollectionSize(r.Collection)
@@ -130,7 +136,7 @@ func (s *Server) planInput(r planRequest) PlanInput {
 		in.Dimensions = s.Embedding.Dimensions()
 	}
 	for name, searcher := range s.VectorSearchers {
-		if name != "quantized" && vec.Built(searcher, r.Collection) {
+		if name != "quantized" && vec.Built(searcher, r.Collection) && !s.vectorTraining(r.Collection, searcher) {
 			in.Built[name] = true
 		}
 	}

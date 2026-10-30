@@ -193,7 +193,7 @@ func TestCorpusPackFromAnotherModelSearchesFullTextOnly(t *testing.T) {
 				t.Fatalf("full-text half did not answer: %q", got)
 			}
 			// A restart skips them too.
-			if dst.loadCollectionVectors("docs", newVectorLoadState(map[string]int{"docs": 3})) {
+			if _, loaded := dst.loadCollectionVectors("docs", newVectorLoadState(map[string]int{"docs": 3})); loaded {
 				t.Fatal("the startup load loaded disabled vectors")
 			}
 		})

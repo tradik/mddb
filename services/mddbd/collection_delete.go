@@ -169,6 +169,9 @@ func (s *Server) dropCollectionVectors(collection string) {
 	if s.VectorIndex != nil {
 		s.VectorIndex.DropCollection(collection)
 	}
+	if t := s.vectorTrain.Load(); t != nil {
+		t.drop(collection) // GO-047: its queued vectors must not be trained back in
+	}
 	s.summaries().drop(collection)  // RAG-009; DeleteCollection removed the stored ones
 	s.imageIndex().drop(collection) // RAG-010; likewise
 }

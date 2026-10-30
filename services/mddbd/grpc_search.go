@@ -554,6 +554,7 @@ func (g *GRPCServer) GetIndexingStatus(ctx context.Context, req *proto.IndexingS
 		Provider:            st.Provider,
 		Indexed:             st.Indexed,
 		Images:              imageStatusToProto(st.Images), // RAG-010
+		TrainingCollections: st.TrainingCollections,        // GO-047
 	}
 	if st.OldestPendingAt != nil {
 		resp.OldestPendingAt = st.OldestPendingAt.Unix()

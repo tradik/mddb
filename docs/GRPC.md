@@ -197,6 +197,12 @@ corpus pack. Both are output only: `SetCollectionConfig` keeps them as
 stored. Every write to a read-only collection answers `PERMISSION_DENIED`;
 see [CORPUS-PACKS.md](CORPUS-PACKS.md).
 
+`IndexingStatusResponse.training_collections` (11) lists the collections
+whose IVF, PQ, OPQ, SQ and SQ4 indexes are still training after a load
+(GO-047), as `trainingCollections` does over REST. `VectorSearch` with one of
+those algorithms on such a collection answers `UNAVAILABLE` naming it; flat and
+HNSW answer already.
+
 ### New in v2.18.9
 
 The query planner (SRCH-013) is available over gRPC. `VectorSearch` and

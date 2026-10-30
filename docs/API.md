@@ -1021,6 +1021,13 @@ loaded (`current`) and `readyCollections`, the ones that already answer.
 `/health` carries the same block as `vectorIndex.progress`. A vector search
 on a collection that is not loaded yet answers `503` with `Retry-After`,
 the collection and the progress; other collections are searched normally.
+
+Since v2.18.10 a collection answers on flat, HNSW and BQ before IVF, PQ,
+OPQ, SQ and SQ4 have trained on it; they train in the background
+afterwards (GO-047). While they do, `indexTraining` lists `current`, the
+collection being trained, `pending`, every collection not trained yet in
+training order, and `indexes`, the ones that refuse those collections. Such a
+refusal is a `503` with `Retry-After` and `"training": true`.
 See [SEARCH.md](SEARCH.md#loading-the-index-at-startup).
 
 **cURL Example**:
@@ -1648,6 +1655,11 @@ curl "http://localhost:11023/v1/indexing-status?collection=notes"
 Since v2.18.9 a collection holding image documents also reports `images`:
 `documents`, `embedded` (with an image vector), the multimodal `model`, or a
 `note` saying why images are not embedded (RAG-010).
+
+Since v2.18.10 `trainingCollections` lists the collections whose IVF, PQ,
+OPQ, SQ and SQ4 indexes are still training after a start or a restore
+(GO-047). Flat and HNSW already answer for them. The field is absent when no
+collection is training.
 
 ```json
 {

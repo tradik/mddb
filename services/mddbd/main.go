@@ -156,6 +156,7 @@ type Server struct {
 	collMu          sync.Mutex                // #336: guards collFiles
 	collFiles       *collectionFiles          // #336: per-collection files, nil in the single-file layout
 	vectorLoad      vectorLoadRef             // #346: the vector index load in progress
+	vectorTrain     vectorTrainerRef          // GO-047: trains the trainable indexes behind the load
 	summaryOnce     sync.Once                 // RAG-009: builds summaryIdx on first use
 	summaryIdx      *summaryIndex             // RAG-009: the summary vectors, apart from every chunk index
 	imageOnce       sync.Once                 // RAG-010: builds imageIdx on first use

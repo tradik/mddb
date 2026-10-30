@@ -63,6 +63,10 @@ type IndexingStatus struct {
 	// Images reports image documents and their vectors (RAG-010); absent
 	// when there are none.
 	Images *ImageIndexingStatus `json:"images,omitempty"`
+	// TrainingCollections are the collections whose trainable indexes (ivf,
+	// pq, opq, sq, sq4) are still training after a load (GO-047): flat and
+	// hnsw already answer for them. Absent when none are.
+	TrainingCollections []string `json:"trainingCollections,omitempty"`
 }
 
 // IndexWait is the read-your-writes part of a search request.
@@ -144,6 +148,7 @@ func (s *Server) IndexingStatus(collection string) IndexingStatus {
 		st.Provider = s.Embedding.Model()
 	}
 	st.Images = s.imageStatus(collection)
+	st.TrainingCollections = s.trainingCollections(collection)
 	return st
 }
 

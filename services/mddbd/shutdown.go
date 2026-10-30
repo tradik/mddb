@@ -107,6 +107,12 @@ func (s *Server) shutdownSteps() []shutdownStep {
 		}
 	})
 
+	// 7. The background training of the trainable indexes (GO-047). It holds
+	//    no durable state, so it goes last: a long training must not cost
+	//    the steps above their deadline. Cancelled, it stops after the
+	//    collection it is training and starts no other.
+	add("vector-training", s.vectorTrain.Load() != nil, func() { s.vectorTrain.Load().stop() })
+
 	return steps
 }
 

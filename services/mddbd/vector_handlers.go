@@ -131,13 +131,19 @@ func (s *Server) loadVectorIndex() {
 	s.vectorLoad.Store(load)
 	defer load.finish()
 
+	// GO-047: the trainable indexes train behind the load, so a collection
+	// is searchable by flat and HNSW as soon as its vectors are in.
+	train := s.startVectorTraining(len(counts))
+	defer train.close()
+
 	totalLoaded := 0
 	s.summaries().reset()  // RAG-009: reloaded per collection below
 	s.imageIndex().reset() // RAG-010: likewise
 	for _, collection := range load.order() {
 		load.begin(collection)
-		if s.loadCollectionVectors(collection, load) {
+		if vectors, loaded := s.loadCollectionVectors(collection, load); loaded {
 			totalLoaded += counts[collection]
+			train.enqueue(collection, vectors) // before it is searchable: ivf must not answer untrained
 		}
 		load.finishCollection(collection) // searchable, with what it has
 	}
@@ -152,20 +158,22 @@ func (s *Server) loadVectorIndex() {
 }
 
 // loadCollectionVectors puts one collection's stored vectors into every
-// in-memory index and trains the trainable ones; it reports whether it
-// loaded them. The startup load runs it per collection, and installing a
-// corpus pack (AGT-005) for the collection installed. A collection whose
-// vectors are disabled — a pack embedded by another model — is skipped.
-func (s *Server) loadCollectionVectors(collection string, load *vectorLoadState) bool {
+// in-memory index; it returns the vectors the trainable indexes are to be
+// trained on (nil for a disk-only collection) and whether it loaded them.
+// The startup load runs it per collection and trains in the background
+// (GO-047); installing a corpus pack (AGT-005) runs it for the collection
+// installed and trains at once. A collection whose vectors are disabled — a
+// pack embedded by another model — is skipped.
+func (s *Server) loadCollectionVectors(collection string, load *vectorLoadState) (map[string][]float32, bool) {
 	if s.collectionVectorsDisabled(collection) {
 		slog.Warn("not loading the vectors of a corpus pack made with another embedding model; its hybrid search uses full text only",
 			"collection", collection)
-		return false
+		return nil, false
 	}
 	records, err := s.VectorStore.LoadCollection(collection)
 	if err != nil {
 		slog.Error("failed to load vectors for collection", "collection", collection, "err", err)
-		return false
+		return nil, false
 	}
 
 	// Collect vectors for trainable indexes
@@ -204,15 +212,8 @@ func (s *Server) loadCollectionVectors(collection string, load *vectorLoadState)
 	s.loadSummaryVectors(collection, diskOnly) // RAG-009
 	s.loadImageVectors(collection, diskOnly)   // RAG-010
 
-	// Trigger training for trainable indexes (IVF, PQ)
-	for _, searcher := range s.VectorSearchers {
-		if trainer, ok := searcher.(vec.Trainable); ok {
-			vec.TrainSafely(trainer, collection, collVecs)
-		}
-	}
-
 	load.add(sinceReport)
-	return true
+	return collVecs, true
 }
 
 // handleVectorSearch handles POST /v1/vector-search
@@ -651,6 +652,10 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 		if p := l.progress(); p != nil {
 			resp["indexProgress"] = p
 		}
+	}
+	// GO-047: the collections the trainable indexes have not trained yet.
+	if t := s.vectorTrainingStatus(); t != nil {
+		resp["indexTraining"] = t
 	}
 
 	// Chunk configuration

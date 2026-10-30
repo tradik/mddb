@@ -7010,6 +7010,10 @@ components:
         provider: { type: string, description: Embedding model; absent when none is configured. }
         indexed: { type: boolean, description: Nothing pending — a search sees every document written so far. }
         images: { $ref: '#/components/schemas/ImageIndexingStatus' }
+        trainingCollections:
+          type: array
+          items: { type: string }
+          description: '(v2.18.10+, GO-047) Collections whose trainable indexes (ivf, pq, opq, sq, sq4) are still training after a load; flat and hnsw already answer for them. Absent when none are.'
     IndexWaitResult:
       type: object
       properties:
@@ -8589,6 +8593,13 @@ components:
             etaSeconds: {type: integer, description: "-1 until it can be estimated"}
             current: {type: string, description: Collection being loaded}
             readyCollections: {type: array, items: {type: string}, description: Collections that already answer}
+        indexTraining:
+          type: object
+          description: (v2.18.10+, GO-047) Present while the trainable indexes are training after a load. A collection is searchable with flat and hnsw once its vectors are in; the indexes listed refuse it with 503 until it is trained, and algorithm auto does not pick them.
+          properties:
+            current: {type: string, description: Collection being trained now}
+            pending: {type: array, items: {type: string}, description: Collections not trained yet, current included, in training order}
+            indexes: {type: array, items: {type: string}, description: 'Indexes that wait for the training (ivf, opq, pq, sq, sq4)'}
         collections:
           type: object
           additionalProperties:

@@ -1886,6 +1886,7 @@ message IndexingStatusResponse {
   string provider = 8;                // embedding model; empty when none
   bool indexed = 9;                   // nothing pending
   ImageIndexingStatus images = 10;    // (v2.18.9, RAG-010) unset when the collection holds no images
+  repeated string training_collections = 11; // (v2.18.10, GO-047) collections whose ivf/pq/opq/sq/sq4 are still training; flat and hnsw already answer
 }
 
 // Image documents and their vectors (v2.18.9, RAG-010).

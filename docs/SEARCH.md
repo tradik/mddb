@@ -645,6 +645,22 @@ hybrid search answers from full text alone. The progress is on
 `/v1/vector-stats` (`indexProgress`) and `/health` (`vectorIndex`), and in the
 log every minute.
 
+Since v2.18.10 the training does not hold a collection back (GO-047). Before,
+a collection became searchable only after IVF, PQ and OPQ had trained on it,
+so flat and HNSW, which never use that training, waited too: 937 vectors of
+768 dimensions answered "loading 0%" for over a minute, and every later
+collection waited for the training of the ones before it. Now a collection
+answers on `flat`, `hnsw` and `bq` as soon as its vectors are in. One
+background goroutine then trains the collections in load order. Until it has
+trained a collection, `ivf`, `pq`, `opq`, `sq` and `sq4` refuse it: a search
+naming one of them answers `503` with `Retry-After` and
+`"training": true`, naming the index and the collection. `auto` never picks one
+of them meanwhile, and `explain` says so (`ivf: training for this
+collection`). `/v1/vector-stats` shows the queue as `indexTraining`
+(`current`, `pending`, `indexes`), and `/v1/indexing-status` as
+`trainingCollections`. On shutdown the training stops after the collection it
+is on. Disk-only collections have nothing to train and are not queued.
+
 Vector search embeds the query text into a high-dimensional vector and finds documents with the most similar embeddings using cosine similarity. Similarity computation is hardware-accelerated on ARM64 via NEON (all ARM64) and SME (Apple M4+) SIMD instructions, with automatic runtime detection and fallback to scalar Go on other platforms. Search is parallelized across multiple goroutines for collections above 2048 vectors (~2.5x speedup on 50K collections).
 
 ### Flat (default)
@@ -869,7 +885,8 @@ collection the filter admits, and the request:
 - **Nothing is built on the query path.** IVF, PQ, OPQ, SQ and SQ4 must be
   trained first. If the index the table names is not trained yet, the planner
   takes the best index that is: `hnsw`, then a trained `ivf`, and finally
-  `flat`. The reason says so.
+  `flat`. The reason says so. An index still training after a restart is not
+  a candidate either, and the plan says `ivf: training` (v2.18.10).
 - **The prefilter costs what the filter admits (v2.18.9).** It looks up the
   admitted documents' vectors and scores those alone. Until v2.18.9 it walked
   the whole collection and dropped what the filter refused, so a 2% filter on
