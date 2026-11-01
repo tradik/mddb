@@ -5,11 +5,11 @@ go 1.27
 toolchain go1.27.3
 
 require (
-	github.com/99designs/gqlgen v0.17.97
+	github.com/99designs/gqlgen v0.17.98
 	github.com/agnivade/levenshtein v1.2.2
 	github.com/bits-and-blooms/bloom/v3 v3.7.1
 	github.com/blevesearch/snowballstem v0.9.0
-	github.com/goccy/go-json v0.11.2
+	github.com/goccy/go-json v0.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang/snappy v1.0.0
 	github.com/klauspost/compress v1.20.3
@@ -18,13 +18,13 @@ require (
 	github.com/quic-go/quic-go v0.64.1
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/tidwall/rtree v1.11.1
-	github.com/vektah/gqlparser/v2 v2.5.63
+	github.com/vektah/gqlparser/v2 v2.5.64
 	go.etcd.io/bbolt v1.5.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/text v0.43.0
-	google.golang.org/grpc v1.84.0
+	google.golang.org/grpc v1.85.0
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
 )
