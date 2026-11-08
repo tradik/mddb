@@ -486,7 +486,7 @@ jobs:
       - name: Set up buf
         # buf-action replaces the archived buf-setup-action, which targeted
         # Node.js 20; setup_only installs buf and runs nothing else.
-        uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7 # v1.6.0
+        uses: bufbuild/buf-action@37ac33d8960807670a6e9719080e885197b09cc6 # v1.7.0
         with:
           version: "1.72.0"
           setup_only: true
@@ -655,7 +655,7 @@ jobs:
       - name: Set up buf
         # buf-action replaces the archived buf-setup-action, which targeted
         # Node.js 20; setup_only installs buf and runs nothing else.
-        uses: bufbuild/buf-action@85aebf73123b5c15fd5528aaecbf9129cddf7fa7 # v1.6.0
+        uses: bufbuild/buf-action@37ac33d8960807670a6e9719080e885197b09cc6 # v1.7.0
         with:
           version: "1.72.0"
           setup_only: true
@@ -677,7 +677,7 @@ jobs:
       # disagree. A CI job that resolves dependencies afresh on every run is
       # a job whose result depends on what PyPI published this morning.
       - name: Set up uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.12.4"
 
@@ -766,7 +766,7 @@ jobs:
       # Same reasoning as the Python client job: versions come from the
       # committed uv.lock rather than from whatever resolves today.
       - name: Set up uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.12.4"
 
@@ -813,7 +813,7 @@ jobs:
           python-version: '3.12'
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.12.4"
 
@@ -1023,7 +1023,7 @@ jobs:
 
       - name: Scan
         if: env.SONAR_TOKEN != ''
-        uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
         with:
           args: >
             -Dsonar.go.coverage.reportPaths=${{ runner.temp }}/sonar-reports/go-mddbd.out,${{ runner.temp }}/sonar-reports/go-cli.out,${{ runner.temp }}/sonar-reports/go-client.out
