@@ -45,7 +45,7 @@ environment: `MDDB_CHAT_LLM_API_KEY`, `MDDB_CHAT_WEBHOOK_SECRET`,
 |-----|---------|---------|
 | `name` | required | Shown to the visitor. |
 | `system_prompt` | required | The operator's instruction; the collection's own prompt is appended after it. |
-| `allowed_collections` | `[]` | The collections this scenario searches. The first one is the default; an empty list means `[mddb] default_collection`. |
+| `allowed_collections` | `[]` | The collections this scenario's tools may search. The first one is the default; an empty list allows only `[mddb] default_collection`. The tool schema advertises exactly this set as an `enum`, and a call naming any other collection is refused with an error the model can read, and logged at `warn`. |
 | `temperature` | `[llm] temperature` | Sampling temperature for this scenario. |
 | `max_turns` | unlimited | User messages one session may send. |
 

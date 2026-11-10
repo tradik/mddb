@@ -349,8 +349,10 @@ async fn handle_message(
         });
     }
 
+    // #396: the tools see only what this scenario allows, and the schema says
+    // so, so a well-behaved model never asks for anything else.
     let tool_policy = tools::ToolPolicy::for_scenario(&state.config, &scenario_name);
-    let tool_defs = tools::tool_definitions();
+    let tool_defs = tools::tool_definitions(&tool_policy);
     let mut mddb_client = state.mddb_client.clone();
 
     // Accumulated across every round of this turn and charged to the session

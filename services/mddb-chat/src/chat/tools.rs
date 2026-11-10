@@ -1,4 +1,5 @@
-//! The tools the model may call, and the policy that bounds them.
+//! The tools the model may call: `search_docs` and `get_document`, bounded by
+//! the scenario's [`ToolPolicy`].
 
 use std::borrow::Cow;
 
@@ -6,8 +7,7 @@ use serde::Deserialize;
 use tracing::debug;
 
 use crate::chat::markdown::{clip, strip_markdown};
-use crate::chat::scenario;
-use crate::config::Config;
+pub use crate::chat::policy::ToolPolicy;
 use crate::error::AppError;
 use crate::grpc::client::SearchResult;
 use crate::llm::provider::{ToolCall, ToolDef, ToolFunction};
@@ -26,27 +26,8 @@ pub trait DocSearch {
     ) -> Result<Vec<SearchResult>, AppError>;
 }
 
-/// What one scenario lets its tools do.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ToolPolicy {
-    /// Searched when the model names no collection.
-    pub default_collection: String,
-    /// Characters of one search result; 0 means the whole chunk (#398).
-    pub result_max_chars: usize,
-}
-
-impl ToolPolicy {
-    /// The policy for a scenario.
-    pub fn for_scenario(config: &Config, scenario_name: &str) -> Self {
-        Self {
-            default_collection: scenario::get_collection(config, scenario_name),
-            result_max_chars: config.mddb.result_max_chars,
-        }
-    }
-}
-
-/// Define the tools available to the LLM.
-pub fn tool_definitions() -> Vec<ToolDef> {
+/// Define the tools available to the LLM for one scenario.
+pub fn tool_definitions(policy: &ToolPolicy) -> Vec<ToolDef> {
     let tool = |name: &str, description: &str, parameters: serde_json::Value| ToolDef {
         tool_type: "function".to_string(),
         function: ToolFunction {
@@ -66,11 +47,7 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                         "type": "string",
                         "description": "The search query to find relevant documentation"
                     },
-                    "collection": {
-                        "type": "string",
-                        "description": "The collection to search in (default: docs)",
-                        "default": "docs"
-                    }
+                    "collection": policy.collection_schema("The collection to search in"),
                 },
                 "required": ["query"]
             }),
@@ -85,11 +62,7 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                         "type": "string",
                         "description": "The document key (e.g. 'api', 'quickstart', 'grpc')"
                     },
-                    "collection": {
-                        "type": "string",
-                        "description": "The collection name (default: docs)",
-                        "default": "docs"
-                    }
+                    "collection": policy.collection_schema("The collection name"),
                 },
                 "required": ["key"]
             }),
@@ -126,19 +99,17 @@ pub async fn execute_tool<S: DocSearch>(
     match tool {
         "search_docs" => {
             let args: SearchArgs = parse_args(tool_call)?;
-            let collection = args
-                .collection
-                .as_deref()
-                .unwrap_or(&policy.default_collection);
-            search_docs(client, &args.query, collection, policy).await
+            match policy.resolve(tool, args.collection.as_deref()) {
+                Ok(collection) => search_docs(client, &args.query, collection, policy).await,
+                Err(refusal) => Ok(refusal),
+            }
         }
         "get_document" => {
             let args: GetDocArgs = parse_args(tool_call)?;
-            let collection = args
-                .collection
-                .as_deref()
-                .unwrap_or(&policy.default_collection);
-            get_document(client, &args.key, collection).await
+            match policy.resolve(tool, args.collection.as_deref()) {
+                Ok(collection) => get_document(client, &args.key, collection).await,
+                Err(refusal) => Ok(refusal),
+            }
         }
         other => Ok(format!("Unknown tool: {other}")),
     }
@@ -202,5 +173,7 @@ fn document_body(doc: &SearchResult) -> String {
     }
 }
 
+#[cfg(test)]
+mod document_tests;
 #[cfg(test)]
 mod tests;
