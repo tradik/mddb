@@ -55,6 +55,25 @@ const coverageFiles = [
   'src/components/ConfigPanel.jsx',
   // 2.18.11: run a sync or backup now, and its last result (#377).
   'src/components/CronRunNow.jsx',
+  // 2.18.11: the panel reaches the 2.18.2–2.18.11 features it lacked —
+  // upload through the server's frontmatter parser, a collection's sources,
+  // aliases, evaluation, storage, indexing status, async vector reindex,
+  // code symbols and image documents.
+  'src/lib/upload-files.js',
+  'src/lib/eval-format.js',
+  'src/lib/storage-format.js',
+  'src/lib/use-reindex-jobs.js',
+  'src/lib/code-symbol.js',
+  'src/lib/image-meta.js',
+  'src/components/UploadModal.jsx',
+  'src/components/CollectionSources.jsx',
+  'src/components/AliasesPanel.jsx',
+  'src/components/EvalPanel.jsx',
+  'src/components/StorageCard.jsx',
+  'src/components/IndexingStatusCard.jsx',
+  'src/components/ReindexJobsTable.jsx',
+  'src/components/CodeSymbolPanel.jsx',
+  'src/components/ImagePreview.jsx',
 ];
 
 export default mergeConfig(

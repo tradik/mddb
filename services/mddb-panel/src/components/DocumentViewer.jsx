@@ -10,6 +10,7 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useStore } from '../lib/store';
 import DocumentEditor from './DocumentEditor';
 import RevisionHistory from './RevisionHistory';
+import ImagePreview from './ImagePreview';
 
 // Error Boundary component
 class ErrorBoundary extends Component {
@@ -280,6 +281,9 @@ export default function DocumentViewer() {
         <h4 style={{ fontSize: '12px', fontWeight: '600', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
           Content
         </h4>
+
+        {/* 2.18.9: an image document shows its picture above its alt text */}
+        <ImagePreview collection={currentDocument.collection} docKey={currentDocument.key} lang={currentDocument.lang} meta={currentDocument.meta} />
 
         <div style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', border: '1px solid #e5e7eb', margin: '0', maxWidth: '100%', overflow: 'hidden' }}>
           <ErrorBoundary>

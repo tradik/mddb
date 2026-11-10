@@ -6,6 +6,8 @@ import GainCard from './GainCard';
 import CorpusPacksCard from './CorpusPacksCard';
 import DiagnoseCard from './DiagnoseCard';
 import ServerEdgeCard from './ServerEdgeCard';
+import IndexingStatusCard from './IndexingStatusCard';
+import StorageCard from './StorageCard';
 
 export default function SystemInfo() {
   const {
@@ -239,6 +241,12 @@ export default function SystemInfo() {
         </div>
 
         <GainCard />
+
+        {/* 2.18.8: is what was just written searchable yet? */}
+        <IndexingStatusCard />
+
+        {/* 2.18.2: where the bytes of the database file are */}
+        <StorageCard />
 
         <CorpusPacksCard />
 

@@ -697,16 +697,6 @@ class MDDBClient {
     return this.request('/vector-stats', { method: 'GET' });
   }
 
-  /**
-   * Reindex vectors for a collection
-   */
-  async reindexVectors(collection) {
-    return this.request('/vector-reindex', {
-      method: 'POST',
-      body: JSON.stringify({ collection }),
-    });
-  }
-
   // ---- User Management Methods ----
 
   /**
@@ -902,9 +892,13 @@ class MDDBClient {
   /**
    * List automation rules, optionally filtered by type
    */
-  async listAutomation(type) {
-    const params = type ? `?type=${encodeURIComponent(type)}` : '';
-    return this.request(`/automation${params}`, { method: 'GET' });
+  async listAutomation(type, { collection } = {}) {
+    const params = new URLSearchParams();
+    if (type) params.set('type', type);
+    // 2.18.11: the syncs writing to and triggers watching one collection.
+    if (collection) params.set('collection', collection);
+    const query = params.toString();
+    return this.request(`/automation${query ? `?${query}` : ''}`, { method: 'GET' });
   }
 
   /**
@@ -1076,7 +1070,7 @@ class MDDBClient {
   /**
    * Upload files via multipart/form-data (supports md/txt/html/pdf/docx)
    */
-  async uploadFile({ files, collection, lang, key, signal }) {
+  async uploadFile({ files, collection, lang, key, extractImages = false, signal }) {
     const formData = new FormData();
     if (Array.isArray(files)) {
       files.forEach((f) => formData.append('files[]', f));
@@ -1086,6 +1080,7 @@ class MDDBClient {
     if (collection) formData.append('collection', collection);
     if (lang) formData.append('lang', lang);
     if (key) formData.append('key', key);
+    if (extractImages) formData.append('extractImages', 'true');
     return this.postForm('/upload', formData, { signal, errorPrefix: 'Upload Error' });
   }
 
@@ -1256,6 +1251,101 @@ class MDDBClient {
   /** Single rotation job status. */
   async getRotationJob(id) {
     return this.request(`/encryption/jobs/${encodeURIComponent(id)}`, { method: 'GET' });
+  }
+
+  // ---- 2.18.2–2.18.10 server features the panel did not reach yet ----
+
+  /** Collection aliases (2.18.8, GO-044): `{ aliases: { alias: collection } }`. */
+  async listAliases() {
+    return this.request('/aliases', { method: 'GET' });
+  }
+
+  /** Point an alias at a collection; moving an existing alias is atomic. */
+  async setAlias(alias, collection) {
+    return this.request(`/aliases/${encodeURIComponent(alias)}`, {
+      method: 'PUT',
+      body: JSON.stringify({ collection }),
+    });
+  }
+
+  /** Delete an alias; its collection stays. */
+  async deleteAlias(alias) {
+    return this.request(`/aliases/${encodeURIComponent(alias)}`, { method: 'DELETE' });
+  }
+
+  /** A collection's stored evaluation set (2.18.8, SRCH-019). */
+  async listEvalQueries(collection) {
+    return this.request(`/eval-queries?${new URLSearchParams({ collection })}`, { method: 'GET' });
+  }
+
+  /** Add or replace one evaluation query: { collection, id, query, expectedKeys, grades }. */
+  async saveEvalQuery(query) {
+    return this.request('/eval-queries', { method: 'POST', body: JSON.stringify(query) });
+  }
+
+  /** Remove one evaluation query by id. */
+  async deleteEvalQuery(collection, id) {
+    return this.request(`/eval-queries?${new URLSearchParams({ collection, id })}`, { method: 'DELETE' });
+  }
+
+  /** Run the evaluation set under up to 8 search configurations. */
+  async runEval({ collection, k, configs, details = false, signal }) {
+    const body = { collection };
+    if (k) body.k = k;
+    if (configs?.length) body.configs = configs;
+    if (details) body.details = true;
+    return this.request('/eval', { method: 'POST', body: JSON.stringify(body), signal });
+  }
+
+  /** Bytes per bucket and per collection (2.18.2); slow on a large file. */
+  async getStorage({ collection, signal } = {}) {
+    const query = collection ? `?${new URLSearchParams({ collection })}` : '';
+    return this.request(`/storage${query}`, { method: 'GET', signal });
+  }
+
+  /** Queued embedding and metadata work (2.18.8, GO-042). */
+  async getIndexingStatus(collection) {
+    const query = collection ? `?${new URLSearchParams({ collection })}` : '';
+    return this.request(`/indexing-status${query}`, { method: 'GET' });
+  }
+
+  /** Start a vector reindex as a background job (2.18.4): 202 with the job. */
+  async startVectorReindexJob({ collection, force = false }) {
+    return this.request('/vector-reindex', {
+      method: 'POST',
+      body: JSON.stringify({ collection, force, async: true }),
+    });
+  }
+
+  /** Recent vector reindex jobs, newest first (kept in memory, last 50). */
+  async listVectorReindexJobs() {
+    return this.request('/vector-reindex/jobs', { method: 'GET' });
+  }
+
+  /** One vector reindex job: status, done, percent, etaSeconds, result. */
+  async getVectorReindexJob(id) {
+    return this.request(`/vector-reindex/jobs/${encodeURIComponent(id)}`, { method: 'GET' });
+  }
+
+  /** Where a code symbol is defined, used, called and tested (2.18.8). */
+  async codeSymbol({ collection, name, include = [], limit, includeContent = false, signal }) {
+    const params = new URLSearchParams({ collection, name });
+    if (include.length) params.set('include', include.join(','));
+    if (limit) params.set('limit', String(limit));
+    if (includeContent) params.set('includeContent', 'true');
+    return this.request(`/symbol?${params}`, { method: 'GET', signal });
+  }
+
+  /** The extension → language table the server classifies source by. */
+  async codeLanguages() {
+    return this.request('/code-languages', { method: 'GET' });
+  }
+
+  /** An image document's bytes (2.18.9) as `{ blob, filename }`. */
+  async getImage({ collection, key, lang }) {
+    const params = new URLSearchParams({ collection, key });
+    if (lang) params.set('lang', lang);
+    return this.requestBlob(`/image?${params}`);
   }
 
   async spellDictionary(method, { collection, lang, words, frequency }) {

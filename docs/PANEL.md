@@ -119,6 +119,46 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   another one (the replaced search used to empty the abort slot as it
   settled).
 
+### Server features of 2.18.2–2.18.11 added in 2.18.11
+
+- **Collection Aliases** page: aliases and their collections, create or move
+  an alias (one atomic step), delete one (its collection stays). An alias
+  cannot take the name of a collection or point at another alias.
+- **Retrieval Evaluation** page: a collection's stored evaluation set
+  (`/v1/eval-queries`; expected keys, optional grades 0–3) and a run of it
+  (`POST /v1/eval`) under up to four presets, with *k* from 1 to 100. The
+  table shows recall@k, nDCG@k, MRR, p50/p99 latency and tokens, marks the
+  best nDCG, and gives each failed configuration's error. Cancel stops the run.
+- **Code Symbols** page: `GET /v1/symbol` for one name in one collection.
+  It lists definitions, references, callers, callees, tests and siblings as
+  path:line passages, with their text when asked, and says when a list was
+  cut. *Recognised languages* lists `GET /v1/code-languages`.
+- **Indexing status** (System page): queued embedding and metadata work for
+  the server or one collection, with a progress bar, image embedding, and the
+  collections whose index is still training. It refreshes every 5 s until
+  everything is indexed.
+- **Storage** (System page): `GET /v1/storage` on demand. The full breakdown
+  reads every key and can take minutes, so it has a Cancel button. It shows
+  the file size, the space a compaction gives back, bytes per collection by
+  category (content, metadata, full text, vectors, other), with a text
+  alternative, and bytes per bucket.
+- **Collection settings** list the syncs writing to and the triggers watching
+  the collection (`GET /v1/automation?collection=`), each sync or backup with
+  its last result and a Run now button.
+- **Vector reindex** runs as a background job (`async: true`, *Force
+  re-embed* optional). The row shows percent, documents done and time left,
+  then the final counts or the error. A second reindex of the same collection
+  says one is already running. *Recent reindex jobs* lists the last jobs
+  (the server keeps 50, in memory).
+- **Image documents** (`meta.kind: image`) show their picture from
+  `GET /v1/image`, with alt text, caption, page and parent.
+- **Upload** sends every file, Markdown included, to `/v1/upload`, so the
+  server reads frontmatter with the same parser as `/v1/ingest` and
+  `mddb-cli`: flow and block lists become lists. *Extract images* sends
+  `extractImages=true`. Accepted formats: md, markdown, txt, html, htm,
+  pdf, docx, odt, rtf, xlsx, ods, csv, tsv, pptx, odp, epub, eml, mbox,
+  yaml, yml, log, lex, tex, latex.
+
 ### Colours and contrast
 
 The panel's palette is Tailwind's gray, red, amber and green plus the

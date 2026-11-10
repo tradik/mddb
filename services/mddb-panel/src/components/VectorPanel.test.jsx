@@ -1,15 +1,21 @@
 // @vitest-environment jsdom
 // VectorPanel: the Vector Search page — loading, error with retry, the
 // disabled-provider screen, provider and totals, per-collection coverage and
-// its colours, the GO-047 training notice and badges, and Reindex with its
-// success/failure note that clears after five seconds.
+// its colours, the GO-047 training notice and badges, and Reindex as a
+// background job (2.18.4): start with or without force, poll its progress,
+// the outcome note, a 409 for a running job, and the recent-jobs table.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, act, within, waitFor } from '@testing-library/react';
 
-vi.mock('../lib/mddb-client', () => ({ default: { getVectorStats: vi.fn(), reindexVectors: vi.fn() } }));
+vi.mock('../lib/mddb-client', () => ({
+  default: {
+    getVectorStats: vi.fn(), startVectorReindexJob: vi.fn(), getVectorReindexJob: vi.fn(), listVectorReindexJobs: vi.fn(),
+  },
+}));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { default: VectorPanel } = await import('./VectorPanel');
+const { POLL_MS } = await import('../lib/use-reindex-jobs');
 
 const stats = {
   enabled: true,
@@ -50,7 +56,9 @@ async function renderWith(data = stats) {
 
 beforeEach(() => {
   vi.mocked(mddbClient.getVectorStats).mockReset();
-  vi.mocked(mddbClient.reindexVectors).mockReset();
+  vi.mocked(mddbClient.startVectorReindexJob).mockReset();
+  vi.mocked(mddbClient.getVectorReindexJob).mockReset();
+  vi.mocked(mddbClient.listVectorReindexJobs).mockReset().mockResolvedValue({ jobs: [] });
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(() => {
@@ -150,47 +158,95 @@ describe('VectorPanel', () => {
     expect(mddbClient.getVectorStats).toHaveBeenCalledTimes(2);
   });
 
-  test('Reindex reports the count, reloads, and the note clears after 5 s', async () => {
+  test('Reindex starts a job, polls it, reports the counts and reloads the stats', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await renderWith();
-    let finish;
-    vi.mocked(mddbClient.reindexVectors).mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    vi.mocked(mddbClient.startVectorReindexJob).mockResolvedValue({ jobId: 'j1', collection: 'notes', status: 'running', percent: 0, done: 0 });
+    fireEvent.click(screen.getByLabelText(/Force re-embed/));
     fireEvent.click(within(row('notes')).getByRole('button', { name: 'Reindex' }));
+    expect(mddbClient.startVectorReindexJob).toHaveBeenCalledWith({ collection: 'notes', force: true });
 
-    const busy = within(row('notes')).getByRole('button', { name: 'Reindexing...' });
-    expect(busy.disabled).toBe(true);
+    expect((await within(row('notes')).findByRole('status')).textContent).toBe('Reindexing… 0% (0 done)');
+    expect(within(row('notes')).getByRole('button', { name: 'Reindexing...' }).disabled).toBe(true);
     expect(within(row('blog')).getByRole('button', { name: 'Reindex' }).disabled).toBe(false);
-    expect(mddbClient.reindexVectors).toHaveBeenCalledWith('notes');
+
+    vi.mocked(mddbClient.getVectorReindexJob)
+      .mockResolvedValueOnce({ jobId: 'j1', status: 'running', percent: 41.3, done: 12, etaSeconds: 2280 })
+      .mockResolvedValueOnce({ jobId: 'j1', status: 'completed', done: 4, result: { total: 4, embedded: 3, skipped: 1 } });
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(within(row('notes')).getByRole('status').textContent).toBe('Reindexing… 41% (12 done, about 38 min left)');
+    expect(mddbClient.getVectorReindexJob).toHaveBeenCalledWith('j1');
 
     vi.mocked(mddbClient.getVectorStats).mockResolvedValue({
       ...stats,
       collections: { ...stats.collections, notes: { total_documents: 4, embedded_documents: 4 } },
     });
-    await act(async () => finish({ indexed: 3 }));
-    const note = await within(row('notes')).findByText('Reindexed 3 documents');
-    expect(note.className).toContain('text-green-600');
-    expect(valueOf('Coverage', row('notes'))).toBe('100.0%');
-    expect(within(row('notes')).getByRole('button', { name: 'Reindex' }).disabled).toBe(false);
+    vi.mocked(mddbClient.listVectorReindexJobs).mockResolvedValue({
+      jobs: [{ jobId: 'j1', collection: 'notes', force: true, status: 'completed', startedAt: '2026-11-10T10:00:00Z', result: { total: 4, embedded: 3, skipped: 1 } }],
+    });
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    const note = await within(row('notes')).findByText('Reindexed: 3 embedded, 1 unchanged of 4');
+    expect(note.className).toContain('text-green-700');
+    expect(within(row('notes')).queryByRole('status')).toBeNull();
+    expect(await screen.findByText('(force)')).toBeTruthy();
+    await waitFor(() => expect(valueOf('Coverage', row('notes'))).toBe('100.0%'));
     expect(mddbClient.getVectorStats).toHaveBeenCalledTimes(2);
-
-    await act(async () => vi.advanceTimersByTime(5000));
-    expect(within(row('notes')).queryByText('Reindexed 3 documents')).toBeNull();
+    // The stats reload quietly: no spinner replaces the page.
+    expect(screen.queryByText('Loading vector search stats...')).toBeNull();
   });
 
-  test('a failed Reindex shows the error in red and clears it after 5 s', async () => {
+  test('a 409 says a reindex is already running and follows that job', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await renderWith();
-    vi.mocked(mddbClient.reindexVectors).mockRejectedValue(new Error('provider unreachable'));
+    vi.mocked(mddbClient.startVectorReindexJob).mockRejectedValue(
+      Object.assign(new Error('API Error (409): running'), { status: 409, body: { jobId: 'j0', status: 'running', percent: 10, done: 1 } }),
+    );
     fireEvent.click(within(row('blog')).getByRole('button', { name: 'Reindex' }));
+    expect(mddbClient.startVectorReindexJob).toHaveBeenCalledWith({ collection: 'blog', force: false });
+    expect(await within(row('blog')).findByText('A reindex of blog is already running.')).toBeTruthy();
+    expect(within(row('blog')).getByRole('status').textContent).toBe('Reindexing… 10% (1 done)');
 
-    const note = await within(row('blog')).findByText('provider unreachable');
-    expect(note.className).toContain('text-red-600');
-    expect(mddbClient.getVectorStats).toHaveBeenCalledTimes(1);
+    vi.mocked(mddbClient.getVectorReindexJob).mockResolvedValue({ jobId: 'j0', status: 'failed', error: 'provider unreachable' });
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    const note = await within(row('blog')).findByText('Reindex failed: provider unreachable');
+    expect(note.className).toContain('text-red-700');
+  });
 
-    // shouldAdvanceTime lets a few real milliseconds through, so stop short of 5 s.
-    await act(async () => vi.advanceTimersByTime(4500));
-    expect(within(row('blog')).getByText('provider unreachable')).toBeTruthy();
-    await act(async () => vi.advanceTimersByTime(500));
-    expect(within(row('blog')).queryByText('provider unreachable')).toBeNull();
+  test('a 409 without a job body and other refusals only show the message', async () => {
+    await renderWith();
+    vi.mocked(mddbClient.startVectorReindexJob)
+      .mockRejectedValueOnce(Object.assign(new Error('busy'), { status: 409 }))
+      .mockRejectedValueOnce(new Error('API Error (403): forbidden'));
+    fireEvent.click(within(row('docs')).getByRole('button', { name: 'Reindex' }));
+    expect(await within(row('docs')).findByText('A reindex of docs is already running.')).toBeTruthy();
+    expect(within(row('docs')).queryByRole('status')).toBeNull();
+    fireEvent.click(within(row('docs')).getByRole('button', { name: 'Reindex' }));
+    expect(await within(row('docs')).findByText('API Error (403): forbidden')).toBeTruthy();
+  });
+
+  test('a job that answers finished at once, and a poll that fails', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    await renderWith();
+    vi.mocked(mddbClient.startVectorReindexJob)
+      .mockResolvedValueOnce({ jobId: 'j2', status: 'completed', done: 2 })
+      .mockResolvedValueOnce({ jobId: 'j3', status: 'running' });
+    fireEvent.click(within(row('blog')).getByRole('button', { name: 'Reindex' }));
+    expect(await within(row('blog')).findByText('Reindexed: 2 embedded of 2')).toBeTruthy();
+
+    vi.mocked(mddbClient.getVectorReindexJob).mockRejectedValue(new Error('API Error (404): no such job'));
+    fireEvent.click(within(row('notes')).getByRole('button', { name: 'Reindex' }));
+    await within(row('notes')).findByRole('status');
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(await within(row('notes')).findByText('Reindex failed: API Error (404): no such job')).toBeTruthy();
+  });
+
+  test('the recent jobs table reports a failure to list and refreshes', async () => {
+    vi.mocked(mddbClient.listVectorReindexJobs)
+      .mockRejectedValueOnce(new Error('API Error (403): forbidden'))
+      .mockResolvedValueOnce({});
+    await renderWith();
+    expect((await screen.findByRole('alert')).textContent).toBe('API Error (403): forbidden');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh reindex jobs' }));
+    expect(await screen.findByText('No reindex jobs since the server started.')).toBeTruthy();
   });
 });

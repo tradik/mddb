@@ -34,6 +34,9 @@ import AuditLogPanel from './components/AuditLogPanel';
 import WebhooksPanel from './components/WebhooksPanel';
 import SecurityDashboard from './components/SecurityDashboard';
 import EncryptionPanel from './components/EncryptionPanel';
+import AliasesPanel from './components/AliasesPanel';
+import EvalPanel from './components/EvalPanel';
+import CodeSymbolPanel from './components/CodeSymbolPanel';
 import ComplianceBanner from './components/ComplianceBanner';
 import SSEToast from './components/SSEToast';
 import { useSSE } from './lib/useSSE';
@@ -261,6 +264,21 @@ function App() {
           {viewMode === 'curation' && (
             <div className="flex-1 border-l border-gray-200">
               <CurationPanel />
+            </div>
+          )}
+          {viewMode === 'aliases' && (
+            <div className="flex-1 border-l border-gray-200">
+              <AliasesPanel />
+            </div>
+          )}
+          {viewMode === 'eval' && (
+            <div className="flex-1 border-l border-gray-200">
+              <EvalPanel />
+            </div>
+          )}
+          {viewMode === 'codeSymbols' && (
+            <div className="flex-1 border-l border-gray-200">
+              <CodeSymbolPanel />
             </div>
           )}
           {viewMode === 'automation' && (

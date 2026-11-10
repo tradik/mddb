@@ -2,20 +2,17 @@ import { useEffect, useState } from 'react';
 import { Database, RefreshCw, AlertCircle, CheckCircle, Zap } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import IndexTrainingNotice from './IndexTrainingNotice';
+import ReindexJobsTable from './ReindexJobsTable';
+import { useReindexJobs, describeJob } from '../lib/use-reindex-jobs';
 
 export default function VectorPanel() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [reindexing, setReindexing] = useState({});
-  const [reindexStatus, setReindexStatus] = useState({});
+  const [force, setForce] = useState(false);
 
-  useEffect(() => {
-    loadStats();
-  }, []);
-
-  const loadStats = async () => {
-    setLoading(true);
+  const loadStats = async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true);
     setError(null);
     try {
       const data = await mddbClient.getVectorStats();
@@ -28,41 +25,13 @@ export default function VectorPanel() {
     }
   };
 
-  const handleReindex = async (collection) => {
-    setReindexing(prev => ({ ...prev, [collection]: true }));
-    setReindexStatus(prev => ({ ...prev, [collection]: null }));
+  // 2.18.4: a reindex runs as a background job, polled until it stops; the
+  // stats reload quietly when it does.
+  const reindex = useReindexJobs(() => loadStats({ quiet: true }));
 
-    try {
-      const result = await mddbClient.reindexVectors(collection);
-      setReindexStatus(prev => ({
-        ...prev,
-        [collection]: {
-          success: true,
-          message: `Reindexed ${result.indexed} documents`,
-        },
-      }));
-      // Reload stats after reindex
-      await loadStats();
-    } catch (err) {
-      setReindexStatus(prev => ({
-        ...prev,
-        [collection]: {
-          success: false,
-          message: err.message,
-        },
-      }));
-    } finally {
-      setReindexing(prev => ({ ...prev, [collection]: false }));
-      // Clear status after 5 seconds
-      setTimeout(() => {
-        setReindexStatus(prev => {
-          const newStatus = { ...prev };
-          delete newStatus[collection];
-          return newStatus;
-        });
-      }, 5000);
-    }
-  };
+  useEffect(() => {
+    loadStats();
+  }, []);
 
   if (loading) {
     return (
@@ -83,7 +52,7 @@ export default function VectorPanel() {
           <p className="text-red-600 mb-2">Error loading vector stats</p>
           <p className="text-sm text-gray-500 mb-4">{error}</p>
           <button
-            onClick={loadStats}
+            onClick={() => loadStats()}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Retry
@@ -166,7 +135,7 @@ export default function VectorPanel() {
             <p className="text-gray-600">Manage vector embeddings and search</p>
           </div>
           <button
-            onClick={loadStats}
+            onClick={() => loadStats()}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-2"
           >
             <RefreshCw className="w-4 h-4" />
@@ -228,6 +197,10 @@ export default function VectorPanel() {
               <p className="text-sm text-gray-600 mt-1">
                 Manage vector embeddings for each collection
               </p>
+              <label className="mt-2 flex items-center gap-2 text-sm text-gray-800">
+                <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
+                Force re-embed (also documents whose content has not changed)
+              </label>
             </div>
 
             {collections.length === 0 ? (
@@ -241,8 +214,9 @@ export default function VectorPanel() {
                   const docCount = collectionsMap[collection]?.total_documents || 0;
                   const vectorCount = collectionsMap[collection]?.embedded_documents || 0;
                   const coverage = docCount > 0 ? ((vectorCount / docCount) * 100).toFixed(1) : 0;
-                  const isReindexing = reindexing[collection];
-                  const status = reindexStatus[collection];
+                  const job = reindex.active[collection];
+                  const isReindexing = Boolean(job);
+                  const status = reindex.messages[collection];
 
                   return (
                     <div key={collection} className="p-6">
@@ -288,11 +262,15 @@ export default function VectorPanel() {
                             ></div>
                           </div>
 
+                          {job && (
+                            <p className="mt-3 text-sm text-blue-800" role="status">{describeJob(job)}</p>
+                          )}
+
                           {/* Status message */}
                           {status && (
                             <div
                               className={`mt-3 text-sm flex items-center gap-2 ${
-                                status.success ? 'text-green-600' : 'text-red-600'
+                                status.success ? 'text-green-700' : 'text-red-700'
                               }`}
                             >
                               {status.success ? (
@@ -306,7 +284,7 @@ export default function VectorPanel() {
                         </div>
 
                         <button
-                          onClick={() => handleReindex(collection)}
+                          onClick={() => reindex.start(collection, force)}
                           disabled={isReindexing}
                           className="ml-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
@@ -329,6 +307,8 @@ export default function VectorPanel() {
               </div>
             )}
           </div>
+
+          <ReindexJobsTable jobs={reindex.recent} error={reindex.recentError} onRefresh={reindex.loadRecent} />
         </div>
       </div>
     </div>

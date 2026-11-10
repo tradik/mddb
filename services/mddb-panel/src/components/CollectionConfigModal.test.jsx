@@ -11,6 +11,10 @@ import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/re
 vi.mock('../lib/mddb-client', () => ({
   default: { getCollectionConfig: vi.fn(), setCollectionConfig: vi.fn() },
 }));
+// The collection's sources have their own suite (CollectionSources.test.jsx).
+vi.mock('./CollectionSources', () => ({
+  default: ({ collection }) => <div data-testid="collection-sources">{collection}</div>,
+}));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
@@ -447,5 +451,13 @@ describe('CollectionConfigModal actions', () => {
     fireEvent.click(container.querySelector('h2').parentElement.nextElementSibling);
     expect(onClose).toHaveBeenCalledTimes(2);
     expect(mddbClient.setCollectionConfig).not.toHaveBeenCalled();
+  });
+});
+
+describe('CollectionConfigModal sources (2.18.11)', () => {
+  test('lists the syncs and triggers of the collection being edited', async () => {
+    vi.mocked(mddbClient.getCollectionConfig).mockResolvedValue({ collection: 'docs' });
+    render(<CollectionConfigModal collection="docs" onClose={() => {}} onSave={() => {}} />);
+    expect((await screen.findByTestId('collection-sources')).textContent).toBe('docs');
   });
 });

@@ -45,7 +45,6 @@ describe('vector and geo', () => {
     ['vectorStats', (c) => c.vectorStats(), '/v1/vector-stats', GET],
     ['vectorProjection', (c) => c.vectorProjection({ collection: 'c', query: 'q' }), '/v1/vector-projection', POST, { collection: 'c', sample: 1000, query: 'q' }],
     ['getVectorStats', (c) => c.getVectorStats(), '/v1/vector-stats', GET],
-    ['reindexVectors', (c) => c.reindexVectors('c'), '/v1/vector-reindex', POST, { collection: 'c' }],
     ['geoSearch defaults', (c) => c.geoSearch({ collection: 'c', lat: 1, lng: 2, radiusMeters: 3 }), '/v1/geo-search', POST, { collection: 'c', lat: 1, lng: 2, radiusMeters: 3, topK: 10, algorithm: 'rtree', filterMeta: {}, includeContent: false }],
     ['geoWithin defaults', (c) => c.geoWithin({ collection: 'c', minLat: 1, maxLat: 2, minLng: 3, maxLng: 4 }), '/v1/geo-within', POST, { collection: 'c', minLat: 1, maxLat: 2, minLng: 3, maxLng: 4, filterMeta: {}, includeContent: false }],
     ['geoPolygon polygon', (c) => c.geoPolygon({ collection: 'c', polygon: [[[0, 0]]] }), '/v1/geo-polygon', POST, { collection: 'c', filterMeta: {}, includeContent: false, polygon: [[[0, 0]]] }],

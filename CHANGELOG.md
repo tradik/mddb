@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `make sonar-local`: the SonarCloud scan and quality gate from this machine before a push (Docker, `SONAR_TOKEN`).
 
+- **Panel: the server features of 2.18.2–2.18.11 it had not reached.**
+  - New pages:
+    - **Collection Aliases** (`/v1/aliases`): list, create or move, and delete.
+    - **Retrieval Evaluation** (`/v1/eval`, `/v1/eval-queries`): the stored query set, and a run under fts/bm25, hybrid RRF, hybrid alpha and vector, with recall@k, nDCG@k, MRR, latency and tokens; the best nDCG is marked.
+    - **Code Symbols** (`/v1/symbol`, `/v1/code-languages`): definitions, references, callers, callees, tests and siblings as path:line passages.
+  - On the System page:
+    - **Indexing status** (`/v1/indexing-status`): pending, failed and completed embeddings, images, and training collections; refreshes every 5 s until indexed.
+    - **Storage** (`/v1/storage`): bytes per collection and category, buckets, and the space a compaction gives back. It runs on demand and can be cancelled.
+  - Collection settings list the syncs and triggers acting on the collection (`GET /v1/automation?collection=`), with each one's last result and Run now.
+  - The Vector page reindexes as a background job (`async: true`): optional force, progress, time left, final counts, a 409 for a reindex already running, and a recent-jobs table.
+  - An image document (`meta.kind: image`) shows its picture from `/v1/image`.
+  - Upload has an *Extract images* option and accepts every format `/v1/upload` converts: xlsx, ods, csv, tsv, pptx, odp, epub, eml, mbox and `.markdown` were missing.
+
 ### Changed
 
 - **`mddb-cli add` and `mddb-cli autoindex` read Markdown frontmatter (#373)**, like `/v1/upload` and the folder loader: the keys become meta and the body is stored without the block. `add` merges `-m` over the frontmatter; `autoindex` sends `.md`, `.markdown` and `.mdx` files with `extractFrontmatter`, so the server reads them once with the same parser, and the file meta (`path`, `kind`, ...) wins. `--no-frontmatter` on both stores files as they are. The CLI carries a byte-identical copy of the server's parser, kept in step by a test and by shared fixtures in `testdata/frontmatter/cases.json`. A Markdown file with frontmatter is rewritten once on the next `autoindex` run, as its stored body changes.
@@ -31,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`scripts/load-md-folder.sh` kept only the first item of a frontmatter list (#372)**: `tags: database, markdown, golang` became `tags=[database]`. The loader no longer parses frontmatter in shell: it stores each file with `mddb-cli add -f`, which reads it, so comma, `[flow]` and `- item` block lists arrive whole. `-s/--server` now reaches the CLI (exported as `MDDB_SERVER`); before, it was only printed. The loader stops with an error on an mddb-cli older than 2.18.11, which would store the block as text. The loader's `source`, `filename` and `-m` meta now win over a frontmatter key of the same name. New test: `make test-load-md-folder`.
 - **Frontmatter lists in `/v1/upload`, `/v1/ingest` (`extractFrontmatter`), import-url, MCP upload and sync**: a flow list `tags: [a, b]` was stored as `["[a", "b]"]` and a block list (`tags:` then `- a` lines) was dropped; both are now lists. Quotes are stripped per item, empty items are dropped, and a `- key: value` item (a list of maps, which flat meta cannot hold) is not stored.
+- **Panel upload stored frontmatter lists wrong.** The upload dialog parsed Markdown frontmatter itself, line by line: `tags: [a, b]` became `["[a", "b]"]`, a block list (`tags:` then `- a`) was lost, and a value holding a comma was split. Markdown now goes to `/v1/upload` like every other format, so the server's parser reads it (the one `/v1/ingest`, `mddb-cli` and the folder loader use). A Markdown file keeps the key earlier panels gave it (its name without `.md`), so uploading it again replaces the same document.
 - **`mddb-cli self-update` on Windows (#374)**: releases carry no Windows archives, so the command (with `--check` too) now stops at once with a non-zero exit and says to build from source with `make build-windows`, instead of looking for an archive that does not exist.
 
 - Truncate is one function for REST, gRPC and the MCP direct client (#380). gRPC `Truncate` now writes its revision deletions to the binlog, so replicas trim too; a negative `keepRevs` keeps every revision instead of crashing the call; and a document that cannot be decoded fails the truncate, as REST always did. The MCP truncate also writes its deletions to the binlog, and a failed delete is reported instead of ignored.

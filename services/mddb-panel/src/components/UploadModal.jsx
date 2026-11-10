@@ -1,23 +1,10 @@
 import { useState } from 'react';
 import { X, FileText, Upload } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
+import { SUPPORTED_EXTENSIONS, classifyFiles, fileIcon } from '../lib/upload-files';
 
-const SUPPORTED_EXTENSIONS = ['.md', '.txt', '.html', '.htm', '.pdf', '.docx', '.odt', '.rtf', '.yaml', '.yml', '.log', '.lex', '.tex', '.latex'];
 const ACCEPT_STRING = SUPPORTED_EXTENSIONS.join(',');
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-function getFileIcon(name) {
-  if (name.endsWith('.pdf')) return '📄';
-  if (name.endsWith('.docx')) return '📝';
-  if (name.endsWith('.html') || name.endsWith('.htm')) return '🌐';
-  if (name.endsWith('.md')) return '📋';
-  if (name.endsWith('.txt')) return '📃';
-  return '📎';
-}
-
-function isMarkdown(name) {
-  return name.endsWith('.md');
-}
+const UPLOAD_TIMEOUT_MS = 30000;
 
 export default function UploadModal({ collection, onClose, onSuccess }) {
   const [files, setFiles] = useState([]);
@@ -28,114 +15,20 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
   const [dragActive, setDragActive] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [successCount, setSuccessCount] = useState(0);
+  const [extractImages, setExtractImages] = useState(false);
 
-  const parseFrontmatter = (text) => {
-    const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
-    const match = text.match(frontmatterRegex);
-
-    if (match) {
-      const frontmatter = match[1];
-      const content = match[2];
-
-      const metadata = {};
-      frontmatter.split('\n').forEach(line => {
-        const colonIndex = line.indexOf(':');
-        if (colonIndex > 0) {
-          const key = line.substring(0, colonIndex).trim();
-          const value = line.substring(colonIndex + 1).trim();
-          const cleanValue = value.replace(/^["'](.*)["']$/, '$1');
-
-          if (cleanValue.includes(',')) {
-            metadata[key] = cleanValue.split(',').map(v => v.trim());
-          } else {
-            metadata[key] = [cleanValue];
-          }
-        }
-      });
-
-      return { metadata, content };
-    }
-
-    return { metadata: {}, content: text };
-  };
-
-  const handleFiles = async (selectedFiles) => {
+  const handleFiles = (selectedFiles) => {
     if (!selectedFiles || selectedFiles.length === 0) return;
-
-    const fileArray = Array.from(selectedFiles);
-    const validFiles = [];
-    const errors = [];
-
-    for (const file of fileArray) {
-      const ext = '.' + file.name.split('.').pop().toLowerCase();
-      if (!SUPPORTED_EXTENSIONS.includes(ext)) {
-        errors.push(`${file.name}: Unsupported format. Use ${SUPPORTED_EXTENSIONS.join(', ')}`);
-        continue;
-      }
-
-      if (file.size > MAX_FILE_SIZE) {
-        errors.push(`${file.name}: File too large (max 10MB)`);
-        continue;
-      }
-
-      if (isMarkdown(file.name)) {
-        // MD files: read text, parse frontmatter, use existing JSON add endpoint
-        try {
-          const text = await readFileAsText(file);
-          if (text.length > 5 * 1024 * 1024) {
-            errors.push(`${file.name}: Content too large (max 5MB)`);
-            continue;
-          }
-          const { metadata, content } = parseFrontmatter(text);
-          const key = file.name.replace(/\.md$/, '');
-          validFiles.push({
-            file,
-            key,
-            meta: metadata,
-            contentMd: content,
-            mode: 'json',
-          });
-        } catch {
-          errors.push(`${file.name}: Failed to read file`);
-        }
-      } else {
-        // Non-MD files: upload via multipart /v1/upload for server-side conversion
-        const key = file.name.replace(/\.[^.]+$/, '').toLowerCase().replace(/\s+/g, '-');
-        validFiles.push({
-          file,
-          key,
-          meta: {},
-          mode: 'upload',
-        });
-      }
-    }
-
-    if (errors.length > 0) {
-      setError(errors.join('; '));
-    } else {
-      setError(null);
-    }
-
-    setFiles(validFiles);
-  };
-
-  const readFileAsText = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file);
-    });
+    const { accepted, errors } = classifyFiles(selectedFiles);
+    setError(errors.length > 0 ? errors.join('; ') : null);
+    setFiles(accepted);
   };
 
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
-      setDragActive(true);
-    } else if (e.type === 'dragleave') {
-      setDragActive(false);
-    }
+    // Bound to dragenter, dragover and dragleave only.
+    setDragActive(e.type !== 'dragleave');
   };
 
   const handleDrop = (e) => {
@@ -155,8 +48,8 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
     setSuccessCount(0);
     setUploadProgress({ current: 0, total: files.length });
 
-    const finalLang = (lang || '').trim() || 'en';
-    const finalCollection = (collectionName || '').trim() || 'default';
+    const finalLang = lang.trim() || 'en';
+    const finalCollection = collectionName.trim() || 'default';
 
     if (files.length === 0) {
       setError('No files selected.');
@@ -173,34 +66,19 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
 
       try {
         const timeout = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Upload timeout (>30s)')), 30000)
+          setTimeout(() => reject(new Error('Upload timeout (>30s)')), UPLOAD_TIMEOUT_MS)
         );
-
-        if (fileData.mode === 'json') {
-          // Markdown files use existing JSON endpoint
-          await Promise.race([
-            mddbClient.addDocument({
-              collection: finalCollection,
-              key: fileData.key,
-              lang: finalLang,
-              meta: fileData.meta,
-              contentMd: fileData.contentMd,
-            }),
-            timeout
-          ]);
-        } else {
-          // Non-MD files use multipart /v1/upload endpoint
-          await Promise.race([
-            mddbClient.uploadFile({
-              files: fileData.file,
-              collection: finalCollection,
-              lang: finalLang,
-              key: fileData.key,
-            }),
-            timeout
-          ]);
-        }
-
+        // One door for every format: the server reads Markdown frontmatter.
+        await Promise.race([
+          mddbClient.uploadFile({
+            files: fileData.file,
+            collection: finalCollection,
+            lang: finalLang,
+            key: fileData.key,
+            extractImages,
+          }),
+          timeout,
+        ]);
         successfulUploads++;
         setSuccessCount(successfulUploads);
       } catch (err) {
@@ -221,7 +99,7 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
   };
 
   const formatModes = files.reduce((acc, f) => {
-    if (f.mode === 'upload') acc.converted++;
+    if (f.converted) acc.converted++;
     else acc.direct++;
     return acc;
   }, { direct: 0, converted: 0 });
@@ -234,7 +112,7 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
             <h2 className="text-xl font-bold text-gray-900">
               {collection ? 'Upload Documents' : 'Create Collection & Upload'}
             </h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600" disabled={loading}>
+            <button onClick={onClose} className="text-gray-600 hover:text-gray-800" disabled={loading} aria-label="Close upload dialog">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -261,10 +139,10 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
                   <div className="max-h-40 overflow-y-auto mb-3">
                     {files.map((fileData, idx) => (
                       <div key={idx} className="text-xs text-gray-600 py-1 flex items-center justify-center gap-1">
-                        <span>{getFileIcon(fileData.file.name)}</span>
+                        <span>{fileIcon(fileData.file.name)}</span>
                         <span>{fileData.file.name}</span>
-                        <span className="text-gray-400">({(fileData.file.size / 1024).toFixed(1)} KB)</span>
-                        {fileData.mode === 'upload' && (
+                        <span className="text-gray-600">({(fileData.file.size / 1024).toFixed(1)} KB)</span>
+                        {fileData.converted && (
                           <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-700">
                             auto-convert
                           </span>
@@ -302,17 +180,17 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
                     />
                   </label>
                   <p className="text-xs text-gray-500 mt-3">
-                    Supported: Markdown, TXT, HTML, PDF, DOCX (max 10MB each)
+                    Supported: Markdown, text, HTML, PDF, Office/OpenDocument, CSV/TSV, EPUB, e-mail, YAML, LaTeX (max 10MB each)
                   </p>
-                  <p className="text-[10px] text-gray-400 mt-1">
-                    Non-markdown files are automatically converted to markdown
+                  <p className="text-xs text-gray-600 mt-1">
+                    Other formats are converted to Markdown; Markdown frontmatter becomes metadata
                   </p>
                 </div>
               )}
             </div>
 
             {/* File summary with conversion info */}
-            {files.length > 0 && (formatModes.converted > 0 || Object.keys(files[0].meta || {}).length > 0) && (
+            {files.length > 0 && (formatModes.converted > 0) && (
               <div className="mb-4 p-4 bg-gray-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-700 mb-2">
                   Upload Summary
@@ -321,7 +199,7 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
                   {formatModes.direct > 0 && (
                     <div className="flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                      {formatModes.direct} markdown file{formatModes.direct !== 1 ? 's' : ''} (direct)
+                      {formatModes.direct} Markdown/text file{formatModes.direct !== 1 ? 's' : ''} (stored as written, frontmatter read by the server)
                     </div>
                   )}
                   {formatModes.converted > 0 && (
@@ -368,6 +246,24 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 disabled={loading}
               />
+            </div>
+
+            {/* Images (2.18.9): pictures inside Markdown and PDFs become image documents */}
+            <div className="mb-4 flex items-start gap-2">
+              <input
+                id="upload-extract-images"
+                type="checkbox"
+                checked={extractImages}
+                onChange={(e) => setExtractImages(e.target.checked)}
+                className="mt-1"
+                disabled={loading}
+              />
+              <label htmlFor="upload-extract-images" className="text-sm text-gray-700">
+                Extract images
+                <span className="block text-xs text-gray-600">
+                  Images in PDFs and Markdown become image documents under KEY/images/ (on by default in an images collection)
+                </span>
+              </label>
             </div>
 
             {/* Error display */}

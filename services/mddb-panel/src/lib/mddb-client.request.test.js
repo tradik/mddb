@@ -140,6 +140,13 @@ describe('uploadFile()', () => {
     expect(req.body.get('collection')).toBe('docs');
     expect(req.body.get('lang')).toBe('pl');
     expect(req.body.get('key')).toBe('k');
+    expect(req.body.get('extractImages')).toBeNull();
+  });
+
+  test('extractImages (2.18.9) is sent as a form field when asked for', async () => {
+    const fetchMock = stubFetch();
+    await client.uploadFile({ files: file('a.pdf'), extractImages: true });
+    expect(lastRequest(fetchMock).body.get('extractImages')).toBe('true');
   });
 
   test.each([

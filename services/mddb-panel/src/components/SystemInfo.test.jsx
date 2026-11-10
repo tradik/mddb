@@ -9,6 +9,8 @@ vi.mock('../lib/mddb-client', () => ({ default: { getSystemInfo: vi.fn(), getGai
 vi.mock('./CorpusPacksCard', () => ({ default: () => <div>corpus packs card</div> }));
 vi.mock('./DiagnoseCard', () => ({ default: () => <div>diagnose card</div> }));
 vi.mock('./ServerEdgeCard', () => ({ default: () => <div>server edge card</div> }));
+vi.mock('./IndexingStatusCard', () => ({ default: () => <div>indexing status card</div> }));
+vi.mock('./StorageCard', () => ({ default: () => <div>storage card</div> }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');

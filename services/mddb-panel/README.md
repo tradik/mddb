@@ -25,6 +25,14 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - ⚙️ **Collection settings** (2.18.10+) - Vector index, summary mode/weight, `maxTopK`, `fts.excludeMetaKeys` and quota; saving keeps every stored setting the dialog does not show
 - 🛡️ **Search surface, tracing & proxies** (2.18.10+) - On the Config and System pages: the Elasticsearch subset and its `/es` prefix, the result cap, OpenTelemetry on or off (collector scheme and host), the trusted-proxy count, client IP header and PROXY protocol, from `GET /v1/config`
 - 📏 **Quota usage** (2.18.10+) - In collection settings: "1,234 / 5,000 documents" bars for every quota limit, from the `usage` of `GET /v1/collection-config`, with a text alternative and WCAG 2.2 contrast (see [docs/PANEL.md](../../docs/PANEL.md#colours-and-contrast))
+- 🔗 **Collection aliases** (2.18.8+) - A page to list, create, move and delete aliases (`/v1/aliases`)
+- 🎯 **Retrieval evaluation** (2.18.8+) - Stored evaluation queries and a run of them under fts, hybrid and vector, with recall@k, nDCG@k, MRR, latency and tokens (`/v1/eval`, `/v1/eval-queries`)
+- 🧩 **Code symbols** (2.18.8+) - Definitions, references, callers, callees, tests and siblings of one symbol (`/v1/symbol`), plus the recognised languages
+- ⏳ **Indexing status & storage** (2.18.2+/2.18.8+) - On the System page: queued embedding work with auto-refresh (`/v1/indexing-status`), and bytes per collection, category and bucket measured on demand (`/v1/storage`)
+- 🔁 **Background vector reindex** (2.18.4+) - Reindex as a job with progress, time left and a recent-jobs table (`/v1/vector-reindex/jobs`)
+- 🖼️ **Image documents** (2.18.9+) - An image document shows its picture (`/v1/image`); upload can *Extract images* from PDFs and Markdown
+- 📥 **Upload** (2.18.11) - Every file goes to `/v1/upload`, so the server reads Markdown frontmatter (lists included); 24 formats accepted
+- 🛰️ **Collection sources** (2.18.11) - Collection settings list the syncs and triggers acting on the collection, with each one's last result and Run now
 - 🔑 **Permission scope** (2.18.10+) - Admin badges say *global* (on `"*"`) or *this collection*; a 403 says which permission the request needed
 
 ## Screenshots

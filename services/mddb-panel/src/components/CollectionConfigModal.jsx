@@ -4,6 +4,7 @@ import mddbClient from '../lib/mddb-client';
 import { advancedFromConfig, applyAdvanced, omit, preservedConfig } from '../lib/collection-config';
 import CollectionAdvancedSettings from './CollectionAdvancedSettings';
 import QuotaUsage from './QuotaUsage';
+import CollectionSources from './CollectionSources';
 import ReadOnlyNotice from './ReadOnlyNotice';
 
 const COLLECTION_TYPES = [
@@ -610,6 +611,9 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
               {/* 2.18.9/2.18.10: index, summaries, result cap, FTS exclusions, quota */}
               <CollectionAdvancedSettings value={advanced} onChange={setAdvanced} />
               <QuotaUsage quota={stored.quota} usage={usage} />
+
+              {/* 2.18.11: syncs writing to and triggers watching this collection */}
+              <CollectionSources collection={collection} />
 
               {/* Response prompt (RAG-002, v2.12.0+) */}
               <div>
