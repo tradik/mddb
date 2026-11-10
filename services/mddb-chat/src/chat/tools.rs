@@ -1,10 +1,18 @@
+use std::borrow::Cow;
+
 use regex::Regex;
 use serde::Deserialize;
 use tracing::debug;
 
+use crate::chat::markdown::clip;
 use crate::error::AppError;
-use crate::grpc::client::MddbClient;
+use crate::grpc::client::{MddbClient, SearchResult};
 use crate::llm::provider::{ToolCall, ToolDef, ToolFunction};
+
+/// Characters of one search result the model gets to see.
+const RESULT_MAX_CHARS: usize = 800;
+/// Characters of a whole document `get_document` hands back before cutting.
+const DOCUMENT_MAX_CHARS: usize = 4000;
 
 /// Strip markdown formatting to give LLM clean plain text
 fn strip_markdown(input: &str) -> String {
@@ -136,17 +144,12 @@ pub async fn execute_tool(
             let mut output = String::new();
             for (i, r) in results.iter().enumerate() {
                 let clean = strip_markdown(&r.content);
-                let truncated = if clean.len() > 800 {
-                    format!("{}...", &clean[..800])
-                } else {
-                    clean
-                };
                 output.push_str(&format!(
                     "Result {} (key: {}, score: {:.2})\n{}\n\n---\n\n",
                     i + 1,
                     r.key,
                     r.score,
-                    truncated,
+                    clip(&clean, RESULT_MAX_CHARS),
                 ));
             }
             Ok(output)
@@ -160,25 +163,13 @@ pub async fn execute_tool(
 
             // Try to find exact match
             if let Some(doc) = results.iter().find(|r| r.key == args.key) {
-                let clean = strip_markdown(&doc.content);
-                let content = if clean.len() > 4000 {
-                    format!("{}...\n\n[Document truncated]", &clean[..4000])
-                } else {
-                    clean
-                };
-                Ok(format!("Document: {}\n\n{}", doc.key, content))
-            } else if !results.is_empty() {
-                // Return best match
-                let doc = &results[0];
-                let clean = strip_markdown(&doc.content);
-                let content = if clean.len() > 4000 {
-                    format!("{}...\n\n[Document truncated]", &clean[..4000])
-                } else {
-                    clean
-                };
+                Ok(format!("Document: {}\n\n{}", doc.key, document_body(doc)))
+            } else if let Some(doc) = results.first() {
                 Ok(format!(
                     "Document '{}' not found. Closest match: {}\n\n{}",
-                    args.key, doc.key, content
+                    args.key,
+                    doc.key,
+                    document_body(doc)
                 ))
             } else {
                 Ok(format!(
@@ -188,5 +179,13 @@ pub async fn execute_tool(
             }
         }
         other => Ok(format!("Unknown tool: {other}")),
+    }
+}
+
+fn document_body(doc: &SearchResult) -> String {
+    let clean = strip_markdown(&doc.content);
+    match clip(&clean, DOCUMENT_MAX_CHARS) {
+        Cow::Borrowed(_) => clean,
+        Cow::Owned(cut) => format!("{cut}\n\n[Document truncated]"),
     }
 }
