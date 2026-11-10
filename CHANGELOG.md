@@ -26,9 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - An image document (`meta.kind: image`) shows its picture from `/v1/image`.
   - Upload has an *Extract images* option and accepts every format `/v1/upload` converts: xlsx, ods, csv, tsv, pptx, odp, epub, eml, mbox and `.markdown` were missing.
 
+### Changed
+
+- **Licence: the product moves from BSD-3-Clause to the Business Source License 1.1; the libraries stay BSD-3-Clause (LIC-001).** The server `mddbd`, `mddb-cli`, the web panel, the chat service, the scripts, the tests and the documentation are under BUSL-1.1 (`LICENSE`): production use inside your own organisation is allowed by the Additional Use Grant, modification and redistribution too; offering MDDB itself to third parties on a hosted or embedded basis as a paid, competing product needs a commercial licence from Tradik Limited. Each version becomes Apache-2.0 four years after it is published. `clients/`, `integrations/`, `proto/`, `services/php-extension`, `services/python-extension` and `services/mddb-chat-widget` keep the BSD 3-Clause License under their own `LICENSE` files, so a client generated from the `.proto` or vendored from `clients/` carries no restriction. The map, the FAQ and the contact for commercial licences are in `LICENSING.md`; `services/mddbd/license_map_doc_test.go` checks that every package manifest, the Debian and RPM metadata, the Homebrew formulas and the OCI image labels declare the licence of their directory. `CONTRIBUTING.md` states the terms a contribution to the BUSL directories is accepted under. Releases up to and including 2.18.11 were published under BSD-3-Clause and stay so.
+
 ### Fixed
 
 - **Panel upload stored frontmatter lists wrong.** The upload dialog parsed Markdown frontmatter itself, line by line: `tags: [a, b]` became `["[a", "b]"]`, a block list (`tags:` then `- a`) was lost, and a value holding a comma was split. Markdown now goes to `/v1/upload` like every other format, so the server's parser reads it (the one `/v1/ingest`, `mddb-cli` and the folder loader use). A Markdown file keeps the key earlier panels gave it (its name without `.md`), so uploading it again replaces the same document.
+
+### Upgrading
+
+- **Nothing changes in how MDDB runs.** Databases, configuration, API, MCP tools and clients from 2.18.x work unchanged; the Change Date and the Additional Use Grant are the only new facts. If you run MDDB for your own organisation, including its affiliates, you need to do nothing. If you sell MDDB to third parties as a hosted service or embedded in a paid product, or sell support for it that competes with Tradik Limited's, you need a commercial licence before upgrading to 2.19.0; 2.18.11 and earlier stay available under BSD-3-Clause. Package metadata now says `BUSL-1.1` for `mddbd`, `mddb-cli` and the panel (deb, rpm, snap store listings, Homebrew, Docker image labels) and `BSD-3-Clause` for every client library and integration, so a licence scanner that allow-lists only OSI licences will flag the server packages and pass the libraries.
 
 ## [2.18.11] - 2026-10-30
 

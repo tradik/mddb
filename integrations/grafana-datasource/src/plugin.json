@@ -30,7 +30,7 @@
       { "name": "Project site", "url": "https://github.com/tradik/mddb" },
       { "name": "Documentation", "url": "https://github.com/tradik/mddb/blob/main/integrations/grafana-datasource/README.md" },
       { "name": "Changelog", "url": "https://github.com/tradik/mddb/blob/main/integrations/grafana-datasource/CHANGELOG.md" },
-      { "name": "License", "url": "https://github.com/tradik/mddb/blob/main/LICENSE" }
+      { "name": "License", "url": "https://github.com/tradik/mddb/blob/main/integrations/LICENSE" }
     ],
     "screenshots": [],
     "version": "0.1.0",

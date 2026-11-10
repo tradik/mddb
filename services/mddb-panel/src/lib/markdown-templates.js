@@ -130,7 +130,7 @@ Contributions are welcome! Please read our contributing guidelines.
 
 ## License
 
-BSD 3-Clause License - see LICENSE file for details.
+See the LICENSE file for details.
 `,
 
   readme: `# Project Name
@@ -204,7 +204,7 @@ Description of what this method does.
 
 ## License
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
+See the [LICENSE](LICENSE) file for the terms this project is distributed under.
 
 ## Contact
 

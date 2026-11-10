@@ -583,4 +583,4 @@ services:
 
 ## License
 
-BSD 3-Clause License - see [LICENSE](https://github.com/tradik/mddb/blob/main/LICENSE) for details.
+Business Source License 1.1 for the server image, BSD-3-Clause for the client libraries - see [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md).

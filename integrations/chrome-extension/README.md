@@ -190,4 +190,4 @@ policy at [tradik.com/privacy](https://tradik.com/privacy).
 
 ## License
 
-BSD 3-Clause — see [LICENSE](../../LICENSE).
+BSD 3-Clause — see [LICENSE](../LICENSE) for the integrations. The MDDB server itself is under the Business Source License 1.1 ([LICENSING.md](../../LICENSING.md)).

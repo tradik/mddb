@@ -1,7 +1,8 @@
 # MDDB: AI-Native Document Database
 
 [![Go Version](https://img.shields.io/badge/Go-1.27-blue.svg)](https://golang.org)
-[![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
+[![License: BUSL-1.1](https://img.shields.io/badge/license-BUSL--1.1-blue.svg)](LICENSE)
+[![Clients: BSD-3-Clause](https://img.shields.io/badge/clients-BSD--3--Clause-green.svg)](LICENSING.md)
 [![Release](https://img.shields.io/github/v/release/tradik/mddb)](https://github.com/tradik/mddb/releases)
 [![Docker](https://img.shields.io/docker/v/tradik/mddb?label=docker)](https://hub.docker.com/r/tradik/mddb)
 [![Docker Pulls](https://img.shields.io/docker/pulls/tradik/mddb)](https://hub.docker.com/r/tradik/mddb)
@@ -743,7 +744,14 @@ Contributions welcome! See **[CONTRIBUTING.md](CONTRIBUTING.md)** for guidelines
 
 ## 📄 License
 
-BSD 3-Clause License - see **[LICENSE](LICENSE)**
+MDDB is source-available. The server, CLI, panel and chat service are under the
+**Business Source License 1.1** ([LICENSE](LICENSE)): free to run in production
+inside your organisation, free to modify; offering MDDB itself to third parties as
+a hosted or embedded product needs a commercial licence. Each version becomes
+Apache-2.0 four years after its release. The client libraries, integrations and
+protocol definitions are **BSD-3-Clause**. The directory map, the FAQ and how to
+get a commercial licence or support are in **[LICENSING.md](LICENSING.md)**.
+Releases up to 2.18.11 stay BSD-3-Clause.
 
 ## 🔗 Quick Links
 

@@ -193,4 +193,4 @@ CI matrix runs against PHP 8.2, 8.3, 8.4, 8.5. Coverage is enforced ≥90 % on t
 
 ## License
 
-BSD-3-Clause — same as the rest of the MDDB monorepo.
+BSD-3-Clause — see [LICENSE](../LICENSE) for the integrations. The MDDB server itself is under the Business Source License 1.1 ([LICENSING.md](../../LICENSING.md)).

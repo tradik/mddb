@@ -273,4 +273,4 @@ pecl install grpc
 
 ## 📄 License
 
-BSD 3-Clause License - see [LICENSE](../LICENSE) for details.
+BSD 3-Clause License - see [LICENSE](LICENSE) in this directory. The definitions stay permissive so anyone can generate a client; the server they describe is under the Business Source License 1.1 ([LICENSING.md](../LICENSING.md)).

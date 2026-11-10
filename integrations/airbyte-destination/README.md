@@ -180,4 +180,4 @@ The connector reads `AirbyteMessage`s from stdin, emits responses on stdout, and
 
 ## License
 
-BSD-3-Clause — see [LICENSE](../../LICENSE) in the MDDB repo root.
+BSD-3-Clause — see [LICENSE](../LICENSE) for the integrations. The MDDB server itself is under the Business Source License 1.1 ([LICENSING.md](../../LICENSING.md)).

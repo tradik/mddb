@@ -1320,4 +1320,4 @@ All HTTP endpoints have equivalent gRPC methods with the same functionality.
 
 ## License
 
-BSD 3-Clause License - see [LICENSE](https://github.com/tradik/mddb/blob/main/LICENSE) for details.
+The server is under the Business Source License 1.1 ([LICENSE](https://github.com/tradik/mddb/blob/main/LICENSE)); the `.proto` definitions are BSD-3-Clause ([proto/LICENSE](https://github.com/tradik/mddb/blob/main/proto/LICENSE)), so any client generated from them is yours. Map in [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md).

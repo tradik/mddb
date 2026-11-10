@@ -591,4 +591,4 @@ sudo rm /usr/local/share/man/man1/mddb-cli.1
 
 ## License
 
-BSD 3-Clause License - see [LICENSE](../../LICENSE) for details.
+Business Source License 1.1 - see [LICENSE](../../LICENSE) and [LICENSING.md](../../LICENSING.md).

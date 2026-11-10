@@ -2,7 +2,7 @@
 title: MDDB RAG Model
 author: MDDB
 version: 2.11.4
-license: BSD-3-Clause
+license: BUSL-1.1
 description: RAG model using MDDB for document retrieval with multi-LLM support (Ollama, OpenAI, DeepSeek)
 """
 

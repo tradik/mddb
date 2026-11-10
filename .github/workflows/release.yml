@@ -269,7 +269,7 @@ jobs:
           Version:        ${VERSION_NUM}
           Release:        1%{?dist}
           Summary:        High-performance markdown database server
-          License:        BSD-3-Clause
+          License:        BUSL-1.1
           URL:            https://github.com/tradik/mddb
           Source0:        mddbd-${VERSION_NUM}.tar.gz
 
@@ -515,7 +515,7 @@ jobs:
           Version:        ${VERSION_NUM}
           Release:        1%{?dist}
           Summary:        Command-line client for MDDB
-          License:        BSD-3-Clause
+          License:        BUSL-1.1
           URL:            https://github.com/tradik/mddb
           Source0:        mddb-cli-${VERSION_NUM}.tar.gz
 
@@ -725,7 +725,7 @@ jobs:
             desc "Embedded Markdown database server with REST, gRPC, GraphQL and vector search"
             homepage "https://github.com/tradik/mddb"
             version "${VN}"
-            license "BSD-3-Clause"
+            license "BUSL-1.1"
 
             on_macos do
               on_arm do
@@ -780,7 +780,7 @@ jobs:
             desc "Command-line interface for MDDB Markdown Database"
             homepage "https://github.com/tradik/mddb"
             version "${VN}"
-            license "BSD-3-Clause"
+            license "BUSL-1.1"
 
             on_macos do
               on_arm do
@@ -1083,7 +1083,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/tradik/mddb
             org.opencontainers.image.url=https://github.com/tradik/mddb
             org.opencontainers.image.documentation=https://github.com/tradik/mddb/blob/main/README.md
-            org.opencontainers.image.licenses=BSD-3-Clause
+            org.opencontainers.image.licenses=BUSL-1.1
             org.opencontainers.image.vendor=MDDB Team
 
       - name: Generate artifact attestation for server
@@ -1164,7 +1164,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/tradik/mddb
             org.opencontainers.image.url=https://github.com/tradik/mddb
             org.opencontainers.image.documentation=https://github.com/tradik/mddb/blob/main/services/mddb-panel/README.md
-            org.opencontainers.image.licenses=BSD-3-Clause
+            org.opencontainers.image.licenses=BUSL-1.1
             org.opencontainers.image.vendor=MDDB Team
           cache-from: type=gha,scope=panel
           cache-to: type=gha,mode=max,scope=panel

@@ -31,6 +31,17 @@ writing, styling and encrypted workbooks the server never uses.
 
 ---
 
+## MDDB's own licence
+
+This report is about the licences MDDB *consumes*. The licence MDDB is
+*distributed under* changed in 2.19.0: the server, CLI, panel and chat service
+are under the Business Source License 1.1 (`LICENSE`), the client libraries,
+integrations and protocol definitions stay BSD-3-Clause under their own
+`LICENSE` files. The map is in [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md).
+None of the dependencies below constrains that choice: there is no GPL or
+AGPL code in the tree, and the two MPL-2.0 libraries carry a file-level
+obligation that stops at their own files.
+
 ## Executive Summary
 
 Scanned **4 targets** (Go modules + npm packages) with a total of **270 dependencies**.

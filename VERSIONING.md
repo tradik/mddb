@@ -74,6 +74,13 @@ starting number and say so here.
 A deprecation gets at least one minor release of warning before it is removed,
 and the warning names the replacement.
 
+A licence change is not a version change in this sense: it alters what you may
+do with the software, not what the software does. 2.19.0 moved the server from
+BSD-3-Clause to the Business Source License 1.1 as a minor release because
+every database, configuration and API call from 2.18.x works unchanged; the
+change is announced in the CHANGELOG under Upgrading and in
+[LICENSING.md](LICENSING.md).
+
 ## Bumping the version
 
 ```bash

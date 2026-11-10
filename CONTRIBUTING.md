@@ -185,4 +185,19 @@ docs: update API reference with new endpoints
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the [BSD 3-Clause License](LICENSE).
+The repository has two licences; [LICENSING.md](LICENSING.md) says which
+directory is under which. By contributing you agree to the following:
+
+- **Code under the Business Source License 1.1** (the server, CLI, panel, chat
+  service, scripts, tests and docs): you keep the copyright in your contribution
+  and grant Tradik Limited a perpetual, worldwide, royalty-free right to use,
+  reproduce, modify, distribute and sublicense it under the Business Source
+  License 1.1, under its Change License (Apache License, Version 2.0) and under
+  commercial licences. You confirm that you wrote the contribution or have the
+  right to submit it under these terms.
+- **Code under the BSD 3-Clause License** (`clients/`, `integrations/`, `proto/`,
+  the PHP and Python extensions, the chat widget): your contribution is licensed
+  under the [BSD 3-Clause License](clients/LICENSE) like the code around it.
+
+Opening a pull request is your acceptance of these terms; no separate agreement
+is signed.

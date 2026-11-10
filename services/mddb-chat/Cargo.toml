@@ -3,7 +3,7 @@ name = "mddb-chat"
 version = "0.1.0"
 edition = "2024"
 description = "Chat support server for MDDB — embeddable AI assistant with RAG"
-license = "BSD-3-Clause"
+license = "BUSL-1.1"
 repository = "https://github.com/tradik/mddb"
 
 [dependencies]

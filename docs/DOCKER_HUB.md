@@ -326,7 +326,10 @@ curl http://localhost:11023/stats
 
 ## 📄 License
 
-BSD 3-Clause License - see [LICENSE](https://github.com/tradik/mddb/blob/main/LICENSE)
+Business Source License 1.1 for the server image (free to run inside your
+organisation; offering MDDB to third parties as a product needs a commercial
+licence; Apache-2.0 four years after each release). Client libraries are
+BSD-3-Clause. See [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md).
 
 ## 🌟 Why MDDB?
 
@@ -336,7 +339,7 @@ BSD 3-Clause License - see [LICENSE](https://github.com/tradik/mddb/blob/main/LI
 - **Zero Dependencies**: Embedded database, no external services
 - **Modern Protocols**: HTTP/3, gRPC, Protobuf
 - **Rich Features**: Metadata, revisions, search, backup
-- **Open Source**: BSD 3-Clause licensed, community driven
+- **Source Available**: the whole codebase is on GitHub; BUSL-1.1 server, BSD-3-Clause clients
 
 ---
 

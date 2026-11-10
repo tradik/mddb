@@ -74,7 +74,7 @@ info:
     name: MDDB Team
     url: https://github.com/tradik/mddb
   license:
-    name: BSD-3-Clause
+    name: BUSL-1.1
     url: https://github.com/tradik/mddb/blob/main/LICENSE
 
 # The defaults resolve to http://localhost:11023, the HTTP listener's default

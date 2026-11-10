@@ -744,4 +744,4 @@ panel's README for how the suites are written.
 
 ## License
 
-BSD 3-Clause License - see [LICENSE](https://github.com/tradik/mddb/blob/main/LICENSE) for details.
+Business Source License 1.1 - see [LICENSE](https://github.com/tradik/mddb/blob/main/LICENSE) and [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md).

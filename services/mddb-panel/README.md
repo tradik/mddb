@@ -322,7 +322,7 @@ The full list is the API client, `src/lib/mddb-client.js`.
 
 ## License
 
-BSD 3-Clause License - see [LICENSE](../../LICENSE) for details.
+Business Source License 1.1 - see [LICENSE](../../LICENSE) and [LICENSING.md](../../LICENSING.md).
 
 ## See Also
 

@@ -9,7 +9,7 @@ status: publish
 
 ## Overview
 
-MDDB is a BSD-3-Clause embedded document database. Starting with v2.9.15 it ships a coordinated set of controls designed to satisfy the administrative and technical requirements of **ISO/IEC 27001:2022 Annex A** and the **SOC 2 Trust Services Criteria** (Security, Confidentiality, Availability). This document is the compliance map, the threat model, and the operator checklist — everything an auditor or security reviewer needs to trace a control from requirement to source file. For vulnerability disclosure and the public security policy, see [`/SECURITY.md`](https://github.com/tradik/mddb/blob/main/SECURITY.md) at the repo root.
+MDDB is a source-available embedded document database (licences in [LICENSING.md](https://github.com/tradik/mddb/blob/main/LICENSING.md)). Starting with v2.9.15 it ships a coordinated set of controls designed to satisfy the administrative and technical requirements of **ISO/IEC 27001:2022 Annex A** and the **SOC 2 Trust Services Criteria** (Security, Confidentiality, Availability). This document is the compliance map, the threat model, and the operator checklist — everything an auditor or security reviewer needs to trace a control from requirement to source file. For vulnerability disclosure and the public security policy, see [`/SECURITY.md`](https://github.com/tradik/mddb/blob/main/SECURITY.md) at the repo root.
 
 This page does not duplicate the configuration reference. Every environment variable mentioned here is fully specified in [docs/config.md](config.md); every endpoint is fully specified in [docs/API.md](API.md).
 
