@@ -21,6 +21,10 @@ RUN mkdir -p /app/data /data && \
 
 USER mddb
 
+# MCP Registry ownership proof: must equal server.json's "name" (this is
+# the image the entry points at; release.yml repeats the label).
+LABEL io.modelcontextprotocol.server.name="com.tradik/mddb"
+
 EXPOSE 11023 11024 9000 11443
 
 ENV MDDB_ADDR=":11023" \

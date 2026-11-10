@@ -149,6 +149,82 @@ curl -X POST http://localhost:9000/mcp \
 }
 ```
 
+## MDDB in the MCP Registry
+
+MDDB is listed in the official [MCP Registry](https://registry.modelcontextprotocol.io/)
+as **`com.tradik/mddb`**. The entry is `server.json` at the root of the
+repository: one OCI package, `docker.io/tradik/mddb:<version>`, served over
+stdio with `MDDB_MCP_STDIO=true`, run with `--network host` and a volume on
+`/app/data` — the same command as the README's
+[Connect to Claude / Cursor / Windsurf (MCP)](https://github.com/tradik/mddb#connect-to-claude--cursor--windsurf-mcp)
+snippet, so a host that reads the registry and a user who pastes the snippet
+start the same server. The description is the one-liner from
+[LISTING.md](LISTING.md), which every catalogue uses.
+
+**Installing from the registry.** A host or a client that browses the registry
+(and the aggregators that copy it hourly: Glama, PulseMCP, mcp.so, the
+clients' own sub-registries) finds the entry by name or by searching "mddb",
+reads the latest version and runs the package it names:
+
+```bash
+curl -s https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest \
+  | jq '.server | {version, image: .packages[0].identifier}'
+# the release version, and docker.io/tradik/mddb:<that version>
+```
+
+What the host then runs is `docker run -i --rm --network host -v mddb-data:/app/data
+-e MDDB_MCP_STDIO=true docker.io/tradik/mddb:<version>`; the registry's
+`runtimeArguments` and `environmentVariables` spell it out, and a host may ask
+for a different volume name or a `MDDB_MCP_TOOLSETS` value before starting.
+Without a registry-aware host, the README snippet is the same thing by hand.
+
+**Refreshed with every tag.** The `publish-mcp-registry` job in
+`.github/workflows/release.yml` runs after the Docker image is on Docker Hub:
+it downloads the pinned `mcp-publisher` release and checks its Sigstore bundle
+with `cosign verify-blob`, validates `server.json`, checks that its `version`
+and image tag are the tag being released, logs in, publishes and then asserts
+that the registry serves the new version. The registry keeps one record per
+version and refuses a re-publish, so `server.json` is one of the files
+`scripts/bump-version.sh` rewrites and `scripts/check-version.sh` compares;
+`services/mddbd/mcp_registry_doc_test.go` checks the entry against the server
+before a release (name equal to the image label, version equal to `VERSION`,
+description within 100 characters with the tool count, every environment
+variable a real setting).
+
+**Why the image carries a label.** The registry proves that an entry owns the
+image it names by reading the image's `io.modelcontextprotocol.server.name`
+label, which must equal the entry's `name`. Both Dockerfiles and the release
+workflow set it to `com.tradik/mddb` ([DOCKER.md](DOCKER.md#production-image)).
+
+**Owner setup (once).** The `com.tradik` namespace is proven with a DNS TXT
+record and an Ed25519 key:
+
+```bash
+openssl genpkey -algorithm Ed25519 -out mcp-registry-key.pem        # OpenSSL 3
+PUBLIC_KEY="$(openssl pkey -in mcp-registry-key.pem -pubout -outform DER | tail -c 32 | base64)"
+echo "tradik.com. IN TXT \"v=MCPv1; k=ed25519; p=${PUBLIC_KEY}\""     # add this record
+PRIVATE_KEY="$(openssl pkey -in mcp-registry-key.pem -noout -text | grep -A3 'priv:' | tail -n +2 | tr -d ' :\n')"
+```
+
+1. Add the TXT record on the **apex** `tradik.com` (not under a selector such
+   as `_mcp-auth.tradik.com`; the registry checks the apex only), and wait for
+   it to propagate.
+2. In the repository settings, environment `mcp-registry` (GitHub creates it
+   on the job's first run; create it earlier to set the rules), add the secret
+   `MCP_DNS_PRIVATE_KEY` with the value of `PRIVATE_KEY` (hex), and restrict the
+   environment's deployment branches and tags to `v*`. The key goes nowhere
+   else: not into the repository, not into a repository-level secret.
+3. Until the secret exists, the job validates `server.json` and ends with a
+   notice saying nothing was published; the release is not held back. With
+   the secret, the first tag publishes the entry.
+4. To rotate the key, generate a new pair, replace the TXT record (remove the
+   old one: a stale record is tried first and fails the login) and the secret.
+
+The fallback, should DNS block a release, is the GitHub namespace
+`io.github.tradik/mddb` with `mcp-publisher login github-oidc` and no secret;
+a change of namespace later is a new entry, with the old one marked deprecated,
+which is why the DNS name was chosen first.
+
 ## Environment Variables
 
 ### Core

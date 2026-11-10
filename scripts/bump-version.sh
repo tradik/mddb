@@ -3,8 +3,8 @@
 # bump-version.sh — set the release version in every source check-version.sh
 # guards.
 #
-# The guard knows where the version lives in thirteen files and says when they
-# disagree. Until now nothing set them, so a release meant thirteen hand edits
+# The guard knows where the version lives in sixteen files and says when they
+# disagree. Until now nothing set them, so a release meant sixteen hand edits
 # and a re-run of the guard to find the one that was missed. That is the same
 # shape as the bug the Makefile had, where `make version` printed 2.11.4 through
 # two releases because it held a fourteenth copy nothing checked.
@@ -144,6 +144,15 @@ bump "integrations/langchain-mddb/pyproject.toml" \
 bump "docker-compose.yml" \
 	"(image: tradik/mddb:.*MDDB_VERSION:-)${V}" \
 	"\\1${NEW}" || FAILED=1
+# The MCP Registry entry (MKT-001). The registry refuses a version it already
+# holds, so a release that forgot this line would publish nothing; and the OCI
+# identifier names the image tag release.yml pushes for the same release.
+bump "server.json" \
+	"^  \"version\": \"${V}\"" \
+	"  \"version\": \"${NEW}\"" || FAILED=1
+bump "server.json" \
+	"^      \"identifier\": \"docker.io/tradik/mddb:${V}\"" \
+	"      \"identifier\": \"docker.io/tradik/mddb:${NEW}\"" || FAILED=1
 # The download section prints this verbatim, and it had been wrong twice in a
 # row — 2.11.4's date shown first for 2.12.0 and then for 2.13.0 — because the
 # version beside it moved and this did not. It moves with the version now.

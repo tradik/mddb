@@ -129,7 +129,7 @@ The Docker workflow runs on:
 1. **Tag push**: `v*.*.*` (e.g., v2.18.6)
    - Builds and pushes versioned images
    - Updates `latest` tag
-   - Updates Docker Hub description
+   - Does **not** update the Docker Hub description — see [DOCKER_HUB_UPDATE.md](DOCKER_HUB_UPDATE.md)
 
 2. **Main branch push**:
    - Builds and pushes `latest` tag
@@ -163,17 +163,17 @@ The Docker workflow runs on:
 
 ## Updating Docker Hub Description
 
-The description is automatically updated on each release. To manually update:
+The description is **not** updated by the release workflow; the push token has
+no permission to write it. After a release:
 
-1. Edit `docs/DOCKER_HUB.md`
-2. Commit and push changes
-3. Trigger workflow (tag push or manual)
-
-Or manually:
 1. Go to Docker Hub repository
 2. Click "Edit" on Overview tab
-3. Paste content from `docs/DOCKER_HUB.md`
+3. Paste content from `docs/DOCKER_HUB.md`; the short description is
+   `docs/DOCKER_HUB_SHORT.txt`
 4. Click "Update"
+
+Both files copy their text from [LISTING.md](LISTING.md); the full steps and the
+optional automation are in [DOCKER_HUB_UPDATE.md](DOCKER_HUB_UPDATE.md).
 
 ## Security Best Practices
 

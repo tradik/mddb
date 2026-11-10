@@ -148,7 +148,9 @@ func TestSiteSizeClaimsInSync(t *testing.T) {
 		t.Errorf(".ssg.yaml: mddbBinarySize ~%gMB is more than 10%% from the measured %.1f MiB", binary, mib)
 	}
 
-	binaryRe := regexp.MustCompile(`~(\d+(?:\.\d+)?) ?MB binary|binary is ~(\d+(?:\.\d+)?) MB`)
+	// "~32 MB Go binary" is the catalogue wording (docs/LISTING.md), hence the
+	// optional "Go".
+	binaryRe := regexp.MustCompile(`~(\d+(?:\.\d+)?) ?MB (?:Go )?binary|binary is ~(\d+(?:\.\d+)?) MB`)
 	dockerRe := regexp.MustCompile("Docker image is ~(\\d+) ?MB|\\| Docker image \\| ~(\\d+) ?MB|`tradik/mddb:latest` \\| ~(\\d+) ?MB|image size \\(~(\\d+) ?MB")
 	for _, c := range []struct {
 		re    *regexp.Regexp
@@ -156,7 +158,7 @@ func TestSiteSizeClaimsInSync(t *testing.T) {
 		what  string
 		paths []string
 	}{
-		{binaryRe, binary, "binary size (MB)", []string{"../../README.md", "../../docs/README.md", "../../docs/index.md", "../../docs/COMPARISON.md"}},
+		{binaryRe, binary, "binary size (MB)", []string{"../../README.md", "../../docs/README.md", "../../docs/index.md", "../../docs/COMPARISON.md", "../../docs/LISTING.md", "../../docs/DOCKER_HUB.md"}},
 		{dockerRe, docker, "Docker image size (MB)", []string{"../../README.md", "../../docs/COMPARISON.md", "../../docs/FEATURES.md"}},
 	} {
 		for _, path := range c.paths {
@@ -191,9 +193,11 @@ func TestLandingSizesRenderFromVariables(t *testing.T) {
 }
 
 // TestNoStaleCountsAnywhereInDocs: the per-page guards above name the pages
-// that must state a count; this one reads every docs page and the README for
-// a stale one. "18 languages" survived in INTEGRATIONS.md after the pages the
-// language guard lists were fixed, because no guard read that page.
+// that must state a count; this one reads every docs page, the README and the
+// catalogue texts outside docs/*.md (the MCP Registry entry server.json and
+// the Docker Hub short description) for a stale one. "18 languages" survived
+// in INTEGRATIONS.md after the pages the language guard lists were fixed,
+// because no guard read that page.
 func TestNoStaleCountsAnywhereInDocs(t *testing.T) {
 	reg := fts.NewLangRegistry("en")
 	fts.RegisterDefaultLanguages(reg)
@@ -210,7 +214,7 @@ func TestNoStaleCountsAnywhereInDocs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range append(pages, "../../README.md") {
+	for _, path := range append(pages, "../../README.md", "../../server.json", "../../docs/DOCKER_HUB_SHORT.txt") {
 		text := readRepoFile(t, path)
 		for _, c := range claims {
 			for _, m := range c.re.FindAllStringSubmatch(text, -1) {

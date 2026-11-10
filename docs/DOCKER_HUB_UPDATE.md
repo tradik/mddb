@@ -7,7 +7,13 @@ status: publish
 
 # Docker Hub Description Update
 
-The Docker Hub description is **not automatically updated** by GitHub Actions due to token permission requirements.
+The Docker Hub description is **not updated by CI**. `.github/workflows/release.yml`
+(`docker-server`) builds and pushes the image and sets its labels, and nothing
+in it writes the Hub listing: the `DOCKER_HUB_TOKEN` it holds is a push token
+without the repository-write permission the description API wants. The texts
+come from [LISTING.md](LISTING.md), which `server.json` and the guards in
+`services/mddbd` share, so after each release the Hub is refreshed by hand from
+two files that are already correct.
 
 ## Manual Update Process
 
@@ -21,22 +27,28 @@ Go to: https://hub.docker.com/r/tradik/mddb
 1. Click on the repository
 2. Go to the **"Overview"** tab
 3. Click **"Edit"** button
-4. Copy content from `docs/DOCKER_HUB.md`
+4. Copy content from `docs/DOCKER_HUB.md` (its first paragraph is the long
+   description from LISTING.md)
 5. Paste into the description field
 6. Click **"Update"**
 
 ### 4. Update Short Description
 1. Go to **"Settings"** tab
-2. Find **"Short Description"** field
-3. Copy from `docs/DOCKER_HUB_SHORT.txt`:
+2. Find **"Short Description"** field (100 characters at most)
+3. Copy from `docs/DOCKER_HUB_SHORT.txt`, the one-liner from LISTING.md:
    ```
-   High-performance markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf) and full revision history
+   Embedded knowledge base with 97 MCP tools, hybrid BM25+vector search and RAG. One Go binary.
    ```
 4. Paste and save
 
+### 5. Log it
+Add a row to the submissions table in [LISTING.md](LISTING.md#submissions)
+(Docker Hub, which text, the date, who).
+
 ## Automated Update (Optional)
 
-To enable automated description updates, the Docker Hub token needs additional permissions:
+To let the release refresh the description, the Docker Hub token needs more
+than push:
 
 ### Requirements:
 1. Go to: https://hub.docker.com/settings/security
@@ -44,39 +56,22 @@ To enable automated description updates, the Docker Hub token needs additional p
    - **Read & Write** permissions
    - **Repository** scope
 3. Update GitHub Secret `DOCKER_HUB_TOKEN` with new token
-4. Uncomment the "Update Docker Hub description" step in `.github/workflows/docker.yml`
+4. Add the step below to the `docker-server` job in `.github/workflows/release.yml`,
+   after "Build and push server image", with the action pinned by SHA as the
+   other steps are
 
-### Enable in Workflow:
+### Step for the Workflow:
 ```yaml
-# Uncomment these lines in .github/workflows/docker.yml
 - name: Update Docker Hub description
-  uses: peter-evans/dockerhub-description@v5
+  uses: peter-evans/dockerhub-description@<sha> # v5
   with:
     username: ${{ env.DOCKER_HUB_USERNAME }}
     password: ${{ secrets.DOCKER_HUB_TOKEN }}
     repository: ${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}
     readme-filepath: ./docs/DOCKER_HUB.md
-    short-description: "High-performance markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf) and full revision history"
+    short-description: ${{ github.event.repository.description }}
 ```
 
-## Files to Update
-
-When updating Docker Hub description, make sure these files are current:
-
-- **`docs/DOCKER_HUB.md`** - Full description (markdown)
-- **`docs/DOCKER_HUB_SHORT.txt`** - Short description (100 chars max)
-
-## Update Frequency
-
-Update the Docker Hub description when:
-- ✅ New major version released
-- ✅ Performance benchmarks change significantly
-- ✅ New features added
-- ✅ Platform support changes
-- ✅ Documentation improvements
-
-## Current Status
-
-- **Automated Updates**: ❌ Disabled (token permissions)
-- **Manual Updates**: ✅ Required
-- **Last Updated**: Check Docker Hub repository
+Set the GitHub repository description to the same one-liner first
+(`gh repo edit tradik/mddb --description "$(cat docs/DOCKER_HUB_SHORT.txt)"`),
+so that the step reads it from there instead of a second copy in the workflow.

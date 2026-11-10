@@ -73,6 +73,16 @@ docker run -d \
 - Health checks included
 - Security hardened
 
+**Labels**: besides the `org.opencontainers.image.*` labels, the image carries
+`io.modelcontextprotocol.server.name="com.tradik/mddb"`. The official
+[MCP Registry](MCP.md#mddb-in-the-mcp-registry) proves that an entry owns the
+image it names by reading this label from the published image and comparing it
+with the entry's `name`, so the value must equal `server.json`'s `name`; both
+Dockerfiles and the `labels:` block of the release workflow set it, and
+`services/mddbd/mcp_registry_doc_test.go` fails when one of them differs.
+`docker inspect tradik/mddb:latest --format '{{index .Config.Labels "io.modelcontextprotocol.server.name"}}'`
+shows it.
+
 **Build**:
 ```bash
 make docker-build

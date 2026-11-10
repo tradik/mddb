@@ -75,6 +75,13 @@ extract "integrations/langchain-mddb/pyproject.toml" "pypi version" "^version = 
 extract "integrations/langchain-mddb/pyproject.toml" "mddb-client floor" "^client = \[\"mddb-client>=${version_re}\"\]"
 extract "services/python-extension/pyproject.toml" "pypi version" "^version = \"${version_re}\""
 
+# The MCP Registry entry (MKT-001): the registry keeps one record per version
+# and refuses a re-publish of the same one, so a stale server.json means the
+# release publishes nothing. The OCI identifier is the image tag the entry
+# points hosts at; it must be the tag release.yml pushes for this release.
+extract "server.json" "mcp registry version"    "^  \"version\": \"${version_re}\""
+extract "server.json" "mcp registry oci image"  "^      \"identifier\": \"docker.io/tradik/mddb:${version_re}\""
+
 # The compose default must match too: it is what `docker compose up` pulls.
 while IFS= read -r match; do
 	file="${match%%:*}"

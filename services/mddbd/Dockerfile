@@ -67,6 +67,11 @@ RUN mkdir -p /app/data /data && \
 # Switch to non-root user
 USER mddb
 
+# The MCP Registry (server.json at the repository root) verifies that the
+# image named by the entry carries the entry's name; the value must equal
+# server.json's "name" (services/mddbd/mcp_registry_doc_test.go checks).
+LABEL io.modelcontextprotocol.server.name="com.tradik/mddb"
+
 # Expose ports (HTTP API, gRPC, MCP, HTTP/3)
 EXPOSE 11023 11024 9000 11443
 

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.tradik/mddb",
+  "title": "MDDB",
+  "description": "Embedded knowledge base with 97 MCP tools, hybrid BM25+vector search and RAG. One Go binary.",
+  "repository": {
+    "url": "https://github.com/tradik/mddb",
+    "source": "github"
+  },
+  "websiteUrl": "https://mddb.tradik.com",
+  "version": "2.18.11",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "docker.io/tradik/mddb:2.18.11",
+      "runtimeHint": "docker",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--network",
+          "value": "host",
+          "description": "Reach an MDDB server already running on this host"
+        },
+        {
+          "type": "named",
+          "name": "-v",
+          "value": "{volume}:/app/data",
+          "isRequired": true,
+          "description": "Where the database file lives between runs",
+          "variables": {
+            "volume": {
+              "description": "Named Docker volume or host path for the database",
+              "default": "mddb-data"
+            }
+          }
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "MDDB_MCP_STDIO",
+          "value": "true",
+          "isRequired": true,
+          "description": "Serve MCP on stdin/stdout instead of the HTTP listener"
+        },
+        {
+          "name": "MDDB_MCP_TOOLSETS",
+          "default": "all",
+          "isRequired": false,
+          "description": "Comma-separated toolsets to expose (search, code, documents, ingest, memory, schema, admin, geo, automation, webhooks, wordpress)"
+        }
+      ]
+    }
+  ]
+}

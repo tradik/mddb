@@ -1,1 +1,1 @@
-High-performance markdown database with dual protocol support (HTTP/JSON + gRPC/Protobuf) and full revision history
+Embedded knowledge base with 97 MCP tools, hybrid BM25+vector search and RAG. One Go binary.

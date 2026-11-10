@@ -27,14 +27,19 @@ func TestMCPToolCountDocsInSync(t *testing.T) {
 	// Paths are relative to this package directory (services/mddbd). The docs
 	// index and the architecture overview joined the guard after both were
 	// found still claiming 67 — the number the guard was written to stop
-	// drifting, in the two files it did not yet cover.
+	// drifting, in the two files it did not yet cover. The catalogue texts
+	// (MKT-005) joined before they could drift: the MCP Registry entry, the
+	// listing page they are copied from, and the Docker Hub short description.
 	for _, path := range []string{
 		"../../README.md",
 		"../../docs/MCP.md",
 		"../../docs/README.md",
 		"../../docs/ARCHITECTURE.md",
+		"../../server.json",
+		"../../docs/LISTING.md",
+		"../../docs/DOCKER_HUB_SHORT.txt",
 	} {
-		data, err := os.ReadFile(path) // #nosec G304 -- path is one of two hardcoded repo doc files, not user input
+		data, err := os.ReadFile(path) // #nosec G304 -- path is one of the hardcoded repo doc files above, not user input
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
 		}

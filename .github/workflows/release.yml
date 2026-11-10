@@ -1085,6 +1085,7 @@ jobs:
             org.opencontainers.image.documentation=https://github.com/tradik/mddb/blob/main/README.md
             org.opencontainers.image.licenses=BUSL-1.1
             org.opencontainers.image.vendor=MDDB Team
+            io.modelcontextprotocol.server.name=com.tradik/mddb
 
       - name: Generate artifact attestation for server
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
@@ -1092,6 +1093,117 @@ jobs:
           subject-name: ${{ env.GHCR_REGISTRY }}/${{ github.repository }}
           subject-digest: ${{ steps.build-server.outputs.digest }}
           push-to-registry: true
+
+  # MKT-001: the entry in the official MCP Registry
+  # (registry.modelcontextprotocol.io), refreshed with every tag so a host
+  # that browses the registry installs the version the Docker image carries.
+  # It waits for docker-server because the registry proves ownership by
+  # reading the io.modelcontextprotocol.server.name label of the image
+  # server.json names, so that image has to be on Docker Hub first; and for
+  # create-release so that a registry outage never holds back the binaries.
+  #
+  # The namespace com.tradik is proven by a DNS TXT record on the apex of
+  # tradik.com and an Ed25519 key that lives only in the mcp-registry
+  # environment as MCP_DNS_PRIVATE_KEY (docs/MCP.md, "MDDB in the MCP
+  # Registry"). Until the owner adds it, the job validates server.json and
+  # says so in a notice instead of failing the release.
+  publish-mcp-registry:
+    name: Publish to MCP Registry
+    needs: [docker-server, create-release]
+    runs-on: ubuntu-latest
+    environment: mcp-registry
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      # A release tag, verified below with its Sigstore bundle — never the
+      # mutable releases/latest, as the registry's own guidance says.
+      MCP_PUBLISHER_VERSION: v1.8.9
+      MCP_REGISTRY_LATEST: https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest
+
+    steps:
+      - name: Check for the DNS signing key
+        id: key
+        env:
+          MCP_DNS_PRIVATE_KEY: ${{ secrets.MCP_DNS_PRIVATE_KEY }}
+        run: |
+          if [ -n "${MCP_DNS_PRIVATE_KEY}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=MCP Registry entry not published::MCP_DNS_PRIVATE_KEY is not set in the mcp-registry environment. server.json is validated below and nothing is published; docs/MCP.md, section 'MDDB in the MCP Registry', says how to add the key."
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Get version
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION=${{ github.event.inputs.version }}
+          else
+            VERSION=${GITHUB_REF#refs/tags/}
+          fi
+          echo "VERSION_NUM=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+
+      - name: Download and verify mcp-publisher
+        run: |
+          set -euo pipefail
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')"
+          archive="mcp-publisher_${os}_${arch}.tar.gz"
+          base_url="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+
+          curl --fail --location --silent --show-error --output "$archive" "$base_url/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base_url/$archive.sigstore.json"
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+
+      # The registry holds one record per version and refuses a re-publish,
+      # so a server.json behind the tag would publish nothing at all — or,
+      # worse, point hosts at an image tag this release did not push.
+      - name: Validate server.json against the tag
+        run: |
+          set -euo pipefail
+          ./mcp-publisher validate
+          want="${{ steps.meta.outputs.VERSION_NUM }}"
+          got="$(jq -r '.version' server.json)"
+          image="$(jq -r '.packages[0].identifier' server.json)"
+          if [ "$got" != "$want" ] || [ "$image" != "docker.io/tradik/mddb:${want}" ]; then
+            echo "::error title=server.json is behind the tag::server.json says version ${got} and image ${image}; the tag is ${want}. Run scripts/bump-version.sh ${want} before tagging."
+            exit 1
+          fi
+
+      - name: Authenticate to MCP Registry (DNS, tradik.com)
+        if: steps.key.outputs.present == 'true'
+        env:
+          MCP_DNS_PRIVATE_KEY: ${{ secrets.MCP_DNS_PRIVATE_KEY }}
+        run: ./mcp-publisher login dns --domain tradik.com --private-key "$MCP_DNS_PRIVATE_KEY"
+
+      - name: Publish server to MCP Registry
+        if: steps.key.outputs.present == 'true'
+        run: ./mcp-publisher publish
+
+      - name: Assert the registry serves this version
+        if: steps.key.outputs.present == 'true'
+        run: |
+          set -euo pipefail
+          want="${{ steps.meta.outputs.VERSION_NUM }}"
+          got="$(curl --fail --silent --show-error "${MCP_REGISTRY_LATEST}" | jq -r '.server.version')"
+          if [ "$got" != "$want" ]; then
+            echo "::error title=MCP Registry::latest is ${got}, expected ${want} (${MCP_REGISTRY_LATEST})"
+            exit 1
+          fi
+          echo "MCP Registry: com.tradik/mddb ${got} — ${MCP_REGISTRY_LATEST}" >> "$GITHUB_STEP_SUMMARY"
 
   docker-panel:
     name: Build Panel Docker Image
@@ -1218,6 +1330,10 @@ jobs:
           - `${{ env.DOCKER_HUB_USERNAME }}/${{ env.IMAGE_NAME }}:panel`
 
           > MCP is built into the server image. Use `MDDB_MCP_STDIO=true` for stdio mode.
+
+          ### MCP Registry
+          - `com.tradik/mddb` — https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest
+            (published by the Publish to MCP Registry job when the `mcp-registry` environment holds `MCP_DNS_PRIVATE_KEY`)
 
           ### Platforms
           - Native: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, freebsd/amd64

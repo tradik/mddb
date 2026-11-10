@@ -112,5 +112,10 @@ go.work
 audit/
 AUDIT_REPORT.md
 
+# Catalogue metadata read from the repository, not from an image: the MCP
+# Registry entry and Glama's maintainer file.
+server.json
+glama.json
+
 # ssg build cache
 .ssg-cache/

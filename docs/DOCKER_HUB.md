@@ -1,7 +1,7 @@
 ---
 title: "MDDB - High-Performance Markdown Database"
 slug: "docs/docker-hub"
-description: "MDDB on Docker Hub - a markdown document database with rich metadata, full revision history and both HTTP/JSON and gRPC protocols in one small image."
+description: "MDDB on Docker Hub - an embedded knowledge base with a built-in MCP server, hybrid BM25+vector search and RAG, full revision history and HTTP/JSON plus gRPC in one small image."
 status: publish
 ---
 
@@ -13,7 +13,9 @@ status: publish
 
 **The fastest markdown database with gRPC and HTTP/3 support**
 
-MDDB is a specialized, high-performance database server designed for storing and managing markdown documents with rich metadata, full revision history, and dual protocol support (HTTP/JSON + gRPC/Protobuf).
+AI-native embedded knowledge base with a built-in MCP server (97 tools), hybrid BM25+vector search and RAG. Single ~32 MB Go binary, zero config. In production behind daemonports.org (about 120,000 pages).
+
+Markdown documents with rich metadata, full revision history, and dual protocol support (HTTP/JSON + gRPC/Protobuf). The MCP server is in the image: `docker run -i --rm --network host -v mddb-data:/app/data -e MDDB_MCP_STDIO=true tradik/mddb:latest` is the whole client configuration, and the image is listed in the [MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest) as `com.tradik/mddb`.
 
 ## 🚀 Performance
 

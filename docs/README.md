@@ -27,6 +27,7 @@ Welcome to the MDDB documentation! This guide will help you understand, deploy, 
 - **[Quick Start Guide](QUICKSTART.md)** - Get up and running in 5 minutes
 - **[Using MDDB from AI Agents](AGENTS.md)** - MCP toolsets and keys, agent instructions, `autoindex`, passages, code symbols and graph, corpus packs, confirming destructive tools
 - **[MCP Server](MCP.md)** - Transports, API keys, OAuth 2.1, toolsets and the built-in tool catalogue
+- **[Catalogue Listing Text](LISTING.md)** - The one description MDDB uses in the MCP Registry, on Docker Hub and in directories, and the submissions log
 - **[API Documentation](API.md)** - Complete HTTP/JSON API reference
 - **[OpenAPI specification](/docs/api/openapi.yaml)** - Machine-readable API spec (OpenAPI 3.0)
 - **[REST API reference](/docs/api/reference/)** - every endpoint and schema, with a Try it console

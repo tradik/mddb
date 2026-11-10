@@ -6,6 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/tradik/mddb)](https://github.com/tradik/mddb/releases)
 [![Docker](https://img.shields.io/docker/v/tradik/mddb?label=docker)](https://hub.docker.com/r/tradik/mddb)
 [![Docker Pulls](https://img.shields.io/docker/pulls/tradik/mddb)](https://hub.docker.com/r/tradik/mddb)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-com.tradik%2Fmddb-5a3ea0.svg)](https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest)
 [![Tests](https://github.com/tradik/mddb/workflows/Tests/badge.svg)](https://github.com/tradik/mddb/actions)
 [![codecov](https://codecov.io/gh/tradik/mddb/branch/main/graph/badge.svg)](https://codecov.io/gh/tradik/mddb)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=tradik_mddb&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=tradik_mddb)
@@ -13,6 +14,10 @@
 **AI-native document database with built-in MCP server, file upload (PDF/DOCX/XLSX/PPTX/EPUB/EML/HTML/ODT/RTF/TEX/YAML/Wikipedia XML to Markdown), vector search, RAG pipelines, and 97 MCP tools. Plugs directly into Claude, ChatGPT, Cursor, Windsurf, and any MCP-compatible agent.**
 
 MDDB is a document database purpose-built for AI agents and LLM workflows. Upload files (PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT). They are auto-converted to Markdown and embedded for semantic search. Expose everything to AI agents via 97 built-in MCP tools. Integrates with [Docling](docs/INTEGRATIONS.md#1-docling--mddb-document-ingestion), [Langflow](docs/INTEGRATIONS.md#2-langflow--mddb-visual-rag-orchestration), [OpenSearch](docs/INTEGRATIONS.md#3-opensearch--mddb-scalable-search), [SSG](docs/INTEGRATIONS.md#4-ssg--static-site-generator-from-mddb), [wpexporter](docs/INTEGRATIONS.md#5-wpexporter--wordpress-to-mddb-migration), [Airbyte](docs/INTEGRATIONS.md#6-airbyte--mddb-elt-destination-connector), [WordPress Sync](docs/INTEGRATIONS.md#7-wordpress--mddb-sync-plugin), a [GitHub Action](docs/INTEGRATIONS.md#8-github-action--mddb-ci-sync), a [Grafana datasource](docs/INTEGRATIONS.md#9-grafana--mddb-datasource-plugin), and a [Chrome browser extension](docs/INTEGRATIONS.md#10-chrome-extension--mddb-browser-toolbar) for production pipelines. Single ~32MB binary, zero configuration, BoltDB embedded storage, triple-protocol APIs (HTTP + gRPC + GraphQL).
+
+**MCP quick start:** MDDB is in the [MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest) as `com.tradik/mddb`, and the whole client configuration is one `docker run` line.
+The snippet for Claude, Cursor and Windsurf is in [Connect to Claude / Cursor / Windsurf (MCP)](#connect-to-claude--cursor--windsurf-mcp);
+the tool catalogue, transports and toolsets are in [docs/MCP.md](docs/MCP.md).
 
 ## 🎯 What is MDDB?
 
