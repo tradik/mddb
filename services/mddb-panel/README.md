@@ -230,7 +230,7 @@ extends `vite.config.js`):
   the URL, query string, method and JSON body each one sends.
 
 `npm test` also measures coverage with `@vitest/coverage-v8`. Every file
-listed in `coverageFiles` in `vitest.config.js` must keep **at least 97%** of
+listed in `coverageFiles` in `vitest.config.js` must keep **at least 98%** of
 its lines, statements, functions and branches covered, checked per file;
 below that the run fails. The text summary prints to the terminal and the
 HTML report is written to `coverage/index.html` (ignored by git and Docker).

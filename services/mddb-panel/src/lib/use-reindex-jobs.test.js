@@ -1,7 +1,18 @@
-// use-reindex-jobs: describeJob turns a job into one line and isFinished
-// tells a stopped job; the hook itself is exercised by VectorPanel.test.jsx.
-import { describe, test, expect } from 'vitest';
-import { describeJob, isFinished } from './use-reindex-jobs';
+// @vitest-environment jsdom
+// use-reindex-jobs: describeJob turns a job into one line, isFinished tells a
+// stopped job, and the hook drops a stale poll answer for a job that finished
+// meanwhile; the rest of the hook is exercised by VectorPanel.test.jsx.
+import { describe, test, expect, vi, afterEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+
+vi.mock('./mddb-client', () => ({
+  default: { listVectorReindexJobs: vi.fn(), startVectorReindexJob: vi.fn(), getVectorReindexJob: vi.fn() },
+}));
+
+const { default: mddbClient } = await import('./mddb-client');
+const { describeJob, isFinished, useReindexJobs, POLL_MS } = await import('./use-reindex-jobs');
+
+afterEach(() => vi.useRealTimers());
 
 describe('describeJob', () => {
   test.each([
@@ -21,5 +32,33 @@ describe('isFinished', () => {
     expect(isFinished({ status: 'failed' })).toBe(true);
     expect(isFinished({ status: 'running' })).toBe(false);
     expect(isFinished(undefined)).toBe(false);
+  });
+});
+
+describe('useReindexJobs', () => {
+  test('a late progress answer for a job that already finished does not revive it', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(mddbClient.listVectorReindexJobs).mockResolvedValue({ jobs: [] });
+    vi.mocked(mddbClient.startVectorReindexJob).mockResolvedValue({ jobId: 'j1', status: 'running' });
+    const polls = [];
+    vi.mocked(mddbClient.getVectorReindexJob).mockImplementation(() => new Promise((resolve) => polls.push(resolve)));
+    const onFinished = vi.fn();
+    const { result } = renderHook(() => useReindexJobs(onFinished));
+
+    await act(() => result.current.start('notes', false));
+    expect(result.current.active.notes.status).toBe('running');
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    await act(() => vi.advanceTimersByTimeAsync(POLL_MS));
+    expect(polls).toHaveLength(2);
+
+    // The second poll answers first: the job is done and leaves `active`.
+    await act(async () => polls[1]({ jobId: 'j1', status: 'completed', done: 1 }));
+    expect(result.current.active).toEqual({});
+    expect(onFinished).toHaveBeenCalledTimes(1);
+
+    // The first poll's stale progress must not bring the job back.
+    await act(async () => polls[0]({ jobId: 'j1', status: 'running', percent: 50 }));
+    expect(result.current.active).toEqual({});
+    expect(result.current.messages.notes).toEqual({ success: true, message: 'Reindexed: 1 embedded of 1' });
   });
 });

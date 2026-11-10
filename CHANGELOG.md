@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Panel tests for `App.jsx`, `Sidebar.jsx` and `DocumentViewer.jsx`** (they had none) and the per-file coverage gate in `vitest.config.js` rises from 97% to 98%; the five files the catch-up touched below that line are at 100%. 65 suites, 929 tests.
 - **Panel: the server features of 2.18.2–2.18.11 it had not reached.**
   - New pages:
     - **Collection Aliases** (`/v1/aliases`): list, create or move, and delete.

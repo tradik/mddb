@@ -689,11 +689,11 @@ npm run lint
 # Fix linting issues
 npm run lint -- --fix
 
-# Every suite once, with the per-file coverage check (97%)
+# Every suite once, with the per-file coverage check (98%)
 npm test
 ```
 
-Files listed in `coverageFiles` in `vitest.config.js` must keep at least 97% of
+Files listed in `coverageFiles` in `vitest.config.js` must keep at least 98% of
 their statements, branches, functions and lines covered, per file. See the
 panel's README for how the suites are written.
 

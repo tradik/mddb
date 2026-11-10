@@ -191,6 +191,14 @@ describe('SearchAdvisorPanel', () => {
     expect(again.querySelector('svg')).toBeNull();
   });
 
+  test('Apply with the collection name cleared measures nothing', async () => {
+    await measureWith(fullAdvice);
+    fireEvent.change(screen.getByLabelText('Collection'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Apply to collection' }));
+    expect(mddbClient.searchAdvisor).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Storing…' })).toBeNull();
+  });
+
   test.each([
     ['the error message', new Error('API Error (404): collection not found'), 'API Error (404): collection not found'],
     ['a non-Error rejection as text', 'connection reset', 'connection reset'],

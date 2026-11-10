@@ -5,7 +5,7 @@
 // - Component suites (`*.test.jsx`) opt into a DOM with a
 //   `// @vitest-environment jsdom` docblock; everything else runs in Node.
 // - Coverage is measured per file: every file in `coverageFiles` must keep at
-//   least 97% of its lines, statements, functions and branches covered. Add a
+//   least 98% of its lines, statements, functions and branches covered. Add a
 //   file here when a release touches it.
 import { fileURLToPath } from 'node:url';
 import { defineConfig, mergeConfig } from 'vitest/config';
@@ -74,6 +74,10 @@ const coverageFiles = [
   'src/components/ReindexJobsTable.jsx',
   'src/components/CodeSymbolPanel.jsx',
   'src/components/ImagePreview.jsx',
+  // 2.19.0: files touched by the panel catch-up that had no tests.
+  'src/App.jsx',
+  'src/components/Sidebar.jsx',
+  'src/components/DocumentViewer.jsx',
 ];
 
 export default mergeConfig(
@@ -95,10 +99,10 @@ export default mergeConfig(
         reporter: ['text', 'html', 'json-summary', 'lcov'],
         thresholds: {
           perFile: true,
-          lines: 97,
-          statements: 97,
-          functions: 97,
-          branches: 97,
+          lines: 98,
+          statements: 98,
+          functions: 98,
+          branches: 98,
         },
       },
     },
