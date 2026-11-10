@@ -7,19 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.18.11] - 2026-10-30
-
 ### Security
 
-- **The access gate reads a JSON body whatever its Content-Type (#371).** The SEC-019 gate read the request body only when `Content-Type` named JSON, while the handlers decode JSON regardless. `curl -d '{…}'` sends `application/x-www-form-urlencoded`, so the gate saw no collection, required `"*"`, and refused a user who has permission on the collection the body names. Only `multipart/*` bodies (uploads, which authorize themselves) are now left to the handler. The gate was stricter than the handler, never looser.
+- **`pulldown-cmark` 0.13.6 in mddb-chat** (RUSTSEC-2026-0433, high: quadratic parsing of nested image wikilinks). `cargo audit` on `main` had been red since 2026-11-09.
 
 ### Added
-
-- **Synced sources: run now, the sources of a collection, `mddb-cli sync` (#377, INT-022 follow-up).** `POST /v1/automation/{id}/run`, gRPC `RunAutomation` and MCP `run_automation` run a cron rule's sync or backup at once, through the code its schedule fires: logged, announced on the jobs SSE stream, firing `source.synced` / `backup.failed`, setting `lastRun`. The answer is 202 with the run's `jobId`, or 409 / `Aborted` while the previous run is still going. A disabled rule can be run. Global administrator only. `GET /v1/automation?collection=` (gRPC `ListAutomationRequest.collection`, MCP `list_automation` `collection`) lists the rules acting on a collection; every sync and backup carries `lastResult` (status, added/updated/unchanged/deleted/failed, error, duration) from the automation log, never stored, with the S3 secret masked. New `mddb-cli sync create|list [--collection]|run|delete`. The panel's automation rules have a Run now button and show each sync or backup's last result. `test_automation` stays a read-only dry run.
-
-- **Corpus packs over MCP and gRPC (#378, AGT-005 follow-up).** MCP tools in the `admin` toolset: `corpus_list` (read-only, the caller's tenant), `corpus_install` (admin; the server downloads a `.mddbpack` from an `https://` URL through its SSRF guard, a redirect may not leave TLS, capped at `MDDB_CORPUS_MAX_BYTES`, an optional `sha256` checked before anything is installed) and `corpus_remove` (admin, destructive; `MDDB_MCP_CONFIRM_DESTRUCTIVE` asks for the pack's name). gRPC: `ListCorpusPacks`, `InstallCorpusPack` (a client stream of the pack, or an https URL in the first message), `RemoveCorpusPack`, `BuildCorpusPack` (a server stream of 1 MiB chunks). Permissions as `/v1/corpus/*`; REST, MCP and gRPC share one implementation. There is no MCP build tool: a pack is a file a tool answer cannot carry. The server now has 97 built-in MCP tools (93 in 2.18.10).
-
-- `make sonar-local`: the SonarCloud scan and quality gate from this machine before a push (Docker, `SONAR_TOKEN`).
 
 - **Panel: the server features of 2.18.2–2.18.11 it had not reached.**
   - New pages:
@@ -34,6 +26,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - An image document (`meta.kind: image`) shows its picture from `/v1/image`.
   - Upload has an *Extract images* option and accepts every format `/v1/upload` converts: xlsx, ods, csv, tsv, pptx, odp, epub, eml, mbox and `.markdown` were missing.
 
+### Fixed
+
+- **Panel upload stored frontmatter lists wrong.** The upload dialog parsed Markdown frontmatter itself, line by line: `tags: [a, b]` became `["[a", "b]"]`, a block list (`tags:` then `- a`) was lost, and a value holding a comma was split. Markdown now goes to `/v1/upload` like every other format, so the server's parser reads it (the one `/v1/ingest`, `mddb-cli` and the folder loader use). A Markdown file keeps the key earlier panels gave it (its name without `.md`), so uploading it again replaces the same document.
+
+## [2.18.11] - 2026-10-30
+
+### Security
+
+- **The access gate reads a JSON body whatever its Content-Type (#371).** The SEC-019 gate read the request body only when `Content-Type` named JSON, while the handlers decode JSON regardless. `curl -d '{…}'` sends `application/x-www-form-urlencoded`, so the gate saw no collection, required `"*"`, and refused a user who has permission on the collection the body names. Only `multipart/*` bodies (uploads, which authorize themselves) are now left to the handler. The gate was stricter than the handler, never looser.
+
+### Added
+
+- **Synced sources: run now, the sources of a collection, `mddb-cli sync` (#377, INT-022 follow-up).** `POST /v1/automation/{id}/run`, gRPC `RunAutomation` and MCP `run_automation` run a cron rule's sync or backup at once, through the code its schedule fires: logged, announced on the jobs SSE stream, firing `source.synced` / `backup.failed`, setting `lastRun`. The answer is 202 with the run's `jobId`, or 409 / `Aborted` while the previous run is still going. A disabled rule can be run. Global administrator only. `GET /v1/automation?collection=` (gRPC `ListAutomationRequest.collection`, MCP `list_automation` `collection`) lists the rules acting on a collection; every sync and backup carries `lastResult` (status, added/updated/unchanged/deleted/failed, error, duration) from the automation log, never stored, with the S3 secret masked. New `mddb-cli sync create|list [--collection]|run|delete`. The panel's automation rules have a Run now button and show each sync or backup's last result. `test_automation` stays a read-only dry run.
+
+- **Corpus packs over MCP and gRPC (#378, AGT-005 follow-up).** MCP tools in the `admin` toolset: `corpus_list` (read-only, the caller's tenant), `corpus_install` (admin; the server downloads a `.mddbpack` from an `https://` URL through its SSRF guard, a redirect may not leave TLS, capped at `MDDB_CORPUS_MAX_BYTES`, an optional `sha256` checked before anything is installed) and `corpus_remove` (admin, destructive; `MDDB_MCP_CONFIRM_DESTRUCTIVE` asks for the pack's name). gRPC: `ListCorpusPacks`, `InstallCorpusPack` (a client stream of the pack, or an https URL in the first message), `RemoveCorpusPack`, `BuildCorpusPack` (a server stream of 1 MiB chunks). Permissions as `/v1/corpus/*`; REST, MCP and gRPC share one implementation. There is no MCP build tool: a pack is a file a tool answer cannot carry. The server now has 97 built-in MCP tools (93 in 2.18.10).
+
+- `make sonar-local`: the SonarCloud scan and quality gate from this machine before a push (Docker, `SONAR_TOKEN`).
+
 ### Changed
 
 - **`mddb-cli add` and `mddb-cli autoindex` read Markdown frontmatter (#373)**, like `/v1/upload` and the folder loader: the keys become meta and the body is stored without the block. `add` merges `-m` over the frontmatter; `autoindex` sends `.md`, `.markdown` and `.mdx` files with `extractFrontmatter`, so the server reads them once with the same parser, and the file meta (`path`, `kind`, ...) wins. `--no-frontmatter` on both stores files as they are. The CLI carries a byte-identical copy of the server's parser, kept in step by a test and by shared fixtures in `testdata/frontmatter/cases.json`. A Markdown file with frontmatter is rewritten once on the next `autoindex` run, as its stored body changes.
@@ -44,7 +54,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`scripts/load-md-folder.sh` kept only the first item of a frontmatter list (#372)**: `tags: database, markdown, golang` became `tags=[database]`. The loader no longer parses frontmatter in shell: it stores each file with `mddb-cli add -f`, which reads it, so comma, `[flow]` and `- item` block lists arrive whole. `-s/--server` now reaches the CLI (exported as `MDDB_SERVER`); before, it was only printed. The loader stops with an error on an mddb-cli older than 2.18.11, which would store the block as text. The loader's `source`, `filename` and `-m` meta now win over a frontmatter key of the same name. New test: `make test-load-md-folder`.
 - **Frontmatter lists in `/v1/upload`, `/v1/ingest` (`extractFrontmatter`), import-url, MCP upload and sync**: a flow list `tags: [a, b]` was stored as `["[a", "b]"]` and a block list (`tags:` then `- a` lines) was dropped; both are now lists. Quotes are stripped per item, empty items are dropped, and a `- key: value` item (a list of maps, which flat meta cannot hold) is not stored.
-- **Panel upload stored frontmatter lists wrong.** The upload dialog parsed Markdown frontmatter itself, line by line: `tags: [a, b]` became `["[a", "b]"]`, a block list (`tags:` then `- a`) was lost, and a value holding a comma was split. Markdown now goes to `/v1/upload` like every other format, so the server's parser reads it (the one `/v1/ingest`, `mddb-cli` and the folder loader use). A Markdown file keeps the key earlier panels gave it (its name without `.md`), so uploading it again replaces the same document.
 - **`mddb-cli self-update` on Windows (#374)**: releases carry no Windows archives, so the command (with `--check` too) now stops at once with a non-zero exit and says to build from source with `make build-windows`, instead of looking for an archive that does not exist.
 
 - Truncate is one function for REST, gRPC and the MCP direct client (#380). gRPC `Truncate` now writes its revision deletions to the binlog, so replicas trim too; a negative `keepRevs` keeps every revision instead of crashing the call; and a document that cannot be decoded fails the truncate, as REST always did. The MCP truncate also writes its deletions to the binlog, and a failed delete is reported instead of ignored.
