@@ -7,6 +7,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::chat::{scenario, tools};
 use crate::error::AppError;
+use crate::grpc::client::{MddbClient, SearchResult};
 use crate::llm::provider::{ApiMsg, ChatResponse, TokenUsage};
 use crate::session::manager::JoinResult;
 use crate::session::types::{MessageRole, WsIncoming, WsOutgoing};
@@ -14,6 +15,20 @@ use crate::state::AppState;
 use crate::webhook::types::WebhookPayload;
 
 const MAX_TOOL_ROUNDS: usize = 5;
+
+/// The real database behind the tools. Lives here, where the concrete gRPC
+/// client meets the tool layer; tools.rs itself only knows the trait, which is
+/// what lets its tests run without mddbd.
+#[async_trait::async_trait]
+impl tools::DocSearch for MddbClient {
+    async fn search(
+        &mut self,
+        query: &str,
+        collection: &str,
+    ) -> Result<Vec<SearchResult>, AppError> {
+        MddbClient::search(self, query, collection).await
+    }
+}
 
 pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: String) {
     let (sender, mut receiver) = socket.split();
@@ -334,6 +349,7 @@ async fn handle_message(
         });
     }
 
+    let tool_policy = tools::ToolPolicy::for_scenario(&state.config, &scenario_name);
     let tool_defs = tools::tool_definitions();
     let mut mddb_client = state.mddb_client.clone();
 
@@ -383,7 +399,7 @@ async fn handle_message(
 
                 // Execute each tool and add results
                 for tc in &tool_calls {
-                    let result = tools::execute_tool(&mut mddb_client, tc, &collection)
+                    let result = tools::execute_tool(&mut mddb_client, tc, &tool_policy)
                         .await
                         .unwrap_or_else(|e| format!("Tool error: {e}"));
 

@@ -12,6 +12,14 @@ default_collection = "docs"
 # Uncomment only to override a specific collection's profile from here.
 # search_top_k = 5
 # search_type = "hybrid"  # "hybrid", "vector", "fts"
+# How much of each search result the model gets to read, in characters
+# (counted in characters, so a cut never lands inside a Polish letter or an
+# emoji). A result shorter than this arrives whole, fenced code blocks and
+# inline code included; a longer one is cut at this many characters and ends
+# with an ellipsis. 0 = the whole chunk, whatever its length. Raise it when
+# the model should see entire config samples or command listings; the cost
+# is prompt tokens per result.
+result_max_chars = 800
 # Credentials used to authenticate to mddbd. Leave EMPTY here and supply them
 # via env (SEC-007): MDDB_CHAT_AUTH_USERNAME / MDDB_CHAT_AUTH_PASSWORD override
 # these when blank. Never commit real passwords — config.toml is gitignored.

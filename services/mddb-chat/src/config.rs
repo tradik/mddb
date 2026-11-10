@@ -78,6 +78,13 @@ pub struct MddbConfig {
     pub search_top_k: Option<u32>,
     #[serde(default)]
     pub search_type: Option<String>,
+    /// Characters of one search result the model gets to see (#398).
+    ///
+    /// Counted in characters, cut on a character boundary. 0 means the whole
+    /// chunk. The default is the literal that used to live in tools.rs, so a
+    /// config.toml without this key behaves as before.
+    #[serde(default = "default_result_max_chars")]
+    pub result_max_chars: usize,
     #[serde(default)]
     pub auth_username: String,
     #[serde(default)]
@@ -248,6 +255,9 @@ fn default_grpc_addr() -> String {
 }
 fn default_collection() -> String {
     "docs".to_string()
+}
+fn default_result_max_chars() -> usize {
+    800
 }
 /// Built-in fallbacks, used only when neither the TOML nor the collection's
 /// retrieval profile says anything.
@@ -551,5 +561,53 @@ max_turns = 5
     fn an_unknown_scenario_is_not_invented() {
         let cfg = config_from(MINIMAL, "unknown-scenario");
         assert!(cfg.get_scenario("does-not-exist").is_none());
+    }
+
+    // #398: the per-result limit used to be a literal 800 in tools.rs. An old
+    // config.toml that never heard of the key must keep loading with the same
+    // number, and a new one may say otherwise.
+    #[test]
+    fn result_max_chars_defaults_to_the_old_literal() {
+        let cfg = config_from(MINIMAL, "result-default");
+        assert_eq!(cfg.mddb.result_max_chars, 800);
+    }
+
+    #[test]
+    fn result_max_chars_is_read_from_the_toml() {
+        let cfg = config_from(
+            r#"
+[server]
+[mddb]
+result_max_chars = 2000
+[llm]
+api_url = "http://localhost:11434/v1"
+model = "test"
+[session]
+[security]
+"#,
+            "result-set",
+        );
+        assert_eq!(cfg.mddb.result_max_chars, 2000);
+    }
+
+    // The LLM key and the webhook secret follow the same rule as the mddbd
+    // credentials: blank in the file means "take it from the environment".
+    // Only this test touches these two variables, and no other asserts on them.
+    #[test]
+    fn llm_key_and_webhook_secret_come_from_the_environment_when_blank() {
+        let path = write_temp("env-secrets", MINIMAL);
+        unsafe {
+            std::env::set_var("MDDB_CHAT_LLM_API_KEY", "sk-env");
+            std::env::set_var("MDDB_CHAT_WEBHOOK_SECRET", "whsec-env");
+        }
+        let cfg = Config::load(&path).unwrap();
+        unsafe {
+            std::env::remove_var("MDDB_CHAT_LLM_API_KEY");
+            std::env::remove_var("MDDB_CHAT_WEBHOOK_SECRET");
+        }
+        std::fs::remove_file(&path).ok();
+
+        assert_eq!(cfg.llm.api_key, "sk-env");
+        assert_eq!(cfg.security.webhook_secret, "whsec-env");
     }
 }

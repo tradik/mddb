@@ -1,107 +1,99 @@
+//! The tools the model may call, and the policy that bounds them.
+
 use std::borrow::Cow;
 
-use regex::Regex;
 use serde::Deserialize;
 use tracing::debug;
 
-use crate::chat::markdown::clip;
+use crate::chat::markdown::{clip, strip_markdown};
+use crate::chat::scenario;
+use crate::config::Config;
 use crate::error::AppError;
-use crate::grpc::client::{MddbClient, SearchResult};
+use crate::grpc::client::SearchResult;
 use crate::llm::provider::{ToolCall, ToolDef, ToolFunction};
 
-/// Characters of one search result the model gets to see.
-const RESULT_MAX_CHARS: usize = 800;
 /// Characters of a whole document `get_document` hands back before cutting.
-const DOCUMENT_MAX_CHARS: usize = 4000;
+pub const DOCUMENT_MAX_CHARS: usize = 4000;
 
-/// Strip markdown formatting to give LLM clean plain text
-fn strip_markdown(input: &str) -> String {
-    let mut s = input.to_string();
-    // Remove code fences (```lang ... ```)
-    let code_fence = Regex::new(r"(?s)```[a-zA-Z]*\n?.*?```").unwrap();
-    s = code_fence
-        .replace_all(&s, "[code block removed]")
-        .to_string();
-    // Remove inline code
-    let inline_code = Regex::new(r"`([^`]+)`").unwrap();
-    s = inline_code.replace_all(&s, "$1").to_string();
-    // Remove images ![alt](url)
-    let images = Regex::new(r"!\[([^\]]*)\]\([^)]+\)").unwrap();
-    s = images.replace_all(&s, "$1").to_string();
-    // Convert links [text](url) → text
-    let links = Regex::new(r"\[([^\]]+)\]\([^)]+\)").unwrap();
-    s = links.replace_all(&s, "$1").to_string();
-    // Remove HTML tags
-    let html = Regex::new(r"<[^>]+>").unwrap();
-    s = html.replace_all(&s, "").to_string();
-    // Remove headers (# ... )
-    let headers = Regex::new(r"(?m)^#{1,6}\s+").unwrap();
-    s = headers.replace_all(&s, "").to_string();
-    // Remove bold/italic markers
-    s = s.replace("**", "").replace("__", "");
-    s = s.replace('*', "").replace('_', " ");
-    // Remove horizontal rules
-    let hr = Regex::new(r"(?m)^-{3,}$|^={3,}$|^\*{3,}$").unwrap();
-    s = hr.replace_all(&s, "").to_string();
-    // Remove blockquote markers
-    let bq = Regex::new(r"(?m)^>\s?").unwrap();
-    s = bq.replace_all(&s, "").to_string();
-    // Remove list markers
-    let list = Regex::new(r"(?m)^[\s]*[-*+]\s").unwrap();
-    s = list.replace_all(&s, "").to_string();
-    // Collapse multiple blank lines
-    let blanks = Regex::new(r"\n{3,}").unwrap();
-    s = blanks.replace_all(&s, "\n\n").to_string();
-    s.trim().to_string()
+/// What the tools need from the database. `MddbClient` is the real one; tests
+/// stand in a fake, so a tool's behaviour can be checked without mddbd.
+#[async_trait::async_trait]
+pub trait DocSearch {
+    async fn search(
+        &mut self,
+        query: &str,
+        collection: &str,
+    ) -> Result<Vec<SearchResult>, AppError>;
 }
 
-/// Define the tools available to the LLM
+/// What one scenario lets its tools do.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ToolPolicy {
+    /// Searched when the model names no collection.
+    pub default_collection: String,
+    /// Characters of one search result; 0 means the whole chunk (#398).
+    pub result_max_chars: usize,
+}
+
+impl ToolPolicy {
+    /// The policy for a scenario.
+    pub fn for_scenario(config: &Config, scenario_name: &str) -> Self {
+        Self {
+            default_collection: scenario::get_collection(config, scenario_name),
+            result_max_chars: config.mddb.result_max_chars,
+        }
+    }
+}
+
+/// Define the tools available to the LLM.
 pub fn tool_definitions() -> Vec<ToolDef> {
+    let tool = |name: &str, description: &str, parameters: serde_json::Value| ToolDef {
+        tool_type: "function".to_string(),
+        function: ToolFunction {
+            name: name.to_string(),
+            description: description.to_string(),
+            parameters,
+        },
+    };
     vec![
-        ToolDef {
-            tool_type: "function".to_string(),
-            function: ToolFunction {
-                name: "search_docs".to_string(),
-                description: "Search the documentation database for relevant information. Use this when the user asks a question about MDDB features, configuration, API, or usage.".to_string(),
-                parameters: serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The search query to find relevant documentation"
-                        },
-                        "collection": {
-                            "type": "string",
-                            "description": "The collection to search in (default: docs)",
-                            "default": "docs"
-                        }
+        tool(
+            "search_docs",
+            "Search the documentation database for relevant information. Use this when the user asks a question about MDDB features, configuration, API, or usage.",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query to find relevant documentation"
                     },
-                    "required": ["query"]
-                }),
-            },
-        },
-        ToolDef {
-            tool_type: "function".to_string(),
-            function: ToolFunction {
-                name: "get_document".to_string(),
-                description: "Get a specific document by its key from the database. Use this when you know the exact document key and need its full content.".to_string(),
-                parameters: serde_json::json!({
-                    "type": "object",
-                    "properties": {
-                        "key": {
-                            "type": "string",
-                            "description": "The document key (e.g. 'api', 'quickstart', 'grpc')"
-                        },
-                        "collection": {
-                            "type": "string",
-                            "description": "The collection name (default: docs)",
-                            "default": "docs"
-                        }
+                    "collection": {
+                        "type": "string",
+                        "description": "The collection to search in (default: docs)",
+                        "default": "docs"
+                    }
+                },
+                "required": ["query"]
+            }),
+        ),
+        tool(
+            "get_document",
+            "Get a specific document by its key from the database. Use this when you know the exact document key and need its full content.",
+            serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "The document key (e.g. 'api', 'quickstart', 'grpc')"
                     },
-                    "required": ["key"]
-                }),
-            },
-        },
+                    "collection": {
+                        "type": "string",
+                        "description": "The collection name (default: docs)",
+                        "default": "docs"
+                    }
+                },
+                "required": ["key"]
+            }),
+        ),
     ]
 }
 
@@ -117,68 +109,88 @@ struct GetDocArgs {
     collection: Option<String>,
 }
 
-/// Execute a tool call and return the result as a string
-pub async fn execute_tool(
-    client: &mut MddbClient,
+fn parse_args<T: for<'de> Deserialize<'de>>(tool_call: &ToolCall) -> Result<T, AppError> {
+    serde_json::from_str(&tool_call.function.arguments)
+        .map_err(|e| AppError::LlmError(format!("invalid tool args: {e}")))
+}
+
+/// Execute a tool call and return the result as a string for the model.
+pub async fn execute_tool<S: DocSearch>(
+    client: &mut S,
     tool_call: &ToolCall,
-    default_collection: &str,
+    policy: &ToolPolicy,
 ) -> Result<String, AppError> {
-    debug!(
-        tool = tool_call.function.name,
-        args = tool_call.function.arguments,
-        "executing tool"
-    );
+    let tool = tool_call.function.name.as_str();
+    debug!(tool, args = tool_call.function.arguments, "executing tool");
 
-    match tool_call.function.name.as_str() {
+    match tool {
         "search_docs" => {
-            let args: SearchArgs = serde_json::from_str(&tool_call.function.arguments)
-                .map_err(|e| AppError::LlmError(format!("invalid tool args: {e}")))?;
-
-            let collection = args.collection.as_deref().unwrap_or(default_collection);
-            let results = client.search(&args.query, collection).await?;
-
-            if results.is_empty() {
-                return Ok("No results found for this query.".to_string());
-            }
-
-            let mut output = String::new();
-            for (i, r) in results.iter().enumerate() {
-                let clean = strip_markdown(&r.content);
-                output.push_str(&format!(
-                    "Result {} (key: {}, score: {:.2})\n{}\n\n---\n\n",
-                    i + 1,
-                    r.key,
-                    r.score,
-                    clip(&clean, RESULT_MAX_CHARS),
-                ));
-            }
-            Ok(output)
+            let args: SearchArgs = parse_args(tool_call)?;
+            let collection = args
+                .collection
+                .as_deref()
+                .unwrap_or(&policy.default_collection);
+            search_docs(client, &args.query, collection, policy).await
         }
         "get_document" => {
-            let args: GetDocArgs = serde_json::from_str(&tool_call.function.arguments)
-                .map_err(|e| AppError::LlmError(format!("invalid tool args: {e}")))?;
-
-            let collection = args.collection.as_deref().unwrap_or(default_collection);
-            let results = client.search(&args.key, collection).await?;
-
-            // Try to find exact match
-            if let Some(doc) = results.iter().find(|r| r.key == args.key) {
-                Ok(format!("Document: {}\n\n{}", doc.key, document_body(doc)))
-            } else if let Some(doc) = results.first() {
-                Ok(format!(
-                    "Document '{}' not found. Closest match: {}\n\n{}",
-                    args.key,
-                    doc.key,
-                    document_body(doc)
-                ))
-            } else {
-                Ok(format!(
-                    "Document '{}' not found in collection '{}'.",
-                    args.key, collection
-                ))
-            }
+            let args: GetDocArgs = parse_args(tool_call)?;
+            let collection = args
+                .collection
+                .as_deref()
+                .unwrap_or(&policy.default_collection);
+            get_document(client, &args.key, collection).await
         }
         other => Ok(format!("Unknown tool: {other}")),
+    }
+}
+
+/// Every hit, each one whole when it fits `result_max_chars` (#398).
+async fn search_docs<S: DocSearch>(
+    client: &mut S,
+    query: &str,
+    collection: &str,
+    policy: &ToolPolicy,
+) -> Result<String, AppError> {
+    let results = client.search(query, collection).await?;
+    if results.is_empty() {
+        return Ok("No results found for this query.".to_string());
+    }
+
+    let mut output = String::new();
+    for (i, r) in results.iter().enumerate() {
+        let clean = strip_markdown(&r.content);
+        output.push_str(&format!(
+            "Result {} (key: {}, score: {:.2})\n{}\n\n---\n\n",
+            i + 1,
+            r.key,
+            r.score,
+            clip(&clean, policy.result_max_chars),
+        ));
+    }
+    Ok(output)
+}
+
+/// The document with that key, else the closest match, else a miss.
+async fn get_document<S: DocSearch>(
+    client: &mut S,
+    key: &str,
+    collection: &str,
+) -> Result<String, AppError> {
+    let results = client.search(key, collection).await?;
+
+    if let Some(doc) = results.iter().find(|r| r.key == key) {
+        Ok(format!("Document: {}\n\n{}", doc.key, document_body(doc)))
+    } else if let Some(doc) = results.first() {
+        Ok(format!(
+            "Document '{}' not found. Closest match: {}\n\n{}",
+            key,
+            doc.key,
+            document_body(doc)
+        ))
+    } else {
+        Ok(format!(
+            "Document '{key}' not found in collection '{collection}'."
+        ))
     }
 }
 
@@ -189,3 +201,6 @@ fn document_body(doc: &SearchResult) -> String {
         Cow::Owned(cut) => format!("{cut}\n\n[Document truncated]"),
     }
 }
+
+#[cfg(test)]
+mod tests;
