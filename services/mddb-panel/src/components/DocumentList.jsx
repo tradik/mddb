@@ -170,7 +170,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
   const afterBatchDelete = (outcome) => {
     setBatchOutcome(outcome);
     if (currentDocument && selection.isSelected(currentDocument)) setCurrentDocument(null);
-    loadDocuments();
+    void loadDocuments(); // reports its own errors
   };
 
   return (

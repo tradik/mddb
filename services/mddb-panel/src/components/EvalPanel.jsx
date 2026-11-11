@@ -132,7 +132,7 @@ export default function EvalPanel() {
 
   const save = (e) => {
     e.preventDefault();
-    change(async () => {
+    void change(async () => {
       await mddbClient.saveEvalQuery({
         collection,
         id: form.id.trim(),
@@ -146,7 +146,7 @@ export default function EvalPanel() {
 
   const remove = (id) => {
     if (!confirm(`Delete the evaluation query "${id}"?`)) return;
-    change(() => mddbClient.deleteEvalQuery(collection, id));
+    void change(() => mddbClient.deleteEvalQuery(collection, id));
   };
 
   const togglePreset = (id) => setPresets((on) => (on.includes(id) ? on.filter((p) => p !== id) : [...on, id]));

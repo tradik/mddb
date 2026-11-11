@@ -28,7 +28,7 @@ export default function ChatMcpSecretsCard({ secrets, onChanged }) {
   const save = (e) => {
     e.preventDefault();
     const key = name.trim();
-    run(async () => {
+    void run(async () => {
       await mddbClient.putChatMcpSecret(key, { value, header: header.trim() });
       setValue('');
       return `Saved the secret ${key}.`;
@@ -36,7 +36,7 @@ export default function ChatMcpSecretsCard({ secrets, onChanged }) {
   };
   const remove = (secret) => {
     if (!confirm(`Delete the secret "${secret}"? A server using it can no longer authenticate.`)) return;
-    run(async () => {
+    void run(async () => {
       await mddbClient.deleteChatMcpSecret(secret);
       return `Deleted ${secret}.`;
     });

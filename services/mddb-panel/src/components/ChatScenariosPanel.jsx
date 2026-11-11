@@ -92,7 +92,7 @@ function ScenariosView() {
       return;
     }
     const name = form.name.trim();
-    run(async () => {
+    void run(async () => {
       await mddbClient.putChatScenario(name, fromForm(form));
       setStored(name);
       return `Saved ${name}. The chat service picks it up on its next poll.`;
@@ -101,7 +101,7 @@ function ScenariosView() {
 
   const remove = () => {
     if (!confirm(`Delete the scenario "${stored}"? An assistant using it falls back to its own configuration.`)) return;
-    run(async () => {
+    void run(async () => {
       await mddbClient.deleteChatScenario(stored);
       setForm(null);
       setStored(null);

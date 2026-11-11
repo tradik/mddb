@@ -22,7 +22,7 @@ export function useJobPolling(jobs, { getId, fetchJob, isDone, onUpdate, onFinis
     latest.current = { jobs, getId, fetchJob, isDone, onUpdate, onFinish };
   });
 
-  const running = Object.values(jobs).map(getId).join(',');
+  const running = Object.values(jobs).map((job) => getId(job)).join(',');
   useEffect(() => {
     if (!running) return undefined;
     const timer = setInterval(() => {

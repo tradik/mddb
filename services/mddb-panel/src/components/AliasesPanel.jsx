@@ -49,7 +49,7 @@ export default function AliasesPanel() {
     const alias = form.alias.trim();
     const collection = form.collection.trim();
     const moved = aliases.some((a) => a.alias === alias);
-    run(async () => {
+    void run(async () => {
       await mddbClient.setAlias(alias, collection);
       setForm({ alias: '', collection: '' });
       return `${moved ? 'Moved' : 'Created'} alias ${alias} → ${collection}.`;
@@ -58,7 +58,7 @@ export default function AliasesPanel() {
 
   const remove = (alias) => {
     if (!confirm(`Delete the alias "${alias}"? Its collection stays; clients using the alias get "not found".`)) return;
-    run(async () => {
+    void run(async () => {
       await mddbClient.deleteAlias(alias);
       return `Deleted alias ${alias}.`;
     });

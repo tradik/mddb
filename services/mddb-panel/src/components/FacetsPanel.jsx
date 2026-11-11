@@ -18,7 +18,7 @@ export default function FacetsPanel({ collection, filters }) {
 
   useEffect(() => {
     mddbClient.getMetaKeys(collection)
-      .then((data) => setKeys(Object.keys(data?.meta || {}).sort()))
+      .then((data) => setKeys(Object.keys(data?.meta || {}).sort((a, b) => a.localeCompare(b))))
       .catch(setKeysError);
   }, [collection]);
 

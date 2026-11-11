@@ -75,7 +75,7 @@ export default function ChatSkillsPanel() {
       return;
     }
     const name = form.name.trim();
-    run(name, async () => {
+    void run(name, async () => {
       const stored = await mddbClient.putChatSkill(name, fromSkillForm(form));
       return `Saved ${name}, version ${stored.version}. Scenarios using it get the new text on the chat service's next poll.`;
     });
