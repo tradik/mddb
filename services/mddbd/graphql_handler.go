@@ -44,6 +44,8 @@ func (s *Server) newGraphQLHandler() http.Handler {
 	srv.AroundFields(s.aliasFieldMiddleware)
 	// SEC-019: then each root field's rule, on the resolved collections.
 	srv.AroundFields(s.accessFieldMiddleware)
+	// GO-049: the fields of a disabled module fail.
+	srv.AroundFields(s.featureFieldMiddleware)
 
 	// GO-043: a quota refusal carries its detail in the error's extensions.
 	srv.SetErrorPresenter(graphQLErrorPresenter)

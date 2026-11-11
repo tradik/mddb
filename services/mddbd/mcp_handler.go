@@ -256,7 +256,7 @@ func (h *MCPHandler) handleResourcesRead(ctx context.Context, req map[string]int
 // ---- Tools with cursor pagination ----
 
 func (h *MCPHandler) handleToolsList(ctx context.Context, req map[string]interface{}) map[string]interface{} {
-	tools := mcpToolsFor(ctx, h.customTools)
+	tools := featureVisibleTools(h.client, h.customTools, mcpToolsFor(ctx, h.customTools)) // GO-049
 
 	// Cursor-based pagination
 	params, _ := req["params"].(map[string]interface{})

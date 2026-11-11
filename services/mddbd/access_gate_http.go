@@ -24,7 +24,8 @@ type routeMux interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
-// gatedMux registers each route behind the access gate.
+// gatedMux registers each route behind the access gate, and a route of a
+// module (GO-049) behind its switch.
 type gatedMux struct {
 	mux routeMux
 	s   *Server
@@ -35,7 +36,7 @@ func (s *Server) gated(mux routeMux) gatedMux { return gatedMux{mux: mux, s: s} 
 
 // Handle registers h behind the gate for pattern.
 func (g gatedMux) Handle(pattern string, h http.Handler) {
-	g.mux.Handle(pattern, g.s.httpGate(pattern, h))
+	g.mux.Handle(pattern, g.s.httpGate(pattern, g.s.featureGate(pattern, h))) // GO-049: then the module switch
 }
 
 // HandleFunc registers h behind the gate for pattern.

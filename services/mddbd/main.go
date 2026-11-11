@@ -125,6 +125,7 @@ type Server struct {
 	Gain               *GainRecorder            // AGT-004: tokens returned and avoided, per day
 	Aliases            *AliasManager            // GO-044: alias → collection
 	ChatScenarios      *ChatScenarioManager     // #403: chat scenarios and their version counter
+	Features           *FeatureManager          // GO-049: module switches and their version counter
 	AuthManager        *AuthManager             // Authentication and authorization
 	AuditManager       *audit.AuditManager      // Audit log (ISO 27001 A.8.15, SOC 2 CC7.2)
 	RateLimiter        *RateLimiter             // Cross-transport rate limiter (ISO 27001 A.5.30, SOC 2 CC6.6)
@@ -945,6 +946,11 @@ func (s *Server) initCollections(clock *startupClock) {
 	s.ChatScenarios = NewChatScenarioManager(s.DB)
 	s.ChatScenarios.FollowDB(func() *bolt.DB { return s.DB })
 	mustStep("ChatScenarioManager.LoadAll", s.ChatScenarios.LoadAll())
+
+	// GO-049: module switches, with MDDB_FEATURES_FORCE_OFF as it is now.
+	s.Features = NewFeatureManager(s.DB)
+	s.Features.FollowDB(func() *bolt.DB { return s.DB })
+	mustStep("FeatureManager.LoadAll", s.Features.LoadAll())
 }
 
 // initEncryption sets up at-rest encryption (ISO 27001 A.8.24 / SOC 2
@@ -1114,6 +1120,7 @@ func (s *Server) setBinlogEverywhere() {
 	s.CollectionManager.SetBinlog(s.Binlog)
 	s.Aliases.SetBinlog(s.Binlog)
 	s.ChatScenarios.SetBinlog(s.Binlog)
+	s.Features.SetBinlog(s.Binlog)
 	if s.TemporalManager != nil {
 		s.TemporalManager.SetBinlog(s.Binlog)
 	}
@@ -1505,6 +1512,10 @@ func (s *Server) grpcServerOptions(authEnabled bool) ([]grpc.ServerOption, strin
 		unaryChain = append(unaryChain, s.accessUnaryInterceptor())
 		streamChain = append(streamChain, s.accessStreamInterceptor())
 	}
+	// GO-049: a method of a disabled module, after auth so a stranger learns
+	// nothing from it.
+	unaryChain = append(unaryChain, s.featureUnaryInterceptor())
+	streamChain = append(streamChain, s.featureStreamInterceptor())
 	unaryChain = append(unaryChain, shapeUnaryInterceptor) // OPS-025: last, after auth
 	grpcOpts = append(grpcOpts, grpc.ChainUnaryInterceptor(unaryChain...))
 	if len(streamChain) > 0 {

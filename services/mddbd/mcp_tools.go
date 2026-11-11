@@ -280,6 +280,13 @@ func (s *MCPToolServer) gateTool(ctx context.Context, name string, args map[stri
 			return fmt.Errorf("tool %q is not available in read-only mode", name)
 		}
 	}
+	// GO-049: a tool of a disabled module is refused (and left out of
+	// tools/list); a custom tool, when it calls its action.
+	if dc, ok := s.client.(*DirectClient); ok && dc.server != nil {
+		if err := dc.server.toolFeatureError(name); err != nil {
+			return fmt.Errorf("tool %q: %w", name, err)
+		}
+	}
 	// GO-044: an alias in the arguments becomes its collection here, once,
 	// before any tool reads it.
 	if dc, ok := s.client.(*DirectClient); ok && args != nil {

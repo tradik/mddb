@@ -72,7 +72,7 @@ func (m *MCPHTTPServer) handleResourceRead(w http.ResponseWriter, r *http.Reques
 func (m *MCPHTTPServer) handleTools(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
-		"tools": mcpToolsFor(r.Context(), m.customTools),
+		"tools": featureVisibleTools(m.client, m.customTools, mcpToolsFor(r.Context(), m.customTools)), // GO-049
 	}); err != nil {
 		slog.Error("encoding tools response", "err", err)
 	}
