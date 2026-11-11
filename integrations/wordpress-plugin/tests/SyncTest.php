@@ -186,8 +186,9 @@ final class SyncTest extends TestCase {
 
 		$sync = $this->syncWith( [ 'url' => 'https://mddb' ], $client );
 		$post = new WP_Post( [ 'ID' => 1, 'post_status' => 'publish' ] );
-		$sync->onSave( 1, $post, false, null );
-		self::assertTrue( true ); // do_action call is enough; absence of exception proves logging path runs
+		// The failure is logged with the post, the error code and its message.
+		$log = $this->captureErrorLog( static fn() => $sync->onSave( 1, $post, false, null ) );
+		self::assertStringContainsString( '[mddb_sync_add] post=1 code=x message=boom', $log );
 	}
 
 	public function testOnDeleteLogsClientError(): void {
@@ -204,8 +205,9 @@ final class SyncTest extends TestCase {
 			],
 			$client
 		);
-		$sync->onDelete( 12 );
-		self::assertTrue( true );
+		// The failure is logged with the post, the error code and its message.
+		$log = $this->captureErrorLog( static fn() => $sync->onDelete( 12 ) );
+		self::assertStringContainsString( '[mddb_sync_delete] post=12 code=x message=kaboom', $log );
 	}
 
 	public function testOnDeleteSkippedWhenPostMissing(): void {
@@ -270,5 +272,24 @@ final class SyncTest extends TestCase {
 		self::assertContains( 'wp_after_insert_post', $hookCalls );
 		self::assertContains( 'before_delete_post', $hookCalls );
 		self::assertContains( 'wp_trash_post', $hookCalls );
+	}
+
+	/**
+	 * Runs $action with PHP's error_log() going to a temporary file and returns
+	 * what was logged. error_log() writes to stderr, outside PHPUnit's output
+	 * buffer, so expectOutput*() cannot see it; a file works on every PHPUnit
+	 * version the plugin supports and keeps the test run quiet.
+	 */
+	private function captureErrorLog( callable $action ): string {
+		$file     = (string) tempnam( sys_get_temp_dir(), 'mddb-log-' );
+		$previous = ini_set( 'error_log', $file );
+		try {
+			$action();
+		} finally {
+			ini_set( 'error_log', false === $previous ? '' : $previous );
+		}
+		$log = (string) file_get_contents( $file );
+		unlink( $file );
+		return $log;
 	}
 }
