@@ -1116,9 +1116,53 @@ class MDDBClient {
     return this.request(`/chat/scenarios/${encodeURIComponent(name)}`, { method: 'DELETE' });
   }
 
-  /** The composed system prompt of a stored scenario: `{ name, prompt, version }`. */
+  /** The composed system prompt of a stored scenario: `{ name, prompt, version, bytes, approxTokens, warning, missingSkills }`. */
   async getChatScenarioPrompt(name) {
     return this.request(`/chat/scenarios/${encodeURIComponent(name)}/prompt`, { method: 'GET' });
+  }
+
+  // ---- Chat skills (#404, 2.19.0+): admin on "*" for every call ----
+
+  /** Every skill without content: `{ skills: [...], version }`. */
+  async listChatSkills() {
+    return this.request('/chat/skills', { method: 'GET' });
+  }
+
+  /** One skill with its content and history; `version` reads a kept earlier one. */
+  async getChatSkill(name, version) {
+    const query = version ? `?version=${encodeURIComponent(version)}` : '';
+    return this.request(`/chat/skills/${encodeURIComponent(name)}${query}`, { method: 'GET' });
+  }
+
+  /** Creates a skill or stores a new version: `{ description, content, source }`. */
+  async putChatSkill(name, skill) {
+    return this.request(`/chat/skills/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(skill),
+    });
+  }
+
+  /** Deletes a skill; a 409 names the scenarios that attach it. */
+  async deleteChatSkill(name) {
+    return this.request(`/chat/skills/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  }
+
+  /** A preview of a SKILL.md, `{ url }` or `{ content }`; stores nothing. */
+  async importChatSkill(source) {
+    return this.request('/chat/skills/import', { method: 'POST', body: JSON.stringify(source) });
+  }
+
+  /** Fetches a skill's source again: a preview, stored with `{ confirm: true, sha256 }`. */
+  async updateChatSkill(name, options = {}) {
+    return this.request(`/chat/skills/${encodeURIComponent(name)}/update`, {
+      method: 'POST',
+      body: JSON.stringify(options),
+    });
+  }
+
+  /** The scenarios attaching a skill: `{ name, scenarios }`. */
+  async getChatSkillUsedBy(name) {
+    return this.request(`/chat/skills/${encodeURIComponent(name)}/used-by`, { method: 'GET' });
   }
 
   // ---- Corpus packs (AGT-005, 2.18.10+) ----

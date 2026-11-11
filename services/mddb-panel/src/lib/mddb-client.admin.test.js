@@ -132,3 +132,18 @@ describe('chat scenarios', () => {
     ['getChatScenarioPrompt', (c) => c.getChatScenarioPrompt(odd), `/v1/chat/scenarios/${oddEnc}/prompt`, GET],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
+
+describe('chat skills', () => {
+  const skill = { description: 'Friendly', content: 'Be kind.', source: { url: 'https://example.com/SKILL.md' } };
+  test.each([
+    ['listChatSkills', (c) => c.listChatSkills(), '/v1/chat/skills', GET],
+    ['getChatSkill encodes', (c) => c.getChatSkill(odd), `/v1/chat/skills/${oddEnc}`, GET],
+    ['getChatSkill of a version', (c) => c.getChatSkill(odd, 3), `/v1/chat/skills/${oddEnc}?version=3`, GET],
+    ['putChatSkill', (c) => c.putChatSkill(odd, skill), `/v1/chat/skills/${oddEnc}`, PUT, skill],
+    ['deleteChatSkill', (c) => c.deleteChatSkill(odd), `/v1/chat/skills/${oddEnc}`, DELETE],
+    ['importChatSkill', (c) => c.importChatSkill({ url: 'https://example.com/SKILL.md' }), '/v1/chat/skills/import', POST, { url: 'https://example.com/SKILL.md' }],
+    ['updateChatSkill previews by default', (c) => c.updateChatSkill(odd), `/v1/chat/skills/${oddEnc}/update`, POST, {}],
+    ['updateChatSkill confirms', (c) => c.updateChatSkill(odd, { confirm: true, sha256: 'ab' }), `/v1/chat/skills/${oddEnc}/update`, POST, { confirm: true, sha256: 'ab' }],
+    ['getChatSkillUsedBy', (c) => c.getChatSkillUsedBy(odd), `/v1/chat/skills/${oddEnc}/used-by`, GET],
+  ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
+});
