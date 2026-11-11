@@ -335,3 +335,53 @@ func TestCovHDeleteDocumentRefusals(t *testing.T) {
 		t.Fatal("a refused delete removed the index entry")
 	}
 }
+
+// A delete that cannot remove one of the document's index entries fails and
+// rolls back: the document is still there. An index key that holds a nested
+// bucket is the one way bbolt refuses a Delete inside a write transaction.
+func TestDeleteDocumentInternalRollsBackOnIndexFailure(t *testing.T) {
+	const coll, key, lang = "delfail", "k", "en"
+	docID := genID(coll, key, lang)
+	cases := map[string][]byte{
+		"bykey":   storage.ByKeyKey(coll, key, lang),
+		"rev":     append(storage.RevPrefix(coll, docID), []byte("nested")...),
+		"idxmeta": append(storage.MetaKeyPrefix(coll, "tag", "a"), []byte(docID)...),
+	}
+	for bucket, blocked := range cases {
+		t.Run(bucket, func(t *testing.T) {
+			s, cleanup := newHandlerTestServer(t)
+			defer cleanup()
+			addTestDoc(t, s, coll, key, lang, "body", map[string][]string{"tag": {"a"}})
+			if err := s.collectionDB(coll).Update(func(tx *bolt.Tx) error { // the collection's file, in either layout
+				b := tx.Bucket([]byte(bucket))
+				_ = b.Delete(blocked)
+				_, err := b.CreateBucket(blocked)
+				return err
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.deleteDocumentInternal(coll, key, lang); err == nil {
+				t.Fatal("delete succeeded although an index entry could not be removed")
+			}
+			if s.loadDocByID(coll, docID, false) == nil {
+				t.Error("the failed delete was not rolled back: the document is gone")
+			}
+		})
+	}
+}
+
+// addDocumentWith narrows the after-write pipeline: a document written with
+// SkipFTS is stored and not searchable, the same write without it is.
+func TestAddDocumentWithSkipsFTS(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+	for key, opts := range map[string]postBatchOptions{"quiet": {SkipFTS: true}, "loud": {}} {
+		if _, _, err := s.addDocumentWith("optsdoc", key, "en", nil, "zeppelin "+key, 0, false, "", opts); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hits, err := s.FTSIndex.Search("optsdoc", "zeppelin", 5)
+	if err != nil || len(hits) != 1 || hits[0].DocID != genID("optsdoc", "loud", "en") {
+		t.Errorf("hits = %v, %v; want only the document written without SkipFTS", hits, err)
+	}
+}

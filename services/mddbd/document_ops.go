@@ -30,6 +30,14 @@ func (s *Server) addDocument(collection, key, lang string, meta map[string][]str
 // expectedRevision set, the write succeeds only if the document is at that
 // revision — and fails if it does not exist yet. "" is unconditional.
 func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]string, contentMD string, ttl int64, saveRevision bool, expectedRevision string) (storage.Doc, bool, error) {
+	return s.addDocumentWith(collection, key, lang, meta, contentMD, ttl, saveRevision, expectedRevision, postBatchOptions{})
+}
+
+// addDocumentWith is addDocumentIf with the after-write pipeline narrowed by
+// opts: a system document that must not be embedded, indexed for full text
+// or sent to webhooks (a chat conversation, #405) says so here and still
+// takes the one write path.
+func (s *Server) addDocumentWith(collection, key, lang string, meta map[string][]string, contentMD string, ttl int64, saveRevision bool, expectedRevision string, opts postBatchOptions) (storage.Doc, bool, error) {
 	// GO-003: validate in the single write path so EVERY transport is covered.
 	// Previously only gRPC Add and HTTP handleAdd validated; MCP (DirectClient)
 	// and GraphQL went straight to addDocument with no checks, and the batch
@@ -165,7 +173,7 @@ func (s *Server) addDocumentIf(collection, key, lang string, meta map[string][]s
 	}
 
 	// The after-write pipeline every write path shares (GO-001, GO-048).
-	s.firePostBatchHooks(collection, []*ProcessedDoc{{DocID: saved.ID, Doc: saved, IsUpdate: !isNew}}, postBatchOptions{})
+	s.firePostBatchHooks(collection, []*ProcessedDoc{{DocID: saved.ID, Doc: saved, IsUpdate: !isNew}}, opts)
 
 	return saved, isNew, nil
 }

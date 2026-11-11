@@ -136,6 +136,10 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/memory/sessions", s.handleMemorySessionsList)
 	mux.HandleFunc("/v1/memory/history", s.handleMemoryHistory)
 
+	// #405: persistent per-user chat conversations, the host API.
+	mux.HandleFunc("/v1/chat/conversations", s.handleChatConversations)
+	mux.HandleFunc("/v1/chat/conversations/", s.handleChatConversations)
+
 	mux.HandleFunc("/v1/cross-search", s.handleCrossSearch)
 	mux.HandleFunc("/v1/find-duplicates", s.handleFindDuplicates)
 	mux.HandleFunc("/v1/aggregate", s.withSearchLimit(s.handleAggregate))
