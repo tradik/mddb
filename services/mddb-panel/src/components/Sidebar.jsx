@@ -1,33 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Folder, Database, Trash2, Brain, Server, Settings, Network, Users, UsersIcon, Upload, FolderPlus, Sliders, GitBranch, PanelLeftClose, BookOpen, Ban, Zap, Globe, Image, Music, FileText, Settings2, Shuffle, Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2, MessageSquare, ToggleRight } from 'lucide-react';
+import { Folder, Database, Trash2, Brain, Upload, FolderPlus, PanelLeftClose, Globe, Image, Music, FileText, Settings2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
-import { useFeatures, isViewEnabled } from '../lib/features';
 import UploadModal from './UploadModal';
 import CreateCollectionModal from './CreateCollectionModal';
 import CollectionConfigModal from './CollectionConfigModal';
-// 2.19.0: memory, schemas, duplicates, import and account pages.
-import AdminToolNav from './AdminToolNav';
-
-// One entry of the administration menu; the open page is highlighted.
-function NavButton({ mode, icon: Icon, label }) {
-  const { viewMode, setViewMode } = useStore();
-  const { features } = useFeatures();
-  // GO-049: a page whose server module is off leaves the menu.
-  if (!isViewEnabled(mode, features)) return null;
-  return (
-    <button
-      onClick={() => setViewMode(mode)}
-      className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${viewMode === mode
-        ? 'bg-blue-100 text-blue-700'
-        : 'text-gray-700 hover:bg-gray-100'
-        }`}
-    >
-      <Icon className="w-4 h-4" />
-      <span className="text-sm font-medium">{label}</span>
-    </button>
-  );
-}
+// 2.19.0: the menu, grouped and searchable.
+import NavMenu from './NavMenu';
 
 export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse }) {
   const { currentCollection, setCurrentCollection, vectorStats, setVectorStats, config, setViewMode, setStats, collectionConfigs, setCollectionConfigs } = useStore();
@@ -291,51 +270,13 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
         </div>
       </div>
 
-      {/* Administration Section */}
+      {/* Menu: grouped, searchable, built from nav-groups.js */}
       <div className="p-4 border-t border-gray-200">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-          Administration
-        </h3>
-        <div className="space-y-1">
-          <NavButton mode="system" icon={Server} label="System Info" />
-          {clusterEnabled && (
-            <NavButton mode="cluster" icon={GitBranch} label="Cluster" />
-          )}
-          <NavButton mode="config" icon={Settings} label="Configuration" />
-          <NavButton mode="features" icon={ToggleRight} label="Features" />
-          <NavButton mode="mcp" icon={Brain} label="LLM Connections" />
-          <NavButton mode="endpoints" icon={Network} label="API Endpoints" />
-          <NavButton mode="chat" icon={MessageSquare} label="Chat" />
-          {authEnabled && (
-            <>
-              <NavButton mode="users" icon={Users} label="Users" />
-              <NavButton mode="groups" icon={UsersIcon} label="Groups" />
-            </>
-          )}
-          <NavButton mode="crossSearch" icon={Shuffle} label="Cross Search" />
-          <NavButton mode="geo" icon={Globe} label="Geo Search" />
-          <NavButton mode="vectors" icon={Database} label="Vector Search" />
-          <NavButton mode="vectorSpace" icon={ScatterChart} label="Vector Space" />
-          <NavButton mode="searchAdvisor" icon={Compass} label="Search Advisor" />
-          <NavButton mode="eval" icon={Gauge} label="Retrieval Evaluation" />
-          <NavButton mode="codeSymbols" icon={Code2} label="Code Symbols" />
-          <NavButton mode="aliases" icon={Link2} label="Collection Aliases" />
-          <NavButton mode="embeddings" icon={Brain} label="Embedding Models" />
-          <NavButton mode="synonyms" icon={BookOpen} label="Synonyms" />
-          <NavButton mode="stopwords" icon={Ban} label="Stop Words" />
-          <NavButton mode="curation" icon={Pin} label="Curation Rules" />
-          <NavButton mode="auditLog" icon={FileSearch} label="Audit Log" />
-          <NavButton mode="webhooks" icon={Webhook} label="Webhooks" />
-          <NavButton mode="security" icon={Shield} label="Security" />
-          <NavButton mode="encryption" icon={Lock} label="Encryption" />
-          <NavButton mode="temporal" icon={Clock} label="Temporal Analytics" />
-          <NavButton mode="spellcheck" icon={Type} label="Spell Checker" />
-          {config?.automationsEnabled !== false && (
-            <NavButton mode="automation" icon={Zap} label="Automation" />
-          )}
-          <NavButton mode="settings" icon={Sliders} label="Client Settings" />
-          <AdminToolNav NavButton={NavButton} authEnabled={authEnabled} />
-        </div>
+        <NavMenu
+          authEnabled={authEnabled}
+          clusterEnabled={clusterEnabled}
+          automationsEnabled={config?.automationsEnabled !== false}
+        />
       </div>
 
       {/* Version Footer */}

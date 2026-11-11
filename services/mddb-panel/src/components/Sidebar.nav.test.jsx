@@ -158,7 +158,7 @@ describe('Sidebar administration', () => {
     expect(screen.queryByRole('button', { name: 'Automation' })).toBeNull();
   });
 
-  test('the 2.19.0 pages are listed after the others and switch the view', async () => {
+  test('the 2.19.0 pages are in the menu and switch the view', async () => {
     await renderWith();
     fireEvent.click(screen.getByRole('button', { name: 'Agent Memory' }));
     expect(useStore.getState().viewMode).toBe('memory');

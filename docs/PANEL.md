@@ -161,7 +161,7 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 
 ### Chat scenarios (2.19.0)
 
-"Chat" in the sidebar's Administration menu edits the chat scenarios stored
+"Chat" in the sidebar menu's Chat group edits the chat scenarios stored
 in MDDB (`/v1/chat/scenarios`, [API.md](API.md#chat-scenarios-v1chatscenarios)).
 A scenario is one assistant: its prompt, what it must not say, the
 collections it may search, its style, model and limits. The chat service
@@ -200,7 +200,7 @@ Every administrative endpoint of the server is now reachable from the panel.
 Destructive actions ask first in a dialog that names what is affected; a
 refused request (403) reads *Not permitted* and says which grant it needs.
 
-- **Agent Memory** page (Administration): the sessions agents keep through
+- **Agent Memory** page (Chat group): the sessions agents keep through
   `/v1/memory/*`, filtered by user and scenario; a session's history, *Add a
   message*, *Summarize*, *Start a session*, and a *Recall* box showing what
   an agent gets back for a query. The API has no delete — sessions expire.
@@ -338,10 +338,12 @@ saved before 2.19.0 loads with the log off and redaction on.
 
 ### Module switches: the Features page (2.19.0)
 
-"Features" in the Administration menu lists the server's optional modules
+"Features" in the menu's System group lists the server's optional modules
 (`GET /v1/features`): chat, chat with external MCP servers, geo, temporal,
 spell, curation, automation, memory, code intelligence, evaluation, corpus
-packs, classification, duplicates and images. Documents, collections,
+packs, classification, duplicates, images, webhooks, collection schemas,
+collection aliases, cross search, search tuning and full-text tuning.
+Documents, collections,
 full-text and vector search, auth and backups are always on and not listed.
 
 - **Switch**: one per module, with its description, its default, the modules
@@ -357,13 +359,40 @@ full-text and vector search, auth and backups are always on and not listed.
 - **Menu and pages**: a module that is off hides its pages from the menu
   (Chat, Geo Search, Temporal Analytics, Spell Checker, Curation Rules,
   Automation, Code Symbols with its code graph, Retrieval Evaluation, Agent
-  Memory, Duplicates); the viewer's *Classify* box and the *Corpus packs*
+  Memory, Duplicates, Webhooks, Collection Schemas, Collection Aliases,
+  Cross Search, Search Advisor and Vector Space, Synonyms and Stop Words); the viewer's *Classify* box and the *Corpus packs*
   card on the System page go with `classify` and `corpus`. A direct visit to such a
   page shows "… is switched off" with a link to this page instead of a page
   full of 404 errors.
 - **Older servers**: while the list loads, and when it cannot be loaded
   (a server without `/v1/features`, a network error), every module counts as
   on, so the panel behaves as it did before.
+
+### Menu: groups and search (2.19.0)
+
+The sidebar menu is grouped. Each group is a disclosure button
+(`aria-expanded`, `aria-controls`) that folds its pages; which groups are
+folded is remembered in the browser's `localStorage` (`mddb.nav.collapsed`)
+and, where storage is blocked, for the length of the visit. All groups start
+open, so a first visit shows the same pages as before.
+
+| Group | Pages |
+|---|---|
+| Search | Vector Search, Cross Search, Geo Search, Vector Space, Search Advisor, Retrieval Evaluation, Code Symbols, Synonyms, Stop Words, Curation Rules, Spell Checker |
+| Data | Collection Aliases, Collection Schemas, Embedding Models, Import, Duplicates, Temporal Analytics |
+| Chat | Chat, Agent Memory, LLM Connections |
+| Automation & Integrations | Automation, Webhooks, API Endpoints |
+| Security | Users, Groups, My Account (with authentication), Security, Encryption, Audit Log |
+| System | System Info, Cluster (with replication), Configuration, Features, Client Settings |
+
+- **Search the menu**: the box above the groups filters pages by name,
+  ignoring case and accents, and opens every group with a match; Escape
+  clears it.
+- **Always open**: the group of the page on screen cannot be folded.
+- **Empty groups go**: a group whose pages are all hidden — by a module
+  switched off, no authentication or no replication — is not shown.
+- The placement lives in one data file, `src/lib/nav-groups.js`; the sidebar
+  renders from it.
 
 ### Colours and contrast
 
@@ -649,7 +678,7 @@ services/mddb-panel/
 ├── src/
 │   ├── components/
 │   │   ├── Header.jsx           # Top navigation bar
-│   │   ├── Sidebar.jsx          # Collections and stats
+│   │   ├── Sidebar.jsx          # Collections, stats and the menu (NavMenu)
 │   │   ├── DocumentList.jsx     # Document browser
 │   │   ├── DocumentViewer.jsx   # Document details view
 │   │   ├── DocumentEditor.jsx   # Document editing modal
