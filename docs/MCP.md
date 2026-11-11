@@ -254,7 +254,7 @@ which is why the DNS name was chosen first.
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 112 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 114 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 | `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 
@@ -627,7 +627,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   answered with JSON-RPC `-32601` — the list is not the authorisation.
 - Custom tools are never filtered: they are the operator's explicit choice.
 
-Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (112 since 2.19.0) take about
+Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (114 since 2.19.0) take about
 94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB
 (≈10 800 tokens), less than half.
 
@@ -671,7 +671,7 @@ stored when a write asks for them: `extract_images` on `upload_file` and
 
 ## Built-in Tool Catalog
 
-All 112 built-in tools, grouped by area. Tool inputs are self-describing via
+All 114 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
