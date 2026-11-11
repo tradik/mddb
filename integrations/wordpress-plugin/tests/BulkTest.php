@@ -90,4 +90,45 @@ final class BulkTest extends TestCase {
 		self::assertSame( 25, $result['nextOffset'] );
 		self::assertFalse( $result['done'] );
 	}
+
+	public function testProcessBatchBuildsDraftAndTermFilterQuery(): void {
+		Functions\when( 'get_option' )->justReturn(
+			[
+				'url'           => 'https://mddb',
+				'postTypes'     => [ 'post' ],
+				'includeDrafts' => true,
+				'termFilter'    => [ 'category' => [ 3, 7 ], 'post_tag' => [ 9 ] ],
+			]
+		);
+		$GLOBALS['__mddb_test_query_state'] = [ 'posts' => [ 'not-a-post', new WP_Post( [ 'ID' => 4 ] ) ], 'found' => 2 ];
+
+		$sync = $this->createMock( Sync::class );
+		$sync->expects( self::once() )->method( 'syncPost' )->willReturn( true );
+
+		$result = ( new Bulk( new Settings(), $sync ) )->processBatch( 0 );
+		$args   = $GLOBALS['__mddb_test_query_args'];
+
+		self::assertSame( [ 'publish', 'draft' ], $args['post_status'] );
+		self::assertSame(
+			[
+				'relation' => 'AND',
+				[ 'taxonomy' => 'category', 'terms' => [ 3, 7 ], 'field' => 'term_id', 'operator' => 'IN' ],
+				[ 'taxonomy' => 'post_tag', 'terms' => [ 9 ], 'field' => 'term_id', 'operator' => 'IN' ],
+			],
+			$args['tax_query']
+		);
+		self::assertSame( 2, $result['processed'] );
+		self::assertSame( 1, $result['succeeded'] );
+	}
+
+	public function testProcessBatchWithoutTermFilterSendsEmptyTaxQuery(): void {
+		Functions\when( 'get_option' )->justReturn( [ 'url' => 'https://mddb', 'postTypes' => [ 'post' ] ] );
+		$GLOBALS['__mddb_test_query_state'] = [ 'posts' => [], 'found' => 0 ];
+
+		$result = ( new Bulk( new Settings(), $this->createStub( Sync::class ) ) )->processBatch( 0 );
+
+		self::assertSame( [], $GLOBALS['__mddb_test_query_args']['tax_query'] );
+		self::assertSame( [ 'publish' ], $GLOBALS['__mddb_test_query_args']['post_status'] );
+		self::assertTrue( $result['done'] );
+	}
 }

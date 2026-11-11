@@ -24,10 +24,13 @@ if ( ! function_exists( 'pll_set_post_language' ) ) {
 }
 if ( ! function_exists( 'pll_get_post_translations' ) ) {
 	/**
+	 * Mirrors Polylang's api.php: the array type is only documented, there is
+	 * no native return type, so callers keep their defensive is_array() check.
+	 *
 	 * @param int $post_id
 	 * @return array<string,int>
 	 */
-	function pll_get_post_translations( $post_id ): array {
+	function pll_get_post_translations( $post_id ) {
 		return [];
 	}
 }

@@ -6,7 +6,8 @@
  * `$GLOBALS['__mddb_test_query_state']` to `[ 'posts' => [...], 'found' => N ]`
  * and every query constructed afterwards returns that page. The class used to
  * be defined with eval() inside the tests, in two versions — only whichever
- * ran first in the process existed.
+ * ran first in the process existed. The constructor arguments are kept in
+ * `$GLOBALS['__mddb_test_query_args']` so a test can assert on them.
  *
  * @package Tradik\MddbSync\Tests
  */
@@ -22,10 +23,10 @@ class WP_Query {
 	public int $found_posts = 0;
 
 	/**
-	 * @param array<string,mixed> $args Ignored: the page comes from the test state.
+	 * @param array<string,mixed> $args Recorded for assertions; the page comes from the test state.
 	 */
 	public function __construct( array $args = [] ) {
-		unset( $args );
+		$GLOBALS['__mddb_test_query_args'] = $args;
 		$state             = $GLOBALS['__mddb_test_query_state'] ?? [];
 		$this->posts       = $state['posts'] ?? [];
 		$this->found_posts = $state['found'] ?? 0;

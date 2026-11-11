@@ -55,7 +55,10 @@ final class Markdown {
 
 	/**
 	 * Replaces ``` fenced blocks with placeholders so their content skips
-	 * both block and inline processing.
+	 * both block and inline processing. Fills $this->codeBlocks as a side
+	 * effect, which toHtml() reads back afterwards.
+	 *
+	 * @phpstan-impure
 	 */
 	private function extractFencedCode( string $text ): string {
 		return (string) preg_replace_callback(

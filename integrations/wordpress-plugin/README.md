@@ -135,7 +135,7 @@ Releases are produced by the [`WordPress Plugin (mddb-sync)`](../../.github/work
 ```bash
 make install     # composer install
 make lint        # phpcs (WordPress security ruleset)
-make stan        # phpstan level 5, WordPress-aware
+make stan        # PHPStan 2.x level 5, WordPress-aware
 make test        # phpunit
 make coverage    # phpunit + xdebug coverage (text + clover.xml)
 make audit       # composer audit (security advisories)
@@ -164,7 +164,7 @@ integrations/wordpress-plugin/
 ├── tests/                   # PHPUnit + Brain Monkey
 ├── composer.json
 ├── phpcs.xml                # WordPress security + DB + i18n + AlternativeFunctions
-├── phpstan.neon.dist        # level 5 + szepeviktor/phpstan-wordpress
+├── phpstan.neon.dist        # PHPStan 2.x level 5 + szepeviktor/phpstan-wordpress 2.x
 ├── phpunit.xml.dist
 └── Makefile
 ```

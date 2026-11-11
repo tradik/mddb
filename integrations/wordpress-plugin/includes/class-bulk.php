@@ -100,7 +100,10 @@ final class Bulk {
 	}
 
 	/**
-	 * @return array<int,array{taxonomy:string,terms:array<int,int>,field:string,operator:string}>
+	 * Builds the WP_Query `tax_query` clause: a `relation => AND` entry plus
+	 * one IN-clause per taxonomy of the term filter (empty when no filter).
+	 *
+	 * @return array<'relation'|int,'AND'|array{taxonomy:string,terms:array<int,int>,field:'term_id',operator:'IN'}>
 	 */
 	private function buildTaxQuery(): array {
 		$filter = $this->settings->termFilter();
@@ -116,7 +119,6 @@ final class Bulk {
 				'operator' => 'IN',
 			];
 		}
-		/** @var array<int,array{taxonomy:string,terms:array<int,int>,field:string,operator:string}> $query */
 		return $query;
 	}
 
