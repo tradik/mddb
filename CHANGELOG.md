@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`pulldown-cmark` 0.13.6 in mddb-chat** (RUSTSEC-2026-0433, high: quadratic parsing of nested image wikilinks). `cargo audit` on `main` had been red since 2026-11-09.
 
 - **The access gate reads a JSON body whatever its Content-Type (#371).** The SEC-019 gate read the request body only when `Content-Type` named JSON, while the handlers decode JSON regardless. `curl -d '{…}'` sends `application/x-www-form-urlencoded`, so the gate saw no collection, required `"*"`, and refused a user who has permission on the collection the body names. Only `multipart/*` bodies (uploads, which authorize themselves) are now left to the handler. The gate was stricter than the handler, never looser.
+- **mddb-chat: tools accept only the scenario's `allowed_collections` (#396).** `search_docs` and `get_document` took the collection the model named and used it as it was, so a prompt-injected or confused model could read any collection the service account can read. A collection outside the scenario's list (only the default collection when the list is empty) is now refused with an error returned to the model and logged at `warn`, and never reaches mddbd. The tool schema lists the allowed collections as an `enum`.
 
 ### Added
 
@@ -37,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Corpus packs over MCP and gRPC (#378, AGT-005 follow-up).** MCP tools in the `admin` toolset: `corpus_list` (read-only, the caller's tenant), `corpus_install` (admin; the server downloads a `.mddbpack` from an `https://` URL through its SSRF guard, a redirect may not leave TLS, capped at `MDDB_CORPUS_MAX_BYTES`, an optional `sha256` checked before anything is installed) and `corpus_remove` (admin, destructive; `MDDB_MCP_CONFIRM_DESTRUCTIVE` asks for the pack's name). gRPC: `ListCorpusPacks`, `InstallCorpusPack` (a client stream of the pack, or an https URL in the first message), `RemoveCorpusPack`, `BuildCorpusPack` (a server stream of 1 MiB chunks). Permissions as `/v1/corpus/*`; REST, MCP and gRPC share one implementation. There is no MCP build tool: a pack is a file a tool answer cannot carry. The server now has 97 built-in MCP tools (93 in 2.18.10).
 
 - `make sonar-local`: the SonarCloud scan and quality gate from this machine before a push (Docker, `SONAR_TOKEN`).
+- **mddb-chat: `[mddb] result_max_chars`** sets how many characters of each search result the model sees (default `800`, as before; `0` = the whole chunk) (#398).
 
 ### Changed
 
@@ -65,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Site: the download links pointed at `#` (a duplicate `href`); the binary quick start downloaded 2.11.4 and ran a path the archive does not contain; the from-source quick start ran `./bin/mddbd`, which `make build` does not write; the Compose quick start called `make docker-up`, which does not exist; the Docker quick start mounted the volume at `/data` while the image keeps data in `/app/data`; the MCP example set `MDDB_GRPC_ADDRESS` and `MDDB_REST_BASE_URL`, which the server does not read.
 - Site: the inline chat widget connected every visitor to their own `localhost:11030` and stayed on "Connecting..."; it now starts only when the page is served locally.
 - docs/DOCKER_HUB.md backup and restore passed `cp` to mddbd; they use `--entrypoint cp`.
+- **mddb-chat panicked when a search result was cut inside a multi-byte character (#397).** Results were cut at byte 800; Polish, German, emoji or box-drawing text at that position ended the answer with "byte index 800 is not a char boundary". Results and documents are cut on a character boundary and end with `…`.
+- **mddb-chat search results lost their code (#398).** Markdown was stripped from the whole result, so fenced blocks, inline code and keys such as `search_top_k` reached the model flattened, and small models invented commands. Markdown is now stripped only from prose; fenced and inline code pass through as written, a cut inside a fence closes it, and a chunk that fits the limit arrives whole.
 
 ### Documentation
 
@@ -84,7 +88,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Nothing changes in how MDDB runs.** Databases, configuration, API, MCP tools and clients from 2.18.x work unchanged; the Change Date and the Additional Use Grant are the only new facts. If you run MDDB for your own organisation, including its affiliates, you need to do nothing. If you sell MDDB to third parties as a hosted service or embedded in a paid product, or sell support for it that competes with Tradik Limited's, you need a commercial licence before upgrading to 2.19.0; 2.18.10 and earlier stay available under BSD-3-Clause. Package metadata now says `BUSL-1.1` for `mddbd`, `mddb-cli` and the panel (deb, rpm, snap store listings, Homebrew, Docker image labels) and `BSD-3-Clause` for every client library and integration, so a licence scanner that allow-lists only OSI licences will flag the server packages and pass the libraries.
 
-- `mddb-cli autoindex` and `mddb-cli add` now read Markdown frontmatter (`--no-frontmatter` keeps the old behaviour). A Markdown file with frontmatter is rewritten once on the next `autoindex` run, as its stored body changes. `scripts/load-md-folder.sh` needs `mddb-cli` 2.18.11.
+- `mddb-cli autoindex` and `mddb-cli add` now read Markdown frontmatter (`--no-frontmatter` keeps the old behaviour). A Markdown file with frontmatter is rewritten once on the next `autoindex` run, as its stored body changes. `scripts/load-md-folder.sh` needs `mddb-cli` 2.19.0.
 - gRPC `Truncate` behaves like REST: deletions reach replicas through the binlog, and a document that cannot be decoded fails the call.
 
 ## [2.18.10] - 2026-10-30

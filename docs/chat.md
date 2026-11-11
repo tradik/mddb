@@ -118,6 +118,7 @@ Everything else is a TOML key, not an environment variable:
 | LLM base URL | `[llm] api_url` | `"https://api.openai.com/v1"` |
 | MDDB gRPC address | `[mddb] grpc_addr` | `"http://localhost:11024"` |
 | Default collection | `[mddb] default_collection` | `"docs"` |
+| Result size (2.19.0) | `[mddb] result_max_chars` | `800` (characters of each search result the model sees; `0` = whole chunk) |
 | Listen port | `[server] port` | `11030` |
 | Concurrent sessions | `[session] max_concurrent` | `2` |
 | Messages per minute | `[security] rate_limit_per_minute` | `30` |
