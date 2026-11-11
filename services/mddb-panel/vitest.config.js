@@ -107,6 +107,16 @@ const coverageFiles = [
   'src/components/ApiErrorNotice.jsx',
   'src/components/CollectionPicker.jsx',
   'src/components/OneTimeSecret.jsx',
+  'src/lib/use-action.js',
+  'src/lib/time-format.js',
+  'src/components/AdminToolNav.jsx',
+  'src/components/AdminToolViews.jsx',
+  'src/components/MemoryPanel.jsx',
+  'src/components/MemorySessionsTable.jsx',
+  'src/components/MemorySessionView.jsx',
+  'src/components/MemoryMessageForm.jsx',
+  'src/components/MemoryRecallBox.jsx',
+  'src/components/MemorySessionForm.jsx',
 ];
 
 export default mergeConfig(

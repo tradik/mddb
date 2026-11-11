@@ -154,4 +154,10 @@ describe('Sidebar administration', () => {
     expect(screen.getByRole('button', { name: 'Cluster' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Automation' })).toBeNull();
   });
+
+  test('the 2.19.0 pages are listed after the others and switch the view', async () => {
+    await renderWith();
+    fireEvent.click(screen.getByRole('button', { name: 'Agent Memory' }));
+    expect(useStore.getState().viewMode).toBe('memory');
+  });
 });

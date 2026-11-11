@@ -5,6 +5,8 @@ import mddbClient from '../lib/mddb-client';
 import UploadModal from './UploadModal';
 import CreateCollectionModal from './CreateCollectionModal';
 import CollectionConfigModal from './CollectionConfigModal';
+// 2.19.0: memory, schemas, duplicates, import and account pages.
+import AdminToolNav from './AdminToolNav';
 
 // One entry of the administration menu; the open page is highlighted.
 function NavButton({ mode, icon: Icon, label }) {
@@ -327,6 +329,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
             <NavButton mode="automation" icon={Zap} label="Automation" />
           )}
           <NavButton mode="settings" icon={Sliders} label="Client Settings" />
+          <AdminToolNav NavButton={NavButton} authEnabled={authEnabled} />
         </div>
       </div>
 

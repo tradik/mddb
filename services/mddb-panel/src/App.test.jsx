@@ -49,6 +49,8 @@ vi.mock('./components/AliasesPanel', () => ({ default: () => 'aliases panel' }))
 vi.mock('./components/ChatScenariosPanel', () => ({ default: () => 'chat scenarios panel' }));
 vi.mock('./components/EvalPanel', () => ({ default: () => 'eval panel' }));
 vi.mock('./components/CodeSymbolPanel', () => ({ default: () => 'code symbol panel' }));
+// 2.19.0 pages: AdminToolViews has its own suite.
+vi.mock('./components/AdminToolViews', () => ({ default: ({ viewMode }) => (viewMode === 'memory' ? 'admin tool page' : null) }));
 
 const { default: mddbClient } = await import('./lib/mddb-client');
 const { useSSE } = await import('./lib/useSSE');
@@ -196,6 +198,7 @@ describe('App', () => {
     ['automation', 'automation panel'], ['settings', 'settings panel'], ['temporal', 'temporal panel'],
     ['spellcheck', 'spell check panel'], ['auditLog', 'audit log panel'], ['webhooks', 'webhooks panel'],
     ['security', 'security dashboard'], ['encryption', 'encryption panel'],
+    ['memory', 'admin tool page'],
   ])('view mode %s shows only %s', async (viewMode, label) => {
     const { container } = await renderWith({ viewMode, currentDocument: { key: 'a' } });
     expect(container.querySelector('.flex-1.flex.overflow-hidden').textContent).toBe(label);

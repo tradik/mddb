@@ -41,6 +41,8 @@ import ChatScenariosPanel from './components/ChatScenariosPanel';
 import ComplianceBanner from './components/ComplianceBanner';
 import SSEToast from './components/SSEToast';
 import { useSSE } from './lib/useSSE';
+// 2.19.0: memory, schemas, duplicates, import and account pages.
+import AdminToolViews from './components/AdminToolViews';
 
 function App() {
   const {
@@ -396,6 +398,7 @@ function App() {
               )}
             </>
           )}
+          <AdminToolViews viewMode={viewMode} currentDocument={currentDocument} />
         </div>
       </div>
       <SSEToast connected={sseConnected} lastEvent={sseLastEvent} />
