@@ -77,13 +77,13 @@ func (s *MCPToolServer) toolMemoryAddMessage(ctx context.Context, args map[strin
 	}
 
 	msgID := generateMemoryMessageID()
-	now := fmt.Sprintf("%d", time.Now().Unix())
+	created := time.Now()
 
 	meta := map[string][]string{
 		"sessionId": {sessionID},
 		"role":      {role},
 		"type":      {"message"},
-		"timestamp": {now},
+		"timestamp": {fmt.Sprintf("%d", created.Unix())},
 	}
 
 	if extraMeta := mcpGetMetaMap(args, "meta"); len(extraMeta) > 0 {
@@ -92,7 +92,7 @@ func (s *MCPToolServer) toolMemoryAddMessage(ctx context.Context, args map[strin
 		}
 	}
 
-	msgKey := fmt.Sprintf("%s/%s-%s", sessionID, now, msgID)
+	msgKey := memoryMessageKey(sessionID, created, msgID) // the key REST writes
 
 	doc, err := s.client.Add(ctx, &MCPAddRequest{
 		Collection: memoryMessagesCollection,
@@ -418,38 +418,58 @@ func (s *MCPToolServer) toolMemorySessionHistory(ctx context.Context, args map[s
 	}
 	offset := mcpGetInt(args, "offset")
 
-	resp, err := s.client.Search(ctx, &MCPSearchRequest{
-		Collection: memoryMessagesCollection,
-		FilterMeta: map[string][]string{
-			"sessionId": {sessionID},
-			"type":      {"message"},
-		},
-		Sort:           "addedAt",
-		Asc:            true,
-		Limit:          limit,
-		Offset:         offset,
-		IncludeContent: true,
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch history: %w", err)
-	}
-
-	messages := make([]map[string]interface{}, 0, len(resp.Documents))
-	for _, doc := range resp.Documents {
-		messages = append(messages, map[string]interface{}{
-			"role":      metaFirst(doc.Meta, "role"),
-			"content":   doc.ContentMD,
-			"createdAt": doc.AddedAt,
-			"key":       doc.Key,
+	var messages []map[string]interface{}
+	var total int
+	if direct, ok := s.client.(*DirectClient); ok {
+		// In process: the order REST's /v1/memory/history answers in —
+		// creation time to the nanosecond, then id — which a search sorted
+		// on whole-second addedAt cannot give.
+		all := direct.server.loadSessionMessages(sessionID, 0, 0)
+		total = len(all)
+		for _, doc := range pageMessages(all, limit, offset) {
+			messages = append(messages, historyEntry(doc.Meta, doc.ContentMD, time.Unix(doc.AddedAt, 0), doc.Key))
+		}
+	} else {
+		resp, err := s.client.Search(ctx, &MCPSearchRequest{
+			Collection: memoryMessagesCollection,
+			FilterMeta: map[string][]string{
+				"sessionId": {sessionID},
+				"type":      {"message"},
+			},
+			Sort:           "addedAt",
+			Asc:            true,
+			Limit:          limit,
+			Offset:         offset,
+			IncludeContent: true,
 		})
+		if err != nil {
+			return "", fmt.Errorf("failed to fetch history: %w", err)
+		}
+		total = resp.Total
+		for _, doc := range resp.Documents {
+			messages = append(messages, historyEntry(doc.Meta, doc.ContentMD, doc.AddedAt, doc.Key))
+		}
+	}
+	if messages == nil {
+		messages = []map[string]interface{}{}
 	}
 
 	data, _ := json.MarshalIndent(map[string]interface{}{
 		"sessionId": sessionID,
-		"total":     resp.Total,
+		"total":     total,
 		"messages":  messages,
 	}, "", "  ")
 	return string(data), nil
+}
+
+// historyEntry is one message as memory_session_history returns it.
+func historyEntry(meta map[string][]string, content string, addedAt time.Time, key string) map[string]interface{} {
+	return map[string]interface{}{
+		"role":      metaFirst(meta, "role"),
+		"content":   content,
+		"createdAt": addedAt,
+		"key":       key,
+	}
 }
 
 // matchesMeta checks if a document's meta matches all filter criteria.

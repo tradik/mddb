@@ -7737,7 +7737,10 @@ paths:
       tags: [ Memory RAG ]
       summary: Get session message history
       operationId: getMemoryHistory
-      description: Retrieve chronologically ordered message history for a session.
+      description: >
+        Retrieve the message history of a session in chronological order: by
+        creation time to the nanosecond, then by message id, so messages written
+        within the same second keep the order they were written in (2.19.0+).
       requestBody:
         required: true
         content:

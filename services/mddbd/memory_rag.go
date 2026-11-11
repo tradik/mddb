@@ -260,20 +260,20 @@ func (s *Server) handleMemoryMessageAdd(w http.ResponseWriter, r *http.Request) 
 	}
 
 	msgID := generateMemoryMessageID()
-	now := time.Now().Unix()
+	now := time.Now()
 
 	meta := map[string][]string{
 		"sessionId": {req.SessionID},
 		"role":      {req.Role},
 		"type":      {"message"},
-		"timestamp": {fmt.Sprintf("%d", now)},
+		"timestamp": {fmt.Sprintf("%d", now.Unix())},
 	}
 	for k, v := range req.Meta {
 		meta[k] = []string{v}
 	}
 
-	// Key format: sessionID/timestamp-msgID for chronological ordering
-	msgKey := fmt.Sprintf("%s/%020d-%s", req.SessionID, now, msgID)
+	// Key format: sessionID/creation time in ns-msgID, for chronological ordering
+	msgKey := memoryMessageKey(req.SessionID, now, msgID)
 
 	saved, _, err := s.addDocument(memoryMessagesCollection, msgKey, "en", meta, req.Content, 0, true)
 	if err != nil {
@@ -743,10 +743,7 @@ func (s *Server) loadSessionMessages(sessionID string, limit, offset int) []stor
 		return nil
 	})
 
-	// Sort by addedAt
-	sort.Slice(messages, func(i, j int) bool {
-		return messages[i].AddedAt < messages[j].AddedAt
-	})
+	sortMessagesChronologically(messages)
 	return pageMessages(messages, limit, offset)
 }
 

@@ -5655,7 +5655,10 @@ list with the title their body was written with. The MCP tool
 
 ### POST /v1/memory/history
 
-Get the full message history for a session, ordered chronologically.
+Get the full message history for a session, ordered chronologically: by creation
+time to the nanosecond, then by message id, so messages written within the same
+second keep the order they were written in (before 2.19.0 they could come back in
+any order). The MCP tool `memory_session_history` answers in the same order.
 
 **Request:**
 ```json
