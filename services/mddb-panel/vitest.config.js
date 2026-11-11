@@ -85,6 +85,28 @@ const coverageFiles = [
   'src/components/ChatScenarioStyleFields.jsx',
   'src/components/ChatScenarioLlmFields.jsx',
   'src/components/ChatScenarioPreview.jsx',
+  // 2.19.0: every admin feature of the server reachable from the panel —
+  // agent memory, schemas, bulk import, personal API keys, facets,
+  // duplicates, imports, batch writes, maintenance and the unused client
+  // calls (classify, code graph, TTL, geo tools, temporal events, spell cleanup).
+  'src/lib/client/http.js',
+  'src/lib/client/index.js',
+  'src/lib/client/memory.js',
+  'src/lib/client/schemas.js',
+  'src/lib/client/bulk-ingest.js',
+  'src/lib/client/api-keys.js',
+  'src/lib/client/aggregate.js',
+  'src/lib/client/duplicates.js',
+  'src/lib/client/batch.js',
+  'src/lib/client/imports.js',
+  'src/lib/client/maintenance.js',
+  'src/lib/json-text.js',
+  'src/lib/use-job-polling.js',
+  'src/components/ConfirmDialog.jsx',
+  'src/components/JsonTextarea.jsx',
+  'src/components/ApiErrorNotice.jsx',
+  'src/components/CollectionPicker.jsx',
+  'src/components/OneTimeSecret.jsx',
 ];
 
 export default mergeConfig(

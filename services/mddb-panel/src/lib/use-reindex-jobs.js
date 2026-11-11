@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import mddbClient from './mddb-client';
 import { formatEta } from './storage-format';
+import { useJobPolling, POLL_MS } from './use-job-polling';
 
 // Vector reindex as background jobs (2.18.4): POST /v1/vector-reindex with
 // async:true answers 202 with a job, GET /v1/vector-reindex/jobs/{id} reports
@@ -8,8 +9,11 @@ import { formatEta } from './storage-format';
 // reindex of a collection while one runs is 409. Jobs live in server memory,
 // so a restart forgets them (the vectors written stay).
 
-/** How often a running job is polled. */
-export const POLL_MS = 2000;
+/** How often a running job is polled (shared with the bulk ingest jobs). */
+export { POLL_MS };
+
+/** A reindex job's id. */
+const jobIdOf = (job) => job.jobId;
 
 /** True once a job has stopped. */
 export const isFinished = (job) => job?.status === 'completed' || job?.status === 'failed';
@@ -66,22 +70,13 @@ export function useReindexJobs(onFinished) {
     finishedRef.current?.();
   }, [loadRecent]);
 
-  const running = Object.values(active).map((j) => j.jobId).join(',');
-  useEffect(() => {
-    if (!running) return undefined;
-    const timer = setInterval(() => {
-      for (const [collection, job] of Object.entries(active)) {
-        mddbClient.getVectorReindexJob(job.jobId)
-          .then((next) => (isFinished(next)
-            ? finish(collection, next)
-            : setActive((prev) => (prev[collection] ? { ...prev, [collection]: next } : prev))))
-          .catch((err) => finish(collection, { status: 'failed', error: err.message }));
-      }
-    }, POLL_MS);
-    return () => clearInterval(timer);
-    // `active` changes on every poll; the timer restarts only when the set of jobs does.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, finish]);
+  useJobPolling(active, {
+    getId: jobIdOf,
+    fetchJob: (id) => mddbClient.getVectorReindexJob(id),
+    isDone: isFinished,
+    onUpdate: (collection, next) => setActive((prev) => (prev[collection] ? { ...prev, [collection]: next } : prev)),
+    onFinish: finish,
+  });
 
   const start = async (collection, force) => {
     setMessages((prev) => {

@@ -228,11 +228,13 @@ class MDDBClient {
   }
 
   /**
-   * Export documents
+   * Export documents as a file: `{ blob, filename }`. The answer is NDJSON or
+   * a ZIP, not JSON, and names no file, so `filename` is null.
    */
   async export({ collection, filterMeta = {}, format = 'ndjson' }) {
-    return this.request('/export', {
+    return this.requestBlob('/export', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         collection,
         filterMeta,
@@ -1397,3 +1399,11 @@ class MDDBClient {
 }
 
 export default new MDDBClient();
+
+// 2.19.0: the admin features the panel reached last — agent memory, schemas,
+// bulk ingest jobs, personal API keys, facets, duplicates, wiki import, batch
+// writes, checksum and restore. One module per feature in ./client/, mixed in
+// here so each method shares request() and its error handling.
+import { adminMethods } from './client';
+
+Object.assign(MDDBClient.prototype, adminMethods);
