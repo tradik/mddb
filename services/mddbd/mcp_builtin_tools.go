@@ -38,6 +38,7 @@ func mcpBuiltinTools() []MCPTool {
 	t = append(t, mcpEvalTools()...)
 	t = append(t, mcpGainTool())
 	t = append(t, mcpCorpusTools()...)
+	t = append(t, mcpChatScenarioTools()...)
 	return append(t, mcpWhereTools()...)
 }
 

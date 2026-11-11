@@ -15,7 +15,7 @@ measure.
 
 ## 1. Connect over MCP
 
-`mddbd` has a built-in MCP server with 97 tools ([MCP.md](MCP.md)). It serves
+`mddbd` has a built-in MCP server with 101 tools ([MCP.md](MCP.md)). It serves
 the 2026-07-28 and 2025-11-25 revisions side by side
 ([MCP-REVISIONS.md](MCP-REVISIONS.md)).
 

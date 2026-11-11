@@ -111,22 +111,26 @@ var mcpToolAccessRules = map[string]accessRule{
 	"fts_languages":        ruleAuthenticated,
 	"geo_encode":           ruleAuthenticated,
 	"geo_decode":           ruleAuthenticated,
+	"chat_scenario_list":   ruleAuthenticated, // #403: filtered to what the caller may read
+	"chat_scenario_get":    ruleHandler,       // #403: the scenario's collections, checked when it is read
 	"wordpress_set_status": ruleAuthenticated, // a post on the WordPress site, not in MDDB
 
 	// Global administration.
-	"create_backup":       ruleAdmin,
-	"restore_backup":      ruleAdmin,
-	"corpus_install":      ruleAdmin, // as POST /v1/corpus/install
-	"corpus_remove":       ruleAdmin, // as POST /v1/corpus/remove
-	"list_webhooks":       ruleAdmin,
-	"list_automation":     ruleAdmin,
-	"create_automation":   ruleAdmin,
-	"get_automation":      ruleAdmin,
-	"update_automation":   ruleAdmin,
-	"delete_automation":   ruleAdmin,
-	"test_automation":     ruleAdmin,
-	"get_automation_logs": ruleAdmin,
-	"run_automation":      ruleAdmin,
+	"create_backup":        ruleAdmin,
+	"restore_backup":       ruleAdmin,
+	"corpus_install":       ruleAdmin, // as POST /v1/corpus/install
+	"corpus_remove":        ruleAdmin, // as POST /v1/corpus/remove
+	"chat_scenario_put":    ruleAdmin, // #403: as PUT /v1/chat/scenarios/{name}
+	"chat_scenario_delete": ruleAdmin, // #403: as DELETE /v1/chat/scenarios/{name}
+	"list_webhooks":        ruleAdmin,
+	"list_automation":      ruleAdmin,
+	"create_automation":    ruleAdmin,
+	"get_automation":       ruleAdmin,
+	"update_automation":    ruleAdmin,
+	"delete_automation":    ruleAdmin,
+	"test_automation":      ruleAdmin,
+	"get_automation_logs":  ruleAdmin,
+	"run_automation":       ruleAdmin,
 }
 
 // referenceRule reads the named collections, or every reference collection.

@@ -151,6 +151,8 @@ func confirmDestructive(ctx context.Context, name string, args map[string]interf
 var mcpConfirmTypedArg = map[string]struct{ arg, title string }{
 	"delete_collection": {"collection", "Collection name"},
 	"corpus_remove":     {"name", "Pack name"}, // #378: the pack's collection goes with it
+	// #403: an assistant loses its prompt, guardrails and limits.
+	"chat_scenario_delete": {"name", "Scenario name"},
 }
 
 // newMCPConfirmRequest builds the question for one call. Every gated tool is

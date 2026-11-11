@@ -1063,6 +1063,11 @@ type MCPClient interface {
 	CorpusList(ctx context.Context) ([]corpusListEntry, error)
 	CorpusInstall(ctx context.Context, url, sha256 string) (*corpusInstallResult, error)
 	CorpusRemove(ctx context.Context, name string) (int, error)
+	// Chat scenarios (#403)
+	ChatScenarioList(ctx context.Context) ([]*ChatScenario, uint64, error)
+	ChatScenarioGet(ctx context.Context, name string) (*ChatScenario, string, error)
+	ChatScenarioPut(ctx context.Context, sc *ChatScenario) (bool, error)
+	ChatScenarioDelete(ctx context.Context, name string) error
 	Close() error
 }
 
