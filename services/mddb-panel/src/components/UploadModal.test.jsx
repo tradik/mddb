@@ -8,6 +8,7 @@ vi.mock('../lib/mddb-client', () => ({ default: { uploadFile: vi.fn() } }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { default: UploadModal } = await import('./UploadModal');
+const { useStore } = await import('../lib/store');
 const client = vi.mocked(mddbClient);
 
 const mdFile = (name = 'My Notes.md') => new File(['---\ntags: [a, b]\n---\n# hi'], name, { type: 'text/markdown' });
@@ -118,5 +119,12 @@ describe('UploadModal', () => {
     render(<UploadModal collection="docs" onClose={onClose} onSuccess={onSuccess} />);
     await act(async () => fireEvent.submit(screen.getByRole('button', { name: /Upload/ }).closest('form')));
     expect(screen.getByText('No files selected.')).toBeTruthy();
+  });
+
+  test('the Import page link switches the view and closes the dialog', () => {
+    render(<UploadModal collection="docs" onClose={onClose} onSuccess={onSuccess} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open the Import page' }));
+    expect(useStore.getState().viewMode).toBe('import');
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

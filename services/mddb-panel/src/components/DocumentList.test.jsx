@@ -5,10 +5,10 @@
 // the delete confirmation, the upload modal's refresh paths, and a read-only
 // corpus-pack collection (no upload, no delete, a notice).
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({
-  default: { search: vi.fn(), getDocument: vi.fn(), deleteDocument: vi.fn(), getStats: vi.fn() },
+  default: { search: vi.fn(), getDocument: vi.fn(), deleteDocument: vi.fn(), getStats: vi.fn(), deleteBatch: vi.fn() },
 }));
 // The modals have suites of their own; these stand-ins expose their callbacks.
 vi.mock('./UploadModal', () => ({
@@ -349,5 +349,68 @@ describe('DocumentList read-only collection', () => {
   test('a store without collection configs is writable', async () => {
     await renderList({ collectionConfigs: undefined });
     expect(screen.getByRole('button', { name: 'Upload' }).disabled).toBe(false);
+  });
+});
+
+describe('DocumentList batch delete', () => {
+  test('ticks documents, deletes them in one request after a confirmation, and reloads', async () => {
+    vi.mocked(mddbClient.deleteBatch).mockResolvedValueOnce({ deleted: 1, not_found: 1, failed: 0, errors: null });
+    await renderList({ currentDocument: { key: 'alpha', lang: 'en' } });
+    expect(screen.queryByText(/selected$/)).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select alpha (en)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select gamma (en)' }));
+    expect(screen.getByText('2 selected')).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: 'Select all shown' }).checked).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    const dialog = screen.getByRole('alertdialog', { name: 'Delete 2 documents' });
+    expect(within(dialog).getByText('docs')).toBeTruthy();
+    expect(dialog.textContent).toContain('alpha (en), gamma (en)');
+    await act(async () => fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' })));
+    expect(mddbClient.deleteBatch).toHaveBeenCalledWith({ collection: 'docs', documents: [docs[0], docs[2]].map((d) => ({ ...d, collection: 'docs' })) });
+    expect(screen.getByText('Deleted 1, 1 already gone.')).toBeTruthy();
+    expect(useStore.getState().currentDocument).toBeNull();
+    await waitFor(() => expect(mddbClient.search).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText(/ selected$/)).toBeNull();
+  });
+
+  test('select all shown follows the key filter; clear and toggling off', async () => {
+    vi.mocked(mddbClient.deleteBatch).mockResolvedValueOnce({ deleted: 0, failed: 1, errors: ['gamma: locked'] }).mockResolvedValueOnce({ failed: 1 });
+    await renderList();
+    fireEvent.change(screen.getByPlaceholderText('Filter by key...'), { target: { value: 'a' } });
+    const all = screen.getByRole('checkbox', { name: 'Select all shown' });
+    fireEvent.click(all);
+    expect(screen.getByText('3 selected')).toBeTruthy();
+    expect(all.checked).toBe(true);
+    fireEvent.click(all);
+    expect(screen.queryByText(/ selected$/)).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Beta (pl)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Beta (pl)' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select gamma (en)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear selection' }));
+    expect(screen.queryByText(/ selected$/)).toBeNull();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select gamma (en)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(mddbClient.deleteBatch).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete' })));
+    expect(screen.getByText('Deleted 0, 1 failed: gamma: locked.')).toBeTruthy();
+  });
+
+  test('a refused batch delete says not permitted; no selection on a read-only or empty list', async () => {
+    vi.mocked(mddbClient.deleteBatch).mockRejectedValueOnce(Object.assign(new Error('API Error (403): forbidden'), { status: 403, body: { error: 'forbidden' } }));
+    await renderList();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select alpha (en)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete' })));
+    expect(screen.getByText('Not permitted')).toBeTruthy();
+    cleanup();
+    await renderList({ collectionConfigs: { docs: { readOnly: true } } });
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    cleanup();
+    await renderList({}, { documents: [], totalCount: 0 });
+    expect(screen.queryByRole('checkbox')).toBeNull();
   });
 });

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X, FileText, Upload } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
+import { useStore } from '../lib/store';
 import { SUPPORTED_EXTENSIONS, classifyFiles, fileIcon } from '../lib/upload-files';
 
 const ACCEPT_STRING = SUPPORTED_EXTENSIONS.join(',');
@@ -96,6 +97,11 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
     } else {
       onSuccess(finalCollection);
     }
+  };
+
+  const openImport = () => {
+    useStore.getState().setViewMode('import');
+    onClose();
   };
 
   const formatModes = files.reduce((acc, f) => {
@@ -265,6 +271,14 @@ export default function UploadModal({ collection, onClose, onSuccess }) {
                 </span>
               </label>
             </div>
+
+            {/* 2.19.0: the other ways in — JSON documents, a URL, a wiki dump */}
+            <p className="mb-4 text-xs text-gray-700">
+              Pasting several documents as JSON, importing a URL or a Wikipedia dump?{' '}
+              <button type="button" onClick={openImport} className="underline text-blue-800" disabled={loading}>
+                Open the Import page
+              </button>
+            </p>
 
             {/* Error display */}
             {error && (

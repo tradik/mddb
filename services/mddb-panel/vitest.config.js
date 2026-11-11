@@ -127,6 +127,8 @@ const coverageFiles = [
   'src/components/CollectionNameInput.jsx',
   'src/components/UrlImportCard.jsx',
   'src/components/WikiImportCard.jsx',
+  'src/lib/use-selection.js',
+  'src/components/BatchDeleteBar.jsx',
 ];
 
 export default mergeConfig(

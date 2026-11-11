@@ -6,6 +6,8 @@ import mddbClient from '../lib/mddb-client';
 import UploadModal from './UploadModal';
 import CommandModal from './CommandModal';
 import ReadOnlyNotice from './ReadOnlyNotice';
+import BatchDeleteBar from './BatchDeleteBar';
+import { useSelection } from '../lib/use-selection';
 
 export default function DocumentList({ sseRefreshKey } = {}) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -37,6 +39,10 @@ export default function DocumentList({ sseRefreshKey } = {}) {
   // controls are off and the notice says why.
   const collectionConfig = collectionConfigs?.[currentCollection];
   const readOnly = collectionConfig?.readOnly === true;
+  // 2.19.0: documents ticked for a batch delete (/v1/delete-batch); a
+  // reloaded list starts with none ticked.
+  const selection = useSelection(documents);
+  const [batchOutcome, setBatchOutcome] = useState(null);
 
   useEffect(() => {
     setOffset(0);
@@ -155,6 +161,14 @@ export default function DocumentList({ sseRefreshKey } = {}) {
   const totalPages = Math.ceil(totalCount / limit);
   const rangeStart = totalCount === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + limit, totalCount);
+  const shownDocs = documents.filter(doc => !filterText || doc.key.toLowerCase().includes(filterText.toLowerCase()));
+  const allShownSelected = shownDocs.length > 0 && shownDocs.every(selection.isSelected);
+
+  const afterBatchDelete = (outcome) => {
+    setBatchOutcome(outcome);
+    if (currentDocument && selection.isSelected(currentDocument)) setCurrentDocument(null);
+    loadDocuments();
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -207,6 +221,16 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             <ReadOnlyNotice config={collectionConfig} compact />
           </div>
         )}
+        {!readOnly && shownDocs.length > 0 && (
+          <>
+            <label className="mt-2 flex items-center gap-2 text-xs text-gray-800">
+              <input type="checkbox" checked={allShownSelected} onChange={() => selection.toggleAll(shownDocs)} />
+              Select all shown
+            </label>
+            <BatchDeleteBar collection={currentCollection} documents={selection.selected} onClear={selection.clear} onDeleted={afterBatchDelete} />
+          </>
+        )}
+        {batchOutcome && <p role="status" className="mt-1 text-xs text-gray-800">{batchOutcome}</p>}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -219,7 +243,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
           </div>
         ) : (
           <ul className="divide-y divide-gray-200">
-            {documents.filter(doc => !filterText || doc.key.toLowerCase().includes(filterText.toLowerCase())).map((doc) => {
+            {shownDocs.map((doc) => {
               const selected = currentDocument?.key === doc.key && currentDocument?.lang === doc.lang;
               // The row and its delete are sibling controls: a button inside a
               // button is invalid HTML, and screen readers announce only one.
@@ -230,6 +254,15 @@ export default function DocumentList({ sseRefreshKey } = {}) {
                     selected ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                   }`}
                 >
+                  {!readOnly && (
+                    <input
+                      type="checkbox"
+                      checked={selection.isSelected(doc)}
+                      onChange={() => selection.toggle(doc)}
+                      aria-label={`Select ${doc.key} (${doc.lang})`}
+                      className="mt-5 ml-3"
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => handleDocumentClick(doc)}
