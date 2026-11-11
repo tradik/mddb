@@ -1514,6 +1514,12 @@ Export documents from a collection in NDJSON or ZIP format.
 **Response (ZIP)**:
 Binary ZIP file containing markdown files named as `{key}.{lang}.md`
 
+Both answers name the file (2.19.0+): `Content-Disposition: attachment;
+filename="<collection>.ndjson"` (or `.zip`), the collection reduced to letters,
+digits, `-` and `_` (anything else becomes `-`; `export` when none was given).
+CORS exposes the header (`Access-Control-Expose-Headers: X-Total-Count,
+Content-Disposition`), so a browser on another origin can read the name.
+
 **cURL Examples**:
 
 NDJSON export:

@@ -66,6 +66,12 @@ describe('file-shaped answers', () => {
     expect(req.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer tok' });
   });
 
+  test('export takes the file name the server gives', async () => {
+    stubFetch(new Response('PK', { headers: { 'Content-Disposition': 'attachment; filename="my-docs.zip"' } }));
+    const { filename } = await client.export({ collection: 'my docs', format: 'zip' });
+    expect(filename).toBe('my-docs.zip');
+  });
+
   test('importWiki posts the dump and only the options that are set', async () => {
     const fetchMock = stubFetch(jsonResponse({ imported: 1 }));
     const file = new File(['<mediawiki/>'], 'dump.xml');

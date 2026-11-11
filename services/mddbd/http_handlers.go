@@ -197,6 +197,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		defer func() { _ = stream.Close() }()
 
 		w.Header().Set("Content-Type", "application/x-ndjson")
+		w.Header().Set("Content-Disposition", exportDisposition(req.Collection, "ndjson"))
 		// Streamed straight to the client: a large collection no longer has
 		// to exist in memory twice before the first byte leaves.
 		if _, err := io.Copy(w, stream); err != nil {
@@ -213,6 +214,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/zip")
+		w.Header().Set("Content-Disposition", exportDisposition(req.Collection, "zip"))
 		zw := zip.NewWriter(w)
 		for _, d := range docs {
 			name := fmt.Sprintf("%s.%s.md", safe(d.Key), safe(d.Lang))
@@ -233,6 +235,17 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, `{"error":"unsupported format"}`, 400)
 	}
+}
+
+// exportDisposition names the file an export is saved as: the collection,
+// reduced to characters safe in a header and a file name, with the format's
+// extension; "export" when no collection was named.
+func exportDisposition(collection, ext string) string {
+	name := safe(collection)
+	if name == "" {
+		name = "export"
+	}
+	return fmt.Sprintf(`attachment; filename="%s.%s"`, name, ext)
 }
 
 func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {

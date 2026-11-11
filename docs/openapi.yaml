@@ -1045,6 +1045,15 @@ paths:
       responses:
         "200":
           description: Export file
+          headers:
+            Content-Disposition:
+              description: >
+                `attachment; filename="<collection>.ndjson"` or `.zip` (2.19.0+): the
+                collection with every character other than letters, digits, `-`
+                and `_` replaced by `-`; `export` when no collection was given.
+              schema:
+                type: string
+                example: attachment; filename="blog.ndjson"
           content:
             application/x-ndjson:
               schema:

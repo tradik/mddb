@@ -229,7 +229,8 @@ class MDDBClient {
 
   /**
    * Export documents as a file: `{ blob, filename }`. The answer is NDJSON or
-   * a ZIP, not JSON, and names no file, so `filename` is null.
+   * a ZIP, not JSON; the server names it (`<collection>.ndjson` or `.zip`,
+   * Content-Disposition, 2.19.0+) — `filename` is null from an older server.
    */
   async export({ collection, filterMeta = {}, format = 'ndjson' }) {
     return this.requestBlob('/export', {

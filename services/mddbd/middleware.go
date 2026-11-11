@@ -17,7 +17,9 @@ func withCORS(h http.Handler) http.Handler {
 		cfg.applyOrigin(w, r.Header.Get("Origin"))
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
-		w.Header().Set("Access-Control-Expose-Headers", "X-Total-Count")
+		// Content-Disposition: the name of a file answer such as /v1/export,
+		// which a panel on another origin could not read otherwise.
+		w.Header().Set("Access-Control-Expose-Headers", "X-Total-Count, Content-Disposition")
 		w.Header().Set("Access-Control-Max-Age", "86400")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
