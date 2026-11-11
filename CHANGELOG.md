@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `make sonar-local`: the SonarCloud scan and quality gate from this machine before a push (Docker, `SONAR_TOKEN`).
 - **mddb-chat: `[mddb] result_max_chars`** sets how many characters of each search result the model sees (default `800`, as before; `0` = the whole chunk) (#398).
+- **mddb-chat: webhook events `message`, `answer` and `feedback` (#399)**, opt-in per `[[webhooks]]` entry, with the same envelope and HMAC signature as the session events. `message` carries the sanitized question; `answer` the final text, provider, model, token usage, the tools called (name and collection), latency and the id of the question it answers; `feedback` the rating and the message id it rates. The WebSocket `done` frame now carries `message_id`, and `feedback` accepts an optional `message_id`; older clients are unaffected. A webhook entry without `events` receives `session.start`, `session.end` and `queue.full`, as before, and an unknown event name is reported at startup.
 
 ### Changed
 

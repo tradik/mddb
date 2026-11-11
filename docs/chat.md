@@ -122,6 +122,9 @@ Everything else is a TOML key, not an environment variable:
 | Listen port | `[server] port` | `11030` |
 | Concurrent sessions | `[session] max_concurrent` | `2` |
 | Messages per minute | `[security] rate_limit_per_minute` | `30` |
+| Webhook events (2.19.0) | `[[webhooks]] events` | `["session.start", "session.end", "queue.full"]` when omitted; add `"message"`, `"answer"`, `"feedback"` to log questions, answers and ratings |
+
+Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming another collection is refused. Each answer ends with a `done` frame carrying `message_id`, which a `feedback` message can name. Payloads of the webhook events are in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#webhooks).
 
 ### Widget Configuration
 
