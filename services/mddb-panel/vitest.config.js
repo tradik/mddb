@@ -129,6 +129,9 @@ const coverageFiles = [
   'src/components/WikiImportCard.jsx',
   'src/lib/use-selection.js',
   'src/components/BatchDeleteBar.jsx',
+  'src/lib/duplicates-format.js',
+  'src/components/DuplicatesPanel.jsx',
+  'src/components/DuplicateGroups.jsx',
 ];
 
 export default mergeConfig(

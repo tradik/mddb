@@ -7,6 +7,8 @@ import { render, screen, cleanup } from '@testing-library/react';
 vi.mock('./MemoryPanel', () => ({ default: () => 'memory page' }));
 vi.mock('./SchemasPanel', () => ({ default: () => 'schemas page' }));
 vi.mock('./ImportPanel', () => ({ default: () => 'import page' }));
+vi.mock('./DuplicatesPanel', () => ({ default: () => 'duplicates page' }));
+vi.mock('./DocumentViewer', () => ({ default: () => ' + viewer' }));
 
 const { default: AdminToolViews } = await import('./AdminToolViews');
 const { default: AdminToolNav } = await import('./AdminToolNav');
@@ -18,9 +20,17 @@ describe('AdminToolViews', () => {
     ['memory', 'memory page'],
     ['schemas', 'schemas page'],
     ['import', 'import page'],
+    ['duplicates', 'duplicates page'],
   ])('%s shows %s', (viewMode, label) => {
     const { container } = render(<AdminToolViews viewMode={viewMode} />);
     expect(container.textContent).toBe(label);
+  });
+
+  test('the duplicates page shows the viewer beside it once a document is open; others do not', () => {
+    const { container, rerender } = render(<AdminToolViews viewMode="duplicates" currentDocument={{ key: 'a' }} />);
+    expect(container.textContent).toBe('duplicates page + viewer');
+    rerender(<AdminToolViews viewMode="import" currentDocument={{ key: 'a' }} />);
+    expect(container.textContent).toBe('import page');
   });
 
   test('another view mode shows nothing', () => {
@@ -37,5 +47,6 @@ describe('AdminToolNav', () => {
     expect(screen.getByRole('button', { name: 'Agent Memory' }).dataset.mode).toBe('memory');
     expect(screen.getByRole('button', { name: 'Collection Schemas' }).dataset.mode).toBe('schemas');
     expect(screen.getByRole('button', { name: 'Import' }).dataset.mode).toBe('import');
+    expect(screen.getByRole('button', { name: 'Duplicates' }).dataset.mode).toBe('duplicates');
   });
 });
