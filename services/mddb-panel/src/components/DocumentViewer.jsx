@@ -11,6 +11,7 @@ import { useStore } from '../lib/store';
 import DocumentEditor from './DocumentEditor';
 import RevisionHistory from './RevisionHistory';
 import ImagePreview from './ImagePreview';
+import DocumentTools from './DocumentTools';
 
 // Error Boundary component
 class ErrorBoundary extends Component {
@@ -275,6 +276,9 @@ export default function DocumentViewer() {
           </div>
         </div>
       )}
+
+      {/* 2.19.0: expiry and classification */}
+      <DocumentTools key={`${currentDocument.collection}|${currentDocument.key}|${currentDocument.lang}`} document={currentDocument} />
 
       {/* Content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>

@@ -140,6 +140,9 @@ const coverageFiles = [
   'src/components/FacetsPanel.jsx',
   'src/components/CollectionMaintenanceCard.jsx',
   'src/components/BackupRestoreCard.jsx',
+  'src/components/DocumentTools.jsx',
+  'src/components/TtlControl.jsx',
+  'src/components/ClassifyBox.jsx',
 ];
 
 export default mergeConfig(

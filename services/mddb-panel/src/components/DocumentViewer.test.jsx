@@ -15,6 +15,7 @@ vi.mock('./RevisionHistory', () => ({
   default: ({ document, onClose }) => <div>revisions {document.key}<button onClick={onClose}>close revisions</button></div>,
 }));
 vi.mock('./ImagePreview', () => ({ default: ({ docKey }) => <div>image preview {docKey}</div> }));
+vi.mock('./DocumentTools', () => ({ default: ({ document }) => <div>document tools {document.key}</div> }));
 vi.mock('react-syntax-highlighter', () => ({ Prism: ({ children, language }) => <pre data-language={language}>{children}</pre> }));
 vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({ vscDarkPlus: {} }));
 // A stand-in for react-markdown hands the `code` renderer the three shapes it
@@ -84,6 +85,7 @@ describe('DocumentViewer', () => {
     expect(screen.getByText('a, b')).toBeTruthy();
     expect(screen.getByText('Ann')).toBeTruthy();
     expect(screen.getByText('image preview guide')).toBeTruthy();
+    expect(screen.getByText('document tools guide')).toBeTruthy();
     expect(screen.getByText('# Guide')).toBeTruthy();
     expect(screen.getByText('docs')).toBeTruthy();
     expect(screen.getByText(format(new Date(doc.addedAt * 1000), 'PP'))).toBeTruthy();
