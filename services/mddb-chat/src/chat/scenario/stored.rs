@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tracing::warn;
 
 use crate::chat::mcp::{McpServers, limits_of};
+use crate::chat::turnlog::LogPolicy;
 use crate::grpc::client::proto::{ChatMcpServerStateProto, ChatScenarioProto};
 
 /// One scenario read from mddbd, with the prompt mddbd composed for it.
@@ -35,6 +36,8 @@ pub struct StoredScenario {
     /// them at the load — a turn asks again and uses these only when that
     /// fails — and each one's timeout and result size.
     pub mcp: Arc<McpServers>,
+    /// The turn log (#406).
+    pub logging: LogPolicy,
 }
 
 impl StoredScenario {
@@ -64,6 +67,7 @@ impl StoredScenario {
                 .rate_limit
                 .and_then(|limit| positive(limit.messages_per_minute))
                 .unwrap_or(0),
+            logging: LogPolicy::from_proto(scenario.logging),
         }
     }
 

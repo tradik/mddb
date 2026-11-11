@@ -156,12 +156,17 @@ fn restore(messages: &[proto::ChatMessageProto]) -> (Vec<ChatMessage>, Vec<Histo
 
 /// Appends one message. A failure is logged and swallowed: the visitor's
 /// conversation goes on, and only its stored copy misses the message.
+/// `redact` asks mddbd to redact it (#406).
 pub async fn record(
     client: &mut MddbClient,
     to: &ConversationRef,
     message: proto::ChatMessageProto,
+    redact: bool,
 ) {
-    if let Err(e) = client.append_messages(&to.id, &to.sub, vec![message]).await {
+    let appended = client
+        .append_redacted(&to.id, &to.sub, vec![message], redact)
+        .await;
+    if let Err(e) = appended {
         warn!(conversation = to.id, error = %e, "could not store a chat message");
     }
 }
@@ -195,6 +200,7 @@ pub fn answer_message(
                 name: stored_tool_name(t),
                 collection: t.collection.clone(),
                 duration_ms: 0,
+                ..Default::default()
             })
             .collect(),
         model: llm.model.clone(),

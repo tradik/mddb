@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use crate::chat::mcp::McpServers;
+use crate::chat::turnlog::LogPolicy;
 use crate::config::{Config, Scenario};
 use crate::llm::provider::CallParams;
 
@@ -76,6 +77,8 @@ pub struct ActiveScenario {
     /// The external MCP servers' states of the last reload and their limits
     /// (MCP-005); empty for a TOML scenario, which has none.
     pub mcp: Arc<McpServers>,
+    /// The turn log (#406); off unless a scenario in mddbd turns it on.
+    pub logging: LogPolicy,
 }
 
 impl ActiveScenario {
@@ -98,6 +101,7 @@ impl ActiveScenario {
             messages_per_minute: 0,
             retention_days: 0,
             mcp: Arc::default(),
+            logging: LogPolicy::default(),
         }
     }
 
@@ -140,6 +144,7 @@ impl ActiveScenario {
         }
         active.messages_per_minute = stored.messages_per_minute;
         active.mcp = stored.mcp.clone();
+        active.logging = stored.logging.clone();
         active
     }
 

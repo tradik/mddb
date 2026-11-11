@@ -67,18 +67,55 @@ impl MddbClient {
     }
 
     /// Adds messages to a conversation; mddbd gives each its id and time.
+    #[cfg(test)]
     pub async fn append_messages(
         &mut self,
         id: &str,
         sub: &str,
         messages: Vec<proto::ChatMessageProto>,
     ) -> Result<(), AppError> {
+        self.append_redacted(id, sub, messages, false).await
+    }
+
+    /// Adds messages, asking mddbd to redact them — and every later write to
+    /// the conversation — when `redact` is set (#406). A message's own id is
+    /// kept when it looks like one, so an answer can be rated by the id the
+    /// client saw.
+    pub async fn append_redacted(
+        &mut self,
+        id: &str,
+        sub: &str,
+        messages: Vec<proto::ChatMessageProto>,
+        redact: bool,
+    ) -> Result<(), AppError> {
         let request = self.auth_request(proto::AppendChatMessagesRequest {
             id: id.to_string(),
             sub: sub.to_string(),
             messages,
+            redact,
         });
         self.client.append_chat_messages(request).await?;
+        Ok(())
+    }
+
+    /// Rates an answer of a conversation, `up` or `down`, with an optional
+    /// comment (#406). Rating again replaces the earlier rating.
+    pub async fn rate_message(
+        &mut self,
+        to: (&str, &str),
+        message_id: &str,
+        rating: &str,
+        comment: &str,
+    ) -> Result<(), AppError> {
+        let (id, sub) = to;
+        let request = self.auth_request(proto::RateChatMessageRequest {
+            id: id.to_string(),
+            sub: sub.to_string(),
+            message_id: message_id.to_string(),
+            rating: rating.to_string(),
+            comment: comment.to_string(),
+        });
+        self.client.rate_chat_message(request).await?;
         Ok(())
     }
 

@@ -100,11 +100,17 @@ pub fn append(
         .into_iter()
         .enumerate()
         .map(|(i, m)| proto::ChatMessageProto {
-            id: format!("msg-{now}-{i}"),
+            // #406: mddbd keeps an id the client gave, so a rating can name it.
+            id: if m.id.is_empty() {
+                format!("msg-{now}-{i}")
+            } else {
+                m.id.clone()
+            },
             created_at: now,
             ..m
         })
         .collect();
+    conversation.redact |= request.redact;
     conversation.messages.extend(added.iter().cloned());
     conversation.message_count = i32::try_from(conversation.messages.len()).unwrap_or(i32::MAX);
     conversation.last_message_at = now;
@@ -133,5 +139,30 @@ pub fn delete_for_user(
     Ok(proto::DeleteChatConversationsForUserResponse {
         deleted: i32::try_from(deleted).unwrap_or(i32::MAX),
         sub: request.sub,
+    })
+}
+
+/// #406: a rating on an assistant message of the conversation.
+pub fn rate(
+    state: &mut FakeState,
+    request: proto::RateChatMessageRequest,
+) -> Result<proto::RateChatMessageResponse, Status> {
+    let at = tick(state);
+    let conversation = owned(state, &request.id, &request.sub)?;
+    let message = conversation
+        .messages
+        .iter_mut()
+        .find(|m| m.id == request.message_id && m.role == "assistant")
+        .ok_or_else(|| Status::not_found("message not found"))?;
+    let feedback = proto::ChatFeedbackProto {
+        rating: request.rating,
+        comment: request.comment,
+        at,
+    };
+    message.feedback = Some(feedback.clone());
+    Ok(proto::RateChatMessageResponse {
+        conversation_id: request.id,
+        message_id: request.message_id,
+        feedback: Some(feedback),
     })
 }

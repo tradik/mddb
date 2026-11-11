@@ -105,6 +105,7 @@ async fn grpc(State(state): State<Shared>, request: Request<Body>) -> Response<B
         "GetChatConversation" => unary(state, method, request, conversations::get).await,
         "AppendChatMessages" => unary(state, method, request, conversations::append).await,
         "EndChatConversation" => unary(state, method, request, conversations::end).await,
+        "RateChatMessage" => unary(state, method, request, conversations::rate).await,
         "DeleteChatConversationsForUser" => {
             unary(state, method, request, conversations::delete_for_user).await
         }

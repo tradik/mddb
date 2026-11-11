@@ -5,6 +5,8 @@
 use std::time::Instant;
 
 use crate::chat::mcp::McpToolset;
+use crate::chat::tools::ToolRun;
+use crate::chat::turnlog::LoggedRun;
 use crate::config::LlmConfig;
 use crate::llm::provider::{TokenUsage, ToolCall};
 use crate::webhook::events::AnswerReport;
@@ -22,6 +24,8 @@ pub struct TurnTrace {
     /// The external tools this turn offers (MCP-005), so that a call of one
     /// is recorded with its server.
     mcp: McpToolset,
+    /// What each call in `tools` looked for and found, in the same order (#406).
+    runs: Vec<LoggedRun>,
 }
 
 impl TurnTrace {
@@ -33,6 +37,7 @@ impl TurnTrace {
             started: Instant::now(),
             tools: Vec::new(),
             mcp: McpToolset::default(),
+            runs: Vec::new(),
         }
     }
 
@@ -44,7 +49,7 @@ impl TurnTrace {
 
     /// Remembers one tool call: its name and the collection it was pointed at,
     /// which is `default_collection` unless the arguments name another — the
-    /// same rule `tools::execute_tool` applies.
+    /// same rule `tools::run_tool` applies.
     pub fn record_tool(&mut self, call: &ToolCall, default_collection: &str) {
         if let Some(external) = self.mcp.find(&call.function.name) {
             let record = ToolCallRecord {
@@ -64,6 +69,17 @@ impl TurnTrace {
             collection,
             server: None,
         });
+    }
+
+    /// Remembers what the call last recorded by `record_tool` found, and how
+    /// long it took (#406).
+    pub fn record_run(&mut self, run: &ToolRun, duration_ms: u64) {
+        self.runs.push(LoggedRun::of(run, duration_ms));
+    }
+
+    /// What the calls found, in the order of `tools` (#406).
+    pub fn runs(&self) -> &[LoggedRun] {
+        &self.runs
     }
 
     /// The tools called so far, in order; stored with a signed user's answer
@@ -161,7 +177,7 @@ model = "claude-x"
 
     #[test]
     fn a_tool_call_without_a_collection_falls_back_to_the_scenarios() {
-        // The same rule execute_tool applies: no collection argument means the
+        // The same rule run_tool applies: no collection argument means the
         // scenario's collection, so the report says where the search went.
         let mut trace = TurnTrace::start();
 

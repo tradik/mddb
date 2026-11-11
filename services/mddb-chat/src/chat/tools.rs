@@ -15,6 +15,7 @@ use crate::error::AppError;
 use crate::grpc::client::SearchResult;
 use crate::grpc::client::proto::{CallChatMcpToolRequest, CallChatMcpToolResponse};
 use crate::llm::provider::{ToolCall, ToolDef, ToolFunction};
+pub use run::ToolRun;
 
 /// Characters of a whole document `get_document` hands back before cutting.
 pub const DOCUMENT_MAX_CHARS: usize = 4000;
@@ -107,12 +108,25 @@ fn parse_args<T: for<'de> Deserialize<'de>>(tool_call: &ToolCall) -> Result<T, A
         .map_err(|e| AppError::LlmError(format!("invalid tool args: {e}")))
 }
 
-/// Execute a tool call and return the result as a string for the model.
+/// Execute a tool call and return the result as a string for the model:
+/// `run_tool` without what the log records.
+#[cfg(test)]
 pub async fn execute_tool<S: DocSearch>(
     client: &mut S,
     tool_call: &ToolCall,
     policy: &ToolPolicy,
 ) -> Result<String, AppError> {
+    run_tool(client, tool_call, policy)
+        .await
+        .map(|run| run.output)
+}
+
+/// Execute a tool call: the result for the model and what the log records.
+pub async fn run_tool<S: DocSearch>(
+    client: &mut S,
+    tool_call: &ToolCall,
+    policy: &ToolPolicy,
+) -> Result<ToolRun, AppError> {
     let tool = tool_call.function.name.as_str();
     debug!(tool, args = tool_call.function.arguments, "executing tool");
 
@@ -121,23 +135,23 @@ pub async fn execute_tool<S: DocSearch>(
             let args: SearchArgs = parse_args(tool_call)?;
             match policy.resolve(tool, args.collection.as_deref()) {
                 Ok(collection) => search_docs(client, &args.query, collection, policy).await,
-                Err(refusal) => Ok(refusal),
+                Err(refusal) => Ok(ToolRun::text(refusal)),
             }
         }
         "get_document" => {
             let args: GetDocArgs = parse_args(tool_call)?;
             match policy.resolve(tool, args.collection.as_deref()) {
                 Ok(collection) => get_document(client, &args.key, collection).await,
-                Err(refusal) => Ok(refusal),
+                Err(refusal) => Ok(ToolRun::text(refusal)),
             }
         }
         external if mcp::is_mcp_name(external) => match policy.mcp_tool(external) {
-            Ok(offered) => {
-                Ok(mcp::call::execute(client, tool_call, offered, &policy.mcp.scenario).await)
-            }
-            Err(refusal) => Ok(refusal),
+            Ok(offered) => Ok(ToolRun::text(
+                mcp::call::execute(client, tool_call, offered, &policy.mcp.scenario).await,
+            )),
+            Err(refusal) => Ok(ToolRun::text(refusal)),
         },
-        other => Ok(format!("Unknown tool: {other}")),
+        other => Ok(ToolRun::text(format!("Unknown tool: {other}"))),
     }
 }
 
@@ -147,10 +161,20 @@ async fn search_docs<S: DocSearch>(
     query: &str,
     collection: &str,
     policy: &ToolPolicy,
-) -> Result<String, AppError> {
+) -> Result<ToolRun, AppError> {
     let results = client.search(query, collection).await?;
+    let mut run = ToolRun {
+        query: query.to_string(),
+        result_keys: results.iter().map(|r| r.key.clone()).collect(),
+        top_score: results
+            .iter()
+            .map(|r| f64::from(r.score))
+            .fold(0.0, f64::max),
+        ..ToolRun::default()
+    };
     if results.is_empty() {
-        return Ok("No results found for this query.".to_string());
+        run.output = "No results found for this query.".to_string();
+        return Ok(run);
     }
 
     let mut output = String::new();
@@ -164,7 +188,8 @@ async fn search_docs<S: DocSearch>(
             clip(&clean, policy.result_max_chars),
         ));
     }
-    Ok(output)
+    run.output = output;
+    Ok(run)
 }
 
 /// The document with that key, else the closest match, else a miss.
@@ -172,22 +197,33 @@ async fn get_document<S: DocSearch>(
     client: &mut S,
     key: &str,
     collection: &str,
-) -> Result<String, AppError> {
+) -> Result<ToolRun, AppError> {
     let results = client.search(key, collection).await?;
+    let found = results
+        .iter()
+        .find(|r| r.key == key)
+        .or_else(|| results.first());
+    Ok(ToolRun {
+        query: key.to_string(),
+        result_keys: found.iter().map(|d| d.key.clone()).collect(),
+        top_score: found.map_or(0.0, |d| f64::from(d.score)),
+        output: document_text(&results, key, collection),
+    })
+}
 
+/// What `get_document` tells the model.
+fn document_text(results: &[SearchResult], key: &str, collection: &str) -> String {
     if let Some(doc) = results.iter().find(|r| r.key == key) {
-        Ok(format!("Document: {}\n\n{}", doc.key, document_body(doc)))
+        format!("Document: {}\n\n{}", doc.key, document_body(doc))
     } else if let Some(doc) = results.first() {
-        Ok(format!(
+        format!(
             "Document '{}' not found. Closest match: {}\n\n{}",
             key,
             doc.key,
             document_body(doc)
-        ))
+        )
     } else {
-        Ok(format!(
-            "Document '{key}' not found in collection '{collection}'."
-        ))
+        format!("Document '{key}' not found in collection '{collection}'.")
     }
 }
 
@@ -198,6 +234,8 @@ fn document_body(doc: &SearchResult) -> String {
         Cow::Owned(cut) => format!("{cut}\n\n[Document truncated]"),
     }
 }
+
+mod run;
 
 #[cfg(test)]
 mod document_tests;

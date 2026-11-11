@@ -56,6 +56,10 @@ pub struct Session {
     /// Where a signed session's turns are stored (#405); `None` for an
     /// anonymous one, which lives in memory only.
     pub conversation: Option<ConversationRef>,
+    /// An anonymous session's turn log in mddbd (#406), created at its first
+    /// logged turn. Never set for a signed session, whose turns go to
+    /// `conversation`.
+    pub log: Option<ConversationRef>,
 }
 
 impl Session {
@@ -78,6 +82,7 @@ impl Session {
             attached: true,
             pace: MessagePace::default(),
             conversation: None,
+            log: None,
         }
     }
 
@@ -179,6 +184,9 @@ pub enum WsIncoming {
         /// (#399). Optional: clients built before it existed send none.
         #[serde(default)]
         message_id: Option<String>,
+        /// What the visitor wrote after a thumbs-down (#406); optional.
+        #[serde(default)]
+        comment: Option<String>,
     },
     Ping,
     /// The signed user's conversations in this scenario (#405).

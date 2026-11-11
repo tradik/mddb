@@ -12,6 +12,7 @@ use futures::StreamExt;
 use tracing::{info, warn};
 
 use crate::chat::outbound::{Sender, send_error, send_frame, send_json};
+use crate::chat::rating::Rating;
 use crate::chat::signed::JoinRequest;
 use crate::chat::{tools, turn};
 use crate::error::AppError;
@@ -114,7 +115,17 @@ impl Connection {
                 question,
                 answer,
                 message_id,
-            } => self.feedback(&rating, &question, &answer, message_id.as_deref()),
+                comment,
+            } => {
+                self.feedback(&rating, &question, &answer, message_id.as_deref());
+                // #406: stored with the answer it rates.
+                let rated = Rating {
+                    message_id: message_id.as_deref(),
+                    rating: &rating,
+                    comment: comment.as_deref().unwrap_or_default(),
+                };
+                self.store_rating(rated).await;
+            }
             WsIncoming::End => self.end(out).await,
             WsIncoming::Ping => send_json(out, &WsOutgoing::Pong).await,
             WsIncoming::ListConversations => self.list_conversations(out).await,

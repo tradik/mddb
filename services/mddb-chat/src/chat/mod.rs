@@ -8,11 +8,13 @@ pub mod mcp;
 mod outbound;
 pub mod policy;
 mod prompt;
+mod rating;
 pub mod scenario;
 mod signed;
 pub mod tools;
 pub mod trace;
 mod turn;
+pub mod turnlog;
 
 #[cfg(test)]
 mod handler_tests;

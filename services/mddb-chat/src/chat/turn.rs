@@ -10,6 +10,7 @@ use crate::chat::mcp::McpToolset;
 use crate::chat::outbound::{Sender, send_error, send_json};
 use crate::chat::scenario::{self, ActiveScenario, Resolved};
 use crate::chat::trace::TurnTrace;
+use crate::chat::turnlog::{self, LogPolicy};
 use crate::chat::{prompt, tools};
 use crate::config::LlmConfig;
 use crate::error::AppError;
@@ -95,7 +96,10 @@ pub async fn handle_message(
     // #405: a signed user's question is stored as soon as it is accepted, so
     // a turn that fails half way still leaves it in the conversation.
     if let Some(to) = &stored {
-        conversation::record(&mut mddb_client, to, conversation::user_message(&content)).await;
+        let question = conversation::user_message(&content);
+        // #406: a logged scenario's redaction covers the question too.
+        let redact = scenario.logging.enabled && scenario.logging.redact;
+        conversation::record(&mut mddb_client, to, question, redact).await;
     }
 
     // #399: the question is accepted, so it gets an id and is reported. The
@@ -131,6 +135,8 @@ pub async fn handle_message(
         scenario: &scenario_name,
         llm: &llm,
         stored: stored.as_ref(),
+        question: &content,
+        logging: &scenario.logging,
     };
 
     // Accumulated across every round of this turn and charged to the session
@@ -141,10 +147,14 @@ pub async fn handle_message(
     for round in 0..MAX_TOOL_ROUNDS {
         debug!(round = round, "tool-calling round");
 
-        let turn = state
+        let asked = state
             .llm_provider
             .chat_with_tools(&api_messages, &tool_defs, &scenario.llm)
-            .await?;
+            .await;
+        let turn = match asked {
+            Ok(turn) => turn,
+            Err(e) => return Err(failed(state, &mut mddb_client, &trace, &closing, e).await),
+        };
 
         // RAG-005: charged per round, not per turn. A budget that counted only
         // the round that produced the answer would miss most of what was spent.
@@ -176,9 +186,17 @@ pub async fn handle_message(
 
                 for tc in &tool_calls {
                     trace.record_tool(tc, &scenario.default_collection);
-                    let result = tools::execute_tool(&mut mddb_client, tc, &tool_policy)
+                    // #406: what the call looked for and found goes to the log.
+                    let started = Instant::now();
+                    let run = tools::run_tool(&mut mddb_client, tc, &tool_policy)
                         .await
-                        .unwrap_or_else(|e| format!("Tool error: {e}"));
+                        .unwrap_or_else(|e| tools::ToolRun {
+                            output: format!("Tool error: {e}"),
+                            ..Default::default()
+                        });
+                    let took = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+                    trace.record_run(&run, took);
+                    let result = run.output;
                     let result_len = result.len();
                     debug!(tool = tc.function.name, result_len, "tool result");
                     api_messages.push(ApiMsg {
@@ -209,7 +227,10 @@ pub async fn handle_message(
     }
 
     debug!("max tool rounds reached, streaming final response");
-    let answer = stream_final_answer(state, out, &api_messages, &scenario.llm).await?;
+    let answer = match stream_final_answer(state, out, &api_messages, &scenario.llm).await {
+        Ok(answer) => answer,
+        Err(e) => return Err(failed(state, &mut mddb_client, &trace, &closing, e).await),
+    };
     // RAG-005: the tool-calling rounds are charged here too, so a turn that
     // exhausted MAX_TOOL_ROUNDS costs what it cost. The streaming call itself
     // is NOT counted: its usage arrives in an SSE frame this reader discards
@@ -317,6 +338,36 @@ struct Closing<'a> {
     llm: &'a LlmConfig,
     /// Where a signed session's answer is stored (#405).
     stored: Option<&'a ConversationRef>,
+    /// The question, for an anonymous session's log (#406).
+    question: &'a str,
+    /// The scenario's turn log (#406).
+    logging: &'a LogPolicy,
+}
+
+impl Closing<'_> {
+    /// Where the turn is written (#406).
+    fn destination(&self) -> turnlog::Destination<'_> {
+        turnlog::Destination {
+            session_id: self.session_id,
+            scenario: self.scenario,
+            stored: self.stored,
+            policy: self.logging,
+        }
+    }
+}
+
+/// Logs a turn that failed after its question was accepted (#406) and hands
+/// the error back.
+async fn failed(
+    state: &AppState,
+    client: &mut MddbClient,
+    trace: &TurnTrace,
+    closing: &Closing<'_>,
+    error: AppError,
+) -> AppError {
+    let turn = (trace, closing.question, closing.llm);
+    turnlog::record_failure(state, client, &closing.destination(), turn, &error).await;
+    error
 }
 
 /// Closes a turn: `done` to the visitor with the answer's id (#399), the
@@ -342,10 +393,15 @@ async fn finish(
         closing.llm,
         spent,
     ));
-    if let Some(to) = closing.stored {
-        let stored = conversation::answer_message(&answer, trace.tools(), closing.llm, spent);
-        conversation::record(client, to, stored).await;
-    }
+    // #405 and #406: the answer under the id `done` gave the client, with the
+    // turn's details when the scenario logs.
+    let logged = closing
+        .logging
+        .enabled
+        .then(|| turnlog::outcome(trace.runs()));
+    let stored = turnlog::answer(trace, &answer, (closing.llm, spent), logged);
+    let to = closing.destination();
+    turnlog::record(state, client, &to, closing.question, stored).await;
 
     if let Some(mut session) = state.session_manager.get_session_mut(closing.session_id) {
         session.add_message(MessageRole::Assistant, answer);
