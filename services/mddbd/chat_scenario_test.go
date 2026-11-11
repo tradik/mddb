@@ -108,6 +108,10 @@ func openChatDB(t *testing.T, path string) *bolt.DB {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Closed before t.TempDir() is removed (cleanups run last-registered
+	// first): Windows cannot delete a file that is still open. bbolt's Close
+	// is a no-op on a closed database, so a test may still close it itself.
+	t.Cleanup(func() { _ = db.Close() })
 	return db
 }
 
