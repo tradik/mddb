@@ -126,6 +126,13 @@ Everything else is a TOML key, not an environment variable:
 
 Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming another collection is refused. Each answer ends with a `done` frame carrying `message_id`, which a `feedback` message can name. Payloads of the webhook events are in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#webhooks).
 
+### Sessions, reconnects and startup (2.19.0)
+
+- A closed WebSocket detaches the session; it keeps its history until `end` or `[session] session_ttl_minutes` of inactivity, and `resume { session_id }` reattaches it. A detached session does not hold a `max_concurrent` seat.
+- `mddb-chat` starts before mddbd is reachable and retries the connection (`[mddb] connect_retry_max_seconds`, default `30`, `0` = exit at once). `/health` answers 503 with `mddb_connected: false` until then.
+- `[llm] extra_body = { reasoning_effort = "none" }` adds fields to every OpenAI-compatible request, for thinking models that otherwise return an empty answer.
+- Scenarios can live in mddbd and be edited in the panel's Chat page (`/v1/chat/scenarios`); the TOML `[scenarios]` stay as bootstrap and fallback.
+
 ### Widget Configuration
 
 ```javascript
