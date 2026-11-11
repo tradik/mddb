@@ -5,6 +5,11 @@ cors_origins = ["*"]
 
 [mddb]
 grpc_addr = "http://localhost:11024"
+# mddbd's HTTP API, where auth_username logs in (2.19.0). Leave it out and it
+# is derived from grpc_addr — but only when grpc_addr uses mddbd's default
+# gRPC port 11024 (HTTP is then 11023 on the same host). With any other port
+# set it, or startup stops with "[mddb] http_url is required".
+# http_url = "http://localhost:11023"
 default_collection = "docs"
 # Retrieval settings. Leave these commented out to use whatever the collection
 # says (its retrieval profile, set in the panel or over the API) — that is the
@@ -133,6 +138,25 @@ trusted_proxies = []
 [scenarios_source]
 poll_seconds = 10
 
+# Signed-in users (2.19.0, #405). A host application that has already
+# authenticated its user signs a short-lived join token with this secret
+# (format and a test vector: docs/API.md, "The join token"); the widget sends
+# it in `join`. With a valid token the user's conversation is stored in mddbd
+# (system collection chat_conversations): a reconnect, another pod or a
+# restart resumes it with its history, and the user can list and delete their
+# conversations. The token's `sub` is the only user id believed.
+#
+# The service account (auth_username) needs read and write on the
+# chat_conversations collection.
+#
+# secret   = at least 32 random bytes, shared with the host only. Leave it
+#            empty here and set MDDB_CHAT_IDENTITY_SECRET. Empty in both:
+#            no signed joins, every visitor is anonymous (as before 2.19.0).
+# required = true refuses a join without a valid token (needs a secret).
+[identity]
+secret = ""
+required = false
+
 [scenarios.assistant]
 name = "Documentation Assistant"
 system_prompt = """You are a helpful documentation assistant for our product.
@@ -150,6 +174,9 @@ If you cannot resolve an issue, suggest contacting human support."""
 allowed_collections = ["docs", "faq"]
 temperature = 0.5
 max_turns = 30
+# Days a signed-in user's conversation in this scenario is kept after its last
+# message. Leave it out for mddbd's default (MDDB_CHAT_RETENTION_DAYS, 30).
+retention_days = 30
 
 # Webhooks: each entry is one URL and the events it receives. Every POST is
 # JSON — { "event", "timestamp", "data" } — with the event name in X-MDDB-Event

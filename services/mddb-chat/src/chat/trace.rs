@@ -45,6 +45,12 @@ impl TurnTrace {
         });
     }
 
+    /// The tools called so far, in order; stored with a signed user's answer
+    /// (#405).
+    pub fn tools(&self) -> &[ToolCallRecord] {
+        &self.tools
+    }
+
     /// Milliseconds since the turn started.
     pub fn latency_ms(&self) -> u64 {
         u64::try_from(self.started.elapsed().as_millis()).unwrap_or(u64::MAX)

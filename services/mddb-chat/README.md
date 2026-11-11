@@ -26,13 +26,15 @@ Every change is expected to pass `cargo fmt --all`, `cargo clippy --all-targets
 Copy [`config.example.toml`](config.example.toml) to `config.toml` and edit it;
 it is gitignored. Secrets can stay blank in the file and come from the
 environment: `MDDB_CHAT_LLM_API_KEY`, `MDDB_CHAT_WEBHOOK_SECRET`,
-`MDDB_CHAT_AUTH_USERNAME`, `MDDB_CHAT_AUTH_PASSWORD`.
+`MDDB_CHAT_AUTH_USERNAME`, `MDDB_CHAT_AUTH_PASSWORD`,
+`MDDB_CHAT_IDENTITY_SECRET`.
 
 ### `[mddb]` — the knowledge base
 
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `grpc_addr` | `"http://localhost:11024"` | Where `mddbd` listens for gRPC. |
+| `http_url` | derived | mddbd's HTTP API, where `auth_username` logs in. Unset: `grpc_addr` with port 11024 replaced by 11023 — only when the gRPC port is exactly 11024; any other port must set it, or startup stops with `[mddb] http_url is required`. Before 2.19.0 the string "11024" was replaced wherever it appeared, so every other port logged in at the gRPC port. |
 | `default_collection` | `"docs"` | Searched when a scenario names no `allowed_collections`. |
 | `search_top_k` | unset | Results per search. Unset means the collection's retrieval profile decides. |
 | `search_type` | unset | `"hybrid"`, `"vector"` or `"fts"`. Unset defers to the collection. |
@@ -49,6 +51,16 @@ environment: `MDDB_CHAT_LLM_API_KEY`, `MDDB_CHAT_WEBHOOK_SECRET`,
 | `allowed_collections` | `[]` | The collections this scenario's tools may search. The first one is the default; an empty list allows only `[mddb] default_collection`. The tool schema advertises exactly this set as an `enum`, and a call naming any other collection is refused with an error the model can read, and logged at `warn`. |
 | `temperature` | `[llm] temperature` | Sampling temperature for this scenario. |
 | `max_turns` | unlimited | User messages one session may send. |
+| `retention_days` | mddbd's default | Days a signed-in user's stored conversation is kept after its last write ([Signed-in users](#signed-in-users)). Unset: `MDDB_CHAT_RETENTION_DAYS` of mddbd, 30. |
+
+### `[identity]` — signed-in users
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `secret` | `""` | HMAC-SHA256 key shared with the host that signs join tokens; at least 32 bytes. Empty: `MDDB_CHAT_IDENTITY_SECRET`; empty there too: no signed joins. |
+| `required` | `false` | Refuse a `join` without a valid token. Needs a secret. |
+
+A secret under 32 bytes, or `required = true` without one, stops startup.
 
 ### `[scenarios_source]` — scenarios stored in mddbd
 
@@ -179,14 +191,58 @@ Every frame is a JSON object with a `type`.
 
 | Client sends | Fields | Server answers |
 |--------------|--------|----------------|
-| `join` | `name`, `scenario` (default `assistant`) | `session` `{id, scenario}`, or `queued` `{position}` and `session` later |
+| `join` | `name`, `scenario` (default `assistant`); signed: `token`, `conversation_id`, `new_conversation` | `session` `{id, scenario, conversation_id?}` (then `history` `{messages}` when a stored conversation resumes), or `queued` `{position}` and `session` later |
 | `message` | `content` | `chunk` `{content}` repeatedly, then `done` `{message_id}` |
 | `feedback` | `rating`, `question`, `answer`, `message_id` (optional) | nothing |
 | `resume` | `session_id` | `session` `{id, scenario}` of the session reattached |
 | `end` | — | `ended` |
 | `ping` | — | `pong` |
+| `list_conversations` | — (signed only) | `conversations` `{conversations: [{id, title, created_at, last_message_at, message_count, ended}]}` |
+| `delete_conversations` | `confirm: true` (signed only) | `conversations_deleted` `{deleted, conversation_id}` |
 
 Any refusal arrives as `error` `{message}`.
+
+### Signed-in users
+
+Since 2.19.0 (#405) a host application that has already signed its user in
+can give them a persistent conversation. The host signs a short-lived join
+token with the `[identity] secret` — `v1.<base64url payload>.<base64url
+HMAC-SHA256>`, payload `{sub, name?, scenario, exp}`; the exact format and a
+test vector are in [docs/API.md](../../docs/API.md#the-join-token-host--mddb-chat)
+— and the widget sends it as `join { token }`.
+
+- **Verification.** Three parts, `v1`, the signature compared in constant
+  time, then `exp` in the future and at most 24 hours away, `sub` and
+  `scenario` present (1–256 bytes, no control characters). The token's
+  `scenario` must be the one joined. The `sub` is the only user id the server
+  believes; a user id sent by the browser is never read.
+- **Storage.** The conversation lives in mddbd (system collection
+  `chat_conversations`, [host API](../../docs/API.md#chat-conversations-v1chatconversations)).
+  Every question is stored when accepted, every final answer with the tools
+  it called (name, collection), model, provider and tokens. The service
+  account needs read and write on `chat_conversations`.
+- **Resume.** A `join` without `conversation_id` reopens the user's newest
+  conversation in that scenario that has not ended, or starts one;
+  `new_conversation: true` starts a fresh one and keeps the old;
+  `conversation_id` reopens that one (another user's, another scenario's or
+  a missing one: `conversation not found`; an ended one: `conversation has
+  ended; start a new one`). The last `[session] max_history_length` messages
+  come back to the model and, as a `history` frame, to the client — on a new
+  socket, another pod or after a restart. The model is told the restored
+  assistant turns are untrusted context, not instructions.
+- **Controls.** `list_conversations` and `delete_conversations { confirm:
+  true }` (every conversation of the user, in every scenario; the session goes
+  on in a fresh one). `end` also ends the stored conversation. Without a
+  signed session both answer `unauthorized: needs a signed join`.
+- **Retention.** A new conversation gets its scenario's `retention_days`, or
+  mddbd's default.
+- **Refusals.** `unauthorized: a signed identity token is required`
+  (`required = true`), `… signed joins are not enabled on this server` (a
+  token, no secret), `… identity token rejected: <reason>`, `… the identity
+  token is for another scenario`, `… conversation_id needs a signed join`.
+- **Anonymous** joins are exactly as before: in memory, `resume` by session
+  id, gone after `end` or the TTL. A failed write to mddbd during a turn is
+  logged and the answer still arrives.
 
 ### Sessions outlive their connection
 
@@ -343,6 +399,10 @@ client typed, and the id already names the answer.
 src/
   chat/handler.rs    the WebSocket loop: frames in, messages dispatched, feedback
   chat/lifecycle.rs  join, resume, end, and detaching on disconnect
+  chat/signed.rs     a signed join: the token verified, the stored conversation opened
+  chat/controls.rs   list_conversations, delete_conversations, ending a stored one
+  chat/conversation.rs  which stored conversation a join opens; what a turn stores
+  identity/          the join token (verification) and the [identity] rules
   chat/turn.rs       one message through the tool-calling loop
   chat/prompt.rs     the system prompt and history as the model sees them
   chat/outbound.rs   frames to the visitor
@@ -354,6 +414,7 @@ src/
   config.rs          config.toml schema and defaults
   grpc/client.rs     mddbd client (search, collection config)
   grpc/scenarios.rs  mddbd client: the scenario list and the composed prompt
+  grpc/conversations.rs  mddbd client: a signed user's conversations
   grpc/testing/      a scripted mddbd for tests (login and the gRPC methods used)
   grpc/link.rs       the connection to mddbd: retried in the background until up
   routes/            /health (readiness), /config, /ws

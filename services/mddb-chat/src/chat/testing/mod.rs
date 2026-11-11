@@ -39,6 +39,8 @@ pub struct ConfigToml {
     pub security: String,
     pub scenarios: String,
     pub webhooks: String,
+    /// The `[identity]` section (#405), empty for an anonymous-only server.
+    pub identity: String,
 }
 
 impl Default for ConfigToml {
@@ -54,6 +56,7 @@ allowed_collections = ["docs", "guides"]
 "#
             .to_string(),
             webhooks: String::new(),
+            identity: String::new(),
         }
     }
 }
@@ -85,11 +88,17 @@ impl ConfigToml {
         self
     }
 
+    /// Signed joins on, with `secret`; `required` refuses unsigned ones.
+    pub fn identity(mut self, secret: &str, required: bool) -> Self {
+        self.identity = format!("[identity]\nsecret = \"{secret}\"\nrequired = {required}\n");
+        self
+    }
+
     fn render(&self) -> String {
         format!(
             "[server]\n[mddb]\n[llm]\nprovider = \"scripted\"\napi_url = \"http://llm.test\"\n\
-             model = \"test-model\"\n[session]\n{}\n[security]\nwebhook_secret = \"hook-secret\"\n{}\n{}\n{}",
-            self.session, self.security, self.scenarios, self.webhooks
+             model = \"test-model\"\n[session]\n{}\n[security]\nwebhook_secret = \"hook-secret\"\n{}\n{}\n{}\n{}",
+            self.session, self.security, self.scenarios, self.webhooks, self.identity
         )
     }
 }

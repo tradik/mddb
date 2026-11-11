@@ -5,6 +5,7 @@ use std::time::Instant;
 use futures::StreamExt;
 use tracing::{debug, error};
 
+use crate::chat::conversation;
 use crate::chat::outbound::{Sender, send_error, send_json};
 use crate::chat::scenario::{self, ActiveScenario, Resolved};
 use crate::chat::trace::TurnTrace;
@@ -13,6 +14,7 @@ use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::grpc::client::MddbClient;
 use crate::llm::provider::{ApiMsg, CallParams, ChatResponse, TokenUsage};
+use crate::session::conversation::ConversationRef;
 use crate::session::types::{MessageRole, WsOutgoing};
 use crate::state::AppState;
 use crate::webhook::types::WebhookPayload;
@@ -32,7 +34,7 @@ pub async fn handle_message(
     // is recorded, so a turn refused for this does not count as one.
     let mut mddb_client = state.mddb.client().await.ok_or(AppError::MddbUnavailable)?;
 
-    let (scenario_name, scenario, history) = {
+    let (scenario_name, scenario, history, stored) = {
         let mut session = state
             .session_manager
             .get_session_mut(session_id)
@@ -80,8 +82,19 @@ pub async fn handle_message(
         session.add_message(MessageRole::User, content.clone());
         session.trim_history(state.config.session.max_history_length);
 
-        (session.scenario.clone(), scenario, session.history.clone())
+        (
+            session.scenario.clone(),
+            scenario,
+            session.history.clone(),
+            session.conversation.clone(),
+        )
     };
+
+    // #405: a signed user's question is stored as soon as it is accepted, so
+    // a turn that fails half way still leaves it in the conversation.
+    if let Some(to) = &stored {
+        conversation::record(&mut mddb_client, to, conversation::user_message(&content)).await;
+    }
 
     // #399: the question is accepted, so it gets an id and is reported. The
     // trace follows the turn and becomes the `answer` event at the end.
@@ -111,6 +124,7 @@ pub async fn handle_message(
         session_id,
         scenario: &scenario_name,
         llm: &llm,
+        stored: stored.as_ref(),
     };
 
     // Accumulated across every round of this turn and charged to the session
@@ -174,7 +188,15 @@ pub async fn handle_message(
                     let piece: String = chunk.iter().collect();
                     send_json(out, &WsOutgoing::Chunk { content: piece }).await;
                 }
-                finish(state, out, &trace, &closing, text, spent).await;
+                finish(
+                    state,
+                    out,
+                    &mut mddb_client,
+                    &trace,
+                    &closing,
+                    (text, spent),
+                )
+                .await;
                 return Ok(());
             }
         }
@@ -187,7 +209,15 @@ pub async fn handle_message(
     // is NOT counted: its usage arrives in an SSE frame this reader discards
     // along with everything that is not a text delta, so a turn that reaches
     // this path undercounts by its final response. Stated rather than hidden.
-    finish(state, out, &trace, &closing, answer, spent).await;
+    finish(
+        state,
+        out,
+        &mut mddb_client,
+        &trace,
+        &closing,
+        (answer, spent),
+    )
+    .await;
     Ok(())
 }
 
@@ -259,20 +289,23 @@ struct Closing<'a> {
     session_id: &'a str,
     scenario: &'a str,
     llm: &'a LlmConfig,
+    /// Where a signed session's answer is stored (#405).
+    stored: Option<&'a ConversationRef>,
 }
 
 /// Closes a turn: `done` to the visitor with the answer's id (#399), the
-/// `answer` webhook, and the answer and its cost recorded in the session.
+/// `answer` webhook, and the answer and its cost recorded in the session —
+/// and, for a signed user, in mddbd with its tools, model and tokens (#405).
 ///
 /// The session may be gone by now — the TTL sweep or an `end` from another
 /// path — in which case there is nothing left to record into.
 async fn finish(
     state: &AppState,
     out: &mut Sender,
+    client: &mut MddbClient,
     trace: &TurnTrace,
     closing: &Closing<'_>,
-    answer: String,
-    spent: TokenUsage,
+    (answer, spent): (String, TokenUsage),
 ) {
     let message_id = trace.answer_id.clone();
     send_json(out, &WsOutgoing::Done { message_id }).await;
@@ -283,6 +316,10 @@ async fn finish(
         closing.llm,
         spent,
     ));
+    if let Some(to) = closing.stored {
+        let stored = conversation::answer_message(&answer, trace.tools(), closing.llm, spent);
+        conversation::record(client, to, stored).await;
+    }
 
     if let Some(mut session) = state.session_manager.get_session_mut(closing.session_id) {
         session.add_message(MessageRole::Assistant, answer);

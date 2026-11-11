@@ -68,6 +68,9 @@ pub struct ActiveScenario {
     pub token_budget: u64,
     /// Messages one session may send per minute; 0 means no limit.
     pub messages_per_minute: u32,
+    /// Days a signed user's stored conversation is kept (#405); 0 leaves it
+    /// to mddbd's default. Only a TOML scenario sets it.
+    pub retention_days: u32,
 }
 
 impl ActiveScenario {
@@ -88,6 +91,7 @@ impl ActiveScenario {
             max_turns: None,
             token_budget: config.security.max_tokens_per_session,
             messages_per_minute: 0,
+            retention_days: 0,
         }
     }
 
@@ -107,6 +111,7 @@ impl ActiveScenario {
             active.llm.temperature = temperature;
         }
         active.max_turns = scenario.max_turns;
+        active.retention_days = scenario.retention_days.unwrap_or(0);
         active
     }
 
@@ -153,6 +158,16 @@ pub enum Resolved {
     /// does not stand in: switching a scenario off must switch it off.
     Disabled,
     Unknown,
+}
+
+impl Resolved {
+    /// The scenario when it may be served, `None` when disabled or unknown.
+    pub fn active(self) -> Option<ActiveScenario> {
+        match self {
+            Resolved::Active(scenario) => Some(scenario),
+            Resolved::Disabled | Resolved::Unknown => None,
+        }
+    }
 }
 
 /// Looks `name` up: mddbd's scenario if it has one, else the TOML's.

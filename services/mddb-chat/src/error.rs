@@ -22,6 +22,14 @@ pub enum AppError {
     /// mddbd has not been reached yet (#401): the server is up, the
     /// knowledge base behind it is not.
     MddbUnavailable,
+    /// A join or a request that needs a verified identity did not have one
+    /// (#405).
+    Unauthorized(String),
+    /// No conversation of that id for this user (#405) — or another user's,
+    /// which is answered the same way.
+    ConversationNotFound,
+    /// The conversation was ended; it takes no more messages (#405).
+    ConversationEnded,
     LlmError(String),
     Internal(String),
 }
@@ -52,6 +60,11 @@ impl std::fmt::Display for AppError {
                 f,
                 "the knowledge base is not connected yet; try again shortly"
             ),
+            AppError::Unauthorized(msg) => write!(f, "unauthorized: {msg}"),
+            AppError::ConversationNotFound => write!(f, "conversation not found"),
+            AppError::ConversationEnded => {
+                write!(f, "conversation has ended; start a new one")
+            }
             AppError::LlmError(msg) => write!(f, "llm error: {msg}"),
             AppError::Internal(msg) => write!(f, "internal error: {msg}"),
         }
@@ -82,6 +95,9 @@ impl IntoResponse for AppError {
             AppError::GrpcError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             // Waiting helps: the link comes up on its own.
             AppError::MddbUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
+            AppError::Unauthorized(_) => (StatusCode::UNAUTHORIZED, self.to_string()),
+            AppError::ConversationNotFound => (StatusCode::NOT_FOUND, self.to_string()),
+            AppError::ConversationEnded => (StatusCode::CONFLICT, self.to_string()),
             AppError::LlmError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
@@ -119,6 +135,9 @@ mod tests {
             AppError::SessionRateLimited(20),
             AppError::ScenarioDisabled,
             AppError::MddbUnavailable,
+            AppError::Unauthorized("no token".into()),
+            AppError::ConversationNotFound,
+            AppError::ConversationEnded,
             AppError::LlmError("upstream refused".into()),
             AppError::Internal("boom".into()),
         ];
@@ -167,6 +186,9 @@ mod tests {
             (AppError::MessageTooLong, StatusCode::BAD_REQUEST),
             (AppError::NameTooLong, StatusCode::BAD_REQUEST),
             (AppError::SessionNotFound, StatusCode::NOT_FOUND),
+            (AppError::Unauthorized("x".into()), StatusCode::UNAUTHORIZED),
+            (AppError::ConversationNotFound, StatusCode::NOT_FOUND),
+            (AppError::ConversationEnded, StatusCode::CONFLICT),
             // Waiting helps.
             (AppError::RateLimited, StatusCode::TOO_MANY_REQUESTS),
             (

@@ -5,6 +5,7 @@
 //! method is unimplemented, the way an mddbd older than the method is.
 //! Compiled only for tests.
 
+mod conversations;
 mod service;
 
 use std::collections::{BTreeMap, HashMap};
@@ -48,6 +49,9 @@ pub(super) struct FakeState {
     pub failing: Option<tonic::Code>,
     pub login: Login,
     pub calls: Vec<Call>,
+    /// Chat conversations by id (#405), and the clock their times come from.
+    pub conversations: BTreeMap<String, proto::ChatConversationProto>,
+    pub clock: i64,
 }
 
 pub(super) type Shared = Arc<Mutex<FakeState>>;
@@ -69,6 +73,8 @@ impl FakeMddbd {
             failing: None,
             login: Login::Token("fake-token".to_string()),
             calls: Vec::new(),
+            conversations: BTreeMap::new(),
+            clock: 0,
         }));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await
@@ -91,6 +97,24 @@ impl FakeMddbd {
     pub fn config(&self) -> MddbConfig {
         toml::from_str(&format!("grpc_addr = \"{}\"", self.grpc_addr()))
             .expect("a minimal mddb config parses")
+    }
+
+    /// A stored conversation by id, with all its messages.
+    pub fn conversation(&self, id: &str) -> Option<proto::ChatConversationProto> {
+        self.state().conversations.get(id).cloned()
+    }
+
+    /// Every stored conversation of `sub`, oldest first.
+    pub fn conversations_of(&self, sub: &str) -> Vec<proto::ChatConversationProto> {
+        let mut of: Vec<_> = self
+            .state()
+            .conversations
+            .values()
+            .filter(|c| c.sub == sub)
+            .cloned()
+            .collect();
+        of.sort_by_key(|c| c.created_at);
+        of
     }
 
     pub async fn client(&self) -> MddbClient {

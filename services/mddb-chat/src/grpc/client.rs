@@ -44,14 +44,11 @@ impl MddbClient {
             return Ok(());
         }
 
-        // Derive HTTP URL from gRPC addr (replace port 11024 -> 11023)
-        let http_url = self
-            .config
-            .grpc_addr
-            .replace("11024", "11023")
-            .replace("grpc://", "http://");
-
-        let login_url = format!("{}/v1/auth/login", http_url.trim_end_matches('/'));
+        // `[mddb] http_url`, or derived from a grpc_addr on the default port.
+        // Config::load already refused a configuration where neither works;
+        // a config built in code gets the same message here.
+        let http_url = self.config.http_base().map_err(AppError::Internal)?;
+        let login_url = format!("{http_url}/v1/auth/login");
 
         let resp = reqwest::Client::new()
             .post(&login_url)

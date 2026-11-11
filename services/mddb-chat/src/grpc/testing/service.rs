@@ -13,7 +13,7 @@ use tonic::Status;
 use tonic::server::UnaryService;
 use tonic_prost::ProstCodec;
 
-use super::{Call, FakeState, Login, Shared};
+use super::{Call, FakeState, Login, Shared, conversations};
 use crate::grpc::client::proto;
 
 pub fn router(state: Shared) -> Router {
@@ -100,6 +100,14 @@ async fn grpc(State(state): State<Shared>, request: Request<Body>) -> Response<B
         "HybridSearch" => unary(state, method, request, hybrid_search).await,
         "VectorSearch" => unary(state, method, request, vector_search).await,
         "FTS" => unary(state, method, request, fts).await,
+        "CreateChatConversation" => unary(state, method, request, conversations::create).await,
+        "ListChatConversations" => unary(state, method, request, conversations::list).await,
+        "GetChatConversation" => unary(state, method, request, conversations::get).await,
+        "AppendChatMessages" => unary(state, method, request, conversations::append).await,
+        "EndChatConversation" => unary(state, method, request, conversations::end).await,
+        "DeleteChatConversationsForUser" => {
+            unary(state, method, request, conversations::delete_for_user).await
+        }
         _ => Status::unimplemented(format!("unknown method {path}")).into_http(),
     }
 }

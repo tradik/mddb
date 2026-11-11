@@ -15,6 +15,46 @@ pub struct Config {
     pub scenarios_source: ScenariosSourceConfig,
     #[serde(default)]
     pub webhooks: Vec<WebhookConfig>,
+    #[serde(default)]
+    pub identity: IdentityConfig,
+}
+
+/// The fewest bytes an `[identity] secret` may have, as docs/API.md asks of
+/// the secret shared with the host.
+pub const MIN_IDENTITY_SECRET_BYTES: usize = 32;
+
+/// Signed joins (#405): the secret a host signs its users' join tokens with.
+///
+/// Absent — the default — keeps every join anonymous, as before 2.19.0.
+#[derive(Debug, Deserialize, Clone, Default, PartialEq, Eq)]
+pub struct IdentityConfig {
+    /// HMAC-SHA256 key shared with the host, at least 32 bytes. Empty here
+    /// means `MDDB_CHAT_IDENTITY_SECRET`, and empty there means no signed
+    /// joins.
+    #[serde(default)]
+    pub secret: String,
+    /// Refuse a `join` without a valid token. Needs a secret.
+    #[serde(default)]
+    pub required: bool,
+}
+
+impl IdentityConfig {
+    /// Whether a token can be verified at all.
+    pub fn enabled(&self) -> bool {
+        !self.secret.is_empty()
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.enabled() && self.secret.len() < MIN_IDENTITY_SECRET_BYTES {
+            return Err(format!(
+                "[identity] secret must be at least {MIN_IDENTITY_SECRET_BYTES} bytes"
+            ));
+        }
+        if self.required && !self.enabled() {
+            return Err("[identity] required = true needs a secret: set [identity] secret or MDDB_CHAT_IDENTITY_SECRET".to_string());
+        }
+        Ok(())
+    }
 }
 
 /// Where scenarios come from besides this file (#403).
@@ -93,6 +133,11 @@ impl ServerConfig {
 pub struct MddbConfig {
     #[serde(default = "default_grpc_addr")]
     pub grpc_addr: String,
+    /// mddbd's HTTP API, where the service account logs in. Empty — the
+    /// default — derives it from `grpc_addr` when that uses the default gRPC
+    /// port 11024 (HTTP on 11023); any other port needs it set.
+    #[serde(default)]
+    pub http_url: String,
     #[serde(default = "default_collection")]
     pub default_collection: String,
     // RAG-001: absent in the TOML means "let the collection decide". The
@@ -124,6 +169,39 @@ pub struct MddbConfig {
     /// failure — the behaviour before this setting existed.
     #[serde(default = "default_connect_retry_max_seconds")]
     pub connect_retry_max_seconds: u64,
+}
+
+/// mddbd's default ports, the only pair `http_url` is derived for.
+const DEFAULT_GRPC_PORT: u16 = 11024;
+const DEFAULT_HTTP_PORT: u16 = 11023;
+
+impl MddbConfig {
+    /// The base URL of mddbd's HTTP API, without a trailing slash.
+    ///
+    /// `http_url` when set. Otherwise `grpc_addr` with its port moved from
+    /// 11024 to 11023 — and only that: the address is parsed, so a port or a
+    /// host name that merely contains "11024" is not rewritten the way the
+    /// old string replace rewrote it, and a non-default port is an error
+    /// naming the setting rather than a login sent to the wrong place.
+    pub fn http_base(&self) -> Result<String, String> {
+        if !self.http_url.is_empty() {
+            return Ok(self.http_url.trim_end_matches('/').to_string());
+        }
+        let required = || {
+            format!(
+                "[mddb] http_url is required: grpc_addr {:?} does not use the default port {DEFAULT_GRPC_PORT}, so the HTTP login URL cannot be derived from it",
+                self.grpc_addr
+            )
+        };
+        let uri: axum::http::Uri = self.grpc_addr.parse().map_err(|_| required())?;
+        let (Some(scheme), Some(host), Some(DEFAULT_GRPC_PORT)) =
+            (uri.scheme_str(), uri.host(), uri.port_u16())
+        else {
+            return Err(required());
+        };
+        let scheme = if scheme == "grpc" { "http" } else { scheme };
+        Ok(format!("{scheme}://{host}:{DEFAULT_HTTP_PORT}"))
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -207,6 +285,11 @@ pub struct Scenario {
     /// the LLM spend a single visitor can cause.
     #[serde(default)]
     pub max_turns: Option<usize>,
+    /// Days a signed user's conversation in this scenario is kept after its
+    /// last message (#405). `None` leaves it to mddbd's default
+    /// (`MDDB_CHAT_RETENTION_DAYS`, 30).
+    #[serde(default)]
+    pub retention_days: Option<u32>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -255,6 +338,15 @@ impl Config {
             config.mddb.auth_password = pass;
         }
 
+        // #405: the secret shared with the host, kept out of the TOML like
+        // the other secrets.
+        if config.identity.secret.is_empty()
+            && let Ok(secret) = std::env::var("MDDB_CHAT_IDENTITY_SECRET")
+        {
+            config.identity.secret = secret;
+        }
+        config.validate()?;
+
         // Ensure default scenario exists
         if !config.scenarios.contains_key("assistant") {
             config.scenarios.insert(
@@ -265,11 +357,23 @@ impl Config {
                     allowed_collections: vec![],
                     temperature: None,
                     max_turns: None,
+                    retention_days: None,
                 },
             );
         }
 
         Ok(config)
+    }
+
+    /// Settings that cannot work, refused at startup rather than at the
+    /// first visitor: an `[identity]` that cannot verify, and credentials
+    /// whose login URL cannot be found.
+    pub fn validate(&self) -> Result<(), String> {
+        self.identity.validate()?;
+        if !self.mddb.auth_username.is_empty() {
+            self.mddb.http_base()?;
+        }
+        Ok(())
     }
 
     pub fn get_scenario(&self, name: &str) -> Option<&Scenario> {
@@ -338,6 +442,10 @@ fn default_rate_limit() -> u32 {
 fn default_max_message_length() -> usize {
     2000
 }
+
+#[cfg(test)]
+#[path = "config_tests.rs"]
+mod identity_tests;
 
 #[cfg(test)]
 mod tests {

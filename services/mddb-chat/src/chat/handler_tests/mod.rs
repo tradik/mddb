@@ -9,6 +9,10 @@ mod message;
 mod resume;
 mod scenario_settings;
 mod scenarios;
+mod signed;
+mod signed_controls;
+mod signed_refusals;
+mod signed_resume;
 mod streaming;
 
 use std::collections::HashMap;

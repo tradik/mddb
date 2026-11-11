@@ -209,3 +209,25 @@ fn the_catalog_is_the_toml_overlaid_by_mddbd() {
         vec![pair("sales", "sales"), pair("support", "Support desk")]
     );
 }
+
+// #405: how long a signed user's conversation is kept is the scenario's to
+// say; only a TOML scenario says it, and 0 leaves it to mddbd.
+#[test]
+fn retention_comes_from_the_toml_scenario_and_active_filters_the_rest() {
+    let mut config = config();
+    config.scenarios.get_mut("support").unwrap().retention_days = Some(14);
+    let store = store_of(vec![
+        scenario("kb-only", &["kb"]),
+        ChatScenarioProto {
+            enabled: false,
+            ..scenario("off", &[])
+        },
+    ]);
+
+    assert_eq!(active(&config, &store, "support").retention_days, 14);
+    assert_eq!(active(&config, &store, "assistant").retention_days, 0);
+    assert_eq!(active(&config, &store, "kb-only").retention_days, 0);
+    assert!(resolve(&config, &store, "kb-only").active().is_some());
+    assert!(resolve(&config, &store, "off").active().is_none());
+    assert!(resolve(&config, &store, "nobody").active().is_none());
+}

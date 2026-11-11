@@ -12,6 +12,7 @@ use futures::StreamExt;
 use tracing::{info, warn};
 
 use crate::chat::outbound::{Sender, send_error, send_frame, send_json};
+use crate::chat::signed::JoinRequest;
 use crate::chat::{tools, turn};
 use crate::error::AppError;
 use crate::grpc::client::{MddbClient, SearchResult};
@@ -82,7 +83,22 @@ impl Connection {
 
     async fn dispatch(&mut self, incoming: WsIncoming, out: &mut Sender) {
         match incoming {
-            WsIncoming::Join { name, scenario } => self.join(out, name, scenario).await,
+            WsIncoming::Join {
+                name,
+                scenario,
+                token,
+                conversation_id,
+                new_conversation,
+            } => {
+                let request = JoinRequest {
+                    name,
+                    scenario,
+                    token,
+                    conversation_id,
+                    new_conversation,
+                };
+                self.join(out, request).await
+            }
             WsIncoming::Message { content } => self.message(out, &content).await,
             WsIncoming::Resume { session_id } => self.resume(out, session_id).await,
             WsIncoming::Feedback {
@@ -93,6 +109,10 @@ impl Connection {
             } => self.feedback(&rating, &question, &answer, message_id.as_deref()),
             WsIncoming::End => self.end(out).await,
             WsIncoming::Ping => send_json(out, &WsOutgoing::Pong).await,
+            WsIncoming::ListConversations => self.list_conversations(out).await,
+            WsIncoming::DeleteConversations { confirm } => {
+                self.delete_conversations(out, confirm).await
+            }
         }
     }
 

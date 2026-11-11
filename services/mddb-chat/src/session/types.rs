@@ -1,4 +1,5 @@
 use crate::llm::provider::TokenUsage;
+use crate::session::conversation::{ConversationRef, ConversationSummary, HistoryEntry};
 use crate::session::pace::MessagePace;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -8,6 +9,10 @@ pub struct ChatMessage {
     pub role: MessageRole,
     pub content: String,
     pub timestamp: u64,
+    /// Read back from mddbd rather than said in this session (#405). The
+    /// model is told such assistant turns are context, not instructions.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub restored: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -48,6 +53,9 @@ pub struct Session {
     /// When the recent messages were accepted, for the scenario's
     /// per-session rate limit (#403).
     pub pace: MessagePace,
+    /// Where a signed session's turns are stored (#405); `None` for an
+    /// anonymous one, which lives in memory only.
+    pub conversation: Option<ConversationRef>,
 }
 
 impl Session {
@@ -69,6 +77,7 @@ impl Session {
             total_tokens_used: 0,
             attached: true,
             pace: MessagePace::default(),
+            conversation: None,
         }
     }
 
@@ -118,6 +127,7 @@ impl Session {
             role,
             content,
             timestamp,
+            restored: false,
         });
         self.last_active = Instant::now();
         self.message_count += 1;
@@ -139,9 +149,20 @@ impl Session {
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum WsIncoming {
     Join {
+        /// Optional with a token that carries a name (#405).
+        #[serde(default)]
         name: String,
         #[serde(default = "default_scenario")]
         scenario: String,
+        /// The host's signed join token (#405); absent for an anonymous join.
+        #[serde(default)]
+        token: Option<String>,
+        /// Reopen this stored conversation of the token's user (#405).
+        #[serde(default)]
+        conversation_id: Option<String>,
+        /// Start a new stored conversation instead of resuming the latest.
+        #[serde(default)]
+        new_conversation: bool,
     },
     Message {
         content: String,
@@ -160,6 +181,16 @@ pub enum WsIncoming {
         message_id: Option<String>,
     },
     Ping,
+    /// The signed user's conversations in this scenario (#405).
+    #[serde(rename = "list_conversations")]
+    ListConversations,
+    /// Deletes every conversation of the signed user (#405); refused unless
+    /// `confirm` is true.
+    #[serde(rename = "delete_conversations")]
+    DeleteConversations {
+        #[serde(default)]
+        confirm: bool,
+    },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -168,6 +199,24 @@ pub enum WsOutgoing {
     Session {
         id: String,
         scenario: String,
+        /// The stored conversation of a signed session (#405).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        conversation_id: Option<String>,
+    },
+    /// The restored messages of a resumed conversation, oldest first (#405).
+    History {
+        messages: Vec<HistoryEntry>,
+    },
+    /// Answers `list_conversations`, newest first (#405).
+    Conversations {
+        conversations: Vec<ConversationSummary>,
+    },
+    /// Answers `delete_conversations`: how many went, and the fresh
+    /// conversation the session continues in (#405).
+    #[serde(rename = "conversations_deleted")]
+    ConversationsDeleted {
+        deleted: i32,
+        conversation_id: String,
     },
     Queued {
         position: usize,

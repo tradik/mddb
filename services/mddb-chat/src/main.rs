@@ -9,6 +9,7 @@ mod chat;
 mod config;
 mod error;
 mod grpc;
+mod identity;
 mod llm;
 mod routes;
 mod security;

@@ -6,6 +6,7 @@ use tracing::info;
 use crate::chat::handler::Connection;
 use crate::chat::outbound::{Sender, send_error, send_json};
 use crate::chat::scenario::{self, Resolved};
+use crate::chat::signed::JoinRequest;
 use crate::error::AppError;
 use crate::session::manager::{JoinResult, ResumeError};
 use crate::session::types::WsOutgoing;
@@ -17,21 +18,24 @@ impl Connection {
     /// A connection that already holds a session detaches it first, so the
     /// old one can still be resumed and no longer counts toward
     /// `max_concurrent`. Before #402 it was simply forgotten, and held its
-    /// slot until the TTL sweep found it.
-    pub(super) async fn join(&mut self, out: &mut Sender, name: String, scenario: String) {
+    /// slot until the TTL sweep found it. A signed join (#405) continues in
+    /// signed.rs.
+    pub(super) async fn join(&mut self, out: &mut Sender, request: JoinRequest) {
         self.detach_session().await;
-        match self.admit(out, name, scenario).await {
-            Ok(id) => self.session_id = Some(id),
-            Err(e) => send_error(out, &e.to_string()).await,
+        if let Err(e) = self.join_as(out, request).await {
+            send_error(out, &e.to_string()).await;
         }
     }
 
-    async fn admit(
+    /// Admits a visitor: a valid name and scenario, within the rate limit,
+    /// and a seat — now or after the queue. Returns the session id and the
+    /// sanitized name; nothing is announced yet.
+    pub(super) async fn admit(
         &self,
         out: &mut Sender,
         name: String,
         scenario_name: String,
-    ) -> Result<String, AppError> {
+    ) -> Result<(String, String), AppError> {
         let state = &self.state;
         let name = state
             .sanitizer
@@ -81,29 +85,40 @@ impl Connection {
                 return Err(AppError::SessionFull);
             }
         };
+        Ok((session_id, name))
+    }
 
+    /// Tells the visitor, the log and the webhooks that a session started.
+    pub(super) async fn announce(
+        &self,
+        out: &mut Sender,
+        session_id: &str,
+        name: &str,
+        scenario_name: &str,
+        conversation_id: Option<String>,
+    ) {
         info!(
             session_id = session_id,
             name = name,
             scenario = scenario_name,
             "session started"
         );
-        state
+        self.state
             .webhook_dispatcher
             .dispatch(WebhookPayload::session_start(
-                &session_id,
-                &name,
-                &scenario_name,
+                session_id,
+                name,
+                scenario_name,
             ));
         send_json(
             out,
             &WsOutgoing::Session {
-                id: session_id.clone(),
-                scenario: scenario_name,
+                id: session_id.to_string(),
+                scenario: scenario_name.to_string(),
+                conversation_id,
             },
         )
         .await;
-        Ok(session_id)
     }
 
     /// Reattaches a session left behind by an earlier connection (#402).
@@ -134,11 +149,13 @@ impl Connection {
             Ok(scenario) => {
                 info!(session_id = session_id, "session resumed");
                 self.session_id = Some(session_id.clone());
+                let conversation_id = self.conversation_id_of(&session_id);
                 send_json(
                     out,
                     &WsOutgoing::Session {
                         id: session_id,
                         scenario,
+                        conversation_id,
                     },
                 )
                 .await;
@@ -154,6 +171,7 @@ impl Connection {
     pub(super) async fn end(&mut self, out: &mut Sender) {
         if let Some(sid) = self.session_id.take() {
             let (name, scenario) = self.describe(&sid);
+            self.end_conversation(&sid).await;
             self.state.session_manager.remove_session(&sid).await;
             self.state
                 .webhook_dispatcher

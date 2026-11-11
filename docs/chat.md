@@ -94,8 +94,8 @@ npm run build
 ### Chat Server Environment Variables
 
 The chat server (`services/mddb-chat`) is configured by its TOML file, see
-`services/mddb-chat/config.example.toml`. It reads five environment variables;
-the four secrets apply only when the matching TOML value is empty:
+`services/mddb-chat/config.example.toml`. It reads six environment variables;
+the five secrets apply only when the matching TOML value is empty:
 
 ```bash
 MDDB_CHAT_CONFIG=config.toml         # path of the TOML file (default: config.toml)
@@ -107,6 +107,7 @@ MDDB_CHAT_WEBHOOK_SECRET=            # [security] webhook_secret
 # your .env (copy .env.example to .env first).
 MDDB_CHAT_AUTH_USERNAME=admin        # [mddb] auth_username
 MDDB_CHAT_AUTH_PASSWORD=             # [mddb] auth_password; never commit a real password
+MDDB_CHAT_IDENTITY_SECRET=           # [identity] secret (2.19.0): signs join tokens of signed-in users
 ```
 
 Everything else is a TOML key, not an environment variable:
@@ -117,6 +118,7 @@ Everything else is a TOML key, not an environment variable:
 | LLM model | `[llm] model` | `"gpt-4o-mini"` |
 | LLM base URL | `[llm] api_url` | `"https://api.openai.com/v1"` |
 | MDDB gRPC address | `[mddb] grpc_addr` | `"http://localhost:11024"` |
+| MDDB HTTP address (2.19.0) | `[mddb] http_url` | derived from `grpc_addr` only when its port is `11024` (→ `11023`); required for any other port when `auth_username` is set |
 | Default collection | `[mddb] default_collection` | `"docs"` |
 | Result size (2.19.0) | `[mddb] result_max_chars` | `800` (characters of each search result the model sees; `0` = whole chunk) |
 | Listen port | `[server] port` | `11030` |
@@ -149,6 +151,29 @@ The full table is in [`services/mddb-chat/README.md`](../services/mddb-chat/READ
 
 A skill is a reusable block of instructions in the `SKILL.md` format (front matter with `name` and `description`, then Markdown), stored in mddbd under `/v1/chat/skills` and attached to scenarios by name in a chosen order. mddbd composes them into the scenario's system prompt after the operator prompt, the guardrails and the off-topic clause, under a line saying the guardrails take precedence, so a skill cannot lift one; `mddb-chat` already uses that server-composed prompt and needs no change. A skill can be pasted or imported from an https URL — the panel shows the whole text before saving, and a GitHub URL is pinned to its commit — and it is fetched again only on an explicit "Update from source", shown as a diff first. Skills are admin only, reads included, and capped by `MDDB_CHAT_SKILL_MAX_BYTES` (32768) per skill and `MDDB_CHAT_PROMPT_MAX_BYTES` (131072) per composed prompt; see [API.md](API.md#chat-skills-v1chatskills).
 
+### Signed-in users (2.19.0)
+
+A site whose users are signed in can give each of them a persistent conversation, stored in mddbd and resumed on the next visit, another pod or after a restart (#405). Visitors without a token stay anonymous, exactly as before.
+
+1. **Share a secret** of at least 32 random bytes between your backend and `mddb-chat`: `[identity] secret`, or `MDDB_CHAT_IDENTITY_SECRET`. `[identity] required = true` refuses every join without a valid token.
+2. **Sign a join token on your backend** for the signed-in user — `v1.<base64url payload>.<base64url HMAC-SHA256>`, payload `{"sub", "name"?, "scenario", "exp"}`, a few minutes of lifetime (at most 24 h). Format, verification order, a Node.js signer and a test vector: [API.md — The join token](API.md#the-join-token-host--mddb-chat). Never sign in the browser.
+3. **Hand it to the widget** before it loads, and refresh it there before it expires — the widget reads it again at every join:
+
+   ```html
+   <script>window.MDDB_CHAT_CONFIG = { identityToken: '<token from your backend>' };</script>
+   ```
+
+4. **Let the service account write** the system collection `chat_conversations` (`read` and `write` on it; see [API.md — Chat conversations](API.md#chat-conversations-v1chatconversations)).
+
+What the user then gets:
+
+- `join` with the token resumes their newest open conversation in that scenario (or starts one); `new_conversation: true` starts a fresh one and keeps the old; `conversation_id` reopens a given one. The session frame carries `conversation_id`, and a `history` frame brings back the last `[session] max_history_length` messages, which the model also gets — marked as untrusted context.
+- Every question and final answer is stored, the answer with the tools it called, the model, the provider and the tokens.
+- `list_conversations` and `delete_conversations { "confirm": true }` (all of the user's conversations) over the same WebSocket; `end` ends the stored conversation.
+- Retention: a TOML scenario's `retention_days`, else mddbd's `MDDB_CHAT_RETENTION_DAYS` (30). Export and erasure for a user (GDPR) are host API calls on mddbd.
+
+The user id is the token's `sub`, and only that: a user id sent by the browser is never read, and mddbd answers "not found" for any conversation of another `sub`. Every refusal and frame is listed in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#signed-in-users).
+
 ### Widget Configuration
 
 ```javascript
@@ -158,9 +183,12 @@ window.MDDB_CHAT_CONFIG = {
   subtitle: 'Powered by MDDB',           // Widget header subtitle
   primaryColor: '#2563eb',               // Accent color (hex)
   position: 'bottom-right',             // bottom-right | bottom-left
-  welcomeMessage: 'Hello! How can I help you today?'
+  welcomeMessage: 'Hello! How can I help you today?',
+  identityToken: '<signed join token>'   // 2.19.0, optional: a signed-in user (see above)
 };
 ```
+
+Each rating (thumbs up/down) carries the `message_id` of the answer it rates (2.19.0).
 
 ## LLM Provider Examples
 

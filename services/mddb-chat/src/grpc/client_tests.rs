@@ -4,10 +4,14 @@
 use super::*;
 use crate::grpc::testing::{FakeMddbd, Login, scenario};
 
-/// The fake's `[mddb]` section with `extra` TOML keys added.
+/// The fake's `[mddb]` section with `extra` TOML keys added. The fake
+/// answers the login on its gRPC port, so `http_url` names that port.
 fn config(fake: &FakeMddbd, extra: &str) -> MddbConfig {
-    toml::from_str(&format!("grpc_addr = \"{}\"\n{extra}", fake.grpc_addr()))
-        .expect("the mddb config parses")
+    let addr = fake.grpc_addr();
+    toml::from_str(&format!(
+        "grpc_addr = \"{addr}\"\nhttp_url = \"{addr}/\"\n{extra}"
+    ))
+    .expect("the mddb config parses")
 }
 
 const CREDENTIALS: &str = "auth_username = \"chat\"\nauth_password = \"secret\"";
@@ -103,6 +107,26 @@ async fn a_failed_login_fails_the_connect_and_says_why() {
     fake.set_login(Login::HangUp);
     let err = connect_error(&fake).await;
     assert!(err.contains("mddbd login failed"), "got {err}");
+}
+
+// The login URL used to be grpc_addr with "11024" replaced by "11023", so on
+// any other port the login went to the gRPC port. Now it is `http_url`, and
+// without one a non-default port is refused by name.
+#[tokio::test]
+async fn a_non_default_port_without_http_url_names_the_setting() {
+    let fake = FakeMddbd::start().await;
+    let config: MddbConfig = toml::from_str(&format!(
+        "grpc_addr = \"{}\"\n{CREDENTIALS}",
+        fake.grpc_addr()
+    ))
+    .expect("parse");
+
+    let err = MddbClient::connect(config).await.err().expect("an error");
+
+    assert!(
+        err.to_string().contains("[mddb] http_url is required"),
+        "got {err}"
+    );
 }
 
 #[tokio::test]
