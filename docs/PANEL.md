@@ -191,6 +191,55 @@ Every field has a visible label tied to its input, errors are announced with
 `role="alert"` and results with `<output>`, and the colours are the ones
 listed below.
 
+### Features added in 2.19.0
+
+Every administrative endpoint of the server is now reachable from the panel.
+Destructive actions ask first in a dialog that names what is affected; a
+refused request (403) reads *Not permitted* and says which grant it needs.
+
+- **Agent Memory** page (Administration): the sessions agents keep through
+  `/v1/memory/*`, filtered by user and scenario; a session's history, *Add a
+  message*, *Summarize*, *Start a session*, and a *Recall* box showing what
+  an agent gets back for a query. The API has no delete — sessions expire.
+- **Collection Schemas** page: the collections that validate metadata, a JSON
+  editor for a collection's schema with parse errors inline, *Delete schema*
+  (confirmed) and *Validate a document*, a dry run of `/v1/validate`.
+- **Import** page: *Import from a URL* (`/v1/import-url`), *Import a
+  Wikipedia dump* (`/v1/import-wiki`, .xml or .xml.bz2), and *Add documents
+  from JSON* — a JSON array or NDJSON, pasted or from a file — either at once
+  (`/v1/add-batch`) or queued as a bulk ingest job. *Bulk import jobs* polls
+  running jobs until they stop, lists each job's errors and cancels a pending
+  one. The upload dialog links to this page.
+- **Duplicates** page: `/v1/find-duplicates` with mode (identical, similar,
+  both, minhash), threshold, document limit and distance; each group's
+  documents open in the viewer or are deleted after a confirmation.
+- **My Account** page (with authentication on): the signed-in identity from
+  `/v1/auth/me` — also named in the header — and the user's own API keys:
+  create with an optional expiry (the secret is shown once, with a copy
+  button), list by hash, revoke (confirmed).
+- **Document list**: a checkbox per document and *Select all shown*; *Delete
+  selected* removes them in one `/v1/delete-batch` request after naming the
+  collection, count and first keys. *Facets* counts documents per value of
+  chosen metadata keys (`/v1/aggregate`) within the active filters, one table
+  per key.
+- **Document viewer**: *Expiry (TTL)* sets or removes a document's TTL
+  (`/v1/set-ttl`); *Classify* ranks labels against the document or other text
+  (`/v1/classify`).
+- **System page**: *Collection maintenance* — checksum (`/v1/checksum`, to
+  compare replicas), export as NDJSON or ZIP (`/v1/export`) and *Truncate
+  revisions* (confirmed); *Backup and restore* — *Back up now* (`/v1/backup`)
+  and *Restore* from a backup file (`/v1/restore`, confirmed).
+- **Code Symbols**: *Code graph* (`/v1/code-graph`) — what depends on a file
+  and what it depends on, 1–3 hops, with the justifying symbol and lines.
+- **Geo Search**: tools for area search by bounding box or GeoJSON polygon
+  (`/v1/geo-within`, `/v1/geo-polygon`) on the same map, geohash encode and
+  decode, and *Rebuild geo index* with optional postcode files
+  (`/v1/geo-reindex`). The collection list now shows names.
+- **Temporal Analytics**: *Document Events* lists one document's create,
+  update and access events in a date range (`/v1/temporal/query`).
+- **Spell Checker**: *Clean up text* applies the corrections
+  (`/v1/spell-cleanup`) and shows how many were applied.
+
 ### Colours and contrast
 
 The panel's palette is Tailwind's gray, red, amber and green plus the

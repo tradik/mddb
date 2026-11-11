@@ -35,6 +35,15 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 📥 **Upload** (2.19.0) - Every file goes to `/v1/upload`, so the server reads Markdown frontmatter (lists included); 24 formats accepted
 - 🛰️ **Collection sources** (2.19.0) - Collection settings list the syncs and triggers acting on the collection, with each one's last result and Run now
 - 🔑 **Permission scope** (2.18.10+) - Admin badges say *global* (on `"*"`) or *this collection*; a 403 says which permission the request needed
+- 🧠 **Agent memory** (2.19.0) - Sessions, history, add a message, summarize and recall (`/v1/memory/*`)
+- 📐 **Collection schemas** (2.19.0) - List, edit as JSON with inline parse errors, delete, and dry-run validation (`/v1/schema/*`, `/v1/validate`)
+- 📦 **Import** (2.19.0) - From a URL, a Wikipedia dump, or JSON/NDJSON documents at once (`/v1/add-batch`) or as bulk ingest jobs with progress and cancel
+- 🧬 **Duplicates** (2.19.0) - Exact, similar and minhash groups with open and delete (`/v1/find-duplicates`)
+- 👤 **My account** (2.19.0) - Signed-in identity in the header (`/v1/auth/me`) and personal API keys: create (secret shown once), list, revoke
+- ☑️ **Batch delete & facets** (2.19.0) - Multi-select in the document list with *Delete selected* (`/v1/delete-batch`); per-value metadata counts (`/v1/aggregate`)
+- ⏱️ **TTL & classify** (2.19.0) - In the document viewer: set or remove expiry (`/v1/set-ttl`), zero-shot labels (`/v1/classify`)
+- 🧰 **Maintenance** (2.19.0) - On the System page: checksum, export (NDJSON/ZIP), truncate revisions, back up now, restore
+- 🕸️ **Code graph, geo tools, temporal events, spell cleanup** (2.19.0) - `/v1/code-graph`; bounding box, polygon, geohash and geo reindex; one document's events; `/v1/spell-cleanup`
 
 ## Screenshots
 
@@ -179,7 +188,8 @@ Simple REST client for MDDB HTTP API:
 - `search()` - Search documents
 - `getDocument()` - Get single document
 - `addDocument()` - Add/update document
-- `export()` - Export documents
+- `export()` - Export documents as a file (NDJSON or ZIP)
+- 2.19.0 features (memory, schemas, bulk ingest, API keys, aggregate, duplicates, batch, wiki import, checksum, restore) live one module per feature in `src/lib/client/` and are mixed into the client at the end of `mddb-client.js`
 - `backup()` - Create backup
 - `truncate()` - Clean old revisions
 
