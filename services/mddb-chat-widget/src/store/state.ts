@@ -2,6 +2,8 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  /** The answer's `message_id` from its `done` frame (#399). */
+  messageId?: string;
 }
 
 export interface WidgetState {
@@ -69,6 +71,19 @@ export class Store {
     } else {
       messages.push({ role: 'assistant', content: chunk, timestamp: Date.now() });
     }
+    this.state = { ...this.state, messages };
+    this.notify();
+  }
+
+  /**
+   * Names the answer that just finished with the `message_id` of its `done`
+   * frame (#399), so a rating of it can say which answer it rates.
+   */
+  tagLastAssistant(messageId: string | undefined): void {
+    const messages = [...this.state.messages];
+    const last = messages[messages.length - 1];
+    if (!messageId || !last || last.role !== 'assistant') return;
+    messages[messages.length - 1] = { ...last, messageId };
     this.state = { ...this.state, messages };
     this.notify();
   }

@@ -1,4 +1,5 @@
 import { WsClient } from './ws/client';
+import { feedbackMessage, joinMessage } from './ws/messages';
 import type { WsIncoming } from './ws/protocol';
 import { Store, type WidgetState, type Message } from './store/state';
 import { saveSession, loadSession, clearSession, setSessionTtl } from './store/session';
@@ -13,6 +14,11 @@ export interface WidgetOptions {
   accent?: string;
   position?: 'bottom-right' | 'bottom-left';
   sessionTtlHours?: number;
+  /**
+   * Returns the host's signed join token (#405), asked at every join so a
+   * refreshed token is used on the next reconnect. Anonymous without it.
+   */
+  identityToken?: () => string | undefined;
 }
 
 const CHAT_ICON_SVG = `<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>`;
@@ -266,6 +272,10 @@ export class ChatWidget {
 
   private join(name: string): void {
     this.store.update({ userName: name });
+    const send = () =>
+      this.ws.send(
+        joinMessage(name, this.options.scenario || 'assistant', this.options.identityToken?.()),
+      );
 
     if (!this.ws.isConnected) {
       this.ws.connect();
@@ -273,19 +283,11 @@ export class ChatWidget {
       const unsub = this.store.subscribe((state) => {
         if (state.isConnected) {
           unsub();
-          this.ws.send({
-            type: 'join',
-            name,
-            scenario: this.options.scenario || 'assistant',
-          });
+          send();
         }
       });
     } else {
-      this.ws.send({
-        type: 'join',
-        name,
-        scenario: this.options.scenario || 'assistant',
-      });
+      send();
     }
   }
 
@@ -322,6 +324,7 @@ export class ChatWidget {
 
     const messages = this.store.getState().messages;
     const answer = messages[msgIndex]?.content || '';
+    const messageId = messages[msgIndex]?.messageId;
     // Find the preceding user message
     let question = '';
     for (let i = msgIndex - 1; i >= 0; i--) {
@@ -331,7 +334,7 @@ export class ChatWidget {
       }
     }
 
-    this.ws.send({ type: 'feedback', rating, question, answer });
+    this.ws.send(feedbackMessage(rating, question, answer, messageId));
 
     // Re-render to update button states
     this.render(this.store.getState());
@@ -367,6 +370,7 @@ export class ChatWidget {
         break;
 
       case 'done':
+        this.store.tagLastAssistant(msg.message_id);
         this.store.update({ isStreaming: false });
         this.persistMessages();
         break;

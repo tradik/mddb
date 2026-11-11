@@ -3,6 +3,8 @@ export interface JoinMessage {
   type: 'join';
   name: string;
   scenario: string;
+  /** The host's signed identity token (#405); absent for an anonymous join. */
+  token?: string;
 }
 
 export interface ChatMessage {
@@ -28,6 +30,8 @@ export interface FeedbackMessage {
   rating: 'up' | 'down';
   question: string;
   answer: string;
+  /** The `message_id` of the rated answer's `done` frame (#399). */
+  message_id?: string;
 }
 
 export type WsOutgoing = JoinMessage | ChatMessage | ResumeMessage | EndMessage | FeedbackMessage | PingMessage;
@@ -37,6 +41,8 @@ export interface SessionMessage {
   type: 'session';
   id: string;
   scenario: string;
+  /** The stored conversation of a signed session (#405). */
+  conversation_id?: string;
 }
 
 export interface QueuedMessage {
@@ -51,6 +57,8 @@ export interface ChunkMessage {
 
 export interface DoneMessage {
   type: 'done';
+  /** Names the answer, for `feedback` (#399). */
+  message_id?: string;
 }
 
 export interface ErrorMessage {

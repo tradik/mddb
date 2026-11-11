@@ -1,5 +1,6 @@
 import { ChatWidget, type WidgetOptions } from './widget';
 import { validateServerUrl } from './utils/serverUrl';
+import { identityTokenFrom } from './utils/identity';
 
 function init(): void {
   // Find the script tag that loaded us
@@ -32,6 +33,9 @@ function init(): void {
       (script.dataset.position as 'bottom-right' | 'bottom-left') ||
       'bottom-right',
     sessionTtlHours: sessionTtlAttr ? parseInt(sessionTtlAttr, 10) : undefined,
+    // #405: a signed-in user's token, read at every join so the host can
+    // refresh it in window.MDDB_CHAT_CONFIG before it expires.
+    identityToken: () => identityTokenFrom((window as any).MDDB_CHAT_CONFIG),
   };
 
   // Create host element

@@ -26,6 +26,23 @@ chat server over WebSocket. Drop one `<script>` tag onto any page.
 | `data-position`     | no       | `bottom-right`   | `bottom-right` or `bottom-left`. |
 | `data-session-ttl`  | no       | —                | Session persistence TTL in hours. |
 
+### Signed-in users (2.19.0)
+
+A page whose user is signed in sets a join token signed by its backend
+before the widget loads; the widget reads it again at every join, so the host
+can replace it before it expires:
+
+```html
+<script>window.MDDB_CHAT_CONFIG = { identityToken: '<token from your backend>' };</script>
+```
+
+With it, `join` carries `token` and the server resumes the user's stored
+conversation (see `docs/chat.md`, "Signed-in users"). Without it the widget is
+anonymous, as before. The token is never stored by the widget.
+
+Ratings carry the `message_id` of the answer they rate, taken from the
+`done` frame that ended it.
+
 ## Security
 
 - **Encrypted transport is required (FE-006).** `data-server` is validated
