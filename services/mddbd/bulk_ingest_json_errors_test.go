@@ -9,6 +9,20 @@ import (
 	json "mddb/internal/jsonx"
 )
 
+// With no jobs the list is an empty array, not null: a client iterating it
+// should not need a nil check.
+func TestBulkIngestListWithoutJobsIsAnEmptyArray(t *testing.T) {
+	s, cleanup := httpBulkTestServer(t)
+	defer cleanup()
+	for _, target := range []string{"/v1/bulk-ingest-jobs", "/v1/bulk-ingest-jobs?collection=none"} {
+		rec := httptest.NewRecorder()
+		s.handleBulkIngestList(rec, httptest.NewRequest(http.MethodGet, target, nil))
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"jobs":[]`) {
+			t.Errorf("%s: %d %s", target, rec.Code, rec.Body.String())
+		}
+	}
+}
+
 // The bulk ingest endpoints answered a missing job ("job X not found") and a
 // wrong method in plain text; every API error is the server's JSON shape.
 func TestBulkIngestErrorsAreJSON(t *testing.T) {

@@ -120,6 +120,9 @@ func (s *Server) handleBulkIngestList(w http.ResponseWriter, r *http.Request) {
 		bad(w, err)
 		return
 	}
+	if jobs == nil {
+		jobs = []*BulkIngestJob{} // an empty list, not null
+	}
 	ok(w, map[string]interface{}{
 		"jobs":  jobs,
 		"total": len(jobs),

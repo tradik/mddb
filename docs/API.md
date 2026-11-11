@@ -293,7 +293,7 @@ Queue a long-running bulk ingest job and return immediately with a job ID. Poll 
 **Companion endpoints**:
 - `GET /v1/bulk-ingest-job/{id}` — status poll
 - `DELETE /v1/bulk-ingest-job/{id}` — cancel (pending jobs only)
-- `GET /v1/bulk-ingest-jobs?collection=X` — list all jobs, newest first
+- `GET /v1/bulk-ingest-jobs?collection=X` — list all jobs, newest first (`{"jobs": [...], "total": n}`; `jobs` is `[]`, not `null`, when there are none)
 
 See [BULK-IMPORT.md](BULK-IMPORT.md#async-bulk-ingest-with-job-tracking) for full usage and semantics.
 

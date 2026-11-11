@@ -632,6 +632,7 @@ paths:
                 properties:
                   jobs:
                     type: array
+                    description: Empty (`[]`, never null) when there are no jobs.
                     items:
                       $ref: "#/components/schemas/BulkIngestJob"
                   total:
