@@ -25,14 +25,14 @@ it is on the release checklist instead.
 
 Up to 100 characters, the MCP Registry schema's hard limit for `description`.
 
-> Embedded knowledge base with 97 MCP tools, hybrid BM25+vector search and RAG. One Go binary.
+> Embedded knowledge base with 101 MCP tools, hybrid BM25+vector search and RAG. One Go binary.
 
 Used for: `server.json` `description`, the Docker Hub short description
 (`docs/DOCKER_HUB_SHORT.txt`), the GitHub repository description.
 
 ## Long description
 
-> AI-native embedded knowledge base with a built-in MCP server (97 tools), hybrid BM25+vector search and RAG. Single ~32 MB Go binary, zero config. In production behind daemonports.org (about 120,000 pages).
+> AI-native embedded knowledge base with a built-in MCP server (101 tools), hybrid BM25+vector search and RAG. Single ~32 MB Go binary, zero config. In production behind daemonports.org (about 120,000 pages).
 
 Used for: the Docker Hub overview (first paragraph of
 [DOCKER_HUB.md](DOCKER_HUB.md)), mcp.so, PulseMCP, the Docker MCP Catalog

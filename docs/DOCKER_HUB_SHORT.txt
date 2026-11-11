@@ -1,1 +1,1 @@
-Embedded knowledge base with 97 MCP tools, hybrid BM25+vector search and RAG. One Go binary.
+Embedded knowledge base with 101 MCP tools, hybrid BM25+vector search and RAG. One Go binary.
