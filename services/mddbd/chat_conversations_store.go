@@ -78,6 +78,12 @@ func (s *Server) chatAppend(ctx context.Context, id string, req ChatAppendReques
 		return nil, err
 	}
 	return s.chatModify(ctx, id, req.Sub, func(conv *ChatConversation) error {
+		// #406: redaction is sticky, and a redirect reply is a refusal.
+		conv.Redact = conv.Redact || req.Redact
+		if conv.Redact {
+			redactChatMessages(msgs)
+		}
+		markChatRefusals(msgs, s.chatRefusalText(conv.Scenario))
 		return appendChatMessages(conv, msgs)
 	}, len(msgs))
 }

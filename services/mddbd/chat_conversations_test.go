@@ -83,14 +83,16 @@ func TestPrepareChatMessages(t *testing.T) {
 		}
 	}
 	out, err := prepareChatMessages([]ChatMessage{
-		{ID: "client-chosen", Role: "user", Content: "hi"},
+		{ID: "client chosen!", Role: "user", Content: "hi"},
 		{Role: "assistant", ToolCalls: []ChatToolCall{{Name: "search", Collection: "docs", DurationMs: 12}}, CreatedAt: 50},
 		{Role: "tool", Content: "3 hits"},
 	}, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out[0].ID == "client-chosen" || out[0].ID == "" || out[0].ID == out[1].ID {
+	// #406: a client id that looks like one is kept (a rating names the
+	// answer by it); anything else is replaced by the server's.
+	if out[0].ID == "client chosen!" || out[0].ID == "" || out[0].ID == out[1].ID {
 		t.Errorf("ids are the server's: %q %q", out[0].ID, out[1].ID)
 	}
 	if out[0].CreatedAt != 100 || out[1].CreatedAt != 50 {

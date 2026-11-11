@@ -155,6 +155,9 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/chat/mcp-secrets":              ruleAdmin, // MCP-005: write-only credentials of external MCP servers
 	"/v1/chat/mcp-secrets/":             ruleAdmin,
 	"/v1/chat/mcp/inspect":              ruleAdmin,
+	"/v1/chat/log":                      ruleAdmin, // #406: every user's turns
+	"/v1/chat/log/export":               ruleAdmin,
+	"/v1/chat/gaps":                     ruleAdmin,
 	"/v1/embedding-configs/":            ruleAdmin,
 	"/v1/embedding-configs/set-default": ruleAdmin,
 	"/v1/audit":                         ruleAdmin,

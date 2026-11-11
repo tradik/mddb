@@ -1088,6 +1088,9 @@ type MCPClient interface {
 	// Chat conversations (#405): read-only here, the host writes over REST/gRPC.
 	ChatConversationList(ctx context.Context, sub, scenario string, limit int, cursor string) (*ChatListResponse, error)
 	ChatConversationGet(ctx context.Context, id, sub string, limit int) (*ChatConversation, error)
+	// The conversation log (#406): global admin, read-only.
+	ChatLogList(ctx context.Context, f ChatLogFilter) (*ChatLogPage, error)
+	ChatGaps(ctx context.Context, f ChatGapsFilter) (*ChatGapsResponse, error)
 	Close() error
 }
 

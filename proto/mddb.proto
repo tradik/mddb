@@ -331,6 +331,16 @@ service MDDB {
   // Everything of one user (GDPR export): one conversation per message,
   // newest first, each with all its messages.
   rpc ExportChatConversations(ExportChatConversationsRequest) returns (stream ChatConversationProto);
+  // (v2.19.0+, #406) A rating (up/down) and an optional comment on one
+  // assistant message, as POST /v1/chat/conversations/{id}/feedback. Write
+  // permission on the chat collection, like an append.
+  rpc RateChatMessage(RateChatMessageRequest) returns (RateChatMessageResponse);
+  // (v2.19.0+, #406) The conversation log across users, as GET /v1/chat/log:
+  // logged turns newest first. Global admin only.
+  rpc ListChatLog(ListChatLogRequest) returns (ListChatLogResponse);
+  // (v2.19.0+, #406) Docs gaps, as GET /v1/chat/gaps: questions whose
+  // searches found nothing or scored low, grouped. Global admin only.
+  rpc ListChatGaps(ListChatGapsRequest) returns (ListChatGapsResponse);
 }
 
 // Document represents a markdown document
@@ -2400,6 +2410,7 @@ message ChatScenarioProto {
   int64 created_at = 14;                         // Unix seconds
   int64 updated_at = 15;                         // Unix seconds
   repeated ChatMcpServerProto mcp_servers = 16;  // MCP-005: external knowledge servers
+  ChatLoggingProto logging = 20;                 // (v2.19.0+, #406) the turn log; off when absent
 }
 
 // An external MCP server of a scenario (MCP-005).
@@ -2427,6 +2438,13 @@ message ChatMcpToolStateProto {
   string name = 1;
   bool active = 2;
   string reason = 3;
+}
+
+// ChatLoggingProto is a scenario's turn log (#406).
+message ChatLoggingProto {
+  bool enabled = 1;                              // default false
+  int32 retention_days = 2;                      // anonymous sessions' log; 0 = server default
+  optional bool redact = 3;                      // default true: e-mails, tokens, card-like digits
 }
 
 // One switchable module (v2.19.0+, GO-049).
@@ -2694,10 +2712,20 @@ message ChatToolCallProto {
   string name = 1;
   string collection = 2;
   int64 duration_ms = 3;
+  string query = 4;                              // (#406) what the tool searched for
+  repeated string result_keys = 5;               // (#406) the keys it found, best first
+  double top_score = 6;                          // (#406) the best result's score
+}
+
+// ChatFeedbackProto is a user's rating of one assistant message (#406).
+message ChatFeedbackProto {
+  string rating = 1;                             // up or down
+  string comment = 2;                            // at most 2000 characters
+  int64 at = 3;                                  // unix seconds
 }
 
 message ChatMessageProto {
-  string id = 1;                                 // set by the server
+  string id = 1;                                 // the client's id when valid ([A-Za-z0-9_-]{1,64}), else set by the server
   string role = 2;                               // user, assistant or tool
   string content = 3;
   repeated ChatToolCallProto tool_calls = 4;
@@ -2706,6 +2734,9 @@ message ChatMessageProto {
   int64 prompt_tokens = 7;
   int64 completion_tokens = 8;
   int64 created_at = 9;                          // unix seconds; 0 on append = now
+  string outcome = 10;                           // (#406) a logged turn: answered, noResults, refused or error
+  int64 latency_ms = 11;                         // (#406)
+  ChatFeedbackProto feedback = 12;               // (#406) set by RateChatMessage
 }
 
 message ChatConversationProto {
@@ -2722,6 +2753,7 @@ message ChatConversationProto {
   int64 expires_at = 11;                         // removed after this unless written again
   int32 message_count = 12;                      // of the whole conversation
   repeated ChatMessageProto messages = 13;       // oldest first; empty in a listing
+  bool redact = 14;                              // (#406) stored text is redacted
 }
 
 message CreateChatConversationRequest {
@@ -2753,6 +2785,7 @@ message AppendChatMessagesRequest {
   string id = 1;
   string sub = 2;
   repeated ChatMessageProto messages = 3;        // 1 to 100
+  bool redact = 4;                               // (#406) redact before storing; sticky on the conversation
 }
 
 message EndChatConversationRequest {
@@ -2781,4 +2814,80 @@ message DeleteChatConversationsForUserResponse {
 
 message ExportChatConversationsRequest {
   string sub = 1;
+}
+
+// ---- v2.19.0: the conversation log and answer feedback (#406) ----
+
+message RateChatMessageRequest {
+  string id = 1;                                 // the conversation
+  string sub = 2;
+  string message_id = 3;                         // an assistant message
+  string rating = 4;                             // up or down
+  string comment = 5;                            // optional, at most 2000 characters
+}
+
+message RateChatMessageResponse {
+  string conversation_id = 1;
+  string message_id = 2;
+  ChatFeedbackProto feedback = 3;
+}
+
+message ListChatLogRequest {
+  string scenario = 1;
+  int64 from = 2;                                // unix seconds, inclusive; 0 = no bound
+  int64 to = 3;                                  // unix seconds, inclusive; 0 = no bound
+  string rating = 4;                             // up, down, none or any
+  string outcome = 5;                            // answered, noResults, refused or error
+  string cursor = 6;
+  int32 limit = 7;                               // default 50, max 200
+}
+
+message ChatLogTurnProto {
+  string conversation_id = 1;
+  string message_id = 2;
+  string scenario = 3;
+  string sub = 4;                                // empty for an anonymous session
+  string display_name = 5;
+  bool anonymous = 6;
+  int64 at = 7;
+  string question = 8;
+  string answer = 9;
+  string answer_excerpt = 10;
+  string outcome = 11;
+  string rating = 12;
+  string comment = 13;
+  string model = 14;
+  string provider = 15;
+  int64 latency_ms = 16;
+  int64 prompt_tokens = 17;
+  int64 completion_tokens = 18;
+  repeated ChatToolCallProto tool_calls = 19;
+}
+
+message ListChatLogResponse {
+  repeated ChatLogTurnProto turns = 1;
+  string next_cursor = 2;
+}
+
+message ListChatGapsRequest {
+  string scenario = 1;
+  int64 from = 2;
+  int64 to = 3;
+  int32 min_count = 4;                           // default 1
+  double threshold = 5;                          // top score below this is a gap; 0 = server default
+  int32 limit = 6;                               // default 100, max 1000
+}
+
+message ChatGapProto {
+  string question = 1;                           // normalised
+  string example = 2;                            // the latest question as asked
+  int32 count = 3;
+  int32 no_results = 4;                          // of count, the turns that found nothing
+  int64 last_asked_at = 5;
+  repeated string scenarios = 6;
+}
+
+message ListChatGapsResponse {
+  repeated ChatGapProto gaps = 1;
+  double threshold = 2;
 }

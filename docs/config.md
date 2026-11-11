@@ -756,6 +756,7 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
 | `MDDB_CHAT_RETENTION_DAYS` | `30` | int | Days a chat conversation is kept after its last write when the host gives no `retentionDays` (1–3650). See [API.md](API.md#chat-conversations-v1chatconversations) |
+| `MDDB_CHAT_GAP_SCORE` | `0.3` | float | A logged chat turn whose best search score is below this counts as a docs gap (`GET /v1/chat/gaps`; a request's `threshold` wins). See [chat.md](chat.md#conversation-log-and-feedback-2190) |
 
 ## Chat Skills (v2.19.0+)
 

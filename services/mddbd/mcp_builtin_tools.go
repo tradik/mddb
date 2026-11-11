@@ -43,6 +43,7 @@ func mcpBuiltinTools() []MCPTool {
 	t = append(t, mcpFeatureTools()...) // GO-049
 	t = append(t, mcpChatMcpTools()...)
 	t = append(t, mcpChatConversationTools()...)
+	t = append(t, mcpChatLogTools()...)
 	return append(t, mcpWhereTools()...)
 }
 

@@ -147,6 +147,10 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/DeleteChatConversation":         ruleHandler,
 	"/mddb.MDDB/DeleteChatConversationsForUser": ruleHandler,
 	"/mddb.MDDB/ExportChatConversations":        ruleHandler,
+	"/mddb.MDDB/RateChatMessage":                ruleHandler, // #406: as an append
+	// The conversation log (#406): every user's turns.
+	"/mddb.MDDB/ListChatLog":  ruleAdmin,
+	"/mddb.MDDB/ListChatGaps": ruleAdmin,
 
 	// Replication authorizes itself: a replication secret, a verified mTLS
 	// certificate or an administrator (authorizeReplication, SEC-001).

@@ -20,6 +20,7 @@ import (
 //	GET    /v1/chat/conversations/{id}?sub=&limit=
 //	POST   /v1/chat/conversations/{id}/messages   {sub, messages: [...]}
 //	POST   /v1/chat/conversations/{id}/end        {sub}
+//	POST   /v1/chat/conversations/{id}/feedback   {sub, messageId, rating, comment?} (#406)
 //	DELETE /v1/chat/conversations/{id}?sub=
 //
 // sub is in the query string of a GET or DELETE and in the body of a POST.
@@ -60,6 +61,8 @@ func (s *Server) handleChatConversations(w http.ResponseWriter, r *http.Request)
 		h = func(w http.ResponseWriter, r *http.Request) { s.chatAppendHandler(w, r, id) }
 	case action == "end" && r.Method == http.MethodPost:
 		h = func(w http.ResponseWriter, r *http.Request) { s.chatEndHandler(w, r, id) }
+	case action == "feedback" && r.Method == http.MethodPost:
+		h = func(w http.ResponseWriter, r *http.Request) { s.chatFeedbackHandler(w, r, id) }
 	default:
 		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -164,4 +167,14 @@ func (s *Server) chatDeleteForUserHandler(w http.ResponseWriter, r *http.Request
 func (s *Server) chatExportHandler(w http.ResponseWriter, r *http.Request) {
 	export, err := s.chatExport(r.Context(), r.URL.Query().Get("sub"))
 	chatReply(w, export, err)
+}
+
+func (s *Server) chatFeedbackHandler(w http.ResponseWriter, r *http.Request, id string) {
+	var req ChatFeedbackRequest
+	if err := chatBody(r, &req); err != nil {
+		chatFail(w, err)
+		return
+	}
+	res, err := s.chatFeedback(r.Context(), id, req)
+	chatReply(w, res, err)
 }

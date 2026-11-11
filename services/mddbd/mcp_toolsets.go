@@ -62,7 +62,7 @@ var mcpToolsets = map[string][]string{
 		"chat_skill_list", "chat_skill_get", "chat_skill_put", "chat_skill_delete",
 		"feature_list", "feature_set",
 		"chat_mcp_secret_list", "chat_mcp_secret_put", "chat_mcp_secret_delete",
-		"chat_conversation_list", "chat_conversation_get"},
+		"chat_conversation_list", "chat_conversation_get", "chat_log_list", "chat_gaps"},
 	ToolsetGeo:        {"geo_search", "geo_within", "geo_polygon", "geo_stats", "geo_encode", "geo_decode"},
 	ToolsetAutomation: {"list_automation", "create_automation", "get_automation", "update_automation", "delete_automation", "test_automation", "get_automation_logs", "run_automation"},
 	ToolsetWebhooks:   {"register_webhook", "list_webhooks", "delete_webhook"},

@@ -137,6 +137,8 @@ var mcpToolAccessRules = map[string]accessRule{
 	"chat_mcp_secret_list":   ruleAdmin,
 	"chat_mcp_secret_put":    ruleAdmin,
 	"chat_mcp_secret_delete": ruleAdmin,
+	"chat_log_list":          ruleAdmin, // #406: every user's turns, as GET /v1/chat/log
+	"chat_gaps":              ruleAdmin,
 	"list_webhooks":          ruleAdmin,
 	"list_automation":        ruleAdmin,
 	"create_automation":      ruleAdmin,

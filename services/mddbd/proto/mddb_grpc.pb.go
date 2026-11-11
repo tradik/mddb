@@ -132,6 +132,9 @@ const (
 	MDDB_DeleteChatConversation_FullMethodName         = "/mddb.MDDB/DeleteChatConversation"
 	MDDB_DeleteChatConversationsForUser_FullMethodName = "/mddb.MDDB/DeleteChatConversationsForUser"
 	MDDB_ExportChatConversations_FullMethodName        = "/mddb.MDDB/ExportChatConversations"
+	MDDB_RateChatMessage_FullMethodName                = "/mddb.MDDB/RateChatMessage"
+	MDDB_ListChatLog_FullMethodName                    = "/mddb.MDDB/ListChatLog"
+	MDDB_ListChatGaps_FullMethodName                   = "/mddb.MDDB/ListChatGaps"
 )
 
 // MDDBClient is the client API for MDDB service.
@@ -386,6 +389,16 @@ type MDDBClient interface {
 	// Everything of one user (GDPR export): one conversation per message,
 	// newest first, each with all its messages.
 	ExportChatConversations(ctx context.Context, in *ExportChatConversationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatConversationProto], error)
+	// (v2.19.0+, #406) A rating (up/down) and an optional comment on one
+	// assistant message, as POST /v1/chat/conversations/{id}/feedback. Write
+	// permission on the chat collection, like an append.
+	RateChatMessage(ctx context.Context, in *RateChatMessageRequest, opts ...grpc.CallOption) (*RateChatMessageResponse, error)
+	// (v2.19.0+, #406) The conversation log across users, as GET /v1/chat/log:
+	// logged turns newest first. Global admin only.
+	ListChatLog(ctx context.Context, in *ListChatLogRequest, opts ...grpc.CallOption) (*ListChatLogResponse, error)
+	// (v2.19.0+, #406) Docs gaps, as GET /v1/chat/gaps: questions whose
+	// searches found nothing or scored low, grouped. Global admin only.
+	ListChatGaps(ctx context.Context, in *ListChatGapsRequest, opts ...grpc.CallOption) (*ListChatGapsResponse, error)
 }
 
 type mDDBClient struct {
@@ -1556,6 +1569,36 @@ func (c *mDDBClient) ExportChatConversations(ctx context.Context, in *ExportChat
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MDDB_ExportChatConversationsClient = grpc.ServerStreamingClient[ChatConversationProto]
 
+func (c *mDDBClient) RateChatMessage(ctx context.Context, in *RateChatMessageRequest, opts ...grpc.CallOption) (*RateChatMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RateChatMessageResponse)
+	err := c.cc.Invoke(ctx, MDDB_RateChatMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) ListChatLog(ctx context.Context, in *ListChatLogRequest, opts ...grpc.CallOption) (*ListChatLogResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChatLogResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListChatLog_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) ListChatGaps(ctx context.Context, in *ListChatGapsRequest, opts ...grpc.CallOption) (*ListChatGapsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChatGapsResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListChatGaps_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MDDBServer is the server API for MDDB service.
 // All implementations must embed UnimplementedMDDBServer
 // for forward compatibility.
@@ -1808,6 +1851,16 @@ type MDDBServer interface {
 	// Everything of one user (GDPR export): one conversation per message,
 	// newest first, each with all its messages.
 	ExportChatConversations(*ExportChatConversationsRequest, grpc.ServerStreamingServer[ChatConversationProto]) error
+	// (v2.19.0+, #406) A rating (up/down) and an optional comment on one
+	// assistant message, as POST /v1/chat/conversations/{id}/feedback. Write
+	// permission on the chat collection, like an append.
+	RateChatMessage(context.Context, *RateChatMessageRequest) (*RateChatMessageResponse, error)
+	// (v2.19.0+, #406) The conversation log across users, as GET /v1/chat/log:
+	// logged turns newest first. Global admin only.
+	ListChatLog(context.Context, *ListChatLogRequest) (*ListChatLogResponse, error)
+	// (v2.19.0+, #406) Docs gaps, as GET /v1/chat/gaps: questions whose
+	// searches found nothing or scored low, grouped. Global admin only.
+	ListChatGaps(context.Context, *ListChatGapsRequest) (*ListChatGapsResponse, error)
 	mustEmbedUnimplementedMDDBServer()
 }
 
@@ -2156,6 +2209,15 @@ func (UnimplementedMDDBServer) DeleteChatConversationsForUser(context.Context, *
 }
 func (UnimplementedMDDBServer) ExportChatConversations(*ExportChatConversationsRequest, grpc.ServerStreamingServer[ChatConversationProto]) error {
 	return status.Error(codes.Unimplemented, "method ExportChatConversations not implemented")
+}
+func (UnimplementedMDDBServer) RateChatMessage(context.Context, *RateChatMessageRequest) (*RateChatMessageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RateChatMessage not implemented")
+}
+func (UnimplementedMDDBServer) ListChatLog(context.Context, *ListChatLogRequest) (*ListChatLogResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChatLog not implemented")
+}
+func (UnimplementedMDDBServer) ListChatGaps(context.Context, *ListChatGapsRequest) (*ListChatGapsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChatGaps not implemented")
 }
 func (UnimplementedMDDBServer) mustEmbedUnimplementedMDDBServer() {}
 func (UnimplementedMDDBServer) testEmbeddedByValue()              {}
@@ -4180,6 +4242,60 @@ func _MDDB_ExportChatConversations_Handler(srv interface{}, stream grpc.ServerSt
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MDDB_ExportChatConversationsServer = grpc.ServerStreamingServer[ChatConversationProto]
 
+func _MDDB_RateChatMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RateChatMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).RateChatMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_RateChatMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).RateChatMessage(ctx, req.(*RateChatMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_ListChatLog_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChatLogRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListChatLog(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListChatLog_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListChatLog(ctx, req.(*ListChatLogRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_ListChatGaps_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChatGapsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListChatGaps(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListChatGaps_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListChatGaps(ctx, req.(*ListChatGapsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MDDB_ServiceDesc is the grpc.ServiceDesc for MDDB service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -4622,6 +4738,18 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteChatConversationsForUser",
 			Handler:    _MDDB_DeleteChatConversationsForUser_Handler,
+		},
+		{
+			MethodName: "RateChatMessage",
+			Handler:    _MDDB_RateChatMessage_Handler,
+		},
+		{
+			MethodName: "ListChatLog",
+			Handler:    _MDDB_ListChatLog_Handler,
+		},
+		{
+			MethodName: "ListChatGaps",
+			Handler:    _MDDB_ListChatGaps_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

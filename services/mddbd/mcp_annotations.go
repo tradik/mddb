@@ -153,6 +153,10 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"chat_conversation_list": readOnly(),
 	"chat_conversation_get":  readOnly(),
 
+	// --- The conversation log (#406): read-only, global admin ---
+	"chat_log_list": readOnly(),
+	"chat_gaps":     readOnly(),
+
 	// --- Write, open world (network calls) ---
 	"import_url":     writeOpenWorld(),
 	"corpus_install": writeOpenWorld(), // #378: the server downloads the pack

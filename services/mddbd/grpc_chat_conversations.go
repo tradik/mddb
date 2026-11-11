@@ -102,7 +102,7 @@ func (g *GRPCServer) AppendChatMessages(ctx context.Context, req *proto.AppendCh
 	for _, m := range req.GetMessages() {
 		msgs = append(msgs, chatMessageFromProto(m))
 	}
-	return chatConversationReply(g.server.chatAppend(ctx, req.GetId(), ChatAppendRequest{Sub: req.GetSub(), Messages: msgs}))
+	return chatConversationReply(g.server.chatAppend(ctx, req.GetId(), ChatAppendRequest{Sub: req.GetSub(), Messages: msgs, Redact: req.GetRedact()}))
 }
 
 // EndChatConversation ends a conversation, as POST /v1/chat/conversations/{id}/end.
@@ -162,29 +162,42 @@ func chatConversationToProto(c ChatConversationSummary, msgs []ChatMessage) *pro
 		Id: c.ID, Scenario: c.Scenario, Sub: c.Sub, DisplayName: c.DisplayName, Title: c.Title,
 		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt, LastMessageAt: c.LastMessageAt, Ended: c.Ended,
 		RetentionDays: safeInt32(c.RetentionDays), ExpiresAt: c.ExpiresAt, MessageCount: safeInt32(c.MessageCount),
-		Messages: make([]*proto.ChatMessageProto, 0, len(msgs)),
+		Messages: make([]*proto.ChatMessageProto, 0, len(msgs)), Redact: c.Redact,
 	}
 	for _, m := range msgs {
-		pm := &proto.ChatMessageProto{Id: m.ID, Role: m.Role, Content: m.Content, Model: m.Model, Provider: m.Provider, CreatedAt: m.CreatedAt}
+		pm := &proto.ChatMessageProto{Id: m.ID, Role: m.Role, Content: m.Content, Model: m.Model, Provider: m.Provider,
+			CreatedAt: m.CreatedAt, Outcome: m.Outcome, LatencyMs: m.LatencyMs, ToolCalls: chatToolCallsToProto(m.ToolCalls)}
 		if m.Tokens != nil {
 			pm.PromptTokens, pm.CompletionTokens = m.Tokens.Prompt, m.Tokens.Completion
 		}
-		for _, tc := range m.ToolCalls {
-			pm.ToolCalls = append(pm.ToolCalls, &proto.ChatToolCallProto{Name: tc.Name, Collection: tc.Collection, DurationMs: tc.DurationMs})
+		if f := m.Feedback; f != nil {
+			pm.Feedback = &proto.ChatFeedbackProto{Rating: f.Rating, Comment: f.Comment, At: f.At}
 		}
 		out.Messages = append(out.Messages, pm)
 	}
 	return out
 }
 
+// chatToolCallsToProto is the tool calls of a message as their messages.
+func chatToolCallsToProto(calls []ChatToolCall) []*proto.ChatToolCallProto {
+	out := make([]*proto.ChatToolCallProto, 0, len(calls))
+	for _, tc := range calls {
+		out = append(out, &proto.ChatToolCallProto{Name: tc.Name, Collection: tc.Collection, DurationMs: tc.DurationMs,
+			Query: tc.Query, ResultKeys: tc.ResultKeys, TopScore: tc.TopScore})
+	}
+	return out
+}
+
 // chatMessageFromProto is the REST body of one appended message.
 func chatMessageFromProto(m *proto.ChatMessageProto) ChatMessage {
-	out := ChatMessage{Role: m.GetRole(), Content: m.GetContent(), Model: m.GetModel(), Provider: m.GetProvider(), CreatedAt: m.GetCreatedAt()}
+	out := ChatMessage{ID: m.GetId(), Role: m.GetRole(), Content: m.GetContent(), Model: m.GetModel(), Provider: m.GetProvider(),
+		CreatedAt: m.GetCreatedAt(), Outcome: m.GetOutcome(), LatencyMs: m.GetLatencyMs()}
 	if m.GetPromptTokens() != 0 || m.GetCompletionTokens() != 0 {
 		out.Tokens = &ChatTokens{Prompt: m.GetPromptTokens(), Completion: m.GetCompletionTokens()}
 	}
 	for _, tc := range m.GetToolCalls() {
-		out.ToolCalls = append(out.ToolCalls, ChatToolCall{Name: tc.GetName(), Collection: tc.GetCollection(), DurationMs: tc.GetDurationMs()})
+		out.ToolCalls = append(out.ToolCalls, ChatToolCall{Name: tc.GetName(), Collection: tc.GetCollection(), DurationMs: tc.GetDurationMs(),
+			Query: tc.GetQuery(), ResultKeys: tc.GetResultKeys(), TopScore: tc.GetTopScore()})
 	}
 	return out
 }

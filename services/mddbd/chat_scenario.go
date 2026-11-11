@@ -64,6 +64,7 @@ type ChatScenario struct {
 	TokenBudgetPerSession int             `json:"tokenBudgetPerSession,omitempty"`
 	RateLimit             ChatRateLimit   `json:"rateLimit"`
 	McpServers            []ChatMcpServer `json:"mcpServers,omitempty"` // MCP-005, chat_mcp_server.go
+	Logging               ChatLogging     `json:"logging"`              // #406: the turn log, off by default
 	CreatedAt             time.Time       `json:"createdAt"`
 	UpdatedAt             time.Time       `json:"updatedAt"`
 }
@@ -183,6 +184,9 @@ func (c *ChatScenario) Normalize(exists func(string) bool) error {
 		}
 	}
 	if err := normalizeChatMcpServers(c.McpServers); err != nil {
+		return err
+	}
+	if err := c.Logging.normalize(); err != nil {
 		return err
 	}
 	return c.normalizeCollections(exists)

@@ -65,6 +65,11 @@ type ChatToolCall struct {
 	Name       string `json:"name"`
 	Collection string `json:"collection,omitempty"`
 	DurationMs int64  `json:"durationMs,omitempty"`
+	// What a logged turn's tool searched for, the keys it found (best first)
+	// and the best score (#406).
+	Query      string   `json:"query,omitempty"`
+	ResultKeys []string `json:"resultKeys,omitempty"`
+	TopScore   float64  `json:"topScore,omitempty"`
 }
 
 // ChatTokens is the token usage of one assistant message.
@@ -83,6 +88,11 @@ type ChatMessage struct {
 	Provider  string         `json:"provider,omitempty"`
 	Tokens    *ChatTokens    `json:"tokens,omitempty"`
 	CreatedAt int64          `json:"createdAt"` // unix seconds
+	// Outcome marks a logged turn's answer (#406): answered, noResults,
+	// refused or error. LatencyMs is how long the turn took.
+	Outcome   string        `json:"outcome,omitempty"`
+	LatencyMs int64         `json:"latencyMs,omitempty"`
+	Feedback  *ChatFeedback `json:"feedback,omitempty"`
 }
 
 // ChatConversationSummary is a conversation without its messages, as a
@@ -100,6 +110,9 @@ type ChatConversationSummary struct {
 	RetentionDays int    `json:"retentionDays"`
 	ExpiresAt     int64  `json:"expiresAt,omitempty"`
 	MessageCount  int    `json:"messageCount"`
+	// Redact is set once an append asked for redaction (#406); from then on
+	// every message and feedback comment of the conversation is redacted.
+	Redact bool `json:"redact,omitempty"`
 }
 
 // ChatConversation is a conversation with its messages, oldest first.
@@ -122,6 +135,8 @@ type ChatCreateRequest struct {
 type ChatAppendRequest struct {
 	Sub      string        `json:"sub"`
 	Messages []ChatMessage `json:"messages"`
+	// Redact redacts these messages and every later write (#406).
+	Redact bool `json:"redact,omitempty"`
 }
 
 // ChatListResponse is one page of a user's conversations, newest first.
@@ -207,14 +222,16 @@ func prepareChatMessages(msgs []ChatMessage, now int64) ([]ChatMessage, error) {
 		switch {
 		case m.Role != "user" && m.Role != "assistant" && m.Role != "tool":
 			return nil, chatInvalid("message %d: role must be user, assistant or tool", i)
-		case m.Content == "" && len(m.ToolCalls) == 0:
+		case m.Content == "" && len(m.ToolCalls) == 0 && m.Outcome == "":
 			return nil, chatInvalid("message %d: missing content", i)
 		case len(m.Content) > chatMaxContentBytes:
 			return nil, chatInvalid("message %d: content is longer than %d bytes", i, chatMaxContentBytes)
 		case m.CreatedAt < 0:
 			return nil, chatInvalid("message %d: createdAt is negative", i)
 		}
-		m.ID = generateMemoryMessageID() // the memory store's message ids: 12 random bytes
+		if err := validChatTurn(i, &m); err != nil {
+			return nil, err
+		}
 		if m.CreatedAt == 0 {
 			m.CreatedAt = now
 		}

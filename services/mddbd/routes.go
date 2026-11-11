@@ -125,6 +125,10 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc(chatMcpSecretsPath+"/", s.handleChatMcpSecrets)
 	mux.HandleFunc(chatMcpInspectPath, s.handleChatMcpInspect)
 	mux.HandleFunc(chatMcpCallPath, s.handleChatMcpCall)
+	// #406: the conversation log and the docs gaps, for global admins.
+	mux.HandleFunc(chatLogPath, s.handleChatLog)
+	mux.HandleFunc(chatLogExportPath, s.handleChatLog)
+	mux.HandleFunc(chatGapsPath, s.handleChatGaps)
 	// GO-045: delete, update metadata and set TTL by metadata filter.
 	mux.HandleFunc("/v1/documents:deleteWhere", s.handleWhere)
 	mux.HandleFunc("/v1/documents:updateWhere", s.handleWhere)

@@ -113,6 +113,8 @@ func chatScenarioToProto(sc *ChatScenario) *proto.ChatScenarioProto {
 		Llm: llm, MaxTurns: safeInt32(sc.MaxTurns), TokenBudgetPerSession: int64(sc.TokenBudgetPerSession),
 		RateLimit: &proto.ChatRateLimitProto{MessagesPerMinute: safeInt32(sc.RateLimit.MessagesPerMinute)},
 		CreatedAt: chatUnix(sc.CreatedAt), UpdatedAt: chatUnix(sc.UpdatedAt), McpServers: chatMcpServersToProto(sc.McpServers),
+		Logging: &proto.ChatLoggingProto{Enabled: sc.Logging.Enabled, RetentionDays: safeInt32(sc.Logging.RetentionDays),
+			Redact: sc.Logging.Redact},
 	}
 }
 
@@ -141,6 +143,9 @@ func chatScenarioFromProto(p *proto.ChatScenarioProto) (*ChatScenario, error) {
 		MaxTurns: int(p.GetMaxTurns()), TokenBudgetPerSession: int(p.GetTokenBudgetPerSession()),
 		RateLimit:  ChatRateLimit{MessagesPerMinute: int(p.GetRateLimit().GetMessagesPerMinute())},
 		McpServers: chatMcpServersFromProto(p.GetMcpServers()),
+	}
+	if l := p.GetLogging(); l != nil { // #406
+		sc.Logging = ChatLogging{Enabled: l.GetEnabled(), RetentionDays: int(l.GetRetentionDays()), Redact: l.Redact}
 	}
 	if p.GetLlm().GetTemperatureSet() {
 		t := p.GetLlm().GetTemperature()
