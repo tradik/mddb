@@ -122,7 +122,14 @@ type outboundResponse struct {
 // images and synced sources (INT-022). A status other than 200 is no error
 // here: a synced source tells 304 and 404 apart.
 func fetchOutbound(ctx context.Context, rawURL string, limit int64, timeout time.Duration, header http.Header) (outboundResponse, error) {
-	resp, err := openOutbound(ctx, httpclient.NewPooledClientWithTimeout(timeout), rawURL, header)
+	return readOutbound(ctx, httpclient.NewPooledClientWithTimeout(timeout), rawURL, limit, header)
+}
+
+// readOutbound is fetchOutbound with the caller's client, which is the
+// pooled client or one built on it: a chat skill (#404) is fetched with
+// redirects held to https.
+func readOutbound(ctx context.Context, client *http.Client, rawURL string, limit int64, header http.Header) (outboundResponse, error) {
+	resp, err := openOutbound(ctx, client, rawURL, header)
 	if err != nil {
 		return outboundResponse{}, err
 	}

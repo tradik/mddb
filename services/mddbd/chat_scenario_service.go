@@ -32,6 +32,10 @@ func (s *Server) PutChatScenario(sc *ChatScenario) (created bool, err error) {
 	if err := sc.Normalize(s.chatCollectionExists); err != nil {
 		return false, err
 	}
+	// #404: skills can make a prompt far longer than its fields allow.
+	if p := s.ChatScenarioPrompt(sc); p.Bytes > chatPromptMaxBytes() {
+		return false, errors.New(p.Warning)
+	}
 	return s.ChatScenarios.Put(sc)
 }
 

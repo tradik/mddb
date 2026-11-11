@@ -15,7 +15,7 @@ import (
 //	GET    /v1/chat/scenarios/{name}          one scenario
 //	PUT    /v1/chat/scenarios/{name}          create (201) or replace (200)
 //	DELETE /v1/chat/scenarios/{name}          remove
-//	GET    /v1/chat/scenarios/{name}/prompt   the composed system prompt
+//	GET    /v1/chat/scenarios/{name}/prompt   the composed system prompt, its size and missing skills
 //
 // Writes need a global administrator. Reads need read permission on every
 // collection the scenario allows; the list leaves out what the caller may
@@ -27,13 +27,6 @@ const chatScenariosPath = "/v1/chat/scenarios"
 type chatScenarioList struct {
 	Scenarios []*ChatScenario `json:"scenarios"`
 	Version   uint64          `json:"version"`
-}
-
-// chatScenarioPrompt is the body of the prompt preview.
-type chatScenarioPrompt struct {
-	Name    string `json:"name"`
-	Prompt  string `json:"prompt"`
-	Version uint64 `json:"version"`
 }
 
 func (s *Server) handleChatScenarios(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +67,7 @@ func (s *Server) getChatScenario(w http.ResponseWriter, r *http.Request, name st
 		return
 	}
 	if prompt {
-		ok(w, chatScenarioPrompt{Name: sc.Name, Prompt: s.ChatScenarioPrompt(sc), Version: s.ChatScenariosVersion()})
+		ok(w, s.ChatScenarioPrompt(sc))
 		return
 	}
 	ok(w, sc)

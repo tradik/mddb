@@ -147,6 +147,8 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/restore":                       ruleAdmin,
 	"/v1/geo-reindex":                   ruleAdmin,
 	"/v1/embedding-configs":             ruleAdmin,
+	"/v1/chat/skills":                   ruleAdmin, // #404: a skill's text is part of system prompts, so reads are admin too
+	"/v1/chat/skills/":                  ruleAdmin,
 	"/v1/embedding-configs/":            ruleAdmin,
 	"/v1/embedding-configs/set-default": ruleAdmin,
 	"/v1/audit":                         ruleAdmin,

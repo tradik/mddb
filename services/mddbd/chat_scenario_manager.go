@@ -27,6 +27,7 @@ type ChatScenarioManager struct {
 	binlog  *binlog.Binlog
 	mu      sync.RWMutex
 	m       map[string]*ChatScenario
+	skills  map[string]*ChatSkill // #404, chat_skill_manager.go
 	version uint64
 	now     func() time.Time
 }
@@ -41,7 +42,7 @@ var (
 
 // NewChatScenarioManager creates the manager; call LoadAll before use.
 func NewChatScenarioManager(db *bolt.DB) *ChatScenarioManager {
-	return &ChatScenarioManager{db: db, m: map[string]*ChatScenario{}, now: time.Now}
+	return &ChatScenarioManager{db: db, m: map[string]*ChatScenario{}, skills: map[string]*ChatSkill{}, now: time.Now}
 }
 
 // FollowDB makes it use the server's current handle after a restore.
@@ -52,14 +53,17 @@ func (c *ChatScenarioManager) SetBinlog(bl *binlog.Binlog) { c.binlog = bl }
 
 func (c *ChatScenarioManager) handle() *bolt.DB { return boltx.Current(c.db, c.follow) }
 
-// LoadAll creates the bucket when missing and reads every scenario and the
-// version counter into memory.
+// LoadAll creates the buckets when missing and reads every scenario, every
+// skill and the version counter into memory.
 func (c *ChatScenarioManager) LoadAll() error {
 	m := map[string]*ChatScenario{}
+	var skills map[string]*ChatSkill
 	var version uint64
 	err := c.handle().Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketChatScenarios)
-		if err == nil {
+		sb, skillErr := tx.CreateBucketIfNotExists(bucketChatSkills)
+		if err = errors.Join(err, skillErr); err == nil {
+			skills = loadChatSkills(sb)
 			if v := b.Get(chatScenarioVersionKey); len(v) == 8 {
 				version = binary.BigEndian.Uint64(v)
 			}
@@ -79,7 +83,7 @@ func (c *ChatScenarioManager) LoadAll() error {
 		return err
 	}
 	c.mu.Lock()
-	c.m, c.version = m, version
+	c.m, c.skills, c.version = m, skills, version
 	c.mu.Unlock()
 	return nil
 }
@@ -134,7 +138,7 @@ func (c *ChatScenarioManager) Put(sc *ChatScenario) (created bool, err error) {
 	if err != nil {
 		return false, err
 	}
-	if err := c.write(func(b *bolt.Bucket) error { return b.Put([]byte(sc.Name), val) },
+	if err := c.write(bucketChatScenarios, func(b *bolt.Bucket) error { return b.Put([]byte(sc.Name), val) },
 		&binlog.BinlogEntry{Type: binlog.BinlogPut, BucketName: string(bucketChatScenarios), Key: []byte(sc.Name), Value: val}); err != nil {
 		return false, err
 	}
@@ -150,7 +154,7 @@ func (c *ChatScenarioManager) Delete(name string) error {
 	if _, ok := c.m[name]; !ok {
 		return errChatScenarioNotFound
 	}
-	if err := c.write(func(b *bolt.Bucket) error { return b.Delete([]byte(name)) },
+	if err := c.write(bucketChatScenarios, func(b *bolt.Bucket) error { return b.Delete([]byte(name)) },
 		&binlog.BinlogEntry{Type: binlog.BinlogDelete, BucketName: string(bucketChatScenarios), Key: []byte(name)}); err != nil {
 		return err
 	}
@@ -158,20 +162,21 @@ func (c *ChatScenarioManager) Delete(name string) error {
 	return nil
 }
 
-// write applies one change and the version bump in a single transaction,
-// then records both in the binlog. Called under the lock.
-func (c *ChatScenarioManager) write(change func(*bolt.Bucket) error, entry *binlog.BinlogEntry) error {
+// write applies one change to bucket — the scenarios' or the skills' — and
+// the version bump in a single transaction, then records both in the
+// binlog. Called under the lock.
+func (c *ChatScenarioManager) write(bucket []byte, change func(*bolt.Bucket) error, entry *binlog.BinlogEntry) error {
 	next := make([]byte, 8)
 	binary.BigEndian.PutUint64(next, c.version+1)
 	if err := c.handle().Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketChatScenarios)
-		if b == nil {
+		b, versions := tx.Bucket(bucket), tx.Bucket(bucketChatScenarios)
+		if b == nil || versions == nil {
 			return errors.New("chat scenarios are not loaded")
 		}
 		if err := change(b); err != nil {
 			return err
 		}
-		return b.Put(chatScenarioVersionKey, next)
+		return versions.Put(chatScenarioVersionKey, next)
 	}); err != nil {
 		return err
 	}

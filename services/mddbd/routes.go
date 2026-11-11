@@ -116,6 +116,8 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	// #403: chat scenarios — the assistant's prompt, collections and limits.
 	mux.HandleFunc("/v1/chat/scenarios", s.handleChatScenarios)
 	mux.HandleFunc("/v1/chat/scenarios/", s.handleChatScenarios)
+	mux.HandleFunc("/v1/chat/skills", s.handleChatSkills)
+	mux.HandleFunc("/v1/chat/skills/", s.handleChatSkills)
 	// GO-045: delete, update metadata and set TTL by metadata filter.
 	mux.HandleFunc("/v1/documents:deleteWhere", s.handleWhere)
 	mux.HandleFunc("/v1/documents:updateWhere", s.handleWhere)

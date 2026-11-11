@@ -17,6 +17,9 @@ import (
 
 func anyCollection(string) bool { return true }
 
+// noChatSkills is a skill store without skills.
+func noChatSkills(string) (*ChatSkill, bool) { return nil, false }
+
 func TestChatScenarioNormalizeDefaultsAndRefusals(t *testing.T) {
 	sc := &ChatScenario{Name: "support", AllowedCollections: []string{"docs"}}
 	if err := sc.Normalize(anyCollection); err != nil {
@@ -64,9 +67,9 @@ func TestComposeChatPromptOrderAndClauses(t *testing.T) {
 		OffTopic:           ChatOffTopic{Mode: OffTopicRedirect, RedirectTemplate: "Ask me about MDDB."},
 		Style:              ChatStyle{Emoji: EmojiSparingly, Verbosity: VerbosityShort, Markdown: true, CitationTemplate: "[{{key}}]"},
 		AllowedCollections: []string{"docs", "plain", "runbooks"}}
-	got := ComposeChatPrompt(sc, func(c string) string {
+	got, _ := ComposeChatPrompt(sc, func(c string) string {
 		return map[string]string{"docs": "Use code blocks.", "runbooks": "Numbered steps."}[c]
-	})
+	}, noChatSkills)
 	want := []string{"You are Ada.", "Guardrails — never do the following:\nNo legal advice.",
 		"reply with: Ask me about MDDB.", "Use emoji sparingly. Keep answers short. Format answers in Markdown. Cite every source as: [{{key}}]",
 		"For answers drawn from the collection docs:\nUse code blocks.", "For answers drawn from the collection runbooks:\nNumbered steps."}
@@ -85,7 +88,7 @@ func TestComposeChatPromptOrderAndClauses(t *testing.T) {
 	none := func(string) string { return "" }
 	for mode, phrase := range map[string]string{OffTopicRefuse: "decline politely", OffTopicBrief: "answer it briefly",
 		OffTopicRedirect: defaultRedirectTemplate} {
-		if p := ComposeChatPrompt(&ChatScenario{OffTopic: ChatOffTopic{Mode: mode}}, none); !strings.Contains(p, phrase) {
+		if p, _ := ComposeChatPrompt(&ChatScenario{OffTopic: ChatOffTopic{Mode: mode}}, none, noChatSkills); !strings.Contains(p, phrase) {
 			t.Errorf("%s: %q", mode, p)
 		}
 	}
@@ -93,7 +96,7 @@ func TestComposeChatPromptOrderAndClauses(t *testing.T) {
 		{Emoji: EmojiFree, Verbosity: VerbosityLong}: "Emoji are welcome. Answer thoroughly, with detail and examples. Answer in plain text, without Markdown.",
 		{Emoji: EmojiOff}: "Do not use emoji. Answer in plain text",
 	} {
-		if p := ComposeChatPrompt(&ChatScenario{Style: style}, none); !strings.Contains(p, phrase) {
+		if p, _ := ComposeChatPrompt(&ChatScenario{Style: style}, none, noChatSkills); !strings.Contains(p, phrase) {
 			t.Errorf("%+v: %q", style, p)
 		}
 	}

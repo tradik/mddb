@@ -100,12 +100,20 @@ var errChatScenarioNotFound = errors.New("chat scenario not found")
 
 // validChatScenarioName applies the alias naming rules: a name is a key and
 // a path segment, so it may not hold '|', '/' or spaces.
-func validChatScenarioName(name string) error {
+func validChatScenarioName(name string) error { return validChatKeyName("scenario", name, "version") }
+
+// validChatKeyName is the rule for a scenario's name and a skill's (#404);
+// reserved are the names the routes of that kind use themselves.
+func validChatKeyName(kind, name string, reserved ...string) error {
+	taken := false
+	for _, r := range reserved {
+		taken = taken || name == r
+	}
 	switch {
 	case name == "" || len(name) > maxChatScenarioNameLen:
-		return fmt.Errorf("scenario name must be 1 to %d characters", maxChatScenarioNameLen)
-	case strings.ContainsAny(name, "|/ "), name == "version":
-		return fmt.Errorf("scenario name %q may not contain '|', '/' or spaces, or be %q", name, "version")
+		return fmt.Errorf("%s name must be 1 to %d characters", kind, maxChatScenarioNameLen)
+	case strings.ContainsAny(name, "|/ "), taken:
+		return fmt.Errorf("%s name %q may not contain '|', '/' or spaces, or be %s", kind, name, `"`+strings.Join(reserved, `" or "`)+`"`)
 	}
 	return nil
 }
