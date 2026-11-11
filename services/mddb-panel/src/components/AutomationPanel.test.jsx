@@ -464,7 +464,7 @@ describe('AutomationPanel: logs tab', () => {
   });
 });
 
-describe('run now (2.18.11)', () => {
+describe('run now (2.19.0)', () => {
   beforeEach(() => {
     client.listAutomation.mockImplementation(serve(rules));
   });

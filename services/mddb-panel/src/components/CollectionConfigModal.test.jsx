@@ -454,7 +454,7 @@ describe('CollectionConfigModal actions', () => {
   });
 });
 
-describe('CollectionConfigModal sources (2.18.11)', () => {
+describe('CollectionConfigModal sources (2.19.0)', () => {
   test('lists the syncs and triggers of the collection being edited', async () => {
     vi.mocked(mddbClient.getCollectionConfig).mockResolvedValue({ collection: 'docs' });
     render(<CollectionConfigModal collection="docs" onClose={() => {}} onSave={() => {}} />);

@@ -252,14 +252,14 @@ export function describeCronAction(rule) {
 }
 
 /**
- * Whether a rule can be run now: a cron rule with a sync or a backup (2.18.11).
+ * Whether a rule can be run now: a cron rule with a sync or a backup (2.19.0).
  */
 export function isRunnable(rule) {
   return rule.type === 'cron' && Boolean(rule.sync || rule.backup);
 }
 
 /**
- * describeLastResult renders a rule's lastResult (2.18.11): the status, a
+ * describeLastResult renders a rule's lastResult (2.19.0): the status, a
  * sync's counts and the error, e.g. "error · +2 ~1 =35 −0 ✕1 · 1 of 40
  * sources failed". Empty when the rule has not run.
  */

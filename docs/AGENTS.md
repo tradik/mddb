@@ -55,7 +55,7 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
 ```
 
 With `search,code` the 22 tool schemas take about 43 KB per turn, against
-94 KB for all 93 tools of 2.18.10 (97 since 2.18.11). A tool outside the caller's toolsets is not listed,
+94 KB for all 93 tools of 2.18.10 (97 since 2.19.0). A tool outside the caller's toolsets is not listed,
 and calling it returns JSON-RPC `-32601` ([MCP.md](MCP.md#toolsets-v2188)).
 
 Operators can add their own tools and prompts in YAML
@@ -106,7 +106,7 @@ In a git repository it takes the files git tracks; elsewhere it skips
 `node_modules`, `vendor`, `dist` and the like. Each document is keyed by its
 path and carries `path`, `extension`, `kind`, `language`, `size`, `modified`
 and, in a repository, `gitCommit` and `gitBranch`. A Markdown file's
-frontmatter becomes metadata as well (2.18.11+): the server reads it once, with
+frontmatter becomes metadata as well (2.19.0+): the server reads it once, with
 the parser `/v1/upload` uses, so `tags: a, b`, `tags: [a, b]` and a `- a` block
 list are all lists, and the body is stored without the block. The meta above
 wins for a key both name; `--no-frontmatter` stores Markdown files as they are.
@@ -202,7 +202,7 @@ mddb-cli corpus install k8s-docs-1.31.mddbpack --sha256 <sum>
 mddb-cli corpus list
 ```
 
-An agent does the same over MCP (v2.18.11, `admin` toolset): `corpus_list`
+An agent does the same over MCP (v2.19.0, `admin` toolset): `corpus_list`
 lists the installed packs, `corpus_install` installs one the server downloads
 from an `https://` URL (optional `sha256`), and `corpus_remove` removes one,
 after the confirmation below. Building is left to the CLI, REST and gRPC: a

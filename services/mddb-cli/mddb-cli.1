@@ -141,7 +141,7 @@ without a text layer scores 0). Other binary files and files over the size
 limit are skipped. Each document is keyed by its path and
 carries meta path, extension, kind, language, size, modified, and gitCommit
 and gitBranch in a repository. A Markdown file's frontmatter becomes meta too
-(v2.18.11): the file is sent as it is and the server reads the frontmatter
+(v2.19.0): the file is sent as it is and the server reads the frontmatter
 once, with the parser /v1/upload uses, so comma, [flow] and block lists are
 lists, and stores the body without the block; the meta above wins for a key
 both name. Unchanged files are not rewritten. The search
@@ -174,7 +174,7 @@ stores them, and the pictures of PDFs, as image documents with their alt text
 and captions searchable (v2.18.9).
 .TP
 .B \-\-no\-frontmatter
-Store Markdown files as they are; do not read frontmatter as meta (v2.18.11).
+Store Markdown files as they are; do not read frontmatter as meta (v2.19.0).
 .TP
 .B \-\-prune
 Delete documents whose file no longer exists.
@@ -190,7 +190,7 @@ Add or update a markdown document in the database.
 Reads content from stdin or a file specified with \fB\-f\fR.
 .PP
 A frontmatter block (between \-\-\- lines at the top) is read as /v1/upload
-reads it (v2.18.11): its keys become meta \(em a comma list (tags: a, b), a
+reads it (v2.19.0): its keys become meta \(em a comma list (tags: a, b), a
 flow list (tags: [a, b]) and a block list (tags: followed by "\- a" lines) all
 become lists \(em and the document is stored without the block. A \fB\-m\fR
 key wins over a frontmatter key of the same name. Content without frontmatter
@@ -657,7 +657,7 @@ mddb-cli backup schedule remove 3f9c2a1b7d4e5f60
 .RE
 
 .SS sync create|list|run|delete
-Synced sources (v2.18.11+): cron automations whose action is a sync, keeping
+Synced sources (v2.19.0+): cron automations whose action is a sync, keeping
 a collection in step with a sitemap, a list of URLs or the objects under an
 S3 prefix. The server runs them when
 .B MDDB_CRONS=true

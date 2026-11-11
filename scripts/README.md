@@ -10,7 +10,7 @@ Bulk import markdown files from a folder into MDDB database.
 
 **Features:**
 - Automatic key generation from filenames
-- Frontmatter read as metadata by `mddb-cli add` (needs mddb-cli 2.18.11+):
+- Frontmatter read as metadata by `mddb-cli add` (needs mddb-cli 2.19.0+):
   comma, `[flow]` and `- item` block lists all arrive as full lists
 - Recursive folder scanning
 - Progress tracking with statistics

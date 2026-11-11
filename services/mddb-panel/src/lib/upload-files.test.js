@@ -1,4 +1,4 @@
-// upload-files: which files the upload dialog accepts and their keys (2.18.11:
+// upload-files: which files the upload dialog accepts and their keys (2.19.0:
 // every file goes to /v1/upload, which reads Markdown frontmatter).
 import { describe, test, expect } from 'vitest';
 import { SUPPORTED_EXTENSIONS, MAX_FILE_SIZE, extensionOf, isMarkdown, keyForFile, fileIcon, classifyFiles } from './upload-files';

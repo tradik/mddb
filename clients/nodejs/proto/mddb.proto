@@ -246,10 +246,10 @@ service MDDB {
   // (v2.9.14+) Curation: remove a rule by id
   rpc DeleteCurationRule(DeleteCurationRuleRequest) returns (DeleteCurationRuleResponse);
 
-  // (v2.18.11+) Run a cron rule's sync or backup now, through the code its
+  // (v2.19.0+) Run a cron rule's sync or backup now, through the code its
   // schedule fires; returns the run's job id (#377).
   rpc RunAutomation(RunAutomationRequest) returns (RunAutomationResponse);
-  // (v2.18.11+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
+  // (v2.19.0+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
   // every collection in the caller's tenant; the rest need admin.
   rpc ListCorpusPacks(ListCorpusPacksRequest) returns (ListCorpusPacksResponse);
   // The pack as a stream of chunks, or an https URL the server fetches
@@ -1087,7 +1087,7 @@ message AutomationRuleProto {
   // sitemap, a list of URLs or an S3 prefix. Unset on an update that names
   // no action keeps the stored one.
   SyncActionProto sync = 26;
-  // (v2.18.11+) What the latest run of a cron rule's sync or backup did,
+  // (v2.19.0+) What the latest run of a cron rule's sync or backup did,
   // from the automation log; set on listings, never stored (#377).
   AutomationRunResultProto last_result = 27;
 }
@@ -1138,7 +1138,7 @@ message BackupActionProto {
 
 message ListAutomationRequest {
   string type = 1; // optional filter: "trigger", "cron", "webhook"
-  // (v2.18.11+) Optional: only the rules acting on this collection — the
+  // (v2.19.0+) Optional: only the rules acting on this collection — the
   // triggers watching it and the syncs writing to it (#377).
   string collection = 2;
 }
@@ -2218,7 +2218,7 @@ message WhereResponse {
   repeated string errors = 6;
 }
 
-// ---- v2.18.11: corpus packs over gRPC (AGT-005, #378) ----
+// ---- v2.19.0: corpus packs over gRPC (AGT-005, #378) ----
 
 message ListCorpusPacksRequest {}
 

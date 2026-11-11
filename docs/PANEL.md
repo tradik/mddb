@@ -71,7 +71,7 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   the opt-in profiles, integrity check and real collection names.
 - **Automations**: a cron rule's action is a webhook, a scheduled backup
   (local or S3, retention) or a synced source (sitemap, URL list, S3 prefix);
-  the log shows backup targets and sync counts. Since 2.18.11 a sync or
+  the log shows backup targets and sync counts. Since 2.19.0 a sync or
   backup rule has a **Run now** button (`POST /v1/automation/{id}/run`; it
   shows the job id, or why the server refused — 409 while the previous run is
   going) and its row shows the last result: status, the sync's added +,
@@ -119,7 +119,7 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   another one (the replaced search used to empty the abort slot as it
   settled).
 
-### Server features of 2.18.2–2.18.11 added in 2.18.11
+### Server features of 2.18.2–2.19.0 the panel gained in 2.19.0
 
 - **Collection Aliases** page: aliases and their collections, create or move
   an alias (one atomic step), delete one (its collection stays). An alias

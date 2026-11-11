@@ -3788,7 +3788,7 @@ Manage a specific automation rule.
 - **PUT** updates the rule
 - **DELETE** removes the rule
 
-**GET** takes `type` (`webhook`, `trigger`, `cron`) and, since 2.18.11,
+**GET** takes `type` (`webhook`, `trigger`, `cron`) and, since 2.19.0,
 `collection`: only the rules acting on that collection — the syncs writing
 to it and the triggers watching it. Every sync and backup in a listing
 carries `lastResult` (`at`, `status`, `durationMs`, `error`, and a sync's
@@ -3796,7 +3796,7 @@ carries `lastResult` (`at`, `status`, `durationMs`, `error`, and a sync's
 log entry of the rule. See
 [AUTOMATIONS.md](AUTOMATIONS.md#synced-sources).
 
-**POST /v1/automation/:id/run** (2.18.11) — Run a cron rule's sync or backup
+**POST /v1/automation/:id/run** (2.19.0) — Run a cron rule's sync or backup
 now, through the code its schedule fires (logged, announced on the jobs SSE
 stream, firing its webhook). `202`:
 ```json
@@ -4530,7 +4530,7 @@ full-text search; choose it when nothing queries the structure.
 MDDB's own frontmatter reader (`/v1/upload`, `/v1/ingest` with
 `extractFrontmatter`, `/v1/import-url`, `mddb-cli add`, `mddb-cli autoindex`)
 reads flat keys only: a scalar, a comma list, a `[flow, list]` or a block list
-of `- item` lines (2.18.11+; before, a flow list kept its brackets and a block
+of `- item` lines (2.19.0+; before, a flow list kept its brackets and a block
 list was dropped). A `- key: value` item is a map and is not stored, so the
 `faq` above does not arrive as garbage; to keep it, use one of the patterns
 above, or `mddb-cli add --no-frontmatter` to leave it in the body.

@@ -6972,7 +6972,7 @@ type AutomationRuleProto struct {
 	// sitemap, a list of URLs or an S3 prefix. Unset on an update that names
 	// no action keeps the stored one.
 	Sync *SyncActionProto `protobuf:"bytes,26,opt,name=sync,proto3" json:"sync,omitempty"`
-	// (v2.18.11+) What the latest run of a cron rule's sync or backup did,
+	// (v2.19.0+) What the latest run of a cron rule's sync or backup did,
 	// from the automation log; set on listings, never stored (#377).
 	LastResult    *AutomationRunResultProto `protobuf:"bytes,27,opt,name=last_result,json=lastResult,proto3" json:"last_result,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -7533,7 +7533,7 @@ func (x *BackupActionProto) GetStorageConfig() *StorageConfigProto {
 type ListAutomationRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Type  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // optional filter: "trigger", "cron", "webhook"
-	// (v2.18.11+) Optional: only the rules acting on this collection — the
+	// (v2.19.0+) Optional: only the rules acting on this collection — the
 	// triggers watching it and the syncs writing to it (#377).
 	Collection    string `protobuf:"bytes,2,opt,name=collection,proto3" json:"collection,omitempty"`
 	unknownFields protoimpl.UnknownFields

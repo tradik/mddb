@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// CollectionSources (2.18.11): the syncs and triggers acting on a collection,
+// CollectionSources (2.19.0): the syncs and triggers acting on a collection,
 // their last result, Run now, refresh, the empty state and a failed load.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';

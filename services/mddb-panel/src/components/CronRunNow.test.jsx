@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// CronRunNow (2.18.11, #377): the Run now button of a sync or backup rule —
+// CronRunNow (2.19.0, #377): the Run now button of a sync or backup rule —
 // the job id it reports, a refusal, the busy state — and the last result line.
 import { describe, test, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';

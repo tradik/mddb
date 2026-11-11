@@ -104,7 +104,7 @@ in read-only mode). The server never takes a path to read. A URL must be
 file before anything is sent.
 
 A client that cannot upload a file — an MCP agent — names an `https://` URL
-instead, and the server downloads the pack itself (v2.18.11): the
+instead, and the server downloads the pack itself (v2.19.0): the
 `corpus_install` MCP tool, or the `InstallCorpusPack` RPC with `url` in its
 first message. The same rules apply as in the CLI: https only, no redirect out
 of TLS, and an optional `sha256` of the pack file, checked on a staged copy
@@ -233,7 +233,7 @@ name the terms. An install refuses a pack without them.
 
 See the [REST API reference](/docs/api/reference/), generated from `openapi.yaml`, for the full schemas.
 
-### MCP (v2.18.11)
+### MCP (v2.19.0)
 
 | Tool | Permission | |
 |---|---|---|
@@ -245,7 +245,7 @@ All three are in the `admin` toolset. There is no build tool: a build's
 product is the pack file, which a tool answer would have to carry base64 in
 the model's context. Build with the CLI, REST or gRPC.
 
-### gRPC (v2.18.11)
+### gRPC (v2.19.0)
 
 | RPC | Permission | |
 |---|---|---|

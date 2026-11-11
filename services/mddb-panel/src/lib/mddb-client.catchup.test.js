@@ -1,5 +1,5 @@
-// mddb-client: the 2.18.2–2.18.11 server features the panel reaches since
-// 2.18.11 — aliases, evaluation, storage, indexing status, async vector
+// mddb-client: the 2.18.2–2.19.0 server features the panel reaches since
+// 2.19.0 — aliases, evaluation, storage, indexing status, async vector
 // reindex jobs, code symbols, image documents and a collection's sources.
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { stubFetch, lastRequest, textResponse, expectEndpoint } from '../../test/fetch-mock.js';

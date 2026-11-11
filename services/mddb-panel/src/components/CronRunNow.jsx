@@ -5,7 +5,7 @@ import { describeLastResult } from '../lib/automation-form';
 
 /**
  * LastRunResult shows what the latest run of a sync or backup rule did
- * (2.18.11): the status, a sync's counts and the error. Nothing before the
+ * (2.19.0): the status, a sync's counts and the error. Nothing before the
  * first run.
  */
 export function LastRunResult({ rule }) {
@@ -23,7 +23,7 @@ export function LastRunResult({ rule }) {
 }
 
 /**
- * RunNowButton runs a sync or backup rule now (2.18.11) — through the code
+ * RunNowButton runs a sync or backup rule now (2.19.0) — through the code
  * its schedule fires — and reports the job id, or why the server refused
  * (409 while the previous run is still going). The run goes on in the
  * background: Refresh shows its result once it is done.

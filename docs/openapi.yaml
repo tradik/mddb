@@ -69,7 +69,7 @@ info:
 
     See authentication endpoints below for user management, groups, and permissions.
 
-  version: "2.18.11"
+  version: "2.19.0"
   contact:
     name: MDDB Team
     url: https://github.com/tradik/mddb
@@ -3791,7 +3791,7 @@ paths:
       summary: List automation rules
       operationId: listAutomationRules
       description: Returns all automation rules (webhooks, triggers, crons).
-        Optionally filter by type, or (2.18.11) by collection to list the
+        Optionally filter by type, or (2.19.0) by collection to list the
         sources syncing into it. Every sync and backup carries lastResult.
       parameters:
         - name: type
@@ -3804,7 +3804,7 @@ paths:
           in: query
           schema:
             type: string
-          description: (2.18.11) Only the rules acting on this collection — the
+          description: (2.19.0) Only the rules acting on this collection — the
             syncs writing to it and the triggers watching it
       responses:
         "200":
@@ -3926,7 +3926,7 @@ paths:
       tags: [ Automation ]
       summary: Run a sync or backup rule now
       operationId: runAutomationRule
-      description: (2.18.11) Runs a cron rule's sync or backup at once, through
+      description: (2.19.0) Runs a cron rule's sync or backup at once, through
         the code its schedule fires — logged in the automation log, announced
         on the jobs SSE stream, firing its webhook — and sets lastRun. A
         disabled rule runs too. The run goes on in the background; follow
@@ -12110,7 +12110,7 @@ components:
     AutomationRunResult:
       type: object
       readOnly: true
-      description: (2.18.11) What the latest run of a cron rule's sync or backup
+      description: (2.19.0) What the latest run of a cron rule's sync or backup
         did — the newest automation log entry of the rule. Set on listings,
         never stored; absent before the first run.
       properties:
@@ -12137,7 +12137,7 @@ components:
 
     AutomationRun:
       type: object
-      description: (2.18.11) A run POST /v1/automation/{id}/run started.
+      description: (2.19.0) A run POST /v1/automation/{id}/run started.
       properties:
         ruleId:
           type: string

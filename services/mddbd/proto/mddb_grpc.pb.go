@@ -277,10 +277,10 @@ type MDDBClient interface {
 	UpdateCurationRule(ctx context.Context, in *UpdateCurationRuleRequest, opts ...grpc.CallOption) (*CurationRuleProto, error)
 	// (v2.9.14+) Curation: remove a rule by id
 	DeleteCurationRule(ctx context.Context, in *DeleteCurationRuleRequest, opts ...grpc.CallOption) (*DeleteCurationRuleResponse, error)
-	// (v2.18.11+) Run a cron rule's sync or backup now, through the code its
+	// (v2.19.0+) Run a cron rule's sync or backup now, through the code its
 	// schedule fires; returns the run's job id (#377).
 	RunAutomation(ctx context.Context, in *RunAutomationRequest, opts ...grpc.CallOption) (*RunAutomationResponse, error)
-	// (v2.18.11+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
+	// (v2.19.0+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
 	// every collection in the caller's tenant; the rest need admin.
 	ListCorpusPacks(ctx context.Context, in *ListCorpusPacksRequest, opts ...grpc.CallOption) (*ListCorpusPacksResponse, error)
 	// The pack as a stream of chunks, or an https URL the server fetches
@@ -1350,10 +1350,10 @@ type MDDBServer interface {
 	UpdateCurationRule(context.Context, *UpdateCurationRuleRequest) (*CurationRuleProto, error)
 	// (v2.9.14+) Curation: remove a rule by id
 	DeleteCurationRule(context.Context, *DeleteCurationRuleRequest) (*DeleteCurationRuleResponse, error)
-	// (v2.18.11+) Run a cron rule's sync or backup now, through the code its
+	// (v2.19.0+) Run a cron rule's sync or backup now, through the code its
 	// schedule fires; returns the run's job id (#377).
 	RunAutomation(context.Context, *RunAutomationRequest) (*RunAutomationResponse, error)
-	// (v2.18.11+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
+	// (v2.19.0+, #378) Corpus packs (AGT-005), as /v1/corpus/*. Listing reads
 	// every collection in the caller's tenant; the rest need admin.
 	ListCorpusPacks(context.Context, *ListCorpusPacksRequest) (*ListCorpusPacksResponse, error)
 	// The pack as a stream of chunks, or an https URL the server fetches

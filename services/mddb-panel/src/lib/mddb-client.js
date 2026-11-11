@@ -895,7 +895,7 @@ class MDDBClient {
   async listAutomation(type, { collection } = {}) {
     const params = new URLSearchParams();
     if (type) params.set('type', type);
-    // 2.18.11: the syncs writing to and triggers watching one collection.
+    // 2.19.0: the syncs writing to and triggers watching one collection.
     if (collection) params.set('collection', collection);
     const query = params.toString();
     return this.request(`/automation${query ? `?${query}` : ''}`, { method: 'GET' });
@@ -943,7 +943,7 @@ class MDDBClient {
   }
 
   /**
-   * Run a cron rule's sync or backup now (2.18.11): resolves to the run,
+   * Run a cron rule's sync or backup now (2.19.0): resolves to the run,
    * { ruleId, action, status, jobId, startedAt }; a 409 while its previous
    * run is still going.
    */

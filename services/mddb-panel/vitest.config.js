@@ -53,9 +53,9 @@ const coverageFiles = [
   'src/components/QuotaUsage.jsx',
   'src/components/ServerEdgeCard.jsx',
   'src/components/ConfigPanel.jsx',
-  // 2.18.11: run a sync or backup now, and its last result (#377).
+  // 2.19.0: run a sync or backup now, and its last result (#377).
   'src/components/CronRunNow.jsx',
-  // 2.18.11: the panel reaches the 2.18.2–2.18.11 features it lacked —
+  // 2.19.0: the panel reaches the 2.18.2–2.19.0 features it lacked —
   // upload through the server's frontmatter parser, a collection's sources,
   // aliases, evaluation, storage, indexing status, async vector reindex,
   // code symbols and image documents.

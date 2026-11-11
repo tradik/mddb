@@ -1,7 +1,7 @@
 // Which files the upload dialog accepts and the key each one is stored under.
 //
 // Every file goes to POST /v1/upload. The server reads Markdown frontmatter
-// with the same parser as /v1/ingest, mddb-cli and the folder loader (2.18.11),
+// with the same parser as /v1/ingest, mddb-cli and the folder loader (2.19.0),
 // so `tags: [a, b]` and block lists arrive as lists. The panel used to parse
 // frontmatter itself and stored `tags: [a, b]` as ["[a", "b]"].
 

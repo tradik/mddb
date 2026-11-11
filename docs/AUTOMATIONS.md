@@ -836,7 +836,7 @@ action keeps the rule's `sync`. Over gRPC the block is
 `AutomationRuleProto.sync` (26, `SyncActionProto`); over MCP it is the
 `sync` argument of `create_automation` / `update_automation`.
 
-**Run now** (2.18.11). `POST /v1/automation/{id}/run` runs a cron rule's
+**Run now** (2.19.0). `POST /v1/automation/{id}/run` runs a cron rule's
 sync — or its backup — at once, through the code its schedule fires: the
 run is logged, announced on the jobs SSE stream and fires `source.synced`
 (a backup: `backup.failed` when it fails), and it sets `lastRun`. A
@@ -858,7 +858,7 @@ without a scheduler), over MCP `run_automation`, from the CLI
 `mddb-cli sync run <id>`. It needs what editing the rule needs: a global
 administrator.
 
-**The sources of a collection** (2.18.11). `GET /v1/automation?collection=docs`
+**The sources of a collection** (2.19.0). `GET /v1/automation?collection=docs`
 lists the rules acting on `docs` — the syncs writing to it and the triggers
 watching it — and every sync and backup in a listing carries `lastResult`,
 the newest automation log entry of the rule:
@@ -899,7 +899,7 @@ The MDDB Panel (React web UI) includes an **Automations** section under the Admi
 - **Toggle** enabled/disabled state per rule.
 - **View** cron metadata including `lastRun`, `nextRun`, and the human-readable schedule description.
 - **Choose a cron rule's action** (2.18.10): call a webhook, take a [scheduled backup](BACKUP.md) (local directory or S3, retention `keep`, collections) or [sync a source](#synced-sources) (sitemap, URL list or S3 prefix, `prune`, `maxDocuments`, max MiB per document). A stored S3 secret is never shown: leave the field blank to keep it.
-- **Run a sync or backup now** (2.18.11): the Run now button of a sync or backup rule starts it and shows the job id; the rule's row shows its last result (status, the sync's counts, the error).
+- **Run a sync or backup now** (2.19.0): the Run now button of a sync or backup rule starts it and shows the job id; the rule's row shows its last result (status, the sync's counts, the error).
 - **Read the log** (Logs tab): rule type, status, HTTP status, and per run what it did — the webhook URL, the backup's target and how many old backups retention removed, or a sync's added / updated / unchanged / deleted / failed counts.
 
 The Panel communicates with the same `/v1/automation` REST API documented above. No additional configuration is required.

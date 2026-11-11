@@ -19,7 +19,7 @@ its directory.
 | `services/python-extension/` | BSD-3-Clause | `services/python-extension/LICENSE` | the Python client extension |
 | `services/mddb-chat-widget/` | BSD-3-Clause | `services/mddb-chat-widget/LICENSE` | the embeddable chat widget |
 
-Releases up to and including 2.18.11 were published under the BSD 3-Clause
+Releases up to and including 2.18.10 were published under the BSD 3-Clause
 License and stay under it. The Business Source License applies from 2.19.0.
 
 ## What the Business Source License means for you

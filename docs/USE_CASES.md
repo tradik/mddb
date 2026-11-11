@@ -61,7 +61,7 @@ mddb-cli autoindex ./docs --collection api-docs --prune     # index; drop delete
 ```
 
 Each document's key is its path (`guides/auth.md`), and its metadata holds
-`path`, `extension`, `kind`, `size` and `modified`. Since 2.18.11 a Markdown
+`path`, `extension`, `kind`, `size` and `modified`. Since 2.19.0 a Markdown
 file's frontmatter becomes metadata too (`tags: a, b`, `tags: [a, b]` and a
 `- a` block list are all lists), read by the server as `/v1/upload` reads it,
 and the body is stored without the block; `--no-frontmatter` turns that off.
@@ -681,7 +681,7 @@ mddb-cli autoindex ./content --collection blog
 `load-md-folder.sh` keys each document by its file name; it is the choice for
 exports from static-site generators and WordPress. Both turn the frontmatter
 (`title`, `author`, `tags`...) into metadata the way `/v1/upload` does, lists
-included, and store the body without it (2.18.11+).
+included, and store the body without it (2.19.0+).
 
 **Coming from Elasticsearch.** With `MDDB_ES_COMPAT=true`, MDDB answers a
 subset of the Elasticsearch API under `/es`, so an indexing script or a client

@@ -627,7 +627,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   answered with JSON-RPC `-32601` — the list is not the authorisation.
 - Custom tools are never filtered: they are the operator's explicit choice.
 
-Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (97 since 2.18.11) take about
+Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (97 since 2.19.0) take about
 94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB
 (≈10 800 tokens), less than half.
 
@@ -765,14 +765,14 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 
 | Tool | Description |
 |------|-------------|
-| `list_automation` | List all automation rules (webhooks, triggers, crons). `type` filters by kind; `collection` (2.18.11) lists the rules acting on a collection — the sources syncing into it — each sync and backup with `lastResult`. |
+| `list_automation` | List all automation rules (webhooks, triggers, crons). `type` filters by kind; `collection` (2.19.0) lists the rules acting on a collection — the sources syncing into it — each sync and backup with `lastResult`. |
 | `create_automation` | Create a new automation rule (webhook target, search trigger, or cron schedule). |
 | `get_automation` | Get a specific automation rule by ID. |
 | `update_automation` | Update an existing automation rule. |
 | `delete_automation` | Delete an automation rule by ID. |
 | `test_automation` | Test a trigger rule by running its search and returning matches (dry run, no webhook fired). |
 | `get_automation_logs` | List automation execution logs with optional filtering by rule ID and status. |
-| `run_automation` | (2.18.11) Run a cron rule's sync or backup now, as its schedule would; returns the run's `jobId`. Fails while the previous run is still going. |
+| `run_automation` | (2.19.0) Run a cron rule's sync or backup now, as its schedule would; returns the run's `jobId`. Fails while the previous run is still going. |
 
 ### Webhooks
 
@@ -826,9 +826,9 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `export_documents` | Export documents from a collection in NDJSON format. |
 | `create_backup` | Create a backup of the MDDB database. |
 | `restore_backup` | Restore the MDDB database from a backup file. |
-| `corpus_list` | (v2.18.11) The corpus packs installed in the caller's tenant: collection, name, version, licence, document count, whether its vectors are disabled. Read-only. See [CORPUS-PACKS.md](CORPUS-PACKS.md). |
-| `corpus_install` | (v2.18.11, admin) Install a `.mddbpack` the server downloads from an `https://` URL (`url`, optional `sha256` of the pack file). The download goes through the SSRF guard, a redirect may not leave https, and it is capped at `MDDB_CORPUS_MAX_BYTES`. Refused with a conflict when the collection already holds data. |
-| `corpus_remove` | (v2.18.11, admin) Remove an installed pack by `name`: its collection, documents and indexes. Gated by `MDDB_MCP_CONFIRM_DESTRUCTIVE`, which asks for the pack's name to be typed. There is no `corpus_build` tool: a build's product is a file a tool answer cannot carry; build with `mddb-cli corpus build`, `POST /v1/corpus/build` or the `BuildCorpusPack` RPC. |
+| `corpus_list` | (v2.19.0) The corpus packs installed in the caller's tenant: collection, name, version, licence, document count, whether its vectors are disabled. Read-only. See [CORPUS-PACKS.md](CORPUS-PACKS.md). |
+| `corpus_install` | (v2.19.0, admin) Install a `.mddbpack` the server downloads from an `https://` URL (`url`, optional `sha256` of the pack file). The download goes through the SSRF guard, a redirect may not leave https, and it is capped at `MDDB_CORPUS_MAX_BYTES`. Refused with a conflict when the collection already holds data. |
+| `corpus_remove` | (v2.19.0, admin) Remove an installed pack by `name`: its collection, documents and indexes. Gated by `MDDB_MCP_CONFIRM_DESTRUCTIVE`, which asks for the pack's name to be typed. There is no `corpus_build` tool: a build's product is a file a tool answer cannot carry; build with `mddb-cli corpus build`, `POST /v1/corpus/build` or the `BuildCorpusPack` RPC. |
 | `update_document` | Partially update a document. Since v2.18.8 `expected_revision` makes it conditional: pass the `revision` from a previous read or write, and a concurrent change is reported instead of overwritten. Since v2.18.10 (GO-048) every MCP write, batch updates included, runs the same after-write step as REST and gRPC: embeddings, geo, full text, webhooks, SSE and triggers. An empty `content_md` empties the document: its content postings and vectors are removed, its meta fields stay searchable. A batch update reads an empty `content_md` as "leave it". |
 | `get_document_meta` | Get document metadata without content. |
 | `reference_search` | (v2.18.8) Search reference code — other projects indexed with `mddb-cli reference add` — hybrid, as passages. See [REFERENCE-CODING.md](REFERENCE-CODING.md). |
@@ -888,7 +888,7 @@ as a question. Nothing happens unless the answer is yes.
 
 **Gated tools** are the built-in tools annotated destructive and not
 idempotent: `delete_collection`, `delete_documents_batch`, `delete_where`,
-`truncate_revisions`, `restore_backup` and `corpus_remove` (v2.18.11). Deleting one named object
+`truncate_revisions`, `restore_backup` and `corpus_remove` (v2.19.0). Deleting one named object
 (`delete_document`, `delete_schema`, …) is not gated. The read-only mode check
 comes first: a read-only server refuses these tools without asking.
 

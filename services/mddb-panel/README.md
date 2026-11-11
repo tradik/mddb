@@ -31,8 +31,8 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - ⏳ **Indexing status & storage** (2.18.2+/2.18.8+) - On the System page: queued embedding work with auto-refresh (`/v1/indexing-status`), and bytes per collection, category and bucket measured on demand (`/v1/storage`)
 - 🔁 **Background vector reindex** (2.18.4+) - Reindex as a job with progress, time left and a recent-jobs table (`/v1/vector-reindex/jobs`)
 - 🖼️ **Image documents** (2.18.9+) - An image document shows its picture (`/v1/image`); upload can *Extract images* from PDFs and Markdown
-- 📥 **Upload** (2.18.11) - Every file goes to `/v1/upload`, so the server reads Markdown frontmatter (lists included); 24 formats accepted
-- 🛰️ **Collection sources** (2.18.11) - Collection settings list the syncs and triggers acting on the collection, with each one's last result and Run now
+- 📥 **Upload** (2.19.0) - Every file goes to `/v1/upload`, so the server reads Markdown frontmatter (lists included); 24 formats accepted
+- 🛰️ **Collection sources** (2.19.0) - Collection settings list the syncs and triggers acting on the collection, with each one's last result and Run now
 - 🔑 **Permission scope** (2.18.10+) - Admin badges say *global* (on `"*"`) or *this collection*; a 403 says which permission the request needed
 
 ## Screenshots

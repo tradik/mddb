@@ -132,7 +132,7 @@ mddb-cli autoindex [path] [-c collection] [--lang en] [--include glob]... [--exc
                    [--prune] [--dry-run]
 ```
 
-A Markdown file's frontmatter becomes metadata (v2.18.11+): the file is sent as
+A Markdown file's frontmatter becomes metadata (v2.19.0+): the file is sent as
 it is and the server reads the frontmatter once, with the parser `/v1/upload`
 uses, then stores the body without the block. `tags: a, b`, `tags: [a, b]` and
 a `- a` block list all become lists; the file meta below wins for a key both
@@ -172,7 +172,7 @@ mddb-cli add blog post1 en_US -f post.md \
 - `-m, --meta META` - Metadata (format: key=val1|val2,key2=val)
 - `--no-frontmatter` - Store the content as it is, frontmatter block included
 
-A frontmatter block at the top is read as `/v1/upload` reads it (v2.18.11+):
+A frontmatter block at the top is read as `/v1/upload` reads it (v2.19.0+):
 
 ```markdown
 ---
@@ -288,7 +288,7 @@ first), `--target local|s3`, `--path`, `--bucket`, `--prefix`, `--keep`,
 `--access-key`, `--secret-key` (default `$MDDB_BACKUP_SECRET_KEY`), `--tls`,
 `--disabled`. `remove` refuses an ID that is not a backup schedule.
 
-#### sync - Synced sources (v2.18.11+)
+#### sync - Synced sources (v2.19.0+)
 
 A synced source keeps a collection in step with a sitemap, a list of URLs
 or the objects under an S3 prefix, on a cron schedule. It is a cron

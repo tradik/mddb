@@ -167,7 +167,7 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `DeleteAutomation` | `DeleteAutomationRequest` → `DeleteAutomationResponse` |
 | | `TestAutomation` | `TestAutomationRequest` → `TestAutomationResponse` |
 | | `GetAutomationLogs` | `GetAutomationLogsRequest` → `GetAutomationLogsResponse` |
-| | `RunAutomation` | `RunAutomationRequest` → `RunAutomationResponse` (2.18.11: run a sync or backup rule now; `job_id`; `Aborted` while its previous run is going) |
+| | `RunAutomation` | `RunAutomationRequest` → `RunAutomationResponse` (2.19.0: run a sync or backup rule now; `job_id`; `Aborted` while its previous run is going) |
 | **Collection Config** | `GetCollectionConfig` | `GetCollectionConfigRequest` → `GetCollectionConfigResponse` |
 | | `SetCollectionConfig` | `SetCollectionConfigRequest` → `SetCollectionConfigResponse` |
 | | `ListCollectionConfigs` | `ListCollectionConfigsRequest` → `ListCollectionConfigsResponse` |
@@ -185,9 +185,9 @@ A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/f
 
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
 
-### New in v2.18.11
+### New in v2.19.0
 
-#### Corpus packs (v2.18.11)
+#### Corpus packs (v2.19.0)
 
 The corpus pack endpoints (`/v1/corpus/*`, AGT-005) over gRPC, calling the
 same server functions and gated with the same permissions:

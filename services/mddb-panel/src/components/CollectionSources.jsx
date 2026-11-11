@@ -22,7 +22,7 @@ function describeRule(rule) {
 
 /**
  * CollectionSources lists the syncs writing to and the triggers watching one
- * collection (2.18.11, `GET /v1/automation?collection=`), with each sync's or
+ * collection (2.19.0, `GET /v1/automation?collection=`), with each sync's or
  * backup's last result and a Run now button.
  */
 export default function CollectionSources({ collection }) {

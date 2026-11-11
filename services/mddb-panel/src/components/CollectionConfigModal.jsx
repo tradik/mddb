@@ -612,7 +612,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
               <CollectionAdvancedSettings value={advanced} onChange={setAdvanced} />
               <QuotaUsage quota={stored.quota} usage={usage} />
 
-              {/* 2.18.11: syncs writing to and triggers watching this collection */}
+              {/* 2.19.0: syncs writing to and triggers watching this collection */}
               <CollectionSources collection={collection} />
 
               {/* Response prompt (RAG-002, v2.12.0+) */}

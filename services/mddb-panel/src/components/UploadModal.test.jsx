@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// UploadModal (2.18.11): every file goes to /v1/upload, so the server reads
+// UploadModal (2.19.0): every file goes to /v1/upload, so the server reads
 // Markdown frontmatter (lists included); extractImages (2.18.9) is an option.
 import { describe, test, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';

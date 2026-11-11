@@ -61,7 +61,7 @@ ${CYAN}Examples:${NC}
   $0 ./docs blog -d
 
 ${CYAN}Frontmatter:${NC}
-  Each file is stored with mddb-cli add (2.18.11 or newer), which reads its
+  Each file is stored with mddb-cli add (2.19.0 or newer), which reads its
   frontmatter as meta: tags: a, b / tags: [a, b] / a "- a" block list all
   become lists. -m values win for a key both name.
 
@@ -98,7 +98,7 @@ generate_key() {
 # enough to do that, since an older one would store the block as text.
 check_cli_frontmatter() {
     if ! $CLI add --help 2>/dev/null | grep -q -- "--no-frontmatter"; then
-        echo -e "${RED}✗ $CLI does not read frontmatter (needs mddb-cli 2.18.11 or newer)${NC}"
+        echo -e "${RED}✗ $CLI does not read frontmatter (needs mddb-cli 2.19.0 or newer)${NC}"
         exit 1
     fi
 }
