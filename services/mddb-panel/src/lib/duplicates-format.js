@@ -1,8 +1,8 @@
 /**
  * Reading a /v1/find-duplicates answer: each mode answers in its own field
- * (exactGroups, similarGroups, minhashGroups — absent when empty), and a
- * group's documents carry `docId` ("collection|key|lang") and `key` but no
- * `lang`, so the language is taken from the id.
+ * (exactGroups, similarGroups, minhashGroups — absent when empty). A group's
+ * documents carry `docId` ("collection|key|lang"), `key` and, from server
+ * 2.19.0, `lang`; against an older server the language is taken from the id.
  */
 
 const GROUP_FIELDS = ['exactGroups', 'similarGroups', 'minhashGroups'];
@@ -15,6 +15,11 @@ export function duplicateGroups(result) {
 /** The language part of a document id ("blog|post|en" → "en"). */
 export function langOfDocId(docId) {
   return docId.slice(docId.lastIndexOf('|') + 1);
+}
+
+/** A group document's language: its `lang`, or the id's last part from a server before 2.19.0. */
+export function langOf(doc) {
+  return doc.lang || langOfDocId(doc.docId);
 }
 
 /** A similarity as a percentage with one decimal, or "" when absent. */

@@ -38,6 +38,7 @@ type DuplicateGroup struct {
 type DuplicateDocInfo struct {
 	DocID       string  `json:"docId"`
 	Key         string  `json:"key,omitempty"`
+	Lang        string  `json:"lang,omitempty"` // the document's language, so a caller need not parse docId
 	ContentHash string  `json:"contentHash,omitempty"`
 	ContentMD   string  `json:"contentMd,omitempty"`
 	Score       float32 `json:"score,omitempty"` // similarity to first doc in group
@@ -126,7 +127,7 @@ func (s *Server) handleFindDuplicates(w http.ResponseWriter, r *http.Request) {
 		req.Mode = "both"
 	}
 	if req.Mode != "exact" && req.Mode != "similar" && req.Mode != "minhash" && req.Mode != "both" {
-		bad(w, errors.New("mode must be 'exact', 'similar', or 'both'"))
+		bad(w, errors.New("mode must be 'exact', 'similar', 'minhash', or 'both'"))
 		return
 	}
 	if req.Threshold <= 0 {
@@ -454,15 +455,23 @@ func (s *Server) enrichDuplicateGroups(collection string, groups []DuplicateGrou
 	})
 
 	// Enrich group documents
-	for gi := range groups {
-		for di := range groups[gi].Documents {
-			docID := groups[gi].Documents[di].DocID
-			if d, found := docMap[docID]; found {
-				groups[gi].Documents[di].Key = d.Key
-				if includeContent {
-					groups[gi].Documents[di].ContentMD = d.ContentMD
-				}
-			}
+	for _, g := range groups {
+		for i := range g.Documents {
+			enrichDuplicateDoc(&g.Documents[i], docMap, includeContent)
 		}
+	}
+}
+
+// enrichDuplicateDoc fills one group document's key, language and, when asked,
+// content from the loaded documents; one that could not be loaded keeps its id.
+func enrichDuplicateDoc(info *DuplicateDocInfo, docMap map[string]*storage.Doc, includeContent bool) {
+	d, found := docMap[info.DocID]
+	if !found {
+		return
+	}
+	info.Key = d.Key
+	info.Lang = d.Lang
+	if includeContent {
+		info.ContentMD = d.ContentMD
 	}
 }

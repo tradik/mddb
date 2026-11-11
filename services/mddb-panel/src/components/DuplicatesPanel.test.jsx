@@ -4,7 +4,7 @@
 // and deleting one after a confirmation naming the collection and key.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react';
-import { duplicateGroups, langOfDocId, formatScore } from '../lib/duplicates-format';
+import { duplicateGroups, langOf, langOfDocId, formatScore } from '../lib/duplicates-format';
 
 vi.mock('../lib/mddb-client', () => ({ default: { findDuplicates: vi.fn(), getDocument: vi.fn(), deleteDocument: vi.fn() } }));
 
@@ -18,7 +18,7 @@ const answer = {
   totalDocuments: 5,
   totalEmbedded: 4,
   exactGroups: [{ groupId: 1, type: 'exact', score: 1, documents: [
-    { docId: 'kb|d1|en', key: 'd1', score: 1 }, { docId: 'kb|d2|pl', key: 'd2', score: 1 },
+    { docId: 'kb|d1|en', key: 'd1', score: 1 }, { docId: 'kb|d2|pl_pl', key: 'd2', lang: 'pl_PL', score: 1 },
   ] }],
   minhashGroups: [{ groupId: 1, type: 'minhash', documents: [{ docId: 'kb|a|b|en', key: 'a|b' }, { docId: 'kb|c|en', key: 'c', score: 0.867 }] }],
 };
@@ -40,6 +40,8 @@ describe('duplicates-format', () => {
     expect(duplicateGroups(null)).toEqual([]);
     expect(duplicateGroups({ similarGroups: [{ groupId: 2, type: 'similar', documents: [] }] })).toEqual([{ groupId: 2, type: 'similar', documents: [], id: 'similar-2' }]);
     expect(langOfDocId('kb|a|b|en_GB')).toBe('en_GB');
+    expect(langOf({ docId: 'kb|a|en_gb', lang: 'en_GB' })).toBe('en_GB');
+    expect(langOf({ docId: 'kb|a|en' })).toBe('en');
     expect(formatScore(0.98246)).toBe('98.2%');
     expect(formatScore(undefined)).toBe('');
   });
@@ -57,7 +59,7 @@ describe('DuplicatesPanel', () => {
     expect(screen.getByRole('status').textContent).toBe('Scanned 5 documents (4 with embeddings): 2 groups.');
     const exact = screen.getByRole('region', { name: 'Identical content, group 1' });
     expect(within(exact).getByText('average 100.0%')).toBeTruthy();
-    expect(within(exact).getByText('(pl)')).toBeTruthy();
+    expect(within(exact).getByText('(pl_PL)')).toBeTruthy();
     const minhash = screen.getByRole('region', { name: 'Overlapping text, group 1' });
     expect(within(minhash).getByText('86.7%')).toBeTruthy();
     expect(within(minhash).queryByText(/average/)).toBeNull();
@@ -84,13 +86,13 @@ describe('DuplicatesPanel', () => {
     expect(screen.getByRole('alert').textContent).toBe('API Error (400): similar mode needs an embedding provider');
   });
 
-  test('opens a document in the viewer with its language from the id', async () => {
-    mddbClient.getDocument.mockResolvedValueOnce({ key: 'd2', lang: 'pl', contentMd: '# x' }).mockRejectedValueOnce(apiError(404, 'not found'));
+  test('opens a document in the viewer with the language the server names', async () => {
+    mddbClient.getDocument.mockResolvedValueOnce({ key: 'd2', lang: 'pl_PL', contentMd: '# x' }).mockRejectedValueOnce(apiError(404, 'not found'));
     render(<DuplicatesPanel />);
     await scan();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open d2' })));
-    expect(mddbClient.getDocument).toHaveBeenCalledWith({ collection: 'kb', key: 'd2', lang: 'pl' });
-    expect(useStore.getState().currentDocument).toEqual({ key: 'd2', lang: 'pl', contentMd: '# x', collection: 'kb' });
+    expect(mddbClient.getDocument).toHaveBeenCalledWith({ collection: 'kb', key: 'd2', lang: 'pl_PL' });
+    expect(useStore.getState().currentDocument).toEqual({ key: 'd2', lang: 'pl_PL', contentMd: '# x', collection: 'kb' });
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Open d1' })));
     expect(screen.getByText('API Error (404): not found')).toBeTruthy();
   });

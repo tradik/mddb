@@ -7413,6 +7413,8 @@ paths:
         Scans a collection for duplicate and similar documents using content hashes and embedding vectors.
         Exact mode groups documents with identical content hashes. Similar mode compares embedding vectors
         pairwise and clusters documents above the similarity threshold using transitive clustering.
+        Minhash mode groups documents whose text overlaps (word shingles) and needs no embeddings;
+        its groups come back in `minhashGroups` with the pair count in `minhashPairs`.
       operationId: findDuplicates
       requestBody:
         required: true
@@ -14356,10 +14358,18 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DuplicateGroup"
+        minhashGroups:
+          type: array
+          description: Near-duplicates by text overlap; present only in `minhash` mode.
+          items:
+            $ref: "#/components/schemas/DuplicateGroup"
         exactDuplicates:
           type: integer
         similarPairs:
           type: integer
+        minhashPairs:
+          type: integer
+          description: Pairs inside the minhash groups (n*(n-1)/2 per group); present only in `minhash` mode.
         searchStats:
           $ref: "#/components/schemas/SearchStats"
     DuplicateGroup:
@@ -14384,6 +14394,9 @@ components:
           type: string
         key:
           type: string
+        lang:
+          type: string
+          description: The document's language (2.19.0+), so a caller need not parse it out of `docId`.
         contentHash:
           type: string
         contentMd:

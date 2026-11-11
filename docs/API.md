@@ -2964,7 +2964,7 @@ Alternative source modes (use one):
 
 ### POST /v1/find-duplicates
 
-Detect exact and similar documents in a collection using content hashing and vector embeddings.
+Detect exact, similar and near-duplicate documents in a collection using content hashing, vector embeddings and text overlap (MinHash).
 
 **Request Body**:
 ```json
@@ -2981,8 +2981,8 @@ Detect exact and similar documents in a collection using content hashing and vec
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `collection` | string | | **Required.** Collection name |
-| `mode` | string | `"both"` | `exact`, `similar`, or `both` |
-| `threshold` | number | `0.9` | Similarity threshold 0–1 |
+| `mode` | string | `"both"` | `exact`, `similar`, `minhash`, or `both` (`both` = exact + similar; it leaves out `minhash`, which reads every document body) |
+| `threshold` | number | `0.9` | Similarity threshold 0–1 (embedding similarity, or text overlap in `minhash` mode) |
 | `maxDocs` | integer | `5000` | Max documents to process |
 | `distanceMetric` | string | `"cosine"` | Distance metric |
 | `includeContent` | boolean | `false` | Include document content |
@@ -3001,13 +3001,47 @@ Detect exact and similar documents in a collection using content hashing and vec
       "groupId": 1,
       "type": "exact",
       "documents": [
-        { "docId": "blog|p1|en", "key": "p1", "contentHash": "abc123" },
-        { "docId": "blog|p2|en", "key": "p2", "contentHash": "abc123" }
+        { "docId": "blog|p1|en", "key": "p1", "lang": "en", "contentHash": "abc123" },
+        { "docId": "blog|p2|en", "key": "p2", "lang": "en", "contentHash": "abc123" }
       ]
     }
   ],
   "similarGroups": [],
   "exactDuplicates": 2,
+  "similarPairs": 0
+}
+```
+
+Every document in a group carries `key` and `lang` (2.19.0+), so a caller does not
+have to parse them out of `docId`.
+
+**`minhash` mode** compares the words themselves (word shingles, MinHash
+signatures) and needs no embedding provider: it finds a page that was forked and
+lightly edited, which `exact` misses and `similar` cannot tell apart from two
+independent pages on one subject. Its groups come back in `minhashGroups`
+(`type: "minhash"`), with the number of pairs in `minhashPairs`;
+`totalDocuments` is the number of documents scanned:
+
+```json
+{
+  "collection": "runbooks",
+  "mode": "minhash",
+  "threshold": 0.7,
+  "distanceMetric": "cosine",
+  "totalDocuments": 3,
+  "totalEmbedded": 0,
+  "minhashGroups": [
+    {
+      "groupId": 1,
+      "type": "minhash",
+      "documents": [
+        { "docId": "runbooks|restart-production|en", "key": "restart-production", "lang": "en", "score": 0.82 },
+        { "docId": "runbooks|restart-staging|en", "key": "restart-staging", "lang": "en", "score": 0.82 }
+      ]
+    }
+  ],
+  "minhashPairs": 1,
+  "exactDuplicates": 0,
   "similarPairs": 0
 }
 ```

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import mddbClient from '../lib/mddb-client';
 import { useStore } from '../lib/store';
 import { useAction } from '../lib/use-action';
-import { langOfDocId, formatScore } from '../lib/duplicates-format';
+import { langOf, formatScore } from '../lib/duplicates-format';
 import ApiErrorNotice from './ApiErrorNotice';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -20,12 +20,12 @@ export default function DuplicateGroups({ collection, groups, onDeleted }) {
   const { busy, error, run } = useAction();
 
   const open = (doc) => run(async () => {
-    const full = await mddbClient.getDocument({ collection, key: doc.key, lang: langOfDocId(doc.docId) });
+    const full = await mddbClient.getDocument({ collection, key: doc.key, lang: langOf(doc) });
     setCurrentDocument({ ...full, collection });
   });
 
   const remove = () => run(async () => {
-    await mddbClient.deleteDocument({ collection, key: deleting.key, lang: langOfDocId(deleting.docId) });
+    await mddbClient.deleteDocument({ collection, key: deleting.key, lang: langOf(deleting) });
     if (currentDocument?.key === deleting.key && currentDocument?.collection === collection) setCurrentDocument(null);
     onDeleted(deleting.docId);
     setDeleting(null);
@@ -43,7 +43,7 @@ export default function DuplicateGroups({ collection, groups, onDeleted }) {
           <ul className="divide-y divide-gray-100">
             {group.documents.map((doc) => (
               <li key={doc.docId} className="flex items-center gap-3 py-1.5 text-sm">
-                <span className="flex-1 font-mono text-gray-900 break-all">{doc.key} <span className="text-gray-700">({langOfDocId(doc.docId)})</span></span>
+                <span className="flex-1 font-mono text-gray-900 break-all">{doc.key} <span className="text-gray-700">({langOf(doc)})</span></span>
                 <span className="text-xs text-gray-700">{formatScore(doc.score)}</span>
                 <button type="button" onClick={() => open(doc)} className="text-blue-800 underline">
                   Open <span className="sr-only">{doc.key}</span>
@@ -59,7 +59,7 @@ export default function DuplicateGroups({ collection, groups, onDeleted }) {
       {deleting && (
         <ConfirmDialog
           title="Delete document"
-          message={<>Delete <strong>{deleting.key}</strong> ({langOfDocId(deleting.docId)}) from <strong>{collection}</strong>? This cannot be undone.</>}
+          message={<>Delete <strong>{deleting.key}</strong> ({langOf(deleting)}) from <strong>{collection}</strong>? This cannot be undone.</>}
           busy={busy}
           onConfirm={remove}
           onCancel={() => setDeleting(null)}
