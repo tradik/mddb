@@ -143,6 +143,7 @@ const coverageFiles = [
   'src/components/DocumentTools.jsx',
   'src/components/TtlControl.jsx',
   'src/components/ClassifyBox.jsx',
+  'src/components/CodeGraphCard.jsx',
 ];
 
 export default mergeConfig(

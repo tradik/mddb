@@ -5,6 +5,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({ default: { codeSymbol: vi.fn(), codeLanguages: vi.fn() } }));
+vi.mock('./CodeGraphCard', () => ({ default: ({ collection }) => <div>code graph for {collection}</div> }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
@@ -50,6 +51,7 @@ describe('CodeSymbolPanel', () => {
     render(<CodeSymbolPanel />);
     fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'docs' } });
     fireEvent.change(screen.getByLabelText('Collection'), { target: { value: 'repo' } });
+    expect(screen.getByText('code graph for repo')).toBeTruthy();
     fireEvent.click(screen.getByLabelText('Siblings'));
     fireEvent.click(screen.getByLabelText('Siblings'));
     fireEvent.click(screen.getByLabelText('References'));

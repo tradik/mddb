@@ -3,6 +3,7 @@ import { Code2, Search, X } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import { MAX_SYMBOL_LIMIT, RELATIONS, passageLocation } from '../lib/code-symbol';
+import CodeGraphCard from './CodeGraphCard';
 
 /** One relation: its passages, or a line saying there are none. */
 function RelationSection({ label, passages }) {
@@ -204,6 +205,7 @@ export default function CodeSymbolPanel() {
         </div>
       )}
       <LanguagesList />
+      <CodeGraphCard collection={collection} />
     </div>
   );
 }
