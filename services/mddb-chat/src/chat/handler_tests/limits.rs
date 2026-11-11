@@ -72,6 +72,32 @@ async fn the_token_budget_refuses_once_spent() {
     );
 }
 
+// #401: the server is up before mddbd is. A visitor is told to wait, and the
+// refused turn is neither recorded nor reported.
+#[tokio::test]
+async fn a_message_before_mddbd_is_reachable_is_refused_politely() {
+    let mut sink = crate::webhook::test_support::WebhookSink::start().await;
+    let server =
+        Harness::start_before_mddbd(ConfigToml::default().webhook(&sink.url, &["message"])).await;
+    let mut client = server.connect().await;
+    let id = server.join(&mut client, "Ada").await;
+
+    ask(&mut client, "anyone there?").await;
+
+    assert_eq!(
+        client.recv_json().await["message"],
+        "the knowledge base is not connected yet; try again shortly"
+    );
+    let turns = server
+        .state
+        .session_manager
+        .get_session(&id)
+        .expect("kept")
+        .user_turns;
+    assert_eq!(turns, 0, "a refused turn must not count");
+    sink.assert_silent().await;
+}
+
 #[tokio::test]
 async fn a_session_whose_scenario_is_gone_still_gets_an_answer() {
     // The config lost the scenario (an operator edit between restarts and a

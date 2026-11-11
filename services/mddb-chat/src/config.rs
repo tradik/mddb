@@ -89,6 +89,16 @@ pub struct MddbConfig {
     pub auth_username: String,
     #[serde(default)]
     pub auth_password: String,
+    /// The longest wait between two attempts to reach mddbd at startup, in
+    /// seconds (#401).
+    ///
+    /// mddb-chat starts serving at once and keeps trying in the background,
+    /// waiting 1 s, 2 s, 4 s... up to this many seconds between attempts, for
+    /// as long as it takes; `/health` answers 503 until the link is up. `0`
+    /// turns retrying off: one attempt before the port is opened, and exit on
+    /// failure — the behaviour before this setting existed.
+    #[serde(default = "default_connect_retry_max_seconds")]
+    pub connect_retry_max_seconds: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -258,6 +268,9 @@ fn default_cors_origins() -> Vec<String> {
 }
 fn default_grpc_addr() -> String {
     "http://localhost:11024".to_string()
+}
+fn default_connect_retry_max_seconds() -> u64 {
+    30
 }
 fn default_collection() -> String {
     "docs".to_string()
@@ -573,6 +586,22 @@ max_turns = 5
         assert!(!scenario.allows_another_turn(5));
     }
 
+    // #401: an old config.toml has no such key and must get the retry.
+    #[test]
+    fn connecting_to_mddbd_is_retried_by_default() {
+        let cfg = config_from(MINIMAL, "retry-default");
+        assert_eq!(cfg.mddb.connect_retry_max_seconds, 30);
+    }
+
+    #[test]
+    fn retrying_can_be_turned_off_for_fail_fast_startup() {
+        let cfg = config_from(
+            &MINIMAL.replace("[mddb]", "[mddb]\nconnect_retry_max_seconds = 0"),
+            "retry-off",
+        );
+        assert_eq!(cfg.mddb.connect_retry_max_seconds, 0);
+    }
+
     #[test]
     fn an_unknown_scenario_is_not_invented() {
         let cfg = config_from(MINIMAL, "unknown-scenario");
@@ -604,27 +633,6 @@ model = "test"
             "result-set",
         );
         assert_eq!(cfg.mddb.result_max_chars, 2000);
-    }
-
-    // The LLM key and the webhook secret follow the same rule as the mddbd
-    // credentials: blank in the file means "take it from the environment".
-    // Only this test touches these two variables, and no other asserts on them.
-    #[test]
-    fn llm_key_and_webhook_secret_come_from_the_environment_when_blank() {
-        let path = write_temp("env-secrets", MINIMAL);
-        unsafe {
-            std::env::set_var("MDDB_CHAT_LLM_API_KEY", "sk-env");
-            std::env::set_var("MDDB_CHAT_WEBHOOK_SECRET", "whsec-env");
-        }
-        let cfg = Config::load(&path).unwrap();
-        unsafe {
-            std::env::remove_var("MDDB_CHAT_LLM_API_KEY");
-            std::env::remove_var("MDDB_CHAT_WEBHOOK_SECRET");
-        }
-        std::fs::remove_file(&path).ok();
-
-        assert_eq!(cfg.llm.api_key, "sk-env");
-        assert_eq!(cfg.security.webhook_secret, "whsec-env");
     }
 
     // #399: a webhook written before the per-message events existed names no

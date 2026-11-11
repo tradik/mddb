@@ -15,6 +15,9 @@ pub enum AppError {
     /// The session has spent its token budget (RAG-005).
     TokenBudgetExceeded(u64),
     GrpcError(tonic::Status),
+    /// mddbd has not been reached yet (#401): the server is up, the
+    /// knowledge base behind it is not.
+    MddbUnavailable,
     LlmError(String),
     Internal(String),
 }
@@ -36,6 +39,10 @@ impl std::fmt::Display for AppError {
                 write!(f, "this conversation is limited to {max} turns")
             }
             AppError::GrpcError(s) => write!(f, "grpc error: {s}"),
+            AppError::MddbUnavailable => write!(
+                f,
+                "the knowledge base is not connected yet; try again shortly"
+            ),
             AppError::LlmError(msg) => write!(f, "llm error: {msg}"),
             AppError::Internal(msg) => write!(f, "internal error: {msg}"),
         }
@@ -60,6 +67,8 @@ impl IntoResponse for AppError {
             // busy, so there is nothing to retry.
             AppError::TokenBudgetExceeded(_) => (StatusCode::FORBIDDEN, self.to_string()),
             AppError::GrpcError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
+            // Waiting helps: the link comes up on its own.
+            AppError::MddbUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             AppError::LlmError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             AppError::Internal(_) => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
         };
@@ -94,6 +103,7 @@ mod tests {
             AppError::NameTooLong,
             AppError::TurnLimitReached(10),
             AppError::TokenBudgetExceeded(120_000),
+            AppError::MddbUnavailable,
             AppError::LlmError("upstream refused".into()),
             AppError::Internal("boom".into()),
         ];
@@ -137,6 +147,7 @@ mod tests {
             // Waiting helps.
             (AppError::RateLimited, StatusCode::TOO_MANY_REQUESTS),
             (AppError::SessionFull, StatusCode::SERVICE_UNAVAILABLE),
+            (AppError::MddbUnavailable, StatusCode::SERVICE_UNAVAILABLE),
             // Waiting does not: the scenario caps the conversation, so this is
             // a refusal rather than backpressure.
             (AppError::TurnLimitReached(5), StatusCode::FORBIDDEN),

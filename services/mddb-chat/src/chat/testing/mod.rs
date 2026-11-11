@@ -18,6 +18,7 @@ use axum::routing::get;
 use crate::chat::handler::handle_ws;
 use crate::config::Config;
 use crate::grpc::client::MddbClient;
+use crate::grpc::link::MddbLink;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
 use crate::security::sanitizer::Sanitizer;
@@ -98,16 +99,27 @@ pub struct Harness {
 
 impl Harness {
     pub async fn start(config: ConfigToml) -> Self {
-        crate::webhook::test_support::enable_logs();
         let mut config: Config = toml::from_str(&config.render()).expect("the test TOML parses");
         config.mddb.grpc_addr = format!("http://{}", unreachable_mddbd().await);
+        let client = MddbClient::connect(config.mddb.clone())
+            .await
+            .expect("the stand-in accepts the connection");
+        Self::start_with_link(config, MddbLink::connected(client)).await
+    }
 
+    /// A server whose mddbd has not been reached yet (#401): the link is
+    /// empty, as it is between startup and the first successful connect.
+    pub async fn start_before_mddbd(config: ConfigToml) -> Self {
+        let config: Config = toml::from_str(&config.render()).expect("the test TOML parses");
+        Self::start_with_link(config, MddbLink::default()).await
+    }
+
+    async fn start_with_link(config: Config, mddb: MddbLink) -> Self {
+        crate::webhook::test_support::enable_logs();
         let llm = Arc::new(ScriptedLlm::default());
         let state = Arc::new(AppState {
             session_manager: SessionManager::new(config.session.clone()),
-            mddb_client: MddbClient::connect(config.mddb.clone())
-                .await
-                .expect("the stand-in accepts the connection"),
+            mddb,
             llm_provider: llm.clone(),
             webhook_dispatcher: WebhookDispatcher::new(
                 config.webhooks.clone(),

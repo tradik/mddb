@@ -23,6 +23,10 @@ pub async fn handle_message(
 ) -> Result<(), AppError> {
     let content = state.sanitizer.sanitize_message(content)?;
 
+    // #401: the server answers before mddbd does. Checked before the message
+    // is recorded, so a turn refused for this does not count as one.
+    let mut mddb_client = state.mddb.client().await.ok_or(AppError::MddbUnavailable)?;
+
     let (scenario_name, history) = {
         let mut session = state
             .session_manager
@@ -79,7 +83,6 @@ pub async fn handle_message(
     // RAG-002: the collection states how answers drawn from it should be
     // formatted, and that instruction travels with the data rather than being
     // repeated in every client's TOML.
-    let mut mddb_client = state.mddb_client.clone();
     let collection_prompt = mddb_client.response_prompt(&collection).await;
     let system_prompt = scenario::compose_system_prompt(&operator_prompt, &collection_prompt);
 

@@ -25,6 +25,14 @@ result_max_chars = 800
 # these when blank. Never commit real passwords — config.toml is gitignored.
 auth_username = ""
 auth_password = ""
+# Startup when mddbd is not reachable yet (the normal order in Kubernetes).
+# mddb-chat opens its port at once and keeps trying to connect and log in,
+# waiting 1 s, 2 s, 4 s... up to this many seconds between attempts, for as
+# long as it takes. Until it succeeds /health answers 503 and chat messages
+# get "the knowledge base is not connected yet".
+#   0 = no retry: one attempt before the port opens, exit on failure
+#       (the behaviour before this setting existed).
+connect_retry_max_seconds = 30
 
 # LLM provider configuration
 # Supported providers:

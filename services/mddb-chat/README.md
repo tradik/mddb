@@ -15,7 +15,7 @@ directory.
 ```bash
 cargo build --release          # needs protoc; build.rs compiles ../../proto/mddb.proto
 cargo test                     # or: make test-chat from the repository root
-cargo run -- config.toml       # start with a config file (see below)
+cargo run                      # reads ./config.toml, or the file named by MDDB_CHAT_CONFIG
 ```
 
 Every change is expected to pass `cargo fmt --all`, `cargo clippy --all-targets
@@ -38,6 +38,7 @@ environment: `MDDB_CHAT_LLM_API_KEY`, `MDDB_CHAT_WEBHOOK_SECRET`,
 | `search_type` | unset | `"hybrid"`, `"vector"` or `"fts"`. Unset defers to the collection. |
 | `result_max_chars` | `800` | How much of each search result the model reads, in characters. A result that fits arrives whole, fenced code and inline code kept verbatim; a longer one is cut on a character boundary and ends with an ellipsis. `0` means the whole chunk. |
 | `auth_username`, `auth_password` | `""` | Credentials for `mddbd`; prefer the environment variables above. |
+| `connect_retry_max_seconds` | `30` | Longest wait between two attempts to reach `mddbd` at startup; see [Starting before mddbd](#starting-before-mddbd). `0` = one attempt, exit on failure. |
 
 ### `[scenarios.<name>]` — who the assistant is
 
@@ -51,6 +52,32 @@ environment: `MDDB_CHAT_LLM_API_KEY`, `MDDB_CHAT_WEBHOOK_SECRET`,
 
 The `[server]`, `[llm]`, `[session]`, `[security]` and `[[webhooks]]` tables
 are documented inline in `config.example.toml`.
+
+## Endpoints
+
+| Path | What it is |
+|------|------------|
+| `GET /ws` | The chat WebSocket (protocol below) |
+| `GET /health` | Readiness and session counts: `200` once mddbd is reached, `503` before |
+| `GET /config` | Scenarios and limits a client needs before joining |
+
+## Starting before mddbd
+
+Since 2.19.0 mddb-chat does not need mddbd to be up when it starts. It opens its port at
+once and connects (and logs in) in the background, waiting 1 s, 2 s, 4 s...
+between attempts, capped at `[mddb] connect_retry_max_seconds` (default `30`),
+for as long as it takes. Until then:
+
+- `GET /health` answers `503` with `"status": "starting"` and
+  `"mddb_connected": false` — point a Kubernetes **readiness** probe at it
+  (not a liveness probe, which would restart a pod that is merely waiting);
+- visitors can join, and a message gets the error
+  `the knowledge base is not connected yet; try again shortly`.
+
+Set `connect_retry_max_seconds = 0` for the behaviour before 2.19.0: one attempt before
+the port opens, and exit with `failed to connect to mddbd` if it fails.
+
+The process exits cleanly on `SIGTERM` and Ctrl-C.
 
 ## WebSocket protocol
 
@@ -228,8 +255,11 @@ src/
   chat/tools.rs      search_docs / get_document and the per-scenario policy
   chat/markdown.rs   result shaping: prose stripped, code kept, character-safe cuts
   chat/scenario.rs   prompt composition, per-scenario temperature and collection
+  app.rs             assembling the server: state, routes, maintenance, shutdown
   config.rs          config.toml schema and defaults
   grpc/client.rs     mddbd client (search, collection config)
+  grpc/link.rs       the connection to mddbd: retried in the background until up
+  routes/            /health (readiness), /config, /ws
   llm/               OpenAI-compatible and Anthropic providers
   session/           admission, queue, history, token budget
   security/          rate limiting, client IP, input sanitising
