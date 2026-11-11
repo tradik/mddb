@@ -70,6 +70,9 @@ type ChatToolCall struct {
 	Query      string   `json:"query,omitempty"`
 	ResultKeys []string `json:"resultKeys,omitempty"`
 	TopScore   float64  `json:"topScore,omitempty"`
+	// Server is the external MCP server of the tool (MCP-005); empty for a
+	// built-in tool.
+	Server string `json:"server,omitempty"`
 }
 
 // ChatTokens is the token usage of one assistant message.

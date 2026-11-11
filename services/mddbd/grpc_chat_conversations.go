@@ -183,7 +183,7 @@ func chatToolCallsToProto(calls []ChatToolCall) []*proto.ChatToolCallProto {
 	out := make([]*proto.ChatToolCallProto, 0, len(calls))
 	for _, tc := range calls {
 		out = append(out, &proto.ChatToolCallProto{Name: tc.Name, Collection: tc.Collection, DurationMs: tc.DurationMs,
-			Query: tc.Query, ResultKeys: tc.ResultKeys, TopScore: tc.TopScore})
+			Query: tc.Query, ResultKeys: tc.ResultKeys, TopScore: tc.TopScore, Server: tc.Server})
 	}
 	return out
 }
@@ -197,7 +197,7 @@ func chatMessageFromProto(m *proto.ChatMessageProto) ChatMessage {
 	}
 	for _, tc := range m.GetToolCalls() {
 		out.ToolCalls = append(out.ToolCalls, ChatToolCall{Name: tc.GetName(), Collection: tc.GetCollection(), DurationMs: tc.GetDurationMs(),
-			Query: tc.GetQuery(), ResultKeys: tc.GetResultKeys(), TopScore: tc.GetTopScore()})
+			Query: tc.GetQuery(), ResultKeys: tc.GetResultKeys(), TopScore: tc.GetTopScore(), Server: tc.GetServer()})
 	}
 	return out
 }

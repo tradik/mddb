@@ -76,6 +76,7 @@ func TestValidChatTurn(t *testing.T) {
 		"calls":           {Role: "assistant", ToolCalls: make([]ChatToolCall, chatMaxToolCallsPerMs+1)},
 		"query":           {Role: "assistant", ToolCalls: []ChatToolCall{{Name: "s", Query: long}}},
 		"keys":            {Role: "assistant", ToolCalls: []ChatToolCall{{Name: "s", ResultKeys: keys}}},
+		"server":          {Role: "assistant", ToolCalls: []ChatToolCall{{Name: "s", Server: strings.Repeat("s", chatMaxNameBytes+1)}}},
 	} {
 		if err := validChatTurn(3, &bad); !errors.Is(err, errChatInvalid) {
 			t.Errorf("%s: %v", name, err)

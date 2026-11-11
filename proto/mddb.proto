@@ -2715,6 +2715,7 @@ message ChatToolCallProto {
   string query = 4;                              // (#406) what the tool searched for
   repeated string result_keys = 5;               // (#406) the keys it found, best first
   double top_score = 6;                          // (#406) the best result's score
+  string server = 7;                             // (MCP-005) the external MCP server of the tool; empty for a built-in tool
 }
 
 // ChatFeedbackProto is a user's rating of one assistant message (#406).

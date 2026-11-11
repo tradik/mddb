@@ -180,11 +180,9 @@ pub fn user_message(content: &str) -> proto::ChatMessageProto {
     }
 }
 
-/// The final answer as stored: the tools called on the way (name and
-/// collection), the model that answered and what the turn cost.
-///
-/// MCP-005: the stored tool call has no field for a server, so an external
-/// tool is stored by name as `mcp:<server>/<tool>`, without a collection.
+/// The final answer as stored: the tools called on the way (name,
+/// collection and — for an external MCP tool — its server), the model that
+/// answered and what the turn cost.
 pub fn answer_message(
     text: &str,
     tools: &[ToolCallRecord],
@@ -194,15 +192,7 @@ pub fn answer_message(
     proto::ChatMessageProto {
         role: "assistant".to_string(),
         content: text.to_string(),
-        tool_calls: tools
-            .iter()
-            .map(|t| proto::ChatToolCallProto {
-                name: stored_tool_name(t),
-                collection: t.collection.clone(),
-                duration_ms: 0,
-                ..Default::default()
-            })
-            .collect(),
+        tool_calls: tools.iter().map(stored_tool_call).collect(),
         model: llm.model.clone(),
         provider: llm.provider.clone(),
         prompt_tokens: i64::try_from(spent.input).unwrap_or(i64::MAX),
@@ -211,12 +201,14 @@ pub fn answer_message(
     }
 }
 
-/// How a tool call is named in a stored conversation: as called for a
-/// built-in tool, `mcp:<server>/<tool>` for an external one (MCP-005).
-fn stored_tool_name(record: &ToolCallRecord) -> String {
-    match &record.server {
-        Some(server) => format!("mcp:{server}/{}", record.name),
-        None => record.name.clone(),
+/// A tool call as a stored conversation holds it: the tool's own name and,
+/// for an external MCP tool, its server (MCP-005, #406).
+pub fn stored_tool_call(record: &ToolCallRecord) -> proto::ChatToolCallProto {
+    proto::ChatToolCallProto {
+        name: record.name.clone(),
+        collection: record.collection.clone(),
+        server: record.server.clone().unwrap_or_default(),
+        ..Default::default()
     }
 }
 

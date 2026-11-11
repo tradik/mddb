@@ -20501,6 +20501,7 @@ type ChatToolCallProto struct {
 	Query         string                 `protobuf:"bytes,4,opt,name=query,proto3" json:"query,omitempty"`                             // (#406) what the tool searched for
 	ResultKeys    []string               `protobuf:"bytes,5,rep,name=result_keys,json=resultKeys,proto3" json:"result_keys,omitempty"` // (#406) the keys it found, best first
 	TopScore      float64                `protobuf:"fixed64,6,opt,name=top_score,json=topScore,proto3" json:"top_score,omitempty"`     // (#406) the best result's score
+	Server        string                 `protobuf:"bytes,7,opt,name=server,proto3" json:"server,omitempty"`                           // (MCP-005) the external MCP server of the tool; empty for a built-in tool
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -20575,6 +20576,13 @@ func (x *ChatToolCallProto) GetTopScore() float64 {
 		return x.TopScore
 	}
 	return 0
+}
+
+func (x *ChatToolCallProto) GetServer() string {
+	if x != nil {
+		return x.Server
+	}
+	return ""
 }
 
 // ChatFeedbackProto is a user's rating of one assistant message (#406).
@@ -24274,7 +24282,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\bis_error\x18\x05 \x01(\bR\aisError\x12\x1c\n" +
 	"\ttruncated\x18\x06 \x01(\bR\ttruncated\x12\x1f\n" +
 	"\vduration_ms\x18\a \x01(\x03R\n" +
-	"durationMs\"\xbc\x01\n" +
+	"durationMs\"\xd4\x01\n" +
 	"\x11ChatToolCallProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
@@ -24285,7 +24293,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05query\x18\x04 \x01(\tR\x05query\x12\x1f\n" +
 	"\vresult_keys\x18\x05 \x03(\tR\n" +
 	"resultKeys\x12\x1b\n" +
-	"\ttop_score\x18\x06 \x01(\x01R\btopScore\"U\n" +
+	"\ttop_score\x18\x06 \x01(\x01R\btopScore\x12\x16\n" +
+	"\x06server\x18\a \x01(\tR\x06server\"U\n" +
 	"\x11ChatFeedbackProto\x12\x16\n" +
 	"\x06rating\x18\x01 \x01(\tR\x06rating\x12\x18\n" +
 	"\acomment\x18\x02 \x01(\tR\acomment\x12\x0e\n" +

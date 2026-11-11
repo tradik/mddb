@@ -20,10 +20,12 @@ func TestGRPCChatLog(t *testing.T) {
 	added, err := g.AppendChatMessages(ctx, &proto.AppendChatMessagesRequest{Id: signed.ID, Sub: "user-1", Redact: true, Messages: []*proto.ChatMessageProto{
 		{Role: "user", Content: "mail a@b.io"},
 		{Id: "ans-g", Role: "assistant", Content: "ok", Outcome: ChatOutcomeAnswered, LatencyMs: 33,
-			ToolCalls: []*proto.ChatToolCallProto{{Name: "search_docs", Query: "q", ResultKeys: []string{"k1"}, TopScore: 0.5}}},
+			ToolCalls: []*proto.ChatToolCallProto{{Name: "search_docs", Query: "q", ResultKeys: []string{"k1"}, TopScore: 0.5},
+				{Name: "lookup", Server: "crm"}}},
 	}})
 	if err != nil || !added.GetRedact() || added.GetMessages()[0].GetContent() != "mail [redacted]" || added.GetMessages()[1].GetId() != "ans-g" ||
-		added.GetMessages()[1].GetLatencyMs() != 33 || added.GetMessages()[1].GetToolCalls()[0].GetTopScore() != 0.5 {
+		added.GetMessages()[1].GetLatencyMs() != 33 || added.GetMessages()[1].GetToolCalls()[0].GetTopScore() != 0.5 ||
+		added.GetMessages()[1].GetToolCalls()[1].GetServer() != "crm" {
 		t.Fatalf("append: %v %v", added, err)
 	}
 	rated, err := g.RateChatMessage(ctx, &proto.RateChatMessageRequest{Id: signed.ID, Sub: "user-1", MessageId: "ans-g", Rating: "up", Comment: "nice"})

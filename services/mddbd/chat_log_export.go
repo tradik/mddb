@@ -88,7 +88,11 @@ func chatLogCSVRow(t ChatLogTurn) []string {
 	tools := make([]string, 0, len(t.ToolCalls))
 	best := 0.0
 	for _, tc := range t.ToolCalls {
-		tools = append(tools, tc.Name+"("+tc.Query+") → "+strings.Join(tc.ResultKeys, " "))
+		name := tc.Name
+		if tc.Server != "" {
+			name = tc.Server + "/" + tc.Name // an external MCP tool (MCP-005)
+		}
+		tools = append(tools, name+"("+tc.Query+") → "+strings.Join(tc.ResultKeys, " "))
 		best = max(best, tc.TopScore)
 	}
 	row := []string{time.Unix(t.At, 0).UTC().Format(time.RFC3339), t.ConversationID, t.MessageID, t.Scenario, t.Sub,

@@ -102,12 +102,11 @@ pub fn tool_calls(tools: &[ToolCallRecord], runs: &[LoggedRun]) -> Vec<proto::Ch
         .iter()
         .zip(runs)
         .map(|(tool, run)| proto::ChatToolCallProto {
-            name: tool.name.clone(),
-            collection: tool.collection.clone(),
             duration_ms: i64::try_from(run.duration_ms).unwrap_or(i64::MAX),
             query: run.query.clone(),
             result_keys: run.result_keys.clone(),
             top_score: run.top_score,
+            ..conversation::stored_tool_call(tool)
         })
         .collect()
 }

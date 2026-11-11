@@ -217,8 +217,8 @@ never sees a secret and never contacts a server itself.
   reaches the model as one line with mddbd's reason; any other failure as
   `… is not available: the call failed.` The turn goes on either way.
 - **Reporting.** The `answer` webhook lists an external call as
-  `{"name": "<tool>", "server": "<server>"}`, without `collection`; a signed
-  user's stored conversation records it as `mcp:<server>/<tool>`.
+  `{"name": "<tool>", "server": "<server>"}`, without `collection`; a stored
+  conversation records it the same way, in `toolCalls[].server` (2.19.0).
 
 ## Extra LLM request fields
 

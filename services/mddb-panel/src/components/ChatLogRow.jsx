@@ -21,12 +21,12 @@ function ToolCalls({ calls }) {
   return (
     <table className="w-full text-left text-xs">
       <thead className="text-gray-700">
-        <tr><th scope="col">Tool</th><th scope="col">Collection</th><th scope="col">Query</th><th scope="col">Result keys</th><th scope="col">Top score</th><th scope="col">ms</th></tr>
+        <tr><th scope="col">Tool (server/tool when external)</th><th scope="col">Collection</th><th scope="col">Query</th><th scope="col">Result keys</th><th scope="col">Top score</th><th scope="col">ms</th></tr>
       </thead>
       <tbody className="text-gray-900">
         {calls.map((c, i) => (
           <tr key={i} className="border-t border-gray-200 align-top">
-            <td className="py-1 pr-2 font-mono">{c.name}</td>
+            <td className="py-1 pr-2 font-mono">{c.server ? `${c.server}/${c.name}` : c.name}</td>
             <td className="py-1 pr-2">{c.collection || '—'}</td>
             <td className="py-1 pr-2">{c.query || '—'}</td>
             <td className="py-1 pr-2 font-mono">{c.resultKeys?.length ? c.resultKeys.join(', ') : 'nothing found'}</td>

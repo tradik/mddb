@@ -25,7 +25,8 @@ func chatLogSeed(t *testing.T, s *Server) (signed, anon *ChatConversation) {
 	}
 	anon = chatLogged(t, s, "anon:sess-9", "support", true, chatTurnMsgs("How to back up?", "Use /v1/backup.", ChatOutcomeAnswered, 2000,
 		ChatToolCall{Name: "search_docs", Query: "backup", ResultKeys: []string{"backup", "restore"}, TopScore: 0.82})...)
-	chatLogged(t, s, "user-2", "sales", false, chatTurnMsgs("price?", "Free.", ChatOutcomeAnswered, 3000)...)
+	chatLogged(t, s, "user-2", "sales", false, chatTurnMsgs("price?", "Free.", ChatOutcomeAnswered, 3000,
+		ChatToolCall{Name: "lookup", Server: "crm", Query: "price", ResultKeys: []string{"p1"}, TopScore: 0.95})...)
 	return signed, anon
 }
 
@@ -83,6 +84,11 @@ func TestChatLogExportREST(t *testing.T) {
 	}
 	if anon := rows[1]; anon[4] != "" || anon[6] != "true" || anon[18] != "0.82" {
 		t.Errorf("anonymous row: %q", anon)
+	}
+	rec = chatREST(t, s, root, http.MethodGet, "/v1/chat/log/export?format=csv&scenario=sales", "")
+	rows, _ = csv.NewReader(strings.NewReader(rec.Body.String())).ReadAll()
+	if len(rows) != 2 || rows[1][17] != "crm/lookup(price) → p1" {
+		t.Errorf("an external MCP tool names its server: %q", rows)
 	}
 
 	rec = chatREST(t, s, root, http.MethodGet, "/v1/chat/log/export?rating=down", "")

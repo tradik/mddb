@@ -3787,6 +3787,7 @@ New, additive message fields — everything above keeps working unchanged:
 | `messages[].outcome` | Marks a **logged turn** (assistant messages only): `answered`, `noResults`, `refused` or `error`. An `answered` reply that is the scenario's redirect text (`offTopic.mode: redirect`) is stored as `refused`. A message with an outcome may have empty content (a failed turn) |
 | `messages[].latencyMs` | How long the turn took, 0 or more |
 | `messages[].toolCalls[].query`, `.resultKeys`, `.topScore` | What a tool searched for (at most 4096 bytes), the keys it found, best first (at most 50), and the best score |
+| `messages[].toolCalls[].server` | The external MCP server of the tool (MCP-005); absent for a built-in tool. `name` is the tool's own name |
 | `messages[].feedback` | `{"rating","comment"?,"at"}` — set only by the feedback call; a `feedback` sent in an append is dropped |
 | `redact` on an append | `true` redacts these messages before they are stored, and makes the conversation `redact: true`: every later message and feedback comment of it is redacted too ([chat.md](chat.md#conversation-log-and-feedback-2190)) |
 
@@ -3895,7 +3896,7 @@ commas, quotes or line breaks are quoted, quotes doubled) under the header
 `time, conversationId, messageId, scenario, sub, displayName, anonymous,
 question, answer, outcome, rating, comment, model, provider, latencyMs,
 promptTokens, completionTokens, tools, topScore` — `time` in RFC 3339 UTC,
-`tools` as `name(query) → key key; …`, `topScore` the best of the turn. A
+`tools` as `name(query) → key key; …` (`server/name` for an external MCP tool), `topScore` the best of the turn. A
 cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading apostrophe,
 so a spreadsheet does not run visitor text as a formula (CSV injection).
 

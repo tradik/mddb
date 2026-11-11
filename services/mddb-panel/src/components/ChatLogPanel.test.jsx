@@ -20,6 +20,7 @@ const signed = {
   toolCalls: [
     { name: 'search_docs', collection: 'docs', query: 'backup guide', resultKeys: [], durationMs: 40 },
     { name: 'get_document', query: 'backup', resultKeys: ['backup', 'restore'], topScore: 0.42 },
+    { name: 'get_order', server: 'orders', resultKeys: ['o-1'] },
   ],
 };
 const anon = { conversationId: 'c2', messageId: 'm2', scenario: 'support', anonymous: true, at: 1_800_000_100, question: '', answer: '', answerExcerpt: 'Hi', outcome: 'mystery' };
@@ -48,6 +49,7 @@ describe('turns', () => {
     expect(screen.getByText('nothing found')).toBeTruthy();
     expect(screen.getByText('backup, restore')).toBeTruthy();
     expect(screen.getByText('0.42')).toBeTruthy();
+    expect(screen.getByText('orders/get_order')).toBeTruthy(); // an external MCP tool names its server
 
     vi.mocked(mddbClient.chatLog).mockResolvedValue({ turns: [anon] });
     fireEvent.click(screen.getByRole('button', { name: 'Load more' }));

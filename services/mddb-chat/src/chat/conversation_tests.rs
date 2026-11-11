@@ -34,7 +34,7 @@ fn not_found_becomes_the_clients_error_and_the_rest_pass_through() {
 }
 
 #[test]
-fn an_external_tool_is_stored_with_its_server_in_the_name() {
+fn an_external_tool_is_stored_with_its_server() {
     let llm: crate::config::LlmConfig =
         toml::from_str("provider = \"openai\"\napi_url = \"http://localhost\"\nmodel = \"m\"")
             .expect("a minimal llm config parses");
@@ -53,13 +53,13 @@ fn an_external_tool_is_stored_with_its_server_in_the_name() {
 
     let stored = answer_message("a", &tools, &llm, TokenUsage::default());
 
-    let names: Vec<(&str, &str)> = stored
+    let names: Vec<(&str, &str, &str)> = stored
         .tool_calls
         .iter()
-        .map(|t| (t.name.as_str(), t.collection.as_str()))
+        .map(|t| (t.name.as_str(), t.collection.as_str(), t.server.as_str()))
         .collect();
     assert_eq!(
         names,
-        vec![("search_docs", "docs"), ("mcp:orders/get_order", "")]
+        vec![("search_docs", "docs", ""), ("get_order", "", "orders")]
     );
 }

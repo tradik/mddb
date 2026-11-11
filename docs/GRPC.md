@@ -368,7 +368,7 @@ Additive message fields: `ChatMessageProto` gains `outcome` (`answered`,
 `noResults`, `refused`, `error` — a logged turn), `latency_ms` and `feedback`
 (`ChatFeedbackProto`: `rating`, `comment`, `at`), and keeps an `id` the
 client sends when it matches `[A-Za-z0-9_-]{1,64}`; `ChatToolCallProto` gains
-`query`, `result_keys` and `top_score`; `AppendChatMessagesRequest` gains
+`query`, `result_keys`, `top_score` and `server` (the external MCP server of the tool, MCP-005); `AppendChatMessagesRequest` gains
 `redact` (sticky: the conversation's `redact` is set and every later write of
 it is redacted). `ChatScenarioProto` gains `logging` (`ChatLoggingProto`:
 `enabled`, `retention_days`, `optional bool redact` — unset means on).

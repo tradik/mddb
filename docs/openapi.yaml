@@ -9070,6 +9070,7 @@ components:
           description: The keys it found, best first (issue 406)
           items: {type: string}
         topScore: {type: number, description: The best result's score (issue 406)}
+        server: {type: string, maxLength: 256, description: The external MCP server of the tool (MCP-005); absent for a built-in tool}
     ChatFeedback:
       type: object
       description: A user's rating of one assistant message (issue 406)

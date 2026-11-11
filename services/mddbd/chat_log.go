@@ -105,6 +105,8 @@ func validChatTurn(i int, m *ChatMessage) error {
 			return chatInvalid("message %d: tool call %d: query is longer than %d bytes", i, j, chatMaxQueryBytes)
 		case len(tc.ResultKeys) > chatMaxResultKeys:
 			return chatInvalid("message %d: tool call %d: at most %d result keys", i, j, chatMaxResultKeys)
+		case len(tc.Server) > chatMaxNameBytes:
+			return chatInvalid("message %d: tool call %d: server is longer than %d bytes", i, j, chatMaxNameBytes)
 		}
 	}
 	return nil

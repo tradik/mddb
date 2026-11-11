@@ -71,7 +71,7 @@ fn tool_calls_pair_each_name_with_what_it_found() {
         ToolCallRecord {
             name: "get_document".into(),
             collection: "kb".into(),
-            server: None,
+            server: Some("crm".into()),
         },
     ];
     let calls = tool_calls(&tools, &[run("q", &["a", "b"], 0.7), run("k", &["k"], 0.9)]);
@@ -85,6 +85,10 @@ fn tool_calls_pair_each_name_with_what_it_found() {
         ("get_document", "kb", "k")
     );
     assert_eq!(calls[0].result_keys, vec!["a", "b"]);
+    assert_eq!(
+        (calls[0].server.as_str(), calls[1].server.as_str()),
+        ("", "crm")
+    );
     assert_eq!((calls[0].duration_ms, calls[0].top_score), (12, 0.7));
 }
 
