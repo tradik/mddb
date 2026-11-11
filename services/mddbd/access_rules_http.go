@@ -21,6 +21,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/compliance-status":  ruleAuthenticated,
 	"/v1/replication/status": ruleAuthenticated,
 	"/v1/fts-languages":      ruleAuthenticated,
+	"/v1/chat/scenarios":     ruleAuthenticated, // #403: the list is filtered to what the caller may read
 	"/v1/code-languages":     ruleAuthenticated,
 	"/v1/geo-encode":         ruleAuthenticated, // arithmetic on the request, no collection
 	"/v1/geo-decode":         ruleAuthenticated,
@@ -125,6 +126,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/curation":             ruleHandler, // a rule looked up by id
 	"/v1/aliases":              ruleHandler, // the alias's old and new collection
 	"/v1/aliases/":             ruleHandler,
+	"/v1/chat/scenarios/":      ruleHandler, // #403: admin to write, the scenario's collections to read
 	"/v1/events":               ruleHandler, // each event is filtered by permission
 	"/events":                  ruleHandler,
 	"/graphql":                 ruleHandler, // per field: graphqlAccessRules

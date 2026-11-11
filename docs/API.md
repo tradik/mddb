@@ -59,6 +59,7 @@ status: publish
   - [GET /v1/collection-config](#get-v1collection-config)
   - [GET /v1/collection-configs](#get-v1collection-configs)
   - [Corpus packs: /v1/corpus](#corpus-packs-v1corpus)
+  - [Chat scenarios: /v1/chat/scenarios](#chat-scenarios-v1chatscenarios)
   - [GET /v1/embedding-configs](#get-v1embedding-configs)
   - [GET/PUT/DELETE /v1/embedding-configs/:id](#getputdelete-v1embedding-configsid)
   - [POST /v1/embedding-configs/set-default](#post-v1embedding-configsset-default)
@@ -1766,6 +1767,90 @@ curl -X DELETE http://localhost:11023/v1/aliases/docs
 `mddb-cli reindex-swap <alias> --into <new>` does the whole switch. It
 copies the documents into the new collection, waits until it is indexed,
 then moves the alias. The old collection is kept, so you can roll back.
+
+### Chat scenarios: /v1/chat/scenarios
+
+A chat scenario is how one assistant behaves (v2.19.0, #403): its prompt,
+guardrails, the collections it may search, its style, LLM parameters and
+limits. Scenarios are stored in MDDB, edited in mddb-panel ("Chat" in the
+sidebar) and read by mddb-chat, so changing a word of a prompt no longer
+means editing a TOML file and restarting a service.
+
+| Method | Path | Answer |
+|---|---|---|
+| `GET` | `/v1/chat/scenarios` | `{"scenarios":[…],"version":N}` — the scenarios the caller may read |
+| `GET` | `/v1/chat/scenarios/version` | `{"version":N}` — the cheap poll |
+| `GET` | `/v1/chat/scenarios/{name}` | the scenario |
+| `PUT` | `/v1/chat/scenarios/{name}` | the stored scenario; `201` when created, `200` when replaced |
+| `DELETE` | `/v1/chat/scenarios/{name}` | `{"deleted":true,"version":N}` |
+| `GET` | `/v1/chat/scenarios/{name}/prompt` | `{"name","prompt","version"}` — the composed system prompt |
+
+```bash
+curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{
+  "description": "Support desk",
+  "enabled": true,
+  "operatorPrompt": "You are Ada, the support assistant of Example Ltd. Answer in the user\u0027s language.",
+  "guardrails": "No legal or medical advice. Never quote prices.",
+  "offTopic": {"mode": "redirect", "redirectTemplate": "I can only help with Example products."},
+  "allowedCollections": ["docs", "runbooks"],
+  "skills": ["triage"],
+  "style": {"emoji": "off", "verbosity": "short", "markdown": true,
+            "citationTemplate": "https://example.org/blob/main/{{key}}"},
+  "llm": {"model": "gpt-5-mini", "temperature": 0.2, "maxTokens": 800,
+          "extraBody": {"reasoning_effort": "low"}},
+  "maxTurns": 12,
+  "tokenBudgetPerSession": 50000,
+  "rateLimit": {"messagesPerMinute": 20}
+}'
+curl http://localhost:11023/v1/chat/scenarios/support/prompt
+curl http://localhost:11023/v1/chat/scenarios/version
+```
+
+| Field | Values | Default |
+|---|---|---|
+| `name` | 1–128 characters, no `\|`, `/` or spaces, not `version`; taken from the path | — |
+| `description`, `operatorPrompt`, `guardrails` | text, at most 16384 bytes each | empty |
+| `enabled` | boolean | `false` |
+| `offTopic.mode` | `refuse`, `redirect`, `brief` | `refuse` |
+| `offTopic.redirectTemplate` | the reply in `redirect` mode | a built-in sentence |
+| `allowedCollections` | existing collections or aliases, each once | none |
+| `skills` | up to 64 names; the skill store itself is a later release | none |
+| `style.emoji` | `off`, `sparingly`, `free` | `off` |
+| `style.verbosity` | `short`, `normal`, `long` | `normal` |
+| `style.markdown` | boolean | `false` |
+| `style.citationTemplate` | how a source is cited, e.g. a link template with `{{key}}` | none |
+| `llm.model`, `llm.maxTokens`, `llm.extraBody` | model name, token cap, an object sent to the model API as is | unset |
+| `llm.temperature` | 0 to 2; `0` is kept as 0, leaving it out means unset | unset |
+| `maxTurns`, `tokenBudgetPerSession`, `rateLimit.messagesPerMinute` | 0 or more; 0 means no limit from the scenario | 0 |
+| `createdAt`, `updatedAt` | set by the server | — |
+
+- **Create or replace.** `PUT` stores the whole body: a field left out is
+  reset to its default. Read the scenario first to change one field.
+- **Precedence.** As with retrieval profiles: an explicit per-request value
+  wins over the scenario, and the scenario wins over MDDB's default.
+- **Version counter.** One number for the whole store. It grows by one on
+  every create, replace and delete, is stored with the scenarios and keeps
+  growing across restarts. A consumer polls `/v1/chat/scenarios/version` and
+  reloads the list when the number changes.
+- **Composed prompt.** `/prompt` joins, in this order: the operator prompt,
+  the guardrails, the off-topic clause, the style clause, then the
+  `responsePrompt` of each allowed collection that has one
+  ([collection config](#get-v1collection-config)). Skills are stored by name
+  and are not expanded yet.
+- **Permissions.** Writing needs a global administrator. Reading a scenario
+  needs read permission on every collection it allows; the list leaves out
+  the scenarios the caller may not read, so a tenant sees only scenarios
+  over its own collections. `/version` needs any valid credential.
+- **Errors.** `400` for an invalid field or a collection that does not
+  exist, `403` without the permission or on a read-only server, `404` for an
+  unknown name.
+- **Storage and replication.** Scenarios are kept in the main database, so
+  backups carry them and the binlog replicates them.
+- **Other surfaces.** gRPC `ListChatScenarios`, `GetChatScenario`,
+  `PutChatScenario`, `DeleteChatScenario`, `GetChatScenarioPrompt`
+  ([GRPC.md](GRPC.md)) and the MCP tools `chat_scenario_list`,
+  `chat_scenario_get`, `chat_scenario_put`, `chat_scenario_delete`
+  ([MCP.md](MCP.md)) call the same code.
 
 ### GET /v1/gain
 

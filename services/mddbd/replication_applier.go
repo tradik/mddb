@@ -161,6 +161,10 @@ func (ra *ReplicationApplier) updateInMemoryState(entry *binlog.BinlogEntry) {
 		if ra.server.Aliases != nil {
 			_ = ra.server.Aliases.LoadAll()
 		}
+	case "chat_scenarios":
+		if ra.server.ChatScenarios != nil {
+			_ = ra.server.ChatScenarios.LoadAll()
+		}
 	case "colmeta":
 		// Reload all collection configs from DB
 		if ra.server.CollectionManager != nil {

@@ -162,6 +162,9 @@ tags:
     description: Document revision history and restore operations
   - name: Collection Config
     description: Per-collection type, description, icon, color, and custom metadata
+  - name: Chat
+    description: Chat scenarios — an assistant's prompt, guardrails, allowed
+      collections, style, LLM parameters and limits, stored in MDDB (v2.19.0+)
   - name: Cross-Collection Search
     description: Search across multiple collections using embeddings or text queries
   - name: Temporal Tracking
@@ -5749,6 +5752,162 @@ paths:
         "403":
           description: Forbidden, or read-only mode
 
+  /v1/chat/scenarios:
+    get:
+      tags:
+        - Chat
+      summary: List chat scenarios
+      description: |
+        The chat scenarios the caller may read (#403, v2.19.0), by name, with
+        the store's `version`. A scenario is readable when the caller has
+        read permission on every collection it allows, so a tenant never
+        sees a scenario over another tenant's collections.
+      operationId: listChatScenarios
+      responses:
+        "200":
+          description: The scenarios and the version counter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scenarios:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatScenario"
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+
+  /v1/chat/scenarios/version:
+    get:
+      tags:
+        - Chat
+      summary: The chat scenario version counter
+      description: |
+        One number that grows on every scenario create, update and delete,
+        and survives restarts. A consumer such as mddb-chat polls it and
+        reloads the scenarios when it changes.
+      operationId: getChatScenariosVersion
+      responses:
+        "200":
+          description: The version counter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+
+  /v1/chat/scenarios/{name}:
+    parameters:
+      - $ref: "#/components/parameters/ChatScenarioName"
+    get:
+      tags:
+        - Chat
+      summary: Get a chat scenario
+      description: Needs read permission on every collection the scenario allows.
+      operationId: getChatScenario
+      responses:
+        "200":
+          description: The scenario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatScenario"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatScenarioNotFound"}
+    put:
+      tags:
+        - Chat
+      summary: Create or replace a chat scenario
+      description: |
+        The body is the whole scenario; the path names it (a `name` in the
+        body is ignored). Empty choices take their defaults: `offTopic.mode`
+        refuse, `style.emoji` off, `style.verbosity` normal. Every name in
+        `allowedCollections` must be an existing collection or alias.
+        Requires a global administrator. Bumps the version counter.
+      operationId: putChatScenario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatScenario"
+      responses:
+        "200":
+          description: Replaced
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatScenario"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatScenario"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    delete:
+      tags:
+        - Chat
+      summary: Delete a chat scenario
+      description: Requires a global administrator. Bumps the version counter.
+      operationId: deleteChatScenario
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatScenarioNotFound"}
+
+  /v1/chat/scenarios/{name}/prompt:
+    parameters:
+      - $ref: "#/components/parameters/ChatScenarioName"
+    get:
+      tags:
+        - Chat
+      summary: The composed system prompt of a chat scenario
+      description: |
+        The prompt in the order it is sent: operator prompt, guardrails, the
+        off-topic clause, the style clause, then the `responsePrompt` of each
+        allowed collection that has one. Same permission as reading the
+        scenario.
+      operationId: getChatScenarioPrompt
+      responses:
+        "200":
+          description: The composed prompt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  prompt:
+                    type: string
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatScenarioNotFound"}
+
   /v1/documents:deleteWhere:
     post:
       tags: [Documents]
@@ -10746,6 +10905,106 @@ components:
         collection:
           type: string
 
+    ChatScenarioVersion:
+      type: integer
+      format: int64
+      minimum: 0
+      description: Grows by one on every scenario create, update and delete.
+
+    ChatScenario:
+      type: object
+      description: >
+        How a chat assistant behaves (#403). Precedence: an explicit
+        per-request value, then the scenario, then MDDB's default.
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          description: The key. No '|', '/' or spaces; not "version".
+        description:
+          type: string
+        enabled:
+          type: boolean
+        operatorPrompt:
+          type: string
+          description: Who the assistant is, its tone and language policy. At most 16384 bytes.
+        guardrails:
+          type: string
+          description: What it must not do or say.
+        offTopic:
+          type: object
+          properties:
+            mode:
+              type: string
+              enum: [refuse, redirect, brief]
+              default: refuse
+            redirectTemplate:
+              type: string
+              description: The reply in redirect mode; a default sentence when empty.
+        allowedCollections:
+          type: array
+          description: Existing collections or aliases the assistant may search.
+          items:
+            type: string
+        skills:
+          type: array
+          description: Names of reusable instruction blocks (the skill store is #404).
+          maxItems: 64
+          items:
+            type: string
+        style:
+          type: object
+          properties:
+            emoji:
+              type: string
+              enum: ["off", sparingly, free]
+              default: "off"
+            verbosity:
+              type: string
+              enum: [short, normal, long]
+              default: normal
+            markdown:
+              type: boolean
+            citationTemplate:
+              type: string
+              example: "https://example.org/blob/main/{{key}}"
+        llm:
+          type: object
+          properties:
+            model:
+              type: string
+            temperature:
+              type: number
+              minimum: 0
+              maximum: 2
+            maxTokens:
+              type: integer
+              minimum: 0
+            extraBody:
+              type: object
+              additionalProperties: true
+              description: Sent to the model API as is, e.g. reasoning_effort.
+        maxTurns:
+          type: integer
+          minimum: 0
+        tokenBudgetPerSession:
+          type: integer
+          minimum: 0
+        rateLimit:
+          type: object
+          properties:
+            messagesPerMinute:
+              type: integer
+              minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
     GainCounters:
       type: object
       properties:
@@ -13241,6 +13500,13 @@ components:
 
   # INT-019: shared parts of the /es paths.
   parameters:
+    ChatScenarioName:
+      name: name
+      in: path
+      required: true
+      description: The scenario's name.
+      schema:
+        type: string
     ESIndex:
       name: index
       in: path
@@ -13271,6 +13537,12 @@ components:
       content:
         application/json:
           schema: {$ref: "#/components/schemas/ESError"}
+    ChatScenarioNotFound:
+      description: No chat scenario of that name
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: chat scenario not found}
     # Refusals shared by many operations. Each matches what the server
     # writes; an operation with a narrower meaning documents it inline.
     BadRequest:

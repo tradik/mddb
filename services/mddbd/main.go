@@ -124,6 +124,7 @@ type Server struct {
 	Tracer             *tracing.Tracer          // OTLP trace export (OPS-024); nil = off
 	Gain               *GainRecorder            // AGT-004: tokens returned and avoided, per day
 	Aliases            *AliasManager            // GO-044: alias → collection
+	ChatScenarios      *ChatScenarioManager     // #403: chat scenarios and their version counter
 	AuthManager        *AuthManager             // Authentication and authorization
 	AuditManager       *audit.AuditManager      // Audit log (ISO 27001 A.8.15, SOC 2 CC7.2)
 	RateLimiter        *RateLimiter             // Cross-transport rate limiter (ISO 27001 A.5.30, SOC 2 CC6.6)
@@ -939,6 +940,11 @@ func (s *Server) initCollections(clock *startupClock) {
 	s.Aliases = NewAliasManager(s.DB)
 	s.Aliases.FollowDB(func() *bolt.DB { return s.DB }) // a restore swaps s.DB
 	mustStep("AliasManager.LoadAll", s.Aliases.LoadAll())
+
+	// #403: chat scenarios, stored beside the collections they name.
+	s.ChatScenarios = NewChatScenarioManager(s.DB)
+	s.ChatScenarios.FollowDB(func() *bolt.DB { return s.DB })
+	mustStep("ChatScenarioManager.LoadAll", s.ChatScenarios.LoadAll())
 }
 
 // initEncryption sets up at-rest encryption (ISO 27001 A.8.24 / SOC 2
@@ -1107,6 +1113,7 @@ func (s *Server) setBinlogEverywhere() {
 	}
 	s.CollectionManager.SetBinlog(s.Binlog)
 	s.Aliases.SetBinlog(s.Binlog)
+	s.ChatScenarios.SetBinlog(s.Binlog)
 	if s.TemporalManager != nil {
 		s.TemporalManager.SetBinlog(s.Binlog)
 	}
