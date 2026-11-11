@@ -258,6 +258,16 @@ service MDDB {
   rpc RemoveCorpusPack(RemoveCorpusPackRequest) returns (RemoveCorpusPackResponse);
   // The pack of a collection, streamed as tar.zst chunks.
   rpc BuildCorpusPack(BuildCorpusPackRequest) returns (stream CorpusPackChunk);
+  // (v2.19.0+, #403) Chat scenarios, as /v1/chat/scenarios. Reads need read
+  // permission on the collections a scenario allows; writes need admin.
+  rpc ListChatScenarios(ListChatScenariosRequest) returns (ListChatScenariosResponse);
+  rpc GetChatScenario(GetChatScenarioRequest) returns (ChatScenarioProto);
+  // Creates or replaces the scenario named in it; bumps the version counter.
+  rpc PutChatScenario(PutChatScenarioRequest) returns (PutChatScenarioResponse);
+  rpc DeleteChatScenario(DeleteChatScenarioRequest) returns (DeleteChatScenarioResponse);
+  // The composed system prompt: operator prompt, guardrails, off-topic and
+  // style clauses, then each allowed collection's responsePrompt.
+  rpc GetChatScenarioPrompt(GetChatScenarioPromptRequest) returns (GetChatScenarioPromptResponse);
 }
 
 // Document represents a markdown document
@@ -2279,4 +2289,89 @@ message CorpusPackChunk {
   bytes data = 1;
   string filename = 2;
   int64 doc_count = 3;
+}
+
+// ---- v2.19.0: chat scenarios (#403) ----
+
+message ChatOffTopicProto {
+  string mode = 1;                               // refuse | redirect | brief
+  string redirect_template = 2;
+}
+
+message ChatStyleProto {
+  string emoji = 1;                              // off | sparingly | free
+  string verbosity = 2;                          // short | normal | long
+  bool markdown = 3;
+  string citation_template = 4;
+}
+
+message ChatLLMProto {
+  string model = 1;
+  double temperature = 2;                        // read only when temperature_set
+  bool temperature_set = 3;                      // 0 is a meaningful temperature
+  int32 max_tokens = 4;
+  string extra_body_json = 5;                    // a JSON object sent to the model API as is
+}
+
+message ChatRateLimitProto {
+  int32 messages_per_minute = 1;
+}
+
+// ChatScenarioProto mirrors ChatScenario, the body of /v1/chat/scenarios/{name}.
+message ChatScenarioProto {
+  string name = 1;
+  string description = 2;
+  bool enabled = 3;
+  string operator_prompt = 4;
+  string guardrails = 5;
+  ChatOffTopicProto off_topic = 6;
+  repeated string allowed_collections = 7;       // existing collections or aliases
+  repeated string skills = 8;                    // names only
+  ChatStyleProto style = 9;
+  ChatLLMProto llm = 10;
+  int32 max_turns = 11;
+  int64 token_budget_per_session = 12;
+  ChatRateLimitProto rate_limit = 13;
+  int64 created_at = 14;                         // Unix seconds
+  int64 updated_at = 15;                         // Unix seconds
+}
+
+message ListChatScenariosRequest {}
+
+message ListChatScenariosResponse {
+  repeated ChatScenarioProto scenarios = 1;
+  uint64 version = 2;                            // grows on every create, update and delete
+}
+
+message GetChatScenarioRequest {
+  string name = 1;
+}
+
+message PutChatScenarioRequest {
+  ChatScenarioProto scenario = 1;
+}
+
+message PutChatScenarioResponse {
+  ChatScenarioProto scenario = 1;
+  bool created = 2;                              // false: an existing scenario was replaced
+  uint64 version = 3;
+}
+
+message DeleteChatScenarioRequest {
+  string name = 1;
+}
+
+message DeleteChatScenarioResponse {
+  bool deleted = 1;
+  uint64 version = 2;
+}
+
+message GetChatScenarioPromptRequest {
+  string name = 1;
+}
+
+message GetChatScenarioPromptResponse {
+  string name = 1;
+  string prompt = 2;
+  uint64 version = 3;
 }

@@ -90,6 +90,11 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/FTSLanguages": ruleAuthenticated,
 	"/mddb.MDDB/GeoEncode":    ruleAuthenticated,
 	"/mddb.MDDB/GeoDecode":    ruleAuthenticated,
+	// Chat scenarios (#403): the list is filtered to what the caller may
+	// read, and a read by name checks the scenario's collections itself.
+	"/mddb.MDDB/ListChatScenarios":     ruleAuthenticated,
+	"/mddb.MDDB/GetChatScenario":       ruleHandler,
+	"/mddb.MDDB/GetChatScenarioPrompt": ruleHandler,
 
 	// Global administration.
 	"/mddb.MDDB/Backup":            ruleAdmin,
@@ -109,6 +114,9 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/InstallCorpusPack": ruleAdmin,
 	"/mddb.MDDB/RemoveCorpusPack":  ruleAdmin,
 	"/mddb.MDDB/BuildCorpusPack":   ruleAdmin,
+	// Chat scenarios (#403), as PUT and DELETE /v1/chat/scenarios/{name}.
+	"/mddb.MDDB/PutChatScenario":    ruleAdmin,
+	"/mddb.MDDB/DeleteChatScenario": ruleAdmin,
 
 	// Replication authorizes itself: a replication secret, a verified mTLS
 	// certificate or an administrator (authorizeReplication, SEC-001).

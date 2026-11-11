@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (86 implemented)
+### Available RPCs (91 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -179,6 +179,11 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `InstallCorpusPack` | `stream InstallCorpusPackRequest` → `InstallCorpusPackResponse` |
 | | `RemoveCorpusPack` | `RemoveCorpusPackRequest` → `RemoveCorpusPackResponse` |
 | | `BuildCorpusPack` | `BuildCorpusPackRequest` → `stream CorpusPackChunk` |
+| **Chat Scenarios** | `ListChatScenarios` | `ListChatScenariosRequest` → `ListChatScenariosResponse` |
+| | `GetChatScenario` | `GetChatScenarioRequest` → `ChatScenarioProto` |
+| | `PutChatScenario` | `PutChatScenarioRequest` → `PutChatScenarioResponse` |
+| | `DeleteChatScenario` | `DeleteChatScenarioRequest` → `DeleteChatScenarioResponse` |
+| | `GetChatScenarioPrompt` | `GetChatScenarioPromptRequest` → `GetChatScenarioPromptResponse` |
 | **System** | `Stats` | `StatsRequest` → `StatsResponse` |
 
 A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/follower replication — see [Replication Service](#replication-service).
@@ -186,6 +191,36 @@ A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/f
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
 
 ### New in v2.19.0
+
+#### Chat scenarios (v2.19.0)
+
+The chat scenario endpoints (`/v1/chat/scenarios`, #403) over gRPC, calling
+the same server functions and gated with the same permissions:
+
+| RPC | Permission | |
+|---|---|---|
+| `ListChatScenarios` | any valid credential; filtered to what the caller may read | `scenarios` (`ChatScenarioProto`) and `version`, the counter that grows on every change |
+| `GetChatScenario` | read on every collection the scenario allows | `{name}` → `ChatScenarioProto` |
+| `PutChatScenario` | admin, writable server | `{scenario}` → `{scenario, created, version}`; creates or replaces the scenario named in it |
+| `DeleteChatScenario` | admin, writable server | `{name}` → `{deleted, version}` |
+| `GetChatScenarioPrompt` | as `GetChatScenario` | `{name}` → `{name, prompt, version}`: the composed system prompt |
+
+`ChatScenarioProto` mirrors the REST body: `off_topic` (`mode`,
+`redirect_template`), `style` (`emoji`, `verbosity`, `markdown`,
+`citation_template`), `llm` (`model`, `temperature` with `temperature_set`,
+because 0 is a meaningful temperature, `max_tokens`, and `extra_body_json`,
+a JSON object as a string), `rate_limit` (`messages_per_minute`), and
+`created_at` / `updated_at` in Unix seconds.
+
+Errors map as on REST: `INVALID_ARGUMENT` (400), `NOT_FOUND` (404),
+`PERMISSION_DENIED` (403), `UNAUTHENTICATED` (401).
+
+```bash
+grpcurl -plaintext localhost:11024 mddb.MDDB/ListChatScenarios
+grpcurl -plaintext -d '{"name":"support"}' localhost:11024 mddb.MDDB/GetChatScenarioPrompt
+```
+
+See [API.md](API.md#chat-scenarios-v1chatscenarios).
 
 #### Corpus packs (v2.19.0)
 
