@@ -230,6 +230,12 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolChatSkillPut(ctx, args)
 	case "chat_skill_delete":
 		return s.toolChatSkillDelete(ctx, args)
+	case "chat_mcp_secret_list":
+		return s.toolChatMcpSecretList(ctx, args)
+	case "chat_mcp_secret_put":
+		return s.toolChatMcpSecretPut(ctx, args)
+	case "chat_mcp_secret_delete":
+		return s.toolChatMcpSecretDelete(ctx, args)
 	case "chat_conversation_list":
 		return s.toolChatConversationList(ctx, args)
 	case "chat_conversation_get":

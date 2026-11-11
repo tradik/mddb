@@ -144,6 +144,11 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"chat_skill_put":    writeIdempotent(), // the same call twice stores one version
 	"chat_skill_delete": destructive(),     // MCP-004 asks for the skill's name
 
+	// --- Chat MCP secrets (MCP-005): values are write-only ---
+	"chat_mcp_secret_list":   readOnly(),
+	"chat_mcp_secret_put":    writeIdempotent(), // a replace: the same call twice stores the same secret
+	"chat_mcp_secret_delete": destructive(),     // MCP-004 asks for the secret's name
+
 	// --- Chat conversations (#405): read-only, the host writes over REST/gRPC ---
 	"chat_conversation_list": readOnly(),
 	"chat_conversation_get":  readOnly(),

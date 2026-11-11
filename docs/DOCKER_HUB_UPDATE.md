@@ -37,7 +37,7 @@ Go to: https://hub.docker.com/r/tradik/mddb
 2. Find **"Short Description"** field (100 characters at most)
 3. Copy from `docs/DOCKER_HUB_SHORT.txt`, the one-liner from LISTING.md:
    ```
-   Embedded knowledge base with 109 MCP tools, hybrid BM25+vector search and RAG. One Go binary.
+   Embedded knowledge base with 112 MCP tools, hybrid BM25+vector search and RAG. One Go binary.
    ```
 4. Paste and save
 

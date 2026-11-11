@@ -154,6 +154,8 @@ var mcpConfirmTypedArg = map[string]struct{ arg, title string }{
 	// #403: an assistant loses its prompt, guardrails and limits.
 	"chat_scenario_delete": {"name", "Scenario name"},
 	"chat_skill_delete":    {"name", "Skill name"}, // #404: its versions go with it
+	// MCP-005: the servers using it lose their credential.
+	"chat_mcp_secret_delete": {"name", "Secret name"},
 }
 
 // newMCPConfirmRequest builds the question for one call. Every gated tool is

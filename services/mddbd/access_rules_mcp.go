@@ -133,15 +133,19 @@ var mcpToolAccessRules = map[string]accessRule{
 	"chat_skill_get":       ruleAdmin,
 	"chat_skill_put":       ruleAdmin,
 	"chat_skill_delete":    ruleAdmin,
-	"list_webhooks":        ruleAdmin,
-	"list_automation":      ruleAdmin,
-	"create_automation":    ruleAdmin,
-	"get_automation":       ruleAdmin,
-	"update_automation":    ruleAdmin,
-	"delete_automation":    ruleAdmin,
-	"test_automation":      ruleAdmin,
-	"get_automation_logs":  ruleAdmin,
-	"run_automation":       ruleAdmin,
+	// MCP-005: credentials of external MCP servers, names only in a listing.
+	"chat_mcp_secret_list":   ruleAdmin,
+	"chat_mcp_secret_put":    ruleAdmin,
+	"chat_mcp_secret_delete": ruleAdmin,
+	"list_webhooks":          ruleAdmin,
+	"list_automation":        ruleAdmin,
+	"create_automation":      ruleAdmin,
+	"get_automation":         ruleAdmin,
+	"update_automation":      ruleAdmin,
+	"delete_automation":      ruleAdmin,
+	"test_automation":        ruleAdmin,
+	"get_automation_logs":    ruleAdmin,
+	"run_automation":         ruleAdmin,
 }
 
 // referenceRule reads the named collections, or every reference collection.

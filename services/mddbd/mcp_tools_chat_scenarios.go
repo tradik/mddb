@@ -46,6 +46,8 @@ var chatScenarioSchema = map[string]interface{}{
 		"rateLimit": map[string]interface{}{"type": "object", "properties": map[string]interface{}{
 			"messagesPerMinute": map[string]interface{}{"type": "integer"},
 		}},
+		"mcpServers": map[string]interface{}{"type": "array", "items": chatMcpServerSchema,
+			"description": "External MCP servers whose read-only tools the assistant may call (MCP-005); each allowed tool is checked against the server when saved"},
 	},
 }
 
@@ -113,6 +115,9 @@ func (s *MCPToolServer) toolChatScenarioGet(ctx context.Context, args map[string
 	}
 	if len(p.MissingSkills) > 0 {
 		out["missingSkills"] = p.MissingSkills
+	}
+	if len(p.McpServers) > 0 {
+		out["mcpServers"] = p.McpServers
 	}
 	data, _ := json.MarshalIndent(out, "", "  ")
 	return string(data), nil

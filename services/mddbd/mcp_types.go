@@ -1081,6 +1081,10 @@ type MCPClient interface {
 	ChatSkillGet(ctx context.Context, name string, version int) (*chatSkillView, error)
 	ChatSkillPut(ctx context.Context, sk *ChatSkill) (*chatSkillView, bool, error)
 	ChatSkillDelete(ctx context.Context, name string) error
+	// Chat MCP secrets (MCP-005): admin only, values write-only.
+	ChatMcpSecretList(ctx context.Context) ([]*chatMcpSecretView, error)
+	ChatMcpSecretPut(ctx context.Context, name, header, value string) (bool, error)
+	ChatMcpSecretDelete(ctx context.Context, name string) error
 	// Chat conversations (#405): read-only here, the host writes over REST/gRPC.
 	ChatConversationList(ctx context.Context, sub, scenario string, limit int, cursor string) (*ChatListResponse, error)
 	ChatConversationGet(ctx context.Context, id, sub string, limit int) (*ChatConversation, error)
