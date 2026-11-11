@@ -166,6 +166,10 @@ tags:
     description: Document revision history and restore operations
   - name: Collection Config
     description: Per-collection type, description, icon, color, and custom metadata
+  - name: Features
+    description: Module switches (v2.19.0+, GO-049) — optional modules such as
+      chat, geo or temporal an administrator turns on and off; a disabled
+      module's routes answer 404
   - name: Chat
     description: Chat scenarios — an assistant's prompt, guardrails, allowed
       collections, style, LLM parameters and limits, stored in MDDB (v2.19.0+)
@@ -5756,6 +5760,93 @@ paths:
         "403":
           description: Forbidden, or read-only mode
 
+  /v1/features:
+    get:
+      tags:
+        - Features
+      summary: List the module switches
+      description: |
+        The server's optional modules (v2.19.0, GO-049) with whether each
+        works now (`enabled`), its switch (`configured`), its default, the
+        modules it requires, `lockedBy` when MDDB_FEATURES_FORCE_OFF forces
+        it off, `blockedBy` for required modules that are off, and the
+        store's `version`. A disabled module's routes answer 404
+        `{"error":"feature disabled","feature":"<name>"}`.
+      operationId: listFeatures
+      responses:
+        "200":
+          description: Every module and the version counter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  features:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Feature"
+                  version:
+                    type: integer
+                    format: int64
+                    description: Grows on every switch
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "429": {$ref: "#/components/responses/RateLimited"}
+
+  /v1/features/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        description: The module, e.g. geo
+        schema:
+          type: string
+    put:
+      tags:
+        - Features
+      summary: Switch a module on or off
+      description: |
+        Requires a global administrator and a writable server. The module's
+        data stays; switching it back on restores it. Bumps the version.
+      operationId: setFeature
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        "200":
+          description: The module's new state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  feature:
+                    $ref: "#/components/schemas/Feature"
+                  version:
+                    type: integer
+                    format: int64
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404":
+          description: No such module
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureError"
+        "409":
+          description: Forced off by MDDB_FEATURES_FORCE_OFF; cannot be switched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeatureError"
+
   /v1/chat/scenarios:
     get:
       tags:
@@ -8373,6 +8464,50 @@ paths:
 
 components:
   schemas:
+    Feature:
+      type: object
+      description: One switchable module (v2.19.0, GO-049).
+      properties:
+        name:
+          type: string
+          enum: [chat, chatExternalMcp, geo, temporal, spell, curation, automation, memory, codeIntel, eval, corpus, classify, duplicates, images]
+        description:
+          type: string
+        enabled:
+          type: boolean
+          description: Works now — switched on, not forced off, every required module on
+        configured:
+          type: boolean
+          description: The switch — what an administrator set, or the default
+        default:
+          type: boolean
+        requires:
+          type: array
+          items:
+            type: string
+        lockedBy:
+          type: string
+          description: MDDB_FEATURES_FORCE_OFF when the operator forced the module off
+        blockedBy:
+          type: array
+          items:
+            type: string
+          description: Required modules that are off
+        updatedAt:
+          type: string
+          format: date-time
+        updatedBy:
+          type: string
+    FeatureError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: feature locked
+        feature:
+          type: string
+        lockedBy:
+          type: string
     # #405: persistent per-user chat conversations.
     ChatToolCall:
       type: object

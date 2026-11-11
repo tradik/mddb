@@ -254,7 +254,7 @@ which is why the DNS name was chosen first.
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 107 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 109 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 | `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 
@@ -615,7 +615,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
 | `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*` |
 | `memory` | `memory_*` |
 | `schema` | `set_schema`, `get_schema`, `delete_schema`, `list_schemas`, `validate_document` |
-| `admin` | stats, reindexing, backups, collection deletion and configs, synonyms, stopwords, curation rules, corpus packs (`corpus_list`, `corpus_install`, `corpus_remove`), chat conversations, read-only (`chat_conversation_list`, `chat_conversation_get`), chat scenarios (`chat_scenario_list`, `chat_scenario_get`, `chat_scenario_put`, `chat_scenario_delete`), chat skills (`chat_skill_list`, `chat_skill_get`, `chat_skill_put`, `chat_skill_delete`) |
+| `admin` | stats, reindexing, backups, collection deletion and configs, synonyms, stopwords, curation rules, corpus packs (`corpus_list`, `corpus_install`, `corpus_remove`), chat conversations, read-only (`chat_conversation_list`, `chat_conversation_get`), chat scenarios (`chat_scenario_list`, `chat_scenario_get`, `chat_scenario_put`, `chat_scenario_delete`), chat skills (`chat_skill_list`, `chat_skill_get`, `chat_skill_put`, `chat_skill_delete`), module switches (`feature_list`, `feature_set`) |
 | `geo`, `automation`, `webhooks`, `wordpress` | the tools of that area |
 
 - **Server:** `MDDB_MCP_TOOLSETS=search,code` (default `all`).
@@ -627,7 +627,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   answered with JSON-RPC `-32601` — the list is not the authorisation.
 - Custom tools are never filtered: they are the operator's explicit choice.
 
-Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (107 since 2.19.0) take about
+Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (109 since 2.19.0) take about
 94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB
 (≈10 800 tokens), less than half.
 
@@ -671,7 +671,7 @@ stored when a write asks for them: `extract_images` on `upload_file` and
 
 ## Built-in Tool Catalog
 
-All 107 built-in tools, grouped by area. Tool inputs are self-describing via
+All 109 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -833,6 +833,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `chat_scenario_get` | (v2.19.0) One scenario by `name`, with its composed system prompt (`prompt`), its size (`bytes`, `approxTokens`), a `warning` past 75% of `MDDB_CHAT_PROMPT_MAX_BYTES`, and `missingSkills`: skills the scenario names that are not stored. Needs read permission on every collection the scenario allows. Read-only. |
 | `chat_scenario_put` | (v2.19.0, admin) Create a scenario or replace it whole: `name` and `scenario`, the body of `PUT /v1/chat/scenarios/{name}`. A field left out is reset to its default; every allowed collection must exist. |
 | `chat_scenario_delete` | (v2.19.0, admin) Delete a scenario by `name`. Gated by `MDDB_MCP_CONFIRM_DESTRUCTIVE`, which asks for the scenario's name to be typed. |
+| `feature_list` | (v2.19.0, GO-049) The server's optional modules — chat, geo, temporal, spell, curation, automation, memory, codeIntel, eval, corpus, classify, duplicates, images, chatExternalMcp — with `enabled` (works now), `configured`, `default`, `requires`, `lockedBy` (`MDDB_FEATURES_FORCE_OFF`), `blockedBy` and the store's `version`. Read-only. See [API.md](API.md#features-v1features). |
+| `feature_set` | (v2.19.0, GO-049, admin) Switch a module on or off: `name`, `enabled`. The data stays. A module locked by `MDDB_FEATURES_FORCE_OFF` is refused. The tools of a disabled module leave `tools/list` and their calls are refused. |
 | `chat_skill_list` | (v2.19.0, #404, admin) The chat skills — reusable `SKILL.md` instruction blocks that scenarios attach by name — with description, `version`, `bytes`, `source` and `usedBy`, without contents, and the scenarios' `version` counter. Admin only, as every skill tool: a skill's text is part of system prompts. Read-only. See [API.md](API.md#chat-skills-v1chatskills). |
 | `chat_skill_get` | (v2.19.0, #404, admin) One skill by `name` with its `content` and the list of its kept earlier versions (the last 10); `version` reads one of those. Read-only. |
 | `chat_skill_put` | (v2.19.0, #404, admin) Create a skill or store a new version: `name`, `content` (the instructions, or a whole `SKILL.md` whose front matter gives the description), optional `description` and `source` (`url`, `commit`, `fetchedAt`). A put that changes nothing stores nothing. There is no import tool: importing from a URL is a preview an operator reads in the panel, over REST or gRPC. |

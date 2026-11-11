@@ -13,7 +13,7 @@ status: publish
 
 **The fastest markdown database with gRPC and HTTP/3 support**
 
-AI-native embedded knowledge base with a built-in MCP server (107 tools), hybrid BM25+vector search and RAG. Single ~32 MB Go binary, zero config. In production behind daemonports.org (about 120,000 pages).
+AI-native embedded knowledge base with a built-in MCP server (109 tools), hybrid BM25+vector search and RAG. Single ~32 MB Go binary, zero config. In production behind daemonports.org (about 120,000 pages).
 
 Markdown documents with rich metadata, full revision history, and dual protocol support (HTTP/JSON + gRPC/Protobuf). The MCP server is in the image: `docker run -i --rm --network host -v mddb-data:/app/data -e MDDB_MCP_STDIO=true tradik/mddb:latest` is the whole client configuration, and the image is listed in the [MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers/com.tradik%2Fmddb/versions/latest) as `com.tradik/mddb`.
 

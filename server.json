@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.tradik/mddb",
   "title": "MDDB",
-  "description": "Embedded knowledge base with 107 MCP tools, hybrid BM25+vector search and RAG. One Go binary.",
+  "description": "Embedded knowledge base with 109 MCP tools, hybrid BM25+vector search and RAG. One Go binary.",
   "repository": {
     "url": "https://github.com/tradik/mddb",
     "source": "github"

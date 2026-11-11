@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (106 implemented)
+### Available RPCs (108 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -229,6 +229,26 @@ grpcurl -plaintext -d '{"name":"support"}' localhost:11024 mddb.MDDB/GetChatScen
 ```
 
 See [API.md](API.md#chat-scenarios-v1chatscenarios).
+
+#### Features (v2.19.0)
+
+The module switches (`/v1/features`, GO-049) over gRPC.
+
+| RPC | Permission | |
+|---|---|---|
+| `ListFeatures` | authenticated | `features` (`FeatureProto`: `name`, `description`, `enabled`, `configured`, `default_enabled`, `requires`, `locked_by`, `blocked_by`, `updated_at` in Unix seconds, `updated_by`) and `version` |
+| `SetFeature` | admin, writable server | `{name, enabled}` → `{feature, version}`; `NOT_FOUND` for an unknown module, `FAILED_PRECONDITION` when `MDDB_FEATURES_FORCE_OFF` locks it |
+
+Every RPC of a disabled module answers `FAILED_PRECONDITION`
+`feature disabled: <name>` (after authentication). Replication and core RPCs
+are never switched.
+
+```bash
+grpcurl -plaintext localhost:11024 mddb.MDDB/ListFeatures
+grpcurl -plaintext -d '{"name":"geo","enabled":false}' localhost:11024 mddb.MDDB/SetFeature
+```
+
+See [API.md](API.md#features-v1features).
 
 #### Chat skills (v2.19.0)
 

@@ -59,6 +59,7 @@ status: publish
   - [GET /v1/collection-config](#get-v1collection-config)
   - [GET /v1/collection-configs](#get-v1collection-configs)
   - [Corpus packs: /v1/corpus](#corpus-packs-v1corpus)
+  - [Features: /v1/features](#features-v1features)
   - [Chat scenarios: /v1/chat/scenarios](#chat-scenarios-v1chatscenarios)
   - [Chat skills: /v1/chat/skills](#chat-skills-v1chatskills)
   - [Chat conversations: /v1/chat/conversations](#chat-conversations-v1chatconversations)
@@ -1769,6 +1770,92 @@ curl -X DELETE http://localhost:11023/v1/aliases/docs
 `mddb-cli reindex-swap <alias> --into <new>` does the whole switch. It
 copies the documents into the new collection, waits until it is indexed,
 then moves the alias. The old collection is kept, so you can roll back.
+
+### Features: /v1/features
+
+Features (v2.19.0, GO-049) are the server's optional modules, each switched
+on or off by an administrator. A switched-off module disappears from every
+surface; its data stays, and switching it back on restores it without a
+migration. Documents, collections, full-text and vector search, auth and
+backups are core and cannot be switched off.
+
+| Module | Default | What it covers |
+|---|---|---|
+| `chat` | on | `/v1/chat/*` (scenarios, skills, conversations), the chat RPCs and `chat_*` tools; mddb-chat refuses `join` while it is off |
+| `chatExternalMcp` | **off** | chat assistants calling external MCP servers (MCP-005); requires `chat` |
+| `geo` | on | `/v1/geo-*`, the `Geo*` RPCs, the `geo` toolset |
+| `temporal` | on | `/v1/temporal/*`, `TemporalQuery`, `TemporalHot` |
+| `spell` | on | `/v1/spell-suggest`, `/v1/spell-cleanup`, `/v1/spell-dictionary`, `SpellSuggest`, `SpellCleanup` |
+| `curation` | on | `/v1/curation`, the curation rule RPCs and tools |
+| `automation` | on | `/v1/automation*`, `/v1/automation-logs`, the automation RPCs and toolset |
+| `memory` | on | `/v1/memory/*`, the `memory` toolset |
+| `codeIntel` | on | `/v1/code-graph`, `/v1/symbol`, `/v1/code-languages`, `CodeSymbol`, the `code` toolset, GraphQL `codeGraph` and `codeSymbol` |
+| `eval` | on | `/v1/eval`, `/v1/eval-queries`, the eval RPCs, `run_eval`, `add_eval_query` |
+| `corpus` | on | `/v1/corpus*`, the corpus pack RPCs and tools |
+| `classify` | on | `/v1/classify`, `Classify`, `classify_document` |
+| `duplicates` | on | `/v1/find-duplicates`, `FindDuplicates`, `find_duplicates` |
+| `images` | on | `/v1/image`, an image document's bytes |
+
+A server that never touched a switch behaves as before 2.19.0.
+
+**What "disabled" means.** A REST route of the module answers
+`404 {"error":"feature disabled","feature":"geo"}` (after authentication); an
+RPC answers `FAILED_PRECONDITION` `feature disabled: geo`; its MCP tools are
+left out of `tools/list` and a call is refused, also through a custom tool
+whose action is one of them; a GraphQL field of it fails with the same text.
+A module whose requirement is off is off too (`chat` off stops
+`chatExternalMcp`), and keeps its own switch for when the requirement returns.
+Background work a module already runs (automation crons and triggers,
+temporal event recording) is not stopped by the switch.
+
+**Precedence.** `MDDB_FEATURES_FORCE_OFF=geo,chat` ([config.md](config.md))
+beats the switch, which beats the default. A forced module is listed with
+`lockedBy` and cannot be switched (`409`).
+
+#### GET /v1/features
+
+Any authenticated caller.
+
+```bash
+curl http://localhost:11023/v1/features
+```
+
+```json
+{
+  "features": [
+    {"name": "chat", "description": "Chat assistants: ...", "enabled": true, "configured": true,
+     "default": true, "requires": []},
+    {"name": "chatExternalMcp", "description": "...", "enabled": false, "configured": true,
+     "default": false, "requires": ["chat"], "blockedBy": ["chat"],
+     "updatedAt": "2026-11-11T10:00:00Z", "updatedBy": "admin"},
+    {"name": "geo", "description": "...", "enabled": false, "configured": true,
+     "default": true, "requires": [], "lockedBy": "MDDB_FEATURES_FORCE_OFF"}
+  ],
+  "version": 3
+}
+```
+
+`enabled` is whether the module works now; `configured` is its switch (what
+an administrator set, or `default`); `blockedBy` lists required modules that
+are off; `version` grows on every switch, so a consumer polls one number.
+
+#### PUT /v1/features/{name}
+
+A global administrator, on a writable server.
+
+```bash
+curl -X PUT http://localhost:11023/v1/features/geo -d '{"enabled": false}'
+```
+
+`200 {"feature": {...}, "version": 4}`. `400` without a boolean `enabled`,
+`403` for a non-administrator, `404 {"error":"unknown feature","feature":"x"}`,
+`409 {"error":"feature locked","feature":"geo","lockedBy":"MDDB_FEATURES_FORCE_OFF"}`.
+
+- **Storage and replication.** Switches are kept in the main database with
+  their version counter, so backups carry them and the binlog replicates them.
+- **Other surfaces.** gRPC `ListFeatures`, `SetFeature` ([GRPC.md](GRPC.md))
+  and the MCP tools `feature_list`, `feature_set` ([MCP.md](MCP.md)) call the
+  same code. The panel's Features page ([PANEL.md](PANEL.md)) switches them.
 
 ### Chat scenarios: /v1/chat/scenarios
 
