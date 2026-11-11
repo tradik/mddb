@@ -11,6 +11,7 @@ namespace Tradik\MddbSync\Tests;
 
 use Brain\Monkey;
 use Brain\Monkey\Functions;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Tradik\MddbSync\Settings;
 
@@ -203,9 +204,8 @@ final class SettingsTest extends TestCase {
 
 	/**
 	 * INT-001: http is permitted for local development hosts only.
-	 *
-	 * @dataProvider localHostUrlProvider
 	 */
+	#[DataProvider( 'localHostUrlProvider' )]
 	public function testSanitizeAllowsHttpForLocalHosts( string $url, string $expected ): void {
 		Functions\when( 'wp_http_validate_url' )->justReturn( true );
 		Functions\when( 'esc_url_raw' )->returnArg();

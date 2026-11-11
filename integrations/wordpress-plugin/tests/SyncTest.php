@@ -148,7 +148,7 @@ final class SyncTest extends TestCase {
 		$client = $this->createMock( Client::class );
 		$client->expects( self::once() )
 			->method( 'deleteDocument' )
-			->with( self::isType( 'string' ), 'post-44', self::isType( 'string' ) )
+			->with( self::isString(), 'post-44', self::isString() )
 			->willReturn( true );
 
 		$sync = $this->syncWith(
@@ -181,7 +181,7 @@ final class SyncTest extends TestCase {
 	}
 
 	public function testOnSaveLogsClientError(): void {
-		$client = $this->createMock( Client::class );
+		$client = $this->createStub( Client::class );
 		$client->method( 'addDocument' )->willReturn( new WP_Error( 'x', 'boom' ) );
 
 		$sync = $this->syncWith( [ 'url' => 'https://mddb' ], $client );
@@ -194,7 +194,7 @@ final class SyncTest extends TestCase {
 		Functions\when( 'get_post' )->alias(
 			static fn( $id ) => new WP_Post( [ 'ID' => $id, 'post_type' => 'post', 'post_status' => 'publish' ] )
 		);
-		$client = $this->createMock( Client::class );
+		$client = $this->createStub( Client::class );
 		$client->method( 'deleteDocument' )->willReturn( new WP_Error( 'x', 'kaboom' ) );
 		$sync = $this->syncWith(
 			[
@@ -264,7 +264,7 @@ final class SyncTest extends TestCase {
 				return true;
 			}
 		);
-		$client = $this->createMock( Client::class );
+		$client = $this->createStub( Client::class );
 		$sync   = $this->syncWith( [ 'url' => 'https://mddb' ], $client );
 		$sync->register();
 		self::assertContains( 'wp_after_insert_post', $hookCalls );

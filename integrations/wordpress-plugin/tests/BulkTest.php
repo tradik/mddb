@@ -54,7 +54,7 @@ final class BulkTest extends TestCase {
 		$postC = new WP_Post( [ 'ID' => 3 ] );
 		$GLOBALS['__mddb_test_query_state'] = [ 'posts' => [ $postA, $postB, $postC ], 'found' => 3 ];
 
-		$sync = $this->createMock( Sync::class );
+		$sync = $this->createStub( Sync::class );
 		$sync->method( 'syncPost' )->willReturnCallback(
 			static function ( $post ) {
 				if ( $post->ID === 1 ) { return true; }
@@ -80,7 +80,7 @@ final class BulkTest extends TestCase {
 		$page = array_map( static fn( int $i ) => new WP_Post( [ 'ID' => $i ] ), range( 1, 25 ) );
 		$GLOBALS['__mddb_test_query_state'] = [ 'posts' => $page, 'found' => 100 ];
 
-		$sync = $this->createMock( Sync::class );
+		$sync = $this->createStub( Sync::class );
 		$sync->method( 'syncPost' )->willReturn( true );
 
 		$bulk   = new Bulk( new Settings(), $sync );

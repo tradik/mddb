@@ -47,7 +47,7 @@ final class TermFilterTest extends TestCase {
 	 */
 	private function syncWith( array $opts ): Sync {
 		Functions\when( 'get_option' )->justReturn( $opts );
-		return new Sync( new Settings(), $this->createMock( Client::class ), new Mapper( new Language() ) );
+		return new Sync( new Settings(), $this->createStub( Client::class ), new Mapper( new Language() ) );
 	}
 
 	public function testEmptyFilterAllowsEverything(): void {
