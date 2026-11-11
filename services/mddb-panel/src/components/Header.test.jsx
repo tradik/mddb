@@ -5,6 +5,8 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 
 vi.mock('../lib/auth', () => ({ authManager: { isAuthenticated: vi.fn(), logout: vi.fn() } }));
+// The identity badge has its own suite.
+vi.mock('./IdentityBadge', () => ({ default: () => <span>identity badge</span> }));
 
 const { authManager } = await import('../lib/auth');
 const { useStore } = await import('../lib/store');
@@ -44,6 +46,7 @@ describe('Header', () => {
   test('Logout signs out', () => {
     vi.mocked(authManager.isAuthenticated).mockReturnValue(true);
     render(<Header onRefresh={() => {}} />);
+    expect(screen.getByText('identity badge')).toBeTruthy();
     fireEvent.click(screen.getByTitle('Logout'));
     expect(authManager.logout).toHaveBeenCalled();
   });

@@ -132,6 +132,11 @@ const coverageFiles = [
   'src/lib/duplicates-format.js',
   'src/components/DuplicatesPanel.jsx',
   'src/components/DuplicateGroups.jsx',
+  'src/lib/use-me.js',
+  'src/components/AccountPanel.jsx',
+  'src/components/MyApiKeysPanel.jsx',
+  'src/components/IdentityBadge.jsx',
+  'src/components/MCPAPIKeysPanel.jsx',
 ];
 
 export default mergeConfig(

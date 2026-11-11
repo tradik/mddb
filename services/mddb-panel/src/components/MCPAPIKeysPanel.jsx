@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Key, Plus, Trash2, Ban, Copy, Check, AlertCircle } from 'lucide-react';
+import { Key, Plus, Trash2, Ban, AlertCircle } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
+import OneTimeSecret from './OneTimeSecret';
 
 export default function MCPAPIKeysPanel() {
   const [keys, setKeys] = useState([]);
@@ -8,22 +9,19 @@ export default function MCPAPIKeysPanel() {
   const [error, setError] = useState(null);
   const [newKeyName, setNewKeyName] = useState('');
   const [createdKey, setCreatedKey] = useState(null);
-  const [copied, setCopied] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const loadKeys = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await mddbClient.listMCPAPIKeys();
+  // A promise chain: its state updates land in callbacks, after the request.
+  const loadKeys = useCallback(() => mddbClient.listMCPAPIKeys()
+    .then((data) => {
       setKeys(data.keys || []);
       setError(null);
-    } catch (err) {
+    })
+    .catch((err) => {
       setError(err.message || 'Failed to load API keys');
       setKeys([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    })
+    .finally(() => setLoading(false)), []);
 
   useEffect(() => { loadKeys(); }, [loadKeys]);
 
@@ -58,14 +56,6 @@ export default function MCPAPIKeysPanel() {
       loadKeys();
     } catch (err) {
       setError(err.message);
-    }
-  };
-
-  const copyKey = () => {
-    if (createdKey) {
-      navigator.clipboard.writeText(createdKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -109,18 +99,7 @@ export default function MCPAPIKeysPanel() {
       </div>
 
       {/* Show newly created key (one-time) */}
-      {createdKey && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-          <p className="text-sm font-medium text-green-800 mb-1">Key created! Copy it now — it won't be shown again.</p>
-          <div className="flex items-center space-x-2">
-            <code className="flex-1 px-2 py-1 bg-white border rounded text-sm font-mono select-all">{createdKey}</code>
-            <button onClick={copyKey} className="p-1.5 text-green-600 hover:text-green-800">
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-            </button>
-          </div>
-          <button onClick={() => setCreatedKey(null)} className="mt-2 text-xs text-green-600 hover:underline">Dismiss</button>
-        </div>
-      )}
+      {createdKey && <OneTimeSecret secret={createdKey} onDismiss={() => setCreatedKey(null)} />}
 
       {/* Key list */}
       {loading ? (

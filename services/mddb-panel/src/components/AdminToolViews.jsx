@@ -2,6 +2,7 @@ import MemoryPanel from './MemoryPanel';
 import SchemasPanel from './SchemasPanel';
 import ImportPanel from './ImportPanel';
 import DuplicatesPanel from './DuplicatesPanel';
+import AccountPanel from './AccountPanel';
 import DocumentViewer from './DocumentViewer';
 
 /** The pages added in 2.19.0, by view mode. */
@@ -10,6 +11,7 @@ const PAGES = {
   schemas: SchemasPanel,
   import: ImportPanel,
   duplicates: DuplicatesPanel,
+  account: AccountPanel,
 };
 
 /** Pages whose documents open in the viewer beside them. */

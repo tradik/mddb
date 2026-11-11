@@ -8,6 +8,7 @@ vi.mock('./MemoryPanel', () => ({ default: () => 'memory page' }));
 vi.mock('./SchemasPanel', () => ({ default: () => 'schemas page' }));
 vi.mock('./ImportPanel', () => ({ default: () => 'import page' }));
 vi.mock('./DuplicatesPanel', () => ({ default: () => 'duplicates page' }));
+vi.mock('./AccountPanel', () => ({ default: () => 'account page' }));
 vi.mock('./DocumentViewer', () => ({ default: () => ' + viewer' }));
 
 const { default: AdminToolViews } = await import('./AdminToolViews');
@@ -21,6 +22,7 @@ describe('AdminToolViews', () => {
     ['schemas', 'schemas page'],
     ['import', 'import page'],
     ['duplicates', 'duplicates page'],
+    ['account', 'account page'],
   ])('%s shows %s', (viewMode, label) => {
     const { container } = render(<AdminToolViews viewMode={viewMode} />);
     expect(container.textContent).toBe(label);
@@ -48,5 +50,11 @@ describe('AdminToolNav', () => {
     expect(screen.getByRole('button', { name: 'Collection Schemas' }).dataset.mode).toBe('schemas');
     expect(screen.getByRole('button', { name: 'Import' }).dataset.mode).toBe('import');
     expect(screen.getByRole('button', { name: 'Duplicates' }).dataset.mode).toBe('duplicates');
+    expect(screen.queryByRole('button', { name: 'My Account' })).toBeNull();
+  });
+
+  test('My Account appears with authentication', () => {
+    render(<AdminToolNav NavButton={NavButton} authEnabled />);
+    expect(screen.getByRole('button', { name: 'My Account' }).dataset.mode).toBe('account');
   });
 });

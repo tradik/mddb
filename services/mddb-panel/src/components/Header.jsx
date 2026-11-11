@@ -2,6 +2,7 @@ import { Database, RefreshCw, Search, Brain, Type, Layers, LogOut } from 'lucide
 import { useStore } from '../lib/store';
 import { authManager } from '../lib/auth';
 import LimitCappedNotice from './LimitCappedNotice';
+import IdentityBadge from './IdentityBadge';
 
 export default function Header({ onRefresh }) {
   const { searchMode, setSearchMode } = useStore();
@@ -75,6 +76,7 @@ export default function Header({ onRefresh }) {
             <span className="text-sm font-medium">Refresh</span>
           </button>
 
+          {isAuthenticated && <IdentityBadge />}
           {isAuthenticated && (
             <button
               onClick={() => authManager.logout()}
