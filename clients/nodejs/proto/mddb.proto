@@ -1570,6 +1570,8 @@ message DuplicateDocInfoProto {
   string content_hash = 3;
   string content_md = 4;
   float score = 5;
+  // (v2.19.0+) The document's language, so a caller need not parse doc_id.
+  string lang = 6;
 }
 
 message DuplicateGroupProto {

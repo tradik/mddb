@@ -327,7 +327,8 @@ func TestCovEFindDuplicates(t *testing.T) {
 		t.Fatal(err)
 	}
 	if resp.Mode != "both" || resp.Threshold != 0.9 || resp.TotalDocuments != 2 || len(resp.ExactGroups) != 1 ||
-		len(resp.ExactGroups[0].Documents) != 2 || resp.ExactGroups[0].Documents[0].ContentMd != "the very same body" {
+		len(resp.ExactGroups[0].Documents) != 2 || resp.ExactGroups[0].Documents[0].ContentMd != "the very same body" ||
+		resp.ExactGroups[0].Documents[0].Lang != "en" {
 		t.Fatalf("duplicates: %+v", resp)
 	}
 

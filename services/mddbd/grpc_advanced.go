@@ -691,6 +691,7 @@ func (g *GRPCServer) FindDuplicates(ctx context.Context, req *proto.FindDuplicat
 					ContentHash: d.ContentHash,
 					ContentMd:   d.ContentMD,
 					Score:       d.Score,
+					Lang:        d.Lang,
 				}
 			}
 			result[i] = &proto.DuplicateGroupProto{

@@ -10494,12 +10494,14 @@ func (x *FindDuplicatesRequest) GetIncludeContent() bool {
 }
 
 type DuplicateDocInfoProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DocId         string                 `protobuf:"bytes,1,opt,name=doc_id,json=docId,proto3" json:"doc_id,omitempty"`
-	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
-	ContentHash   string                 `protobuf:"bytes,3,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"`
-	ContentMd     string                 `protobuf:"bytes,4,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
-	Score         float32                `protobuf:"fixed32,5,opt,name=score,proto3" json:"score,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	DocId       string                 `protobuf:"bytes,1,opt,name=doc_id,json=docId,proto3" json:"doc_id,omitempty"`
+	Key         string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	ContentHash string                 `protobuf:"bytes,3,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"`
+	ContentMd   string                 `protobuf:"bytes,4,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
+	Score       float32                `protobuf:"fixed32,5,opt,name=score,proto3" json:"score,omitempty"`
+	// (v2.19.0+) The document's language, so a caller need not parse doc_id.
+	Lang          string `protobuf:"bytes,6,opt,name=lang,proto3" json:"lang,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -10567,6 +10569,13 @@ func (x *DuplicateDocInfoProto) GetScore() float32 {
 		return x.Score
 	}
 	return 0
+}
+
+func (x *DuplicateDocInfoProto) GetLang() string {
+	if x != nil {
+		return x.Lang
+	}
+	return ""
 }
 
 type DuplicateGroupProto struct {
@@ -21432,14 +21441,15 @@ const file_mddb_proto_rawDesc = "" +
 	"\tthreshold\x18\x03 \x01(\x01R\tthreshold\x12\x19\n" +
 	"\bmax_docs\x18\x04 \x01(\x05R\amaxDocs\x12'\n" +
 	"\x0fdistance_metric\x18\x05 \x01(\tR\x0edistanceMetric\x12'\n" +
-	"\x0finclude_content\x18\x06 \x01(\bR\x0eincludeContent\"\x98\x01\n" +
+	"\x0finclude_content\x18\x06 \x01(\bR\x0eincludeContent\"\xac\x01\n" +
 	"\x15DuplicateDocInfoProto\x12\x15\n" +
 	"\x06doc_id\x18\x01 \x01(\tR\x05docId\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12!\n" +
 	"\fcontent_hash\x18\x03 \x01(\tR\vcontentHash\x12\x1d\n" +
 	"\n" +
 	"content_md\x18\x04 \x01(\tR\tcontentMd\x12\x14\n" +
-	"\x05score\x18\x05 \x01(\x02R\x05score\"\x95\x01\n" +
+	"\x05score\x18\x05 \x01(\x02R\x05score\x12\x12\n" +
+	"\x04lang\x18\x06 \x01(\tR\x04lang\"\x95\x01\n" +
 	"\x13DuplicateGroupProto\x12\x19\n" +
 	"\bgroup_id\x18\x01 \x01(\x05R\agroupId\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x129\n" +
