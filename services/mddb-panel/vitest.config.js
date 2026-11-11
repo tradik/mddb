@@ -120,6 +120,10 @@ const coverageFiles = [
   'src/components/SchemasPanel.jsx',
   'src/components/SchemaEditor.jsx',
   'src/components/SchemaValidateBox.jsx',
+  'src/lib/use-bulk-jobs.js',
+  'src/components/ImportPanel.jsx',
+  'src/components/BulkJobsTable.jsx',
+  'src/components/DocumentsJsonForm.jsx',
 ];
 
 export default mergeConfig(

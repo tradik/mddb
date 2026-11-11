@@ -6,6 +6,7 @@ import { render, screen, cleanup } from '@testing-library/react';
 
 vi.mock('./MemoryPanel', () => ({ default: () => 'memory page' }));
 vi.mock('./SchemasPanel', () => ({ default: () => 'schemas page' }));
+vi.mock('./ImportPanel', () => ({ default: () => 'import page' }));
 
 const { default: AdminToolViews } = await import('./AdminToolViews');
 const { default: AdminToolNav } = await import('./AdminToolNav');
@@ -16,6 +17,7 @@ describe('AdminToolViews', () => {
   test.each([
     ['memory', 'memory page'],
     ['schemas', 'schemas page'],
+    ['import', 'import page'],
   ])('%s shows %s', (viewMode, label) => {
     const { container } = render(<AdminToolViews viewMode={viewMode} />);
     expect(container.textContent).toBe(label);
@@ -34,5 +36,6 @@ describe('AdminToolNav', () => {
     render(<AdminToolNav NavButton={NavButton} />);
     expect(screen.getByRole('button', { name: 'Agent Memory' }).dataset.mode).toBe('memory');
     expect(screen.getByRole('button', { name: 'Collection Schemas' }).dataset.mode).toBe('schemas');
+    expect(screen.getByRole('button', { name: 'Import' }).dataset.mode).toBe('import');
   });
 });
