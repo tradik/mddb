@@ -110,6 +110,13 @@ const (
 	MDDB_PutChatScenario_FullMethodName                = "/mddb.MDDB/PutChatScenario"
 	MDDB_DeleteChatScenario_FullMethodName             = "/mddb.MDDB/DeleteChatScenario"
 	MDDB_GetChatScenarioPrompt_FullMethodName          = "/mddb.MDDB/GetChatScenarioPrompt"
+	MDDB_ListChatSkills_FullMethodName                 = "/mddb.MDDB/ListChatSkills"
+	MDDB_GetChatSkill_FullMethodName                   = "/mddb.MDDB/GetChatSkill"
+	MDDB_PutChatSkill_FullMethodName                   = "/mddb.MDDB/PutChatSkill"
+	MDDB_DeleteChatSkill_FullMethodName                = "/mddb.MDDB/DeleteChatSkill"
+	MDDB_ImportChatSkill_FullMethodName                = "/mddb.MDDB/ImportChatSkill"
+	MDDB_UpdateChatSkill_FullMethodName                = "/mddb.MDDB/UpdateChatSkill"
+	MDDB_GetChatSkillUsedBy_FullMethodName             = "/mddb.MDDB/GetChatSkillUsedBy"
 	MDDB_CreateChatConversation_FullMethodName         = "/mddb.MDDB/CreateChatConversation"
 	MDDB_ListChatConversations_FullMethodName          = "/mddb.MDDB/ListChatConversations"
 	MDDB_GetChatConversation_FullMethodName            = "/mddb.MDDB/GetChatConversation"
@@ -309,9 +316,28 @@ type MDDBClient interface {
 	// Creates or replaces the scenario named in it; bumps the version counter.
 	PutChatScenario(ctx context.Context, in *PutChatScenarioRequest, opts ...grpc.CallOption) (*PutChatScenarioResponse, error)
 	DeleteChatScenario(ctx context.Context, in *DeleteChatScenarioRequest, opts ...grpc.CallOption) (*DeleteChatScenarioResponse, error)
-	// The composed system prompt: operator prompt, guardrails, off-topic and
-	// style clauses, then each allowed collection's responsePrompt.
+	// The composed system prompt: operator prompt, guardrails, off-topic
+	// clause, the scenario's skills in order (#404), style clause, then each
+	// allowed collection's responsePrompt — with its size.
 	GetChatScenarioPrompt(ctx context.Context, in *GetChatScenarioPromptRequest, opts ...grpc.CallOption) (*GetChatScenarioPromptResponse, error)
+	// ---- (v2.19.0+, #404) Chat skills, as /v1/chat/skills: reusable SKILL.md
+	// instruction blocks that scenarios attach by name. Admin only, reads
+	// included. A change bumps the chat scenarios' version counter.
+	// Every skill, without contents.
+	ListChatSkills(ctx context.Context, in *ListChatSkillsRequest, opts ...grpc.CallOption) (*ListChatSkillsResponse, error)
+	// The current version, or a kept earlier one.
+	GetChatSkill(ctx context.Context, in *GetChatSkillRequest, opts ...grpc.CallOption) (*ChatSkillProto, error)
+	// Creates the skill or stores a new version of it.
+	PutChatSkill(ctx context.Context, in *PutChatSkillRequest, opts ...grpc.CallOption) (*PutChatSkillResponse, error)
+	// FAILED_PRECONDITION while a scenario attaches the skill.
+	DeleteChatSkill(ctx context.Context, in *DeleteChatSkillRequest, opts ...grpc.CallOption) (*DeleteChatSkillResponse, error)
+	// A preview of the SKILL.md at an https URL (fetched through the SSRF
+	// guard) or of pasted text. Stores nothing.
+	ImportChatSkill(ctx context.Context, in *ImportChatSkillRequest, opts ...grpc.CallOption) (*ChatSkillPreviewProto, error)
+	// Fetches the skill's source again: a preview, stored with confirm.
+	UpdateChatSkill(ctx context.Context, in *UpdateChatSkillRequest, opts ...grpc.CallOption) (*UpdateChatSkillResponse, error)
+	// The scenarios attaching the skill.
+	GetChatSkillUsedBy(ctx context.Context, in *GetChatSkillUsedByRequest, opts ...grpc.CallOption) (*GetChatSkillUsedByResponse, error)
 	// ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
 	// /v1/chat/conversations. The caller is the host application; every call
 	// names the user (sub), and a conversation of another sub is NOT_FOUND.
@@ -1272,6 +1298,76 @@ func (c *mDDBClient) GetChatScenarioPrompt(ctx context.Context, in *GetChatScena
 	return out, nil
 }
 
+func (c *mDDBClient) ListChatSkills(ctx context.Context, in *ListChatSkillsRequest, opts ...grpc.CallOption) (*ListChatSkillsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChatSkillsResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListChatSkills_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) GetChatSkill(ctx context.Context, in *GetChatSkillRequest, opts ...grpc.CallOption) (*ChatSkillProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatSkillProto)
+	err := c.cc.Invoke(ctx, MDDB_GetChatSkill_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) PutChatSkill(ctx context.Context, in *PutChatSkillRequest, opts ...grpc.CallOption) (*PutChatSkillResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PutChatSkillResponse)
+	err := c.cc.Invoke(ctx, MDDB_PutChatSkill_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) DeleteChatSkill(ctx context.Context, in *DeleteChatSkillRequest, opts ...grpc.CallOption) (*DeleteChatSkillResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteChatSkillResponse)
+	err := c.cc.Invoke(ctx, MDDB_DeleteChatSkill_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) ImportChatSkill(ctx context.Context, in *ImportChatSkillRequest, opts ...grpc.CallOption) (*ChatSkillPreviewProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatSkillPreviewProto)
+	err := c.cc.Invoke(ctx, MDDB_ImportChatSkill_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) UpdateChatSkill(ctx context.Context, in *UpdateChatSkillRequest, opts ...grpc.CallOption) (*UpdateChatSkillResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateChatSkillResponse)
+	err := c.cc.Invoke(ctx, MDDB_UpdateChatSkill_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) GetChatSkillUsedBy(ctx context.Context, in *GetChatSkillUsedByRequest, opts ...grpc.CallOption) (*GetChatSkillUsedByResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetChatSkillUsedByResponse)
+	err := c.cc.Invoke(ctx, MDDB_GetChatSkillUsedBy_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mDDBClient) CreateChatConversation(ctx context.Context, in *CreateChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ChatConversationProto)
@@ -1550,9 +1646,28 @@ type MDDBServer interface {
 	// Creates or replaces the scenario named in it; bumps the version counter.
 	PutChatScenario(context.Context, *PutChatScenarioRequest) (*PutChatScenarioResponse, error)
 	DeleteChatScenario(context.Context, *DeleteChatScenarioRequest) (*DeleteChatScenarioResponse, error)
-	// The composed system prompt: operator prompt, guardrails, off-topic and
-	// style clauses, then each allowed collection's responsePrompt.
+	// The composed system prompt: operator prompt, guardrails, off-topic
+	// clause, the scenario's skills in order (#404), style clause, then each
+	// allowed collection's responsePrompt — with its size.
 	GetChatScenarioPrompt(context.Context, *GetChatScenarioPromptRequest) (*GetChatScenarioPromptResponse, error)
+	// ---- (v2.19.0+, #404) Chat skills, as /v1/chat/skills: reusable SKILL.md
+	// instruction blocks that scenarios attach by name. Admin only, reads
+	// included. A change bumps the chat scenarios' version counter.
+	// Every skill, without contents.
+	ListChatSkills(context.Context, *ListChatSkillsRequest) (*ListChatSkillsResponse, error)
+	// The current version, or a kept earlier one.
+	GetChatSkill(context.Context, *GetChatSkillRequest) (*ChatSkillProto, error)
+	// Creates the skill or stores a new version of it.
+	PutChatSkill(context.Context, *PutChatSkillRequest) (*PutChatSkillResponse, error)
+	// FAILED_PRECONDITION while a scenario attaches the skill.
+	DeleteChatSkill(context.Context, *DeleteChatSkillRequest) (*DeleteChatSkillResponse, error)
+	// A preview of the SKILL.md at an https URL (fetched through the SSRF
+	// guard) or of pasted text. Stores nothing.
+	ImportChatSkill(context.Context, *ImportChatSkillRequest) (*ChatSkillPreviewProto, error)
+	// Fetches the skill's source again: a preview, stored with confirm.
+	UpdateChatSkill(context.Context, *UpdateChatSkillRequest) (*UpdateChatSkillResponse, error)
+	// The scenarios attaching the skill.
+	GetChatSkillUsedBy(context.Context, *GetChatSkillUsedByRequest) (*GetChatSkillUsedByResponse, error)
 	// ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
 	// /v1/chat/conversations. The caller is the host application; every call
 	// names the user (sub), and a conversation of another sub is NOT_FOUND.
@@ -1854,6 +1969,27 @@ func (UnimplementedMDDBServer) DeleteChatScenario(context.Context, *DeleteChatSc
 }
 func (UnimplementedMDDBServer) GetChatScenarioPrompt(context.Context, *GetChatScenarioPromptRequest) (*GetChatScenarioPromptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetChatScenarioPrompt not implemented")
+}
+func (UnimplementedMDDBServer) ListChatSkills(context.Context, *ListChatSkillsRequest) (*ListChatSkillsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChatSkills not implemented")
+}
+func (UnimplementedMDDBServer) GetChatSkill(context.Context, *GetChatSkillRequest) (*ChatSkillProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetChatSkill not implemented")
+}
+func (UnimplementedMDDBServer) PutChatSkill(context.Context, *PutChatSkillRequest) (*PutChatSkillResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PutChatSkill not implemented")
+}
+func (UnimplementedMDDBServer) DeleteChatSkill(context.Context, *DeleteChatSkillRequest) (*DeleteChatSkillResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteChatSkill not implemented")
+}
+func (UnimplementedMDDBServer) ImportChatSkill(context.Context, *ImportChatSkillRequest) (*ChatSkillPreviewProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method ImportChatSkill not implemented")
+}
+func (UnimplementedMDDBServer) UpdateChatSkill(context.Context, *UpdateChatSkillRequest) (*UpdateChatSkillResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateChatSkill not implemented")
+}
+func (UnimplementedMDDBServer) GetChatSkillUsedBy(context.Context, *GetChatSkillUsedByRequest) (*GetChatSkillUsedByResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetChatSkillUsedBy not implemented")
 }
 func (UnimplementedMDDBServer) CreateChatConversation(context.Context, *CreateChatConversationRequest) (*ChatConversationProto, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateChatConversation not implemented")
@@ -3513,6 +3649,132 @@ func _MDDB_GetChatScenarioPrompt_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_ListChatSkills_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChatSkillsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListChatSkills(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListChatSkills_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListChatSkills(ctx, req.(*ListChatSkillsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_GetChatSkill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChatSkillRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).GetChatSkill(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_GetChatSkill_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).GetChatSkill(ctx, req.(*GetChatSkillRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_PutChatSkill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PutChatSkillRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).PutChatSkill(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_PutChatSkill_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).PutChatSkill(ctx, req.(*PutChatSkillRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_DeleteChatSkill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteChatSkillRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).DeleteChatSkill(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_DeleteChatSkill_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).DeleteChatSkill(ctx, req.(*DeleteChatSkillRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_ImportChatSkill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportChatSkillRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ImportChatSkill(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ImportChatSkill_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ImportChatSkill(ctx, req.(*ImportChatSkillRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_UpdateChatSkill_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateChatSkillRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).UpdateChatSkill(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_UpdateChatSkill_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).UpdateChatSkill(ctx, req.(*UpdateChatSkillRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_GetChatSkillUsedBy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChatSkillUsedByRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).GetChatSkillUsedBy(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_GetChatSkillUsedBy_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).GetChatSkillUsedBy(ctx, req.(*GetChatSkillUsedByRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MDDB_CreateChatConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateChatConversationRequest)
 	if err := dec(in); err != nil {
@@ -4008,6 +4270,34 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetChatScenarioPrompt",
 			Handler:    _MDDB_GetChatScenarioPrompt_Handler,
+		},
+		{
+			MethodName: "ListChatSkills",
+			Handler:    _MDDB_ListChatSkills_Handler,
+		},
+		{
+			MethodName: "GetChatSkill",
+			Handler:    _MDDB_GetChatSkill_Handler,
+		},
+		{
+			MethodName: "PutChatSkill",
+			Handler:    _MDDB_PutChatSkill_Handler,
+		},
+		{
+			MethodName: "DeleteChatSkill",
+			Handler:    _MDDB_DeleteChatSkill_Handler,
+		},
+		{
+			MethodName: "ImportChatSkill",
+			Handler:    _MDDB_ImportChatSkill_Handler,
+		},
+		{
+			MethodName: "UpdateChatSkill",
+			Handler:    _MDDB_UpdateChatSkill_Handler,
+		},
+		{
+			MethodName: "GetChatSkillUsedBy",
+			Handler:    _MDDB_GetChatSkillUsedBy_Handler,
 		},
 		{
 			MethodName: "CreateChatConversation",

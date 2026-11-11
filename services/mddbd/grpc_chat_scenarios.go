@@ -72,7 +72,9 @@ func (g *GRPCServer) GetChatScenarioPrompt(ctx context.Context, req *proto.GetCh
 	if err != nil {
 		return nil, chatScenarioGRPCError(err)
 	}
-	return &proto.GetChatScenarioPromptResponse{Name: sc.Name, Prompt: g.server.ChatScenarioPrompt(sc), Version: g.server.ChatScenariosVersion()}, nil
+	p := g.server.ChatScenarioPrompt(sc)
+	return &proto.GetChatScenarioPromptResponse{Name: p.Name, Prompt: p.Prompt, Version: p.Version, Bytes: int64(p.Bytes),
+		ApproxTokens: int64(p.ApproxTokens), Warning: p.Warning, MissingSkills: p.MissingSkills}, nil
 }
 
 // chatScenarioGRPCError maps a failure to its status, as chatScenarioError

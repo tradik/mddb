@@ -18016,6 +18016,10 @@ type GetChatScenarioPromptResponse struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Prompt        string                 `protobuf:"bytes,2,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	Version       uint64                 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	Bytes         int64                  `protobuf:"varint,4,opt,name=bytes,proto3" json:"bytes,omitempty"`                                     // length of prompt
+	ApproxTokens  int64                  `protobuf:"varint,5,opt,name=approx_tokens,json=approxTokens,proto3" json:"approx_tokens,omitempty"`   // bytes / 4
+	Warning       string                 `protobuf:"bytes,6,opt,name=warning,proto3" json:"warning,omitempty"`                                  // set past 75% of MDDB_CHAT_PROMPT_MAX_BYTES
+	MissingSkills []string               `protobuf:"bytes,7,rep,name=missing_skills,json=missingSkills,proto3" json:"missing_skills,omitempty"` // named by the scenario, not stored; skipped
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -18071,6 +18075,1014 @@ func (x *GetChatScenarioPromptResponse) GetVersion() uint64 {
 	return 0
 }
 
+func (x *GetChatScenarioPromptResponse) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+func (x *GetChatScenarioPromptResponse) GetApproxTokens() int64 {
+	if x != nil {
+		return x.ApproxTokens
+	}
+	return 0
+}
+
+func (x *GetChatScenarioPromptResponse) GetWarning() string {
+	if x != nil {
+		return x.Warning
+	}
+	return ""
+}
+
+func (x *GetChatScenarioPromptResponse) GetMissingSkills() []string {
+	if x != nil {
+		return x.MissingSkills
+	}
+	return nil
+}
+
+type ChatSkillSourceProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`
+	Commit        string                 `protobuf:"bytes,2,opt,name=commit,proto3" json:"commit,omitempty"`                         // the Git commit, for a GitHub URL
+	FetchedAt     int64                  `protobuf:"varint,3,opt,name=fetched_at,json=fetchedAt,proto3" json:"fetched_at,omitempty"` // Unix seconds
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatSkillSourceProto) Reset() {
+	*x = ChatSkillSourceProto{}
+	mi := &file_mddb_proto_msgTypes[248]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatSkillSourceProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatSkillSourceProto) ProtoMessage() {}
+
+func (x *ChatSkillSourceProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[248]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatSkillSourceProto.ProtoReflect.Descriptor instead.
+func (*ChatSkillSourceProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{248}
+}
+
+func (x *ChatSkillSourceProto) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *ChatSkillSourceProto) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *ChatSkillSourceProto) GetFetchedAt() int64 {
+	if x != nil {
+		return x.FetchedAt
+	}
+	return 0
+}
+
+// An earlier version of a skill, without its content: GetChatSkill with the
+// version reads it.
+type ChatSkillRevisionProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       int32                  `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Bytes         int64                  `protobuf:"varint,3,opt,name=bytes,proto3" json:"bytes,omitempty"` // length of its content
+	Source        *ChatSkillSourceProto  `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`
+	UpdatedAt     int64                  `protobuf:"varint,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // Unix seconds
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatSkillRevisionProto) Reset() {
+	*x = ChatSkillRevisionProto{}
+	mi := &file_mddb_proto_msgTypes[249]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatSkillRevisionProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatSkillRevisionProto) ProtoMessage() {}
+
+func (x *ChatSkillRevisionProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[249]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatSkillRevisionProto.ProtoReflect.Descriptor instead.
+func (*ChatSkillRevisionProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{249}
+}
+
+func (x *ChatSkillRevisionProto) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *ChatSkillRevisionProto) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ChatSkillRevisionProto) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+func (x *ChatSkillRevisionProto) GetSource() *ChatSkillSourceProto {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *ChatSkillRevisionProto) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+// ChatSkillProto mirrors a skill, the body of /v1/chat/skills/{name}.
+type ChatSkillProto struct {
+	state         protoimpl.MessageState    `protogen:"open.v1"`
+	Name          string                    `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                    `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Content       string                    `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"`                        // the instructions; empty in a listing
+	Source        *ChatSkillSourceProto     `protobuf:"bytes,4,opt,name=source,proto3" json:"source,omitempty"`                          // unset for a pasted skill
+	Version       int32                     `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`                       // grows by one on every change
+	History       []*ChatSkillRevisionProto `protobuf:"bytes,6,rep,name=history,proto3" json:"history,omitempty"`                        // newest first, the last 10, without contents
+	Bytes         int64                     `protobuf:"varint,7,opt,name=bytes,proto3" json:"bytes,omitempty"`                           // length of content
+	UsedBy        []string                  `protobuf:"bytes,8,rep,name=used_by,json=usedBy,proto3" json:"used_by,omitempty"`            // scenarios attaching the skill
+	CreatedAt     int64                     `protobuf:"varint,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`  // Unix seconds
+	UpdatedAt     int64                     `protobuf:"varint,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"` // Unix seconds
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatSkillProto) Reset() {
+	*x = ChatSkillProto{}
+	mi := &file_mddb_proto_msgTypes[250]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatSkillProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatSkillProto) ProtoMessage() {}
+
+func (x *ChatSkillProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[250]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatSkillProto.ProtoReflect.Descriptor instead.
+func (*ChatSkillProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{250}
+}
+
+func (x *ChatSkillProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ChatSkillProto) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ChatSkillProto) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *ChatSkillProto) GetSource() *ChatSkillSourceProto {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *ChatSkillProto) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *ChatSkillProto) GetHistory() []*ChatSkillRevisionProto {
+	if x != nil {
+		return x.History
+	}
+	return nil
+}
+
+func (x *ChatSkillProto) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+func (x *ChatSkillProto) GetUsedBy() []string {
+	if x != nil {
+		return x.UsedBy
+	}
+	return nil
+}
+
+func (x *ChatSkillProto) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *ChatSkillProto) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+type ListChatSkillsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListChatSkillsRequest) Reset() {
+	*x = ListChatSkillsRequest{}
+	mi := &file_mddb_proto_msgTypes[251]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListChatSkillsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListChatSkillsRequest) ProtoMessage() {}
+
+func (x *ListChatSkillsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[251]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListChatSkillsRequest.ProtoReflect.Descriptor instead.
+func (*ListChatSkillsRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{251}
+}
+
+type ListChatSkillsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Skills        []*ChatSkillProto      `protobuf:"bytes,1,rep,name=skills,proto3" json:"skills,omitempty"`
+	Version       uint64                 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"` // the chat scenarios' version counter
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListChatSkillsResponse) Reset() {
+	*x = ListChatSkillsResponse{}
+	mi := &file_mddb_proto_msgTypes[252]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListChatSkillsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListChatSkillsResponse) ProtoMessage() {}
+
+func (x *ListChatSkillsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[252]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListChatSkillsResponse.ProtoReflect.Descriptor instead.
+func (*ListChatSkillsResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{252}
+}
+
+func (x *ListChatSkillsResponse) GetSkills() []*ChatSkillProto {
+	if x != nil {
+		return x.Skills
+	}
+	return nil
+}
+
+func (x *ListChatSkillsResponse) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type GetChatSkillRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Version       int32                  `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"` // 0: the current version
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatSkillRequest) Reset() {
+	*x = GetChatSkillRequest{}
+	mi := &file_mddb_proto_msgTypes[253]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatSkillRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatSkillRequest) ProtoMessage() {}
+
+func (x *GetChatSkillRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[253]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatSkillRequest.ProtoReflect.Descriptor instead.
+func (*GetChatSkillRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{253}
+}
+
+func (x *GetChatSkillRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GetChatSkillRequest) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type PutChatSkillRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Skill         *ChatSkillProto        `protobuf:"bytes,1,opt,name=skill,proto3" json:"skill,omitempty"` // name, description, content and source are read
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutChatSkillRequest) Reset() {
+	*x = PutChatSkillRequest{}
+	mi := &file_mddb_proto_msgTypes[254]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutChatSkillRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutChatSkillRequest) ProtoMessage() {}
+
+func (x *PutChatSkillRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[254]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutChatSkillRequest.ProtoReflect.Descriptor instead.
+func (*PutChatSkillRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{254}
+}
+
+func (x *PutChatSkillRequest) GetSkill() *ChatSkillProto {
+	if x != nil {
+		return x.Skill
+	}
+	return nil
+}
+
+type PutChatSkillResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Skill         *ChatSkillProto        `protobuf:"bytes,1,opt,name=skill,proto3" json:"skill,omitempty"`
+	Created       bool                   `protobuf:"varint,2,opt,name=created,proto3" json:"created,omitempty"` // false: a new version of an existing skill, or no change
+	Version       uint64                 `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PutChatSkillResponse) Reset() {
+	*x = PutChatSkillResponse{}
+	mi := &file_mddb_proto_msgTypes[255]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PutChatSkillResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PutChatSkillResponse) ProtoMessage() {}
+
+func (x *PutChatSkillResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[255]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PutChatSkillResponse.ProtoReflect.Descriptor instead.
+func (*PutChatSkillResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{255}
+}
+
+func (x *PutChatSkillResponse) GetSkill() *ChatSkillProto {
+	if x != nil {
+		return x.Skill
+	}
+	return nil
+}
+
+func (x *PutChatSkillResponse) GetCreated() bool {
+	if x != nil {
+		return x.Created
+	}
+	return false
+}
+
+func (x *PutChatSkillResponse) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type DeleteChatSkillRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteChatSkillRequest) Reset() {
+	*x = DeleteChatSkillRequest{}
+	mi := &file_mddb_proto_msgTypes[256]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteChatSkillRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteChatSkillRequest) ProtoMessage() {}
+
+func (x *DeleteChatSkillRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[256]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteChatSkillRequest.ProtoReflect.Descriptor instead.
+func (*DeleteChatSkillRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{256}
+}
+
+func (x *DeleteChatSkillRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type DeleteChatSkillResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Deleted       bool                   `protobuf:"varint,1,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	Version       uint64                 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteChatSkillResponse) Reset() {
+	*x = DeleteChatSkillResponse{}
+	mi := &file_mddb_proto_msgTypes[257]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteChatSkillResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteChatSkillResponse) ProtoMessage() {}
+
+func (x *DeleteChatSkillResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[257]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteChatSkillResponse.ProtoReflect.Descriptor instead.
+func (*DeleteChatSkillResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{257}
+}
+
+func (x *DeleteChatSkillResponse) GetDeleted() bool {
+	if x != nil {
+		return x.Deleted
+	}
+	return false
+}
+
+func (x *DeleteChatSkillResponse) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type ImportChatSkillRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Url           string                 `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`         // https; or content
+	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"` // a pasted SKILL.md
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportChatSkillRequest) Reset() {
+	*x = ImportChatSkillRequest{}
+	mi := &file_mddb_proto_msgTypes[258]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportChatSkillRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportChatSkillRequest) ProtoMessage() {}
+
+func (x *ImportChatSkillRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[258]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportChatSkillRequest.ProtoReflect.Descriptor instead.
+func (*ImportChatSkillRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{258}
+}
+
+func (x *ImportChatSkillRequest) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
+}
+
+func (x *ImportChatSkillRequest) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+// A SKILL.md parsed but not stored.
+type ChatSkillPreviewProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // from the front matter
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Content       string                 `protobuf:"bytes,3,opt,name=content,proto3" json:"content,omitempty"` // the instructions
+	Raw           string                 `protobuf:"bytes,4,opt,name=raw,proto3" json:"raw,omitempty"`         // the whole text, front matter included
+	Source        *ChatSkillSourceProto  `protobuf:"bytes,5,opt,name=source,proto3" json:"source,omitempty"`
+	Bytes         int64                  `protobuf:"varint,6,opt,name=bytes,proto3" json:"bytes,omitempty"`
+	Sha256        string                 `protobuf:"bytes,7,opt,name=sha256,proto3" json:"sha256,omitempty"`  // of content
+	Exists        bool                   `protobuf:"varint,8,opt,name=exists,proto3" json:"exists,omitempty"` // a skill of this name is stored
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ChatSkillPreviewProto) Reset() {
+	*x = ChatSkillPreviewProto{}
+	mi := &file_mddb_proto_msgTypes[259]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ChatSkillPreviewProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ChatSkillPreviewProto) ProtoMessage() {}
+
+func (x *ChatSkillPreviewProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[259]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ChatSkillPreviewProto.ProtoReflect.Descriptor instead.
+func (*ChatSkillPreviewProto) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{259}
+}
+
+func (x *ChatSkillPreviewProto) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *ChatSkillPreviewProto) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ChatSkillPreviewProto) GetContent() string {
+	if x != nil {
+		return x.Content
+	}
+	return ""
+}
+
+func (x *ChatSkillPreviewProto) GetRaw() string {
+	if x != nil {
+		return x.Raw
+	}
+	return ""
+}
+
+func (x *ChatSkillPreviewProto) GetSource() *ChatSkillSourceProto {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *ChatSkillPreviewProto) GetBytes() int64 {
+	if x != nil {
+		return x.Bytes
+	}
+	return 0
+}
+
+func (x *ChatSkillPreviewProto) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *ChatSkillPreviewProto) GetExists() bool {
+	if x != nil {
+		return x.Exists
+	}
+	return false
+}
+
+type UpdateChatSkillRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Confirm       bool                   `protobuf:"varint,2,opt,name=confirm,proto3" json:"confirm,omitempty"` // false: preview only
+	Sha256        string                 `protobuf:"bytes,3,opt,name=sha256,proto3" json:"sha256,omitempty"`    // of the preview read; ABORTED when the source changed since
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateChatSkillRequest) Reset() {
+	*x = UpdateChatSkillRequest{}
+	mi := &file_mddb_proto_msgTypes[260]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateChatSkillRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateChatSkillRequest) ProtoMessage() {}
+
+func (x *UpdateChatSkillRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[260]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateChatSkillRequest.ProtoReflect.Descriptor instead.
+func (*UpdateChatSkillRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{260}
+}
+
+func (x *UpdateChatSkillRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *UpdateChatSkillRequest) GetConfirm() bool {
+	if x != nil {
+		return x.Confirm
+	}
+	return false
+}
+
+func (x *UpdateChatSkillRequest) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+type UpdateChatSkillResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Skill         *ChatSkillProto        `protobuf:"bytes,1,opt,name=skill,proto3" json:"skill,omitempty"`     // the stored skill, after the save when saved
+	Preview       *ChatSkillPreviewProto `protobuf:"bytes,2,opt,name=preview,proto3" json:"preview,omitempty"` // what the source holds now
+	Changed       bool                   `protobuf:"varint,3,opt,name=changed,proto3" json:"changed,omitempty"`
+	Saved         bool                   `protobuf:"varint,4,opt,name=saved,proto3" json:"saved,omitempty"`
+	Version       uint64                 `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateChatSkillResponse) Reset() {
+	*x = UpdateChatSkillResponse{}
+	mi := &file_mddb_proto_msgTypes[261]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateChatSkillResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateChatSkillResponse) ProtoMessage() {}
+
+func (x *UpdateChatSkillResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[261]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateChatSkillResponse.ProtoReflect.Descriptor instead.
+func (*UpdateChatSkillResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{261}
+}
+
+func (x *UpdateChatSkillResponse) GetSkill() *ChatSkillProto {
+	if x != nil {
+		return x.Skill
+	}
+	return nil
+}
+
+func (x *UpdateChatSkillResponse) GetPreview() *ChatSkillPreviewProto {
+	if x != nil {
+		return x.Preview
+	}
+	return nil
+}
+
+func (x *UpdateChatSkillResponse) GetChanged() bool {
+	if x != nil {
+		return x.Changed
+	}
+	return false
+}
+
+func (x *UpdateChatSkillResponse) GetSaved() bool {
+	if x != nil {
+		return x.Saved
+	}
+	return false
+}
+
+func (x *UpdateChatSkillResponse) GetVersion() uint64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+type GetChatSkillUsedByRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatSkillUsedByRequest) Reset() {
+	*x = GetChatSkillUsedByRequest{}
+	mi := &file_mddb_proto_msgTypes[262]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatSkillUsedByRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatSkillUsedByRequest) ProtoMessage() {}
+
+func (x *GetChatSkillUsedByRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[262]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatSkillUsedByRequest.ProtoReflect.Descriptor instead.
+func (*GetChatSkillUsedByRequest) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{262}
+}
+
+func (x *GetChatSkillUsedByRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type GetChatSkillUsedByResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Scenarios     []string               `protobuf:"bytes,2,rep,name=scenarios,proto3" json:"scenarios,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetChatSkillUsedByResponse) Reset() {
+	*x = GetChatSkillUsedByResponse{}
+	mi := &file_mddb_proto_msgTypes[263]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetChatSkillUsedByResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetChatSkillUsedByResponse) ProtoMessage() {}
+
+func (x *GetChatSkillUsedByResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mddb_proto_msgTypes[263]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetChatSkillUsedByResponse.ProtoReflect.Descriptor instead.
+func (*GetChatSkillUsedByResponse) Descriptor() ([]byte, []int) {
+	return file_mddb_proto_rawDescGZIP(), []int{263}
+}
+
+func (x *GetChatSkillUsedByResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *GetChatSkillUsedByResponse) GetScenarios() []string {
+	if x != nil {
+		return x.Scenarios
+	}
+	return nil
+}
+
 type ChatToolCallProto struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -18082,7 +19094,7 @@ type ChatToolCallProto struct {
 
 func (x *ChatToolCallProto) Reset() {
 	*x = ChatToolCallProto{}
-	mi := &file_mddb_proto_msgTypes[248]
+	mi := &file_mddb_proto_msgTypes[264]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18094,7 +19106,7 @@ func (x *ChatToolCallProto) String() string {
 func (*ChatToolCallProto) ProtoMessage() {}
 
 func (x *ChatToolCallProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[248]
+	mi := &file_mddb_proto_msgTypes[264]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18107,7 +19119,7 @@ func (x *ChatToolCallProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatToolCallProto.ProtoReflect.Descriptor instead.
 func (*ChatToolCallProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{248}
+	return file_mddb_proto_rawDescGZIP(), []int{264}
 }
 
 func (x *ChatToolCallProto) GetName() string {
@@ -18148,7 +19160,7 @@ type ChatMessageProto struct {
 
 func (x *ChatMessageProto) Reset() {
 	*x = ChatMessageProto{}
-	mi := &file_mddb_proto_msgTypes[249]
+	mi := &file_mddb_proto_msgTypes[265]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18160,7 +19172,7 @@ func (x *ChatMessageProto) String() string {
 func (*ChatMessageProto) ProtoMessage() {}
 
 func (x *ChatMessageProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[249]
+	mi := &file_mddb_proto_msgTypes[265]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18173,7 +19185,7 @@ func (x *ChatMessageProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatMessageProto.ProtoReflect.Descriptor instead.
 func (*ChatMessageProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{249}
+	return file_mddb_proto_rawDescGZIP(), []int{265}
 }
 
 func (x *ChatMessageProto) GetId() string {
@@ -18260,7 +19272,7 @@ type ChatConversationProto struct {
 
 func (x *ChatConversationProto) Reset() {
 	*x = ChatConversationProto{}
-	mi := &file_mddb_proto_msgTypes[250]
+	mi := &file_mddb_proto_msgTypes[266]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18272,7 +19284,7 @@ func (x *ChatConversationProto) String() string {
 func (*ChatConversationProto) ProtoMessage() {}
 
 func (x *ChatConversationProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[250]
+	mi := &file_mddb_proto_msgTypes[266]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18285,7 +19297,7 @@ func (x *ChatConversationProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChatConversationProto.ProtoReflect.Descriptor instead.
 func (*ChatConversationProto) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{250}
+	return file_mddb_proto_rawDescGZIP(), []int{266}
 }
 
 func (x *ChatConversationProto) GetId() string {
@@ -18391,7 +19403,7 @@ type CreateChatConversationRequest struct {
 
 func (x *CreateChatConversationRequest) Reset() {
 	*x = CreateChatConversationRequest{}
-	mi := &file_mddb_proto_msgTypes[251]
+	mi := &file_mddb_proto_msgTypes[267]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18403,7 +19415,7 @@ func (x *CreateChatConversationRequest) String() string {
 func (*CreateChatConversationRequest) ProtoMessage() {}
 
 func (x *CreateChatConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[251]
+	mi := &file_mddb_proto_msgTypes[267]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18416,7 +19428,7 @@ func (x *CreateChatConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateChatConversationRequest.ProtoReflect.Descriptor instead.
 func (*CreateChatConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{251}
+	return file_mddb_proto_rawDescGZIP(), []int{267}
 }
 
 func (x *CreateChatConversationRequest) GetSub() string {
@@ -18459,7 +19471,7 @@ type ListChatConversationsRequest struct {
 
 func (x *ListChatConversationsRequest) Reset() {
 	*x = ListChatConversationsRequest{}
-	mi := &file_mddb_proto_msgTypes[252]
+	mi := &file_mddb_proto_msgTypes[268]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18471,7 +19483,7 @@ func (x *ListChatConversationsRequest) String() string {
 func (*ListChatConversationsRequest) ProtoMessage() {}
 
 func (x *ListChatConversationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[252]
+	mi := &file_mddb_proto_msgTypes[268]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18484,7 +19496,7 @@ func (x *ListChatConversationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChatConversationsRequest.ProtoReflect.Descriptor instead.
 func (*ListChatConversationsRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{252}
+	return file_mddb_proto_rawDescGZIP(), []int{268}
 }
 
 func (x *ListChatConversationsRequest) GetSub() string {
@@ -18525,7 +19537,7 @@ type ListChatConversationsResponse struct {
 
 func (x *ListChatConversationsResponse) Reset() {
 	*x = ListChatConversationsResponse{}
-	mi := &file_mddb_proto_msgTypes[253]
+	mi := &file_mddb_proto_msgTypes[269]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18537,7 +19549,7 @@ func (x *ListChatConversationsResponse) String() string {
 func (*ListChatConversationsResponse) ProtoMessage() {}
 
 func (x *ListChatConversationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[253]
+	mi := &file_mddb_proto_msgTypes[269]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18550,7 +19562,7 @@ func (x *ListChatConversationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChatConversationsResponse.ProtoReflect.Descriptor instead.
 func (*ListChatConversationsResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{253}
+	return file_mddb_proto_rawDescGZIP(), []int{269}
 }
 
 func (x *ListChatConversationsResponse) GetConversations() []*ChatConversationProto {
@@ -18578,7 +19590,7 @@ type GetChatConversationRequest struct {
 
 func (x *GetChatConversationRequest) Reset() {
 	*x = GetChatConversationRequest{}
-	mi := &file_mddb_proto_msgTypes[254]
+	mi := &file_mddb_proto_msgTypes[270]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18590,7 +19602,7 @@ func (x *GetChatConversationRequest) String() string {
 func (*GetChatConversationRequest) ProtoMessage() {}
 
 func (x *GetChatConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[254]
+	mi := &file_mddb_proto_msgTypes[270]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18603,7 +19615,7 @@ func (x *GetChatConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetChatConversationRequest.ProtoReflect.Descriptor instead.
 func (*GetChatConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{254}
+	return file_mddb_proto_rawDescGZIP(), []int{270}
 }
 
 func (x *GetChatConversationRequest) GetId() string {
@@ -18638,7 +19650,7 @@ type AppendChatMessagesRequest struct {
 
 func (x *AppendChatMessagesRequest) Reset() {
 	*x = AppendChatMessagesRequest{}
-	mi := &file_mddb_proto_msgTypes[255]
+	mi := &file_mddb_proto_msgTypes[271]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18650,7 +19662,7 @@ func (x *AppendChatMessagesRequest) String() string {
 func (*AppendChatMessagesRequest) ProtoMessage() {}
 
 func (x *AppendChatMessagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[255]
+	mi := &file_mddb_proto_msgTypes[271]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18663,7 +19675,7 @@ func (x *AppendChatMessagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppendChatMessagesRequest.ProtoReflect.Descriptor instead.
 func (*AppendChatMessagesRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{255}
+	return file_mddb_proto_rawDescGZIP(), []int{271}
 }
 
 func (x *AppendChatMessagesRequest) GetId() string {
@@ -18697,7 +19709,7 @@ type EndChatConversationRequest struct {
 
 func (x *EndChatConversationRequest) Reset() {
 	*x = EndChatConversationRequest{}
-	mi := &file_mddb_proto_msgTypes[256]
+	mi := &file_mddb_proto_msgTypes[272]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18709,7 +19721,7 @@ func (x *EndChatConversationRequest) String() string {
 func (*EndChatConversationRequest) ProtoMessage() {}
 
 func (x *EndChatConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[256]
+	mi := &file_mddb_proto_msgTypes[272]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18722,7 +19734,7 @@ func (x *EndChatConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EndChatConversationRequest.ProtoReflect.Descriptor instead.
 func (*EndChatConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{256}
+	return file_mddb_proto_rawDescGZIP(), []int{272}
 }
 
 func (x *EndChatConversationRequest) GetId() string {
@@ -18749,7 +19761,7 @@ type DeleteChatConversationRequest struct {
 
 func (x *DeleteChatConversationRequest) Reset() {
 	*x = DeleteChatConversationRequest{}
-	mi := &file_mddb_proto_msgTypes[257]
+	mi := &file_mddb_proto_msgTypes[273]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18761,7 +19773,7 @@ func (x *DeleteChatConversationRequest) String() string {
 func (*DeleteChatConversationRequest) ProtoMessage() {}
 
 func (x *DeleteChatConversationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[257]
+	mi := &file_mddb_proto_msgTypes[273]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18774,7 +19786,7 @@ func (x *DeleteChatConversationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteChatConversationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteChatConversationRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{257}
+	return file_mddb_proto_rawDescGZIP(), []int{273}
 }
 
 func (x *DeleteChatConversationRequest) GetId() string {
@@ -18801,7 +19813,7 @@ type DeleteChatConversationResponse struct {
 
 func (x *DeleteChatConversationResponse) Reset() {
 	*x = DeleteChatConversationResponse{}
-	mi := &file_mddb_proto_msgTypes[258]
+	mi := &file_mddb_proto_msgTypes[274]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18813,7 +19825,7 @@ func (x *DeleteChatConversationResponse) String() string {
 func (*DeleteChatConversationResponse) ProtoMessage() {}
 
 func (x *DeleteChatConversationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[258]
+	mi := &file_mddb_proto_msgTypes[274]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18826,7 +19838,7 @@ func (x *DeleteChatConversationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteChatConversationResponse.ProtoReflect.Descriptor instead.
 func (*DeleteChatConversationResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{258}
+	return file_mddb_proto_rawDescGZIP(), []int{274}
 }
 
 func (x *DeleteChatConversationResponse) GetDeleted() bool {
@@ -18852,7 +19864,7 @@ type DeleteChatConversationsForUserRequest struct {
 
 func (x *DeleteChatConversationsForUserRequest) Reset() {
 	*x = DeleteChatConversationsForUserRequest{}
-	mi := &file_mddb_proto_msgTypes[259]
+	mi := &file_mddb_proto_msgTypes[275]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18864,7 +19876,7 @@ func (x *DeleteChatConversationsForUserRequest) String() string {
 func (*DeleteChatConversationsForUserRequest) ProtoMessage() {}
 
 func (x *DeleteChatConversationsForUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[259]
+	mi := &file_mddb_proto_msgTypes[275]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18877,7 +19889,7 @@ func (x *DeleteChatConversationsForUserRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use DeleteChatConversationsForUserRequest.ProtoReflect.Descriptor instead.
 func (*DeleteChatConversationsForUserRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{259}
+	return file_mddb_proto_rawDescGZIP(), []int{275}
 }
 
 func (x *DeleteChatConversationsForUserRequest) GetSub() string {
@@ -18897,7 +19909,7 @@ type DeleteChatConversationsForUserResponse struct {
 
 func (x *DeleteChatConversationsForUserResponse) Reset() {
 	*x = DeleteChatConversationsForUserResponse{}
-	mi := &file_mddb_proto_msgTypes[260]
+	mi := &file_mddb_proto_msgTypes[276]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18909,7 +19921,7 @@ func (x *DeleteChatConversationsForUserResponse) String() string {
 func (*DeleteChatConversationsForUserResponse) ProtoMessage() {}
 
 func (x *DeleteChatConversationsForUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[260]
+	mi := &file_mddb_proto_msgTypes[276]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18922,7 +19934,7 @@ func (x *DeleteChatConversationsForUserResponse) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use DeleteChatConversationsForUserResponse.ProtoReflect.Descriptor instead.
 func (*DeleteChatConversationsForUserResponse) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{260}
+	return file_mddb_proto_rawDescGZIP(), []int{276}
 }
 
 func (x *DeleteChatConversationsForUserResponse) GetDeleted() int32 {
@@ -18948,7 +19960,7 @@ type ExportChatConversationsRequest struct {
 
 func (x *ExportChatConversationsRequest) Reset() {
 	*x = ExportChatConversationsRequest{}
-	mi := &file_mddb_proto_msgTypes[261]
+	mi := &file_mddb_proto_msgTypes[277]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -18960,7 +19972,7 @@ func (x *ExportChatConversationsRequest) String() string {
 func (*ExportChatConversationsRequest) ProtoMessage() {}
 
 func (x *ExportChatConversationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mddb_proto_msgTypes[261]
+	mi := &file_mddb_proto_msgTypes[277]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -18973,7 +19985,7 @@ func (x *ExportChatConversationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExportChatConversationsRequest.ProtoReflect.Descriptor instead.
 func (*ExportChatConversationsRequest) Descriptor() ([]byte, []int) {
-	return file_mddb_proto_rawDescGZIP(), []int{261}
+	return file_mddb_proto_rawDescGZIP(), []int{277}
 }
 
 func (x *ExportChatConversationsRequest) GetSub() string {
@@ -20843,11 +21855,86 @@ const file_mddb_proto_rawDesc = "" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\x04R\aversion\"2\n" +
 	"\x1cGetChatScenarioPromptRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"e\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\xe1\x01\n" +
 	"\x1dGetChatScenarioPromptResponse\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x16\n" +
 	"\x06prompt\x18\x02 \x01(\tR\x06prompt\x12\x18\n" +
-	"\aversion\x18\x03 \x01(\x04R\aversion\"h\n" +
+	"\aversion\x18\x03 \x01(\x04R\aversion\x12\x14\n" +
+	"\x05bytes\x18\x04 \x01(\x03R\x05bytes\x12#\n" +
+	"\rapprox_tokens\x18\x05 \x01(\x03R\fapproxTokens\x12\x18\n" +
+	"\awarning\x18\x06 \x01(\tR\awarning\x12%\n" +
+	"\x0emissing_skills\x18\a \x03(\tR\rmissingSkills\"_\n" +
+	"\x14ChatSkillSourceProto\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12\x16\n" +
+	"\x06commit\x18\x02 \x01(\tR\x06commit\x12\x1d\n" +
+	"\n" +
+	"fetched_at\x18\x03 \x01(\x03R\tfetchedAt\"\xbd\x01\n" +
+	"\x16ChatSkillRevisionProto\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x05R\aversion\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x14\n" +
+	"\x05bytes\x18\x03 \x01(\x03R\x05bytes\x122\n" +
+	"\x06source\x18\x04 \x01(\v2\x1a.mddb.ChatSkillSourceProtoR\x06source\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x05 \x01(\x03R\tupdatedAt\"\xd3\x02\n" +
+	"\x0eChatSkillProto\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\tR\acontent\x122\n" +
+	"\x06source\x18\x04 \x01(\v2\x1a.mddb.ChatSkillSourceProtoR\x06source\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\x05R\aversion\x126\n" +
+	"\ahistory\x18\x06 \x03(\v2\x1c.mddb.ChatSkillRevisionProtoR\ahistory\x12\x14\n" +
+	"\x05bytes\x18\a \x01(\x03R\x05bytes\x12\x17\n" +
+	"\aused_by\x18\b \x03(\tR\x06usedBy\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\t \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\n" +
+	" \x01(\x03R\tupdatedAt\"\x17\n" +
+	"\x15ListChatSkillsRequest\"`\n" +
+	"\x16ListChatSkillsResponse\x12,\n" +
+	"\x06skills\x18\x01 \x03(\v2\x14.mddb.ChatSkillProtoR\x06skills\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x04R\aversion\"C\n" +
+	"\x13GetChatSkillRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x05R\aversion\"A\n" +
+	"\x13PutChatSkillRequest\x12*\n" +
+	"\x05skill\x18\x01 \x01(\v2\x14.mddb.ChatSkillProtoR\x05skill\"v\n" +
+	"\x14PutChatSkillResponse\x12*\n" +
+	"\x05skill\x18\x01 \x01(\v2\x14.mddb.ChatSkillProtoR\x05skill\x12\x18\n" +
+	"\acreated\x18\x02 \x01(\bR\acreated\x12\x18\n" +
+	"\aversion\x18\x03 \x01(\x04R\aversion\",\n" +
+	"\x16DeleteChatSkillRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"M\n" +
+	"\x17DeleteChatSkillResponse\x12\x18\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\x04R\aversion\"D\n" +
+	"\x16ImportChatSkillRequest\x12\x10\n" +
+	"\x03url\x18\x01 \x01(\tR\x03url\x12\x18\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\"\xf3\x01\n" +
+	"\x15ChatSkillPreviewProto\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x18\n" +
+	"\acontent\x18\x03 \x01(\tR\acontent\x12\x10\n" +
+	"\x03raw\x18\x04 \x01(\tR\x03raw\x122\n" +
+	"\x06source\x18\x05 \x01(\v2\x1a.mddb.ChatSkillSourceProtoR\x06source\x12\x14\n" +
+	"\x05bytes\x18\x06 \x01(\x03R\x05bytes\x12\x16\n" +
+	"\x06sha256\x18\a \x01(\tR\x06sha256\x12\x16\n" +
+	"\x06exists\x18\b \x01(\bR\x06exists\"^\n" +
+	"\x16UpdateChatSkillRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\aconfirm\x18\x02 \x01(\bR\aconfirm\x12\x16\n" +
+	"\x06sha256\x18\x03 \x01(\tR\x06sha256\"\xc6\x01\n" +
+	"\x17UpdateChatSkillResponse\x12*\n" +
+	"\x05skill\x18\x01 \x01(\v2\x14.mddb.ChatSkillProtoR\x05skill\x125\n" +
+	"\apreview\x18\x02 \x01(\v2\x1b.mddb.ChatSkillPreviewProtoR\apreview\x12\x18\n" +
+	"\achanged\x18\x03 \x01(\bR\achanged\x12\x14\n" +
+	"\x05saved\x18\x04 \x01(\bR\x05saved\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\x04R\aversion\"/\n" +
+	"\x19GetChatSkillUsedByRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"N\n" +
+	"\x1aGetChatSkillUsedByResponse\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1c\n" +
+	"\tscenarios\x18\x02 \x03(\tR\tscenarios\"h\n" +
 	"\x11ChatToolCallProto\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
@@ -20922,7 +22009,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\adeleted\x18\x01 \x01(\x05R\adeleted\x12\x10\n" +
 	"\x03sub\x18\x02 \x01(\tR\x03sub\"2\n" +
 	"\x1eExportChatConversationsRequest\x12\x10\n" +
-	"\x03sub\x18\x01 \x01(\tR\x03sub2\xe67\n" +
+	"\x03sub\x18\x01 \x01(\tR\x03sub2\x82<\n" +
 	"\x04MDDB\x12'\n" +
 	"\x03Add\x12\x10.mddb.AddRequest\x1a\x0e.mddb.Document\x129\n" +
 	"\bAddBatch\x12\x15.mddb.AddBatchRequest\x1a\x16.mddb.AddBatchResponse\x12B\n" +
@@ -21018,7 +22105,14 @@ const file_mddb_proto_rawDesc = "" +
 	"\x0fGetChatScenario\x12\x1c.mddb.GetChatScenarioRequest\x1a\x17.mddb.ChatScenarioProto\x12N\n" +
 	"\x0fPutChatScenario\x12\x1c.mddb.PutChatScenarioRequest\x1a\x1d.mddb.PutChatScenarioResponse\x12W\n" +
 	"\x12DeleteChatScenario\x12\x1f.mddb.DeleteChatScenarioRequest\x1a .mddb.DeleteChatScenarioResponse\x12`\n" +
-	"\x15GetChatScenarioPrompt\x12\".mddb.GetChatScenarioPromptRequest\x1a#.mddb.GetChatScenarioPromptResponse\x12Z\n" +
+	"\x15GetChatScenarioPrompt\x12\".mddb.GetChatScenarioPromptRequest\x1a#.mddb.GetChatScenarioPromptResponse\x12K\n" +
+	"\x0eListChatSkills\x12\x1b.mddb.ListChatSkillsRequest\x1a\x1c.mddb.ListChatSkillsResponse\x12?\n" +
+	"\fGetChatSkill\x12\x19.mddb.GetChatSkillRequest\x1a\x14.mddb.ChatSkillProto\x12E\n" +
+	"\fPutChatSkill\x12\x19.mddb.PutChatSkillRequest\x1a\x1a.mddb.PutChatSkillResponse\x12N\n" +
+	"\x0fDeleteChatSkill\x12\x1c.mddb.DeleteChatSkillRequest\x1a\x1d.mddb.DeleteChatSkillResponse\x12L\n" +
+	"\x0fImportChatSkill\x12\x1c.mddb.ImportChatSkillRequest\x1a\x1b.mddb.ChatSkillPreviewProto\x12N\n" +
+	"\x0fUpdateChatSkill\x12\x1c.mddb.UpdateChatSkillRequest\x1a\x1d.mddb.UpdateChatSkillResponse\x12W\n" +
+	"\x12GetChatSkillUsedBy\x12\x1f.mddb.GetChatSkillUsedByRequest\x1a .mddb.GetChatSkillUsedByResponse\x12Z\n" +
 	"\x16CreateChatConversation\x12#.mddb.CreateChatConversationRequest\x1a\x1b.mddb.ChatConversationProto\x12`\n" +
 	"\x15ListChatConversations\x12\".mddb.ListChatConversationsRequest\x1a#.mddb.ListChatConversationsResponse\x12T\n" +
 	"\x13GetChatConversation\x12 .mddb.GetChatConversationRequest\x1a\x1b.mddb.ChatConversationProto\x12R\n" +
@@ -21046,7 +22140,7 @@ func file_mddb_proto_rawDescGZIP() []byte {
 	return file_mddb_proto_rawDescData
 }
 
-var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 307)
+var file_mddb_proto_msgTypes = make([]protoimpl.MessageInfo, 323)
 var file_mddb_proto_goTypes = []any{
 	(*Document)(nil),                               // 0: mddb.Document
 	(*MetaValues)(nil),                             // 1: mddb.MetaValues
@@ -21296,82 +22390,98 @@ var file_mddb_proto_goTypes = []any{
 	(*DeleteChatScenarioResponse)(nil),             // 245: mddb.DeleteChatScenarioResponse
 	(*GetChatScenarioPromptRequest)(nil),           // 246: mddb.GetChatScenarioPromptRequest
 	(*GetChatScenarioPromptResponse)(nil),          // 247: mddb.GetChatScenarioPromptResponse
-	(*ChatToolCallProto)(nil),                      // 248: mddb.ChatToolCallProto
-	(*ChatMessageProto)(nil),                       // 249: mddb.ChatMessageProto
-	(*ChatConversationProto)(nil),                  // 250: mddb.ChatConversationProto
-	(*CreateChatConversationRequest)(nil),          // 251: mddb.CreateChatConversationRequest
-	(*ListChatConversationsRequest)(nil),           // 252: mddb.ListChatConversationsRequest
-	(*ListChatConversationsResponse)(nil),          // 253: mddb.ListChatConversationsResponse
-	(*GetChatConversationRequest)(nil),             // 254: mddb.GetChatConversationRequest
-	(*AppendChatMessagesRequest)(nil),              // 255: mddb.AppendChatMessagesRequest
-	(*EndChatConversationRequest)(nil),             // 256: mddb.EndChatConversationRequest
-	(*DeleteChatConversationRequest)(nil),          // 257: mddb.DeleteChatConversationRequest
-	(*DeleteChatConversationResponse)(nil),         // 258: mddb.DeleteChatConversationResponse
-	(*DeleteChatConversationsForUserRequest)(nil),  // 259: mddb.DeleteChatConversationsForUserRequest
-	(*DeleteChatConversationsForUserResponse)(nil), // 260: mddb.DeleteChatConversationsForUserResponse
-	(*ExportChatConversationsRequest)(nil),         // 261: mddb.ExportChatConversationsRequest
-	nil,                                            // 262: mddb.Document.MetaEntry
-	nil,                                            // 263: mddb.AddRequest.MetaEntry
-	nil,                                            // 264: mddb.BatchDocument.MetaEntry
-	nil,                                            // 265: mddb.GetRequest.EnvEntry
-	nil,                                            // 266: mddb.SearchRequest.FilterMetaEntry
-	nil,                                            // 267: mddb.SearchRequest.FilterEntry
-	nil,                                            // 268: mddb.ExportRequest.FilterMetaEntry
-	nil,                                            // 269: mddb.UpdateDocument.MetaEntry
-	nil,                                            // 270: mddb.VectorSearchRequest.FilterMetaEntry
-	nil,                                            // 271: mddb.VectorSearchRequest.FilterEntry
-	nil,                                            // 272: mddb.SearchPlan.CollectionsEntry
-	nil,                                            // 273: mddb.VectorStatsResponse.CollectionsEntry
-	nil,                                            // 274: mddb.ImportURLRequest.MetaEntry
-	nil,                                            // 275: mddb.FTSRequest.FilterMetaEntry
-	nil,                                            // 276: mddb.FTSRequest.BoostEntry
-	nil,                                            // 277: mddb.FTSRequest.FilterEntry
-	nil,                                            // 278: mddb.FTSResponse.FacetsEntry
-	nil,                                            // 279: mddb.HybridSearchRequest.FilterMetaEntry
-	nil,                                            // 280: mddb.HybridSearchRequest.FieldWeightsEntry
-	nil,                                            // 281: mddb.HybridSearchRequest.BoostEntry
-	nil,                                            // 282: mddb.HybridSearchRequest.FilterEntry
-	nil,                                            // 283: mddb.HybridSearchResponse.FacetsEntry
-	nil,                                            // 284: mddb.ValidateDocumentRequest.MetaEntry
-	nil,                                            // 285: mddb.UpdateDocumentRequest.MetaEntry
-	nil,                                            // 286: mddb.GetDocumentMetaResponse.MetaEntry
-	nil,                                            // 287: mddb.GetMetaKeysResponse.MetaEntry
-	nil,                                            // 288: mddb.AutomationRuleProto.HeadersEntry
-	nil,                                            // 289: mddb.CollectionConfigProto.CustomMetaEntry
-	nil,                                            // 290: mddb.SetCollectionConfigRequest.CustomMetaEntry
-	nil,                                            // 291: mddb.CrossSearchRequest.FilterMetaEntry
-	nil,                                            // 292: mddb.CrossSearchRequest.FilterEntry
-	nil,                                            // 293: mddb.IngestDocument.MetaEntry
-	nil,                                            // 294: mddb.RevisionEntryProto.MetaEntry
-	nil,                                            // 295: mddb.GeoSearchRequest.FilterMetaEntry
-	nil,                                            // 296: mddb.GeoWithinRequest.FilterMetaEntry
-	nil,                                            // 297: mddb.GeoReindexResponse.PostcodesLoadedEntry
-	nil,                                            // 298: mddb.GeoStatsResponse.CollectionsEntry
-	nil,                                            // 299: mddb.GeoStatsResponse.PostcodeDatasetsEntry
-	nil,                                            // 300: mddb.EvalQueryProto.GradesEntry
-	nil,                                            // 301: mddb.GainCountersProto.SearchesEntry
-	nil,                                            // 302: mddb.GainCountersProto.AlgorithmsEntry
-	nil,                                            // 303: mddb.GainCountersProto.FusionEntry
-	nil,                                            // 304: mddb.WhereRequest.FilterMetaEntry
-	nil,                                            // 305: mddb.WhereRequest.FilterEntry
-	nil,                                            // 306: mddb.WhereRequest.MetaEntry
+	(*ChatSkillSourceProto)(nil),                   // 248: mddb.ChatSkillSourceProto
+	(*ChatSkillRevisionProto)(nil),                 // 249: mddb.ChatSkillRevisionProto
+	(*ChatSkillProto)(nil),                         // 250: mddb.ChatSkillProto
+	(*ListChatSkillsRequest)(nil),                  // 251: mddb.ListChatSkillsRequest
+	(*ListChatSkillsResponse)(nil),                 // 252: mddb.ListChatSkillsResponse
+	(*GetChatSkillRequest)(nil),                    // 253: mddb.GetChatSkillRequest
+	(*PutChatSkillRequest)(nil),                    // 254: mddb.PutChatSkillRequest
+	(*PutChatSkillResponse)(nil),                   // 255: mddb.PutChatSkillResponse
+	(*DeleteChatSkillRequest)(nil),                 // 256: mddb.DeleteChatSkillRequest
+	(*DeleteChatSkillResponse)(nil),                // 257: mddb.DeleteChatSkillResponse
+	(*ImportChatSkillRequest)(nil),                 // 258: mddb.ImportChatSkillRequest
+	(*ChatSkillPreviewProto)(nil),                  // 259: mddb.ChatSkillPreviewProto
+	(*UpdateChatSkillRequest)(nil),                 // 260: mddb.UpdateChatSkillRequest
+	(*UpdateChatSkillResponse)(nil),                // 261: mddb.UpdateChatSkillResponse
+	(*GetChatSkillUsedByRequest)(nil),              // 262: mddb.GetChatSkillUsedByRequest
+	(*GetChatSkillUsedByResponse)(nil),             // 263: mddb.GetChatSkillUsedByResponse
+	(*ChatToolCallProto)(nil),                      // 264: mddb.ChatToolCallProto
+	(*ChatMessageProto)(nil),                       // 265: mddb.ChatMessageProto
+	(*ChatConversationProto)(nil),                  // 266: mddb.ChatConversationProto
+	(*CreateChatConversationRequest)(nil),          // 267: mddb.CreateChatConversationRequest
+	(*ListChatConversationsRequest)(nil),           // 268: mddb.ListChatConversationsRequest
+	(*ListChatConversationsResponse)(nil),          // 269: mddb.ListChatConversationsResponse
+	(*GetChatConversationRequest)(nil),             // 270: mddb.GetChatConversationRequest
+	(*AppendChatMessagesRequest)(nil),              // 271: mddb.AppendChatMessagesRequest
+	(*EndChatConversationRequest)(nil),             // 272: mddb.EndChatConversationRequest
+	(*DeleteChatConversationRequest)(nil),          // 273: mddb.DeleteChatConversationRequest
+	(*DeleteChatConversationResponse)(nil),         // 274: mddb.DeleteChatConversationResponse
+	(*DeleteChatConversationsForUserRequest)(nil),  // 275: mddb.DeleteChatConversationsForUserRequest
+	(*DeleteChatConversationsForUserResponse)(nil), // 276: mddb.DeleteChatConversationsForUserResponse
+	(*ExportChatConversationsRequest)(nil),         // 277: mddb.ExportChatConversationsRequest
+	nil,                                            // 278: mddb.Document.MetaEntry
+	nil,                                            // 279: mddb.AddRequest.MetaEntry
+	nil,                                            // 280: mddb.BatchDocument.MetaEntry
+	nil,                                            // 281: mddb.GetRequest.EnvEntry
+	nil,                                            // 282: mddb.SearchRequest.FilterMetaEntry
+	nil,                                            // 283: mddb.SearchRequest.FilterEntry
+	nil,                                            // 284: mddb.ExportRequest.FilterMetaEntry
+	nil,                                            // 285: mddb.UpdateDocument.MetaEntry
+	nil,                                            // 286: mddb.VectorSearchRequest.FilterMetaEntry
+	nil,                                            // 287: mddb.VectorSearchRequest.FilterEntry
+	nil,                                            // 288: mddb.SearchPlan.CollectionsEntry
+	nil,                                            // 289: mddb.VectorStatsResponse.CollectionsEntry
+	nil,                                            // 290: mddb.ImportURLRequest.MetaEntry
+	nil,                                            // 291: mddb.FTSRequest.FilterMetaEntry
+	nil,                                            // 292: mddb.FTSRequest.BoostEntry
+	nil,                                            // 293: mddb.FTSRequest.FilterEntry
+	nil,                                            // 294: mddb.FTSResponse.FacetsEntry
+	nil,                                            // 295: mddb.HybridSearchRequest.FilterMetaEntry
+	nil,                                            // 296: mddb.HybridSearchRequest.FieldWeightsEntry
+	nil,                                            // 297: mddb.HybridSearchRequest.BoostEntry
+	nil,                                            // 298: mddb.HybridSearchRequest.FilterEntry
+	nil,                                            // 299: mddb.HybridSearchResponse.FacetsEntry
+	nil,                                            // 300: mddb.ValidateDocumentRequest.MetaEntry
+	nil,                                            // 301: mddb.UpdateDocumentRequest.MetaEntry
+	nil,                                            // 302: mddb.GetDocumentMetaResponse.MetaEntry
+	nil,                                            // 303: mddb.GetMetaKeysResponse.MetaEntry
+	nil,                                            // 304: mddb.AutomationRuleProto.HeadersEntry
+	nil,                                            // 305: mddb.CollectionConfigProto.CustomMetaEntry
+	nil,                                            // 306: mddb.SetCollectionConfigRequest.CustomMetaEntry
+	nil,                                            // 307: mddb.CrossSearchRequest.FilterMetaEntry
+	nil,                                            // 308: mddb.CrossSearchRequest.FilterEntry
+	nil,                                            // 309: mddb.IngestDocument.MetaEntry
+	nil,                                            // 310: mddb.RevisionEntryProto.MetaEntry
+	nil,                                            // 311: mddb.GeoSearchRequest.FilterMetaEntry
+	nil,                                            // 312: mddb.GeoWithinRequest.FilterMetaEntry
+	nil,                                            // 313: mddb.GeoReindexResponse.PostcodesLoadedEntry
+	nil,                                            // 314: mddb.GeoStatsResponse.CollectionsEntry
+	nil,                                            // 315: mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	nil,                                            // 316: mddb.EvalQueryProto.GradesEntry
+	nil,                                            // 317: mddb.GainCountersProto.SearchesEntry
+	nil,                                            // 318: mddb.GainCountersProto.AlgorithmsEntry
+	nil,                                            // 319: mddb.GainCountersProto.FusionEntry
+	nil,                                            // 320: mddb.WhereRequest.FilterMetaEntry
+	nil,                                            // 321: mddb.WhereRequest.FilterEntry
+	nil,                                            // 322: mddb.WhereRequest.MetaEntry
 }
 var file_mddb_proto_depIdxs = []int32{
-	262, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
-	263, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
+	278, // 0: mddb.Document.meta:type_name -> mddb.Document.MetaEntry
+	279, // 1: mddb.AddRequest.meta:type_name -> mddb.AddRequest.MetaEntry
 	4,   // 2: mddb.AddBatchRequest.documents:type_name -> mddb.BatchDocument
-	264, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
-	265, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
-	266, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
-	267, // 6: mddb.SearchRequest.filter:type_name -> mddb.SearchRequest.FilterEntry
+	280, // 3: mddb.BatchDocument.meta:type_name -> mddb.BatchDocument.MetaEntry
+	281, // 4: mddb.GetRequest.env:type_name -> mddb.GetRequest.EnvEntry
+	282, // 5: mddb.SearchRequest.filter_meta:type_name -> mddb.SearchRequest.FilterMetaEntry
+	283, // 6: mddb.SearchRequest.filter:type_name -> mddb.SearchRequest.FilterEntry
 	0,   // 7: mddb.SearchResponse.documents:type_name -> mddb.Document
-	268, // 8: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
+	284, // 8: mddb.ExportRequest.filter_meta:type_name -> mddb.ExportRequest.FilterMetaEntry
 	19,  // 9: mddb.StatsResponse.collections:type_name -> mddb.CollectionStats
 	21,  // 10: mddb.DeleteBatchRequest.documents:type_name -> mddb.DeleteDocument
 	24,  // 11: mddb.UpdateBatchRequest.documents:type_name -> mddb.UpdateDocument
-	269, // 12: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
-	270, // 13: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
-	271, // 14: mddb.VectorSearchRequest.filter:type_name -> mddb.VectorSearchRequest.FilterEntry
+	285, // 12: mddb.UpdateDocument.meta:type_name -> mddb.UpdateDocument.MetaEntry
+	286, // 13: mddb.VectorSearchRequest.filter_meta:type_name -> mddb.VectorSearchRequest.FilterMetaEntry
+	287, // 14: mddb.VectorSearchRequest.filter:type_name -> mddb.VectorSearchRequest.FilterEntry
 	202, // 15: mddb.VectorSearchRequest.group_by:type_name -> mddb.GroupBy
 	28,  // 16: mddb.VectorSearchRequest.positive:type_name -> mddb.FeedbackExample
 	28,  // 17: mddb.VectorSearchRequest.negative:type_name -> mddb.FeedbackExample
@@ -21383,26 +22493,26 @@ var file_mddb_proto_depIdxs = []int32{
 	204, // 23: mddb.VectorSearchResponse.indexing:type_name -> mddb.IndexWaitResult
 	33,  // 24: mddb.VectorSearchResponse.plan:type_name -> mddb.SearchPlan
 	27,  // 25: mddb.VectorSearchResponse.image_hits:type_name -> mddb.ImageRef
-	272, // 26: mddb.SearchPlan.collections:type_name -> mddb.SearchPlan.CollectionsEntry
+	288, // 26: mddb.SearchPlan.collections:type_name -> mddb.SearchPlan.CollectionsEntry
 	30,  // 27: mddb.SearchPlan.feedback:type_name -> mddb.FeedbackApplied
 	34,  // 28: mddb.SearchPlan.decomposition:type_name -> mddb.QueryDecomposition
-	273, // 29: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
-	274, // 30: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
-	275, // 31: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
-	276, // 32: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
-	277, // 33: mddb.FTSRequest.filter:type_name -> mddb.FTSRequest.FilterEntry
+	289, // 29: mddb.VectorStatsResponse.collections:type_name -> mddb.VectorStatsResponse.CollectionsEntry
+	290, // 30: mddb.ImportURLRequest.meta:type_name -> mddb.ImportURLRequest.MetaEntry
+	291, // 31: mddb.FTSRequest.filter_meta:type_name -> mddb.FTSRequest.FilterMetaEntry
+	292, // 32: mddb.FTSRequest.boost:type_name -> mddb.FTSRequest.BoostEntry
+	293, // 33: mddb.FTSRequest.filter:type_name -> mddb.FTSRequest.FilterEntry
 	202, // 34: mddb.FTSRequest.group_by:type_name -> mddb.GroupBy
 	0,   // 35: mddb.FTSResult.document:type_name -> mddb.Document
 	27,  // 36: mddb.FTSResult.images:type_name -> mddb.ImageRef
 	44,  // 37: mddb.FacetBucketList.buckets:type_name -> mddb.FacetBucketProto
 	43,  // 38: mddb.FTSResponse.results:type_name -> mddb.FTSResult
-	278, // 39: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
+	294, // 39: mddb.FTSResponse.facets:type_name -> mddb.FTSResponse.FacetsEntry
 	203, // 40: mddb.FTSResponse.passages:type_name -> mddb.Passage
 	50,  // 41: mddb.FTSLanguagesResponse.languages:type_name -> mddb.FTSLanguageInfo
-	279, // 42: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
-	280, // 43: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
-	281, // 44: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
-	282, // 45: mddb.HybridSearchRequest.filter:type_name -> mddb.HybridSearchRequest.FilterEntry
+	295, // 42: mddb.HybridSearchRequest.filter_meta:type_name -> mddb.HybridSearchRequest.FilterMetaEntry
+	296, // 43: mddb.HybridSearchRequest.field_weights:type_name -> mddb.HybridSearchRequest.FieldWeightsEntry
+	297, // 44: mddb.HybridSearchRequest.boost:type_name -> mddb.HybridSearchRequest.BoostEntry
+	298, // 45: mddb.HybridSearchRequest.filter:type_name -> mddb.HybridSearchRequest.FilterEntry
 	202, // 46: mddb.HybridSearchRequest.group_by:type_name -> mddb.GroupBy
 	28,  // 47: mddb.HybridSearchRequest.positive:type_name -> mddb.FeedbackExample
 	28,  // 48: mddb.HybridSearchRequest.negative:type_name -> mddb.FeedbackExample
@@ -21410,21 +22520,21 @@ var file_mddb_proto_depIdxs = []int32{
 	0,   // 50: mddb.HybridSearchResult.document:type_name -> mddb.Document
 	27,  // 51: mddb.HybridSearchResult.images:type_name -> mddb.ImageRef
 	53,  // 52: mddb.HybridSearchResponse.results:type_name -> mddb.HybridSearchResult
-	283, // 53: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
+	299, // 53: mddb.HybridSearchResponse.facets:type_name -> mddb.HybridSearchResponse.FacetsEntry
 	203, // 54: mddb.HybridSearchResponse.passages:type_name -> mddb.Passage
 	204, // 55: mddb.HybridSearchResponse.indexing:type_name -> mddb.IndexWaitResult
 	33,  // 56: mddb.HybridSearchResponse.plan:type_name -> mddb.SearchPlan
 	27,  // 57: mddb.HybridSearchResponse.image_hits:type_name -> mddb.ImageRef
 	55,  // 58: mddb.ListWebhooksResponse.webhooks:type_name -> mddb.WebhookProto
 	69,  // 59: mddb.ListSchemasResponse.schemas:type_name -> mddb.SchemaInfo
-	284, // 60: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
-	285, // 61: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
-	286, // 62: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
+	300, // 60: mddb.ValidateDocumentRequest.meta:type_name -> mddb.ValidateDocumentRequest.MetaEntry
+	301, // 61: mddb.UpdateDocumentRequest.meta:type_name -> mddb.UpdateDocumentRequest.MetaEntry
+	302, // 62: mddb.GetDocumentMetaResponse.meta:type_name -> mddb.GetDocumentMetaResponse.MetaEntry
 	76,  // 63: mddb.ClassifyResponse.results:type_name -> mddb.ClassifyLabelScore
 	82,  // 64: mddb.ListSynonymsResponse.entries:type_name -> mddb.SynonymEntry
 	89,  // 65: mddb.ListStopwordsResponse.entries:type_name -> mddb.StopwordEntry
-	287, // 66: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
-	288, // 67: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
+	303, // 66: mddb.GetMetaKeysResponse.meta:type_name -> mddb.GetMetaKeysResponse.MetaEntry
+	304, // 67: mddb.AutomationRuleProto.headers:type_name -> mddb.AutomationRuleProto.HeadersEntry
 	103, // 68: mddb.AutomationRuleProto.backup:type_name -> mddb.BackupActionProto
 	102, // 69: mddb.AutomationRuleProto.sync:type_name -> mddb.SyncActionProto
 	101, // 70: mddb.AutomationRuleProto.last_result:type_name -> mddb.AutomationRunResultProto
@@ -21436,7 +22546,7 @@ var file_mddb_proto_depIdxs = []int32{
 	100, // 76: mddb.TestAutomationResponse.trigger:type_name -> mddb.AutomationRuleProto
 	0,   // 77: mddb.TestAutomationResponse.matches:type_name -> mddb.Document
 	115, // 78: mddb.GetAutomationLogsResponse.logs:type_name -> mddb.AutomationLogEntryProto
-	289, // 79: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
+	305, // 79: mddb.CollectionConfigProto.custom_meta:type_name -> mddb.CollectionConfigProto.CustomMetaEntry
 	118, // 80: mddb.CollectionConfigProto.retrieval:type_name -> mddb.RetrievalProfileProto
 	119, // 81: mddb.CollectionConfigProto.storage_config:type_name -> mddb.StorageConfigProto
 	120, // 82: mddb.CollectionConfigProto.wordpress:type_name -> mddb.WordPressTargetProto
@@ -21447,7 +22557,7 @@ var file_mddb_proto_depIdxs = []int32{
 	125, // 87: mddb.CollectionConfigProto.corpus:type_name -> mddb.CorpusInfoProto
 	124, // 88: mddb.GetCollectionConfigResponse.config:type_name -> mddb.CollectionConfigProto
 	128, // 89: mddb.GetCollectionConfigResponse.usage:type_name -> mddb.CollectionQuotaUsageProto
-	290, // 90: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
+	306, // 90: mddb.SetCollectionConfigRequest.custom_meta:type_name -> mddb.SetCollectionConfigRequest.CustomMetaEntry
 	118, // 91: mddb.SetCollectionConfigRequest.retrieval:type_name -> mddb.RetrievalProfileProto
 	119, // 92: mddb.SetCollectionConfigRequest.storage_config:type_name -> mddb.StorageConfigProto
 	120, // 93: mddb.SetCollectionConfigRequest.wordpress:type_name -> mddb.WordPressTargetProto
@@ -21457,8 +22567,8 @@ var file_mddb_proto_depIdxs = []int32{
 	126, // 97: mddb.SetCollectionConfigRequest.quota:type_name -> mddb.CollectionQuotaProto
 	124, // 98: mddb.CollectionConfigEntry.config:type_name -> mddb.CollectionConfigProto
 	133, // 99: mddb.ListCollectionConfigsResponse.configs:type_name -> mddb.CollectionConfigEntry
-	291, // 100: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
-	292, // 101: mddb.CrossSearchRequest.filter:type_name -> mddb.CrossSearchRequest.FilterEntry
+	307, // 100: mddb.CrossSearchRequest.filter_meta:type_name -> mddb.CrossSearchRequest.FilterMetaEntry
+	308, // 101: mddb.CrossSearchRequest.filter:type_name -> mddb.CrossSearchRequest.FilterEntry
 	202, // 102: mddb.CrossSearchRequest.group_by:type_name -> mddb.GroupBy
 	28,  // 103: mddb.CrossSearchRequest.positive:type_name -> mddb.FeedbackExample
 	28,  // 104: mddb.CrossSearchRequest.negative:type_name -> mddb.FeedbackExample
@@ -21472,27 +22582,27 @@ var file_mddb_proto_depIdxs = []int32{
 	139, // 112: mddb.DuplicateGroupProto.documents:type_name -> mddb.DuplicateDocInfoProto
 	140, // 113: mddb.FindDuplicatesResponse.exact_groups:type_name -> mddb.DuplicateGroupProto
 	140, // 114: mddb.FindDuplicatesResponse.similar_groups:type_name -> mddb.DuplicateGroupProto
-	293, // 115: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
+	309, // 115: mddb.IngestDocument.meta:type_name -> mddb.IngestDocument.MetaEntry
 	143, // 116: mddb.IngestDocument.images:type_name -> mddb.IngestImage
 	142, // 117: mddb.IngestRequest.documents:type_name -> mddb.IngestDocument
 	144, // 118: mddb.IngestRequest.options:type_name -> mddb.IngestOptions
 	147, // 119: mddb.IngestResponse.conversions:type_name -> mddb.IngestConversion
-	294, // 120: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
+	310, // 120: mddb.RevisionEntryProto.meta:type_name -> mddb.RevisionEntryProto.MetaEntry
 	149, // 121: mddb.ListRevisionsResponse.revisions:type_name -> mddb.RevisionEntryProto
 	158, // 122: mddb.ReplicationStatusResponse.followers:type_name -> mddb.FollowerInfo
 	162, // 123: mddb.TemporalQueryResponse.events:type_name -> mddb.TemporalEventProto
 	0,   // 124: mddb.TemporalHotEntry.document:type_name -> mddb.Document
 	165, // 125: mddb.TemporalHotResponse.entries:type_name -> mddb.TemporalHotEntry
 	168, // 126: mddb.SpellSuggestResponse.token_suggestions:type_name -> mddb.SpellSuggestionProto
-	295, // 127: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
+	311, // 127: mddb.GeoSearchRequest.filter_meta:type_name -> mddb.GeoSearchRequest.FilterMetaEntry
 	0,   // 128: mddb.GeoSearchResultItem.document:type_name -> mddb.Document
 	173, // 129: mddb.GeoSearchResponse.results:type_name -> mddb.GeoSearchResultItem
-	296, // 130: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
+	312, // 130: mddb.GeoWithinRequest.filter_meta:type_name -> mddb.GeoWithinRequest.FilterMetaEntry
 	173, // 131: mddb.GeoWithinResponse.results:type_name -> mddb.GeoSearchResultItem
 	177, // 132: mddb.GeoReindexRequest.load_postcodes:type_name -> mddb.GeoPostcodeLoadProto
-	297, // 133: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
-	298, // 134: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
-	299, // 135: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
+	313, // 133: mddb.GeoReindexResponse.postcodes_loaded:type_name -> mddb.GeoReindexResponse.PostcodesLoadedEntry
+	314, // 134: mddb.GeoStatsResponse.collections:type_name -> mddb.GeoStatsResponse.CollectionsEntry
+	315, // 135: mddb.GeoStatsResponse.postcode_datasets:type_name -> mddb.GeoStatsResponse.PostcodeDatasetsEntry
 	187, // 136: mddb.CurationRuleProto.pins:type_name -> mddb.PinnedDocProto
 	188, // 137: mddb.ListCurationRulesResponse.rules:type_name -> mddb.CurationRuleProto
 	188, // 138: mddb.CreateCurationRuleRequest.rule:type_name -> mddb.CurationRuleProto
@@ -21506,22 +22616,22 @@ var file_mddb_proto_depIdxs = []int32{
 	203, // 146: mddb.CodeSymbolResponse.callees:type_name -> mddb.Passage
 	203, // 147: mddb.CodeSymbolResponse.tests:type_name -> mddb.Passage
 	203, // 148: mddb.CodeSymbolResponse.siblings:type_name -> mddb.Passage
-	300, // 149: mddb.EvalQueryProto.grades:type_name -> mddb.EvalQueryProto.GradesEntry
+	316, // 149: mddb.EvalQueryProto.grades:type_name -> mddb.EvalQueryProto.GradesEntry
 	208, // 150: mddb.RunEvalRequest.configs:type_name -> mddb.EvalConfigProto
 	207, // 151: mddb.RunEvalRequest.queries:type_name -> mddb.EvalQueryProto
 	210, // 152: mddb.EvalConfigResultProto.per_query:type_name -> mddb.EvalQueryResultProto
 	211, // 153: mddb.RunEvalResponse.results:type_name -> mddb.EvalConfigResultProto
 	207, // 154: mddb.AddEvalQueryRequest.query:type_name -> mddb.EvalQueryProto
 	207, // 155: mddb.ListEvalQueriesResponse.queries:type_name -> mddb.EvalQueryProto
-	301, // 156: mddb.GainCountersProto.searches:type_name -> mddb.GainCountersProto.SearchesEntry
-	302, // 157: mddb.GainCountersProto.algorithms:type_name -> mddb.GainCountersProto.AlgorithmsEntry
-	303, // 158: mddb.GainCountersProto.fusion:type_name -> mddb.GainCountersProto.FusionEntry
+	317, // 156: mddb.GainCountersProto.searches:type_name -> mddb.GainCountersProto.SearchesEntry
+	318, // 157: mddb.GainCountersProto.algorithms:type_name -> mddb.GainCountersProto.AlgorithmsEntry
+	319, // 158: mddb.GainCountersProto.fusion:type_name -> mddb.GainCountersProto.FusionEntry
 	219, // 159: mddb.GainDayProto.counters:type_name -> mddb.GainCountersProto
 	219, // 160: mddb.GetGainResponse.totals:type_name -> mddb.GainCountersProto
 	220, // 161: mddb.GetGainResponse.daily:type_name -> mddb.GainDayProto
-	304, // 162: mddb.WhereRequest.filter_meta:type_name -> mddb.WhereRequest.FilterMetaEntry
-	305, // 163: mddb.WhereRequest.filter:type_name -> mddb.WhereRequest.FilterEntry
-	306, // 164: mddb.WhereRequest.meta:type_name -> mddb.WhereRequest.MetaEntry
+	320, // 162: mddb.WhereRequest.filter_meta:type_name -> mddb.WhereRequest.FilterMetaEntry
+	321, // 163: mddb.WhereRequest.filter:type_name -> mddb.WhereRequest.FilterEntry
+	322, // 164: mddb.WhereRequest.meta:type_name -> mddb.WhereRequest.MetaEntry
 	125, // 165: mddb.CorpusPackProto.corpus:type_name -> mddb.CorpusInfoProto
 	225, // 166: mddb.ListCorpusPacksResponse.packs:type_name -> mddb.CorpusPackProto
 	231, // 167: mddb.BuildCorpusPackRequest.sources:type_name -> mddb.CorpusSourceProto
@@ -21532,253 +22642,276 @@ var file_mddb_proto_depIdxs = []int32{
 	238, // 172: mddb.ListChatScenariosResponse.scenarios:type_name -> mddb.ChatScenarioProto
 	238, // 173: mddb.PutChatScenarioRequest.scenario:type_name -> mddb.ChatScenarioProto
 	238, // 174: mddb.PutChatScenarioResponse.scenario:type_name -> mddb.ChatScenarioProto
-	248, // 175: mddb.ChatMessageProto.tool_calls:type_name -> mddb.ChatToolCallProto
-	249, // 176: mddb.ChatConversationProto.messages:type_name -> mddb.ChatMessageProto
-	250, // 177: mddb.ListChatConversationsResponse.conversations:type_name -> mddb.ChatConversationProto
-	249, // 178: mddb.AppendChatMessagesRequest.messages:type_name -> mddb.ChatMessageProto
-	1,   // 179: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 180: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 181: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 182: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	201, // 183: mddb.SearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
-	1,   // 184: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 185: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 186: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	201, // 187: mddb.VectorSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
-	33,  // 188: mddb.SearchPlan.CollectionsEntry.value:type_name -> mddb.SearchPlan
-	39,  // 189: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
-	1,   // 190: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 191: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	201, // 192: mddb.FTSRequest.FilterEntry.value:type_name -> mddb.MetaCondition
-	45,  // 193: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 194: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	201, // 195: mddb.HybridSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
-	45,  // 196: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
-	1,   // 197: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 198: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 199: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 200: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 201: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	201, // 202: mddb.CrossSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
-	1,   // 203: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 204: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 205: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	1,   // 206: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	181, // 207: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
-	1,   // 208: mddb.WhereRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
-	201, // 209: mddb.WhereRequest.FilterEntry.value:type_name -> mddb.MetaCondition
-	1,   // 210: mddb.WhereRequest.MetaEntry.value:type_name -> mddb.MetaValues
-	2,   // 211: mddb.MDDB.Add:input_type -> mddb.AddRequest
-	3,   // 212: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
-	20,  // 213: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
-	23,  // 214: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
-	6,   // 215: mddb.MDDB.Get:input_type -> mddb.GetRequest
-	7,   // 216: mddb.MDDB.Search:input_type -> mddb.SearchRequest
-	9,   // 217: mddb.MDDB.Export:input_type -> mddb.ExportRequest
-	11,  // 218: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
-	13,  // 219: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
-	15,  // 220: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
-	17,  // 221: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
-	26,  // 222: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
-	35,  // 223: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
-	37,  // 224: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
-	172, // 225: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
-	175, // 226: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
-	178, // 227: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
-	180, // 228: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
-	183, // 229: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
-	185, // 230: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
-	40,  // 231: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
-	41,  // 232: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
-	42,  // 233: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
-	47,  // 234: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
-	49,  // 235: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
-	52,  // 236: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
-	56,  // 237: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
-	57,  // 238: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
-	59,  // 239: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
-	61,  // 240: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
-	63,  // 241: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
-	65,  // 242: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
-	67,  // 243: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
-	70,  // 244: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
-	72,  // 245: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
-	73,  // 246: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
-	75,  // 247: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
-	195, // 248: mddb.MDDB.SearchAdvisor:input_type -> mddb.SearchAdvisorRequest
-	196, // 249: mddb.MDDB.GetIndexingStatus:input_type -> mddb.IndexingStatusRequest
-	205, // 250: mddb.MDDB.CodeSymbol:input_type -> mddb.CodeSymbolRequest
-	209, // 251: mddb.MDDB.RunEval:input_type -> mddb.RunEvalRequest
-	213, // 252: mddb.MDDB.AddEvalQuery:input_type -> mddb.AddEvalQueryRequest
-	214, // 253: mddb.MDDB.ListEvalQueries:input_type -> mddb.ListEvalQueriesRequest
-	216, // 254: mddb.MDDB.DeleteEvalQuery:input_type -> mddb.DeleteEvalQueryRequest
-	218, // 255: mddb.MDDB.GetGain:input_type -> mddb.GetGainRequest
-	222, // 256: mddb.MDDB.DeleteWhere:input_type -> mddb.WhereRequest
-	222, // 257: mddb.MDDB.UpdateWhere:input_type -> mddb.WhereRequest
-	222, // 258: mddb.MDDB.SetTTLWhere:input_type -> mddb.WhereRequest
-	78,  // 259: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
-	80,  // 260: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
-	83,  // 261: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
-	85,  // 262: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
-	87,  // 263: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
-	90,  // 264: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
-	92,  // 265: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
-	94,  // 266: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
-	96,  // 267: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
-	98,  // 268: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
-	104, // 269: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
-	106, // 270: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
-	107, // 271: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
-	108, // 272: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
-	110, // 273: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
-	111, // 274: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
-	116, // 275: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
-	127, // 276: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
-	130, // 277: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
-	132, // 278: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
-	135, // 279: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
-	138, // 280: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
-	145, // 281: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
-	148, // 282: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
-	151, // 283: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
-	161, // 284: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
-	164, // 285: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
-	167, // 286: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
-	170, // 287: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
-	189, // 288: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
-	191, // 289: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
-	192, // 290: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
-	193, // 291: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
-	113, // 292: mddb.MDDB.RunAutomation:input_type -> mddb.RunAutomationRequest
-	224, // 293: mddb.MDDB.ListCorpusPacks:input_type -> mddb.ListCorpusPacksRequest
-	227, // 294: mddb.MDDB.InstallCorpusPack:input_type -> mddb.InstallCorpusPackRequest
-	229, // 295: mddb.MDDB.RemoveCorpusPack:input_type -> mddb.RemoveCorpusPackRequest
-	232, // 296: mddb.MDDB.BuildCorpusPack:input_type -> mddb.BuildCorpusPackRequest
-	239, // 297: mddb.MDDB.ListChatScenarios:input_type -> mddb.ListChatScenariosRequest
-	241, // 298: mddb.MDDB.GetChatScenario:input_type -> mddb.GetChatScenarioRequest
-	242, // 299: mddb.MDDB.PutChatScenario:input_type -> mddb.PutChatScenarioRequest
-	244, // 300: mddb.MDDB.DeleteChatScenario:input_type -> mddb.DeleteChatScenarioRequest
-	246, // 301: mddb.MDDB.GetChatScenarioPrompt:input_type -> mddb.GetChatScenarioPromptRequest
-	251, // 302: mddb.MDDB.CreateChatConversation:input_type -> mddb.CreateChatConversationRequest
-	252, // 303: mddb.MDDB.ListChatConversations:input_type -> mddb.ListChatConversationsRequest
-	254, // 304: mddb.MDDB.GetChatConversation:input_type -> mddb.GetChatConversationRequest
-	255, // 305: mddb.MDDB.AppendChatMessages:input_type -> mddb.AppendChatMessagesRequest
-	256, // 306: mddb.MDDB.EndChatConversation:input_type -> mddb.EndChatConversationRequest
-	257, // 307: mddb.MDDB.DeleteChatConversation:input_type -> mddb.DeleteChatConversationRequest
-	259, // 308: mddb.MDDB.DeleteChatConversationsForUser:input_type -> mddb.DeleteChatConversationsForUserRequest
-	261, // 309: mddb.MDDB.ExportChatConversations:input_type -> mddb.ExportChatConversationsRequest
-	152, // 310: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
-	154, // 311: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
-	156, // 312: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
-	159, // 313: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
-	0,   // 314: mddb.MDDB.Add:output_type -> mddb.Document
-	5,   // 315: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
-	22,  // 316: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
-	25,  // 317: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
-	0,   // 318: mddb.MDDB.Get:output_type -> mddb.Document
-	8,   // 319: mddb.MDDB.Search:output_type -> mddb.SearchResponse
-	10,  // 320: mddb.MDDB.Export:output_type -> mddb.ExportChunk
-	12,  // 321: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
-	14,  // 322: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
-	16,  // 323: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
-	18,  // 324: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
-	32,  // 325: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
-	36,  // 326: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
-	38,  // 327: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
-	174, // 328: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
-	176, // 329: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
-	179, // 330: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
-	182, // 331: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
-	184, // 332: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
-	186, // 333: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
-	0,   // 334: mddb.MDDB.ImportURL:output_type -> mddb.Document
-	0,   // 335: mddb.MDDB.SetTTL:output_type -> mddb.Document
-	46,  // 336: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
-	48,  // 337: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
-	51,  // 338: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
-	54,  // 339: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
-	55,  // 340: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
-	58,  // 341: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
-	60,  // 342: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
-	62,  // 343: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
-	64,  // 344: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
-	66,  // 345: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
-	68,  // 346: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
-	71,  // 347: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
-	0,   // 348: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
-	74,  // 349: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
-	77,  // 350: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
-	200, // 351: mddb.MDDB.SearchAdvisor:output_type -> mddb.SearchAdvisorResponse
-	197, // 352: mddb.MDDB.GetIndexingStatus:output_type -> mddb.IndexingStatusResponse
-	206, // 353: mddb.MDDB.CodeSymbol:output_type -> mddb.CodeSymbolResponse
-	212, // 354: mddb.MDDB.RunEval:output_type -> mddb.RunEvalResponse
-	207, // 355: mddb.MDDB.AddEvalQuery:output_type -> mddb.EvalQueryProto
-	215, // 356: mddb.MDDB.ListEvalQueries:output_type -> mddb.ListEvalQueriesResponse
-	217, // 357: mddb.MDDB.DeleteEvalQuery:output_type -> mddb.DeleteEvalQueryResponse
-	221, // 358: mddb.MDDB.GetGain:output_type -> mddb.GetGainResponse
-	223, // 359: mddb.MDDB.DeleteWhere:output_type -> mddb.WhereResponse
-	223, // 360: mddb.MDDB.UpdateWhere:output_type -> mddb.WhereResponse
-	223, // 361: mddb.MDDB.SetTTLWhere:output_type -> mddb.WhereResponse
-	79,  // 362: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
-	81,  // 363: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
-	84,  // 364: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
-	86,  // 365: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
-	88,  // 366: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
-	91,  // 367: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
-	93,  // 368: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
-	95,  // 369: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
-	97,  // 370: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
-	99,  // 371: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
-	105, // 372: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
-	100, // 373: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
-	100, // 374: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
-	100, // 375: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
-	109, // 376: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
-	112, // 377: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
-	117, // 378: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
-	129, // 379: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
-	131, // 380: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
-	134, // 381: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
-	137, // 382: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
-	141, // 383: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
-	146, // 384: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
-	150, // 385: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
-	0,   // 386: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
-	163, // 387: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
-	166, // 388: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
-	169, // 389: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
-	171, // 390: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
-	190, // 391: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
-	188, // 392: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
-	188, // 393: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
-	194, // 394: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
-	114, // 395: mddb.MDDB.RunAutomation:output_type -> mddb.RunAutomationResponse
-	226, // 396: mddb.MDDB.ListCorpusPacks:output_type -> mddb.ListCorpusPacksResponse
-	228, // 397: mddb.MDDB.InstallCorpusPack:output_type -> mddb.InstallCorpusPackResponse
-	230, // 398: mddb.MDDB.RemoveCorpusPack:output_type -> mddb.RemoveCorpusPackResponse
-	233, // 399: mddb.MDDB.BuildCorpusPack:output_type -> mddb.CorpusPackChunk
-	240, // 400: mddb.MDDB.ListChatScenarios:output_type -> mddb.ListChatScenariosResponse
-	238, // 401: mddb.MDDB.GetChatScenario:output_type -> mddb.ChatScenarioProto
-	243, // 402: mddb.MDDB.PutChatScenario:output_type -> mddb.PutChatScenarioResponse
-	245, // 403: mddb.MDDB.DeleteChatScenario:output_type -> mddb.DeleteChatScenarioResponse
-	247, // 404: mddb.MDDB.GetChatScenarioPrompt:output_type -> mddb.GetChatScenarioPromptResponse
-	250, // 405: mddb.MDDB.CreateChatConversation:output_type -> mddb.ChatConversationProto
-	253, // 406: mddb.MDDB.ListChatConversations:output_type -> mddb.ListChatConversationsResponse
-	250, // 407: mddb.MDDB.GetChatConversation:output_type -> mddb.ChatConversationProto
-	250, // 408: mddb.MDDB.AppendChatMessages:output_type -> mddb.ChatConversationProto
-	250, // 409: mddb.MDDB.EndChatConversation:output_type -> mddb.ChatConversationProto
-	258, // 410: mddb.MDDB.DeleteChatConversation:output_type -> mddb.DeleteChatConversationResponse
-	260, // 411: mddb.MDDB.DeleteChatConversationsForUser:output_type -> mddb.DeleteChatConversationsForUserResponse
-	250, // 412: mddb.MDDB.ExportChatConversations:output_type -> mddb.ChatConversationProto
-	153, // 413: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
-	155, // 414: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
-	157, // 415: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
-	160, // 416: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
-	314, // [314:417] is the sub-list for method output_type
-	211, // [211:314] is the sub-list for method input_type
-	211, // [211:211] is the sub-list for extension type_name
-	211, // [211:211] is the sub-list for extension extendee
-	0,   // [0:211] is the sub-list for field type_name
+	248, // 175: mddb.ChatSkillRevisionProto.source:type_name -> mddb.ChatSkillSourceProto
+	248, // 176: mddb.ChatSkillProto.source:type_name -> mddb.ChatSkillSourceProto
+	249, // 177: mddb.ChatSkillProto.history:type_name -> mddb.ChatSkillRevisionProto
+	250, // 178: mddb.ListChatSkillsResponse.skills:type_name -> mddb.ChatSkillProto
+	250, // 179: mddb.PutChatSkillRequest.skill:type_name -> mddb.ChatSkillProto
+	250, // 180: mddb.PutChatSkillResponse.skill:type_name -> mddb.ChatSkillProto
+	248, // 181: mddb.ChatSkillPreviewProto.source:type_name -> mddb.ChatSkillSourceProto
+	250, // 182: mddb.UpdateChatSkillResponse.skill:type_name -> mddb.ChatSkillProto
+	259, // 183: mddb.UpdateChatSkillResponse.preview:type_name -> mddb.ChatSkillPreviewProto
+	264, // 184: mddb.ChatMessageProto.tool_calls:type_name -> mddb.ChatToolCallProto
+	265, // 185: mddb.ChatConversationProto.messages:type_name -> mddb.ChatMessageProto
+	266, // 186: mddb.ListChatConversationsResponse.conversations:type_name -> mddb.ChatConversationProto
+	265, // 187: mddb.AppendChatMessagesRequest.messages:type_name -> mddb.ChatMessageProto
+	1,   // 188: mddb.Document.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 189: mddb.AddRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 190: mddb.BatchDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 191: mddb.SearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	201, // 192: mddb.SearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	1,   // 193: mddb.ExportRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 194: mddb.UpdateDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 195: mddb.VectorSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	201, // 196: mddb.VectorSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	33,  // 197: mddb.SearchPlan.CollectionsEntry.value:type_name -> mddb.SearchPlan
+	39,  // 198: mddb.VectorStatsResponse.CollectionsEntry.value:type_name -> mddb.VectorCollectionStats
+	1,   // 199: mddb.ImportURLRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 200: mddb.FTSRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	201, // 201: mddb.FTSRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	45,  // 202: mddb.FTSResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 203: mddb.HybridSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	201, // 204: mddb.HybridSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	45,  // 205: mddb.HybridSearchResponse.FacetsEntry.value:type_name -> mddb.FacetBucketList
+	1,   // 206: mddb.ValidateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 207: mddb.UpdateDocumentRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 208: mddb.GetDocumentMetaResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 209: mddb.GetMetaKeysResponse.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 210: mddb.CrossSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	201, // 211: mddb.CrossSearchRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	1,   // 212: mddb.IngestDocument.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 213: mddb.RevisionEntryProto.MetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 214: mddb.GeoSearchRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	1,   // 215: mddb.GeoWithinRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	181, // 216: mddb.GeoStatsResponse.CollectionsEntry.value:type_name -> mddb.GeoCollectionStatProto
+	1,   // 217: mddb.WhereRequest.FilterMetaEntry.value:type_name -> mddb.MetaValues
+	201, // 218: mddb.WhereRequest.FilterEntry.value:type_name -> mddb.MetaCondition
+	1,   // 219: mddb.WhereRequest.MetaEntry.value:type_name -> mddb.MetaValues
+	2,   // 220: mddb.MDDB.Add:input_type -> mddb.AddRequest
+	3,   // 221: mddb.MDDB.AddBatch:input_type -> mddb.AddBatchRequest
+	20,  // 222: mddb.MDDB.DeleteBatch:input_type -> mddb.DeleteBatchRequest
+	23,  // 223: mddb.MDDB.UpdateBatch:input_type -> mddb.UpdateBatchRequest
+	6,   // 224: mddb.MDDB.Get:input_type -> mddb.GetRequest
+	7,   // 225: mddb.MDDB.Search:input_type -> mddb.SearchRequest
+	9,   // 226: mddb.MDDB.Export:input_type -> mddb.ExportRequest
+	11,  // 227: mddb.MDDB.Backup:input_type -> mddb.BackupRequest
+	13,  // 228: mddb.MDDB.Restore:input_type -> mddb.RestoreRequest
+	15,  // 229: mddb.MDDB.Truncate:input_type -> mddb.TruncateRequest
+	17,  // 230: mddb.MDDB.Stats:input_type -> mddb.StatsRequest
+	26,  // 231: mddb.MDDB.VectorSearch:input_type -> mddb.VectorSearchRequest
+	35,  // 232: mddb.MDDB.VectorReindex:input_type -> mddb.VectorReindexRequest
+	37,  // 233: mddb.MDDB.VectorStats:input_type -> mddb.VectorStatsRequest
+	172, // 234: mddb.MDDB.GeoSearch:input_type -> mddb.GeoSearchRequest
+	175, // 235: mddb.MDDB.GeoWithin:input_type -> mddb.GeoWithinRequest
+	178, // 236: mddb.MDDB.GeoReindex:input_type -> mddb.GeoReindexRequest
+	180, // 237: mddb.MDDB.GeoStats:input_type -> mddb.GeoStatsRequest
+	183, // 238: mddb.MDDB.GeoEncode:input_type -> mddb.GeoEncodeRequest
+	185, // 239: mddb.MDDB.GeoDecode:input_type -> mddb.GeoDecodeRequest
+	40,  // 240: mddb.MDDB.ImportURL:input_type -> mddb.ImportURLRequest
+	41,  // 241: mddb.MDDB.SetTTL:input_type -> mddb.SetTTLRequest
+	42,  // 242: mddb.MDDB.FTS:input_type -> mddb.FTSRequest
+	47,  // 243: mddb.MDDB.FTSReindex:input_type -> mddb.FTSReindexRequest
+	49,  // 244: mddb.MDDB.FTSLanguages:input_type -> mddb.FTSLanguagesRequest
+	52,  // 245: mddb.MDDB.HybridSearch:input_type -> mddb.HybridSearchRequest
+	56,  // 246: mddb.MDDB.RegisterWebhook:input_type -> mddb.RegisterWebhookRequest
+	57,  // 247: mddb.MDDB.ListWebhooks:input_type -> mddb.ListWebhooksRequest
+	59,  // 248: mddb.MDDB.DeleteWebhook:input_type -> mddb.DeleteWebhookRequest
+	61,  // 249: mddb.MDDB.SetSchema:input_type -> mddb.SetSchemaRequest
+	63,  // 250: mddb.MDDB.GetSchema:input_type -> mddb.GetSchemaRequest
+	65,  // 251: mddb.MDDB.DeleteSchema:input_type -> mddb.DeleteSchemaRequest
+	67,  // 252: mddb.MDDB.ListSchemas:input_type -> mddb.ListSchemasRequest
+	70,  // 253: mddb.MDDB.ValidateDocument:input_type -> mddb.ValidateDocumentRequest
+	72,  // 254: mddb.MDDB.UpdateDocument:input_type -> mddb.UpdateDocumentRequest
+	73,  // 255: mddb.MDDB.GetDocumentMeta:input_type -> mddb.GetDocumentMetaRequest
+	75,  // 256: mddb.MDDB.Classify:input_type -> mddb.ClassifyRequest
+	195, // 257: mddb.MDDB.SearchAdvisor:input_type -> mddb.SearchAdvisorRequest
+	196, // 258: mddb.MDDB.GetIndexingStatus:input_type -> mddb.IndexingStatusRequest
+	205, // 259: mddb.MDDB.CodeSymbol:input_type -> mddb.CodeSymbolRequest
+	209, // 260: mddb.MDDB.RunEval:input_type -> mddb.RunEvalRequest
+	213, // 261: mddb.MDDB.AddEvalQuery:input_type -> mddb.AddEvalQueryRequest
+	214, // 262: mddb.MDDB.ListEvalQueries:input_type -> mddb.ListEvalQueriesRequest
+	216, // 263: mddb.MDDB.DeleteEvalQuery:input_type -> mddb.DeleteEvalQueryRequest
+	218, // 264: mddb.MDDB.GetGain:input_type -> mddb.GetGainRequest
+	222, // 265: mddb.MDDB.DeleteWhere:input_type -> mddb.WhereRequest
+	222, // 266: mddb.MDDB.UpdateWhere:input_type -> mddb.WhereRequest
+	222, // 267: mddb.MDDB.SetTTLWhere:input_type -> mddb.WhereRequest
+	78,  // 268: mddb.MDDB.DeleteDocument:input_type -> mddb.DeleteDocumentRequest
+	80,  // 269: mddb.MDDB.DeleteCollection:input_type -> mddb.DeleteCollectionRequest
+	83,  // 270: mddb.MDDB.ListSynonyms:input_type -> mddb.ListSynonymsRequest
+	85,  // 271: mddb.MDDB.AddSynonym:input_type -> mddb.AddSynonymRequest
+	87,  // 272: mddb.MDDB.DeleteSynonym:input_type -> mddb.DeleteSynonymRequest
+	90,  // 273: mddb.MDDB.ListStopwords:input_type -> mddb.ListStopwordsRequest
+	92,  // 274: mddb.MDDB.AddStopwords:input_type -> mddb.AddStopwordsRequest
+	94,  // 275: mddb.MDDB.DeleteStopwords:input_type -> mddb.DeleteStopwordsRequest
+	96,  // 276: mddb.MDDB.GetMetaKeys:input_type -> mddb.GetMetaKeysRequest
+	98,  // 277: mddb.MDDB.GetChecksum:input_type -> mddb.GetChecksumRequest
+	104, // 278: mddb.MDDB.ListAutomation:input_type -> mddb.ListAutomationRequest
+	106, // 279: mddb.MDDB.CreateAutomation:input_type -> mddb.CreateAutomationRequest
+	107, // 280: mddb.MDDB.GetAutomation:input_type -> mddb.GetAutomationRequest
+	108, // 281: mddb.MDDB.UpdateAutomation:input_type -> mddb.UpdateAutomationRequest
+	110, // 282: mddb.MDDB.DeleteAutomation:input_type -> mddb.DeleteAutomationRequest
+	111, // 283: mddb.MDDB.TestAutomation:input_type -> mddb.TestAutomationRequest
+	116, // 284: mddb.MDDB.GetAutomationLogs:input_type -> mddb.GetAutomationLogsRequest
+	127, // 285: mddb.MDDB.GetCollectionConfig:input_type -> mddb.GetCollectionConfigRequest
+	130, // 286: mddb.MDDB.SetCollectionConfig:input_type -> mddb.SetCollectionConfigRequest
+	132, // 287: mddb.MDDB.ListCollectionConfigs:input_type -> mddb.ListCollectionConfigsRequest
+	135, // 288: mddb.MDDB.CrossSearch:input_type -> mddb.CrossSearchRequest
+	138, // 289: mddb.MDDB.FindDuplicates:input_type -> mddb.FindDuplicatesRequest
+	145, // 290: mddb.MDDB.Ingest:input_type -> mddb.IngestRequest
+	148, // 291: mddb.MDDB.ListRevisions:input_type -> mddb.ListRevisionsRequest
+	151, // 292: mddb.MDDB.RestoreRevision:input_type -> mddb.RestoreRevisionRequest
+	161, // 293: mddb.MDDB.TemporalQuery:input_type -> mddb.TemporalQueryRequest
+	164, // 294: mddb.MDDB.TemporalHot:input_type -> mddb.TemporalHotRequest
+	167, // 295: mddb.MDDB.SpellSuggest:input_type -> mddb.SpellSuggestRequest
+	170, // 296: mddb.MDDB.SpellCleanup:input_type -> mddb.SpellCleanupRequest
+	189, // 297: mddb.MDDB.ListCurationRules:input_type -> mddb.ListCurationRulesRequest
+	191, // 298: mddb.MDDB.CreateCurationRule:input_type -> mddb.CreateCurationRuleRequest
+	192, // 299: mddb.MDDB.UpdateCurationRule:input_type -> mddb.UpdateCurationRuleRequest
+	193, // 300: mddb.MDDB.DeleteCurationRule:input_type -> mddb.DeleteCurationRuleRequest
+	113, // 301: mddb.MDDB.RunAutomation:input_type -> mddb.RunAutomationRequest
+	224, // 302: mddb.MDDB.ListCorpusPacks:input_type -> mddb.ListCorpusPacksRequest
+	227, // 303: mddb.MDDB.InstallCorpusPack:input_type -> mddb.InstallCorpusPackRequest
+	229, // 304: mddb.MDDB.RemoveCorpusPack:input_type -> mddb.RemoveCorpusPackRequest
+	232, // 305: mddb.MDDB.BuildCorpusPack:input_type -> mddb.BuildCorpusPackRequest
+	239, // 306: mddb.MDDB.ListChatScenarios:input_type -> mddb.ListChatScenariosRequest
+	241, // 307: mddb.MDDB.GetChatScenario:input_type -> mddb.GetChatScenarioRequest
+	242, // 308: mddb.MDDB.PutChatScenario:input_type -> mddb.PutChatScenarioRequest
+	244, // 309: mddb.MDDB.DeleteChatScenario:input_type -> mddb.DeleteChatScenarioRequest
+	246, // 310: mddb.MDDB.GetChatScenarioPrompt:input_type -> mddb.GetChatScenarioPromptRequest
+	251, // 311: mddb.MDDB.ListChatSkills:input_type -> mddb.ListChatSkillsRequest
+	253, // 312: mddb.MDDB.GetChatSkill:input_type -> mddb.GetChatSkillRequest
+	254, // 313: mddb.MDDB.PutChatSkill:input_type -> mddb.PutChatSkillRequest
+	256, // 314: mddb.MDDB.DeleteChatSkill:input_type -> mddb.DeleteChatSkillRequest
+	258, // 315: mddb.MDDB.ImportChatSkill:input_type -> mddb.ImportChatSkillRequest
+	260, // 316: mddb.MDDB.UpdateChatSkill:input_type -> mddb.UpdateChatSkillRequest
+	262, // 317: mddb.MDDB.GetChatSkillUsedBy:input_type -> mddb.GetChatSkillUsedByRequest
+	267, // 318: mddb.MDDB.CreateChatConversation:input_type -> mddb.CreateChatConversationRequest
+	268, // 319: mddb.MDDB.ListChatConversations:input_type -> mddb.ListChatConversationsRequest
+	270, // 320: mddb.MDDB.GetChatConversation:input_type -> mddb.GetChatConversationRequest
+	271, // 321: mddb.MDDB.AppendChatMessages:input_type -> mddb.AppendChatMessagesRequest
+	272, // 322: mddb.MDDB.EndChatConversation:input_type -> mddb.EndChatConversationRequest
+	273, // 323: mddb.MDDB.DeleteChatConversation:input_type -> mddb.DeleteChatConversationRequest
+	275, // 324: mddb.MDDB.DeleteChatConversationsForUser:input_type -> mddb.DeleteChatConversationsForUserRequest
+	277, // 325: mddb.MDDB.ExportChatConversations:input_type -> mddb.ExportChatConversationsRequest
+	152, // 326: mddb.MDDBReplication.RequestSnapshot:input_type -> mddb.SnapshotRequest
+	154, // 327: mddb.MDDBReplication.StreamBinlog:input_type -> mddb.StreamBinlogRequest
+	156, // 328: mddb.MDDBReplication.ReplicationStatus:input_type -> mddb.ReplicationStatusRequest
+	159, // 329: mddb.MDDBReplication.AcknowledgeLSN:input_type -> mddb.AcknowledgeLSNRequest
+	0,   // 330: mddb.MDDB.Add:output_type -> mddb.Document
+	5,   // 331: mddb.MDDB.AddBatch:output_type -> mddb.AddBatchResponse
+	22,  // 332: mddb.MDDB.DeleteBatch:output_type -> mddb.DeleteBatchResponse
+	25,  // 333: mddb.MDDB.UpdateBatch:output_type -> mddb.UpdateBatchResponse
+	0,   // 334: mddb.MDDB.Get:output_type -> mddb.Document
+	8,   // 335: mddb.MDDB.Search:output_type -> mddb.SearchResponse
+	10,  // 336: mddb.MDDB.Export:output_type -> mddb.ExportChunk
+	12,  // 337: mddb.MDDB.Backup:output_type -> mddb.BackupResponse
+	14,  // 338: mddb.MDDB.Restore:output_type -> mddb.RestoreResponse
+	16,  // 339: mddb.MDDB.Truncate:output_type -> mddb.TruncateResponse
+	18,  // 340: mddb.MDDB.Stats:output_type -> mddb.StatsResponse
+	32,  // 341: mddb.MDDB.VectorSearch:output_type -> mddb.VectorSearchResponse
+	36,  // 342: mddb.MDDB.VectorReindex:output_type -> mddb.VectorReindexResponse
+	38,  // 343: mddb.MDDB.VectorStats:output_type -> mddb.VectorStatsResponse
+	174, // 344: mddb.MDDB.GeoSearch:output_type -> mddb.GeoSearchResponse
+	176, // 345: mddb.MDDB.GeoWithin:output_type -> mddb.GeoWithinResponse
+	179, // 346: mddb.MDDB.GeoReindex:output_type -> mddb.GeoReindexResponse
+	182, // 347: mddb.MDDB.GeoStats:output_type -> mddb.GeoStatsResponse
+	184, // 348: mddb.MDDB.GeoEncode:output_type -> mddb.GeoEncodeResponse
+	186, // 349: mddb.MDDB.GeoDecode:output_type -> mddb.GeoDecodeResponse
+	0,   // 350: mddb.MDDB.ImportURL:output_type -> mddb.Document
+	0,   // 351: mddb.MDDB.SetTTL:output_type -> mddb.Document
+	46,  // 352: mddb.MDDB.FTS:output_type -> mddb.FTSResponse
+	48,  // 353: mddb.MDDB.FTSReindex:output_type -> mddb.FTSReindexResponse
+	51,  // 354: mddb.MDDB.FTSLanguages:output_type -> mddb.FTSLanguagesResponse
+	54,  // 355: mddb.MDDB.HybridSearch:output_type -> mddb.HybridSearchResponse
+	55,  // 356: mddb.MDDB.RegisterWebhook:output_type -> mddb.WebhookProto
+	58,  // 357: mddb.MDDB.ListWebhooks:output_type -> mddb.ListWebhooksResponse
+	60,  // 358: mddb.MDDB.DeleteWebhook:output_type -> mddb.DeleteWebhookResponse
+	62,  // 359: mddb.MDDB.SetSchema:output_type -> mddb.SetSchemaResponse
+	64,  // 360: mddb.MDDB.GetSchema:output_type -> mddb.GetSchemaResponse
+	66,  // 361: mddb.MDDB.DeleteSchema:output_type -> mddb.DeleteSchemaResponse
+	68,  // 362: mddb.MDDB.ListSchemas:output_type -> mddb.ListSchemasResponse
+	71,  // 363: mddb.MDDB.ValidateDocument:output_type -> mddb.ValidateDocumentResponse
+	0,   // 364: mddb.MDDB.UpdateDocument:output_type -> mddb.Document
+	74,  // 365: mddb.MDDB.GetDocumentMeta:output_type -> mddb.GetDocumentMetaResponse
+	77,  // 366: mddb.MDDB.Classify:output_type -> mddb.ClassifyResponse
+	200, // 367: mddb.MDDB.SearchAdvisor:output_type -> mddb.SearchAdvisorResponse
+	197, // 368: mddb.MDDB.GetIndexingStatus:output_type -> mddb.IndexingStatusResponse
+	206, // 369: mddb.MDDB.CodeSymbol:output_type -> mddb.CodeSymbolResponse
+	212, // 370: mddb.MDDB.RunEval:output_type -> mddb.RunEvalResponse
+	207, // 371: mddb.MDDB.AddEvalQuery:output_type -> mddb.EvalQueryProto
+	215, // 372: mddb.MDDB.ListEvalQueries:output_type -> mddb.ListEvalQueriesResponse
+	217, // 373: mddb.MDDB.DeleteEvalQuery:output_type -> mddb.DeleteEvalQueryResponse
+	221, // 374: mddb.MDDB.GetGain:output_type -> mddb.GetGainResponse
+	223, // 375: mddb.MDDB.DeleteWhere:output_type -> mddb.WhereResponse
+	223, // 376: mddb.MDDB.UpdateWhere:output_type -> mddb.WhereResponse
+	223, // 377: mddb.MDDB.SetTTLWhere:output_type -> mddb.WhereResponse
+	79,  // 378: mddb.MDDB.DeleteDocument:output_type -> mddb.DeleteDocumentResponse
+	81,  // 379: mddb.MDDB.DeleteCollection:output_type -> mddb.DeleteCollectionResponse
+	84,  // 380: mddb.MDDB.ListSynonyms:output_type -> mddb.ListSynonymsResponse
+	86,  // 381: mddb.MDDB.AddSynonym:output_type -> mddb.AddSynonymResponse
+	88,  // 382: mddb.MDDB.DeleteSynonym:output_type -> mddb.DeleteSynonymResponse
+	91,  // 383: mddb.MDDB.ListStopwords:output_type -> mddb.ListStopwordsResponse
+	93,  // 384: mddb.MDDB.AddStopwords:output_type -> mddb.AddStopwordsResponse
+	95,  // 385: mddb.MDDB.DeleteStopwords:output_type -> mddb.DeleteStopwordsResponse
+	97,  // 386: mddb.MDDB.GetMetaKeys:output_type -> mddb.GetMetaKeysResponse
+	99,  // 387: mddb.MDDB.GetChecksum:output_type -> mddb.GetChecksumResponse
+	105, // 388: mddb.MDDB.ListAutomation:output_type -> mddb.ListAutomationResponse
+	100, // 389: mddb.MDDB.CreateAutomation:output_type -> mddb.AutomationRuleProto
+	100, // 390: mddb.MDDB.GetAutomation:output_type -> mddb.AutomationRuleProto
+	100, // 391: mddb.MDDB.UpdateAutomation:output_type -> mddb.AutomationRuleProto
+	109, // 392: mddb.MDDB.DeleteAutomation:output_type -> mddb.DeleteAutomationResponse
+	112, // 393: mddb.MDDB.TestAutomation:output_type -> mddb.TestAutomationResponse
+	117, // 394: mddb.MDDB.GetAutomationLogs:output_type -> mddb.GetAutomationLogsResponse
+	129, // 395: mddb.MDDB.GetCollectionConfig:output_type -> mddb.GetCollectionConfigResponse
+	131, // 396: mddb.MDDB.SetCollectionConfig:output_type -> mddb.SetCollectionConfigResponse
+	134, // 397: mddb.MDDB.ListCollectionConfigs:output_type -> mddb.ListCollectionConfigsResponse
+	137, // 398: mddb.MDDB.CrossSearch:output_type -> mddb.CrossSearchResponse
+	141, // 399: mddb.MDDB.FindDuplicates:output_type -> mddb.FindDuplicatesResponse
+	146, // 400: mddb.MDDB.Ingest:output_type -> mddb.IngestResponse
+	150, // 401: mddb.MDDB.ListRevisions:output_type -> mddb.ListRevisionsResponse
+	0,   // 402: mddb.MDDB.RestoreRevision:output_type -> mddb.Document
+	163, // 403: mddb.MDDB.TemporalQuery:output_type -> mddb.TemporalQueryResponse
+	166, // 404: mddb.MDDB.TemporalHot:output_type -> mddb.TemporalHotResponse
+	169, // 405: mddb.MDDB.SpellSuggest:output_type -> mddb.SpellSuggestResponse
+	171, // 406: mddb.MDDB.SpellCleanup:output_type -> mddb.SpellCleanupResponse
+	190, // 407: mddb.MDDB.ListCurationRules:output_type -> mddb.ListCurationRulesResponse
+	188, // 408: mddb.MDDB.CreateCurationRule:output_type -> mddb.CurationRuleProto
+	188, // 409: mddb.MDDB.UpdateCurationRule:output_type -> mddb.CurationRuleProto
+	194, // 410: mddb.MDDB.DeleteCurationRule:output_type -> mddb.DeleteCurationRuleResponse
+	114, // 411: mddb.MDDB.RunAutomation:output_type -> mddb.RunAutomationResponse
+	226, // 412: mddb.MDDB.ListCorpusPacks:output_type -> mddb.ListCorpusPacksResponse
+	228, // 413: mddb.MDDB.InstallCorpusPack:output_type -> mddb.InstallCorpusPackResponse
+	230, // 414: mddb.MDDB.RemoveCorpusPack:output_type -> mddb.RemoveCorpusPackResponse
+	233, // 415: mddb.MDDB.BuildCorpusPack:output_type -> mddb.CorpusPackChunk
+	240, // 416: mddb.MDDB.ListChatScenarios:output_type -> mddb.ListChatScenariosResponse
+	238, // 417: mddb.MDDB.GetChatScenario:output_type -> mddb.ChatScenarioProto
+	243, // 418: mddb.MDDB.PutChatScenario:output_type -> mddb.PutChatScenarioResponse
+	245, // 419: mddb.MDDB.DeleteChatScenario:output_type -> mddb.DeleteChatScenarioResponse
+	247, // 420: mddb.MDDB.GetChatScenarioPrompt:output_type -> mddb.GetChatScenarioPromptResponse
+	252, // 421: mddb.MDDB.ListChatSkills:output_type -> mddb.ListChatSkillsResponse
+	250, // 422: mddb.MDDB.GetChatSkill:output_type -> mddb.ChatSkillProto
+	255, // 423: mddb.MDDB.PutChatSkill:output_type -> mddb.PutChatSkillResponse
+	257, // 424: mddb.MDDB.DeleteChatSkill:output_type -> mddb.DeleteChatSkillResponse
+	259, // 425: mddb.MDDB.ImportChatSkill:output_type -> mddb.ChatSkillPreviewProto
+	261, // 426: mddb.MDDB.UpdateChatSkill:output_type -> mddb.UpdateChatSkillResponse
+	263, // 427: mddb.MDDB.GetChatSkillUsedBy:output_type -> mddb.GetChatSkillUsedByResponse
+	266, // 428: mddb.MDDB.CreateChatConversation:output_type -> mddb.ChatConversationProto
+	269, // 429: mddb.MDDB.ListChatConversations:output_type -> mddb.ListChatConversationsResponse
+	266, // 430: mddb.MDDB.GetChatConversation:output_type -> mddb.ChatConversationProto
+	266, // 431: mddb.MDDB.AppendChatMessages:output_type -> mddb.ChatConversationProto
+	266, // 432: mddb.MDDB.EndChatConversation:output_type -> mddb.ChatConversationProto
+	274, // 433: mddb.MDDB.DeleteChatConversation:output_type -> mddb.DeleteChatConversationResponse
+	276, // 434: mddb.MDDB.DeleteChatConversationsForUser:output_type -> mddb.DeleteChatConversationsForUserResponse
+	266, // 435: mddb.MDDB.ExportChatConversations:output_type -> mddb.ChatConversationProto
+	153, // 436: mddb.MDDBReplication.RequestSnapshot:output_type -> mddb.SnapshotChunk
+	155, // 437: mddb.MDDBReplication.StreamBinlog:output_type -> mddb.BinlogEntryProto
+	157, // 438: mddb.MDDBReplication.ReplicationStatus:output_type -> mddb.ReplicationStatusResponse
+	160, // 439: mddb.MDDBReplication.AcknowledgeLSN:output_type -> mddb.AcknowledgeLSNResponse
+	330, // [330:440] is the sub-list for method output_type
+	220, // [220:330] is the sub-list for method input_type
+	220, // [220:220] is the sub-list for extension type_name
+	220, // [220:220] is the sub-list for extension extendee
+	0,   // [0:220] is the sub-list for field type_name
 }
 
 func init() { file_mddb_proto_init() }
@@ -21802,7 +22935,7 @@ func file_mddb_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mddb_proto_rawDesc), len(file_mddb_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   307,
+			NumMessages:   323,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

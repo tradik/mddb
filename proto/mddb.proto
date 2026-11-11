@@ -265,9 +265,29 @@ service MDDB {
   // Creates or replaces the scenario named in it; bumps the version counter.
   rpc PutChatScenario(PutChatScenarioRequest) returns (PutChatScenarioResponse);
   rpc DeleteChatScenario(DeleteChatScenarioRequest) returns (DeleteChatScenarioResponse);
-  // The composed system prompt: operator prompt, guardrails, off-topic and
-  // style clauses, then each allowed collection's responsePrompt.
+  // The composed system prompt: operator prompt, guardrails, off-topic
+  // clause, the scenario's skills in order (#404), style clause, then each
+  // allowed collection's responsePrompt — with its size.
   rpc GetChatScenarioPrompt(GetChatScenarioPromptRequest) returns (GetChatScenarioPromptResponse);
+
+  // ---- (v2.19.0+, #404) Chat skills, as /v1/chat/skills: reusable SKILL.md
+  // instruction blocks that scenarios attach by name. Admin only, reads
+  // included. A change bumps the chat scenarios' version counter.
+  // Every skill, without contents.
+  rpc ListChatSkills(ListChatSkillsRequest) returns (ListChatSkillsResponse);
+  // The current version, or a kept earlier one.
+  rpc GetChatSkill(GetChatSkillRequest) returns (ChatSkillProto);
+  // Creates the skill or stores a new version of it.
+  rpc PutChatSkill(PutChatSkillRequest) returns (PutChatSkillResponse);
+  // FAILED_PRECONDITION while a scenario attaches the skill.
+  rpc DeleteChatSkill(DeleteChatSkillRequest) returns (DeleteChatSkillResponse);
+  // A preview of the SKILL.md at an https URL (fetched through the SSRF
+  // guard) or of pasted text. Stores nothing.
+  rpc ImportChatSkill(ImportChatSkillRequest) returns (ChatSkillPreviewProto);
+  // Fetches the skill's source again: a preview, stored with confirm.
+  rpc UpdateChatSkill(UpdateChatSkillRequest) returns (UpdateChatSkillResponse);
+  // The scenarios attaching the skill.
+  rpc GetChatSkillUsedBy(GetChatSkillUsedByRequest) returns (GetChatSkillUsedByResponse);
 
   // ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
   // /v1/chat/conversations. The caller is the host application; every call
@@ -2394,6 +2414,113 @@ message GetChatScenarioPromptResponse {
   string name = 1;
   string prompt = 2;
   uint64 version = 3;
+  int64 bytes = 4;                               // length of prompt
+  int64 approx_tokens = 5;                       // bytes / 4
+  string warning = 6;                            // set past 75% of MDDB_CHAT_PROMPT_MAX_BYTES
+  repeated string missing_skills = 7;            // named by the scenario, not stored; skipped
+}
+
+// ---- v2.19.0: chat skills (#404) ----
+
+message ChatSkillSourceProto {
+  string url = 1;
+  string commit = 2;                             // the Git commit, for a GitHub URL
+  int64 fetched_at = 3;                          // Unix seconds
+}
+
+// An earlier version of a skill, without its content: GetChatSkill with the
+// version reads it.
+message ChatSkillRevisionProto {
+  int32 version = 1;
+  string description = 2;
+  int64 bytes = 3;                               // length of its content
+  ChatSkillSourceProto source = 4;
+  int64 updated_at = 5;                          // Unix seconds
+}
+
+// ChatSkillProto mirrors a skill, the body of /v1/chat/skills/{name}.
+message ChatSkillProto {
+  string name = 1;
+  string description = 2;
+  string content = 3;                            // the instructions; empty in a listing
+  ChatSkillSourceProto source = 4;               // unset for a pasted skill
+  int32 version = 5;                             // grows by one on every change
+  repeated ChatSkillRevisionProto history = 6;   // newest first, the last 10, without contents
+  int64 bytes = 7;                               // length of content
+  repeated string used_by = 8;                   // scenarios attaching the skill
+  int64 created_at = 9;                          // Unix seconds
+  int64 updated_at = 10;                         // Unix seconds
+}
+
+message ListChatSkillsRequest {}
+
+message ListChatSkillsResponse {
+  repeated ChatSkillProto skills = 1;
+  uint64 version = 2;                            // the chat scenarios' version counter
+}
+
+message GetChatSkillRequest {
+  string name = 1;
+  int32 version = 2;                             // 0: the current version
+}
+
+message PutChatSkillRequest {
+  ChatSkillProto skill = 1;                      // name, description, content and source are read
+}
+
+message PutChatSkillResponse {
+  ChatSkillProto skill = 1;
+  bool created = 2;                              // false: a new version of an existing skill, or no change
+  uint64 version = 3;
+}
+
+message DeleteChatSkillRequest {
+  string name = 1;
+}
+
+message DeleteChatSkillResponse {
+  bool deleted = 1;
+  uint64 version = 2;
+}
+
+message ImportChatSkillRequest {
+  string url = 1;                                // https; or content
+  string content = 2;                            // a pasted SKILL.md
+}
+
+// A SKILL.md parsed but not stored.
+message ChatSkillPreviewProto {
+  string name = 1;                               // from the front matter
+  string description = 2;
+  string content = 3;                            // the instructions
+  string raw = 4;                                // the whole text, front matter included
+  ChatSkillSourceProto source = 5;
+  int64 bytes = 6;
+  string sha256 = 7;                             // of content
+  bool exists = 8;                               // a skill of this name is stored
+}
+
+message UpdateChatSkillRequest {
+  string name = 1;
+  bool confirm = 2;                              // false: preview only
+  string sha256 = 3;                             // of the preview read; ABORTED when the source changed since
+}
+
+message UpdateChatSkillResponse {
+  ChatSkillProto skill = 1;                      // the stored skill, after the save when saved
+  ChatSkillPreviewProto preview = 2;             // what the source holds now
+  bool changed = 3;
+  bool saved = 4;
+  uint64 version = 5;
+}
+
+message GetChatSkillUsedByRequest {
+  string name = 1;
+}
+
+message GetChatSkillUsedByResponse {
+  string name = 1;
+  repeated string scenarios = 2;
 }
 
 // ---- v2.19.0: persistent per-user chat conversations (#405) ----

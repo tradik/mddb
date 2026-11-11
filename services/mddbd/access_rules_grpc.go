@@ -117,6 +117,15 @@ var grpcAccessRules = map[string]accessRule{
 	// Chat scenarios (#403), as PUT and DELETE /v1/chat/scenarios/{name}.
 	"/mddb.MDDB/PutChatScenario":    ruleAdmin,
 	"/mddb.MDDB/DeleteChatScenario": ruleAdmin,
+	// Chat skills (#404), as /v1/chat/skills: a skill's text is part of
+	// system prompts, so reads are admin too.
+	"/mddb.MDDB/ListChatSkills":     ruleAdmin,
+	"/mddb.MDDB/GetChatSkill":       ruleAdmin,
+	"/mddb.MDDB/PutChatSkill":       ruleAdmin,
+	"/mddb.MDDB/DeleteChatSkill":    ruleAdmin,
+	"/mddb.MDDB/ImportChatSkill":    ruleAdmin,
+	"/mddb.MDDB/UpdateChatSkill":    ruleAdmin,
+	"/mddb.MDDB/GetChatSkillUsedBy": ruleAdmin,
 
 	// Chat conversations (#405) authorize themselves, as /v1/chat/conversations:
 	// the collection is the chat collection of the caller's tenant.
