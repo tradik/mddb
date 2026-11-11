@@ -155,8 +155,14 @@ def _extractKey(record: Mapping[str, Any], keyField: str) -> str:
 
 
 def _hashFallback(record: Mapping[str, Any]) -> str:
+    """A stable document key for a record without a usable key field.
+
+    SHA-1 names the record, it does not protect anything, hence
+    usedforsecurity=False. It stays SHA-1 so keys written by earlier versions
+    keep matching and a re-sync updates documents instead of duplicating them.
+    """
     canonical = json.dumps(record, sort_keys=True, default=str, ensure_ascii=False)
-    return hashlib.sha1(canonical.encode("utf-8")).hexdigest()
+    return hashlib.sha1(canonical.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _flattenToStringLists(record: Mapping[str, Any]) -> Dict[str, List[str]]:
