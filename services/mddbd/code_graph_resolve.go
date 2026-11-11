@@ -288,7 +288,7 @@ func dedupeEdges(in []resolvedEdge) []resolvedEdge {
 	seen := make(map[string]struct{}, len(in))
 	out := in[:0]
 	for _, e := range in {
-		id := e.edge.From + "\x00" + e.edge.To + "\x00" + string(e.edge.Kind) + "\x00" + e.edge.Symbol
+		id := edgeID(e.edge)
 		if _, dup := seen[id]; dup {
 			continue
 		}

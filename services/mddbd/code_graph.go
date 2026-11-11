@@ -200,6 +200,12 @@ func (s *Server) CodeGraph(req GraphRequest) (*GraphResult, error) {
 	}
 
 	seen := map[string]bool{root.Key: true}
+	// With direction both, the walk meets an edge from each end: "out" from
+	// the document that depends, "in" when it reaches the one depended on and
+	// looks back. An edge is one statement about two documents, so it is
+	// listed once, with the direction it was first found in — the hop nearer
+	// the root, breadth-first.
+	listed := map[string]bool{}
 	frontier := []graphVisit{{doc: root, depth: 0}}
 
 	for len(frontier) > 0 {
@@ -212,7 +218,10 @@ func (s *Server) CodeGraph(req GraphRequest) (*GraphResult, error) {
 			res.Truncated = res.Truncated || truncated
 
 			for _, e := range edges {
-				res.Edges = append(res.Edges, e.edge)
+				if id := edgeID(e.edge); !listed[id] {
+					listed[id] = true
+					res.Edges = append(res.Edges, e.edge)
+				}
 				if seen[e.doc.Key] {
 					continue
 				}
@@ -229,6 +238,11 @@ func (s *Server) CodeGraph(req GraphRequest) (*GraphResult, error) {
 		s.annotateLines(req.Collection, res)
 	}
 	return res, nil
+}
+
+// edgeID identifies an edge whichever end it was found from.
+func edgeID(e GraphEdge) string {
+	return e.From + "\x00" + e.To + "\x00" + string(e.Kind) + "\x00" + e.Symbol
 }
 
 type graphVisit struct {

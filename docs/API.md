@@ -5252,6 +5252,14 @@ curl -s "$MDDB/v1/code-graph?collection=theme&key=theme/index.html&direction=out
 }
 ```
 
+`direction` is `in`, `out` or `both` (the default). An edge is one statement
+about two documents — `from` depends on `to` through `symbol` — and is listed
+once. Its `direction` says which way the walk found it: `out` from the document
+that depends, `in` from the one depended on. With `both` and `depth` above 1 the
+walk meets an edge from both ends; the direction kept is the one found first,
+the hop nearer the root (before 2.19.0 such an edge was listed twice, once each
+way).
+
 Every edge carries **the symbol that justifies it**. Without it the answer is
 only "these two files are related", which is not actionable; with it, the caller
 knows what to look at. Add `&lines=true` to get the first line the symbol

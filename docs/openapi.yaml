@@ -4263,7 +4263,9 @@ paths:
             enum: [ in, out, both ]
             default: both
           description: >
-            `in` = what depends on this document, `out` = what it depends on.
+            `in` = what depends on this document, `out` = what it depends on,
+            `both` = either. Each edge is listed once, whichever end the walk
+            found it from.
         - name: depth
           in: query
           schema:
@@ -9070,6 +9072,14 @@ components:
               direction:
                 type: string
                 enum: [ in, out ]
+                description: >
+                  Which way the walk found the edge: `out` from the document
+                  that depends, `in` from the one depended on. Each edge
+                  (from, to, kind, symbol) is listed once; with direction
+                  `both` and depth above 1 the walk meets it from both ends,
+                  and the direction kept is the one found first — the hop
+                  nearer the root (2.19.0+; before, such an edge was listed
+                  twice).
               lines:
                 type: object
                 description: >
