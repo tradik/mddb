@@ -44,17 +44,17 @@ func newSkillSource(t *testing.T) *skillSource {
 	}}
 	src.head.Store(skillShaOne)
 	src.Server = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/api/repos/acme/skills/commits/main":
+		switch r.URL.Path {
+		case "/api/repos/acme/skills/commits/main":
 			src.apiCalls.Add(1)
 			if r.Header.Get("Accept") != "application/vnd.github.sha" || !strings.HasPrefix(r.Header.Get("User-Agent"), "mddbd/") {
 				http.Error(w, "bad headers", http.StatusBadRequest)
 				return
 			}
 			_, _ = w.Write([]byte(src.head.Load().(string) + "\n"))
-		case r.URL.Path == "/api/repos/acme/skills/commits/odd":
+		case "/api/repos/acme/skills/commits/odd":
 			_, _ = w.Write([]byte("not a commit"))
-		case r.URL.Path == "/redirect":
+		case "/redirect":
 			http.Redirect(w, r, "http://example.com/SKILL.md", http.StatusFound)
 		default:
 			body, found := src.files[r.URL.Path]
