@@ -174,6 +174,13 @@ const coverageFiles = [
   'src/components/ChatSkillUpdate.jsx',
   'src/components/ChatSkillHistory.jsx',
   'src/components/LineDiff.jsx',
+  // 2.19.0: external MCP servers of a chat scenario and their secrets (MCP-005).
+  'src/lib/chat-mcp.js',
+  'src/components/ChatMcpServers.jsx',
+  'src/components/ChatMcpServerRow.jsx',
+  'src/components/ChatMcpToolList.jsx',
+  'src/components/ChatMcpSecretsCard.jsx',
+  'src/components/ChatMcpStates.jsx',
 ];
 
 export default mergeConfig(

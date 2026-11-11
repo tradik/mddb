@@ -276,6 +276,32 @@ part of system prompts, so the whole tab needs admin on `"*"`.
 Diff lines carry a `+` or `-` sign and a screen-reader word besides their
 green or red background, so a change does not rest on colour alone.
 
+### External knowledge over MCP (2.19.0)
+
+The scenario editor has a section *External knowledge (MCP)* (MCP-005,
+[API.md](API.md#external-mcp-servers-v1chatmcp)): foreign MCP servers whose
+read-only tools the assistant may call next to its collections.
+
+- **Add an MCP server**: a name, an `https://` URL (MCP Streamable HTTP), a
+  credential picked from the stored secrets, a timeout and a result limit
+  (empty: 8000 ms and 4000 characters), and a *Server enabled* switch.
+- **Test connection** asks mddbd to inspect the server and lists its tools
+  with *read-only*, *destructive* or *may write* badges. Only a read-only
+  tool can be checked; any other is disabled with the server's reason. An
+  allowed tool the server no longer offers stays listed so it can be
+  unchecked. While the `chatExternalMcp` feature is off the test says so and
+  points to the Features page.
+- **Why a tool is inactive**: each tool shows *Active* or the first switch
+  that hides it — the feature, the scenario, the server, or not allowed. The
+  composed-prompt preview shows the server's own verdict per server
+  (`mcpServers` of `/prompt`), including a missing secret.
+- **Saving** a scenario with servers makes mddbd connect and check every
+  allowed tool; a refusal names the tool.
+- **MCP secrets** (a card below the scenarios): set or replace a token, or
+  the value of a named header, and delete one. Values are write-only and the
+  field is a password field; the list shows names, the header and the
+  scenarios using each. Without admin on `*` the card says so.
+
 ### Module switches: the Features page (2.19.0)
 
 "Features" in the Administration menu lists the server's optional modules
@@ -612,10 +638,16 @@ services/mddb-panel/
 │   │   ├── ChatSkillUpdate.jsx         # Update from source, a diff before confirming
 │   │   ├── ChatSkillHistory.jsx        # Used by, earlier versions
 │   │   ├── LineDiff.jsx                # A line diff with signs as well as colours
+│   │   ├── ChatMcpServers.jsx          # A scenario's external MCP servers (MCP-005)
+│   │   ├── ChatMcpServerRow.jsx        # One server: fields, switch, Test connection
+│   │   ├── ChatMcpToolList.jsx         # Its tools: badges, allow, why inactive
+│   │   ├── ChatMcpSecretsCard.jsx      # Write-only MCP secrets
+│   │   ├── ChatMcpStates.jsx           # The server's verdict per MCP server in the preview
 │   │   └── FilterPanel.jsx      # Filter controls
 │   ├── lib/
 │   │   ├── mddb-client.js       # API client
 │   │   ├── chat-scenario.js     # Scenario form state and its conversion
+│   │   ├── chat-mcp.js          # MCP server rows and inactive reasons
 │   │   ├── markdown-templates.js # Document templates
 │   │   └── store.js             # Zustand store
 │   ├── App.jsx                  # Main application

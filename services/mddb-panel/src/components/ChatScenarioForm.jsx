@@ -2,6 +2,7 @@ import { inputClass, labelClass } from '../lib/chat-scenario';
 import ChatScenarioStyleFields from './ChatScenarioStyleFields';
 import ChatScenarioLlmFields from './ChatScenarioLlmFields';
 import ChatSkillPicker from './ChatSkillPicker';
+import ChatMcpServers from './ChatMcpServers';
 
 // #403: the scenario editor. The form state is flat (lib/chat-scenario.js);
 // `set(field, value)` changes one field. A stored scenario keeps its name:
@@ -47,7 +48,7 @@ function TextArea({ id, label, value, onChange, rows, placeholder, hint }) {
   );
 }
 
-export default function ChatScenarioForm({ form, set, collections, skills, isNew }) {
+export default function ChatScenarioForm({ form, set, collections, skills, secrets, isNew }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
@@ -100,6 +101,8 @@ export default function ChatScenarioForm({ form, set, collections, skills, isNew
       <CollectionPicker collections={collections} selected={form.allowedCollections} onChange={(v) => set('allowedCollections', v)} />
 
       <ChatSkillPicker selected={form.skills} available={skills} onChange={(v) => set('skills', v)} />
+
+      <ChatMcpServers rows={form.mcpServers} onChange={(v) => set('mcpServers', v)} secrets={secrets} scenarioEnabled={form.enabled} />
 
       <ChatScenarioStyleFields form={form} set={set} />
       <ChatScenarioLlmFields form={form} set={set} />

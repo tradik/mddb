@@ -12,6 +12,8 @@ vi.mock('../lib/mddb-client', () => ({
     deleteChatScenario: vi.fn(),
     getChatScenarioPrompt: vi.fn(),
     listChatSkills: vi.fn(),
+    listChatMcpSecrets: vi.fn(),
+    putChatMcpSecret: vi.fn(),
   },
 }));
 
@@ -51,6 +53,8 @@ beforeEach(() => {
   vi.mocked(mddbClient.getChatScenarioPrompt).mockResolvedValue({ name: 'support', prompt: 'You are Ada.\n\nDo not use emoji.', version: 4 });
   vi.mocked(mddbClient.putChatScenario).mockResolvedValue({});
   vi.mocked(mddbClient.deleteChatScenario).mockResolvedValue({ deleted: true });
+  vi.mocked(mddbClient.listChatMcpSecrets).mockResolvedValue({ secrets: [{ name: 'wiki', set: true }] });
+  vi.mocked(mddbClient.putChatMcpSecret).mockResolvedValue({ set: true });
   vi.mocked(mddbClient.listChatSkills).mockResolvedValue({ skills: [{ name: 'triage' }, { name: 'refunds', description: 'Money back' }], version: 4 });
 });
 afterEach(cleanup);
@@ -238,3 +242,48 @@ describe('the tabs and the skill list (#404)', () => {
   });
 });
 
+
+describe('external MCP servers (MCP-005)', () => {
+  test('a server added in the editor is saved with the scenario, and a secret is set from the card', async () => {
+    await renderWith();
+    fireEvent.click(screen.getByRole('button', { name: /support/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Add an MCP server/ }));
+    fireEvent.change(screen.getByLabelText('Server name'), { target: { value: 'wiki' } });
+    fireEvent.change(screen.getByLabelText('URL (https, Streamable HTTP)'), { target: { value: 'https://w/mcp' } });
+    fireEvent.change(screen.getByLabelText('Credential'), { target: { value: 'wiki' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(mddbClient.putChatScenario).toHaveBeenCalled());
+    expect(vi.mocked(mddbClient.putChatScenario).mock.calls[0][1].mcpServers).toEqual([
+      { name: 'wiki', url: 'https://w/mcp', enabled: true, secretRef: 'wiki', allowedTools: [], timeoutMs: 0, resultMaxChars: 0 },
+    ]);
+
+    fireEvent.change(screen.getByLabelText('Secret name'), { target: { value: 'crm' } });
+    fireEvent.change(screen.getByLabelText('Secret value'), { target: { value: 'tok' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set or replace' }));
+    expect(await screen.findByText('Saved the secret crm.')).toBeTruthy();
+    expect(mddbClient.listChatMcpSecrets).toHaveBeenCalledTimes(2);
+  });
+
+  test('an http URL is refused before saving', async () => {
+    await renderWith();
+    fireEvent.click(screen.getByRole('button', { name: /support/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Add an MCP server/ }));
+    fireEvent.change(screen.getByLabelText('Server name'), { target: { value: 'wiki' } });
+    fireEvent.change(screen.getByLabelText('URL (https, Streamable HTTP)'), { target: { value: 'http://w' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/https:\/\//);
+    expect(mddbClient.putChatScenario).not.toHaveBeenCalled();
+  });
+
+  test('a secret list without the field shows none', async () => {
+    vi.mocked(mddbClient.listChatMcpSecrets).mockResolvedValue({});
+    await renderWith();
+    expect(await screen.findByText('No secrets yet.')).toBeTruthy();
+  });
+
+  test('a user who may not list secrets sees why', async () => {
+    vi.mocked(mddbClient.listChatMcpSecrets).mockRejectedValue(new Error('HTTP 403'));
+    await renderWith();
+    expect(await screen.findByText(/Secrets need admin/)).toBeTruthy();
+  });
+});

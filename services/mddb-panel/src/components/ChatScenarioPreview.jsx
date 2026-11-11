@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileText, MessageSquare, RefreshCw } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { formatBytes } from '../lib/chat-skill';
+import ChatMcpStates from './ChatMcpStates';
 
 // #403: what the model is told. The server composes the system prompt of a
 // stored scenario — operator prompt, guardrails, the off-topic clause, the
@@ -43,6 +44,7 @@ export function PromptFacts({ data }) {
           Skipped skills that are not stored: {missing.join(', ')}
         </p>
       )}
+      <ChatMcpStates servers={data.mcpServers} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import ChatScenarioList from './ChatScenarioList';
 import ChatScenarioPreview from './ChatScenarioPreview';
 import ChatSkillsPanel from './ChatSkillsPanel';
 import ChatTabs from './ChatTabs';
+import ChatMcpSecretsCard from './ChatMcpSecretsCard';
 
 // #403: chat scenarios — an assistant's prompt, guardrails, allowed
 // collections, style, model and limits — stored in MDDB and picked up by the
@@ -15,6 +16,7 @@ import ChatTabs from './ChatTabs';
 // collections sees it; saving and deleting need admin on "*".
 //
 // #404: the page has two tabs, the scenarios and the skills they attach.
+// MCP-005: a scenario's external MCP servers, and a card for their secrets.
 
 export default function ChatScenariosPanel() {
   const [tab, setTab] = useState('scenarios');
@@ -32,6 +34,7 @@ function ScenariosView() {
   const { stats } = useStore();
   const [scenarios, setScenarios] = useState([]);
   const [skills, setSkills] = useState([]); // null: the list is admin only and was refused
+  const [secrets, setSecrets] = useState([]); // null, likewise (MCP-005)
   const [version, setVersion] = useState(0);
   const [form, setForm] = useState(null);
   const [stored, setStored] = useState(null); // the name being edited; null for a new scenario
@@ -47,8 +50,11 @@ function ScenariosView() {
     })
     .catch((err) => setError(err.message));
 
+  const loadSecrets = () => mddbClient.listChatMcpSecrets().then((data) => setSecrets(data.secrets || []), () => setSecrets(null));
+
   useEffect(() => {
     load();
+    loadSecrets();
     mddbClient.listChatSkills().then((data) => setSkills(data.skills || []), () => setSkills(null));
   }, []);
 
@@ -132,7 +138,7 @@ function ScenariosView() {
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             <form onSubmit={save} className="rounded-lg bg-white p-4 shadow">
-              <ChatScenarioForm form={form} set={(field, value) => setForm((f) => ({ ...f, [field]: value }))} collections={collections} skills={skills} isNew={stored === null} />
+              <ChatScenarioForm form={form} set={(field, value) => setForm((f) => ({ ...f, [field]: value }))} collections={collections} skills={skills} secrets={secrets} isNew={stored === null} />
               <div className="mt-4 flex items-center gap-2">
                 <button type="submit" disabled={busy} className="flex items-center gap-1.5 rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800 disabled:opacity-50">
                   <Save className="h-4 w-4" aria-hidden="true" /> {busy ? 'Working…' : 'Save'}
@@ -152,6 +158,7 @@ function ScenariosView() {
           </div>
         )}
       </div>
+      <ChatMcpSecretsCard secrets={secrets} onChanged={loadSecrets} />
     </>
   );
 }

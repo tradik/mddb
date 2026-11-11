@@ -15,6 +15,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('ChatScenarioPreview', () => {
+  test('shows each external MCP server active or with the reason it is not (MCP-005)', async () => {
+    vi.mocked(mddbClient.getChatScenarioPrompt).mockResolvedValue({ prompt: 'p', mcpServers: [
+      { name: 'wiki', active: true, tools: [{ name: 'search' }] },
+      { name: 'empty', active: true, tools: [] },
+      { name: 'crm', active: false, reason: 'feature chatExternalMcp is off', tools: [] },
+    ] });
+    render(<ChatScenarioPreview name="support" version={1} />);
+    expect(await screen.findByText('active — tools: search')).toBeTruthy();
+    expect(screen.getByText('active — tools: none allowed')).toBeTruthy();
+    expect(screen.getByText('inactive: feature chatExternalMcp is off')).toBeTruthy();
+  });
+
   test('shows the prompt, and asks again on Reload and on a new version', async () => {
     const view = render(<ChatScenarioPreview name="support" version={1} />);
     expect((await screen.findByText('You are Ada.')).tagName).toBe('PRE');
