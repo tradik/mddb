@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **mddb-chat: tools accept only the scenario's `allowed_collections` (#396).** `search_docs` and `get_document` took the collection the model named and used it as it was, so a prompt-injected or confused model could read any collection the service account can read. A collection outside the scenario's list (only the default collection when the list is empty) is now refused with an error returned to the model and logged at `warn`, and never reaches mddbd. The tool schema lists the allowed collections as an `enum`.
 - **`rustix` 1.1.6 in mddb-chat** (RUSTSEC-2026-0486: xattr functions marked unwritten bytes as initialized; build-time only, via prost-build).
 - **WordPress plugin development tools:** PHP_CodeSniffer 3.13.6, WPCS 3.4.1 and PHPCSUtils 1.2.3, past CVE-2026-67434, CVE-2026-45293 and CVE-2026-65954 (code execution through crafted files during a lint run; development only, nothing ships in the plugin).
+- **Go 1.27.4** for every module, image and CI job (GO-2026-6859: an HTTP/1 server crash through a `MaxBytesReader` header race in `net/http`, reachable from mddbd and mddb-cli).
 
 ### Added
 
@@ -81,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **mddb-chat handles SIGTERM and Ctrl-C** by shutting down cleanly.
 - **A chat message id the client sends is kept** when it matches `[A-Za-z0-9_-]{1,64}`, instead of always being replaced, so a rating can name the answer by the id the visitor saw.
 - **Dependencies (the three open Dependabot pull requests, cherry-picked):** Go — gRPC 1.85.0, quic-go 0.65.0, gqlgen 0.17.98, gqlparser 2.5.64, goccy/go-json 0.12.0; npm minor and patch updates in the panel, the chat widget, the Chrome extension, the GitHub Action (its `dist/` rebuilt) and the Grafana data source; the WordPress plugin's tests move to PHPUnit 13.
+- **WordPress plugin:** static analysis on PHPStan 2.3 with `szepeviktor/phpstan-wordpress` 2.0, still at level 5 with no baseline; its three new findings are fixed in code. The tests accept PHPUnit 11.5, 12.5 or 13.4, whichever the PHP version installs, so the plugin is still tested from PHP 8.2; the error-logging tests now check the logged line.
 
 ### Deprecated
 
