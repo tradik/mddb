@@ -1084,6 +1084,41 @@ class MDDBClient {
     return this.postForm('/upload', formData, { signal, errorPrefix: 'Upload Error' });
   }
 
+  // ---- Chat scenarios (#403, 2.19.0+) ----
+
+  /** The scenarios the caller may read: `{ scenarios: [...], version }`. */
+  async listChatScenarios() {
+    return this.request('/chat/scenarios', { method: 'GET' });
+  }
+
+  /** The store's version counter, `{ version }`: it grows on every change. */
+  async getChatScenariosVersion() {
+    return this.request('/chat/scenarios/version', { method: 'GET' });
+  }
+
+  /** One scenario by name. */
+  async getChatScenario(name) {
+    return this.request(`/chat/scenarios/${encodeURIComponent(name)}`, { method: 'GET' });
+  }
+
+  /** Creates a scenario or replaces it whole (admin on "*"). */
+  async putChatScenario(name, scenario) {
+    return this.request(`/chat/scenarios/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(scenario),
+    });
+  }
+
+  /** Deletes a scenario (admin on "*"). */
+  async deleteChatScenario(name) {
+    return this.request(`/chat/scenarios/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  }
+
+  /** The composed system prompt of a stored scenario: `{ name, prompt, version }`. */
+  async getChatScenarioPrompt(name) {
+    return this.request(`/chat/scenarios/${encodeURIComponent(name)}/prompt`, { method: 'GET' });
+  }
+
   // ---- Corpus packs (AGT-005, 2.18.10+) ----
 
   /** Installed packs: `{ packs: [{ collection, readOnly, corpus }], total }`. */

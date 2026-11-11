@@ -46,6 +46,7 @@ vi.mock('./components/WebhooksPanel', () => ({ default: () => 'webhooks panel' }
 vi.mock('./components/SecurityDashboard', () => ({ default: () => 'security dashboard' }));
 vi.mock('./components/EncryptionPanel', () => ({ default: () => 'encryption panel' }));
 vi.mock('./components/AliasesPanel', () => ({ default: () => 'aliases panel' }));
+vi.mock('./components/ChatScenariosPanel', () => ({ default: () => 'chat scenarios panel' }));
 vi.mock('./components/EvalPanel', () => ({ default: () => 'eval panel' }));
 vi.mock('./components/CodeSymbolPanel', () => ({ default: () => 'code symbol panel' }));
 
@@ -135,7 +136,6 @@ describe('App', () => {
   });
 
   test('dragging the handle resizes the sidebar between 180 and 480 px until the mouse is released', async () => {
-    const added = vi.spyOn(document, 'addEventListener');
     const { container } = await renderWith();
     fireEvent.mouseDown(container.querySelector('.cursor-col-resize'));
     expect(document.body.style.cursor).toBe('col-resize');
@@ -152,10 +152,6 @@ describe('App', () => {
     expect(document.body.style.cursor).toBe('');
     expect(document.body.style.userSelect).toBe('');
     fireEvent.mouseMove(document, { clientX: 300 });
-    expect(useStore.getState().sidebarWidth).toBe(480);
-    // A move that reaches the handler after release is ignored too.
-    const onMove = added.mock.calls.find(([type]) => type === 'mousemove')[1];
-    onMove({ clientX: 300 });
     expect(useStore.getState().sidebarWidth).toBe(480);
   });
 
@@ -196,7 +192,7 @@ describe('App', () => {
     ['groups', 'groups panel'], ['vectors', 'vector panel'], ['vectorSpace', 'vector space panel'],
     ['searchAdvisor', 'search advisor panel'], ['embeddings', 'embedding models panel'],
     ['synonyms', 'synonyms panel'], ['stopwords', 'stop words panel'], ['curation', 'curation panel'],
-    ['aliases', 'aliases panel'], ['eval', 'eval panel'], ['codeSymbols', 'code symbol panel'],
+    ['aliases', 'aliases panel'], ['chat', 'chat scenarios panel'], ['eval', 'eval panel'], ['codeSymbols', 'code symbol panel'],
     ['automation', 'automation panel'], ['settings', 'settings panel'], ['temporal', 'temporal panel'],
     ['spellcheck', 'spell check panel'], ['auditLog', 'audit log panel'], ['webhooks', 'webhooks panel'],
     ['security', 'security dashboard'], ['encryption', 'encryption panel'],

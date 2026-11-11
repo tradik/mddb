@@ -1,13 +1,30 @@
 import { useState, useEffect } from 'react';
-import { Folder, Database, Trash2, Brain, Server, Settings, Network, Users, UsersIcon, Upload, FolderPlus, Sliders, GitBranch, PanelLeftClose, BookOpen, Ban, Zap, Globe, Image, Music, FileText, Settings2, Shuffle, Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2 } from 'lucide-react';
+import { Folder, Database, Trash2, Brain, Server, Settings, Network, Users, UsersIcon, Upload, FolderPlus, Sliders, GitBranch, PanelLeftClose, BookOpen, Ban, Zap, Globe, Image, Music, FileText, Settings2, Shuffle, Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2, MessageSquare } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import UploadModal from './UploadModal';
 import CreateCollectionModal from './CreateCollectionModal';
 import CollectionConfigModal from './CollectionConfigModal';
 
+// One entry of the administration menu; the open page is highlighted.
+function NavButton({ mode, icon: Icon, label }) {
+  const { viewMode, setViewMode } = useStore();
+  return (
+    <button
+      onClick={() => setViewMode(mode)}
+      className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${viewMode === mode
+        ? 'bg-blue-100 text-blue-700'
+        : 'text-gray-700 hover:bg-gray-100'
+        }`}
+    >
+      <Icon className="w-4 h-4" />
+      <span className="text-sm font-medium">{label}</span>
+    </button>
+  );
+}
+
 export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse }) {
-  const { currentCollection, setCurrentCollection, vectorStats, setVectorStats, config, viewMode, setViewMode, setStats, collectionConfigs, setCollectionConfigs } = useStore();
+  const { currentCollection, setCurrentCollection, vectorStats, setVectorStats, config, setViewMode, setStats, collectionConfigs, setCollectionConfigs } = useStore();
   const [deletingCollection, setDeletingCollection] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -94,19 +111,6 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
-
-  const NavButton = ({ mode, icon: Icon, label }) => (
-    <button
-      onClick={() => setViewMode(mode)}
-      className={`w-full flex items-center space-x-2 px-3 py-2 rounded-lg transition-colors ${viewMode === mode
-        ? 'bg-blue-100 text-blue-700'
-        : 'text-gray-700 hover:bg-gray-100'
-        }`}
-    >
-      <Icon className="w-4 h-4" />
-      <span className="text-sm font-medium">{label}</span>
-    </button>
-  );
 
   return (
     <div className="h-full bg-white border-r border-gray-200 overflow-y-auto flex flex-col">
@@ -294,6 +298,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
           <NavButton mode="config" icon={Settings} label="Configuration" />
           <NavButton mode="mcp" icon={Brain} label="LLM Connections" />
           <NavButton mode="endpoints" icon={Network} label="API Endpoints" />
+          <NavButton mode="chat" icon={MessageSquare} label="Chat" />
           {authEnabled && (
             <>
               <NavButton mode="users" icon={Users} label="Users" />

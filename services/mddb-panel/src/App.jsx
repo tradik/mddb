@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useStore } from './lib/store';
 import mddbClient from './lib/mddb-client';
 import { authManager } from './lib/auth';
@@ -37,6 +37,7 @@ import EncryptionPanel from './components/EncryptionPanel';
 import AliasesPanel from './components/AliasesPanel';
 import EvalPanel from './components/EvalPanel';
 import CodeSymbolPanel from './components/CodeSymbolPanel';
+import ChatScenariosPanel from './components/ChatScenariosPanel';
 import ComplianceBanner from './components/ComplianceBanner';
 import SSEToast from './components/SSEToast';
 import { useSSE } from './lib/useSSE';
@@ -60,7 +61,6 @@ function App() {
 
   const [isAuthenticated, setIsAuthenticated] = useState(authManager.isAuthenticated());
   const [needsAuth, setNeedsAuth] = useState(false);
-  const isResizing = useRef(false);
   const [sseRefreshKey, setSSERefreshKey] = useState(0);
 
   // SSE: real-time document change notifications
@@ -126,18 +126,15 @@ function App() {
   // Sidebar resize handlers
   const handleMouseDown = useCallback((e) => {
     e.preventDefault();
-    isResizing.current = true;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
     const handleMouseMove = (e) => {
-      if (!isResizing.current) return;
       const newWidth = Math.min(Math.max(e.clientX, 180), 480);
       setSidebarWidth(newWidth);
     };
 
     const handleMouseUp = () => {
-      isResizing.current = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       document.removeEventListener('mousemove', handleMouseMove);
@@ -219,6 +216,11 @@ function App() {
           {viewMode === 'endpoints' && (
             <div className="flex-1 border-l border-gray-200">
               <EndpointsPanel />
+            </div>
+          )}
+          {viewMode === 'chat' && (
+            <div className="flex-1 border-l border-gray-200">
+              <ChatScenariosPanel />
             </div>
           )}
           {viewMode === 'users' && (

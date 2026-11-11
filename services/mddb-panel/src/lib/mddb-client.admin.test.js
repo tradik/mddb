@@ -120,3 +120,15 @@ describe('audit and encryption', () => {
     ['getRotationJob', (c) => c.getRotationJob(odd), `/v1/encryption/jobs/${oddEnc}`, GET],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
+
+describe('chat scenarios', () => {
+  const scenario = { enabled: true, operatorPrompt: 'You are Ada.', allowedCollections: ['docs'] };
+  test.each([
+    ['listChatScenarios', (c) => c.listChatScenarios(), '/v1/chat/scenarios', GET],
+    ['getChatScenariosVersion', (c) => c.getChatScenariosVersion(), '/v1/chat/scenarios/version', GET],
+    ['getChatScenario encodes', (c) => c.getChatScenario(odd), `/v1/chat/scenarios/${oddEnc}`, GET],
+    ['putChatScenario', (c) => c.putChatScenario(odd, scenario), `/v1/chat/scenarios/${oddEnc}`, PUT, scenario],
+    ['deleteChatScenario', (c) => c.deleteChatScenario(odd), `/v1/chat/scenarios/${oddEnc}`, DELETE],
+    ['getChatScenarioPrompt', (c) => c.getChatScenarioPrompt(odd), `/v1/chat/scenarios/${oddEnc}/prompt`, GET],
+  ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
+});

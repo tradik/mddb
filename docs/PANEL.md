@@ -159,6 +159,38 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   pdf, docx, odt, rtf, xlsx, ods, csv, tsv, pptx, odp, epub, eml, mbox,
   yaml, yml, log, lex, tex, latex.
 
+### Chat scenarios (2.19.0)
+
+"Chat" in the sidebar's Administration menu edits the chat scenarios stored
+in MDDB (`/v1/chat/scenarios`, [API.md](API.md#chat-scenarios-v1chatscenarios)).
+A scenario is one assistant: its prompt, what it must not say, the
+collections it may search, its style, model and limits. The chat service
+polls the store's version counter, shown next to the page title, and picks
+up a saved scenario without a restart.
+
+- **List**: every scenario the signed-in user may read (read permission on
+  all of its collections), with an *off* badge on a disabled one.
+- **Editor**: name (fixed once saved — it is the key), description, enabled,
+  operator prompt, guardrails, allowed collections as a checklist of the
+  server's collections (a stored name that is not a collection here, such as
+  an alias, stays listed), skill names, off-topic behaviour with the redirect
+  reply, emoji, answer length, Markdown, citation format, model, temperature
+  (empty means unset, 0 is kept), max answer tokens, the extra request body
+  as name/value rows (a value that reads as JSON is sent as JSON), max turns,
+  token budget and messages per minute. Saving replaces the whole scenario.
+- **Composed prompt**: the system prompt as the server builds it
+  (`GET /v1/chat/scenarios/{name}/prompt`) for the saved scenario — operator
+  prompt, guardrails, off-topic clause, style clause, then each allowed
+  collection's response prompt. It reloads after a save and on *Reload*.
+- **Try it**: a placeholder. Talking to a scenario from the panel needs the
+  chat service connected to it, which a later release adds.
+- **Permissions**: saving and deleting need admin on `"*"`; the server's 403
+  is shown as it is. Delete asks for a confirmation.
+
+Every field has a visible label tied to its input, errors are announced with
+`role="alert"` and results with `<output>`, and the colours are the ones
+listed below.
+
 ### Colours and contrast
 
 The panel's palette is Tailwind's gray, red, amber and green plus the
@@ -450,9 +482,15 @@ services/mddb-panel/
 │   │   ├── MarkdownEditor.jsx   # Markdown editor with preview
 │   │   ├── MarkdownToolbar.jsx  # Formatting toolbar
 │   │   ├── EndpointsPanel.jsx   # API endpoints browser
+│   │   ├── ChatScenariosPanel.jsx      # Chat scenarios: list, save, delete
+│   │   ├── ChatScenarioForm.jsx        # Scenario editor (prompt, collections, skills)
+│   │   ├── ChatScenarioStyleFields.jsx # Off-topic behaviour and style
+│   │   ├── ChatScenarioLlmFields.jsx   # Model, extra request body, limits
+│   │   ├── ChatScenarioPreview.jsx     # Composed prompt and the "Try it" placeholder
 │   │   └── FilterPanel.jsx      # Filter controls
 │   ├── lib/
 │   │   ├── mddb-client.js       # API client
+│   │   ├── chat-scenario.js     # Scenario form state and its conversion
 │   │   ├── markdown-templates.js # Document templates
 │   │   └── store.js             # Zustand store
 │   ├── App.jsx                  # Main application

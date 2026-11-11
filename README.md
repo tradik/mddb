@@ -361,6 +361,7 @@ There is no CLI image. `mddb-cli` ships in the release archives (`.tar.gz`, `.de
 
 ### AI & Search
 - ✅ **MCP Server** - 101 built-in tools via Model Context Protocol 2026-07-28 and 2025-11-25, served side by side (stdio + Streamable HTTP + SSE) with `server/discover`, tool annotations, prompts, completion, and structured output
+- ✅ **Chat Scenarios** (2.19.0) - An assistant's prompt, guardrails, allowed collections, style, LLM parameters and limits stored in MDDB (`/v1/chat/scenarios`, gRPC and MCP alike), edited in the panel, with a composed-prompt preview and one version counter a chat service polls to pick up changes without a restart ([API.md](docs/API.md#chat-scenarios-v1chatscenarios))
 - ✅ **WordPress Publishing** - `wordpress_publish` / `wordpress_set_status` MCP tools create, update and (un)publish posts & pages on sites running the [mddb-sync plugin](integrations/wordpress-plugin/README.md), including tags, categories, meta fields and Polylang/WPML translations included ([docs](docs/MCP.md#wordpress-publishing-tools-v2110))
 - ✅ **File Upload** - Upload PDF, DOCX, XLSX, CSV, PPTX, EPUB, EML/MBOX, HTML, ODT, ODS, ODP, RTF, TEX, YAML, TXT, auto-converted to Markdown (single, batch, ingest and `mddb-cli autoindex`; `meta.conversionConfidence` flags scans and broken files)
 - ✅ **Wikipedia Import** - Stream MediaWiki XML dumps (`.xml.bz2`) with wikitext to Markdown conversion, namespace filtering, batch processing

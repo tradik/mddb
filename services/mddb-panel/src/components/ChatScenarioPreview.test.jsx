@@ -1,0 +1,62 @@
+// @vitest-environment jsdom
+// ChatScenarioPreview (#403): the composed prompt from the server, reloaded
+// when the store's version changes or on demand, and the "Try it" placeholder.
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
+
+vi.mock('../lib/mddb-client', () => ({ default: { getChatScenarioPrompt: vi.fn() } }));
+
+const { default: mddbClient } = await import('../lib/mddb-client');
+const { default: ChatScenarioPreview, TryItPlaceholder } = await import('./ChatScenarioPreview');
+
+beforeEach(() => {
+  vi.mocked(mddbClient.getChatScenarioPrompt).mockResolvedValue({ prompt: 'You are Ada.' });
+});
+afterEach(cleanup);
+
+describe('ChatScenarioPreview', () => {
+  test('shows the prompt, and asks again on Reload and on a new version', async () => {
+    const view = render(<ChatScenarioPreview name="support" version={1} />);
+    expect((await screen.findByText('You are Ada.')).tagName).toBe('PRE');
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    view.rerender(<ChatScenarioPreview name="support" version={2} />);
+    await act(async () => {});
+    expect(mddbClient.getChatScenarioPrompt).toHaveBeenCalledTimes(3);
+    expect(mddbClient.getChatScenarioPrompt).toHaveBeenLastCalledWith('support');
+  });
+
+  test('a refusal replaces the prompt with the server message, and a later success clears it', async () => {
+    vi.mocked(mddbClient.getChatScenarioPrompt).mockRejectedValueOnce(new Error('HTTP 403: forbidden'));
+    render(<ChatScenarioPreview name="support" version={1} />);
+    expect((await screen.findByRole('alert')).textContent).toBe('HTTP 403: forbidden');
+    expect(document.querySelector('pre')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    expect(await screen.findByText('You are Ada.')).toBeTruthy();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  test('an answer that arrives after the scenario changed is dropped', async () => {
+    let answerFirst;
+    let failSecond;
+    vi.mocked(mddbClient.getChatScenarioPrompt)
+      .mockReturnValueOnce(new Promise((resolve) => { answerFirst = resolve; }))
+      .mockReturnValueOnce(new Promise((_resolve, reject) => { failSecond = reject; }))
+      .mockResolvedValue({ prompt: 'You are Bo.' });
+    const view = render(<ChatScenarioPreview name="support" version={1} />);
+    view.rerender(<ChatScenarioPreview name="sales" version={1} />);
+    view.rerender(<ChatScenarioPreview name="billing" version={1} />);
+    expect(await screen.findByText('You are Bo.')).toBeTruthy();
+    await act(async () => {
+      answerFirst({ prompt: 'stale' });
+      failSecond(new Error('stale failure'));
+    });
+    expect(screen.queryByText('stale')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+test('the placeholder names the scenario and what is missing', () => {
+  render(<TryItPlaceholder name="support" />);
+  const section = screen.getByRole('region', { name: 'Try it' });
+  expect(section.textContent).toContain('Talking to support from here needs the chat service (mddb-chat)');
+});

@@ -78,6 +78,13 @@ const coverageFiles = [
   'src/App.jsx',
   'src/components/Sidebar.jsx',
   'src/components/DocumentViewer.jsx',
+  // 2.19.0: chat scenarios stored in mddbd and edited here (#403).
+  'src/lib/chat-scenario.js',
+  'src/components/ChatScenariosPanel.jsx',
+  'src/components/ChatScenarioForm.jsx',
+  'src/components/ChatScenarioStyleFields.jsx',
+  'src/components/ChatScenarioLlmFields.jsx',
+  'src/components/ChatScenarioPreview.jsx',
 ];
 
 export default mergeConfig(
