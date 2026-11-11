@@ -1616,7 +1616,12 @@ paths:
                   }
                 includeContent: { type: boolean, default: false }
       responses:
-        "200": { description: OK }
+        "200":
+          description: Matches nearest first (an empty list when none)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoSearchResponse"
         "400": { description: Invalid request }
         "503": { description: Index still loading }
 
@@ -1648,7 +1653,12 @@ paths:
                   }
                 includeContent: { type: boolean }
       responses:
-        "200": { description: OK }
+        "200":
+          description: Documents inside the box (an empty list when none)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoWithinResponse"
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
@@ -1716,7 +1726,12 @@ paths:
                       country: { type: string }
                       csvPath: { type: string }
       responses:
-        "200": { description: OK }
+        "200":
+          description: The rebuilt index
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoReindexResponse"
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
@@ -1731,7 +1746,12 @@ paths:
       summary: Geo index statistics
       operationId: geoStats
       responses:
-        "200": { description: OK }
+        "200":
+          description: Points per collection and loaded postcode datasets
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoStatsResponse"
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "429": {$ref: "#/components/responses/RateLimited"}
@@ -1754,7 +1774,12 @@ paths:
                 lng: { type: number }
                 precision: { type: integer, minimum: 1, maximum: 12, default: 12 }
       responses:
-        "200": { description: OK }
+        "200":
+          description: The geohash
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoEncodeResponse"
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "413": {$ref: "#/components/responses/PayloadTooLarge"}
@@ -1776,7 +1801,12 @@ paths:
               properties:
                 geohash: { type: string }
       responses:
-        "200": { description: OK }
+        "200":
+          description: The centre and bounding box of the cell
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GeoDecodeResponse"
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "413": {$ref: "#/components/responses/PayloadTooLarge"}
@@ -9482,6 +9512,126 @@ components:
         algorithm:
           type: string
           example: rtree
+
+    GeoSearchResultItem:
+      type: object
+      properties:
+        document:
+          $ref: "#/components/schemas/Document"
+        distanceMeters:
+          type: number
+          format: double
+          description: Distance from the query point; set by /v1/geo-search only.
+        rank:
+          type: integer
+          description: 1-based position in the answer.
+
+    GeoSearchResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeoSearchResultItem"
+        total:
+          type: integer
+        radiusMeters:
+          type: number
+          format: double
+        algorithm:
+          type: string
+          enum: [ rtree, geohash ]
+        limit:
+          type: integer
+          description: The topK served, when the server's cap lowered it (#368).
+        limitCapped:
+          $ref: "#/components/schemas/LimitCapped"
+
+    GeoWithinResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeoSearchResultItem"
+        total:
+          type: integer
+        algorithm:
+          type: string
+          example: rtree
+
+    GeoReindexResponse:
+      type: object
+      properties:
+        points:
+          type: integer
+          description: Points indexed.
+        collection:
+          type: string
+          description: The collection rebuilt; absent when all were.
+        postcodesLoaded:
+          type: object
+          description: Postcodes loaded per country, when loadPostcodes was given.
+          additionalProperties:
+            type: integer
+        durationMs:
+          type: integer
+          format: int64
+
+    GeoStatsResponse:
+      type: object
+      properties:
+        collections:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              points:
+                type: integer
+              lastRebuild:
+                type: string
+                format: date-time
+        postcodeDatasets:
+          type: object
+          additionalProperties:
+            type: integer
+        ready:
+          type: boolean
+
+    GeoEncodeResponse:
+      type: object
+      properties:
+        geohash:
+          type: string
+          example: u4pruydqqvj8
+        precision:
+          type: integer
+          description: Length of the geohash.
+          example: 12
+
+    GeoDecodeResponse:
+      type: object
+      properties:
+        lat:
+          type: number
+          format: double
+          description: Latitude of the cell's centre.
+        lng:
+          type: number
+          format: double
+          description: Longitude of the cell's centre.
+        minLat:
+          type: number
+          format: double
+        maxLat:
+          type: number
+          format: double
+        minLng:
+          type: number
+          format: double
+        maxLng:
+          type: number
+          format: double
 
     IngestRequest:
       type: object
