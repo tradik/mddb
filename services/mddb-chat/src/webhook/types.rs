@@ -19,12 +19,57 @@ pub enum WebhookData {
         queue_size: usize,
         active_sessions: usize,
     },
+    /// A visitor's question, as sanitized (#399).
+    Message {
+        session_id: String,
+        scenario: String,
+        message_id: String,
+        text: String,
+    },
+    /// The assistant's final text and what producing it cost (#399).
+    Answer {
+        session_id: String,
+        scenario: String,
+        message_id: String,
+        /// The `message_id` of the question this answers.
+        in_reply_to: String,
+        text: String,
+        provider: String,
+        model: String,
+        /// `None` when the provider reported no usage.
+        usage: Option<UsageReport>,
+        tools: Vec<ToolCallRecord>,
+        latency_ms: u64,
+    },
+    /// A visitor's rating of an answer (#399).
+    Feedback {
+        session_id: String,
+        scenario: String,
+        /// `None` when the client predates message ids.
+        message_id: Option<String>,
+        rating: String,
+    },
+}
+
+/// Token usage as the provider reported it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct UsageReport {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+}
+
+/// One tool the model called while answering: its name and the collection it
+/// searched, which is the one argument a host app can aggregate on.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ToolCallRecord {
+    pub name: String,
+    pub collection: String,
 }
 
 impl WebhookPayload {
     pub fn session_start(session_id: &str, user_name: &str, scenario: &str) -> Self {
         Self {
-            event: "session.start".to_string(),
+            event: super::events::SESSION_START.to_string(),
             timestamp: now_unix(),
             data: WebhookData::Session {
                 session_id: session_id.to_string(),
@@ -36,7 +81,7 @@ impl WebhookPayload {
 
     pub fn session_end(session_id: &str, user_name: &str, scenario: &str) -> Self {
         Self {
-            event: "session.end".to_string(),
+            event: super::events::SESSION_END.to_string(),
             timestamp: now_unix(),
             data: WebhookData::Session {
                 session_id: session_id.to_string(),
@@ -48,7 +93,7 @@ impl WebhookPayload {
 
     pub fn queue_full(queue_size: usize, active_sessions: usize) -> Self {
         Self {
-            event: "queue.full".to_string(),
+            event: super::events::QUEUE_FULL.to_string(),
             timestamp: now_unix(),
             data: WebhookData::Queue {
                 queue_size,
@@ -58,7 +103,7 @@ impl WebhookPayload {
     }
 }
 
-fn now_unix() -> u64 {
+pub(super) fn now_unix() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -117,11 +162,8 @@ mod tests {
 
         // Seconds since the epoch; anything below the 2020s means the clock
         // arithmetic went wrong rather than the clock being unusual.
-        assert!(
-            v["timestamp"].as_u64().expect("timestamp must be a number") > 1_600_000_000,
-            "implausible timestamp: {}",
-            v["timestamp"]
-        );
+        let stamp = v["timestamp"].as_u64().expect("timestamp must be a number");
+        assert!(stamp > 1_600_000_000, "implausible timestamp: {stamp}");
     }
 
     // The data variants are untagged, so a receiver distinguishes them by the

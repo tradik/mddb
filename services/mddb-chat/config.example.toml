@@ -107,7 +107,38 @@ allowed_collections = ["docs", "faq"]
 temperature = 0.5
 max_turns = 30
 
+# Webhooks: each entry is one URL and the events it receives. Every POST is
+# JSON — { "event", "timestamp", "data" } — with the event name in X-MDDB-Event
+# and, when [security] webhook_secret is set, the hex HMAC-SHA256 of the body
+# in X-MDDB-Signature.
+#
+# Events are opt-in per entry:
+#
+#   session.start  a visitor was admitted
+#   session.end    a session ended (by the visitor or by disconnect)
+#   queue.full     a visitor was turned away
+#   message        a visitor's question, as sanitized (session id, scenario,
+#                  message id, text)
+#   answer         the assistant's final text, with provider, model, token
+#                  usage (null when the provider reports none), the tools
+#                  called (name + collection), latency in ms, its own message
+#                  id and the id of the question it answers
+#   feedback       a rating sent by the widget, with the message id it rates
+#                  (null from clients that predate message ids)
+#
+# Leaving `events` out subscribes to session.start, session.end and
+# queue.full only — the events that existed before the per-message ones — so
+# an older config keeps receiving exactly what it did. `message` and `answer`
+# carry conversation text: subscribe to them only for an endpoint you trust
+# with it. An event name the server does not know is logged at startup.
+#
+# Payload examples: services/mddb-chat/README.md.
+#
 # [[webhooks]]
 # url = "https://example.com/webhook"
 # events = ["session.start", "session.end", "queue.full"]
 # headers = { "Authorization" = "Bearer your-token" }
+#
+# [[webhooks]]
+# url = "https://example.com/chat-log"
+# events = ["message", "answer", "feedback"]

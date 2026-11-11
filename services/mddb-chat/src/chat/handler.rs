@@ -5,6 +5,7 @@ use futures::{SinkExt, StreamExt};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
+use crate::chat::trace::TurnTrace;
 use crate::chat::{scenario, tools};
 use crate::error::AppError;
 use crate::grpc::client::{MddbClient, SearchResult};
@@ -99,13 +100,25 @@ pub async fn handle_ws(socket: WebSocket, state: Arc<AppState>, client_ip: Strin
                 rating,
                 question,
                 answer,
+                message_id,
             } => {
                 let sid_str = session_id.as_deref().unwrap_or("unknown");
-                let user_name = session_id
+                let session = session_id
                     .as_ref()
                     .and_then(|sid| state.session_manager.get_session(sid))
-                    .map(|s| s.name.clone())
-                    .unwrap_or_default();
+                    .map(|s| (s.name.clone(), s.scenario.clone()));
+                let user_name = session.as_ref().map_or_else(String::new, |s| s.0.clone());
+
+                // #399: forwarded only when there is a session to attribute it
+                // to; a rating from nobody is nothing a host app can analyse.
+                if let Some((_, scenario_name)) = &session {
+                    state.webhook_dispatcher.dispatch(WebhookPayload::feedback(
+                        sid_str,
+                        scenario_name,
+                        message_id.as_deref(),
+                        &rating,
+                    ));
+                }
 
                 if rating == "down" {
                     warn!(
@@ -301,6 +314,16 @@ async fn handle_message(
         (session.scenario.clone(), session.history.clone())
     };
 
+    // #399: the question is accepted, so it gets an id and is reported. The
+    // trace follows the turn and becomes the `answer` event at the end.
+    let mut trace = TurnTrace::start();
+    state.webhook_dispatcher.dispatch(WebhookPayload::message(
+        session_id,
+        &scenario_name,
+        &trace.message_id,
+        &content,
+    ));
+
     // Build system prompt (without RAG context — tools will fetch it)
     let system_prompt = if let Some(scenario) = state.config.get_scenario(&scenario_name) {
         scenario.system_prompt.clone()
@@ -401,6 +424,7 @@ async fn handle_message(
 
                 // Execute each tool and add results
                 for tc in &tool_calls {
+                    trace.record_tool(tc, &collection);
                     let result = tools::execute_tool(&mut mddb_client, tc, &tool_policy)
                         .await
                         .unwrap_or_else(|e| format!("Tool error: {e}"));
@@ -426,7 +450,20 @@ async fn handle_message(
                     let piece: String = chunk.iter().collect();
                     send_json(sender, &WsOutgoing::Chunk { content: piece }).await;
                 }
-                send_json(sender, &WsOutgoing::Done).await;
+                send_json(
+                    sender,
+                    &WsOutgoing::Done {
+                        message_id: trace.answer_id.clone(),
+                    },
+                )
+                .await;
+                state.webhook_dispatcher.dispatch(trace.answer(
+                    session_id,
+                    &scenario_name,
+                    &text,
+                    &state.config.llm,
+                    spent,
+                ));
 
                 if let Some(mut session) = state.session_manager.get_session_mut(session_id) {
                     session.add_message(MessageRole::Assistant, text);
@@ -471,7 +508,20 @@ async fn handle_message(
         }
     }
 
-    send_json(sender, &WsOutgoing::Done).await;
+    send_json(
+        sender,
+        &WsOutgoing::Done {
+            message_id: trace.answer_id.clone(),
+        },
+    )
+    .await;
+    state.webhook_dispatcher.dispatch(trace.answer(
+        session_id,
+        &scenario_name,
+        &full_response,
+        &state.config.llm,
+        spent,
+    ));
 
     if let Some(mut session) = state.session_manager.get_session_mut(session_id) {
         session.add_message(MessageRole::Assistant, full_response);

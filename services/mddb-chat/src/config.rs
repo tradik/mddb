@@ -182,6 +182,12 @@ impl Scenario {
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebhookConfig {
     pub url: String,
+    /// Which events this URL receives; see `webhook::events::ALL`.
+    ///
+    /// Absent means the three events that existed before #399, so a config
+    /// written for an older server does not start receiving per-message
+    /// traffic because the server learned new events.
+    #[serde(default = "crate::webhook::events::legacy_events")]
     pub events: Vec<String>,
     #[serde(default)]
     pub headers: HashMap<String, String>,
@@ -326,15 +332,25 @@ model = "test"
     // two cases concurrently. set_var/remove_var are unsafe in edition 2024.
     #[test]
     fn mddb_auth_env_override_precedence() {
-        // 1) Empty config auth -> env wins (SEC-007).
+        // 1) Empty config auth -> env wins (SEC-007). The LLM key and the
+        //    webhook secret follow the same rule, checked in the same test for
+        //    the same process-global reason.
         let empty = write_temp("empty", MINIMAL);
         unsafe {
             std::env::set_var("MDDB_CHAT_AUTH_USERNAME", "envuser");
             std::env::set_var("MDDB_CHAT_AUTH_PASSWORD", "envpass");
+            std::env::set_var("MDDB_CHAT_LLM_API_KEY", "envkey");
+            std::env::set_var("MDDB_CHAT_WEBHOOK_SECRET", "envsecret");
         }
         let cfg = Config::load(&empty).unwrap();
         assert_eq!(cfg.mddb.auth_username, "envuser");
         assert_eq!(cfg.mddb.auth_password, "envpass");
+        assert_eq!(cfg.llm.api_key, "envkey");
+        assert_eq!(cfg.security.webhook_secret, "envsecret");
+        unsafe {
+            std::env::remove_var("MDDB_CHAT_LLM_API_KEY");
+            std::env::remove_var("MDDB_CHAT_WEBHOOK_SECRET");
+        }
 
         // 2) Non-empty config auth -> config wins over env.
         let with_auth = write_temp(
@@ -609,5 +625,54 @@ model = "test"
 
         assert_eq!(cfg.llm.api_key, "sk-env");
         assert_eq!(cfg.security.webhook_secret, "whsec-env");
+    }
+
+    // #399: a webhook written before the per-message events existed names no
+    // events, and must keep getting exactly what it got.
+    #[test]
+    fn a_webhook_without_events_receives_the_three_original_ones() {
+        let cfg = config_from(
+            r#"
+[server]
+[mddb]
+[llm]
+api_url = "http://localhost:11434/v1"
+model = "test"
+[session]
+[security]
+[[webhooks]]
+url = "https://example.test/hook"
+"#,
+            "webhook-default-events",
+        );
+
+        assert_eq!(
+            cfg.webhooks[0].events,
+            vec!["session.start", "session.end", "queue.full"]
+        );
+    }
+
+    #[test]
+    fn a_webhook_that_lists_events_gets_only_those() {
+        let cfg = config_from(
+            r#"
+[server]
+[mddb]
+[llm]
+api_url = "http://localhost:11434/v1"
+model = "test"
+[session]
+[security]
+[[webhooks]]
+url = "https://example.test/hook"
+events = ["message", "answer", "feedback"]
+"#,
+            "webhook-listed-events",
+        );
+
+        assert_eq!(
+            cfg.webhooks[0].events,
+            vec!["message", "answer", "feedback"]
+        );
     }
 }

@@ -124,6 +124,10 @@ pub enum WsIncoming {
         rating: String,
         question: String,
         answer: String,
+        /// The `message_id` of the `done` frame that ended the rated answer
+        /// (#399). Optional: clients built before it existed send none.
+        #[serde(default)]
+        message_id: Option<String>,
     },
     Ping,
 }
@@ -131,11 +135,25 @@ pub enum WsIncoming {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum WsOutgoing {
-    Session { id: String, scenario: String },
-    Queued { position: usize },
-    Chunk { content: String },
-    Done,
-    Error { message: String },
+    Session {
+        id: String,
+        scenario: String,
+    },
+    Queued {
+        position: usize,
+    },
+    Chunk {
+        content: String,
+    },
+    /// Ends an answer. `message_id` names the answer so that a `feedback`
+    /// can refer to it (#399); clients that predate it ignore the extra field.
+    Done {
+        #[serde(default)]
+        message_id: String,
+    },
+    Error {
+        message: String,
+    },
     Pong,
     Ended,
 }
@@ -296,10 +314,63 @@ mod tests {
 
         let incoming: WsIncoming =
             serde_json::from_str(r#"{"type":"message","content":"hello"}"#).expect("parse");
-        match incoming {
-            WsIncoming::Message { content } => assert_eq!(content, "hello"),
-            other => panic!("parsed as {other:?}"),
-        }
+        assert!(
+            matches!(incoming, WsIncoming::Message { ref content } if content == "hello"),
+            "parsed as {incoming:?}"
+        );
+    }
+
+    // #399: the frame that ends an answer names it, so feedback can too.
+
+    #[test]
+    fn a_done_frame_carries_the_answers_message_id() {
+        let json = serde_json::to_string(&WsOutgoing::Done {
+            message_id: "ans-1".into(),
+        })
+        .expect("serialise");
+
+        assert!(
+            json.contains(r#""type":"done""#),
+            "unexpected shape: {json}"
+        );
+        assert!(
+            json.contains(r#""message_id":"ans-1""#),
+            "unexpected shape: {json}"
+        );
+    }
+
+    #[test]
+    fn a_done_frame_without_an_id_still_parses() {
+        // The pre-#399 shape, so a reader of recorded traffic is not broken.
+        let parsed: WsOutgoing = serde_json::from_str(r#"{"type":"done"}"#).expect("parse");
+        assert!(
+            matches!(parsed, WsOutgoing::Done { ref message_id } if message_id.is_empty()),
+            "parsed as {parsed:?}"
+        );
+    }
+
+    #[test]
+    fn feedback_may_name_the_answer_it_rates() {
+        let with_id: WsIncoming = serde_json::from_str(
+            r#"{"type":"feedback","rating":"down","question":"q","answer":"a","message_id":"ans-1"}"#,
+        )
+        .expect("parse");
+        assert!(matches!(
+            with_id,
+            WsIncoming::Feedback { ref message_id, .. } if message_id.as_deref() == Some("ans-1")
+        ));
+
+        // A widget built before message ids sends none; the message must still
+        // be accepted, since refusing it would break every deployed client.
+        let without: WsIncoming = serde_json::from_str(
+            r#"{"type":"feedback","rating":"up","question":"q","answer":"a"}"#,
+        )
+        .expect("parse");
+        assert!(matches!(
+            without,
+            WsIncoming::Feedback { ref message_id, ref rating, .. }
+                if message_id.is_none() && rating == "up"
+        ));
     }
 
     // RAG-005: the counter that used to exist and never counted.

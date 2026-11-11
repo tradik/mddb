@@ -52,6 +52,146 @@ environment: `MDDB_CHAT_LLM_API_KEY`, `MDDB_CHAT_WEBHOOK_SECRET`,
 The `[server]`, `[llm]`, `[session]`, `[security]` and `[[webhooks]]` tables
 are documented inline in `config.example.toml`.
 
+## WebSocket protocol
+
+Every frame is a JSON object with a `type`.
+
+| Client sends | Fields | Server answers |
+|--------------|--------|----------------|
+| `join` | `name`, `scenario` (default `assistant`) | `session` `{id, scenario}`, or `queued` `{position}` and `session` later |
+| `message` | `content` | `chunk` `{content}` repeatedly, then `done` `{message_id}` |
+| `feedback` | `rating`, `question`, `answer`, `message_id` (optional) | nothing |
+| `resume` | `session_id` | `session` |
+| `end` | — | `ended` |
+| `ping` | — | `pong` |
+
+Any refusal arrives as `error` `{message}`.
+
+### Message ids
+
+`done` carries `message_id`, a UUID that names the answer it ends:
+
+```json
+{"type": "done", "message_id": "7f0c1a52-6f0e-4c58-9a51-0f4a1c6f2b11"}
+```
+
+A client that lets the visitor rate an answer sends that id back, so the
+rating names one answer unambiguously:
+
+```json
+{"type": "feedback", "rating": "down", "question": "…", "answer": "…",
+ "message_id": "7f0c1a52-6f0e-4c58-9a51-0f4a1c6f2b11"}
+```
+
+Both fields are additions. A client written before them ignores the extra
+field on `done`, and a `feedback` without `message_id` is still accepted.
+
+## Webhooks
+
+Each `[[webhooks]]` entry is a URL and the events it subscribes to:
+
+```toml
+[[webhooks]]
+url = "https://example.com/chat-log"
+events = ["message", "answer", "feedback"]
+headers = { "Authorization" = "Bearer your-token" }
+```
+
+| Event | Fired when |
+|-------|------------|
+| `session.start` | a visitor is admitted |
+| `session.end` | a session ends, by `end` or by disconnect |
+| `queue.full` | a visitor is turned away |
+| `message` | a question is accepted (after sanitizing and the turn and token limits) |
+| `answer` | an answer has been sent in full |
+| `feedback` | a visitor with a session rates an answer |
+
+Events are opt-in. An entry without `events` receives `session.start`,
+`session.end` and `queue.full` only — the set that existed before the
+per-message events — so an existing config keeps receiving exactly what it
+did. `message` and `answer` carry conversation text; subscribe to them only
+for an endpoint you trust with it. A name the server does not know is logged
+at startup and matches nothing.
+
+### Envelope and signature
+
+Every delivery is a `POST` with a JSON body of the same shape:
+
+```json
+{"event": "<name>", "timestamp": 1794268800, "data": { }}
+```
+
+`timestamp` is Unix seconds. `X-MDDB-Event` repeats the event name, and
+`X-MDDB-Signature` is the hex HMAC-SHA256 of the raw body keyed with
+`[security] webhook_secret` (empty when no secret is set). Verify it over the
+bytes received, before parsing. A delivery that does not get a 2xx is retried
+twice, after 0.5 s and 1 s.
+
+### `message`
+
+```json
+{
+  "event": "message",
+  "timestamp": 1794268800,
+  "data": {
+    "session_id": "0b6f2d0e-8f0a-4a39-b0f3-3f1d0c0f7a10",
+    "scenario": "support",
+    "message_id": "c1c9c2b4-5a7e-4b43-8f55-9d2f0a3f6e01",
+    "text": "How do I export a collection?"
+  }
+}
+```
+
+`text` is the question as sanitized (HTML tags stripped, trimmed). A message
+the server refused — rate limit, turn limit, token budget — fires no event.
+
+### `answer`
+
+```json
+{
+  "event": "answer",
+  "timestamp": 1794268802,
+  "data": {
+    "session_id": "0b6f2d0e-8f0a-4a39-b0f3-3f1d0c0f7a10",
+    "scenario": "support",
+    "message_id": "7f0c1a52-6f0e-4c58-9a51-0f4a1c6f2b11",
+    "in_reply_to": "c1c9c2b4-5a7e-4b43-8f55-9d2f0a3f6e01",
+    "text": "Run `mddb-cli export docs` …",
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "usage": {"input_tokens": 1840, "output_tokens": 212},
+    "tools": [{"name": "search_docs", "collection": "docs"}],
+    "latency_ms": 1730
+  }
+}
+```
+
+`message_id` is the id the client received in `done`; `in_reply_to` is the
+`message_id` of the question. `usage` sums every tool-calling round of the
+turn and is `null` when the provider reported none. A turn that used all five
+tool rounds ends with a streamed response whose own usage is not counted.
+`tools` lists each call in order with the collection it was pointed at;
+`latency_ms` runs from accepting the question to the end of the answer.
+
+### `feedback`
+
+```json
+{
+  "event": "feedback",
+  "timestamp": 1794268830,
+  "data": {
+    "session_id": "0b6f2d0e-8f0a-4a39-b0f3-3f1d0c0f7a10",
+    "scenario": "support",
+    "message_id": "7f0c1a52-6f0e-4c58-9a51-0f4a1c6f2b11",
+    "rating": "down"
+  }
+}
+```
+
+`message_id` is `null` when the client sent none. The `question` and `answer`
+strings of the WebSocket message are not forwarded: they are whatever the
+client typed, and the id already names the answer.
+
 ## Layout
 
 ```
@@ -65,5 +205,11 @@ src/
   llm/               OpenAI-compatible and Anthropic providers
   session/           admission, queue, history, token budget
   security/          rate limiting, client IP, input sanitising
-  webhook/           session lifecycle webhooks
+  chat/trace.rs      one turn's message ids, tools called and latency
+  webhook/           webhooks: session lifecycle, message, answer, feedback
 ```
+
+The handler tests run the real WebSocket handler on a loopback port with a
+scripted model (`src/chat/testing/`) and a webhook receiver
+(`src/webhook/test_support.rs`); they need no mddbd and no network.
+`cargo llvm-cov --summary-only` prints per-file coverage.
