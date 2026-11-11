@@ -7,6 +7,7 @@ import UploadModal from './UploadModal';
 import CommandModal from './CommandModal';
 import ReadOnlyNotice from './ReadOnlyNotice';
 import BatchDeleteBar from './BatchDeleteBar';
+import FacetsPanel from './FacetsPanel';
 import { useSelection } from '../lib/use-selection';
 
 export default function DocumentList({ sseRefreshKey } = {}) {
@@ -43,6 +44,8 @@ export default function DocumentList({ sseRefreshKey } = {}) {
   // reloaded list starts with none ticked.
   const selection = useSelection(documents);
   const [batchOutcome, setBatchOutcome] = useState(null);
+  // 2.19.0: per-value counts of metadata keys (/v1/aggregate).
+  const [showFacets, setShowFacets] = useState(false);
 
   useEffect(() => {
     setOffset(0);
@@ -183,6 +186,15 @@ export default function DocumentList({ sseRefreshKey } = {}) {
           </h3>
           <div className="flex items-center gap-2">
             <button
+              type="button"
+              onClick={() => setShowFacets(!showFacets)}
+              aria-expanded={showFacets}
+              disabled={!currentCollection}
+              className="px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200 disabled:opacity-50"
+            >
+              Facets
+            </button>
+            <button
               onClick={() => setShowCommand(true)}
               className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded hover:bg-gray-200 flex items-center gap-1.5"
             >
@@ -216,6 +228,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
+        {showFacets && currentCollection && <FacetsPanel key={currentCollection} collection={currentCollection} filters={filters} />}
         {readOnly && (
           <div className="mt-2">
             <ReadOnlyNotice config={collectionConfig} compact />

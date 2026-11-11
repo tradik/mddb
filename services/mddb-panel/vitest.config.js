@@ -137,6 +137,7 @@ const coverageFiles = [
   'src/components/MyApiKeysPanel.jsx',
   'src/components/IdentityBadge.jsx',
   'src/components/MCPAPIKeysPanel.jsx',
+  'src/components/FacetsPanel.jsx',
 ];
 
 export default mergeConfig(

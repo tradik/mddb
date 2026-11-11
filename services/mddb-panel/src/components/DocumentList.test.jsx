@@ -20,6 +20,8 @@ vi.mock('./UploadModal', () => ({
     </div>
   ),
 }));
+// FacetsPanel has its own suite.
+vi.mock('./FacetsPanel', () => ({ default: ({ collection, filters }) => <div>facets for {collection} {JSON.stringify(filters)}</div> }));
 vi.mock('./CommandModal', () => ({
   default: ({ isOpen, onClose, params }) => (isOpen ? (
     <div data-testid="command-modal" data-params={JSON.stringify(params)}>
@@ -412,5 +414,23 @@ describe('DocumentList batch delete', () => {
     cleanup();
     await renderList({}, { documents: [], totalCount: 0 });
     expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+});
+
+describe('DocumentList facets', () => {
+  test('Facets opens the counts for the collection with the active filters, and closes', async () => {
+    await renderList({ filters: { tag: ['a'] } });
+    const toggle = screen.getByRole('button', { name: 'Facets' });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByText('facets for docs {"tag":["a"]}')).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(screen.queryByText(/^facets for/)).toBeNull();
+  });
+
+  test('without a collection Facets is off', () => {
+    render(<DocumentList />);
+    expect(screen.getByRole('button', { name: 'Facets' }).disabled).toBe(true);
   });
 });
