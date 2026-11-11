@@ -28,7 +28,7 @@ describe('toForm', () => {
       offTopicMode: 'refuse', redirectTemplate: '', allowedCollections: [], skills: [],
       emoji: 'off', verbosity: 'normal', markdown: true, citationTemplate: '',
       model: '', temperature: '', maxTokens: '', extraBody: [],
-      maxTurns: '', tokenBudgetPerSession: '', messagesPerMinute: '',
+      maxTurns: '', tokenBudgetPerSession: '', messagesPerMinute: '', mcpServers: [],
     });
   });
 
@@ -60,6 +60,15 @@ describe('fromForm', () => {
     expect(body.skills).toEqual(['b', 'a']);
     expect(body.maxTurns).toBe(0);
     expect(fromForm(toForm()).llm).toEqual({ model: '', maxTokens: 0 });
+  });
+
+  test('MCP servers (MCP-005) are sent only when there are some', () => {
+    expect('mcpServers' in fromForm(toForm())).toBe(false);
+    const withServer = toForm({ mcpServers: [{ name: 'wiki', url: 'https://w', enabled: true, allowedTools: ['search'] }] });
+    expect(fromForm(withServer).mcpServers).toEqual([
+      { name: 'wiki', url: 'https://w', enabled: true, secretRef: '', allowedTools: ['search'], timeoutMs: 0, resultMaxChars: 0 },
+    ]);
+    expect(formProblem({ ...withServer, name: 'ok', mcpServers: [{ ...withServer.mcpServers[0], url: 'http://w' }] })).toMatch(/https/);
   });
 });
 

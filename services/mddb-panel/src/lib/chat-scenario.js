@@ -6,6 +6,8 @@
  * "not set", which matters for temperature, where 0 is a real value.
  */
 
+import { toMcpRows, fromMcpRows, mcpServerProblem } from './chat-mcp';
+
 export const inputClass = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500';
 export const labelClass = 'block text-xs font-medium text-gray-700 mb-1';
 
@@ -71,6 +73,7 @@ export function toForm(scenario = {}) {
     maxTurns: numberText(scenario.maxTurns),
     tokenBudgetPerSession: numberText(scenario.tokenBudgetPerSession),
     messagesPerMinute: numberText(rateLimit.messagesPerMinute),
+    mcpServers: toMcpRows(scenario.mcpServers), // MCP-005, lib/chat-mcp.js
   };
 }
 
@@ -88,7 +91,7 @@ export function fromForm(form) {
     if (key.trim()) extraBody[key.trim()] = parseExtraValue(value);
   });
   if (Object.keys(extraBody).length > 0) llm.extraBody = extraBody;
-  return {
+  const scenario = {
     description: form.description,
     enabled: form.enabled,
     operatorPrompt: form.operatorPrompt,
@@ -107,6 +110,9 @@ export function fromForm(form) {
     tokenBudgetPerSession: wholeNumber(form.tokenBudgetPerSession),
     rateLimit: { messagesPerMinute: wholeNumber(form.messagesPerMinute) },
   };
+  // A scenario without servers is sent as before; the PUT replaces it whole.
+  if (form.mcpServers.length > 0) scenario.mcpServers = fromMcpRows(form.mcpServers);
+  return scenario;
 }
 
 /** Why a form cannot be saved yet, or null when it can. */
@@ -116,5 +122,5 @@ export function formProblem(form) {
   if (/[|/\s]/.test(name) || name === 'version') return 'The name may not contain spaces, "/" or "|", or be "version".';
   const temperature = Number(form.temperature);
   if (form.temperature !== '' && !(temperature >= 0 && temperature <= 2)) return 'Temperature must be between 0 and 2.';
-  return null;
+  return mcpServerProblem(form.mcpServers);
 }

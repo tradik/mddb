@@ -145,5 +145,9 @@ describe('chat skills', () => {
     ['updateChatSkill previews by default', (c) => c.updateChatSkill(odd), `/v1/chat/skills/${oddEnc}/update`, POST, {}],
     ['updateChatSkill confirms', (c) => c.updateChatSkill(odd, { confirm: true, sha256: 'ab' }), `/v1/chat/skills/${oddEnc}/update`, POST, { confirm: true, sha256: 'ab' }],
     ['getChatSkillUsedBy', (c) => c.getChatSkillUsedBy(odd), `/v1/chat/skills/${oddEnc}/used-by`, GET],
+    ['listChatMcpSecrets', (c) => c.listChatMcpSecrets(), '/v1/chat/mcp-secrets', GET],
+    ['putChatMcpSecret', (c) => c.putChatMcpSecret(odd, { value: 'v' }), `/v1/chat/mcp-secrets/${oddEnc}`, PUT, { value: 'v' }],
+    ['deleteChatMcpSecret', (c) => c.deleteChatMcpSecret(odd), `/v1/chat/mcp-secrets/${oddEnc}`, DELETE],
+    ['inspectChatMcpServer', (c) => c.inspectChatMcpServer({ url: 'https://w/mcp' }), '/v1/chat/mcp/inspect', POST, { url: 'https://w/mcp' }],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });

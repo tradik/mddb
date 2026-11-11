@@ -1166,6 +1166,28 @@ class MDDBClient {
     return this.request(`/chat/skills/${encodeURIComponent(name)}/used-by`, { method: 'GET' });
   }
 
+  // ---- External MCP servers of the chat (MCP-005, 2.19.0+): admin on "*" ----
+
+  /** The MCP secrets: `{ secrets: [{ name, header, set, updatedAt, usedBy }] }`; never a value. */
+  async listChatMcpSecrets() {
+    return this.request('/chat/mcp-secrets', { method: 'GET' });
+  }
+
+  /** Sets or replaces a secret, `{ value, header }`; the answer carries no value. */
+  async putChatMcpSecret(name, secret) {
+    return this.request(`/chat/mcp-secrets/${encodeURIComponent(name)}`, { method: 'PUT', body: JSON.stringify(secret) });
+  }
+
+  /** Deletes a secret; a 409 names the scenarios using it. */
+  async deleteChatMcpSecret(name) {
+    return this.request(`/chat/mcp-secrets/${encodeURIComponent(name)}`, { method: 'DELETE' });
+  }
+
+  /** A server's tools, `{ url, secretRef }` → `{ serverName, tools }`; 404 with `feature` while chatExternalMcp is off. */
+  async inspectChatMcpServer(target) {
+    return this.request('/chat/mcp/inspect', { method: 'POST', body: JSON.stringify(target) });
+  }
+
   // ---- Corpus packs (AGT-005, 2.18.10+) ----
 
   /** Installed packs: `{ packs: [{ collection, readOnly, corpus }], total }`. */
