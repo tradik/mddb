@@ -138,6 +138,8 @@ const coverageFiles = [
   'src/components/IdentityBadge.jsx',
   'src/components/MCPAPIKeysPanel.jsx',
   'src/components/FacetsPanel.jsx',
+  'src/components/CollectionMaintenanceCard.jsx',
+  'src/components/BackupRestoreCard.jsx',
 ];
 
 export default mergeConfig(

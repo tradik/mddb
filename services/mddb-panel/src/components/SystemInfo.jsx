@@ -8,6 +8,8 @@ import DiagnoseCard from './DiagnoseCard';
 import ServerEdgeCard from './ServerEdgeCard';
 import IndexingStatusCard from './IndexingStatusCard';
 import StorageCard from './StorageCard';
+import CollectionMaintenanceCard from './CollectionMaintenanceCard';
+import BackupRestoreCard from './BackupRestoreCard';
 
 export default function SystemInfo() {
   const {
@@ -251,6 +253,10 @@ export default function SystemInfo() {
         <CorpusPacksCard />
 
         <DiagnoseCard />
+
+        <CollectionMaintenanceCard />
+
+        <BackupRestoreCard />
 
         {/* Refresh Button */}
         <div className="mt-6 flex justify-end">

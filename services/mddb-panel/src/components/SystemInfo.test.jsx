@@ -11,6 +11,8 @@ vi.mock('./DiagnoseCard', () => ({ default: () => <div>diagnose card</div> }));
 vi.mock('./ServerEdgeCard', () => ({ default: () => <div>server edge card</div> }));
 vi.mock('./IndexingStatusCard', () => ({ default: () => <div>indexing status card</div> }));
 vi.mock('./StorageCard', () => ({ default: () => <div>storage card</div> }));
+vi.mock('./CollectionMaintenanceCard', () => ({ default: () => <div>maintenance card</div> }));
+vi.mock('./BackupRestoreCard', () => ({ default: () => <div>backup card</div> }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
@@ -109,6 +111,8 @@ describe('SystemInfo', () => {
     expect(await screen.findByText('Retrieval gain, last 30 days')).toBeTruthy();
     expect(screen.getByText('corpus packs card')).toBeTruthy();
     expect(screen.getByText('diagnose card')).toBeTruthy();
+    expect(screen.getByText('maintenance card')).toBeTruthy();
+    expect(screen.getByText('backup card')).toBeTruthy();
     expect(screen.getByText('server edge card')).toBeTruthy();
   });
 
