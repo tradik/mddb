@@ -1,6 +1,6 @@
 use futures::StreamExt;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::config::LlmConfig;
 use crate::error::AppError;
@@ -14,18 +14,8 @@ pub struct OpenAiProvider {
     config: LlmConfig,
 }
 
-// --- Request types ---
-
-#[derive(Serialize)]
-struct ChatRequest {
-    model: String,
-    messages: Vec<serde_json::Value>,
-    max_tokens: u32,
-    temperature: f32,
-    stream: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tools: Option<Vec<ToolDef>>,
-}
+/// How much of a model's reasoning is quoted in the debug log.
+const REASONING_PREVIEW_CHARS: usize = 400;
 
 // --- Response types (non-streaming) ---
 
@@ -53,7 +43,51 @@ struct CompletionChoice {
 #[derive(Deserialize)]
 struct CompletionMessage {
     content: Option<String>,
+    /// Where a thinking model puts its chain of thought (#400): `reasoning`
+    /// on Ollama and OpenRouter, `reasoning_content` on DeepSeek and vLLM.
+    /// Read only to explain an empty answer in the log — never shown to the
+    /// visitor.
+    #[serde(default)]
+    reasoning: Option<String>,
+    #[serde(default)]
+    reasoning_content: Option<String>,
     tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl CompletionMessage {
+    /// The answer for the visitor: the content, and only the content.
+    ///
+    /// A thinking model that spends `max_tokens` on reasoning returns an
+    /// empty `content` next to a full `reasoning`. That used to look like a
+    /// model that said nothing; it is now explained at debug level, with the
+    /// setting that fixes it.
+    fn into_answer(self) -> String {
+        let answer = self.content.unwrap_or_default();
+        let reasoning = self
+            .reasoning
+            .or(self.reasoning_content)
+            .unwrap_or_default();
+        if answer.is_empty() && !reasoning.is_empty() {
+            let reasoning_chars = reasoning.chars().count();
+            let reasoning = preview(&reasoning);
+            debug!(
+                reasoning_chars,
+                reasoning,
+                "the model returned reasoning and no content; raise [llm] max_tokens \
+                 or set [llm] extra_body = {{ reasoning_effort = \"none\" }}"
+            );
+        }
+        answer
+    }
+}
+
+/// The first [`REASONING_PREVIEW_CHARS`] characters of `text`, marked when
+/// cut.
+fn preview(text: &str) -> String {
+    match text.char_indices().nth(REASONING_PREVIEW_CHARS) {
+        Some((cut, _)) => format!("{}…", &text[..cut]),
+        None => text.to_string(),
+    }
 }
 
 // --- Response types (streaming) ---
@@ -113,6 +147,51 @@ impl OpenAiProvider {
                 obj
             })
             .collect()
+    }
+
+    /// The JSON body of one request.
+    ///
+    /// Starts from `[llm] extra_body` and writes the request's own fields
+    /// over it (#400), so extra_body can add a parameter this server does not
+    /// model but cannot swap the model or drop the conversation.
+    fn request_body(
+        &self,
+        messages: &[ApiMsg],
+        tools: &[ToolDef],
+        temperature: f32,
+        max_tokens: u32,
+        stream: bool,
+    ) -> serde_json::Value {
+        let mut body = self.config.extra_body.clone();
+        body.insert("model".into(), self.config.model.clone().into());
+        body.insert("messages".into(), Self::api_messages(messages).into());
+        body.insert("max_tokens".into(), max_tokens.into());
+        body.insert("temperature".into(), temperature.into());
+        body.insert("stream".into(), stream.into());
+        // No tools means no key at all — which also discards an extra_body
+        // `tools`, since that one belongs to the request.
+        body.remove("tools");
+        if !tools.is_empty() {
+            body.insert("tools".into(), serde_json::json!(tools));
+        }
+        serde_json::Value::Object(body)
+    }
+
+    /// Posts `body` and returns the response if the endpoint accepted it.
+    async fn post(&self, body: &serde_json::Value) -> Result<reqwest::Response, AppError> {
+        let req = self.client.post(self.api_url()).json(body);
+        let response = self
+            .auth_header(req)
+            .send()
+            .await
+            .map_err(|e| AppError::LlmError(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::LlmError(format!("LLM API {status}: {body}")));
+        }
+        Ok(response)
     }
 
     fn build_sse_stream(&self, response: reqwest::Response) -> ChunkStream {
@@ -182,35 +261,8 @@ impl LlmProvider for OpenAiProvider {
         temperature: f32,
         max_tokens: u32,
     ) -> Result<ChatTurn, AppError> {
-        let request = ChatRequest {
-            model: self.config.model.clone(),
-            messages: Self::api_messages(messages),
-            max_tokens,
-            temperature,
-            stream: false,
-            tools: if tools.is_empty() {
-                None
-            } else {
-                Some(tools.to_vec())
-            },
-        };
-
-        let req = self.client.post(self.api_url()).json(&request);
-        let req = self.auth_header(req);
-
-        let response = req
-            .send()
-            .await
-            .map_err(|e| AppError::LlmError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("LLM API {status}: {body}")));
-        }
+        let body = self.request_body(messages, tools, temperature, max_tokens, false);
+        let response = self.post(&body).await?;
 
         let completion: ChatCompletion = response
             .json()
@@ -236,7 +288,7 @@ impl LlmProvider for OpenAiProvider {
 
         let response = match choice.message.tool_calls {
             Some(tool_calls) if !tool_calls.is_empty() => ChatResponse::ToolCalls { tool_calls },
-            _ => ChatResponse::Content(choice.message.content.unwrap_or_default()),
+            _ => ChatResponse::Content(choice.message.into_answer()),
         };
 
         Ok(ChatTurn { response, usage })
@@ -248,74 +300,12 @@ impl LlmProvider for OpenAiProvider {
         temperature: f32,
         max_tokens: u32,
     ) -> Result<ChunkStream, AppError> {
-        let request = ChatRequest {
-            model: self.config.model.clone(),
-            messages: Self::api_messages(messages),
-            max_tokens,
-            temperature,
-            stream: true,
-            tools: None,
-        };
-
-        let req = self.client.post(self.api_url()).json(&request);
-        let req = self.auth_header(req);
-
-        let response = req
-            .send()
-            .await
-            .map_err(|e| AppError::LlmError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!("LLM API {status}: {body}")));
-        }
-
+        let body = self.request_body(messages, &[], temperature, max_tokens, true);
+        let response = self.post(&body).await?;
         Ok(self.build_sse_stream(response))
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    // RAG-005. OpenAI names the same two numbers differently from Anthropic,
-    // which is exactly the kind of difference that goes unnoticed until a
-    // budget silently stops counting on one provider.
-
-    #[test]
-    fn usage_is_read_from_the_response() {
-        let body = r#"{
-            "choices": [{"message": {"content": "hello"}}],
-            "usage": {"prompt_tokens": 900, "completion_tokens": 100, "total_tokens": 1000}
-        }"#;
-
-        let parsed: ChatCompletion = serde_json::from_str(body).expect("parse");
-        let usage = parsed.usage.expect("usage block");
-
-        assert_eq!(usage.prompt_tokens, 900);
-        assert_eq!(usage.completion_tokens, 100);
-    }
-
-    #[test]
-    fn a_response_without_usage_still_parses() {
-        let body = r#"{"choices": [{"message": {"content": "hi"}}]}"#;
-
-        let parsed: ChatCompletion = serde_json::from_str(body).expect("parse");
-        assert!(parsed.usage.is_none());
-    }
-
-    #[test]
-    fn a_partial_usage_block_counts_what_it_reports() {
-        let body = r#"{"choices": [], "usage": {"prompt_tokens": 42}}"#;
-
-        let parsed: ChatCompletion = serde_json::from_str(body).expect("parse");
-        let usage = parsed.usage.expect("usage block");
-
-        assert_eq!(usage.prompt_tokens, 42);
-        assert_eq!(usage.completion_tokens, 0);
-    }
-}
+#[path = "openai_tests.rs"]
+mod tests;

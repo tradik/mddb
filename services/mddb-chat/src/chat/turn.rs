@@ -138,11 +138,8 @@ pub async fn handle_message(
                     let result = tools::execute_tool(&mut mddb_client, tc, &tool_policy)
                         .await
                         .unwrap_or_else(|e| format!("Tool error: {e}"));
-                    debug!(
-                        tool = tc.function.name,
-                        result_len = result.len(),
-                        "tool result"
-                    );
+                    let result_len = result.len();
+                    debug!(tool = tc.function.name, result_len, "tool result");
                     api_messages.push(ApiMsg {
                         role: "tool".to_string(),
                         content: Some(result),

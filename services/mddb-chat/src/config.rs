@@ -113,6 +113,16 @@ pub struct LlmConfig {
     pub max_tokens: u32,
     #[serde(default = "default_temperature")]
     pub temperature: f32,
+    /// Extra fields merged into every request to an OpenAI-compatible
+    /// endpoint (#400), for parameters this server does not model — e.g.
+    /// `extra_body = { reasoning_effort = "none" }` to stop a thinking model
+    /// behind Ollama from spending `max_tokens` on reasoning.
+    ///
+    /// Any TOML value is passed through as JSON. Keys the request itself sets
+    /// (`model`, `messages`, `max_tokens`, `temperature`, `stream`, `tools`)
+    /// are ignored here: the request wins. Not used by the Anthropic provider.
+    #[serde(default)]
+    pub extra_body: serde_json::Map<String, serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -584,6 +594,34 @@ max_turns = 5
         let scenario = cfg.get_scenario("demo").expect("the scenario should load");
         assert_eq!(scenario.max_turns, Some(5));
         assert!(!scenario.allows_another_turn(5));
+    }
+
+    // #400: a table of arbitrary values, passed through to the LLM endpoint.
+    #[test]
+    fn extra_body_is_empty_unless_configured() {
+        let cfg = config_from(MINIMAL, "extra-default");
+        assert!(cfg.llm.extra_body.is_empty());
+    }
+
+    #[test]
+    fn extra_body_keeps_every_kind_of_toml_value_as_json() {
+        let extra = r#"extra_body = { reasoning_effort = "none", seed = 7, top_p = 0.5, think = false, stop = ["a"], options = { num_ctx = 8192 } }"#;
+        let cfg = config_from(
+            &MINIMAL.replace("[session]", &format!("{extra}\n[session]")),
+            "extra-set",
+        );
+
+        assert_eq!(
+            serde_json::Value::Object(cfg.llm.extra_body),
+            serde_json::json!({
+                "reasoning_effort": "none",
+                "seed": 7,
+                "top_p": 0.5,
+                "think": false,
+                "stop": ["a"],
+                "options": {"num_ctx": 8192},
+            })
+        );
     }
 
     // #401: an old config.toml has no such key and must get the retry.

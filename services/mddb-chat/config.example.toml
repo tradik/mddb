@@ -54,6 +54,17 @@ api_key = ""  # or set MDDB_CHAT_LLM_API_KEY env var
 model = "gpt-4o-mini"
 max_tokens = 1024
 temperature = 0.7
+# Extra fields merged into every request to an OpenAI-compatible endpoint,
+# for parameters mddb-chat does not model. Any TOML value is sent as JSON.
+# Keys the request sets itself (model, messages, max_tokens, temperature,
+# stream, tools) are ignored here. Not used with provider = "anthropic".
+#
+# Thinking models behind Ollama (qwen3, deepseek-r1...) put their reasoning in
+# a separate field; once it uses up max_tokens the answer comes back empty.
+# Turn the reasoning off, or raise max_tokens:
+#   extra_body = { reasoning_effort = "none" }
+# Other examples:
+#   extra_body = { seed = 7, top_p = 0.9, options = { num_ctx = 8192 } }
 
 [session]
 max_concurrent = 2

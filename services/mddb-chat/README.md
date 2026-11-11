@@ -79,6 +79,34 @@ the port opens, and exit with `failed to connect to mddbd` if it fails.
 
 The process exits cleanly on `SIGTERM` and Ctrl-C.
 
+## Extra LLM request fields
+
+`[llm] extra_body` (2.19.0) is a TOML table merged into every request sent to an
+OpenAI-compatible endpoint, for parameters mddb-chat does not model:
+
+```toml
+[llm]
+provider = "openai"
+api_url = "http://localhost:11434/v1"
+model = "qwen3:8b"
+extra_body = { reasoning_effort = "none" }
+```
+
+- Any TOML value is passed through as JSON, nested tables included
+  (`extra_body = { options = { num_ctx = 8192 } }`).
+- The request's own fields win: `model`, `messages`, `max_tokens`,
+  `temperature`, `stream` and `tools` in `extra_body` are ignored.
+- It applies to the non-streaming and the streaming call alike, and not to
+  `provider = "anthropic"`.
+
+**Empty answers from thinking models.** Ollama returns a thinking model's
+chain of thought in a separate `reasoning` field (`reasoning_content` on some
+other servers). When the reasoning uses up `max_tokens`, `content` comes back
+empty. mddb-chat never shows reasoning to the visitor; with
+`RUST_LOG=mddb_chat=debug` it logs that an answer was reasoning-only, with the
+first 400 characters. Fix it with `extra_body = { reasoning_effort = "none" }`
+or a larger `max_tokens`.
+
 ## WebSocket protocol
 
 Every frame is a JSON object with a `type`.

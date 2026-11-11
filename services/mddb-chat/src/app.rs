@@ -132,10 +132,8 @@ pub fn cors_layer(server: &ServerConfig) -> CorsLayer {
         return layer.allow_origin(Any);
     }
     let origins = server.allowed_origins();
-    tracing::info!(
-        count = origins.len(),
-        "CORS restricted to configured origins"
-    );
+    let count = origins.len();
+    tracing::info!(count, "CORS restricted to configured origins");
     layer.allow_origin(origins)
 }
 
