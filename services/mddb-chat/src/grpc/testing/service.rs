@@ -135,6 +135,9 @@ fn scenario_prompt(
         name: request.name,
         prompt,
         version: state.version,
+        // #404 added the prompt's size and missing skills; mddb-chat reads
+        // only the prompt.
+        ..Default::default()
     })
 }
 
