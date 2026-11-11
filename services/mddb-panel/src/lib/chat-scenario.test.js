@@ -25,7 +25,7 @@ describe('toForm', () => {
   test('a new scenario starts enabled, refusing off-topic questions, in Markdown', () => {
     expect(toForm()).toEqual({
       name: '', description: '', enabled: true, operatorPrompt: '', guardrails: '',
-      offTopicMode: 'refuse', redirectTemplate: '', allowedCollections: [], skills: '',
+      offTopicMode: 'refuse', redirectTemplate: '', allowedCollections: [], skills: [],
       emoji: 'off', verbosity: 'normal', markdown: true, citationTemplate: '',
       model: '', temperature: '', maxTokens: '', extraBody: [],
       maxTurns: '', tokenBudgetPerSession: '', messagesPerMinute: '',
@@ -36,7 +36,7 @@ describe('toForm', () => {
     const form = toForm(stored);
     expect(form).toMatchObject({
       name: 'support', enabled: false, offTopicMode: 'redirect', redirectTemplate: 'Ask me about MDDB.',
-      skills: 'triage, refunds', emoji: 'sparingly', verbosity: 'short', markdown: false,
+      skills: ['triage', 'refunds'], emoji: 'sparingly', verbosity: 'short', markdown: false,
       temperature: '0', maxTokens: '800', maxTurns: '12', tokenBudgetPerSession: '50000', messagesPerMinute: '20',
     });
     expect(form.extraBody).toEqual([
@@ -53,11 +53,11 @@ describe('fromForm', () => {
     expect(fromForm(toForm(stored))).toEqual(body);
   });
 
-  test('empty numbers are 0, an empty temperature is left out, blank extras and skills are dropped', () => {
-    const form = { ...toForm(), model: ' m ', skills: ' a ,, b ', extraBody: [{ key: ' ', value: 'x' }, { key: ' on ', value: 'true' }], maxTurns: 'many' };
+  test('empty numbers are 0, an empty temperature is left out, blank extras are dropped, skills keep their order', () => {
+    const form = { ...toForm(), model: ' m ', skills: ['b', 'a'], extraBody: [{ key: ' ', value: 'x' }, { key: ' on ', value: 'true' }], maxTurns: 'many' };
     const body = fromForm(form);
     expect(body.llm).toEqual({ model: 'm', maxTokens: 0, extraBody: { on: true } });
-    expect(body.skills).toEqual(['a', 'b']);
+    expect(body.skills).toEqual(['b', 'a']);
     expect(body.maxTurns).toBe(0);
     expect(fromForm(toForm()).llm).toEqual({ model: '', maxTokens: 0 });
   });

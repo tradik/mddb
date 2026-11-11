@@ -154,6 +154,20 @@ const coverageFiles = [
   'src/components/TemporalEventsTab.jsx',
   'src/components/SpellCheckPanel.jsx',
   'src/components/SpellCleanupBox.jsx',
+  // 2.19.0: chat skills — the Skills tab, the ordered skill picker and the
+  // prompt's size in the preview (#404).
+  'src/lib/chat-skill.js',
+  'src/lib/line-diff.js',
+  'src/components/ChatTabs.jsx',
+  'src/components/ChatScenarioList.jsx',
+  'src/components/ChatSkillPicker.jsx',
+  'src/components/ChatSkillsPanel.jsx',
+  'src/components/ChatSkillList.jsx',
+  'src/components/ChatSkillEditor.jsx',
+  'src/components/ChatSkillImport.jsx',
+  'src/components/ChatSkillUpdate.jsx',
+  'src/components/ChatSkillHistory.jsx',
+  'src/components/LineDiff.jsx',
 ];
 
 export default mergeConfig(

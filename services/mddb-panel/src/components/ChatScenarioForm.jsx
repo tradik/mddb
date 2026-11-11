@@ -1,6 +1,7 @@
 import { inputClass, labelClass } from '../lib/chat-scenario';
 import ChatScenarioStyleFields from './ChatScenarioStyleFields';
 import ChatScenarioLlmFields from './ChatScenarioLlmFields';
+import ChatSkillPicker from './ChatSkillPicker';
 
 // #403: the scenario editor. The form state is flat (lib/chat-scenario.js);
 // `set(field, value)` changes one field. A stored scenario keeps its name:
@@ -46,7 +47,7 @@ function TextArea({ id, label, value, onChange, rows, placeholder, hint }) {
   );
 }
 
-export default function ChatScenarioForm({ form, set, collections, isNew }) {
+export default function ChatScenarioForm({ form, set, collections, skills, isNew }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2">
@@ -98,11 +99,7 @@ export default function ChatScenarioForm({ form, set, collections, isNew }) {
 
       <CollectionPicker collections={collections} selected={form.allowedCollections} onChange={(v) => set('allowedCollections', v)} />
 
-      <div>
-        <label htmlFor="chat-skills" className={labelClass}>Skills</label>
-        <input id="chat-skills" value={form.skills} onChange={(e) => set('skills', e.target.value)} placeholder="triage, refunds" className={inputClass} />
-        <p className="mt-1 text-xs text-gray-600">Names of reusable instruction blocks, separated by commas. They are stored now and expanded once the skill store ships.</p>
-      </div>
+      <ChatSkillPicker selected={form.skills} available={skills} onChange={(v) => set('skills', v)} />
 
       <ChatScenarioStyleFields form={form} set={set} />
       <ChatScenarioLlmFields form={form} set={set} />

@@ -59,7 +59,7 @@ export function toForm(scenario = {}) {
     offTopicMode: offTopic.mode || 'refuse',
     redirectTemplate: offTopic.redirectTemplate || '',
     allowedCollections: scenario.allowedCollections || [],
-    skills: (scenario.skills || []).join(', '),
+    skills: [...(scenario.skills || [])], // ordered skill names (#404)
     emoji: style.emoji || 'off',
     verbosity: style.verbosity || 'normal',
     markdown: style.markdown ?? true,
@@ -95,7 +95,7 @@ export function fromForm(form) {
     guardrails: form.guardrails,
     offTopic: { mode: form.offTopicMode, redirectTemplate: form.redirectTemplate },
     allowedCollections: form.allowedCollections,
-    skills: form.skills.split(',').map((skill) => skill.trim()).filter(Boolean),
+    skills: form.skills,
     style: {
       emoji: form.emoji,
       verbosity: form.verbosity,

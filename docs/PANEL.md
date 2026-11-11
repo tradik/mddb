@@ -173,15 +173,18 @@ up a saved scenario without a restart.
 - **Editor**: name (fixed once saved — it is the key), description, enabled,
   operator prompt, guardrails, allowed collections as a checklist of the
   server's collections (a stored name that is not a collection here, such as
-  an alias, stays listed), skill names, off-topic behaviour with the redirect
+  an alias, stays listed), the skills in prompt order (see below), off-topic behaviour with the redirect
   reply, emoji, answer length, Markdown, citation format, model, temperature
   (empty means unset, 0 is kept), max answer tokens, the extra request body
   as name/value rows (a value that reads as JSON is sent as JSON), max turns,
   token budget and messages per minute. Saving replaces the whole scenario.
 - **Composed prompt**: the system prompt as the server builds it
   (`GET /v1/chat/scenarios/{name}/prompt`) for the saved scenario — operator
-  prompt, guardrails, off-topic clause, style clause, then each allowed
-  collection's response prompt. It reloads after a save and on *Reload*.
+  prompt, guardrails, off-topic clause, skills, style clause, then each
+  allowed collection's response prompt — with its size in bytes and
+  approximate tokens (bytes ÷ 4), the server's warning past 75% of
+  `MDDB_CHAT_PROMPT_MAX_BYTES`, and the skill names it skipped because no
+  such skill is stored. It reloads after a save and on *Reload*.
 - **Try it**: a placeholder. Talking to a scenario from the panel needs the
   chat service connected to it, which a later release adds.
 - **Permissions**: saving and deleting need admin on `"*"`; the server's 403
@@ -240,6 +243,39 @@ refused request (403) reads *Not permitted* and says which grant it needs.
 - **Spell Checker**: *Clean up text* applies the corrections
   (`/v1/spell-cleanup`) and shows how many were applied.
 
+### Chat skills (2.19.0)
+
+The Chat page has two tabs, *Scenarios* and *Skills* (an ARIA tab list: the
+arrow keys, Home and End move between them). A skill is a block of
+instructions in the `SKILL.md` format that scenarios attach
+(`/v1/chat/skills`, [API.md](API.md#chat-skills-v1chatskills)). Skills are
+part of system prompts, so the whole tab needs admin on `"*"`.
+
+- **List**: name, description, version, size, source (host, path and short
+  commit, or *pasted*) and how many scenarios use it.
+- **Editor**: name (fixed once saved), description and the instructions.
+  Paste a whole `SKILL.md` and *Read front matter* has the server split it
+  into name, description and body. Editing the instructions of an imported
+  skill detaches it from its source.
+- **Import from URL**: an https URL; *Fetch preview* shows the whole fetched
+  text, front matter included, its source and size, and whether the name is
+  taken. Nothing is stored until *Save*.
+- **Update from source** (imported skills): fetches again only when pressed,
+  then shows a line diff of the stored and the new text (and description);
+  *Save as version N* confirms, naming the hash of the text shown.
+- **Used by and earlier versions**: the scenarios attaching the skill, and
+  the last 10 versions, each comparable with the current one as a diff.
+- **Delete**: asks first; the server refuses while a scenario uses the
+  skill, and the refusal names them.
+- **In the scenario editor** the skills are an ordered list: add one of the
+  stored skills from a select, move it up or down, remove it — all buttons
+  with names such as "Move triage up". A name with no stored skill is marked
+  *missing*. Without the right to list skills the attached names are kept and
+  can still be ordered or removed.
+
+Diff lines carry a `+` or `-` sign and a screen-reader word besides their
+green or red background, so a change does not rest on colour alone.
+
 ### Colours and contrast
 
 The panel's palette is Tailwind's gray, red, amber and green plus the
@@ -253,6 +289,7 @@ and bars and other meaningful graphics meet SC 1.4.11 (3:1):
 | Quota bar fill: under 80% / 80–99% / at the limit | `primary-700`, `amber-700`, `red-700` | 4.8:1, 4.1:1, 5.2:1 against the track |
 | Warning / error notes on white | `amber-800`, `red-700` | 7.1:1, 6.5:1 |
 | *Enabled* label on the Config page | `green-700` | 5.0:1 |
+| Diff lines added / removed, chat notes (#404) | `green-900` on `green-50`, `red-900` on `red-50`, `amber-900` on `amber-50` | 9.9:1, 9.3:1, 9.6:1 |
 
 Colour never carries a state alone: every bar has its numbers as text, and
 near or over a limit a sentence says so.
@@ -535,7 +572,17 @@ services/mddb-panel/
 │   │   ├── ChatScenarioForm.jsx        # Scenario editor (prompt, collections, skills)
 │   │   ├── ChatScenarioStyleFields.jsx # Off-topic behaviour and style
 │   │   ├── ChatScenarioLlmFields.jsx   # Model, extra request body, limits
-│   │   ├── ChatScenarioPreview.jsx     # Composed prompt and the "Try it" placeholder
+│   │   ├── ChatScenarioPreview.jsx     # Composed prompt, its size, and the "Try it" placeholder
+│   │   ├── ChatScenarioList.jsx        # The stored scenarios
+│   │   ├── ChatTabs.jsx                # Scenarios / Skills tabs
+│   │   ├── ChatSkillPicker.jsx         # A scenario's skills, in order
+│   │   ├── ChatSkillsPanel.jsx         # Chat skills: list, write, import, update, delete
+│   │   ├── ChatSkillList.jsx           # The stored skills
+│   │   ├── ChatSkillEditor.jsx         # A skill's fields; front matter read by the server
+│   │   ├── ChatSkillImport.jsx         # Import from a URL, the whole text before saving
+│   │   ├── ChatSkillUpdate.jsx         # Update from source, a diff before confirming
+│   │   ├── ChatSkillHistory.jsx        # Used by, earlier versions
+│   │   ├── LineDiff.jsx                # A line diff with signs as well as colours
 │   │   └── FilterPanel.jsx      # Filter controls
 │   ├── lib/
 │   │   ├── mddb-client.js       # API client

@@ -60,3 +60,22 @@ test('the placeholder names the scenario and what is missing', () => {
   const section = screen.getByRole('region', { name: 'Try it' });
   expect(section.textContent).toContain('Talking to support from here needs the chat service (mddb-chat)');
 });
+
+describe('the prompt facts (#404)', () => {
+  test('size and tokens, the cap warning and the skipped skills', async () => {
+    vi.mocked(mddbClient.getChatScenarioPrompt).mockResolvedValue({
+      prompt: 'You are Ada.', bytes: 100000, approxTokens: 25000,
+      warning: 'the composed prompt is 100000 bytes, 76% of the 131072-byte limit', missingSkills: ['ghost', 'phantom'],
+    });
+    render(<ChatScenarioPreview name="support" version={1} />);
+    expect(await screen.findByText('97.7 KiB · about 25000 tokens (bytes ÷ 4)')).toBeTruthy();
+    const notes = screen.getAllByRole('status').map((n) => n.textContent);
+    expect(notes).toEqual(['the composed prompt is 100000 bytes, 76% of the 131072-byte limit', 'Skipped skills that are not stored: ghost, phantom']);
+  });
+
+  test('an answer without the fields shows zero and no notes', async () => {
+    render(<ChatScenarioPreview name="support" version={1} />);
+    expect(await screen.findByText('0 B · about 0 tokens (bytes ÷ 4)')).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+});

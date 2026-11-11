@@ -19,6 +19,7 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 🪝 **Webhooks Panel** - Register, list, and delete webhooks with one-click subscription to incident events
 - 📉 **Retrieval Gain** (2.18.8+) - On the System page: searches, tokens returned and tokens saved by passages over the last 30 days, from `GET /v1/gain`
 - 💬 **Chat Scenarios** (2.19.0+) - "Chat" in the sidebar: list, edit and delete the assistants stored in MDDB (`/v1/chat/scenarios`) — prompt, guardrails, allowed collections, style, model and limits — with a preview of the composed system prompt
+- 🧩 **Chat Skills** (2.19.0+) - The Chat page's "Skills" tab: reusable SKILL.md instruction blocks (`/v1/chat/skills`) — write or paste one, import one from an https URL after reading the whole text, update an imported one from its source after a line diff, see which scenarios use it, compare earlier versions, delete one no scenario uses; scenarios attach skills in order with a keyboard-accessible picker
 - 📦 **Corpus Packs** (2.18.10+) - On the System page: list, install (`.mddbpack` upload), remove and build read-only packs (`/v1/corpus*`); a read-only collection is marked in its document list and settings, with Upload and delete off
 - 🩺 **Diagnose Bundle** (2.18.10+) - On the System page: download `GET /v1/admin/diagnose` with the opt-in profiles, integrity check and real collection names
 - ⏰ **Cron actions** (2.18.9+/2.18.10+) - A cron rule calls a webhook, takes a backup (local or S3, retention) or syncs a sitemap / URL list / S3 prefix; the automation log shows backup targets and sync counts
@@ -312,6 +313,7 @@ The panel connects to MDDB HTTP API at `/v1` endpoints:
 - `POST /v1/truncate` - Truncate revisions
 - `GET /v1/corpus`, `POST /v1/corpus/install|remove|build` - Corpus packs
 - `GET /v1/chat/scenarios`, `GET|PUT|DELETE /v1/chat/scenarios/{name}`, `GET /v1/chat/scenarios/{name}/prompt` - Chat scenarios
+- `GET /v1/chat/skills`, `GET|PUT|DELETE /v1/chat/skills/{name}`, `POST /v1/chat/skills/import`, `POST /v1/chat/skills/{name}/update`, `GET /v1/chat/skills/{name}/used-by` - Chat skills
 - `GET /v1/admin/diagnose` - Diagnose bundle
 - `GET|POST|PUT|DELETE /v1/automation`, `GET /v1/automation-logs` - Automations (webhook, backup and sync actions)
 - `GET|PUT /v1/collection-config` - Collection settings

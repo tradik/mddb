@@ -11,6 +11,7 @@ vi.mock('../lib/mddb-client', () => ({
     putChatScenario: vi.fn(),
     deleteChatScenario: vi.fn(),
     getChatScenarioPrompt: vi.fn(),
+    listChatSkills: vi.fn(),
   },
 }));
 
@@ -50,6 +51,7 @@ beforeEach(() => {
   vi.mocked(mddbClient.getChatScenarioPrompt).mockResolvedValue({ name: 'support', prompt: 'You are Ada.\n\nDo not use emoji.', version: 4 });
   vi.mocked(mddbClient.putChatScenario).mockResolvedValue({});
   vi.mocked(mddbClient.deleteChatScenario).mockResolvedValue({ deleted: true });
+  vi.mocked(mddbClient.listChatSkills).mockResolvedValue({ skills: [{ name: 'triage' }, { name: 'refunds', description: 'Money back' }], version: 4 });
 });
 afterEach(cleanup);
 
@@ -103,7 +105,10 @@ describe('editing a stored scenario', () => {
     type('Guardrails', 'No prices.');
     fireEvent.click(field('runbooks'));
     fireEvent.click(field('kb-alias'));
-    type('Skills', 'triage, refunds');
+    type('Add a skill', 'refunds');
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move triage up' }));
     type('Off-topic questions', 'redirect');
     type('Redirect reply', 'Ask about MDDB.');
     type('Emoji', 'free');
@@ -206,3 +211,30 @@ describe('a new scenario', () => {
     expect(screen.getByText('This server has no collections yet.')).toBeTruthy();
   });
 });
+
+describe('the tabs and the skill list (#404)', () => {
+  test('the Skills tab shows the skills panel; the scenarios tab comes back', async () => {
+    await renderWith();
+    fireEvent.click(screen.getByRole('tab', { name: 'Skills' }));
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('chat-tab-skills');
+    expect(await screen.findByRole('heading', { name: 'Chat skills' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('tab', { name: 'Scenarios' }));
+    expect(await screen.findByRole('heading', { name: 'Chat scenarios' })).toBeTruthy();
+  });
+
+  test('a user who may not list skills keeps the scenario\'s names', async () => {
+    vi.mocked(mddbClient.listChatSkills).mockRejectedValue(new Error('HTTP 403: admin access required'));
+    await renderWith([{ ...support, skills: ['triage'] }]);
+    fireEvent.click(screen.getByRole('button', { name: /support/ }));
+    expect(await screen.findByText(/The skill list needs admin/)).toBeTruthy();
+    expect(screen.getByText('triage')).toBeTruthy();
+  });
+
+  test('a skill list without the field offers nothing to add', async () => {
+    vi.mocked(mddbClient.listChatSkills).mockResolvedValue({});
+    await renderWith();
+    fireEvent.click(screen.getByRole('button', { name: /support/ }));
+    expect(await screen.findByText('No other skills stored')).toBeTruthy();
+  });
+});
+

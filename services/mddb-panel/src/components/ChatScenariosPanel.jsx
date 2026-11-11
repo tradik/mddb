@@ -4,40 +4,34 @@ import mddbClient from '../lib/mddb-client';
 import { useStore } from '../lib/store';
 import { toForm, fromForm, formProblem } from '../lib/chat-scenario';
 import ChatScenarioForm from './ChatScenarioForm';
+import ChatScenarioList from './ChatScenarioList';
 import ChatScenarioPreview from './ChatScenarioPreview';
+import ChatSkillsPanel from './ChatSkillsPanel';
+import ChatTabs from './ChatTabs';
 
 // #403: chat scenarios — an assistant's prompt, guardrails, allowed
 // collections, style, model and limits — stored in MDDB and picked up by the
 // chat service without a restart. Everyone who may read a scenario's
 // collections sees it; saving and deleting need admin on "*".
+//
+// #404: the page has two tabs, the scenarios and the skills they attach.
 
-function ScenarioList({ scenarios, selected, onSelect }) {
-  if (scenarios.length === 0) return <p className="text-sm text-gray-600">No scenarios yet.</p>;
+export default function ChatScenariosPanel() {
+  const [tab, setTab] = useState('scenarios');
   return (
-    <ul className="space-y-1">
-      {scenarios.map((scenario) => (
-        <li key={scenario.name}>
-          <button
-            type="button"
-            onClick={() => onSelect(scenario)}
-            aria-current={selected === scenario.name ? 'true' : undefined}
-            className={`w-full rounded-lg px-3 py-2 text-left ${selected === scenario.name ? 'bg-primary-100 text-primary-900' : 'text-gray-800 hover:bg-gray-100'}`}
-          >
-            <span className="flex items-center justify-between gap-2">
-              <span className="truncate text-sm font-medium">{scenario.name}</span>
-              {!scenario.enabled && <span className="rounded-full bg-gray-200 px-2 py-0.5 text-xs text-gray-800">off</span>}
-            </span>
-            {scenario.description && <span className="block truncate text-xs text-gray-600">{scenario.description}</span>}
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+      <ChatTabs tab={tab} onChange={setTab} />
+      <div role="tabpanel" id={`chat-panel-${tab}`} aria-labelledby={`chat-tab-${tab}`}>
+        {tab === 'scenarios' ? <ScenariosView /> : <ChatSkillsPanel />}
+      </div>
+    </div>
   );
 }
 
-export default function ChatScenariosPanel() {
+function ScenariosView() {
   const { stats } = useStore();
   const [scenarios, setScenarios] = useState([]);
+  const [skills, setSkills] = useState([]); // null: the list is admin only and was refused
   const [version, setVersion] = useState(0);
   const [form, setForm] = useState(null);
   const [stored, setStored] = useState(null); // the name being edited; null for a new scenario
@@ -55,6 +49,7 @@ export default function ChatScenariosPanel() {
 
   useEffect(() => {
     load();
+    mddbClient.listChatSkills().then((data) => setSkills(data.skills || []), () => setSkills(null));
   }, []);
 
   const open = (scenario) => {
@@ -107,7 +102,7 @@ export default function ChatScenariosPanel() {
   const collections = (stats?.collections || []).map((c) => c.name);
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+    <>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-6 w-6 text-primary-700" aria-hidden="true" />
@@ -129,7 +124,7 @@ export default function ChatScenariosPanel() {
 
       <div className="grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <nav aria-label="Scenarios" className="rounded-lg bg-white p-3 shadow">
-          <ScenarioList scenarios={scenarios} selected={stored} onSelect={open} />
+          <ChatScenarioList scenarios={scenarios} selected={stored} onSelect={open} />
         </nav>
 
         {form === null ? (
@@ -137,7 +132,7 @@ export default function ChatScenariosPanel() {
         ) : (
           <div className="grid gap-4 xl:grid-cols-2">
             <form onSubmit={save} className="rounded-lg bg-white p-4 shadow">
-              <ChatScenarioForm form={form} set={(field, value) => setForm((f) => ({ ...f, [field]: value }))} collections={collections} isNew={stored === null} />
+              <ChatScenarioForm form={form} set={(field, value) => setForm((f) => ({ ...f, [field]: value }))} collections={collections} skills={skills} isNew={stored === null} />
               <div className="mt-4 flex items-center gap-2">
                 <button type="submit" disabled={busy} className="flex items-center gap-1.5 rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800 disabled:opacity-50">
                   <Save className="h-4 w-4" aria-hidden="true" /> {busy ? 'Working…' : 'Save'}
@@ -157,6 +152,6 @@ export default function ChatScenariosPanel() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
