@@ -2,11 +2,14 @@ import { Import } from 'lucide-react';
 import { useBulkJobs } from '../lib/use-bulk-jobs';
 import DocumentsJsonForm from './DocumentsJsonForm';
 import BulkJobsTable from './BulkJobsTable';
+import UrlImportCard from './UrlImportCard';
+import WikiImportCard from './WikiImportCard';
 
 /**
  * ImportPanel is the Import page: ways to add documents other than the file
- * upload — several documents from JSON at once or as a background job, with
- * the bulk import jobs and their progress.
+ * upload — one document from a URL, a Wikipedia dump, several documents from
+ * JSON at once or as a background job, with the bulk import jobs and their
+ * progress.
  */
 export default function ImportPanel() {
   const { jobs, listError, track, load } = useBulkJobs();
@@ -21,6 +24,8 @@ export default function ImportPanel() {
           Add documents without uploading files one by one. Files themselves go through Upload in the document list.
         </p>
       </div>
+      <UrlImportCard />
+      <WikiImportCard />
       <DocumentsJsonForm onQueued={track} />
       <BulkJobsTable jobs={jobs} error={listError} onRefresh={load} />
     </div>

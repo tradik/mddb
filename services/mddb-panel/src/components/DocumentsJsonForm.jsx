@@ -1,10 +1,11 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import mddbClient from '../lib/mddb-client';
 import { parseDocuments } from '../lib/json-text';
 import { useAction } from '../lib/use-action';
 import { useStore } from '../lib/store';
 import ApiErrorNotice from './ApiErrorNotice';
 import JsonTextarea from './JsonTextarea';
+import CollectionNameInput from './CollectionNameInput';
 
 const EXAMPLE = '[\n  { "key": "post-1", "contentMd": "# First post", "meta": { "category": ["blog"] } },\n  { "key": "post-2", "lang": "pl", "contentMd": "# Drugi wpis" }\n]';
 
@@ -19,10 +20,7 @@ const describeBatch = (r) => `Added ${r.added || 0}, updated ${r.updated || 0}, 
  * receives the job so its progress can be followed.
  */
 export default function DocumentsJsonForm({ onQueued }) {
-  const listId = useId();
-  const stats = useStore((s) => s.stats);
   const currentCollection = useStore((s) => s.currentCollection);
-  const names = (stats?.collections || []).map((c) => c.name);
   const [collection, setCollection] = useState(currentCollection || '');
   const [lang, setLang] = useState('en');
   const [text, setText] = useState('');
@@ -58,11 +56,7 @@ export default function DocumentsJsonForm({ onQueued }) {
     <section aria-labelledby="documents-json-title" className="bg-white rounded-lg shadow p-4 space-y-3">
       <h3 id="documents-json-title" className="text-base font-semibold text-gray-900">Add documents from JSON</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <label className="text-sm text-gray-800">
-          <span className="block mb-1">Collection</span>
-          <input list={listId} value={collection} onChange={(e) => setCollection(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
-          <datalist id={listId}>{names.map((n) => <option key={n} value={n} />)}</datalist>
-        </label>
+        <CollectionNameInput value={collection} onChange={setCollection} />
         <label className="text-sm text-gray-800">
           <span className="block mb-1">Language of documents that name none</span>
           <input value={lang} onChange={(e) => setLang(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />

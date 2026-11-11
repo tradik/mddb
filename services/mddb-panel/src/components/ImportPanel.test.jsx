@@ -15,6 +15,10 @@ vi.mock('../lib/mddb-client', () => ({
   },
 }));
 
+// The URL and wiki cards have their own suite.
+vi.mock('./UrlImportCard', () => ({ default: () => null }));
+vi.mock('./WikiImportCard', () => ({ default: () => null }));
+
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
 const { POLL_MS } = await import('../lib/use-job-polling');

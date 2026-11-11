@@ -124,6 +124,9 @@ const coverageFiles = [
   'src/components/ImportPanel.jsx',
   'src/components/BulkJobsTable.jsx',
   'src/components/DocumentsJsonForm.jsx',
+  'src/components/CollectionNameInput.jsx',
+  'src/components/UrlImportCard.jsx',
+  'src/components/WikiImportCard.jsx',
 ];
 
 export default mergeConfig(
