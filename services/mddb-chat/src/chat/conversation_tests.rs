@@ -32,3 +32,34 @@ fn not_found_becomes_the_clients_error_and_the_rest_pass_through() {
         AppError::MddbUnavailable
     ));
 }
+
+#[test]
+fn an_external_tool_is_stored_with_its_server_in_the_name() {
+    let llm: crate::config::LlmConfig =
+        toml::from_str("provider = \"openai\"\napi_url = \"http://localhost\"\nmodel = \"m\"")
+            .expect("a minimal llm config parses");
+    let tools = [
+        ToolCallRecord {
+            name: "search_docs".into(),
+            collection: "docs".into(),
+            server: None,
+        },
+        ToolCallRecord {
+            name: "get_order".into(),
+            collection: String::new(),
+            server: Some("orders".into()),
+        },
+    ];
+
+    let stored = answer_message("a", &tools, &llm, TokenUsage::default());
+
+    let names: Vec<(&str, &str)> = stored
+        .tool_calls
+        .iter()
+        .map(|t| (t.name.as_str(), t.collection.as_str()))
+        .collect();
+    assert_eq!(
+        names,
+        vec![("search_docs", "docs"), ("mcp:orders/get_order", "")]
+    );
+}

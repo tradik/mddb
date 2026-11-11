@@ -6,6 +6,7 @@ use futures::StreamExt;
 use tracing::{debug, error};
 
 use crate::chat::conversation;
+use crate::chat::mcp::McpToolset;
 use crate::chat::outbound::{Sender, send_error, send_json};
 use crate::chat::scenario::{self, ActiveScenario, Resolved};
 use crate::chat::trace::TurnTrace;
@@ -13,6 +14,7 @@ use crate::chat::{prompt, tools};
 use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::grpc::client::MddbClient;
+use crate::grpc::client::proto::ChatMcpServerStateProto;
 use crate::llm::provider::{ApiMsg, CallParams, ChatResponse, TokenUsage};
 use crate::session::conversation::ConversationRef;
 use crate::session::types::{MessageRole, WsOutgoing};
@@ -106,13 +108,17 @@ pub async fn handle_message(
         &content,
     ));
 
-    let system_prompt = system_prompt(&mut mddb_client, &scenario_name, &scenario).await;
+    let (system_prompt, mcp_states) =
+        system_prompt(&mut mddb_client, &scenario_name, &scenario).await;
     let mut api_messages = prompt::build_api_messages(&system_prompt, &history);
     // #396: the tools see only what this scenario allows, and the schema says
     // so, so a well-behaved model never asks for anything else.
     let tool_policy =
-        tools::ToolPolicy::for_scenario(&scenario, state.config.mddb.result_max_chars);
+        tools::ToolPolicy::for_scenario(&scenario, state.config.mddb.result_max_chars).with_mcp(
+            external_tools(state, &scenario_name, &scenario, &mcp_states),
+        );
     let tool_defs = tools::tool_definitions(&tool_policy);
+    trace.offer_mcp(&tool_policy.mcp);
 
     // #403: what the `answer` event reports is the model that was asked, which
     // a scenario may have changed.
@@ -221,7 +227,22 @@ pub async fn handle_message(
     Ok(())
 }
 
-/// The system prompt of one turn.
+/// The external MCP tools of one turn (MCP-005): the ones mddbd reports
+/// active right now, offered only while mddb-chat's own reading of the `chat`
+/// and `chatExternalMcp` features is on, so a switch turned off in mddbd
+/// hides them at the next poll even if a preview says otherwise.
+fn external_tools(
+    state: &AppState,
+    name: &str,
+    scenario: &ActiveScenario,
+    states: &[ChatMcpServerStateProto],
+) -> McpToolset {
+    let enabled = state.features.chat() && state.features.chat_external_mcp();
+    McpToolset::for_turn(name, states, &scenario.mcp.limits, enabled)
+}
+
+/// The system prompt of one turn, and the state of its external MCP servers
+/// (MCP-005) from the same preview.
 ///
 /// A scenario from mddbd comes with its prompt composed there — operator
 /// prompt, guardrails, off-topic and style clauses, the collections'
@@ -234,16 +255,21 @@ pub async fn handle_message(
 /// (RAG-002): the collection states how answers drawn from it should be
 /// formatted, and that instruction travels with the data rather than being
 /// repeated in every client's TOML.
-async fn system_prompt(client: &mut MddbClient, name: &str, scenario: &ActiveScenario) -> String {
+async fn system_prompt(
+    client: &mut MddbClient,
+    name: &str,
+    scenario: &ActiveScenario,
+) -> (String, Vec<ChatMcpServerStateProto>) {
     if !scenario.composed {
         let collection_prompt = client.response_prompt(&scenario.default_collection).await;
-        return scenario::compose_system_prompt(&scenario.system_prompt, &collection_prompt);
+        let prompt = scenario::compose_system_prompt(&scenario.system_prompt, &collection_prompt);
+        return (prompt, Vec::new());
     }
-    match client.chat_scenario_prompt(name).await {
-        Ok(prompt) => prompt,
+    match client.chat_scenario_preview(name).await {
+        Ok(preview) => (preview.prompt, preview.mcp_servers),
         Err(e) => {
             debug!(scenario = name, error = %e, "prompt lookup failed; using the one last loaded");
-            scenario.system_prompt.clone()
+            (scenario.system_prompt.clone(), scenario.mcp.states.clone())
         }
     }
 }

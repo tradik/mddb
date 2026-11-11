@@ -51,6 +51,7 @@ pub(super) fn policy(allowed: &[&str], result_max_chars: usize) -> ToolPolicy {
         default_collection: allowed[0].into(),
         allowed_collections: allowed.iter().map(|c| c.to_string()).collect(),
         result_max_chars,
+        mcp: Default::default(),
     }
 }
 

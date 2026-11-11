@@ -60,10 +60,17 @@ pub struct UsageReport {
 
 /// One tool the model called while answering: its name and the collection it
 /// searched, which is the one argument a host app can aggregate on.
+///
+/// MCP-005: an external tool carries its `server` and its own name, and no
+/// collection; both fields are left out of the JSON when not set, so a
+/// built-in tool's record reads exactly as before.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ToolCallRecord {
     pub name: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub collection: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server: Option<String>,
 }
 
 impl WebhookPayload {

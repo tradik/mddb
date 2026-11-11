@@ -7,9 +7,11 @@
 
 mod conversations;
 mod features;
+mod mcp;
 mod service;
 
 pub use features::FakeFeatures;
+pub use mcp::{FakeMcpCall, mcp_server, mcp_state};
 
 use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
@@ -57,6 +59,10 @@ pub(super) struct FakeState {
     /// Chat conversations by id (#405), and the clock their times come from.
     pub conversations: BTreeMap<String, proto::ChatConversationProto>,
     pub clock: i64,
+    /// The external MCP servers each scenario's prompt reports (MCP-005).
+    pub mcp_states: HashMap<String, Vec<proto::ChatMcpServerStateProto>>,
+    /// What `CallChatMcpTool` answers.
+    pub mcp_call: FakeMcpCall,
 }
 
 pub(super) type Shared = Arc<Mutex<FakeState>>;
@@ -81,6 +87,8 @@ impl FakeMddbd {
             calls: Vec::new(),
             conversations: BTreeMap::new(),
             clock: 0,
+            mcp_states: HashMap::new(),
+            mcp_call: FakeMcpCall::Refused(tonic::Code::Unimplemented, "unscripted".into()),
         }));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
             .await

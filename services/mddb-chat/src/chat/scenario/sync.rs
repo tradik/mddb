@@ -80,10 +80,11 @@ async fn reload(client: &mut MddbClient, store: &ScenarioStore) -> Result<Sync, 
 
     let mut scenarios = HashMap::with_capacity(list.scenarios.len());
     for scenario in list.scenarios {
-        let prompt = client.chat_scenario_prompt(&scenario.name).await?;
+        let preview = client.chat_scenario_preview(&scenario.name).await?;
         scenarios.insert(
             scenario.name.clone(),
-            StoredScenario::from_proto(scenario, prompt),
+            StoredScenario::from_proto(scenario, preview.prompt)
+                .with_mcp_states(preview.mcp_servers),
         );
     }
 
@@ -127,6 +128,30 @@ mod tests {
             sync_once(&MddbLink::default(), &store, &features).await,
             Sync::NotConnected
         );
+    }
+
+    #[tokio::test]
+    async fn a_reload_keeps_the_external_servers_states_and_limits() {
+        use crate::grpc::client::proto::ChatScenarioProto;
+        use crate::grpc::testing::{mcp_server, mcp_state};
+
+        let mddbd = FakeMddbd::start().await;
+        let states = vec![mcp_state("orders", true, &[("get_order", true)])];
+        mddbd.set_mcp_states("support", states.clone());
+        let support = ChatScenarioProto {
+            mcp_servers: vec![mcp_server("orders", 900, 50)],
+            ..scenario("support", &["kb"])
+        };
+        mddbd.put_scenario(support, "You are Ada.");
+        let store = ScenarioStore::default();
+
+        let link = mddbd.link().await;
+        sync_once(&link, &store, &FeatureFlags::default()).await;
+
+        let loaded = store.get("support").expect("loaded");
+        assert_eq!(loaded.mcp.states, states);
+        assert_eq!(loaded.mcp.limits["orders"].timeout_ms, 900);
+        assert_eq!(loaded.mcp.limits["orders"].result_max_chars, 50);
     }
 
     /// Waits until `store` is at `version`.

@@ -37,9 +37,9 @@ impl FeatureFlags {
         self.chat.load(Ordering::Relaxed)
     }
 
-    /// Whether chat skills may call external MCP servers. Only reported on
-    /// /health for now: the switch is in place for MCP-005, which nothing in
-    /// mddb-chat implements yet.
+    /// Whether scenarios may call external MCP servers (MCP-005). Off — or
+    /// `chat` off — a turn offers the model no external tool and refuses a
+    /// call of one before it reaches mddbd; also reported on /health.
     pub fn chat_external_mcp(&self) -> bool {
         self.chat_external_mcp.load(Ordering::Relaxed)
     }

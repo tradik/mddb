@@ -15,7 +15,9 @@ pub mod sync;
 mod tests;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
+use crate::chat::mcp::McpServers;
 use crate::config::{Config, Scenario};
 use crate::llm::provider::CallParams;
 
@@ -71,6 +73,9 @@ pub struct ActiveScenario {
     /// Days a signed user's stored conversation is kept (#405); 0 leaves it
     /// to mddbd's default. Only a TOML scenario sets it.
     pub retention_days: u32,
+    /// The external MCP servers' states of the last reload and their limits
+    /// (MCP-005); empty for a TOML scenario, which has none.
+    pub mcp: Arc<McpServers>,
 }
 
 impl ActiveScenario {
@@ -92,6 +97,7 @@ impl ActiveScenario {
             token_budget: config.security.max_tokens_per_session,
             messages_per_minute: 0,
             retention_days: 0,
+            mcp: Arc::default(),
         }
     }
 
@@ -133,6 +139,7 @@ impl ActiveScenario {
             active.token_budget = stored.token_budget;
         }
         active.messages_per_minute = stored.messages_per_minute;
+        active.mcp = stored.mcp.clone();
         active
     }
 

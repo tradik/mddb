@@ -2,6 +2,7 @@
 
 use tracing::warn;
 
+use crate::chat::mcp::{McpTool, McpToolset};
 use crate::chat::scenario::ActiveScenario;
 
 /// The bounds a scenario puts on its tools.
@@ -18,6 +19,9 @@ pub struct ToolPolicy {
     pub allowed_collections: Vec<String>,
     /// Characters of one search result; 0 means the whole chunk (#398).
     pub result_max_chars: usize,
+    /// The external MCP tools this turn offers (MCP-005); empty unless
+    /// [`ToolPolicy::with_mcp`] set them.
+    pub mcp: McpToolset,
 }
 
 impl ToolPolicy {
@@ -31,7 +35,27 @@ impl ToolPolicy {
             default_collection: scenario.default_collection.clone(),
             allowed_collections: scenario.allowed_collections.clone(),
             result_max_chars,
+            mcp: McpToolset::default(),
         }
+    }
+
+    /// The same policy with these external tools offered (MCP-005).
+    pub fn with_mcp(self, mcp: McpToolset) -> Self {
+        Self { mcp, ..self }
+    }
+
+    /// The external tool the model named, or the refusal to hand back to it.
+    /// mddbd checks again; this is the second wall, so a name the turn never
+    /// offered — a stale or invented one — does not even reach mddbd.
+    pub fn mcp_tool(&self, name: &str) -> Result<&McpTool, String> {
+        self.mcp.find(name).ok_or_else(|| {
+            warn!(
+                tool = name,
+                scenario = self.mcp.scenario,
+                "tool call refused: external tool not offered in this turn"
+            );
+            format!("Error: the tool '{name}' is not available in this scenario.")
+        })
     }
 
     /// The collection a tool call may search, or the refusal to hand back to
@@ -109,6 +133,7 @@ model = "test"
             default_collection: allowed[0].into(),
             allowed_collections: allowed.iter().map(|c| c.to_string()).collect(),
             result_max_chars: 300,
+            mcp: Default::default(),
         }
     }
 

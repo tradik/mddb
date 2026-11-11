@@ -109,6 +109,7 @@ async fn grpc(State(state): State<Shared>, request: Request<Body>) -> Response<B
             unary(state, method, request, conversations::delete_for_user).await
         }
         "ListFeatures" => unary(state, method, request, super::features::list_features).await,
+        "CallChatMcpTool" => unary(state, method, request, super::mcp::call_tool).await,
         _ => Status::unimplemented(format!("unknown method {path}")).into_http(),
     }
 }
@@ -132,12 +133,18 @@ fn scenario_prompt(
         .get(&request.name)
         .cloned()
         .ok_or_else(|| Status::not_found("chat scenario not found"))?;
+    let mcp_servers = state
+        .mcp_states
+        .get(&request.name)
+        .cloned()
+        .unwrap_or_default();
     Ok(proto::GetChatScenarioPromptResponse {
         name: request.name,
         prompt,
         version: state.version,
+        mcp_servers,
         // #404 added the prompt's size and missing skills; mddb-chat reads
-        // only the prompt.
+        // the prompt and, since MCP-005, the servers' states.
         ..Default::default()
     })
 }

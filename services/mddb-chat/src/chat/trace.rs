@@ -4,6 +4,7 @@
 
 use std::time::Instant;
 
+use crate::chat::mcp::McpToolset;
 use crate::config::LlmConfig;
 use crate::llm::provider::{TokenUsage, ToolCall};
 use crate::webhook::events::AnswerReport;
@@ -18,6 +19,9 @@ pub struct TurnTrace {
     pub answer_id: String,
     started: Instant,
     tools: Vec<ToolCallRecord>,
+    /// The external tools this turn offers (MCP-005), so that a call of one
+    /// is recorded with its server.
+    mcp: McpToolset,
 }
 
 impl TurnTrace {
@@ -28,13 +32,29 @@ impl TurnTrace {
             answer_id: uuid::Uuid::new_v4().to_string(),
             started: Instant::now(),
             tools: Vec::new(),
+            mcp: McpToolset::default(),
         }
+    }
+
+    /// The external tools of this turn (MCP-005): a call of one is recorded
+    /// by its own name with its server, and without a collection.
+    pub fn offer_mcp(&mut self, mcp: &McpToolset) {
+        self.mcp = mcp.clone();
     }
 
     /// Remembers one tool call: its name and the collection it was pointed at,
     /// which is `default_collection` unless the arguments name another — the
     /// same rule `tools::execute_tool` applies.
     pub fn record_tool(&mut self, call: &ToolCall, default_collection: &str) {
+        if let Some(external) = self.mcp.find(&call.function.name) {
+            let record = ToolCallRecord {
+                name: external.tool.clone(),
+                collection: String::new(),
+                server: Some(external.server.clone()),
+            };
+            self.tools.push(record);
+            return;
+        }
         let collection = serde_json::from_str::<serde_json::Value>(&call.function.arguments)
             .ok()
             .and_then(|args| args.get("collection")?.as_str().map(str::to_string))
@@ -42,6 +62,7 @@ impl TurnTrace {
         self.tools.push(ToolCallRecord {
             name: call.function.name.clone(),
             collection,
+            server: None,
         });
     }
 
@@ -132,7 +153,8 @@ model = "claude-x"
             trace.tools,
             vec![ToolCallRecord {
                 name: "search_docs".into(),
-                collection: "guides".into()
+                collection: "guides".into(),
+                server: None,
             }]
         );
     }
@@ -175,6 +197,28 @@ model = "claude-x"
         assert_eq!(v["data"]["usage"]["input_tokens"], 10);
         assert_eq!(v["data"]["tools"][0]["collection"], "docs");
         assert!(v["data"]["latency_ms"].as_u64().unwrap() < 10_000);
+    }
+
+    #[test]
+    fn an_external_tool_is_recorded_with_its_server_and_no_collection() {
+        use crate::grpc::testing::mcp_state;
+        let states = vec![mcp_state("orders", true, &[("get.order", true)])];
+        let mcp = McpToolset::for_turn("support", &states, &Default::default(), true);
+        let mut trace = TurnTrace::start();
+        trace.offer_mcp(&mcp);
+
+        trace.record_tool(&call("mcp__orders__get_order", "{}"), "docs");
+        trace.record_tool(&call("mcp__orders__invented", "{}"), "docs");
+        let v = serde_json::to_value(trace.answer("s", "support", "a", &llm(), Default::default()))
+            .unwrap();
+
+        assert_eq!(
+            v["data"]["tools"],
+            serde_json::json!([
+                {"name": "get.order", "server": "orders"},
+                {"name": "mcp__orders__invented", "collection": "docs"},
+            ])
+        );
     }
 
     #[test]

@@ -255,11 +255,15 @@ async fn scenarios_come_with_the_store_version_and_a_composed_prompt() {
     assert_eq!(list.version, 2);
     assert_eq!(names, vec!["sales", "support"]);
 
-    let prompt = client
-        .chat_scenario_prompt("support")
+    let preview = client
+        .chat_scenario_preview("support")
         .await
         .expect("prompt");
-    assert_eq!(prompt, "You are Ada.");
+    assert_eq!(preview.prompt, "You are Ada.");
+    assert!(
+        preview.mcp_servers.is_empty(),
+        "no external servers scripted"
+    );
     let call = fake.calls().pop().expect("a call");
     assert_eq!(call.method, "GetChatScenarioPrompt");
     assert!(call.request.contains("name: \"support\""), "{call:?}");
@@ -270,12 +274,58 @@ async fn an_mddbd_without_scenarios_answers_with_a_grpc_error() {
     let fake = FakeMddbd::start().await;
     let mut client = fake.client().await;
 
-    let missing = client.chat_scenario_prompt("nobody").await.err();
+    let missing = client.chat_scenario_preview("nobody").await.err();
     assert!(matches!(missing, Some(AppError::GrpcError(s)) if s.code() == tonic::Code::NotFound));
 
     fake.fail_with(Some(tonic::Code::Unimplemented));
     let old = client.list_chat_scenarios().await.err();
     assert!(matches!(old, Some(AppError::GrpcError(s)) if s.code() == tonic::Code::Unimplemented));
+}
+
+// MCP-005: a call goes out with the service account's token and the deadline,
+// and mddbd's refusal comes back as the gRPC status.
+#[tokio::test]
+async fn an_external_tool_call_carries_the_token_and_the_answer_comes_back() {
+    use crate::grpc::client::proto::CallChatMcpToolRequest;
+    use crate::grpc::testing::FakeMcpCall;
+    use std::time::Duration;
+
+    let fake = FakeMddbd::start().await;
+    let mut client = fake.client().await;
+    let request = CallChatMcpToolRequest {
+        scenario: "support".into(),
+        server: "orders".into(),
+        tool: "get_order".into(),
+        arguments_json: "{}".into(),
+    };
+    let deadline = Duration::from_secs(3);
+
+    let refused = client
+        .call_chat_mcp_tool(request.clone(), deadline)
+        .await
+        .err();
+    assert!(
+        matches!(refused, Some(AppError::GrpcError(s)) if s.code() == tonic::Code::Unimplemented)
+    );
+
+    fake.set_mcp_call(FakeMcpCall::Answer {
+        content: "shipped".into(),
+        is_error: false,
+        truncated: true,
+    });
+    let answer = client
+        .call_chat_mcp_tool(request, deadline)
+        .await
+        .expect("answered");
+    assert_eq!(
+        (answer.server.as_str(), answer.tool.as_str()),
+        ("orders", "get_order")
+    );
+    assert_eq!(answer.content, "shipped");
+    assert!(answer.truncated && !answer.is_error);
+    assert_eq!(answer.duration_ms, 12);
+    let call = fake.calls().pop().expect("a call");
+    assert_eq!(call.method, "CallChatMcpTool");
 }
 
 // The fake itself: a method it does not script is unimplemented, as on an

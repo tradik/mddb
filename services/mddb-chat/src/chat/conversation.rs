@@ -177,6 +177,9 @@ pub fn user_message(content: &str) -> proto::ChatMessageProto {
 
 /// The final answer as stored: the tools called on the way (name and
 /// collection), the model that answered and what the turn cost.
+///
+/// MCP-005: the stored tool call has no field for a server, so an external
+/// tool is stored by name as `mcp:<server>/<tool>`, without a collection.
 pub fn answer_message(
     text: &str,
     tools: &[ToolCallRecord],
@@ -189,7 +192,7 @@ pub fn answer_message(
         tool_calls: tools
             .iter()
             .map(|t| proto::ChatToolCallProto {
-                name: t.name.clone(),
+                name: stored_tool_name(t),
                 collection: t.collection.clone(),
                 duration_ms: 0,
             })
@@ -199,6 +202,15 @@ pub fn answer_message(
         prompt_tokens: i64::try_from(spent.input).unwrap_or(i64::MAX),
         completion_tokens: i64::try_from(spent.output).unwrap_or(i64::MAX),
         ..Default::default()
+    }
+}
+
+/// How a tool call is named in a stored conversation: as called for a
+/// built-in tool, `mcp:<server>/<tool>` for an external one (MCP-005).
+fn stored_tool_name(record: &ToolCallRecord) -> String {
+    match &record.server {
+        Some(server) => format!("mcp:{server}/{}", record.name),
+        None => record.name.clone(),
     }
 }
 

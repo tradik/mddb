@@ -15,7 +15,7 @@ use crate::chat::outbound::{Sender, send_error, send_frame, send_json};
 use crate::chat::signed::JoinRequest;
 use crate::chat::{tools, turn};
 use crate::error::AppError;
-use crate::grpc::client::{MddbClient, SearchResult};
+use crate::grpc::client::{MddbClient, SearchResult, proto};
 use crate::session::types::{WsIncoming, WsOutgoing};
 use crate::state::AppState;
 use crate::webhook::types::WebhookPayload;
@@ -31,6 +31,14 @@ impl tools::DocSearch for MddbClient {
         collection: &str,
     ) -> Result<Vec<SearchResult>, AppError> {
         MddbClient::search(self, query, collection).await
+    }
+
+    async fn call_mcp_tool(
+        &mut self,
+        request: proto::CallChatMcpToolRequest,
+        deadline: std::time::Duration,
+    ) -> Result<proto::CallChatMcpToolResponse, AppError> {
+        self.call_chat_mcp_tool(request, deadline).await
     }
 }
 

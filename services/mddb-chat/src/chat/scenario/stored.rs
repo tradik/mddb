@@ -1,8 +1,11 @@
 //! A scenario as mddbd stores it, reduced to what mddb-chat applies (#403).
 
+use std::sync::Arc;
+
 use tracing::warn;
 
-use crate::grpc::client::proto::ChatScenarioProto;
+use crate::chat::mcp::{McpServers, limits_of};
+use crate::grpc::client::proto::{ChatMcpServerStateProto, ChatScenarioProto};
 
 /// One scenario read from mddbd, with the prompt mddbd composed for it.
 ///
@@ -28,6 +31,10 @@ pub struct StoredScenario {
     pub token_budget: u64,
     /// Messages per session per minute; 0 means no limit.
     pub messages_per_minute: u32,
+    /// The external MCP servers (MCP-005): their states as mddbd reported
+    /// them at the load — a turn asks again and uses these only when that
+    /// fails — and each one's timeout and result size.
+    pub mcp: Arc<McpServers>,
 }
 
 impl StoredScenario {
@@ -38,6 +45,10 @@ impl StoredScenario {
             description => description.to_string(),
         };
         Self {
+            mcp: Arc::new(McpServers {
+                states: Vec::new(),
+                limits: limits_of(&scenario.mcp_servers),
+            }),
             enabled: scenario.enabled,
             label,
             prompt,
@@ -53,6 +64,15 @@ impl StoredScenario {
                 .rate_limit
                 .and_then(|limit| positive(limit.messages_per_minute))
                 .unwrap_or(0),
+        }
+    }
+
+    /// The same scenario with the servers' states of its preview (MCP-005).
+    pub fn with_mcp_states(self, states: Vec<ChatMcpServerStateProto>) -> Self {
+        let limits = self.mcp.limits.clone();
+        Self {
+            mcp: Arc::new(McpServers { states, limits }),
+            ..self
         }
     }
 }

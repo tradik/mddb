@@ -12,6 +12,7 @@ fn record(name: &str, collection: &str) -> ToolCallRecord {
     ToolCallRecord {
         name: name.into(),
         collection: collection.into(),
+        server: None,
     }
 }
 

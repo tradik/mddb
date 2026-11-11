@@ -1,15 +1,19 @@
-//! The tools the model may call: `search_docs` and `get_document`, bounded by
+//! The tools the model may call: `search_docs` and `get_document`, and the
+//! scenario's external MCP tools (MCP-005), all bounded by
 //! the scenario's [`ToolPolicy`].
 
 use std::borrow::Cow;
+use std::time::Duration;
 
 use serde::Deserialize;
 use tracing::debug;
 
 use crate::chat::markdown::{clip, strip_markdown};
+use crate::chat::mcp;
 pub use crate::chat::policy::ToolPolicy;
 use crate::error::AppError;
 use crate::grpc::client::SearchResult;
+use crate::grpc::client::proto::{CallChatMcpToolRequest, CallChatMcpToolResponse};
 use crate::llm::provider::{ToolCall, ToolDef, ToolFunction};
 
 /// Characters of a whole document `get_document` hands back before cutting.
@@ -18,12 +22,25 @@ pub const DOCUMENT_MAX_CHARS: usize = 4000;
 /// What the tools need from the database. `MddbClient` is the real one; tests
 /// stand in a fake, so a tool's behaviour can be checked without mddbd.
 #[async_trait::async_trait]
-pub trait DocSearch {
+pub trait DocSearch: Send {
     async fn search(
         &mut self,
         query: &str,
         collection: &str,
     ) -> Result<Vec<SearchResult>, AppError>;
+
+    /// Calls an external MCP tool through mddbd (MCP-005), waiting at most
+    /// `deadline`. A client that cannot reach one answers UNIMPLEMENTED,
+    /// which the model is told as a short error.
+    async fn call_mcp_tool(
+        &mut self,
+        _request: CallChatMcpToolRequest,
+        _deadline: Duration,
+    ) -> Result<CallChatMcpToolResponse, AppError> {
+        Err(AppError::GrpcError(tonic::Status::unimplemented(
+            "no external tools here",
+        )))
+    }
 }
 
 /// Define the tools available to the LLM for one scenario.
@@ -36,7 +53,7 @@ pub fn tool_definitions(policy: &ToolPolicy) -> Vec<ToolDef> {
             parameters,
         },
     };
-    vec![
+    let mut tools = vec![
         tool(
             "search_docs",
             "Search the documentation database for relevant information. Use this when the user asks a question about MDDB features, configuration, API, or usage.",
@@ -67,7 +84,10 @@ pub fn tool_definitions(policy: &ToolPolicy) -> Vec<ToolDef> {
                 "required": ["key"]
             }),
         ),
-    ]
+    ];
+    // MCP-005: the scenario's external tools, after the built-in ones.
+    tools.extend(policy.mcp.definitions());
+    tools
 }
 
 #[derive(Deserialize)]
@@ -111,6 +131,12 @@ pub async fn execute_tool<S: DocSearch>(
                 Err(refusal) => Ok(refusal),
             }
         }
+        external if mcp::is_mcp_name(external) => match policy.mcp_tool(external) {
+            Ok(offered) => {
+                Ok(mcp::call::execute(client, tool_call, offered, &policy.mcp.scenario).await)
+            }
+            Err(refusal) => Ok(refusal),
+        },
         other => Ok(format!("Unknown tool: {other}")),
     }
 }
@@ -175,5 +201,7 @@ fn document_body(doc: &SearchResult) -> String {
 
 #[cfg(test)]
 mod document_tests;
+#[cfg(test)]
+mod mcp_tests;
 #[cfg(test)]
 mod tests;
