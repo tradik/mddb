@@ -254,7 +254,7 @@ which is why the DNS name was chosen first.
 | Env Var | Default | Description |
 |---------|---------|-------------|
 | `MDDB_MCP_CONFIG` | — | Path to YAML file with custom tool definitions |
-| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 101 built-in tools (only custom tools exposed) |
+| `MDDB_MCP_BUILTIN_TOOLS` | `true` | Set to `false` to hide all 103 built-in tools (only custom tools exposed) |
 | `MDDB_MCP_TOOLSETS` | `all` | Comma-separated toolsets to expose, e.g. `search,code` (v2.18.8). See [Toolsets](#toolsets-v2188) |
 | `MDDB_MCP_CONFIRM_DESTRUCTIVE` | `off` | `off`, `elicit` or `require`: ask the user, through MCP elicitation, before a destructive tool runs (v2.18.9). See [Confirming Destructive Tools](#confirming-destructive-tools-v2189) |
 
@@ -615,7 +615,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
 | `ingest` | `import_url`, `upload_file`, `ingest_documents`, `bulk_ingest_*` |
 | `memory` | `memory_*` |
 | `schema` | `set_schema`, `get_schema`, `delete_schema`, `list_schemas`, `validate_document` |
-| `admin` | stats, reindexing, backups, collection deletion and configs, synonyms, stopwords, curation rules, corpus packs (`corpus_list`, `corpus_install`, `corpus_remove`), chat scenarios (`chat_scenario_list`, `chat_scenario_get`, `chat_scenario_put`, `chat_scenario_delete`) |
+| `admin` | stats, reindexing, backups, collection deletion and configs, synonyms, stopwords, curation rules, corpus packs (`corpus_list`, `corpus_install`, `corpus_remove`), chat conversations, read-only (`chat_conversation_list`, `chat_conversation_get`), chat scenarios (`chat_scenario_list`, `chat_scenario_get`, `chat_scenario_put`, `chat_scenario_delete`) |
 | `geo`, `automation`, `webhooks`, `wordpress` | the tools of that area |
 
 - **Server:** `MDDB_MCP_TOOLSETS=search,code` (default `all`).
@@ -627,11 +627,7 @@ to one toolset, and a server or a key can expose only the toolsets it needs:
   answered with JSON-RPC `-32601` — the list is not the authorisation.
 - Custom tools are never filtered: they are the operator's explicit choice.
 
-<<<<<<< ours
-Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (97 since 2.19.0) take about
-=======
-Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (101 since 2.19.0) take about
->>>>>>> theirs
+Measured on 2.18.10, the `tools/list` schemas of all 93 tools of that release (103 since 2.19.0) take about
 94 KB (≈23 600 tokens) per turn. The 22 tools of `search,code` take about 43 KB
 (≈10 800 tokens), less than half.
 
@@ -675,7 +671,7 @@ stored when a write asks for them: `extract_images` on `upload_file` and
 
 ## Built-in Tool Catalog
 
-All 101 built-in tools, grouped by area. Tool inputs are self-describing via
+All 103 built-in tools, grouped by area. Tool inputs are self-describing via
 MCP schema discovery (`tools/list`); the `semantic_search` tool additionally
 supports `retrieval_mode`/`window_size` (passage-level results) and
 `mmr`/`mmr_lambda` (result diversification).
@@ -830,11 +826,6 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `export_documents` | Export documents from a collection in NDJSON format. |
 | `create_backup` | Create a backup of the MDDB database. |
 | `restore_backup` | Restore the MDDB database from a backup file. |
-<<<<<<< ours
-| `corpus_list` | (v2.19.0) The corpus packs installed in the caller's tenant: collection, name, version, licence, document count, whether its vectors are disabled. Read-only. See [CORPUS-PACKS.md](CORPUS-PACKS.md). |
-| `corpus_install` | (v2.19.0, admin) Install a `.mddbpack` the server downloads from an `https://` URL (`url`, optional `sha256` of the pack file). The download goes through the SSRF guard, a redirect may not leave https, and it is capped at `MDDB_CORPUS_MAX_BYTES`. Refused with a conflict when the collection already holds data. |
-| `corpus_remove` | (v2.19.0, admin) Remove an installed pack by `name`: its collection, documents and indexes. Gated by `MDDB_MCP_CONFIRM_DESTRUCTIVE`, which asks for the pack's name to be typed. There is no `corpus_build` tool: a build's product is a file a tool answer cannot carry; build with `mddb-cli corpus build`, `POST /v1/corpus/build` or the `BuildCorpusPack` RPC. |
-=======
 | `corpus_list` | (v2.19.0) The corpus packs installed in the caller's tenant: collection, name, version, licence, document count, whether its vectors are disabled. Read-only. See [CORPUS-PACKS.md](CORPUS-PACKS.md). |
 | `corpus_install` | (v2.19.0, admin) Install a `.mddbpack` the server downloads from an `https://` URL (`url`, optional `sha256` of the pack file). The download goes through the SSRF guard, a redirect may not leave https, and it is capped at `MDDB_CORPUS_MAX_BYTES`. Refused with a conflict when the collection already holds data. |
 | `corpus_remove` | (v2.19.0, admin) Remove an installed pack by `name`: its collection, documents and indexes. Gated by `MDDB_MCP_CONFIRM_DESTRUCTIVE`, which asks for the pack's name to be typed. There is no `corpus_build` tool: a build's product is a file a tool answer cannot carry; build with `mddb-cli corpus build`, `POST /v1/corpus/build` or the `BuildCorpusPack` RPC. |
@@ -842,7 +833,8 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | `chat_scenario_get` | (v2.19.0) One scenario by `name`, with its composed system prompt (`prompt`). Needs read permission on every collection the scenario allows. Read-only. |
 | `chat_scenario_put` | (v2.19.0, admin) Create a scenario or replace it whole: `name` and `scenario`, the body of `PUT /v1/chat/scenarios/{name}`. A field left out is reset to its default; every allowed collection must exist. |
 | `chat_scenario_delete` | (v2.19.0, admin) Delete a scenario by `name`. Gated by `MDDB_MCP_CONFIRM_DESTRUCTIVE`, which asks for the scenario's name to be typed. |
->>>>>>> theirs
+| `chat_conversation_list` | (v2.19.0, #405) One user's persistent chat conversations (`sub`, optional `scenario`, `limit`, `cursor`), newest first: id, scenario, title, message count, times, `ended`. Read-only. See [API.md](API.md#chat-conversations-v1chatconversations). |
+| `chat_conversation_get` | (v2.19.0, #405) One conversation of a user (`id`, `sub`, optional `limit` for the last N messages) with its messages: role, content, tool calls, model, tokens. A conversation of another `sub` is not found. Read-only: the host writes conversations over REST or gRPC, and no tool creates, appends to or deletes one. |
 | `update_document` | Partially update a document. Since v2.18.8 `expected_revision` makes it conditional: pass the `revision` from a previous read or write, and a concurrent change is reported instead of overwritten. Since v2.18.10 (GO-048) every MCP write, batch updates included, runs the same after-write step as REST and gRPC: embeddings, geo, full text, webhooks, SSE and triggers. An empty `content_md` empties the document: its content postings and vectors are removed, its meta fields stay searchable. A batch update reads an empty `content_md` as "leave it". |
 | `get_document_meta` | Get document metadata without content. |
 | `reference_search` | (v2.18.8) Search reference code — other projects indexed with `mddb-cli reference add` — hybrid, as passages. See [REFERENCE-CODING.md](REFERENCE-CODING.md). |
@@ -902,12 +894,8 @@ as a question. Nothing happens unless the answer is yes.
 
 **Gated tools** are the built-in tools annotated destructive and not
 idempotent: `delete_collection`, `delete_documents_batch`, `delete_where`,
-<<<<<<< ours
-`truncate_revisions`, `restore_backup` and `corpus_remove` (v2.19.0). Deleting one named object
-=======
 `truncate_revisions`, `restore_backup`, `corpus_remove` and
 `chat_scenario_delete` (both v2.19.0). Deleting one named object
->>>>>>> theirs
 (`delete_document`, `delete_schema`, …) is not gated. The read-only mode check
 comes first: a read-only server refuses these tools without asking.
 

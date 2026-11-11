@@ -152,6 +152,10 @@ tags:
   - name: Memory RAG
     description: Conversational memory system for RAG — session management, message
       storage, semantic/hybrid recall, summarization
+  - name: Chat Conversations
+    description: Persistent per-user chat conversations (v2.19.0+, issue 405) — the
+      host API a signed-in application (or mddb-chat on its behalf) uses to
+      create, resume, export and delete a user's conversations
   - name: Configuration
     description: Server and MCP configuration
   - name: GraphQL
@@ -6646,6 +6650,349 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /v1/chat/conversations:
+    post:
+      tags:
+        - Chat Conversations
+      summary: Create a conversation for a user
+      description: >-
+        Creates an empty conversation of `sub` in a scenario (v2.19.0+, #405).
+        Needs write on the chat collection of the caller's tenant
+        (`chat_conversations`, or `<tenant>/chat_conversations`).
+      operationId: createChatConversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatCreateRequest"
+      responses:
+        "200":
+          description: The new conversation, with an empty message list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+    get:
+      tags:
+        - Chat Conversations
+      summary: List a user's conversations
+      description: One page of the conversations of `sub`, newest first (by last message), without messages. Needs read on the chat collection.
+      operationId: listChatConversations
+      parameters:
+        - name: sub
+          in: query
+          required: true
+          description: The user's id — the `sub` of the host's signed join token. Never taken from the browser.
+          schema: {type: string, maxLength: 256}
+        - name: scenario
+          in: query
+          description: Only conversations of this scenario
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, default: 50, maximum: 200}
+        - name: cursor
+          in: query
+          description: "`nextCursor` of the previous page"
+          schema: {type: string}
+      responses:
+        "200":
+          description: A page of conversation summaries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatConversationSummary"
+                  nextCursor:
+                    type: string
+                    description: Present when more conversations remain
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+    delete:
+      tags:
+        - Chat Conversations
+      summary: Delete everything of a user (GDPR erasure)
+      description: Deletes every conversation of `sub`. Needs write on the chat collection.
+      operationId: deleteChatConversationsForUser
+      parameters:
+        - name: sub
+          in: query
+          required: true
+          description: The user's id — the `sub` of the host's signed join token. Never taken from the browser.
+          schema: {type: string, maxLength: 256}
+      responses:
+        "200":
+          description: How many conversations were deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: {type: integer}
+                  sub: {type: string}
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+
+  /v1/chat/conversations/export:
+    get:
+      tags:
+        - Chat Conversations
+      summary: Export everything of a user (GDPR export)
+      description: Every conversation of `sub` with all its messages, newest conversation first. Needs read on the chat collection.
+      operationId: exportChatConversations
+      parameters:
+        - name: sub
+          in: query
+          required: true
+          description: The user's id — the `sub` of the host's signed join token. Never taken from the browser.
+          schema: {type: string, maxLength: 256}
+      responses:
+        "200":
+          description: The user's conversations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sub: {type: string}
+                  exportedAt: {type: integer, format: int64, description: Unix seconds}
+                  total: {type: integer}
+                  conversations:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+
+  /v1/chat/conversations/{id}:
+    get:
+      tags:
+        - Chat Conversations
+      summary: Read a conversation with its messages
+      description: >-
+        The conversation of `sub` with its messages, oldest first. `limit`
+        keeps only the last N (the chat's `max_history_length`);
+        `messageCount` is always the whole conversation's.
+      operationId: getChatConversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The conversation id
+          schema: {type: string}
+        - name: sub
+          in: query
+          required: true
+          description: The user's id — the `sub` of the host's signed join token. Never taken from the browser.
+          schema: {type: string, maxLength: 256}
+        - name: limit
+          in: query
+          description: Only the last N messages (default all)
+          schema: {type: integer}
+      responses:
+        "200":
+          description: The conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+        "404":
+          description: No such conversation for this `sub` — also the answer for another user's conversation, so its existence does not leak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags:
+        - Chat Conversations
+      summary: Delete a conversation
+      operationId: deleteChatConversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The conversation id
+          schema: {type: string}
+        - name: sub
+          in: query
+          required: true
+          description: The user's id — the `sub` of the host's signed join token. Never taken from the browser.
+          schema: {type: string, maxLength: 256}
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: {type: boolean}
+                  id: {type: string}
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+        "404":
+          description: No such conversation for this `sub` — also the answer for another user's conversation, so its existence does not leak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/chat/conversations/{id}/messages:
+    post:
+      tags:
+        - Chat Conversations
+      summary: Append messages to a conversation
+      description: >-
+        Appends 1 to 100 messages and refreshes the conversation's retention.
+        The server sets each message's `id`; `createdAt` defaults to now. The
+        first user message becomes the title.
+      operationId: appendChatMessages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The conversation id
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sub, messages]
+              properties:
+                sub: {type: string}
+                messages:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    $ref: "#/components/schemas/ChatMessage"
+      responses:
+        "200":
+          description: The conversation, holding only the messages just added (with their ids)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+        "404":
+          description: No such conversation for this `sub` — also the answer for another user's conversation, so its existence does not leak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: The conversation has ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/chat/conversations/{id}/end:
+    post:
+      tags:
+        - Chat Conversations
+      summary: End a conversation
+      description: Marks the conversation ended; it stays readable until its retention runs out and refuses further messages. Ending twice changes nothing.
+      operationId: endChatConversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The conversation id
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sub]
+              properties:
+                sub: {type: string}
+      responses:
+        "200":
+          description: The ended conversation, without messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatConversation"
+        "400":
+          description: Missing `sub`, or a request the store refuses
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No permission on the chat collection of the caller's tenant, or read-only mode
+        "404":
+          description: No such conversation for this `sub` — also the answer for another user's conversation, so its existence does not leak
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /v1/aggregate:
     post:
       tags:
@@ -7764,6 +8111,70 @@ paths:
 
 components:
   schemas:
+    # #405: persistent per-user chat conversations.
+    ChatToolCall:
+      type: object
+      required: [name]
+      properties:
+        name: {type: string, example: search}
+        collection: {type: string, example: docs}
+        durationMs: {type: integer, format: int64}
+    ChatMessage:
+      type: object
+      required: [role]
+      properties:
+        id: {type: string, readOnly: true, description: Set by the server}
+        role: {type: string, enum: [user, assistant, tool]}
+        content: {type: string, description: Required unless toolCalls is set; at most 256000 bytes}
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatToolCall"
+        model: {type: string}
+        provider: {type: string}
+        tokens:
+          type: object
+          properties:
+            prompt: {type: integer, format: int64}
+            completion: {type: integer, format: int64}
+        createdAt: {type: integer, format: int64, description: Unix seconds; now when omitted}
+    ChatConversationSummary:
+      type: object
+      properties:
+        id: {type: string}
+        scenario: {type: string}
+        sub: {type: string, description: Opaque user id from the host's signed join token}
+        displayName: {type: string}
+        title: {type: string, description: The start of the first user message (at most 80 characters)}
+        createdAt: {type: integer, format: int64}
+        updatedAt: {type: integer, format: int64}
+        lastMessageAt: {type: integer, format: int64}
+        ended: {type: boolean}
+        retentionDays: {type: integer}
+        expiresAt: {type: integer, format: int64, description: The conversation is removed after this unless it is written again}
+        messageCount: {type: integer, description: Messages in the whole conversation}
+    ChatConversation:
+      allOf:
+        - $ref: "#/components/schemas/ChatConversationSummary"
+        - type: object
+          properties:
+            messages:
+              type: array
+              description: Oldest first
+              items:
+                $ref: "#/components/schemas/ChatMessage"
+    ChatCreateRequest:
+      type: object
+      required: [sub, scenario]
+      properties:
+        sub: {type: string, maxLength: 256}
+        scenario: {type: string, maxLength: 256}
+        displayName: {type: string, maxLength: 256}
+        retentionDays:
+          type: integer
+          minimum: 0
+          maximum: 3650
+          description: The scenario's retention; 0 or omitted is the server default (MDDB_CHAT_RETENTION_DAYS, 30)
     # INT-019: shapes of the Elasticsearch-compatible subset.
     ESInfo:
       type: object

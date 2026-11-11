@@ -750,6 +750,14 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 
 ---
 
+## Chat Conversations (v2.19.0+)
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_CHAT_RETENTION_DAYS` | `30` | int | Days a chat conversation is kept after its last write when the host gives no `retentionDays` (1–3650). See [API.md](API.md#chat-conversations-v1chatconversations) |
+
+---
+
 ## Corpus Packs (v2.18.10+)
 
 | Env Var | Default | Type | Description |

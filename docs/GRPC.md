@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (91 implemented)
+### Available RPCs (99 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -184,6 +184,14 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `PutChatScenario` | `PutChatScenarioRequest` → `PutChatScenarioResponse` |
 | | `DeleteChatScenario` | `DeleteChatScenarioRequest` → `DeleteChatScenarioResponse` |
 | | `GetChatScenarioPrompt` | `GetChatScenarioPromptRequest` → `GetChatScenarioPromptResponse` |
+| **Chat Conversations** | `CreateChatConversation` | `CreateChatConversationRequest` → `ChatConversationProto` |
+| | `ListChatConversations` | `ListChatConversationsRequest` → `ListChatConversationsResponse` |
+| | `GetChatConversation` | `GetChatConversationRequest` → `ChatConversationProto` |
+| | `AppendChatMessages` | `AppendChatMessagesRequest` → `ChatConversationProto` |
+| | `EndChatConversation` | `EndChatConversationRequest` → `ChatConversationProto` |
+| | `DeleteChatConversation` | `DeleteChatConversationRequest` → `DeleteChatConversationResponse` |
+| | `DeleteChatConversationsForUser` | `DeleteChatConversationsForUserRequest` → `DeleteChatConversationsForUserResponse` |
+| | `ExportChatConversations` | `ExportChatConversationsRequest` → `stream ChatConversationProto` |
 | **System** | `Stats` | `StatsRequest` → `StatsResponse` |
 
 A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/follower replication — see [Replication Service](#replication-service).
@@ -221,6 +229,44 @@ grpcurl -plaintext -d '{"name":"support"}' localhost:11024 mddb.MDDB/GetChatScen
 ```
 
 See [API.md](API.md#chat-scenarios-v1chatscenarios).
+
+#### Chat conversations (v2.19.0)
+
+Persistent per-user chat conversations (`/v1/chat/conversations`, #405) over
+gRPC, on the same store and the same functions as REST: a conversation
+written over one transport reads the same over the other, and a list cursor
+from one works on the other. The caller is the host application; every
+request names the user (`sub`), and a conversation of another `sub` is
+`NOT_FOUND`, as a missing one is. The model, limits, retention and the join
+token `sub` comes from are in
+[API.md](API.md#chat-conversations-v1chatconversations).
+
+| RPC | Permission | |
+|---|---|---|
+| `CreateChatConversation` | write, writable server | `{sub, scenario, display_name, retention_days}` → the conversation (`ChatConversationProto`) |
+| `ListChatConversations` | read | `{sub, scenario, limit, cursor}` → `conversations` (no messages), newest first, and `next_cursor` |
+| `GetChatConversation` | read | `{id, sub, limit}` → the conversation with its last `limit` messages (all when 0), oldest first |
+| `AppendChatMessages` | write, writable server | `{id, sub, messages}` (1 to 100 `ChatMessageProto`) → the conversation holding only the messages added, with their ids |
+| `EndChatConversation` | write, writable server | `{id, sub}` → the conversation, `ended` |
+| `DeleteChatConversation` | write, writable server | `{id, sub}` → `{deleted, id}` |
+| `DeleteChatConversationsForUser` | write, writable server | `{sub}` → `{deleted, sub}`: everything of a user (GDPR erasure) |
+| `ExportChatConversations` | read | `{sub}` → a stream of `ChatConversationProto`, one conversation per message with all its messages (GDPR export). A stream, so a long history is not bound by the 4 MiB message limit |
+
+The permission is on the chat collection of the caller's tenant
+(`chat_conversations`, or `<tenant>/chat_conversations`). `ChatMessageProto`
+carries the token usage flat, as `prompt_tokens` and `completion_tokens`
+(REST: `tokens.prompt`, `tokens.completion`).
+
+Errors map as on REST: `INVALID_ARGUMENT` (400: no `sub`, a refused message),
+`NOT_FOUND` (404), `FAILED_PRECONDITION` (409: an append to an ended
+conversation), `UNAUTHENTICATED` (401), `PERMISSION_DENIED` (403).
+
+```bash
+grpcurl -plaintext -d '{"sub":"user-42","scenario":"support"}' localhost:11024 mddb.MDDB/CreateChatConversation
+grpcurl -plaintext -d '{"id":"<id>","sub":"user-42","messages":[{"role":"user","content":"hi"}]}' \
+  localhost:11024 mddb.MDDB/AppendChatMessages
+grpcurl -plaintext -d '{"sub":"user-42"}' localhost:11024 mddb.MDDB/ExportChatConversations
+```
 
 #### Corpus packs (v2.19.0)
 

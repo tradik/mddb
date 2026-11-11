@@ -60,6 +60,7 @@ status: publish
   - [GET /v1/collection-configs](#get-v1collection-configs)
   - [Corpus packs: /v1/corpus](#corpus-packs-v1corpus)
   - [Chat scenarios: /v1/chat/scenarios](#chat-scenarios-v1chatscenarios)
+  - [Chat conversations: /v1/chat/conversations](#chat-conversations-v1chatconversations)
   - [GET /v1/embedding-configs](#get-v1embedding-configs)
   - [GET/PUT/DELETE /v1/embedding-configs/:id](#getputdelete-v1embedding-configsid)
   - [POST /v1/embedding-configs/set-default](#post-v1embedding-configsset-default)
@@ -3329,6 +3330,182 @@ An installed pack's config carries `readOnly: true` and `corpus`. Every write
 to it is refused: `403` with `{"code":"READ_ONLY","collection":"…"}` over
 REST, `PERMISSION_DENIED` over gRPC, `READ_ONLY` in MCP structured content
 and GraphQL extensions.
+
+---
+
+### Chat conversations: /v1/chat/conversations
+
+Persistent per-user chat conversations (v2.19.0, #405). A host application
+that has already signed its user in keeps that user's conversations in MDDB,
+so a reconnect, a new pod or a restart of `mddb-chat` resumes them with their
+history. This is the **host API**: the caller is the host's backend (or
+`mddb-chat` on its behalf), never a browser.
+
+Every conversation belongs to one `sub` — the opaque user id of the host's
+signed join token (below). Every request names it, in the query string of a
+`GET` or `DELETE` and in the body of a `POST`. A conversation whose `sub`
+differs answers **404**, exactly as a missing id does: a host cannot cross
+users by mistake, and cannot learn that another user's conversation exists.
+
+| Method | Path | Body / query | Answer |
+|---|---|---|---|
+| `POST` | `/v1/chat/conversations` | `{"sub","scenario","displayName"?,"retentionDays"?}` | the conversation, `messages: []` |
+| `GET` | `/v1/chat/conversations` | `?sub=&scenario=&limit=&cursor=` | `{"conversations":[summary…],"nextCursor"?}`, newest first |
+| `GET` | `/v1/chat/conversations/{id}` | `?sub=&limit=` | the conversation with its messages, oldest first; `limit` keeps the last N |
+| `POST` | `/v1/chat/conversations/{id}/messages` | `{"sub","messages":[…]}` | the conversation holding only the messages added, with their ids |
+| `POST` | `/v1/chat/conversations/{id}/end` | `{"sub"}` | the conversation, `ended: true`, no messages |
+| `DELETE` | `/v1/chat/conversations/{id}` | `?sub=` | `{"deleted":true,"id"}` |
+| `DELETE` | `/v1/chat/conversations` | `?sub=` | `{"deleted":<count>,"sub"}` — everything of a user (GDPR erasure) |
+| `GET` | `/v1/chat/conversations/export` | `?sub=` | `{"sub","exportedAt","total","conversations":[…]}` — everything of a user, with messages (GDPR export) |
+
+A conversation:
+
+```json
+{
+  "id": "5f3c9a0e1b2d4c6f8a7b9c0d1e2f3a4b",
+  "scenario": "support",
+  "sub": "user-42",
+  "displayName": "Ada",
+  "title": "How do I rotate the key?",
+  "createdAt": 1794000000,
+  "updatedAt": 1794000042,
+  "lastMessageAt": 1794000042,
+  "ended": false,
+  "retentionDays": 30,
+  "expiresAt": 1796592042,
+  "messageCount": 2,
+  "messages": [
+    {"id": "9b1d…", "role": "user", "content": "How do I rotate the key?", "createdAt": 1794000040},
+    {"id": "c41e…", "role": "assistant", "content": "Call POST /v1/encryption/rotate.",
+     "toolCalls": [{"name": "search", "collection": "docs", "durationMs": 42}],
+     "model": "gpt-5", "provider": "openai", "tokens": {"prompt": 812, "completion": 64},
+     "createdAt": 1794000042}
+  ]
+}
+```
+
+A summary (in a listing) is the same object without `messages`. Times are
+Unix seconds.
+
+| Field | Rule |
+|---|---|
+| `sub`, `scenario` | Required. At most 256 bytes, no control characters. `sub` is opaque to MDDB |
+| `displayName` | Optional, same limits |
+| `title` | Set by the server: the start of the first user message, one line, at most 80 characters, cut between characters |
+| `messages[].role` | `user`, `assistant` or `tool` — a `system` message is refused, the prompt belongs to the scenario |
+| `messages[].content` | Required unless `toolCalls` is set; at most 256 000 bytes |
+| `messages[].id` | Set by the server; a value sent by the caller is replaced |
+| `messages[].createdAt` | Optional; now when omitted (send it to import an older history) |
+| one append | 1 to 100 messages; a conversation holds at most 5000 — start a new one after that |
+| `limit` on a listing | default 50, at most 200; walk with `cursor=<nextCursor>` |
+| `limit` on a read | the last N messages — `mddb-chat` passes its `max_history_length`; `messageCount` stays the whole conversation's |
+
+```bash
+# Start (or "new conversation": the old one stays)
+curl -X POST http://localhost:11023/v1/chat/conversations \
+  -H "Authorization: Bearer $HOST_TOKEN" \
+  -d '{"sub":"user-42","scenario":"support","displayName":"Ada","retentionDays":30}'
+
+# After each turn
+curl -X POST http://localhost:11023/v1/chat/conversations/$ID/messages \
+  -H "Authorization: Bearer $HOST_TOKEN" \
+  -d '{"sub":"user-42","messages":[{"role":"user","content":"How do I rotate the key?"},
+       {"role":"assistant","content":"Call POST /v1/encryption/rotate.","model":"gpt-5","provider":"openai",
+        "tokens":{"prompt":812,"completion":64},"toolCalls":[{"name":"search","collection":"docs","durationMs":42}]}]}'
+
+# Resume after a reconnect: the newest conversation, the last 20 messages
+curl "http://localhost:11023/v1/chat/conversations?sub=user-42&scenario=support&limit=1" -H "Authorization: Bearer $HOST_TOKEN"
+curl "http://localhost:11023/v1/chat/conversations/$ID?sub=user-42&limit=20" -H "Authorization: Bearer $HOST_TOKEN"
+
+# "Delete my conversations" / GDPR
+curl "http://localhost:11023/v1/chat/conversations/export?sub=user-42" -H "Authorization: Bearer $HOST_TOKEN"
+curl -X DELETE "http://localhost:11023/v1/chat/conversations?sub=user-42" -H "Authorization: Bearer $HOST_TOKEN"
+```
+
+**Status codes.** `400` a missing `sub` or a request the store refuses (the
+reason is in `error`); `401`/`403` no credentials / no permission, or a
+read-only server or collection on a write; `404` no such conversation for
+this `sub`; `409` an append to an ended conversation; `405` any other method.
+
+**Permission.** There is no separate scope to grant: the conversations live
+in one system collection, `chat_conversations`, and the host API needs `read`
+on it for the three `GET`s and `write` for everything else. Give the host's
+user (or API key) read and write on that collection and nothing more, and the
+key is a chat host that reaches no other data — least privilege with the
+permissions MDDB already has. A global administrator passes as everywhere.
+A tenant user's conversations live in `<tenant>/chat_conversations`
+([MULTI_TENANCY.md](MULTI_TENANCY.md#chat-conversations)), so two tenants
+never share a store even for the same `sub`.
+
+```bash
+curl -X POST http://localhost:11023/v1/auth/permissions -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -d '{"username":"chat-host","collection":"chat_conversations","read":true,"write":true}'
+```
+
+**Retention.** `retentionDays` is the scenario's retention, given when the
+conversation is created (0 or omitted: `MDDB_CHAT_RETENTION_DAYS`, default
+30; at most 3650). Every write — an append, an end — moves `expiresAt` to
+that many days from now, and the conversation is removed after it by the same
+TTL reaper that removes any expired document; an expired conversation is
+"not found" from the moment it expires.
+
+**Storage.** One document per conversation, written through the same path as
+every document: encryption at rest, replication, backups and quotas apply
+unchanged. A conversation is not embedded, not full-text indexed and not sent
+to webhooks. It is separate from the [agent memory](#post-v1memorysession)
+store on purpose: memory sessions are read by any caller that names a
+`sessionId` and every message there is embedded for recall, while a
+conversation is only ever reachable with its `sub`.
+
+Also over gRPC (`CreateChatConversation` … `ExportChatConversations`,
+[GRPC.md](GRPC.md#new-in-v2190)) and, read-only, as the MCP tools
+`chat_conversation_list` and `chat_conversation_get` ([MCP.md](MCP.md)).
+
+#### The join token (host → mddb-chat)
+
+MDDB itself never sees this token. It is documented here because it is where
+`sub` comes from: the host signs it, `mddb-chat` verifies it and then calls
+the API above with the `sub` it carries — never with a user id sent by the
+browser.
+
+```text
+token   = "v1." + payloadB64 + "." + signatureB64
+payload = {"sub":"<opaque user id>","name":"<display name>","scenario":"<scenario>","exp":<unix seconds>}
+payloadB64   = base64url(UTF-8 JSON of payload), no padding
+signatureB64 = base64url(HMAC-SHA256(secret, "v1." + payloadB64)), no padding
+```
+
+| Claim | Required | Meaning |
+|---|---|---|
+| `sub` | yes | The user's id at the host: opaque, stable, 1–256 bytes, no control characters. It becomes the conversation's `sub` |
+| `name` | no | Display name, stored as `displayName` |
+| `scenario` | yes | The scenario the user may join; a `join` for another scenario is refused |
+| `exp` | yes | Expiry, Unix seconds. Keep it short (a few minutes): the token only opens the socket |
+
+Verification, in this order: the token has three dot-separated parts and the
+first is `v1`; the signature equals HMAC-SHA256 over the ASCII bytes of
+`"v1." + payloadB64`, compared in constant time; only then the payload is
+decoded; `exp` is in the future (and not more than 24 hours away); `sub` and
+`scenario` are present. The secret is shared between the host and `mddb-chat`
+only, at least 32 random bytes. Unknown claims are ignored, so the payload
+can grow without a new version.
+
+Test vector — secret `test-secret-0123456789abcdef0123456789abcdef`, payload
+`{"sub":"user-42","name":"Ada","scenario":"support","exp":1900000000}`:
+
+```text
+v1.eyJzdWIiOiJ1c2VyLTQyIiwibmFtZSI6IkFkYSIsInNjZW5hcmlvIjoic3VwcG9ydCIsImV4cCI6MTkwMDAwMDAwMH0.GlF4jwoVSiQHfdz2PJCcQimFfTfy-kCn-wWGkDd69xI
+```
+
+```js
+// Host side (Node.js)
+import { createHmac } from "node:crypto";
+const b64 = (b) => Buffer.from(b).toString("base64url");
+function joinToken(secret, sub, scenario, name, ttlSeconds = 300) {
+  const body = "v1." + b64(JSON.stringify({ sub, name, scenario, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
+  return body + "." + createHmac("sha256", secret).update(body).digest("base64url");
+}
+```
 
 ---
 

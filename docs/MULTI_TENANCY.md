@@ -165,6 +165,18 @@ and `mddb_embedding_budget_used{collection}` (0–1, see
 Server-wide, `MDDB_DISK_RESERVE_BYTES` and `MDDB_VECTOR_RAM_LIMIT_BYTES`
 protect the node itself ([config.md](config.md#quotas-and-reserves-v2189)).
 
+## Chat conversations
+
+Persistent chat conversations (v2.19.0,
+[API.md](API.md#chat-conversations-v1chatconversations)) follow the
+namespace: a tenant user's conversations are stored in
+`<tenant>/chat_conversations`, a global user's in `chat_conversations`. The
+host API takes no collection — the server derives it from the caller — so a
+tenant's chat host needs `read` and `write` on `acme/chat_conversations`
+(or the tenant's `*`), reaches only that tenant's conversations, and the
+same `sub` in two tenants is two unrelated users. Quotas on the tenant count
+the conversations like any other collection of the namespace.
+
 ## Design notes
 
 - **Single choke point.** The namespace gate lives in the same permission check

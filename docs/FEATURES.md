@@ -118,6 +118,15 @@ Complete list of MDDB features organized by category.
 - **6 MCP Tools** — `memory_start_session`, `memory_add_message`, `memory_recall`, `memory_summarize`, `memory_list_sessions`, `memory_session_history`
 - **API Endpoints** — `POST /v1/memory/session`, `/message`, `/recall`, `/summarize`, `/sessions`, `/history`
 
+#### Persistent Chat Conversations (v2.19.0)
+- **Per-user conversations** — The conversations of `mddb-chat` users stored in mddbd: messages, tool calls, model, provider, token usage, times
+- **Bound to the user** — Every read and write names the `sub` of the host's signed join token; another user's conversation answers 404
+- **Resume** — Read a conversation with its last N messages after a reconnect, a new pod or a restart
+- **User controls** — New conversation, end, delete one, delete or export everything of a user (GDPR)
+- **Retention per scenario** — `retentionDays` per conversation, refreshed on every write, enforced by the TTL reaper
+- **Tenant-scoped** — `<tenant>/chat_conversations`; least privilege is read/write on that one collection
+- **API Endpoints** — `/v1/chat/conversations` (REST), 8 gRPC RPCs, read-only MCP tools `chat_conversation_list`, `chat_conversation_get` — see [API.md](API.md#chat-conversations-v1chatconversations)
+
 #### Zero-Shot Classification
 - **Embedding-based** — Classify documents against candidate labels using cosine similarity
 - **No Training Data** — Works out of the box with any embedding provider
