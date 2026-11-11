@@ -18,7 +18,7 @@ picks up a change at the visitor's next message.
 The release also changes the licence, lets you switch off the modules you do
 not use, and closes the gap between what the server can do and what the panel
 shows. The full list is in the
-[changelog](https://github.com/tradik/mddb/blob/v2.19.0/CHANGELOG.md).
+[changelog](https://github.com/tradik/mddb/blob/v2.19.1/CHANGELOG.md).
 
 ## A new licence
 
@@ -31,7 +31,7 @@ release.
 
 The client libraries, the integrations, the proto files and the chat widget
 stay BSD-3-Clause, so code you write against MDDB is not affected. Releases up
-to 2.18.10 stay BSD-3-Clause. [LICENSING.md](https://github.com/tradik/mddb/blob/v2.19.0/LICENSING.md)
+to 2.18.10 stay BSD-3-Clause. [LICENSING.md](https://github.com/tradik/mddb/blob/v2.19.1/LICENSING.md)
 maps every directory to its licence.
 
 ## The assistant is configured in the panel
@@ -136,6 +136,6 @@ A few things behave differently:
 - **`/v1/delete-batch`** answers `notFound`. The old `not_found` is still
   sent and will be removed in a later release.
 
-Download 2.19.0 from
+Download 2.19.1 (the first published build of 2.19) from
 [GitHub releases](https://github.com/tradik/mddb/releases), or run
 `mddb-cli self-update`.

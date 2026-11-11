@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.1] - 2026-11-11
+
+2.19.0 was tagged, but its release run failed before anything but the panel image was published: no binaries, packages, server image, snaps, Homebrew formula or MCP Registry entry. 2.19.1 is the first published release of everything listed under 2.19.0, plus the fixes below. If you pulled `tradik/mddb-panel:2.19.0`, it is the same code as 2.19.1.
+
+### Security
+
+- **The Airbyte destination's fallback document key is marked as not a security hash.** A record without a usable key field is named by a SHA-1 of its content; it now says `usedforsecurity=False`, which is what it is. The key stays the same, so a re-sync updates the documents written by earlier versions instead of duplicating them (a test pins the value). SonarCloud's quality gate on `main` failed on this line.
+
+### Fixed
+
+- **The release builds its .rpm packages again (#410).** GitHub's `ubuntu-latest` moved to Ubuntu 26.04, whose rpmbuild builds a `-debuginfo` package by default and stops on its empty file list, because the Go binaries are built without symbols. The release turns that package off.
+- **The source Dockerfiles build for the platform asked for (#410).** `services/mddbd/Dockerfile` hard-coded `GOARCH=amd64`, so `docker buildx build --platform linux/arm64` produced an arm64 image with an amd64 binary inside. Both it and `services/mddb-cli/Dockerfile` now cross-compile on the build host for `TARGETOS`/`TARGETARCH` (no QEMU). The release images were not affected; they copy the binary built for each architecture.
+
+### Changed
+
+- **Dependencies:** lucide-react 1.70.0, zustand 5.1.0 and @tailwindcss/postcss 4.3.5 in the panel (#408).
+- `scripts/check-go-version.sh` reads `FROM --platform=… golang:X` lines and ignores local agent worktrees under `.claude/`.
+
 ## [2.19.0] - 2026-11-11
 
 ### Security
@@ -82,7 +100,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **mddb-chat: `session.end` fires when a session ends, not when its socket closes (#402).** Webhook consumers that treated it as "disconnected" now get it on `end` and on TTL expiry only. `/health` counts attached sessions in `active_sessions`, adds `detached_sessions` and `mddb_connected`, and answers 503 with `status: "starting"` until mddbd is connected, so a container is unhealthy until then.
 - **mddb-chat handles SIGTERM and Ctrl-C** by shutting down cleanly.
 - **A chat message id the client sends is kept** when it matches `[A-Za-z0-9_-]{1,64}`, instead of always being replaced, so a rating can name the answer by the id the visitor saw.
-- **Dependencies (the open Dependabot pull requests, cherry-picked):** Go — gRPC 1.85.0, quic-go 0.65.0, gqlgen 0.17.98, gqlparser 2.5.64, goccy/go-json 0.12.0; npm minor and patch updates (#394, #408; lucide-react 1.70, zustand 5.1, Tailwind 4.3.5 in the panel) in the panel, the chat widget, the Chrome extension, the GitHub Action (its `dist/` rebuilt) and the Grafana data source; the WordPress plugin's tests move to PHPUnit 13.
+- **Dependencies (the open Dependabot pull requests, cherry-picked):** Go — gRPC 1.85.0, quic-go 0.65.0, gqlgen 0.17.98, gqlparser 2.5.64, goccy/go-json 0.12.0; npm minor and patch updates in the panel, the chat widget, the Chrome extension, the GitHub Action (its `dist/` rebuilt) and the Grafana data source; the WordPress plugin's tests move to PHPUnit 13.
 - **WordPress plugin:** static analysis on PHPStan 2.3 with `szepeviktor/phpstan-wordpress` 2.0, still at level 5 with no baseline; its three new findings are fixed in code. The tests accept PHPUnit 11.5, 12.5 or 13.4, whichever the PHP version installs, so the plugin is still tested from PHP 8.2; the error-logging tests now check the logged line.
 
 ### Deprecated
@@ -122,7 +140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/v1/bulk-ingest-jobs` answers `"jobs": []`** instead of `null` when there are none.
 - **`/v1/export` names the file** with `Content-Disposition: attachment; filename="<collection>.ndjson|.zip"`, exposed through CORS.
 - **`/v1/code-graph` with `direction=both` listed each edge twice** at depth above 1. Each edge is now listed once, with the direction found nearest the root (REST, gRPC, MCP).
-- **Release: the .rpm packages build on the Ubuntu 26.04 runners.** `ubuntu-latest` moved to 26.04, whose rpm builds a `-debuginfo` package by default and stops on its empty file list, because the Go binaries are built without symbols (`-s -w`). The release turns that package off.
 
 ### Documentation
 
