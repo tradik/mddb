@@ -756,6 +756,13 @@ When enabled, provides endpoints: `POST /v1/spell-suggest`, `POST /v1/spell-clea
 |---------|---------|------|-------------|
 | `MDDB_CHAT_RETENTION_DAYS` | `30` | int | Days a chat conversation is kept after its last write when the host gives no `retentionDays` (1–3650). See [API.md](API.md#chat-conversations-v1chatconversations) |
 
+## Chat Skills (v2.19.0+)
+
+| Env Var | Default | Type | Description |
+|---------|---------|------|-------------|
+| `MDDB_CHAT_SKILL_MAX_BYTES` | `32768` | int | Largest content of one chat skill, in bytes. A put or import over it is refused. See [API.md](API.md#chat-skills-v1chatskills) |
+| `MDDB_CHAT_PROMPT_MAX_BYTES` | `131072` | int | Largest composed system prompt of a chat scenario, skills included. A scenario over it is refused; the prompt preview warns past 75% |
+
 ---
 
 ## Corpus Packs (v2.18.10+)

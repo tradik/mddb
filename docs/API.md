@@ -60,6 +60,7 @@ status: publish
   - [GET /v1/collection-configs](#get-v1collection-configs)
   - [Corpus packs: /v1/corpus](#corpus-packs-v1corpus)
   - [Chat scenarios: /v1/chat/scenarios](#chat-scenarios-v1chatscenarios)
+  - [Chat skills: /v1/chat/skills](#chat-skills-v1chatskills)
   - [Chat conversations: /v1/chat/conversations](#chat-conversations-v1chatconversations)
   - [GET /v1/embedding-configs](#get-v1embedding-configs)
   - [GET/PUT/DELETE /v1/embedding-configs/:id](#getputdelete-v1embedding-configsid)
@@ -1784,7 +1785,7 @@ means editing a TOML file and restarting a service.
 | `GET` | `/v1/chat/scenarios/{name}` | the scenario |
 | `PUT` | `/v1/chat/scenarios/{name}` | the stored scenario; `201` when created, `200` when replaced |
 | `DELETE` | `/v1/chat/scenarios/{name}` | `{"deleted":true,"version":N}` |
-| `GET` | `/v1/chat/scenarios/{name}/prompt` | `{"name","prompt","version"}` — the composed system prompt |
+| `GET` | `/v1/chat/scenarios/{name}/prompt` | `{"name","prompt","version","bytes","approxTokens","warning","missingSkills"}` — the composed system prompt and its size |
 
 ```bash
 curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{
@@ -1815,7 +1816,7 @@ curl http://localhost:11023/v1/chat/scenarios/version
 | `offTopic.mode` | `refuse`, `redirect`, `brief` | `refuse` |
 | `offTopic.redirectTemplate` | the reply in `redirect` mode | a built-in sentence |
 | `allowedCollections` | existing collections or aliases, each once | none |
-| `skills` | up to 64 names; the skill store itself is a later release | none |
+| `skills` | up to 64 [skill](#chat-skills-v1chatskills) names, composed in this order | none |
 | `style.emoji` | `off`, `sparingly`, `free` | `off` |
 | `style.verbosity` | `short`, `normal`, `long` | `normal` |
 | `style.markdown` | boolean | `false` |
@@ -1834,10 +1835,16 @@ curl http://localhost:11023/v1/chat/scenarios/version
   growing across restarts. A consumer polls `/v1/chat/scenarios/version` and
   reloads the list when the number changes.
 - **Composed prompt.** `/prompt` joins, in this order: the operator prompt,
-  the guardrails, the off-topic clause, the style clause, then the
-  `responsePrompt` of each allowed collection that has one
-  ([collection config](#get-v1collection-config)). Skills are stored by name
-  and are not expanded yet.
+  the guardrails, the off-topic clause, the scenario's
+  [skills](#chat-skills-v1chatskills) in its order (since 2.19.0, under a line
+  saying the guardrails and the scope rule above take precedence), the style
+  clause, then the `responsePrompt` of each allowed collection that has one
+  ([collection config](#get-v1collection-config)). A skill name with no
+  stored skill is skipped and listed in `missingSkills`. `bytes` is the
+  prompt's length, `approxTokens` is `bytes / 4` (a rule of thumb, not a
+  tokenizer) and `warning` is set past 75% of `MDDB_CHAT_PROMPT_MAX_BYTES`
+  (default 131072). A `PUT` whose composed prompt is over that limit is `400`.
+  A scenario without skills composes exactly as before.
 - **Permissions.** Writing needs a global administrator. Reading a scenario
   needs read permission on every collection it allows; the list leaves out
   the scenarios the caller may not read, so a tenant sees only scenarios
@@ -1851,6 +1858,83 @@ curl http://localhost:11023/v1/chat/scenarios/version
   `PutChatScenario`, `DeleteChatScenario`, `GetChatScenarioPrompt`
   ([GRPC.md](GRPC.md)) and the MCP tools `chat_scenario_list`,
   `chat_scenario_get`, `chat_scenario_put`, `chat_scenario_delete`
+  ([MCP.md](MCP.md)) call the same code.
+
+### Chat skills: /v1/chat/skills
+
+A chat skill (v2.19.0, #404) is a reusable block of Markdown instructions in
+the `SKILL.md` format — front matter with `name` and `description`, then the
+instructions — that [scenarios](#chat-scenarios-v1chatscenarios) attach by
+name. A skill is operator-trusted text: it becomes part of a system prompt,
+so **every** endpoint, reads included, needs a global administrator.
+
+| Method | Path | Answer |
+|---|---|---|
+| `GET` | `/v1/chat/skills` | `{"skills":[…],"version":N}` — every skill without `content` or `history`; `version` is the scenarios' counter |
+| `GET` | `/v1/chat/skills/{name}` | the skill with `content` and `history` (earlier versions, without contents) |
+| `GET` | `/v1/chat/skills/{name}?version=N` | a kept earlier version, with its `content` |
+| `PUT` | `/v1/chat/skills/{name}` | the stored skill; `201` when created, `200` for a new version or no change |
+| `DELETE` | `/v1/chat/skills/{name}` | `{"deleted":true,"version":N}`; `409` with `usedBy` while a scenario attaches it |
+| `GET` | `/v1/chat/skills/{name}/used-by` | `{"name","scenarios":[…]}` |
+| `POST` | `/v1/chat/skills/import` | a **preview** of `{"url"}` or `{"content"}`; stores nothing |
+| `POST` | `/v1/chat/skills/{name}/update` | fetch the source again: a preview, stored with `{"confirm":true}` |
+
+```bash
+# 1. Preview: the server fetches the file and returns the whole text.
+curl -X POST http://localhost:11023/v1/chat/skills/import \
+  -d '{"url":"https://github.com/blader/humanizer/blob/main/SKILL.md"}'
+# {"name":"humanizer","description":"…","content":"…","raw":"---\nname: …",
+#  "source":{"url":"…","commit":"3f2c…","fetchedAt":"2026-11-11T10:00:00Z"},
+#  "bytes":5123,"sha256":"…","exists":false}
+
+# 2. Save what was read, with its source.
+curl -X PUT http://localhost:11023/v1/chat/skills/humanizer \
+  -d '{"description":"…","content":"…","source":{"url":"…","commit":"3f2c…","fetchedAt":"2026-11-11T10:00:00Z"}}'
+
+# 3. Later: see what changed upstream, then confirm the text that was shown.
+curl -X POST http://localhost:11023/v1/chat/skills/humanizer/update
+curl -X POST http://localhost:11023/v1/chat/skills/humanizer/update -d '{"confirm":true,"sha256":"…"}'
+```
+
+| Field | Values |
+|---|---|
+| `name` | 1–128 characters, no `\|`, `/` or spaces, not `version` or `import`; taken from the path |
+| `description` | text, at most 16384 bytes; taken from the front matter when the content is a whole `SKILL.md` and none is given |
+| `content` | the instructions, 1 to `MDDB_CHAT_SKILL_MAX_BYTES` (default 32768) bytes of UTF-8; a whole `SKILL.md` is split into front matter and body |
+| `source` | `{url, commit, fetchedAt}` for an imported skill: an `https` URL, the Git commit when the URL is a GitHub one, the fetch time |
+| `version` | set by the server: 1, then one more on every change |
+| `history` | the last 10 earlier versions, newest first: `version`, `description`, `bytes`, `source`, `updatedAt` |
+| `bytes`, `usedBy`, `createdAt`, `updatedAt` | set by the server |
+
+- **Versions.** Each `PUT` that changes the description, the content or the
+  source stores a new version and keeps the previous one (the last 10), so
+  the panel can show a diff. A `PUT` that changes nothing stores nothing.
+  Every change bumps the scenarios' version counter
+  (`/v1/chat/scenarios/version`), so mddb-chat reloads on the same poll.
+- **Import.** `import` fetches over `https` only, through the server's SSRF
+  guard (private and loopback addresses are refused, a redirect may not leave
+  https), capped at the skill limit plus 8 KiB of front matter, 15 s. A
+  GitHub URL (`github.com/{owner}/{repo}/blob|raw/{ref}/{path}` or
+  `raw.githubusercontent.com/…`) is pinned: the branch or tag is resolved to
+  a commit through the GitHub API and the file is read at that commit. When
+  the API cannot tell (a rate limit, a private repository), the file is read
+  as named and `commit` is empty. The answer carries the full text (`raw`)
+  so an operator reads it before saving; saving is a separate `PUT`.
+- **Update.** Only an explicit `POST …/update` fetches again. Without
+  `confirm` it is a preview: `{skill, preview, changed, saved, version}`.
+  With `confirm: true` a changed text is stored as a new version; pass the
+  preview's `sha256` and a source that changed since the preview is refused
+  with `409`. A skill without a `source` cannot be updated (`400`).
+- **Delete.** Refused with `409` and `{"error","usedBy":[…]}` while a
+  scenario attaches the skill.
+- **Errors.** `400` for an invalid field or fetch, `403` without admin or on
+  a read-only server (for writes), `404` for an unknown name or version.
+- **Storage and replication.** Skills are kept in the main database next to
+  the scenarios, so backups carry them and the binlog replicates them.
+- **Other surfaces.** gRPC `ListChatSkills`, `GetChatSkill`, `PutChatSkill`,
+  `DeleteChatSkill`, `ImportChatSkill`, `UpdateChatSkill`,
+  `GetChatSkillUsedBy` ([GRPC.md](GRPC.md)) and the MCP tools
+  `chat_skill_list`, `chat_skill_get`, `chat_skill_put`, `chat_skill_delete`
   ([MCP.md](MCP.md)) call the same code.
 
 ### GET /v1/gain

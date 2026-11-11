@@ -5890,9 +5890,10 @@ paths:
       summary: The composed system prompt of a chat scenario
       description: |
         The prompt in the order it is sent: operator prompt, guardrails, the
-        off-topic clause, the style clause, then the `responsePrompt` of each
-        allowed collection that has one. Same permission as reading the
-        scenario.
+        off-topic clause, the scenario's skills in its order (#404, under a
+        line saying the guardrails take precedence), the style clause, then
+        the `responsePrompt` of each allowed collection that has one, with
+        its size. Same permission as reading the scenario.
       operationId: getChatScenarioPrompt
       responses:
         "200":
@@ -5908,9 +5909,270 @@ paths:
                     type: string
                   version:
                     $ref: "#/components/schemas/ChatScenarioVersion"
+                  bytes:
+                    type: integer
+                    description: The prompt's length in bytes (v2.19.0, #404).
+                  approxTokens:
+                    type: integer
+                    description: bytes / 4, a rule of thumb.
+                  warning:
+                    type: string
+                    description: Set past 75% of MDDB_CHAT_PROMPT_MAX_BYTES.
+                  missingSkills:
+                    type: array
+                    description: Skill names the scenario lists that are not stored; skipped.
+                    items:
+                      type: string
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/ChatScenarioNotFound"}
+
+  /v1/chat/skills:
+    get:
+      tags:
+        - Chat
+      summary: List chat skills
+      description: |
+        Every chat skill (#404, v2.19.0) without content or history, with
+        the chat scenarios' version counter, which a skill change bumps
+        too. Requires a global administrator: a skill's text is part of
+        system prompts.
+      operationId: listChatSkills
+      responses:
+        "200":
+          description: The skills and the version counter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  skills:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatSkill"
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /v1/chat/skills/import:
+    post:
+      tags:
+        - Chat
+      summary: Preview a SKILL.md from a URL or pasted text
+      description: |
+        Parses a SKILL.md and returns it whole without storing anything. A
+        `url` must be https; it is fetched through the SSRF guard, capped at
+        MDDB_CHAT_SKILL_MAX_BYTES plus 8 KiB. A GitHub blob or raw URL is
+        resolved to a commit and read at it. Requires a global administrator.
+      operationId: importChatSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Exactly one of url and content.
+              properties:
+                url:
+                  type: string
+                  format: uri
+                content:
+                  type: string
+      responses:
+        "200":
+          description: The preview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatSkillPreview"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /v1/chat/skills/{name}:
+    parameters:
+      - $ref: "#/components/parameters/ChatSkillName"
+    get:
+      tags:
+        - Chat
+      summary: Get a chat skill
+      description: |
+        The current version with its content and the list of kept earlier
+        versions (without contents), or with `version` one of those.
+        Requires a global administrator.
+      operationId: getChatSkill
+      parameters:
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: The skill
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatSkill"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatSkillNotFound"}
+    put:
+      tags:
+        - Chat
+      summary: Create a chat skill or store a new version
+      description: |
+        `content` is the instructions, or a whole SKILL.md whose front matter
+        gives the description when none is sent. A change stores a new
+        version and keeps the previous one (the last 10); a put that changes
+        nothing stores nothing. Requires a global administrator. Bumps the
+        chat scenarios' version counter.
+      operationId: putChatSkill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                description:
+                  type: string
+                content:
+                  type: string
+                source:
+                  $ref: "#/components/schemas/ChatSkillSource"
+      responses:
+        "200":
+          description: A new version, or unchanged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatSkill"
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatSkill"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    delete:
+      tags:
+        - Chat
+      summary: Delete a chat skill
+      description: Refused while a scenario attaches it. Requires a global administrator. Bumps the version counter.
+      operationId: deleteChatSkill
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatSkillNotFound"}
+        "409":
+          description: Scenarios attach the skill
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  usedBy:
+                    type: array
+                    items:
+                      type: string
+
+  /v1/chat/skills/{name}/used-by:
+    parameters:
+      - $ref: "#/components/parameters/ChatSkillName"
+    get:
+      tags:
+        - Chat
+      summary: The scenarios attaching a chat skill
+      operationId: getChatSkillUsedBy
+      responses:
+        "200":
+          description: The scenario names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  scenarios:
+                    type: array
+                    items:
+                      type: string
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatSkillNotFound"}
+
+  /v1/chat/skills/{name}/update:
+    parameters:
+      - $ref: "#/components/parameters/ChatSkillName"
+    post:
+      tags:
+        - Chat
+      summary: Fetch a chat skill's source again
+      description: |
+        Without `confirm` a preview of what the source holds now next to the
+        stored skill. With `confirm: true` a changed text is stored as a new
+        version; with `sha256` (of the preview's content) a source that
+        changed since the preview is refused. Requires a global administrator.
+      operationId: updateChatSkill
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirm:
+                  type: boolean
+                sha256:
+                  type: string
+      responses:
+        "200":
+          description: The stored skill and the preview
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  skill:
+                    $ref: "#/components/schemas/ChatSkill"
+                  preview:
+                    $ref: "#/components/schemas/ChatSkillPreview"
+                  changed:
+                    type: boolean
+                  saved:
+                    type: boolean
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404": {$ref: "#/components/responses/ChatSkillNotFound"}
+        "409":
+          description: The source changed since the preview
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
 
   /v1/documents:deleteWhere:
     post:
@@ -11322,6 +11584,92 @@ components:
       minimum: 0
       description: Grows by one on every scenario create, update and delete.
 
+    ChatSkillSource:
+      type: object
+      description: Where an imported chat skill was fetched from.
+      properties:
+        url:
+          type: string
+          format: uri
+          description: https only.
+        commit:
+          type: string
+          description: The Git commit, for a GitHub URL.
+        fetchedAt:
+          type: string
+          format: date-time
+
+    ChatSkill:
+      type: object
+      description: A reusable SKILL.md instruction block (#404, v2.19.0).
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          description: The key. No '|', '/' or spaces; not "version" or "import".
+        description:
+          type: string
+        content:
+          type: string
+          description: The instructions; left out of the list. At most MDDB_CHAT_SKILL_MAX_BYTES.
+        source:
+          $ref: "#/components/schemas/ChatSkillSource"
+        version:
+          type: integer
+          description: 1, then one more on every change.
+        history:
+          type: array
+          description: The last 10 earlier versions, newest first, without contents.
+          items:
+            type: object
+            properties:
+              version:
+                type: integer
+              description:
+                type: string
+              bytes:
+                type: integer
+              source:
+                $ref: "#/components/schemas/ChatSkillSource"
+              updatedAt:
+                type: string
+                format: date-time
+        bytes:
+          type: integer
+        usedBy:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ChatSkillPreview:
+      type: object
+      description: A SKILL.md parsed but not stored.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        content:
+          type: string
+        raw:
+          type: string
+          description: The whole text, front matter included.
+        source:
+          $ref: "#/components/schemas/ChatSkillSource"
+        bytes:
+          type: integer
+        sha256:
+          type: string
+          description: Of content; what a confirmed update names.
+        exists:
+          type: boolean
+
     ChatScenario:
       type: object
       description: >
@@ -11359,7 +11707,7 @@ components:
             type: string
         skills:
           type: array
-          description: Names of reusable instruction blocks (the skill store is #404).
+          description: Names of chat skills (#404), composed into the prompt in this order after the guardrails.
           maxItems: 64
           items:
             type: string
@@ -13918,6 +14266,13 @@ components:
       description: The scenario's name.
       schema:
         type: string
+    ChatSkillName:
+      name: name
+      in: path
+      required: true
+      description: The skill's name.
+      schema:
+        type: string
     ESIndex:
       name: index
       in: path
@@ -13954,6 +14309,12 @@ components:
         application/json:
           schema: {$ref: "#/components/schemas/ErrorResponse"}
           example: {error: chat scenario not found}
+    ChatSkillNotFound:
+      description: No chat skill of that name, or a version not kept
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/ErrorResponse"}
+          example: {error: chat skill not found}
     # Refusals shared by many operations. Each matches what the server
     # writes; an operation with a narrower meaning documents it inline.
     BadRequest:

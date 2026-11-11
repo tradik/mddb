@@ -139,11 +139,15 @@ Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming 
 
 - **Which one wins.** A scenario stored in mddbd wins over the TOML `[scenarios.<name>]` of the same name. A name mddbd does not have is served from the TOML, and so is every name until mddbd is reached or when mddbd is older than 2.19.0.
 - **Disabled.** A scenario stored with `enabled: false` is refused at `join` with `scenario is disabled`; the TOML scenario of the same name does not stand in.
-- **Prompt.** The system prompt is the one mddbd composes (operator prompt, guardrails, off-topic and style clauses, the collections' `responsePrompt`s), so the panel's preview is what the model reads.
-- **Applied fields.** `allowedCollections` bound the tools, `llm.model` / `temperature` / `maxTokens` / `extraBody` override `[llm]` for that scenario, and `maxTurns`, `tokenBudgetPerSession` and `rateLimit.messagesPerMinute` (per session) limit the conversation. A field left at 0 or empty keeps the server's own setting. `skills` are ignored for now.
+- **Prompt.** The system prompt is the one mddbd composes (operator prompt, guardrails, off-topic clause, the scenario's skills, style clause, the collections' `responsePrompt`s), so the panel's preview is what the model reads.
+- **Applied fields.** `allowedCollections` bound the tools, `llm.model` / `temperature` / `maxTokens` / `extraBody` override `[llm]` for that scenario, and `maxTurns`, `tokenBudgetPerSession` and `rateLimit.messagesPerMinute` (per session) limit the conversation. A field left at 0 or empty keeps the server's own setting. `skills` reach the model through that composed prompt (see Skills below).
 - **Health.** `GET /health` reports `"scenarios_source": "mddbd" | "toml"` and `"scenarios_version"`.
 
 The full table is in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#scenarios-from-mddbd).
+
+### Skills (2.19.0)
+
+A skill is a reusable block of instructions in the `SKILL.md` format (front matter with `name` and `description`, then Markdown), stored in mddbd under `/v1/chat/skills` and attached to scenarios by name in a chosen order. mddbd composes them into the scenario's system prompt after the operator prompt, the guardrails and the off-topic clause, under a line saying the guardrails take precedence, so a skill cannot lift one; `mddb-chat` already uses that server-composed prompt and needs no change. A skill can be pasted or imported from an https URL — the panel shows the whole text before saving, and a GitHub URL is pinned to its commit — and it is fetched again only on an explicit "Update from source", shown as a diff first. Skills are admin only, reads included, and capped by `MDDB_CHAT_SKILL_MAX_BYTES` (32768) per skill and `MDDB_CHAT_PROMPT_MAX_BYTES` (131072) per composed prompt; see [API.md](API.md#chat-skills-v1chatskills).
 
 ### Widget Configuration
 

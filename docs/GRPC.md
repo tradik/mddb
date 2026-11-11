@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (99 implemented)
+### Available RPCs (106 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -211,7 +211,7 @@ the same server functions and gated with the same permissions:
 | `GetChatScenario` | read on every collection the scenario allows | `{name}` → `ChatScenarioProto` |
 | `PutChatScenario` | admin, writable server | `{scenario}` → `{scenario, created, version}`; creates or replaces the scenario named in it |
 | `DeleteChatScenario` | admin, writable server | `{name}` → `{deleted, version}` |
-| `GetChatScenarioPrompt` | as `GetChatScenario` | `{name}` → `{name, prompt, version}`: the composed system prompt |
+| `GetChatScenarioPrompt` | as `GetChatScenario` | `{name}` → `{name, prompt, version, bytes, approx_tokens, warning, missing_skills}`: the composed system prompt and its size |
 
 `ChatScenarioProto` mirrors the REST body: `off_topic` (`mode`,
 `redirect_template`), `style` (`emoji`, `verbosity`, `markdown`,
@@ -229,6 +229,34 @@ grpcurl -plaintext -d '{"name":"support"}' localhost:11024 mddb.MDDB/GetChatScen
 ```
 
 See [API.md](API.md#chat-scenarios-v1chatscenarios).
+
+#### Chat skills (v2.19.0)
+
+The chat skill endpoints (`/v1/chat/skills`, #404) over gRPC. Every RPC
+needs a global administrator, reads included: a skill's text is part of
+system prompts.
+
+| RPC | Permission | |
+|---|---|---|
+| `ListChatSkills` | admin | `skills` (`ChatSkillProto`, without `content`) and `version`, the scenarios' counter |
+| `GetChatSkill` | admin | `{name, version}` → `ChatSkillProto`; `version` 0 is the current one |
+| `PutChatSkill` | admin, writable server | `{skill}` → `{skill, created, version}`; reads `name`, `description`, `content`, `source` |
+| `DeleteChatSkill` | admin, writable server | `{name}` → `{deleted, version}`; `FAILED_PRECONDITION` naming the scenarios while one attaches it |
+| `ImportChatSkill` | admin | `{url}` or `{content}` → `ChatSkillPreviewProto` (`name`, `description`, `content`, `raw`, `source`, `bytes`, `sha256`, `exists`); stores nothing |
+| `UpdateChatSkill` | admin, writable server | `{name, confirm, sha256}` → `{skill, preview, changed, saved, version}`; `ABORTED` when the source changed since the preview |
+| `GetChatSkillUsedBy` | admin | `{name}` → `{name, scenarios}` |
+
+`ChatSkillProto` carries `source` (`url`, `commit`, `fetched_at`), `version`,
+`history` (`ChatSkillRevisionProto`: `version`, `description`, `bytes`,
+`source`, `updated_at`, without contents), `bytes`, `used_by` and the times
+in Unix seconds. Other errors map as on REST.
+
+```bash
+grpcurl -plaintext -d '{"url":"https://github.com/blader/humanizer/blob/main/SKILL.md"}' localhost:11024 mddb.MDDB/ImportChatSkill
+grpcurl -plaintext -d '{"name":"humanizer"}' localhost:11024 mddb.MDDB/UpdateChatSkill
+```
+
+See [API.md](API.md#chat-skills-v1chatskills).
 
 #### Chat conversations (v2.19.0)
 
