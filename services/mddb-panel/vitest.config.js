@@ -152,6 +152,8 @@ const coverageFiles = [
   'src/components/GeoReindexForm.jsx',
   'src/components/TemporalPanel.jsx',
   'src/components/TemporalEventsTab.jsx',
+  'src/components/SpellCheckPanel.jsx',
+  'src/components/SpellCleanupBox.jsx',
 ];
 
 export default mergeConfig(

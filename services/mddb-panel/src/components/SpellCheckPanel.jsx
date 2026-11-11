@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BookOpen, Plus, Trash2, Wand2 } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
+import SpellCleanupBox from './SpellCleanupBox';
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -169,6 +170,9 @@ export default function SpellCheckPanel() {
               <Wand2 className="w-4 h-4" />
               {testLoading ? 'Checking...' : 'Check Spelling'}
             </button>
+
+            {/* 2.19.0: apply the corrections (/v1/spell-cleanup) */}
+            <SpellCleanupBox collection={currentCollection || ''} text={testText} lang={testLang} />
 
             {testError && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
