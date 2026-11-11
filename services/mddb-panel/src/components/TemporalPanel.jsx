@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Clock, Flame, BarChart2 } from 'lucide-react';
+import { Clock, Flame, BarChart2, ListOrdered } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
+import TemporalEventsTab from './TemporalEventsTab';
 
 const INTERVALS = [
   { value: 'day', label: 'Daily' },
@@ -26,8 +27,8 @@ function HotDocsTab({ collection }) {
   const [error, setError] = useState(null);
   const [topN, setTopN] = useState(20);
 
+  // The tabs are only shown with a collection selected.
   const load = async () => {
-    if (!collection) return;
     setLoading(true);
     setError(null);
     try {
@@ -106,8 +107,8 @@ function HistogramTab({ collection }) {
   const [interval, setInterval] = useState('day');
   const [eventType, setEventType] = useState('access');
 
+  // The tabs are only shown with a collection selected.
   const load = async () => {
-    if (!collection) return;
     setLoading(true);
     setError(null);
     try {
@@ -191,6 +192,7 @@ export default function TemporalPanel() {
   const tabs = [
     { id: 'histogram', label: 'Activity Histogram', icon: BarChart2 },
     { id: 'hot', label: 'Hot Documents', icon: Flame },
+    { id: 'events', label: 'Document Events', icon: ListOrdered },
   ];
 
   return (
@@ -232,6 +234,7 @@ export default function TemporalPanel() {
           <div className="flex-1 overflow-y-auto p-4">
             {activeTab === 'histogram' && <HistogramTab collection={currentCollection} />}
             {activeTab === 'hot' && <HotDocsTab collection={currentCollection} />}
+            {activeTab === 'events' && <TemporalEventsTab collection={currentCollection} />}
           </div>
         </>
       )}

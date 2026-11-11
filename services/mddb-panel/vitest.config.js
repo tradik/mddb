@@ -150,6 +150,8 @@ const coverageFiles = [
   'src/components/GeoAreaSearch.jsx',
   'src/components/GeohashTools.jsx',
   'src/components/GeoReindexForm.jsx',
+  'src/components/TemporalPanel.jsx',
+  'src/components/TemporalEventsTab.jsx',
 ];
 
 export default mergeConfig(
