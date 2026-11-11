@@ -22,6 +22,7 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/replication/status": ruleAuthenticated,
 	"/v1/fts-languages":      ruleAuthenticated,
 	"/v1/chat/scenarios":     ruleAuthenticated, // #403: the list is filtered to what the caller may read
+	"/v1/chat/mcp/call":      ruleAuthenticated, // MCP-005: the scenario's collections, checked when it is read
 	"/v1/code-languages":     ruleAuthenticated,
 	"/v1/features":           ruleAuthenticated, // GO-049: the module switches
 	"/v1/geo-encode":         ruleAuthenticated, // arithmetic on the request, no collection
@@ -151,6 +152,9 @@ var httpAccessRules = map[string]accessRule{
 	"/v1/embedding-configs":             ruleAdmin,
 	"/v1/chat/skills":                   ruleAdmin, // #404: a skill's text is part of system prompts, so reads are admin too
 	"/v1/chat/skills/":                  ruleAdmin,
+	"/v1/chat/mcp-secrets":              ruleAdmin, // MCP-005: write-only credentials of external MCP servers
+	"/v1/chat/mcp-secrets/":             ruleAdmin,
+	"/v1/chat/mcp/inspect":              ruleAdmin,
 	"/v1/embedding-configs/":            ruleAdmin,
 	"/v1/embedding-configs/set-default": ruleAdmin,
 	"/v1/audit":                         ruleAdmin,

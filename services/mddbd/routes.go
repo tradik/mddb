@@ -121,6 +121,10 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	// GO-049: module switches.
 	mux.HandleFunc("/v1/features", s.handleFeatures)
 	mux.HandleFunc("/v1/features/", s.handleFeatures)
+	mux.HandleFunc(chatMcpSecretsPath, s.handleChatMcpSecrets) // MCP-005
+	mux.HandleFunc(chatMcpSecretsPath+"/", s.handleChatMcpSecrets)
+	mux.HandleFunc(chatMcpInspectPath, s.handleChatMcpInspect)
+	mux.HandleFunc(chatMcpCallPath, s.handleChatMcpCall)
 	// GO-045: delete, update metadata and set TTL by metadata filter.
 	mux.HandleFunc("/v1/documents:deleteWhere", s.handleWhere)
 	mux.HandleFunc("/v1/documents:updateWhere", s.handleWhere)

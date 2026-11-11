@@ -165,7 +165,7 @@ func (ra *ReplicationApplier) updateInMemoryState(entry *binlog.BinlogEntry) {
 		if ra.server.Features != nil {
 			_ = ra.server.Features.LoadAll()
 		}
-	case "chat_scenarios", "chat_skills": // one manager holds both (#403, #404)
+	case "chat_scenarios", "chat_skills", "chat_mcp_secrets": // one manager holds them (#403, #404, MCP-005)
 		if ra.server.ChatScenarios != nil {
 			_ = ra.server.ChatScenarios.LoadAll()
 		}

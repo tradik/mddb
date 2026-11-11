@@ -6079,6 +6079,11 @@ paths:
                     description: Skill names the scenario lists that are not stored; skipped.
                     items:
                       type: string
+                  mcpServers:
+                    type: array
+                    description: Each external MCP server's state (MCP-005).
+                    items:
+                      $ref: "#/components/schemas/ChatMcpServerState"
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "404": {$ref: "#/components/responses/ChatScenarioNotFound"}
@@ -6326,6 +6331,246 @@ paths:
         "404": {$ref: "#/components/responses/ChatSkillNotFound"}
         "409":
           description: The source changed since the preview
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+
+  /v1/chat/mcp-secrets:
+    get:
+      tags:
+        - Chat
+      summary: List chat MCP secrets
+      description: |
+        The credentials of the external MCP servers chat scenarios use
+        (MCP-005, v2.19.0): names, headers and set, never a value. Requires a
+        global administrator.
+      operationId: listChatMcpSecrets
+      responses:
+        "200":
+          description: The secrets
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secrets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMcpSecret"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+
+  /v1/chat/mcp-secrets/{name}:
+    parameters:
+      - name: name
+        in: path
+        required: true
+        description: The secret's name.
+        schema:
+          type: string
+    put:
+      tags:
+        - Chat
+      summary: Set or replace a chat MCP secret
+      description: |
+        A bearer token, or the value of the header named in `header`. Sealed
+        with the at-rest key when MDDB_ENCRYPTION_KEY is set; never returned.
+        Requires a global administrator.
+      operationId: putChatMcpSecret
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  type: string
+                  writeOnly: true
+                  maxLength: 8192
+                header:
+                  type: string
+                  pattern: "^[A-Za-z0-9-]{1,64}$"
+      responses:
+        "200":
+          description: Replaced
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ChatMcpSecretSaved"}
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ChatMcpSecretSaved"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+    delete:
+      tags:
+        - Chat
+      summary: Delete a chat MCP secret
+      description: Refused while a scenario's server names it. Requires a global administrator.
+      operationId: deleteChatMcpSecret
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  version:
+                    $ref: "#/components/schemas/ChatScenarioVersion"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404":
+          description: No secret of that name
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+        "409":
+          description: Scenarios use the secret
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  usedBy:
+                    type: array
+                    items:
+                      type: string
+
+  /v1/chat/mcp/inspect:
+    post:
+      tags:
+        - Chat
+      summary: List an external MCP server's tools
+      description: |
+        Connects over MCP Streamable HTTP (https only, through the SSRF
+        guard, redirects held to https, 8 s), runs initialize and tools/list,
+        and returns the tools with their annotations and whether a scenario
+        may allow each. Requires a global administrator and the
+        chatExternalMcp feature.
+      operationId: inspectChatMcpServer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  format: uri
+                secretRef:
+                  type: string
+      responses:
+        "200":
+          description: The server and its tools
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                  serverName:
+                    type: string
+                  serverVersion:
+                    type: string
+                  protocolVersion:
+                    type: string
+                  tools:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ChatMcpTool"
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403": {$ref: "#/components/responses/Forbidden"}
+        "404":
+          description: The chatExternalMcp feature is off, or no secret of that name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  feature:
+                    type: string
+        "502":
+          description: The server cannot be reached or answered with an error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+
+  /v1/chat/mcp/call:
+    post:
+      tags:
+        - Chat
+      summary: Call an allowed external MCP tool of a scenario
+      description: |
+        For mddb-chat: mddbd checks every switch (the chat and
+        chatExternalMcp features, the scenario, the server, the tool in
+        allowedTools and still read-only on the server), attaches the
+        credential and calls the tool. A timeout or an upstream failure is
+        200 with isError and a short content. Needs read permission on every
+        collection the scenario allows.
+      operationId: callChatMcpTool
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scenario, server, tool]
+              properties:
+                scenario:
+                  type: string
+                server:
+                  type: string
+                tool:
+                  type: string
+                arguments:
+                  type: object
+                  additionalProperties: true
+      responses:
+        "200":
+          description: The tool's result, cut to the server's resultMaxChars
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scenario:
+                    type: string
+                  server:
+                    type: string
+                  tool:
+                    type: string
+                  content:
+                    type: string
+                  isError:
+                    type: boolean
+                  truncated:
+                    type: boolean
+                  durationMs:
+                    type: integer
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: A switch is off, the tool is not allowed, or the caller may not read the scenario
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ErrorResponse"}
+        "404":
+          description: No such scenario, or no such server in it
           content:
             application/json:
               schema: {$ref: "#/components/schemas/ErrorResponse"}
@@ -12097,6 +12342,15 @@ components:
             messagesPerMinute:
               type: integer
               minimum: 0
+        mcpServers:
+          type: array
+          maxItems: 16
+          description: >
+            External MCP servers whose read-only tools the assistant may call
+            (MCP-005, v2.19.0). With the chatExternalMcp feature on, a save
+            checks every allowed tool against the server.
+          items:
+            $ref: "#/components/schemas/ChatMcpServer"
         createdAt:
           type: string
           format: date-time
@@ -12105,6 +12359,123 @@ components:
           type: string
           format: date-time
           readOnly: true
+
+    ChatMcpServer:
+      type: object
+      required: [name, url]
+      properties:
+        name:
+          type: string
+          maxLength: 128
+        url:
+          type: string
+          format: uri
+          description: https only, MCP Streamable HTTP, no user or password.
+        enabled:
+          type: boolean
+        secretRef:
+          type: string
+          description: The name of a chat MCP secret.
+        allowedTools:
+          type: array
+          maxItems: 64
+          items:
+            type: string
+          description: Read-only tools of the server (readOnlyHint true, destructiveHint not true).
+        timeoutMs:
+          type: integer
+          minimum: 100
+          maximum: 60000
+          default: 8000
+        resultMaxChars:
+          type: integer
+          minimum: 100
+          maximum: 100000
+          default: 4000
+
+    ChatMcpServerState:
+      type: object
+      description: Whether the model sees a server's tools, and the first switch that hides them.
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        enabled:
+          type: boolean
+        active:
+          type: boolean
+        reason:
+          type: string
+          example: feature chatExternalMcp is off
+        tools:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              active:
+                type: boolean
+              reason:
+                type: string
+
+    ChatMcpSecretSaved:
+      type: object
+      properties:
+        name:
+          type: string
+        header:
+          type: string
+        set:
+          type: boolean
+        version:
+          $ref: "#/components/schemas/ChatScenarioVersion"
+
+    ChatMcpSecret:
+      type: object
+      description: A secret as listed; the value is write-only and never returned.
+      properties:
+        name:
+          type: string
+        header:
+          type: string
+          description: Empty for Authorization Bearer.
+        set:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+        usedBy:
+          type: array
+          items:
+            type: string
+
+    ChatMcpTool:
+      type: object
+      properties:
+        name:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        annotations:
+          type: object
+          properties:
+            readOnlyHint:
+              type: boolean
+            destructiveHint:
+              type: boolean
+            idempotentHint:
+              type: boolean
+            openWorldHint:
+              type: boolean
+        allowable:
+          type: boolean
+          description: A scenario may allow it.
+        reason:
+          type: string
 
     GainCounters:
       type: object

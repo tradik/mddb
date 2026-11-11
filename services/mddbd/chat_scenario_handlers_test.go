@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -195,7 +196,7 @@ func TestChatScenarioPermissions(t *testing.T) {
 func TestChatScenariosWithoutAStoreOrAuth(t *testing.T) {
 	s, cleanup := newHandlerTestServer(t)
 	defer cleanup()
-	if _, err := s.PutChatScenario(&ChatScenario{Name: "s"}); err != errChatScenariosUnavailable {
+	if _, err := s.PutChatScenario(context.Background(), &ChatScenario{Name: "s"}); err != errChatScenariosUnavailable {
 		t.Errorf("put: %v", err)
 	}
 	if err := s.DeleteChatScenario("s"); err != errChatScenariosUnavailable {
@@ -218,7 +219,7 @@ func TestChatScenariosWithoutAStoreOrAuth(t *testing.T) {
 		t.Fatal(err)
 	}
 	addTestDoc(t, s, "docs", "a", "en", "hello", nil)
-	if _, err := s.PutChatScenario(&ChatScenario{Name: "s", AllowedCollections: []string{"docs"}}); err != nil {
+	if _, err := s.PutChatScenario(context.Background(), &ChatScenario{Name: "s", AllowedCollections: []string{"docs"}}); err != nil {
 		t.Fatal(err)
 	}
 	if sc, err := s.GetChatScenario(t.Context(), "s"); err != nil || sc.Name != "s" {

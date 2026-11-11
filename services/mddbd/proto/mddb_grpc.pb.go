@@ -119,6 +119,11 @@ const (
 	MDDB_ImportChatSkill_FullMethodName                = "/mddb.MDDB/ImportChatSkill"
 	MDDB_UpdateChatSkill_FullMethodName                = "/mddb.MDDB/UpdateChatSkill"
 	MDDB_GetChatSkillUsedBy_FullMethodName             = "/mddb.MDDB/GetChatSkillUsedBy"
+	MDDB_ListChatMcpSecrets_FullMethodName             = "/mddb.MDDB/ListChatMcpSecrets"
+	MDDB_PutChatMcpSecret_FullMethodName               = "/mddb.MDDB/PutChatMcpSecret"
+	MDDB_DeleteChatMcpSecret_FullMethodName            = "/mddb.MDDB/DeleteChatMcpSecret"
+	MDDB_InspectChatMcpServer_FullMethodName           = "/mddb.MDDB/InspectChatMcpServer"
+	MDDB_CallChatMcpTool_FullMethodName                = "/mddb.MDDB/CallChatMcpTool"
 	MDDB_CreateChatConversation_FullMethodName         = "/mddb.MDDB/CreateChatConversation"
 	MDDB_ListChatConversations_FullMethodName          = "/mddb.MDDB/ListChatConversations"
 	MDDB_GetChatConversation_FullMethodName            = "/mddb.MDDB/GetChatConversation"
@@ -347,6 +352,21 @@ type MDDBClient interface {
 	UpdateChatSkill(ctx context.Context, in *UpdateChatSkillRequest, opts ...grpc.CallOption) (*UpdateChatSkillResponse, error)
 	// The scenarios attaching the skill.
 	GetChatSkillUsedBy(ctx context.Context, in *GetChatSkillUsedByRequest, opts ...grpc.CallOption) (*GetChatSkillUsedByResponse, error)
+	// ---- (v2.19.0+, MCP-005) External MCP servers of the chat, as
+	// /v1/chat/mcp-secrets and /v1/chat/mcp. Secrets are write-only: no call
+	// returns a value. Admin, except CallChatMcpTool.
+	// The secrets: name, header, set and the scenarios using each.
+	ListChatMcpSecrets(ctx context.Context, in *ListChatMcpSecretsRequest, opts ...grpc.CallOption) (*ListChatMcpSecretsResponse, error)
+	// Sets or replaces a secret.
+	PutChatMcpSecret(ctx context.Context, in *PutChatMcpSecretRequest, opts ...grpc.CallOption) (*PutChatMcpSecretResponse, error)
+	// FAILED_PRECONDITION while a scenario uses the secret.
+	DeleteChatMcpSecret(ctx context.Context, in *DeleteChatMcpSecretRequest, opts ...grpc.CallOption) (*DeleteChatMcpSecretResponse, error)
+	// Connects to a server (https, SSRF-guarded) and lists its tools with their
+	// annotations. FAILED_PRECONDITION while the chatExternalMcp feature is off.
+	InspectChatMcpServer(ctx context.Context, in *InspectChatMcpServerRequest, opts ...grpc.CallOption) (*InspectChatMcpServerResponse, error)
+	// Calls an allowed, read-only tool of a scenario's server for mddb-chat,
+	// which never sees the credential. Needs read on the scenario.
+	CallChatMcpTool(ctx context.Context, in *CallChatMcpToolRequest, opts ...grpc.CallOption) (*CallChatMcpToolResponse, error)
 	// ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
 	// /v1/chat/conversations. The caller is the host application; every call
 	// names the user (sub), and a conversation of another sub is NOT_FOUND.
@@ -1397,6 +1417,56 @@ func (c *mDDBClient) GetChatSkillUsedBy(ctx context.Context, in *GetChatSkillUse
 	return out, nil
 }
 
+func (c *mDDBClient) ListChatMcpSecrets(ctx context.Context, in *ListChatMcpSecretsRequest, opts ...grpc.CallOption) (*ListChatMcpSecretsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChatMcpSecretsResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListChatMcpSecrets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) PutChatMcpSecret(ctx context.Context, in *PutChatMcpSecretRequest, opts ...grpc.CallOption) (*PutChatMcpSecretResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PutChatMcpSecretResponse)
+	err := c.cc.Invoke(ctx, MDDB_PutChatMcpSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) DeleteChatMcpSecret(ctx context.Context, in *DeleteChatMcpSecretRequest, opts ...grpc.CallOption) (*DeleteChatMcpSecretResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteChatMcpSecretResponse)
+	err := c.cc.Invoke(ctx, MDDB_DeleteChatMcpSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) InspectChatMcpServer(ctx context.Context, in *InspectChatMcpServerRequest, opts ...grpc.CallOption) (*InspectChatMcpServerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(InspectChatMcpServerResponse)
+	err := c.cc.Invoke(ctx, MDDB_InspectChatMcpServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) CallChatMcpTool(ctx context.Context, in *CallChatMcpToolRequest, opts ...grpc.CallOption) (*CallChatMcpToolResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CallChatMcpToolResponse)
+	err := c.cc.Invoke(ctx, MDDB_CallChatMcpTool_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mDDBClient) CreateChatConversation(ctx context.Context, in *CreateChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ChatConversationProto)
@@ -1704,6 +1774,21 @@ type MDDBServer interface {
 	UpdateChatSkill(context.Context, *UpdateChatSkillRequest) (*UpdateChatSkillResponse, error)
 	// The scenarios attaching the skill.
 	GetChatSkillUsedBy(context.Context, *GetChatSkillUsedByRequest) (*GetChatSkillUsedByResponse, error)
+	// ---- (v2.19.0+, MCP-005) External MCP servers of the chat, as
+	// /v1/chat/mcp-secrets and /v1/chat/mcp. Secrets are write-only: no call
+	// returns a value. Admin, except CallChatMcpTool.
+	// The secrets: name, header, set and the scenarios using each.
+	ListChatMcpSecrets(context.Context, *ListChatMcpSecretsRequest) (*ListChatMcpSecretsResponse, error)
+	// Sets or replaces a secret.
+	PutChatMcpSecret(context.Context, *PutChatMcpSecretRequest) (*PutChatMcpSecretResponse, error)
+	// FAILED_PRECONDITION while a scenario uses the secret.
+	DeleteChatMcpSecret(context.Context, *DeleteChatMcpSecretRequest) (*DeleteChatMcpSecretResponse, error)
+	// Connects to a server (https, SSRF-guarded) and lists its tools with their
+	// annotations. FAILED_PRECONDITION while the chatExternalMcp feature is off.
+	InspectChatMcpServer(context.Context, *InspectChatMcpServerRequest) (*InspectChatMcpServerResponse, error)
+	// Calls an allowed, read-only tool of a scenario's server for mddb-chat,
+	// which never sees the credential. Needs read on the scenario.
+	CallChatMcpTool(context.Context, *CallChatMcpToolRequest) (*CallChatMcpToolResponse, error)
 	// ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
 	// /v1/chat/conversations. The caller is the host application; every call
 	// names the user (sub), and a conversation of another sub is NOT_FOUND.
@@ -2032,6 +2117,21 @@ func (UnimplementedMDDBServer) UpdateChatSkill(context.Context, *UpdateChatSkill
 }
 func (UnimplementedMDDBServer) GetChatSkillUsedBy(context.Context, *GetChatSkillUsedByRequest) (*GetChatSkillUsedByResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetChatSkillUsedBy not implemented")
+}
+func (UnimplementedMDDBServer) ListChatMcpSecrets(context.Context, *ListChatMcpSecretsRequest) (*ListChatMcpSecretsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChatMcpSecrets not implemented")
+}
+func (UnimplementedMDDBServer) PutChatMcpSecret(context.Context, *PutChatMcpSecretRequest) (*PutChatMcpSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PutChatMcpSecret not implemented")
+}
+func (UnimplementedMDDBServer) DeleteChatMcpSecret(context.Context, *DeleteChatMcpSecretRequest) (*DeleteChatMcpSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteChatMcpSecret not implemented")
+}
+func (UnimplementedMDDBServer) InspectChatMcpServer(context.Context, *InspectChatMcpServerRequest) (*InspectChatMcpServerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method InspectChatMcpServer not implemented")
+}
+func (UnimplementedMDDBServer) CallChatMcpTool(context.Context, *CallChatMcpToolRequest) (*CallChatMcpToolResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CallChatMcpTool not implemented")
 }
 func (UnimplementedMDDBServer) CreateChatConversation(context.Context, *CreateChatConversationRequest) (*ChatConversationProto, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateChatConversation not implemented")
@@ -3853,6 +3953,96 @@ func _MDDB_GetChatSkillUsedBy_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_ListChatMcpSecrets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChatMcpSecretsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListChatMcpSecrets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListChatMcpSecrets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListChatMcpSecrets(ctx, req.(*ListChatMcpSecretsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_PutChatMcpSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PutChatMcpSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).PutChatMcpSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_PutChatMcpSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).PutChatMcpSecret(ctx, req.(*PutChatMcpSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_DeleteChatMcpSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteChatMcpSecretRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).DeleteChatMcpSecret(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_DeleteChatMcpSecret_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).DeleteChatMcpSecret(ctx, req.(*DeleteChatMcpSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_InspectChatMcpServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InspectChatMcpServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).InspectChatMcpServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_InspectChatMcpServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).InspectChatMcpServer(ctx, req.(*InspectChatMcpServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_CallChatMcpTool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CallChatMcpToolRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).CallChatMcpTool(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_CallChatMcpTool_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).CallChatMcpTool(ctx, req.(*CallChatMcpToolRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MDDB_CreateChatConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateChatConversationRequest)
 	if err := dec(in); err != nil {
@@ -4384,6 +4574,26 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetChatSkillUsedBy",
 			Handler:    _MDDB_GetChatSkillUsedBy_Handler,
+		},
+		{
+			MethodName: "ListChatMcpSecrets",
+			Handler:    _MDDB_ListChatMcpSecrets_Handler,
+		},
+		{
+			MethodName: "PutChatMcpSecret",
+			Handler:    _MDDB_PutChatMcpSecret_Handler,
+		},
+		{
+			MethodName: "DeleteChatMcpSecret",
+			Handler:    _MDDB_DeleteChatMcpSecret_Handler,
+		},
+		{
+			MethodName: "InspectChatMcpServer",
+			Handler:    _MDDB_InspectChatMcpServer_Handler,
+		},
+		{
+			MethodName: "CallChatMcpTool",
+			Handler:    _MDDB_CallChatMcpTool_Handler,
 		},
 		{
 			MethodName: "CreateChatConversation",

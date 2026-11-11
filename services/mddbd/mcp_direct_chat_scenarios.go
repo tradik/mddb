@@ -23,8 +23,8 @@ func (c *DirectClient) ChatScenarioGet(ctx context.Context, name string) (*ChatS
 }
 
 // ChatScenarioPut creates or replaces a scenario; true when it is new.
-func (c *DirectClient) ChatScenarioPut(_ context.Context, sc *ChatScenario) (bool, error) {
-	return c.server.PutChatScenario(sc)
+func (c *DirectClient) ChatScenarioPut(ctx context.Context, sc *ChatScenario) (bool, error) {
+	return c.server.PutChatScenario(ctx, sc)
 }
 
 // ChatScenarioDelete removes a scenario.

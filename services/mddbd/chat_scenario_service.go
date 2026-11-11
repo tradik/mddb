@@ -24,8 +24,9 @@ func (s *Server) chatCollectionExists(name string) bool {
 }
 
 // PutChatScenario validates and stores a scenario; created reports whether
-// the name was new.
-func (s *Server) PutChatScenario(sc *ChatScenario) (created bool, err error) {
+// the name was new. Its external MCP servers are contacted to check the
+// tools it allows (MCP-005), within ctx.
+func (s *Server) PutChatScenario(ctx context.Context, sc *ChatScenario) (created bool, err error) {
 	if s.ChatScenarios == nil {
 		return false, errChatScenariosUnavailable
 	}
@@ -35,6 +36,9 @@ func (s *Server) PutChatScenario(sc *ChatScenario) (created bool, err error) {
 	// #404: skills can make a prompt far longer than its fields allow.
 	if p := s.ChatScenarioPrompt(sc); p.Bytes > chatPromptMaxBytes() {
 		return false, errors.New(p.Warning)
+	}
+	if err := s.checkChatMcpServers(ctx, sc); err != nil {
+		return false, err
 	}
 	return s.ChatScenarios.Put(sc)
 }

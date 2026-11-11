@@ -47,7 +47,7 @@ func (g *GRPCServer) PutChatScenario(ctx context.Context, req *proto.PutChatScen
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	created, err := g.server.PutChatScenario(sc)
+	created, err := g.server.PutChatScenario(ctx, sc)
 	if err != nil {
 		return nil, chatScenarioGRPCError(err)
 	}
@@ -74,7 +74,8 @@ func (g *GRPCServer) GetChatScenarioPrompt(ctx context.Context, req *proto.GetCh
 	}
 	p := g.server.ChatScenarioPrompt(sc)
 	return &proto.GetChatScenarioPromptResponse{Name: p.Name, Prompt: p.Prompt, Version: p.Version, Bytes: int64(p.Bytes),
-		ApproxTokens: int64(p.ApproxTokens), Warning: p.Warning, MissingSkills: p.MissingSkills}, nil
+		ApproxTokens: int64(p.ApproxTokens), Warning: p.Warning, MissingSkills: p.MissingSkills,
+		McpServers: chatMcpStatesToProto(p.McpServers)}, nil
 }
 
 // chatScenarioGRPCError maps a failure to its status, as chatScenarioError
@@ -111,7 +112,7 @@ func chatScenarioToProto(sc *ChatScenario) *proto.ChatScenarioProto {
 			CitationTemplate: sc.Style.CitationTemplate},
 		Llm: llm, MaxTurns: safeInt32(sc.MaxTurns), TokenBudgetPerSession: int64(sc.TokenBudgetPerSession),
 		RateLimit: &proto.ChatRateLimitProto{MessagesPerMinute: safeInt32(sc.RateLimit.MessagesPerMinute)},
-		CreatedAt: chatUnix(sc.CreatedAt), UpdatedAt: chatUnix(sc.UpdatedAt),
+		CreatedAt: chatUnix(sc.CreatedAt), UpdatedAt: chatUnix(sc.UpdatedAt), McpServers: chatMcpServersToProto(sc.McpServers),
 	}
 }
 
@@ -138,7 +139,8 @@ func chatScenarioFromProto(p *proto.ChatScenarioProto) (*ChatScenario, error) {
 			CitationTemplate: p.GetStyle().GetCitationTemplate()},
 		LLM:      ChatLLM{Model: p.GetLlm().GetModel(), MaxTokens: int(p.GetLlm().GetMaxTokens())},
 		MaxTurns: int(p.GetMaxTurns()), TokenBudgetPerSession: int(p.GetTokenBudgetPerSession()),
-		RateLimit: ChatRateLimit{MessagesPerMinute: int(p.GetRateLimit().GetMessagesPerMinute())},
+		RateLimit:  ChatRateLimit{MessagesPerMinute: int(p.GetRateLimit().GetMessagesPerMinute())},
+		McpServers: chatMcpServersFromProto(p.GetMcpServers()),
 	}
 	if p.GetLlm().GetTemperatureSet() {
 		t := p.GetLlm().GetTemperature()

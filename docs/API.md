@@ -62,6 +62,7 @@ status: publish
   - [Features: /v1/features](#features-v1features)
   - [Chat scenarios: /v1/chat/scenarios](#chat-scenarios-v1chatscenarios)
   - [Chat skills: /v1/chat/skills](#chat-skills-v1chatskills)
+  - [External MCP servers: /v1/chat/mcp](#external-mcp-servers-v1chatmcp)
   - [Chat conversations: /v1/chat/conversations](#chat-conversations-v1chatconversations)
   - [GET /v1/embedding-configs](#get-v1embedding-configs)
   - [GET/PUT/DELETE /v1/embedding-configs/:id](#getputdelete-v1embedding-configsid)
@@ -1910,6 +1911,7 @@ curl http://localhost:11023/v1/chat/scenarios/version
 | `offTopic.redirectTemplate` | the reply in `redirect` mode | a built-in sentence |
 | `allowedCollections` | existing collections or aliases, each once | none |
 | `skills` | up to 64 [skill](#chat-skills-v1chatskills) names, composed in this order | none |
+| `mcpServers` | up to 16 [external MCP servers](#external-mcp-servers-v1chatmcp): `{name, url, enabled, secretRef, allowedTools, timeoutMs, resultMaxChars}` | none |
 | `style.emoji` | `off`, `sparingly`, `free` | `off` |
 | `style.verbosity` | `short`, `normal`, `long` | `normal` |
 | `style.markdown` | boolean | `false` |
@@ -1937,7 +1939,10 @@ curl http://localhost:11023/v1/chat/scenarios/version
   prompt's length, `approxTokens` is `bytes / 4` (a rule of thumb, not a
   tokenizer) and `warning` is set past 75% of `MDDB_CHAT_PROMPT_MAX_BYTES`
   (default 131072). A `PUT` whose composed prompt is over that limit is `400`.
-  A scenario without skills composes exactly as before.
+  A scenario without skills composes exactly as before. Since 2.19.0
+  `/prompt` also returns `mcpServers`: each external server's `active` state
+  and, when it is off, the `reason`; with an active server the prompt ends
+  with a clause framing external tool results as untrusted data.
 - **Permissions.** Writing needs a global administrator. Reading a scenario
   needs read permission on every collection it allows; the list leaves out
   the scenarios the caller may not read, so a tenant sees only scenarios
@@ -2029,6 +2034,81 @@ curl -X POST http://localhost:11023/v1/chat/skills/humanizer/update -d '{"confir
   `GetChatSkillUsedBy` ([GRPC.md](GRPC.md)) and the MCP tools
   `chat_skill_list`, `chat_skill_get`, `chat_skill_put`, `chat_skill_delete`
   ([MCP.md](MCP.md)) call the same code.
+
+### External MCP servers: /v1/chat/mcp
+
+(v2.19.0, MCP-005) A [scenario](#chat-scenarios-v1chatscenarios) may name
+external MCP servers whose **read-only** tools the assistant calls next to
+its collections: live data (an order's status, a service's health) or
+knowledge someone else keeps behind their own MCP server. Static knowledge
+still belongs in a collection, which is faster and ranks and cites by key.
+The security model is in [chat.md](chat.md#external-knowledge-over-mcp-2190).
+
+| Method | Path | Answer |
+|---|---|---|
+| `GET` | `/v1/chat/mcp-secrets` | `{"secrets":[{name, header, set, updatedAt, usedBy}]}` — never a value (admin) |
+| `PUT` | `/v1/chat/mcp-secrets/{name}` | `{"value":"…","header":"X-Api-Key"}`; `201` when new, `200` when replaced; the answer has no value (admin) |
+| `DELETE` | `/v1/chat/mcp-secrets/{name}` | `{"deleted":true,"version":N}`; `409` with `usedBy` while a scenario names it (admin) |
+| `POST` | `/v1/chat/mcp/inspect` | `{"url","secretRef"}` → `{url, serverName, serverVersion, protocolVersion, tools:[{name, title, description, annotations, allowable, reason}]}` (admin) |
+| `POST` | `/v1/chat/mcp/call` | `{"scenario","server","tool","arguments"}` → `{scenario, server, tool, content, isError, truncated, durationMs}` (read on the scenario) |
+
+```bash
+# A credential: a bearer token, or a header value when header is given.
+curl -X PUT http://localhost:11023/v1/chat/mcp-secrets/wiki -d '{"value":"…"}'
+# What the server offers (the chatExternalMcp feature must be on).
+curl -X POST http://localhost:11023/v1/chat/mcp/inspect \
+  -d '{"url":"https://wiki.example.com/mcp","secretRef":"wiki"}'
+# Allow its read-only tools in a scenario.
+curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{"enabled":true,
+  "mcpServers":[{"name":"wiki","url":"https://wiki.example.com/mcp","enabled":true,
+                 "secretRef":"wiki","allowedTools":["search"]}]}'
+```
+
+| `mcpServers[]` field | Values | Default |
+|---|---|---|
+| `name` | 1–128 characters, no `\|`, `/` or spaces, unique in the scenario | — |
+| `url` | `https` only, no user or password in it (MCP Streamable HTTP) | — |
+| `enabled` | boolean | `false` |
+| `secretRef` | the name of a stored secret | none |
+| `allowedTools` | up to 64 tool names; each must be read-only on the server | none |
+| `timeoutMs` | 100 to 60000 | 8000 |
+| `resultMaxChars` | 100 to 100000; a longer result is cut and marked `truncated` | 4000 |
+
+- **Switches.** A tool reaches the model only when every level is on: the
+  `chat` feature, the scenario's `enabled`, the `chatExternalMcp` feature
+  (off by default), the server's `enabled`, and the tool in `allowedTools`.
+  `/v1/chat/scenarios/{name}/prompt` returns each server's state with the
+  first switch that is off as `reason`.
+- **Checked on save.** With `chatExternalMcp` on, a `PUT` of a scenario
+  connects to each server (`initialize`, `tools/list`) and refuses with
+  `400`, naming the tool, any allowed tool that is not offered, lacks
+  `readOnlyHint: true`, or has `destructiveHint: true`. A server that cannot
+  be reached refuses the save unless it is saved with `enabled: false`. A
+  `secretRef` naming no secret is `400`. With the feature off nothing is
+  contacted and the servers are stored inactive.
+- **Inspect** answers `404` `{"error":"feature disabled","feature":"chatExternalMcp"}`
+  while the feature is off, `404` for an unknown `secretRef`, `502` when the
+  server cannot be reached or answers with an error.
+- **Call.** mddb-chat calls tools through mddbd, which holds the credential
+  and checks every switch again, and checks again that the tool is still
+  read-only in the server's own `tools/list`. A switch that is off or a tool
+  not allowed is `403`; an unknown scenario or server `404`. A timeout, a
+  refused connection or the tool's own error is `200` with `isError: true`
+  and a short `content`, so the chat turn goes on.
+- **Transport.** `https` only, through the server's SSRF guard (private and
+  loopback addresses are refused unless `MDDB_OUTBOUND_ALLOW_PRIVATE=true`;
+  a redirect may not leave https), the session's `Mcp-Session-Id` sent back,
+  JSON or event-stream answers up to 4 MiB.
+- **Secrets** are write-only: no API returns a value. They are stored next to
+  the scenarios (backups carry them, the binlog replicates them), sealed with
+  the at-rest key when `MDDB_ENCRYPTION_KEY` is set. A secret's value never
+  appears in a log or an error; one quoted back by a server is replaced with
+  `[redacted]`.
+- **Other surfaces.** gRPC `ListChatMcpSecrets`, `PutChatMcpSecret`,
+  `DeleteChatMcpSecret`, `InspectChatMcpServer`, `CallChatMcpTool`
+  ([GRPC.md](GRPC.md)) and the MCP tools `chat_mcp_secret_list`,
+  `chat_mcp_secret_put`, `chat_mcp_secret_delete` ([MCP.md](MCP.md)) call
+  the same code.
 
 ### GET /v1/gain
 

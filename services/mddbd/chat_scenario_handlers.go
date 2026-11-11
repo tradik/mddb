@@ -83,7 +83,7 @@ func (s *Server) putChatScenario(w http.ResponseWriter, r *http.Request, name st
 		return
 	}
 	sc.Name = name // the path names the scenario
-	created, err := s.PutChatScenario(&sc)
+	created, err := s.PutChatScenario(r.Context(), &sc)
 	if err != nil {
 		bad(w, err)
 		return

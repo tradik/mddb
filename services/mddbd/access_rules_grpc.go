@@ -96,6 +96,7 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/GetChatScenario":       ruleHandler,
 	"/mddb.MDDB/GetChatScenarioPrompt": ruleHandler,
 	"/mddb.MDDB/ListFeatures":          ruleAuthenticated, // GO-049: as GET /v1/features
+	"/mddb.MDDB/CallChatMcpTool":       ruleAuthenticated, // MCP-005: the scenario's collections, checked when it is read
 
 	// Global administration.
 	"/mddb.MDDB/Backup":            ruleAdmin,
@@ -129,6 +130,12 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/GetChatSkillUsedBy": ruleAdmin,
 	// GO-049, as PUT /v1/features/{name}.
 	"/mddb.MDDB/SetFeature": ruleAdmin,
+	// External MCP servers of the chat (MCP-005), as /v1/chat/mcp-secrets and
+	// /v1/chat/mcp/inspect: the credentials are admin only.
+	"/mddb.MDDB/ListChatMcpSecrets":   ruleAdmin,
+	"/mddb.MDDB/PutChatMcpSecret":     ruleAdmin,
+	"/mddb.MDDB/DeleteChatMcpSecret":  ruleAdmin,
+	"/mddb.MDDB/InspectChatMcpServer": ruleAdmin,
 
 	// Chat conversations (#405) authorize themselves, as /v1/chat/conversations:
 	// the collection is the chat collection of the caller's tenant.

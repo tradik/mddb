@@ -50,21 +50,22 @@ const (
 
 // ChatScenario is one assistant configuration.
 type ChatScenario struct {
-	Name                  string        `json:"name"`
-	Description           string        `json:"description,omitempty"`
-	Enabled               bool          `json:"enabled"`
-	OperatorPrompt        string        `json:"operatorPrompt,omitempty"`
-	Guardrails            string        `json:"guardrails,omitempty"`
-	OffTopic              ChatOffTopic  `json:"offTopic"`
-	AllowedCollections    []string      `json:"allowedCollections"`
-	Skills                []string      `json:"skills,omitempty"`
-	Style                 ChatStyle     `json:"style"`
-	LLM                   ChatLLM       `json:"llm"`
-	MaxTurns              int           `json:"maxTurns,omitempty"`
-	TokenBudgetPerSession int           `json:"tokenBudgetPerSession,omitempty"`
-	RateLimit             ChatRateLimit `json:"rateLimit"`
-	CreatedAt             time.Time     `json:"createdAt"`
-	UpdatedAt             time.Time     `json:"updatedAt"`
+	Name                  string          `json:"name"`
+	Description           string          `json:"description,omitempty"`
+	Enabled               bool            `json:"enabled"`
+	OperatorPrompt        string          `json:"operatorPrompt,omitempty"`
+	Guardrails            string          `json:"guardrails,omitempty"`
+	OffTopic              ChatOffTopic    `json:"offTopic"`
+	AllowedCollections    []string        `json:"allowedCollections"`
+	Skills                []string        `json:"skills,omitempty"`
+	Style                 ChatStyle       `json:"style"`
+	LLM                   ChatLLM         `json:"llm"`
+	MaxTurns              int             `json:"maxTurns,omitempty"`
+	TokenBudgetPerSession int             `json:"tokenBudgetPerSession,omitempty"`
+	RateLimit             ChatRateLimit   `json:"rateLimit"`
+	McpServers            []ChatMcpServer `json:"mcpServers,omitempty"` // MCP-005, chat_mcp_server.go
+	CreatedAt             time.Time       `json:"createdAt"`
+	UpdatedAt             time.Time       `json:"updatedAt"`
 }
 
 // ChatOffTopic is the off-topic behaviour.
@@ -180,6 +181,9 @@ func (c *ChatScenario) Normalize(exists func(string) bool) error {
 		if sk == "" || len(sk) > maxChatScenarioNameLen {
 			return fmt.Errorf("skill names must be 1 to %d characters", maxChatScenarioNameLen)
 		}
+	}
+	if err := normalizeChatMcpServers(c.McpServers); err != nil {
+		return err
 	}
 	return c.normalizeCollections(exists)
 }

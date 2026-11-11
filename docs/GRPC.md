@@ -94,7 +94,7 @@ grpcurl -plaintext -d '{"collection":"blog","key":"test","lang":"en_US"}' \
 
 The complete service definition is in [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto).
 
-### Available RPCs (108 implemented)
+### Available RPCs (113 implemented)
 
 | Category | RPC | Request → Response |
 |---|---|---|
@@ -217,8 +217,12 @@ the same server functions and gated with the same permissions:
 `redirect_template`), `style` (`emoji`, `verbosity`, `markdown`,
 `citation_template`), `llm` (`model`, `temperature` with `temperature_set`,
 because 0 is a meaningful temperature, `max_tokens`, and `extra_body_json`,
-a JSON object as a string), `rate_limit` (`messages_per_minute`), and
-`created_at` / `updated_at` in Unix seconds.
+a JSON object as a string), `rate_limit` (`messages_per_minute`),
+`mcp_servers` (`ChatMcpServerProto`, since 2.19.0: `name`, `url`, `enabled`,
+`secret_ref`, `allowed_tools`, `timeout_ms`, `result_max_chars`), and
+`created_at` / `updated_at` in Unix seconds. `GetChatScenarioPrompt` also
+returns `mcp_servers` (`ChatMcpServerStateProto`: `active` and `reason` per
+server and per allowed tool).
 
 Errors map as on REST: `INVALID_ARGUMENT` (400), `NOT_FOUND` (404),
 `PERMISSION_DENIED` (403), `UNAUTHENTICATED` (401).
@@ -277,6 +281,32 @@ grpcurl -plaintext -d '{"name":"humanizer"}' localhost:11024 mddb.MDDB/UpdateCha
 ```
 
 See [API.md](API.md#chat-skills-v1chatskills).
+
+#### External MCP servers of the chat (v2.19.0)
+
+The external MCP server endpoints (`/v1/chat/mcp-secrets`, `/v1/chat/mcp`,
+MCP-005) over gRPC. Secrets are write-only: no RPC returns a value.
+
+| RPC | Permission | |
+|---|---|---|
+| `ListChatMcpSecrets` | admin | `secrets` (`ChatMcpSecretProto`: `name`, `header`, `set`, `updated_at`, `used_by`) |
+| `PutChatMcpSecret` | admin, writable server | `{name, value, header}` → `{secret, created, version}` |
+| `DeleteChatMcpSecret` | admin, writable server | `{name}` → `{deleted, version}`; `FAILED_PRECONDITION` naming the scenarios while one uses it |
+| `InspectChatMcpServer` | admin | `{url, secret_ref}` → `{url, server_name, server_version, protocol_version, tools}`; `FAILED_PRECONDITION` while the `chatExternalMcp` feature is off, `UNAVAILABLE` when the server cannot be reached |
+| `CallChatMcpTool` | read on the scenario | `{scenario, server, tool, arguments_json}` → `{content, is_error, truncated, duration_ms}`; `FAILED_PRECONDITION` for a switch that is off or a tool not allowed |
+
+`ChatMcpToolProto` carries `read_only_hint` and `destructive_hint`, each
+with a `*_set` flag (an absent hint is not `false`), `allowable` and the
+`reason` a scenario may not allow it. A timeout or an upstream failure of
+`CallChatMcpTool` is not an RPC error: `is_error` is set and `content` says
+what happened in one line.
+
+```bash
+grpcurl -plaintext -d '{"name":"wiki","value":"…"}' localhost:11024 mddb.MDDB/PutChatMcpSecret
+grpcurl -plaintext -d '{"url":"https://wiki.example.com/mcp","secret_ref":"wiki"}' localhost:11024 mddb.MDDB/InspectChatMcpServer
+```
+
+See [API.md](API.md#external-mcp-servers-v1chatmcp).
 
 #### Chat conversations (v2.19.0)
 

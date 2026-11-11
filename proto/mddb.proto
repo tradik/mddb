@@ -296,6 +296,22 @@ service MDDB {
   // The scenarios attaching the skill.
   rpc GetChatSkillUsedBy(GetChatSkillUsedByRequest) returns (GetChatSkillUsedByResponse);
 
+  // ---- (v2.19.0+, MCP-005) External MCP servers of the chat, as
+  // /v1/chat/mcp-secrets and /v1/chat/mcp. Secrets are write-only: no call
+  // returns a value. Admin, except CallChatMcpTool.
+  // The secrets: name, header, set and the scenarios using each.
+  rpc ListChatMcpSecrets(ListChatMcpSecretsRequest) returns (ListChatMcpSecretsResponse);
+  // Sets or replaces a secret.
+  rpc PutChatMcpSecret(PutChatMcpSecretRequest) returns (PutChatMcpSecretResponse);
+  // FAILED_PRECONDITION while a scenario uses the secret.
+  rpc DeleteChatMcpSecret(DeleteChatMcpSecretRequest) returns (DeleteChatMcpSecretResponse);
+  // Connects to a server (https, SSRF-guarded) and lists its tools with their
+  // annotations. FAILED_PRECONDITION while the chatExternalMcp feature is off.
+  rpc InspectChatMcpServer(InspectChatMcpServerRequest) returns (InspectChatMcpServerResponse);
+  // Calls an allowed, read-only tool of a scenario's server for mddb-chat,
+  // which never sees the credential. Needs read on the scenario.
+  rpc CallChatMcpTool(CallChatMcpToolRequest) returns (CallChatMcpToolResponse);
+
   // ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
   // /v1/chat/conversations. The caller is the host application; every call
   // names the user (sub), and a conversation of another sub is NOT_FOUND.
@@ -2383,6 +2399,34 @@ message ChatScenarioProto {
   ChatRateLimitProto rate_limit = 13;
   int64 created_at = 14;                         // Unix seconds
   int64 updated_at = 15;                         // Unix seconds
+  repeated ChatMcpServerProto mcp_servers = 16;  // MCP-005: external knowledge servers
+}
+
+// An external MCP server of a scenario (MCP-005).
+message ChatMcpServerProto {
+  string name = 1;
+  string url = 2;                                // https, MCP Streamable HTTP
+  bool enabled = 3;
+  string secret_ref = 4;                         // a secret's name; empty: no credential
+  repeated string allowed_tools = 5;             // read-only tools only
+  int32 timeout_ms = 6;                          // 0: 8000
+  int32 result_max_chars = 7;                    // 0: 4000
+}
+
+// Whether the model sees a server's tools, and the first switch that hides them.
+message ChatMcpServerStateProto {
+  string name = 1;
+  string url = 2;
+  bool enabled = 3;
+  bool active = 4;
+  string reason = 5;                             // e.g. "feature chatExternalMcp is off"
+  repeated ChatMcpToolStateProto tools = 6;
+}
+
+message ChatMcpToolStateProto {
+  string name = 1;
+  bool active = 2;
+  string reason = 3;
 }
 
 // One switchable module (v2.19.0+, GO-049).
@@ -2458,6 +2502,7 @@ message GetChatScenarioPromptResponse {
   int64 approx_tokens = 5;                       // bytes / 4
   string warning = 6;                            // set past 75% of MDDB_CHAT_PROMPT_MAX_BYTES
   repeated string missing_skills = 7;            // named by the scenario, not stored; skipped
+  repeated ChatMcpServerStateProto mcp_servers = 8; // MCP-005
 }
 
 // ---- v2.19.0: chat skills (#404) ----
@@ -2561,6 +2606,86 @@ message GetChatSkillUsedByRequest {
 message GetChatSkillUsedByResponse {
   string name = 1;
   repeated string scenarios = 2;
+}
+
+// ---- v2.19.0: external MCP servers of the chat (MCP-005) ----
+
+// A secret as listed: never its value.
+message ChatMcpSecretProto {
+  string name = 1;
+  string header = 2;                             // empty: Authorization: Bearer <value>
+  bool set = 3;
+  int64 updated_at = 4;                          // Unix seconds
+  repeated string used_by = 5;                   // scenarios whose servers name it
+}
+
+message ListChatMcpSecretsRequest {}
+
+message ListChatMcpSecretsResponse {
+  repeated ChatMcpSecretProto secrets = 1;
+}
+
+message PutChatMcpSecretRequest {
+  string name = 1;
+  string value = 2;                              // write-only
+  string header = 3;                             // optional header name
+}
+
+message PutChatMcpSecretResponse {
+  ChatMcpSecretProto secret = 1;
+  bool created = 2;
+  uint64 version = 3;
+}
+
+message DeleteChatMcpSecretRequest {
+  string name = 1;
+}
+
+message DeleteChatMcpSecretResponse {
+  bool deleted = 1;
+  uint64 version = 2;
+}
+
+message InspectChatMcpServerRequest {
+  string url = 1;
+  string secret_ref = 2;
+}
+
+message ChatMcpToolProto {
+  string name = 1;
+  string title = 2;
+  string description = 3;
+  bool read_only_hint = 4;
+  bool read_only_hint_set = 5;                   // false: the server gave no readOnlyHint
+  bool destructive_hint = 6;
+  bool destructive_hint_set = 7;
+  bool allowable = 8;                            // a scenario may allow it
+  string reason = 9;                             // why not, when not
+}
+
+message InspectChatMcpServerResponse {
+  string url = 1;
+  string server_name = 2;
+  string server_version = 3;
+  string protocol_version = 4;
+  repeated ChatMcpToolProto tools = 5;
+}
+
+message CallChatMcpToolRequest {
+  string scenario = 1;
+  string server = 2;
+  string tool = 3;
+  string arguments_json = 4;                     // a JSON object; empty: {}
+}
+
+message CallChatMcpToolResponse {
+  string scenario = 1;
+  string server = 2;
+  string tool = 3;
+  string content = 4;                            // text for the model, at most result_max_chars
+  bool is_error = 5;                             // a timeout or an upstream failure: a short text, not an RPC error
+  bool truncated = 6;
+  int64 duration_ms = 7;
 }
 
 // ---- v2.19.0: persistent per-user chat conversations (#405) ----

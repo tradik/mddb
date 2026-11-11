@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -153,14 +154,20 @@ func readOutbound(ctx context.Context, client *http.Client, rawURL string, limit
 // a corpus pack (AGT-005) is streamed to disk. client is the pooled client or
 // one built on it, so its dialer refuses the same destinations.
 func openOutbound(ctx context.Context, client *http.Client, rawURL string, header http.Header) (*http.Response, error) {
+	return sendOutbound(ctx, client, http.MethodGet, rawURL, nil, header)
+}
+
+// sendOutbound is openOutbound with a method and a body: the MCP client of
+// the chat's external servers (MCP-005) POSTs JSON-RPC through the same guard.
+func sendOutbound(ctx context.Context, client *http.Client, method, rawURL string, body []byte, header http.Header) (*http.Response, error) {
 	safeURL, err := httpclient.ValidateOutboundURL(rawURL)
 	if err != nil {
 		return nil, err
 	}
 
-	// GET of a URL ValidateOutboundURL has just parsed: building the request
-	// cannot fail.
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, safeURL, nil)
+	// A method of the caller's and a URL ValidateOutboundURL has just
+	// parsed: building the request cannot fail.
+	req, _ := http.NewRequestWithContext(ctx, method, safeURL, bytes.NewReader(body))
 	for k, v := range header {
 		req.Header[k] = v
 	}

@@ -78,7 +78,7 @@ func TestChatSkillMCPLifecycle(t *testing.T) {
 		}
 	}
 	// In use: the error names the scenarios.
-	if _, err := s.PutChatScenario(&ChatScenario{Name: "support", Skills: []string{"tone"}}); err != nil {
+	if _, err := s.PutChatScenario(context.Background(), &ChatScenario{Name: "support", Skills: []string{"tone"}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ts.mcpCallTool(admin, "chat_skill_delete", map[string]interface{}{"name": "tone"}); !errors.Is(err, errChatSkillInUse) ||
@@ -86,7 +86,7 @@ func TestChatSkillMCPLifecycle(t *testing.T) {
 		t.Errorf("delete in use: %v", err)
 	}
 	// The scenario's tool shows the skill in the prompt, and what is missing.
-	if _, err := s.PutChatScenario(&ChatScenario{Name: "support", Skills: []string{"tone", "ghost"}}); err != nil {
+	if _, err := s.PutChatScenario(context.Background(), &ChatScenario{Name: "support", Skills: []string{"tone", "ghost"}}); err != nil {
 		t.Fatal(err)
 	}
 	out, err = ts.mcpCallTool(admin, "chat_scenario_get", map[string]interface{}{"name": "support"})
@@ -226,7 +226,7 @@ func TestChatSkillParityAcrossSurfaces(t *testing.T) {
 	}
 
 	// One scenario over the three skills: the same prompt everywhere.
-	if _, err := s.PutChatScenario(&ChatScenario{Name: "support", Skills: []string{"via-mcp", "via-rest", "via-grpc", "ghost"}}); err != nil {
+	if _, err := s.PutChatScenario(context.Background(), &ChatScenario{Name: "support", Skills: []string{"via-mcp", "via-rest", "via-grpc", "ghost"}}); err != nil {
 		t.Fatal(err)
 	}
 	restPrompt := skillJSON[chatScenarioPrompt](t, chatREST(t, s, root, http.MethodGet, "/v1/chat/scenarios/support/prompt", ""))
