@@ -105,6 +105,8 @@ const (
 	MDDB_InstallCorpusPack_FullMethodName              = "/mddb.MDDB/InstallCorpusPack"
 	MDDB_RemoveCorpusPack_FullMethodName               = "/mddb.MDDB/RemoveCorpusPack"
 	MDDB_BuildCorpusPack_FullMethodName                = "/mddb.MDDB/BuildCorpusPack"
+	MDDB_ListFeatures_FullMethodName                   = "/mddb.MDDB/ListFeatures"
+	MDDB_SetFeature_FullMethodName                     = "/mddb.MDDB/SetFeature"
 	MDDB_ListChatScenarios_FullMethodName              = "/mddb.MDDB/ListChatScenarios"
 	MDDB_GetChatScenario_FullMethodName                = "/mddb.MDDB/GetChatScenario"
 	MDDB_PutChatScenario_FullMethodName                = "/mddb.MDDB/PutChatScenario"
@@ -309,6 +311,13 @@ type MDDBClient interface {
 	RemoveCorpusPack(ctx context.Context, in *RemoveCorpusPackRequest, opts ...grpc.CallOption) (*RemoveCorpusPackResponse, error)
 	// The pack of a collection, streamed as tar.zst chunks.
 	BuildCorpusPack(ctx context.Context, in *BuildCorpusPackRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[CorpusPackChunk], error)
+	// (v2.19.0+, GO-049) Module switches, as /v1/features. Any authenticated
+	// caller lists them; SetFeature needs a global administrator. A method of
+	// a disabled module answers FAILED_PRECONDITION "feature disabled: <name>".
+	ListFeatures(ctx context.Context, in *ListFeaturesRequest, opts ...grpc.CallOption) (*ListFeaturesResponse, error)
+	// FAILED_PRECONDITION when MDDB_FEATURES_FORCE_OFF locks the module,
+	// NOT_FOUND for a name outside the registry.
+	SetFeature(ctx context.Context, in *SetFeatureRequest, opts ...grpc.CallOption) (*SetFeatureResponse, error)
 	// (v2.19.0+, #403) Chat scenarios, as /v1/chat/scenarios. Reads need read
 	// permission on the collections a scenario allows; writes need admin.
 	ListChatScenarios(ctx context.Context, in *ListChatScenariosRequest, opts ...grpc.CallOption) (*ListChatScenariosResponse, error)
@@ -1248,6 +1257,26 @@ func (c *mDDBClient) BuildCorpusPack(ctx context.Context, in *BuildCorpusPackReq
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MDDB_BuildCorpusPackClient = grpc.ServerStreamingClient[CorpusPackChunk]
 
+func (c *mDDBClient) ListFeatures(ctx context.Context, in *ListFeaturesRequest, opts ...grpc.CallOption) (*ListFeaturesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFeaturesResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListFeatures_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) SetFeature(ctx context.Context, in *SetFeatureRequest, opts ...grpc.CallOption) (*SetFeatureResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetFeatureResponse)
+	err := c.cc.Invoke(ctx, MDDB_SetFeature_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *mDDBClient) ListChatScenarios(ctx context.Context, in *ListChatScenariosRequest, opts ...grpc.CallOption) (*ListChatScenariosResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListChatScenariosResponse)
@@ -1639,6 +1668,13 @@ type MDDBServer interface {
 	RemoveCorpusPack(context.Context, *RemoveCorpusPackRequest) (*RemoveCorpusPackResponse, error)
 	// The pack of a collection, streamed as tar.zst chunks.
 	BuildCorpusPack(*BuildCorpusPackRequest, grpc.ServerStreamingServer[CorpusPackChunk]) error
+	// (v2.19.0+, GO-049) Module switches, as /v1/features. Any authenticated
+	// caller lists them; SetFeature needs a global administrator. A method of
+	// a disabled module answers FAILED_PRECONDITION "feature disabled: <name>".
+	ListFeatures(context.Context, *ListFeaturesRequest) (*ListFeaturesResponse, error)
+	// FAILED_PRECONDITION when MDDB_FEATURES_FORCE_OFF locks the module,
+	// NOT_FOUND for a name outside the registry.
+	SetFeature(context.Context, *SetFeatureRequest) (*SetFeatureResponse, error)
 	// (v2.19.0+, #403) Chat scenarios, as /v1/chat/scenarios. Reads need read
 	// permission on the collections a scenario allows; writes need admin.
 	ListChatScenarios(context.Context, *ListChatScenariosRequest) (*ListChatScenariosResponse, error)
@@ -1954,6 +1990,12 @@ func (UnimplementedMDDBServer) RemoveCorpusPack(context.Context, *RemoveCorpusPa
 }
 func (UnimplementedMDDBServer) BuildCorpusPack(*BuildCorpusPackRequest, grpc.ServerStreamingServer[CorpusPackChunk]) error {
 	return status.Error(codes.Unimplemented, "method BuildCorpusPack not implemented")
+}
+func (UnimplementedMDDBServer) ListFeatures(context.Context, *ListFeaturesRequest) (*ListFeaturesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFeatures not implemented")
+}
+func (UnimplementedMDDBServer) SetFeature(context.Context, *SetFeatureRequest) (*SetFeatureResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetFeature not implemented")
 }
 func (UnimplementedMDDBServer) ListChatScenarios(context.Context, *ListChatScenariosRequest) (*ListChatScenariosResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListChatScenarios not implemented")
@@ -3559,6 +3601,42 @@ func _MDDB_BuildCorpusPack_Handler(srv interface{}, stream grpc.ServerStream) er
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type MDDB_BuildCorpusPackServer = grpc.ServerStreamingServer[CorpusPackChunk]
 
+func _MDDB_ListFeatures_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFeaturesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListFeatures(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListFeatures_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListFeatures(ctx, req.(*ListFeaturesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_SetFeature_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetFeatureRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).SetFeature(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_SetFeature_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).SetFeature(ctx, req.(*SetFeatureRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _MDDB_ListChatScenarios_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListChatScenariosRequest)
 	if err := dec(in); err != nil {
@@ -4250,6 +4328,14 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveCorpusPack",
 			Handler:    _MDDB_RemoveCorpusPack_Handler,
+		},
+		{
+			MethodName: "ListFeatures",
+			Handler:    _MDDB_ListFeatures_Handler,
+		},
+		{
+			MethodName: "SetFeature",
+			Handler:    _MDDB_SetFeature_Handler,
 		},
 		{
 			MethodName: "ListChatScenarios",

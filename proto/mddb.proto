@@ -258,6 +258,13 @@ service MDDB {
   rpc RemoveCorpusPack(RemoveCorpusPackRequest) returns (RemoveCorpusPackResponse);
   // The pack of a collection, streamed as tar.zst chunks.
   rpc BuildCorpusPack(BuildCorpusPackRequest) returns (stream CorpusPackChunk);
+  // (v2.19.0+, GO-049) Module switches, as /v1/features. Any authenticated
+  // caller lists them; SetFeature needs a global administrator. A method of
+  // a disabled module answers FAILED_PRECONDITION "feature disabled: <name>".
+  rpc ListFeatures(ListFeaturesRequest) returns (ListFeaturesResponse);
+  // FAILED_PRECONDITION when MDDB_FEATURES_FORCE_OFF locks the module,
+  // NOT_FOUND for a name outside the registry.
+  rpc SetFeature(SetFeatureRequest) returns (SetFeatureResponse);
   // (v2.19.0+, #403) Chat scenarios, as /v1/chat/scenarios. Reads need read
   // permission on the collections a scenario allows; writes need admin.
   rpc ListChatScenarios(ListChatScenariosRequest) returns (ListChatScenariosResponse);
@@ -2374,6 +2381,37 @@ message ChatScenarioProto {
   ChatRateLimitProto rate_limit = 13;
   int64 created_at = 14;                         // Unix seconds
   int64 updated_at = 15;                         // Unix seconds
+}
+
+// One switchable module (v2.19.0+, GO-049).
+message FeatureProto {
+  string name = 1;
+  string description = 2;
+  bool enabled = 3;                              // works now: switched on, not forced off, requirements on
+  bool configured = 4;                           // the switch: what an administrator set, or the default
+  bool default_enabled = 5;
+  repeated string requires = 6;
+  string locked_by = 7;                          // "MDDB_FEATURES_FORCE_OFF" when the operator forced it off
+  repeated string blocked_by = 8;                // required modules that are off
+  int64 updated_at = 9;                          // Unix seconds; 0 when never switched
+  string updated_by = 10;
+}
+
+message ListFeaturesRequest {}
+
+message ListFeaturesResponse {
+  repeated FeatureProto features = 1;
+  uint64 version = 2;                            // grows on every switch
+}
+
+message SetFeatureRequest {
+  string name = 1;
+  bool enabled = 2;
+}
+
+message SetFeatureResponse {
+  FeatureProto feature = 1;
+  uint64 version = 2;
 }
 
 message ListChatScenariosRequest {}
