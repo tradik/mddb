@@ -27,6 +27,7 @@ func (s *MCPToolServer) toolMemoryStartSession(ctx context.Context, args map[str
 		"type":     {"session"},
 		"status":   {"active"},
 		"scenario": {scenario},
+		"title":    {title}, // read back by the session listing
 	}
 
 	// Merge extra meta
@@ -390,6 +391,7 @@ func (s *MCPToolServer) toolMemoryListSessions(ctx context.Context, args map[str
 			"sessionId": doc.Key,
 			"userId":    metaFirst(doc.Meta, "userId"),
 			"scenario":  metaFirst(doc.Meta, "scenario"),
+			"title":     sessionTitle(doc.Meta, doc.ContentMD),
 			"status":    metaFirst(doc.Meta, "status"),
 			"createdAt": doc.AddedAt,
 			"updatedAt": doc.UpdatedAt,

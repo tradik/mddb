@@ -5648,6 +5648,11 @@ List memory sessions with optional filtering.
 }
 ```
 
+`title` is the one given to `/v1/memory/session`, or the default `Session <first 8
+characters of the id>`. Before 2.19.0 the list left it out; sessions created then
+list with the title their body was written with. The MCP tool
+`memory_list_sessions` returns it too.
+
 ### POST /v1/memory/history
 
 Get the full message history for a session, ordered chronologically.

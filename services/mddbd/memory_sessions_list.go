@@ -6,6 +6,7 @@ import (
 	"mddb/internal/storage"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	json "mddb/internal/jsonx"
@@ -117,12 +118,28 @@ func (s *Server) memorySessionDetail(bDocs *bolt.Bucket, docID string) (detail M
 		SessionID:    d.Key,
 		UserID:       metaFirst(d.Meta, "userId"),
 		Scenario:     metaFirst(d.Meta, "scenario"),
-		Title:        metaFirst(d.Meta, "title"),
+		Title:        sessionTitle(d.Meta, d.ContentMD),
 		CreatedAt:    d.AddedAt,
 		UpdatedAt:    d.UpdatedAt,
 		ExpiresAt:    d.ExpiresAt,
 		MessageCount: s.countSessionMessages(d.Key),
 	}, true
+}
+
+// sessionTitleHeading starts the body every session is created with.
+const sessionTitleHeading = "# Session: "
+
+// sessionTitle is a session's title: from its metadata, or — for a session
+// created before 2.19.0 stored it there — from the heading of its body.
+func sessionTitle(meta map[string][]string, content string) string {
+	if title := metaFirst(meta, "title"); title != "" {
+		return title
+	}
+	first, _, _ := strings.Cut(content, "\n")
+	if title, found := strings.CutPrefix(first, sessionTitleHeading); found {
+		return title
+	}
+	return ""
 }
 
 // sortMemorySessions orders sessions by updatedAt or, by default, createdAt;

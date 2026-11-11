@@ -198,6 +198,7 @@ func (s *Server) handleMemorySessionCreate(w http.ResponseWriter, r *http.Reques
 		"type":     {"session"},
 		"status":   {"active"},
 		"scenario": {req.Scenario},
+		"title":    {title}, // read back by the session listing
 	}
 	for k, v := range req.Meta {
 		meta[k] = []string{v}
