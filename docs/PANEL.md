@@ -276,6 +276,33 @@ part of system prompts, so the whole tab needs admin on `"*"`.
 Diff lines carry a `+` or `-` sign and a screen-reader word besides their
 green or red background, so a change does not rest on colour alone.
 
+### Module switches: the Features page (2.19.0)
+
+"Features" in the Administration menu lists the server's optional modules
+(`GET /v1/features`): chat, chat with external MCP servers, geo, temporal,
+spell, curation, automation, memory, code intelligence, evaluation, corpus
+packs, classification, duplicates and images. Documents, collections,
+full-text and vector search, auth and backups are always on and not listed.
+
+- **Switch**: one per module, with its description, its default, the modules
+  it requires and who changed it last and when. Switching calls
+  `PUT /v1/features/{name}` and needs admin on `"*"`; the server's 403 is
+  shown as it is.
+- **Locked**: a module the operator forced off with
+  `MDDB_FEATURES_FORCE_OFF` has its switch disabled and names the variable;
+  only a change of the server's environment turns it back on. A 409 from the
+  server says the same.
+- **Blocked**: a module whose requirement is off (e.g. external MCP servers
+  without chat) keeps its stored setting and says which module it waits for.
+- **Menu and pages**: a module that is off hides its pages from the menu
+  (Chat, Geo Search, Temporal Analytics, Spell Checker, Curation Rules,
+  Automation, Code Symbols, Retrieval Evaluation). A direct visit to such a
+  page shows "… is switched off" with a link to this page instead of a page
+  full of 404 errors.
+- **Older servers**: while the list loads, and when it cannot be loaded
+  (a server without `/v1/features`, a network error), every module counts as
+  on, so the panel behaves as it did before.
+
 ### Colours and contrast
 
 The panel's palette is Tailwind's gray, red, amber and green plus the
