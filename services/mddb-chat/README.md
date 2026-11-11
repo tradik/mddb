@@ -126,7 +126,7 @@ What a stored scenario sets, and what happens where it sets nothing:
 | `tokenBudgetPerSession` | Tokens per session; wins over `[security] max_tokens_per_session`. | `[security] max_tokens_per_session` |
 | `rateLimit.messagesPerMinute` | Messages per session in any 60 seconds, next to the per-address `[security] rate_limit_per_minute`. A message over it gets `this conversation is limited to N messages per minute` and is not counted as a turn. | no per-session limit |
 | `description` | The label in `GET /config` (`scenario_labels`). | the scenario's name |
-| `skills` | Ignored until the skill store exists (#404). | — |
+| `skills` | Reach the model through the server-composed prompt: mddbd appends them after the guardrails (#404). | — |
 
 A stored scenario replaces the TOML one of the same name whole: a `max_turns`
 or `temperature` written in the TOML table does not leak into it.
