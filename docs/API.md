@@ -1803,6 +1803,12 @@ backups are core and cannot be switched off.
 | `classify` | on | `/v1/classify`, `Classify`, `classify_document` |
 | `duplicates` | on | `/v1/find-duplicates`, `FindDuplicates`, `find_duplicates` |
 | `images` | on | `/v1/image`, an image document's bytes |
+| `webhooks` | on | `/v1/webhooks`, `/v1/webhooks/delete`, `RegisterWebhook`, `ListWebhooks`, `DeleteWebhook`, the `webhooks` toolset, GraphQL `webhooks`, `registerWebhook`, `deleteWebhook` |
+| `schemas` | on | `/v1/schema/*`, `/v1/validate`, the schema RPCs and `ValidateDocument`, the `schema` toolset, GraphQL `schema`, `schemas`, `setSchema`, `deleteSchema`, `validateDocument` |
+| `aliases` | on | `/v1/aliases`, `/v1/aliases/{name}` (alias management) |
+| `crossSearch` | on | `/v1/cross-search`, `CrossSearch`, `cross_search` |
+| `searchTuning` | on | `/v1/search-advisor`, `/v1/vector-projection` (the panel's Vector Space), `SearchAdvisor`, `search_advisor` |
+| `ftsTuning` | on | `/v1/synonyms`, `/v1/stopwords`, the synonym and stop word RPCs and tools |
 
 A server that never touched a switch behaves as before 2.19.0.
 
@@ -1814,7 +1820,18 @@ whose action is one of them; a GraphQL field of it fails with the same text.
 A module whose requirement is off is off too (`chat` off stops
 `chatExternalMcp`), and keeps its own switch for when the requirement returns.
 Background work a module already runs (automation crons and triggers,
-temporal event recording) is not stopped by the switch.
+temporal event recording, webhook delivery) is not stopped by the switch.
+
+**Management off, stored data still applies.** The six modules added later
+in 2.19.0 switch a management surface, never access to data: with
+`webhooks` off, registered webhooks are still delivered; with `schemas` off,
+a stored schema is still checked on every write (a write that breaks it is
+still `400`), only its management and the stand-alone `/v1/validate` go;
+with `aliases` off, existing aliases still resolve on every surface (REST,
+gRPC, MCP, GraphQL, `/es`), they just cannot be listed, created or deleted;
+with `ftsTuning` off, stored synonyms and stop words still shape full-text
+queries. To stop a schema, a webhook or an alias from applying, delete it
+while its module is on.
 
 **Precedence.** `MDDB_FEATURES_FORCE_OFF=geo,chat` ([config.md](config.md))
 beats the switch, which beats the default. A forced module is listed with

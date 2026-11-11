@@ -30,6 +30,13 @@ var httpFeatureRoutes = map[string]string{
 	"/v1/classify":        FeatureClassify,
 	"/v1/find-duplicates": FeatureDuplicates,
 	"/v1/image":           FeatureImages,
+	"/v1/webhooks":        FeatureWebhooks, "/v1/webhooks/delete": FeatureWebhooks,
+	"/v1/schema/set": FeatureSchemas, "/v1/schema/get": FeatureSchemas, "/v1/schema/delete": FeatureSchemas,
+	"/v1/schema/list": FeatureSchemas, "/v1/validate": FeatureSchemas,
+	"/v1/aliases": FeatureAliases, "/v1/aliases/": FeatureAliases,
+	"/v1/cross-search":   FeatureCrossSearch,
+	"/v1/search-advisor": FeatureSearchTuning, "/v1/vector-projection": FeatureSearchTuning,
+	"/v1/synonyms": FeatureFTSTuning, "/v1/stopwords": FeatureFTSTuning,
 }
 
 // routeFeature is the module of a route pattern, "" for core.
@@ -57,6 +64,13 @@ var grpcFeatureMethods = map[string]string{
 	"BuildCorpusPack": FeatureCorpus,
 	"Classify":        FeatureClassify,
 	"FindDuplicates":  FeatureDuplicates,
+	"RegisterWebhook": FeatureWebhooks, "ListWebhooks": FeatureWebhooks, "DeleteWebhook": FeatureWebhooks,
+	"SetSchema": FeatureSchemas, "GetSchema": FeatureSchemas, "DeleteSchema": FeatureSchemas,
+	"ListSchemas": FeatureSchemas, "ValidateDocument": FeatureSchemas,
+	"CrossSearch":   FeatureCrossSearch,
+	"SearchAdvisor": FeatureSearchTuning,
+	"ListSynonyms":  FeatureFTSTuning, "AddSynonym": FeatureFTSTuning, "DeleteSynonym": FeatureFTSTuning,
+	"ListStopwords": FeatureFTSTuning, "AddStopwords": FeatureFTSTuning, "DeleteStopwords": FeatureFTSTuning,
 }
 
 // rpcFeature is the module of a full gRPC method name, "" for core.
@@ -74,6 +88,7 @@ func rpcFeature(fullMethod string) string {
 // mcpToolsetFeatures maps whole MCP toolsets to a module.
 var mcpToolsetFeatures = map[string]string{
 	ToolsetGeo: FeatureGeo, ToolsetAutomation: FeatureAutomation, ToolsetMemory: FeatureMemory, ToolsetCode: FeatureCodeIntel,
+	ToolsetWebhooks: FeatureWebhooks, ToolsetSchema: FeatureSchemas,
 }
 
 // mcpToolFeatures maps the module tools of mixed toolsets.
@@ -84,6 +99,10 @@ var mcpToolFeatures = map[string]string{
 	"run_eval": FeatureEval, "add_eval_query": FeatureEval,
 	"classify_document": FeatureClassify,
 	"find_duplicates":   FeatureDuplicates,
+	"cross_search":      FeatureCrossSearch,
+	"search_advisor":    FeatureSearchTuning,
+	"list_synonyms":     FeatureFTSTuning, "add_synonym": FeatureFTSTuning, "delete_synonym": FeatureFTSTuning,
+	"list_stopwords": FeatureFTSTuning, "add_stopwords": FeatureFTSTuning, "delete_stopwords": FeatureFTSTuning,
 }
 
 // toolFeature is the module of a built-in MCP tool, "" for core.
@@ -98,7 +117,12 @@ func toolFeature(name string) string {
 }
 
 // graphqlFeatureFields maps a GraphQL root field to its module.
-var graphqlFeatureFields = map[string]string{"Query.codeGraph": FeatureCodeIntel, "Query.codeSymbol": FeatureCodeIntel}
+var graphqlFeatureFields = map[string]string{
+	"Query.codeGraph": FeatureCodeIntel, "Query.codeSymbol": FeatureCodeIntel,
+	"Query.webhooks": FeatureWebhooks, "Mutation.registerWebhook": FeatureWebhooks, "Mutation.deleteWebhook": FeatureWebhooks,
+	"Query.schema": FeatureSchemas, "Query.schemas": FeatureSchemas, "Mutation.setSchema": FeatureSchemas,
+	"Mutation.deleteSchema": FeatureSchemas, "Mutation.validateDocument": FeatureSchemas,
+}
 
 // disabledFeatureOf returns the module of an entry point when that module is
 // off, "" when the call may go on.

@@ -9017,7 +9017,7 @@ components:
       properties:
         name:
           type: string
-          enum: [chat, chatExternalMcp, geo, temporal, spell, curation, automation, memory, codeIntel, eval, corpus, classify, duplicates, images]
+          enum: [chat, chatExternalMcp, geo, temporal, spell, curation, automation, memory, codeIntel, eval, corpus, classify, duplicates, images, webhooks, schemas, aliases, crossSearch, searchTuning, ftsTuning]
         description:
           type: string
         enabled:

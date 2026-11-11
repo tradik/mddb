@@ -60,7 +60,7 @@ Complete reference for all MDDB configuration parameters.
 | `MDDB_METRICS` | `"true"` | bool | Enable Prometheus-compatible `/metrics` endpoint |
 | `MDDB_METRICS_PUBLIC` | `"false"` | bool | With `MDDB_AUTH_ENABLED=true`, serve `/metrics` without credentials (SEC-009). No effect when auth is off ([TELEMETRY.md](TELEMETRY.md)) |
 | `MDDB_SEARCH_STATS` | `"true"` | bool | Include `searchStats` in search responses |
-| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
+| `MDDB_FEATURES_FORCE_OFF` | `""` | list | Optional modules kept off whatever the panel says (v2.19.0, GO-049), comma-separated, e.g. `geo,chat`: `chat`, `chatExternalMcp`, `geo`, `temporal`, `spell`, `curation`, `automation`, `memory`, `codeIntel`, `eval`, `corpus`, `classify`, `duplicates`, `images`, `webhooks`, `schemas`, `aliases`, `crossSearch`, `searchTuning`, `ftsTuning`. Such a module is shown as locked and `PUT /v1/features/{name}` answers `409`. Unknown names are ignored. See [API.md](API.md#features-v1features) |
 
 ---
 

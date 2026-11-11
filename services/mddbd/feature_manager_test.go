@@ -33,7 +33,7 @@ func featureManager(t *testing.T, forceOff string) (*FeatureManager, *bolt.DB) {
 func TestFeatureRegistryDefaults(t *testing.T) {
 	f, _ := featureManager(t, "")
 	list := f.List()
-	if len(list) != len(featureRegistry) || len(list) != 14 {
+	if len(list) != len(featureRegistry) || len(list) != 20 {
 		t.Fatalf("registry: %d modules", len(list))
 	}
 	for _, st := range list {
@@ -52,7 +52,7 @@ func TestFeatureRegistryDefaults(t *testing.T) {
 		t.Error("unknown found")
 	}
 	var nilMgr *FeatureManager
-	if !nilMgr.Enabled(FeatureGeo) || nilMgr.Enabled(FeatureChatExternalMCP) || nilMgr.Version() != 0 || len(nilMgr.List()) != 14 {
+	if !nilMgr.Enabled(FeatureGeo) || nilMgr.Enabled(FeatureChatExternalMCP) || nilMgr.Version() != 0 || len(nilMgr.List()) != len(featureRegistry) {
 		t.Error("a nil manager knows the defaults")
 	}
 	if st, ok := nilMgr.State(FeatureGeo); !ok || !st.Enabled {

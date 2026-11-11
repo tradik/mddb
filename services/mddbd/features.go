@@ -30,6 +30,12 @@ const (
 	FeatureClassify        = "classify"
 	FeatureDuplicates      = "duplicates"
 	FeatureImages          = "images"
+	FeatureWebhooks        = "webhooks"
+	FeatureSchemas         = "schemas"
+	FeatureAliases         = "aliases"
+	FeatureCrossSearch     = "crossSearch"
+	FeatureSearchTuning    = "searchTuning"
+	FeatureFTSTuning       = "ftsTuning"
 )
 
 // featuresForceOffEnv names the operator's override: a comma-separated list
@@ -62,6 +68,15 @@ var featureRegistry = []featureDef{
 	{Name: FeatureClassify, Default: true, Description: "Classification: rank labels against a document or a text"},
 	{Name: FeatureDuplicates, Default: true, Description: "Duplicate detection: identical, similar and MinHash groups"},
 	{Name: FeatureImages, Default: true, Description: "Image documents: the bytes of an image document over /v1/image"},
+	// The management surfaces below (2.19.0): switched off, what they stored
+	// keeps working — webhooks are delivered, schemas checked on write,
+	// aliases resolved, synonyms and stop words applied.
+	{Name: FeatureWebhooks, Default: true, Description: "Webhook management: register, list and delete webhooks; registered ones are delivered either way"},
+	{Name: FeatureSchemas, Default: true, Description: "Schema management and /v1/validate; stored schemas are checked on write either way"},
+	{Name: FeatureAliases, Default: true, Description: "Alias management: create, list and delete collection aliases; existing aliases resolve either way"},
+	{Name: FeatureCrossSearch, Default: true, Description: "Cross search: one query over several collections"},
+	{Name: FeatureSearchTuning, Default: true, Description: "Search tuning: the Search Advisor and the vector space projection"},
+	{Name: FeatureFTSTuning, Default: true, Description: "Full-text tuning: synonym and stop word management; stored ones apply either way"},
 }
 
 // featureByName finds a module of the registry.

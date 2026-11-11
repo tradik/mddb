@@ -17,7 +17,7 @@ func mcpFeatureTools() []MCPTool {
 		{
 			Name: "feature_list",
 			Description: "List the server's optional modules (chat, geo, temporal, spell, curation, automation, memory, " +
-				"codeIntel, eval, corpus, classify, duplicates, images, chatExternalMcp) with whether each works now, its switch, " +
+				"codeIntel, eval, corpus, classify, duplicates, images, webhooks, schemas, aliases, crossSearch, searchTuning, ftsTuning, chatExternalMcp) with whether each works now, its switch, " +
 				"default, requirements, the environment lock and the store's version. A disabled module's tools are not listed.",
 			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
 		},

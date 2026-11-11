@@ -88,7 +88,7 @@ func TestFeatureErrorsAndUnloadedStore(t *testing.T) {
 	if _, err := s.SetFeature(context.Background(), FeatureGeo, false); err != errFeatureUnavailable {
 		t.Errorf("no store: %v", err)
 	}
-	if got := s.FeaturesList(); len(got.Features) != 14 || got.Version != 0 {
+	if got := s.FeaturesList(); len(got.Features) != len(featureRegistry) || got.Version != 0 {
 		t.Errorf("no store lists the defaults: %+v", got)
 	}
 	for err, code := range map[error]int{errFeatureUnavailable: 503, context.Canceled: 500} {
@@ -110,7 +110,7 @@ func TestFeaturesGRPC(t *testing.T) {
 	s := featureServer(t)
 	g := NewGRPCServer(s)
 	list, err := g.ListFeatures(asClaims(alice), &proto.ListFeaturesRequest{})
-	if err != nil || len(list.GetFeatures()) != 14 || list.GetFeatures()[1].GetDefaultEnabled() || list.GetFeatures()[1].GetRequires()[0] != FeatureChat {
+	if err != nil || len(list.GetFeatures()) != len(featureRegistry) || list.GetFeatures()[1].GetDefaultEnabled() || list.GetFeatures()[1].GetRequires()[0] != FeatureChat {
 		t.Fatalf("list: %+v, %v", list, err)
 	}
 	if _, err := g.SetFeature(asClaims(alice), &proto.SetFeatureRequest{Name: "geo"}); status.Code(err) != codes.PermissionDenied {
