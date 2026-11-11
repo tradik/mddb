@@ -26,6 +26,12 @@ export const FEATURE_VIEWS = {
   classify: [],
   duplicates: ['duplicates'],
   images: [],
+  webhooks: ['webhooks'],
+  schemas: ['schemas'],
+  aliases: ['aliases'],
+  crossSearch: ['crossSearch'],
+  searchTuning: ['searchAdvisor', 'vectorSpace'],
+  ftsTuning: ['synonyms', 'stopwords'],
 };
 
 /** Human names of the modules, for the notice and the Features page. */
@@ -44,6 +50,12 @@ export const FEATURE_LABELS = {
   classify: 'Classification',
   duplicates: 'Duplicate detection',
   images: 'Image documents',
+  webhooks: 'Webhooks',
+  schemas: 'Collection schemas',
+  aliases: 'Collection aliases',
+  crossSearch: 'Cross search',
+  searchTuning: 'Search tuning',
+  ftsTuning: 'Full-text tuning',
 };
 
 /** The label of a module; an unknown name is shown as it is. */

@@ -22,7 +22,11 @@ describe('the map', () => {
     expect(Object.keys(FEATURE_VIEWS)).toEqual([
       'chat', 'chatExternalMcp', 'geo', 'temporal', 'spell', 'curation', 'automation',
       'memory', 'codeIntel', 'eval', 'corpus', 'classify', 'duplicates', 'images',
+      'webhooks', 'schemas', 'aliases', 'crossSearch', 'searchTuning', 'ftsTuning',
     ]);
+    expect(featureForView('vectorSpace')).toBe('searchTuning');
+    expect(featureForView('stopwords')).toBe('ftsTuning');
+    expect(featureForView('aliases')).toBe('aliases');
     expect(featureForView('spellcheck')).toBe('spell');
     expect(featureForView('codeSymbols')).toBe('codeIntel');
     expect(featureForView('memory')).toBe('memory');
