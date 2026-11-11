@@ -48,7 +48,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    id: 'integrations', label: 'Automation & Integrations', items: [
+    id: 'integrations', label: 'Integrations', items: [
       { mode: 'automation', icon: Zap, label: 'Automation', when: 'automations' },
       { mode: 'webhooks', icon: Webhook, label: 'Webhooks' },
       { mode: 'endpoints', icon: Network, label: 'API Endpoints' },

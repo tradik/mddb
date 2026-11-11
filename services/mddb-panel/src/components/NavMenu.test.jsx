@@ -33,7 +33,7 @@ afterEach(cleanup);
 describe('groups', () => {
   test('six disclosure headers, all open, each controlling its list', async () => {
     await renderMenu({ authEnabled: true, clusterEnabled: true });
-    for (const label of ['Search', 'Data', 'Chat', 'Automation & Integrations', 'Security', 'System']) {
+    for (const label of ['Search', 'Data', 'Chat', 'Integrations', 'Security', 'System']) {
       const h = header(label);
       expect(h.getAttribute('aria-expanded')).toBe('true');
       expect(document.getElementById(h.getAttribute('aria-controls')).hidden).toBe(false);

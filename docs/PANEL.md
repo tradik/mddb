@@ -347,7 +347,7 @@ Documents, collections,
 full-text and vector search, auth and backups are always on and not listed.
 
 - **Categories**: the modules sit under the same headings as their pages in
-  the menu — Search, Data, Chat, Automation & Integrations — and a module a
+  the menu — Search, Data, Chat, Integrations — and a module a
   newer server reports but the panel does not know yet appears under Other.
 - **Turn on all / Turn off all**: for every module at the top of the page,
   and for one category next to its heading. A confirmation names each module
@@ -391,7 +391,7 @@ open, so a first visit shows the same pages as before.
 | Search | Vector Search, Cross Search, Geo Search, Vector Space, Search Advisor, Retrieval Evaluation, Code Symbols, Synonyms, Stop Words, Curation Rules, Spell Checker |
 | Data | Collection Aliases, Collection Schemas, Embedding Models, Import, Duplicates, Temporal Analytics |
 | Chat | Chat, Agent Memory, LLM Connections |
-| Automation & Integrations | Automation, Webhooks, API Endpoints |
+| Integrations | Automation, Webhooks, API Endpoints |
 | Security | Users, Groups, My Account (with authentication), Security, Encryption, Audit Log |
 | System | System Info, Cluster (with replication), Configuration, Features, Client Settings |
 

@@ -15,7 +15,7 @@ describe('groupFeatures', () => {
 
   test('splits the list by category in display order, keeps an unknown module under Other, drops empty ones', () => {
     const groups = groupFeatures([f('webhooks'), f('geo'), f('chat'), f('futureThing'), f('crossSearch')]);
-    expect(groups.map((group) => group.label)).toEqual(['Search', 'Chat', 'Automation & Integrations', 'Other']);
+    expect(groups.map((group) => group.label)).toEqual(['Search', 'Chat', 'Integrations', 'Other']);
     expect(groups[0].features.map((feature) => feature.name)).toEqual(['crossSearch', 'geo']);
     expect(groups[3].features.map((feature) => feature.name)).toEqual(['futureThing']);
   });

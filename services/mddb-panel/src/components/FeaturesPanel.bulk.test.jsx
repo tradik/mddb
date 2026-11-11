@@ -48,7 +48,7 @@ describe('categories', () => {
   test('modules sit under their category headings, each with its own list', async () => {
     await renderPanel();
     expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
-      'Search', 'Data', 'Chat', 'Automation & Integrations',
+      'Search', 'Data', 'Chat', 'Integrations',
     ]);
     const chatList = screen.getByRole('list', { name: 'Chat modules' });
     expect(within(chatList).getAllByRole('switch')).toHaveLength(2);

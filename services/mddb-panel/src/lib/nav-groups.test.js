@@ -9,7 +9,7 @@ const modes = (groups) => groups.flatMap((g) => g.items.map((i) => i.mode));
 
 describe('the menu data', () => {
   test('six groups in order, every page once, each with an icon and a label', () => {
-    expect(NAV_GROUPS.map((g) => g.label)).toEqual(['Search', 'Data', 'Chat', 'Automation & Integrations', 'Security', 'System']);
+    expect(NAV_GROUPS.map((g) => g.label)).toEqual(['Search', 'Data', 'Chat', 'Integrations', 'Security', 'System']);
     const all = modes(NAV_GROUPS);
     expect(all).toHaveLength(34);
     expect(new Set(all).size).toBe(all.length);
