@@ -1,6 +1,10 @@
 # Multi-stage build for minimal image size
 # Stage 1: Build
-FROM golang:1.27.4-alpine AS builder
+# Built on the host's platform and cross-compiled for the target, so an arm64
+# image gets an arm64 binary and no QEMU is needed (#410).
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS builder
+ARG TARGETOS=linux
+ARG TARGETARCH
 
 # Install build dependencies (git for VCS stamping, make for Makefile targets)
 RUN apk add --no-cache git make
@@ -27,7 +31,7 @@ RUN go mod download
 COPY services/mddbd/ ./
 
 # Build the binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -ldflags='-w -s -extldflags "-static"' \
     -a -installsuffix cgo \
     -o mddbd .

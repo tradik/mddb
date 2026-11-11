@@ -75,6 +75,24 @@ expect_exit "snap channel on the toolchain track" 0 bash "${TMP}/snapok/scripts/
 scaffold "${TMP}/snapdrift" "1.27.0" "1.26"
 expect_exit "stale snap go channel is rejected" 1 bash "${TMP}/snapdrift/scripts/check-go-version.sh"
 
+# Case 6: a cross-compiling Dockerfile ("FROM --platform=$BUILDPLATFORM
+# golang:X") is still read — a stale pin there is caught, a matching one passes.
+scaffold "${TMP}/platok" "1.27.4"
+mkdir -p "${TMP}/platok/services/svc"
+printf 'FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS builder\n' > "${TMP}/platok/services/svc/Dockerfile"
+expect_exit "FROM --platform golang pin on the toolchain" 0 bash "${TMP}/platok/scripts/check-go-version.sh"
+scaffold "${TMP}/platdrift" "1.27.4"
+mkdir -p "${TMP}/platdrift/services/svc"
+printf 'FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine AS builder\n' > "${TMP}/platdrift/services/svc/Dockerfile"
+expect_exit "stale FROM --platform golang pin is rejected" 1 bash "${TMP}/platdrift/scripts/check-go-version.sh"
+
+# Case 7: a local agent worktree under .claude/ at an older toolchain is not
+# part of the repo and does not count as drift.
+scaffold "${TMP}/wt" "1.27.4"
+mkdir -p "${TMP}/wt/.claude/worktrees/a"
+printf 'module a\n\ngo 1.26\n\ntoolchain go1.27.3\n' > "${TMP}/wt/.claude/worktrees/a/go.mod"
+expect_exit "agent worktrees under .claude are ignored" 0 bash "${TMP}/wt/scripts/check-go-version.sh"
+
 # Case 3: empty tree (no pins) -> 2
 mkdir -p "${TMP}/empty/scripts"
 cp "${GUARD}" "${TMP}/empty/scripts/check-go-version.sh"

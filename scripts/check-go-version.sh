@@ -42,7 +42,9 @@ record() {
 
 # 1) toolchain directives in go.work + every go.mod (found recursively;
 #    vendored/third-party trees are excluded).
-mapfile -t gomod_files < <(find . -name go.mod -not -path '*/vendor/*' -not -path '*/node_modules/*' | sort)
+# .claude/ (gitignored) holds local agent worktrees, full copies of the repo
+# at other commits; they are not part of this tree.
+mapfile -t gomod_files < <(find . -name go.mod -not -path '*/vendor/*' -not -path '*/node_modules/*' -not -path './.claude/*' | sort)
 while IFS= read -r match; do
 	file="${match%%:*}"
 	ver="$(printf '%s' "${match#*:}" | grep -oE "${version_re}")"
@@ -61,7 +63,7 @@ while IFS= read -r match; do
 	file="${match%%:*}"
 	ver="$(printf '%s' "${match#*:}" | grep -oE "golang:${version_re}" | grep -oE "${version_re}")"
 	[[ -n "${ver}" ]] && record "${file}" "FROM golang" "${ver}"
-done < <(grep -rHnE 'FROM[[:space:]]+golang:'"${version_re}" services 2>/dev/null || true)
+done < <(grep -rHnE 'FROM[[:space:]]+(--platform=[^[:space:]]+[[:space:]]+)?golang:'"${version_re}" services 2>/dev/null || true)
 
 # 4) go/X.Y/stable snap channels in snapcraft.yaml. Snap channels track a
 #    major.minor track and carry no patch component, so they are collected
@@ -76,7 +78,7 @@ while IFS= read -r match; do
 # snapcraft.yaml about why the build-snap was removed contains the channel
 # string, and the guard counted it as a live pin that would have failed the
 # next time Go moved.
-done < <(grep -rHnE 'go/[0-9]+\.[0-9]+/(stable|candidate|beta|edge)' --include='snapcraft.yaml' . 2>/dev/null |
+done < <(grep -rHnE 'go/[0-9]+\.[0-9]+/(stable|candidate|beta|edge)' --include='snapcraft.yaml' --exclude-dir=.claude . 2>/dev/null |
 	grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
 
 if [[ ${#sources[@]} -eq 0 ]]; then
