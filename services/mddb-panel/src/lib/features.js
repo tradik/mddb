@@ -19,12 +19,12 @@ export const FEATURE_VIEWS = {
   spell: ['spellcheck'],
   curation: ['curation'],
   automation: ['automation'],
-  memory: [],
+  memory: ['memory'],
   codeIntel: ['codeSymbols'],
   eval: ['eval'],
   corpus: [],
   classify: [],
-  duplicates: [],
+  duplicates: ['duplicates'],
   images: [],
 };
 

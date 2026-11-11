@@ -1451,7 +1451,3 @@ export default new MDDBClient();
 import { adminMethods } from './client';
 
 Object.assign(MDDBClient.prototype, adminMethods);
-
-// GO-049 (2.19.0): module on/off switches, kept in src/lib/client/features.js.
-import { featureMethods } from './client/features';
-Object.assign(MDDBClient.prototype, featureMethods);

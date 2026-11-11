@@ -296,7 +296,9 @@ full-text and vector search, auth and backups are always on and not listed.
   without chat) keeps its stored setting and says which module it waits for.
 - **Menu and pages**: a module that is off hides its pages from the menu
   (Chat, Geo Search, Temporal Analytics, Spell Checker, Curation Rules,
-  Automation, Code Symbols, Retrieval Evaluation). A direct visit to such a
+  Automation, Code Symbols with its code graph, Retrieval Evaluation, Agent
+  Memory, Duplicates); the viewer's *Classify* box and the *Corpus packs*
+  card on the System page go with `classify` and `corpus`. A direct visit to such a
   page shows "… is switched off" with a link to this page instead of a page
   full of 404 errors.
 - **Older servers**: while the list loads, and when it cannot be loaded

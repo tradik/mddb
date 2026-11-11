@@ -25,6 +25,8 @@ describe('the map', () => {
     ]);
     expect(featureForView('spellcheck')).toBe('spell');
     expect(featureForView('codeSymbols')).toBe('codeIntel');
+    expect(featureForView('memory')).toBe('memory');
+    expect(featureForView('duplicates')).toBe('duplicates');
     expect(featureForView('documents')).toBeNull();
   });
 
