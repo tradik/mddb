@@ -64,6 +64,7 @@ status: publish
   - [Chat skills: /v1/chat/skills](#chat-skills-v1chatskills)
   - [External MCP servers: /v1/chat/mcp](#external-mcp-servers-v1chatmcp)
   - [Chat conversations: /v1/chat/conversations](#chat-conversations-v1chatconversations)
+  - [Chat conversation log: /v1/chat/log](#chat-conversation-log-v1chatlog)
   - [GET /v1/embedding-configs](#get-v1embedding-configs)
   - [GET/PUT/DELETE /v1/embedding-configs/:id](#getputdelete-v1embedding-configsid)
   - [POST /v1/embedding-configs/set-default](#post-v1embedding-configsset-default)
@@ -1919,6 +1920,9 @@ curl http://localhost:11023/v1/chat/scenarios/version
 | `llm.model`, `llm.maxTokens`, `llm.extraBody` | model name, token cap, an object sent to the model API as is | unset |
 | `llm.temperature` | 0 to 2; `0` is kept as 0, leaving it out means unset | unset |
 | `maxTurns`, `tokenBudgetPerSession`, `rateLimit.messagesPerMinute` | 0 or more; 0 means no limit from the scenario | 0 |
+| `logging.enabled` | boolean: record every turn, anonymous sessions included, for the [conversation log](#chat-conversation-log-v1chatlog) (#406) | `false` |
+| `logging.retentionDays` | 0–3650: how long an anonymous session's log is kept; 0 is `MDDB_CHAT_RETENTION_DAYS` (30) | 0 |
+| `logging.redact` | boolean: redact e-mails, tokens and card-like numbers before storage ([chat.md](chat.md#conversation-log-and-feedback-2190)) | `true` |
 | `createdAt`, `updatedAt` | set by the server | — |
 
 - **Create or replace.** `PUT` stores the whole body: a field left out is
@@ -3692,7 +3696,7 @@ Unix seconds.
 | `title` | Set by the server: the start of the first user message, one line, at most 80 characters, cut between characters |
 | `messages[].role` | `user`, `assistant` or `tool` — a `system` message is refused, the prompt belongs to the scenario |
 | `messages[].content` | Required unless `toolCalls` is set; at most 256 000 bytes |
-| `messages[].id` | Set by the server; a value sent by the caller is replaced |
+| `messages[].id` | Set by the server unless the caller sends one matching `[A-Za-z0-9_-]{1,64}` (2.19.0, #406; below) |
 | `messages[].createdAt` | Optional; now when omitted (send it to import an older history) |
 | one append | 1 to 100 messages; a conversation holds at most 5000 — start a new one after that |
 | `limit` on a listing | default 50, at most 200; walk with `cursor=<nextCursor>` |
@@ -3759,6 +3763,39 @@ Also over gRPC (`CreateChatConversation` … `ExportChatConversations`,
 [GRPC.md](GRPC.md#new-in-v2190)) and, read-only, as the MCP tools
 `chat_conversation_list` and `chat_conversation_get` ([MCP.md](MCP.md)).
 
+#### Answer feedback and the turn log fields (2.19.0, #406)
+
+| Method | Path | Body | Answer |
+|---|---|---|---|
+| `POST` | `/v1/chat/conversations/{id}/feedback` | `{"sub","messageId","rating","comment"?}` | `{"conversationId","messageId","feedback":{"rating","comment"?,"at"}}` |
+
+A rating is `up` or `down`, on one **assistant** message, and is stored with
+that message as `feedback`. `comment` is optional: trimmed, at most 2000
+characters, line breaks and tabs allowed, no other control characters. Rating
+the same message again replaces the earlier rating. An ended conversation can
+still be rated (a visitor often rates after closing the chat). `400` for a
+missing `messageId`, a rating that is not `up`/`down` or a bad comment; `404`
+for a message the conversation does not hold, a user message, or another
+`sub`'s conversation. Permission is `write` on the chat collection, as for an
+append. Over gRPC: `RateChatMessage`.
+
+New, additive message fields — everything above keeps working unchanged:
+
+| Field | Rule |
+|---|---|
+| `messages[].id` | Kept when the caller sends one matching `[A-Za-z0-9_-]{1,64}` (so a rating can name the answer by the id the client saw — `mddb-chat` sends the `done` frame's `message_id`); otherwise set by the server |
+| `messages[].outcome` | Marks a **logged turn** (assistant messages only): `answered`, `noResults`, `refused` or `error`. An `answered` reply that is the scenario's redirect text (`offTopic.mode: redirect`) is stored as `refused`. A message with an outcome may have empty content (a failed turn) |
+| `messages[].latencyMs` | How long the turn took, 0 or more |
+| `messages[].toolCalls[].query`, `.resultKeys`, `.topScore` | What a tool searched for (at most 4096 bytes), the keys it found, best first (at most 50), and the best score |
+| `messages[].feedback` | `{"rating","comment"?,"at"}` — set only by the feedback call; a `feedback` sent in an append is dropped |
+| `redact` on an append | `true` redacts these messages before they are stored, and makes the conversation `redact: true`: every later message and feedback comment of it is redacted too ([chat.md](chat.md#conversation-log-and-feedback-2190)) |
+
+```bash
+curl -X POST http://localhost:11023/v1/chat/conversations/$ID/feedback \
+  -H "Authorization: Bearer $HOST_TOKEN" \
+  -d '{"sub":"user-42","messageId":"3f9a…","rating":"down","comment":"The port is wrong."}'
+```
+
 #### The join token (host → mddb-chat)
 
 MDDB itself never sees this token. It is documented here because it is where
@@ -3806,6 +3843,89 @@ function joinToken(secret, sub, scenario, name, ttlSeconds = 300) {
 ```
 
 ---
+
+### Chat conversation log: /v1/chat/log
+
+The review API of the conversation log (v2.19.0, #406): what visitors asked
+and how the assistant did, across users. **Global admin only**: it shows
+every user's turns. It reads the logged turns — assistant messages with an
+`outcome` — of the caller's chat collection (for a global admin, the global
+`chat_conversations`); a scenario logs only when its
+[`logging.enabled`](#chat-scenarios-v1chatscenarios) is on.
+
+| Method | Path | Query | Answer |
+|---|---|---|---|
+| `GET` | `/v1/chat/log` | `scenario`, `from`, `to`, `rating`, `outcome`, `cursor`, `limit` | `{"turns":[…],"nextCursor"?}`, newest first |
+| `GET` | `/v1/chat/log/export` | `format=csv\|json` (default `json`) and the same filters, no paging | a file download (`Content-Disposition: attachment`) |
+| `GET` | `/v1/chat/gaps` | `scenario`, `from`, `to`, `minCount`, `threshold`, `limit` | `{"gaps":[…],"threshold"}`, most frequent first |
+
+| Parameter | Values |
+|---|---|
+| `from`, `to` | Unix seconds, an RFC 3339 time or a date `YYYY-MM-DD`; both inclusive; a date as `to` is that whole day (UTC) |
+| `rating` | `up`, `down`, `none` (unrated) or `any` (rated) |
+| `outcome` | `answered`, `noResults`, `refused`, `error` |
+| `limit` | log: default 50, at most 200, walk with `cursor=<nextCursor>`; gaps: default 100, at most 1000 |
+| `minCount` | gaps: only questions asked at least this often (default 1) |
+| `threshold` | gaps: a turn whose best search score is below this is a gap; default `MDDB_CHAT_GAP_SCORE`, else 0.3 |
+
+A turn:
+
+```json
+{
+  "conversationId": "5f3c…", "messageId": "3f9a…", "scenario": "support",
+  "sub": "user-42", "displayName": "Ada", "anonymous": false, "at": 1794000042,
+  "question": "How do I rotate the key?",
+  "answer": "Call POST /v1/encryption/rotate.", "answerExcerpt": "Call POST /v1/encryption/rotate.",
+  "outcome": "answered", "rating": "down", "comment": "Wrong endpoint.",
+  "model": "gpt-5", "provider": "openai", "latencyMs": 1830, "tokens": {"prompt": 812, "completion": 64},
+  "toolCalls": [{"name": "search_docs", "collection": "docs", "durationMs": 42,
+                 "query": "rotate encryption key", "resultKeys": ["encryption", "keys"], "topScore": 0.81}]
+}
+```
+
+`question` is the user message before the answer; `answerExcerpt` is the
+answer on one line, at most 280 characters. An anonymous session's turn has
+`anonymous: true` and no `sub` or `displayName` — its session id is never
+shown as an identity. Identities (`sub`, `displayName`) appear only because
+the API is for global administrators.
+
+**Export.** Every turn the filters select, at most 100 000, written and
+flushed row by row. JSON is one array of turns. CSV is RFC 4180 (fields with
+commas, quotes or line breaks are quoted, quotes doubled) under the header
+`time, conversationId, messageId, scenario, sub, displayName, anonymous,
+question, answer, outcome, rating, comment, model, provider, latencyMs,
+promptTokens, completionTokens, tools, topScore` — `time` in RFC 3339 UTC,
+`tools` as `name(query) → key key; …`, `topScore` the best of the turn. A
+cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading apostrophe,
+so a spreadsheet does not run visitor text as a formula (CSV injection).
+
+**Docs gaps.** The questions the documentation did not answer: a logged turn
+whose outcome is `noResults`, whose searches (tool calls with a query) found
+nothing, or whose best score is below `threshold`. Errors and refusals do not
+count, nor does a turn that searched nothing. Questions are grouped by their
+normalised text — lowercase, punctuation and symbols stripped, whitespace
+collapsed:
+
+```json
+{"gaps": [{"question": "how do i back up", "example": "How do I back up?", "count": 7,
+           "noResults": 5, "lastAskedAt": 1794000042, "scenarios": ["support"]}],
+ "threshold": 0.3}
+```
+
+`example` is the latest question as asked; `noResults` how many of `count`
+found nothing at all. Ordered by `count`, then the latest asked.
+
+```bash
+curl "http://localhost:11023/v1/chat/log?scenario=support&rating=down&from=2026-11-01" -H "Authorization: Bearer $ADMIN_TOKEN"
+curl -OJ "http://localhost:11023/v1/chat/log/export?format=csv&outcome=noResults" -H "Authorization: Bearer $ADMIN_TOKEN"
+curl "http://localhost:11023/v1/chat/gaps?minCount=2" -H "Authorization: Bearer $ADMIN_TOKEN"
+```
+
+`400` for an unreadable time, rating, outcome, format, cursor or threshold,
+or a negative number; `401`/`403` for anyone but a global administrator. Also
+over gRPC (`ListChatLog`, `ListChatGaps`, [GRPC.md](GRPC.md#new-in-v2190))
+and as the read-only MCP tools `chat_log_list` and `chat_gaps`
+([MCP.md](MCP.md)).
 
 ### GET /v1/embedding-configs
 

@@ -245,7 +245,7 @@ refused request (403) reads *Not permitted* and says which grant it needs.
 
 ### Chat skills (2.19.0)
 
-The Chat page has two tabs, *Scenarios* and *Skills* (an ARIA tab list: the
+The Chat page has three tabs, *Scenarios*, *Skills* and *Log* ([below](#chat-conversation-log-2190)) (an ARIA tab list: the
 arrow keys, Home and End move between them). A skill is a block of
 instructions in the `SKILL.md` format that scenarios attach
 (`/v1/chat/skills`, [API.md](API.md#chat-skills-v1chatskills)). Skills are
@@ -301,6 +301,40 @@ read-only tools the assistant may call next to its collections.
   the value of a named header, and delete one. Values are write-only and the
   field is a password field; the list shows names, the header and the
   scenarios using each. Without admin on `*` the card says so.
+
+### Chat conversation log (2.19.0)
+
+The Chat page's third tab, *Log* (#406,
+[API.md](API.md#chat-conversation-log-v1chatlog)), shows what visitors asked
+the scenarios that log their turns, and how the assistant did. It needs a
+global administrator: the log holds every user's turns.
+
+- **Filters**: scenario, a date range (from / to, a whole day each), an
+  outcome (*answered*, *no results*, *refused*, *error*), and the shortcuts
+  *Thumbs-down only*, *No results* and *Refused*. The server filters by one
+  outcome, so a ticked *No results* or *Refused* overrides the outcome list
+  (*No results* wins when both are ticked).
+- **Turns**: time, scenario, user (the signed user's name or id, or
+  *anonymous*), the question, the start of the answer, the outcome and the
+  rating. A row expands (a button with `aria-expanded`) to the whole question
+  and answer, every tool call with its collection, query, result keys, best
+  score and duration, the model and provider, the latency, the tokens, and
+  the rating with the visitor's comment. *Load more* follows the cursor.
+- **Export CSV / Export JSON** download every turn the filters select (up to
+  100 000), with the same authorization as the page.
+- **Docs gaps** (a toggle next to *Turns*): the questions whose searches found
+  nothing or scored below a threshold, grouped by normalised text, with the
+  count, how many found nothing, the last time asked and the scenarios —
+  what to document next. *Minimum count* and *Score threshold* narrow it.
+
+The scenario editor has a *Conversation log* section: *Log every turn of this
+scenario* (off by default), *Log retention (days)* for anonymous visitors'
+logs (empty or 0: the server's 30 days) and *Redact e-mails, tokens and card
+numbers* (on by default). Its privacy note says what turning it on means:
+every turn is stored, anonymous visitors included; only global
+administrators can read it; redaction replaces e-mail addresses, tokens and
+card-like numbers with `[redacted]` before anything is stored. A scenario
+saved before 2.19.0 loads with the log off and redaction on.
 
 ### Module switches: the Features page (2.19.0)
 
@@ -643,11 +677,17 @@ services/mddb-panel/
 │   │   ├── ChatMcpToolList.jsx         # Its tools: badges, allow, why inactive
 │   │   ├── ChatMcpSecretsCard.jsx      # Write-only MCP secrets
 │   │   ├── ChatMcpStates.jsx           # The server's verdict per MCP server in the preview
+│   │   ├── ChatScenarioLoggingFields.jsx # A scenario's conversation log and its privacy note (#406)
+│   │   ├── ChatLogPanel.jsx            # The Log tab: turns or docs gaps, export (#406)
+│   │   ├── ChatLogFilters.jsx          # Its filters
+│   │   ├── ChatLogRow.jsx              # One turn, expandable
+│   │   ├── ChatGaps.jsx                # Docs gaps
 │   │   └── FilterPanel.jsx      # Filter controls
 │   ├── lib/
 │   │   ├── mddb-client.js       # API client
 │   │   ├── chat-scenario.js     # Scenario form state and its conversion
 │   │   ├── chat-mcp.js          # MCP server rows and inactive reasons
+│   │   ├── chat-log.js          # Log filters to query parameters, labels (#406)
 │   │   ├── markdown-templates.js # Document templates
 │   │   └── store.js             # Zustand store
 │   ├── App.jsx                  # Main application

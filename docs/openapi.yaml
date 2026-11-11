@@ -7582,6 +7582,9 @@ paths:
                   maxItems: 100
                   items:
                     $ref: "#/components/schemas/ChatMessage"
+                redact:
+                  type: boolean
+                  description: Redact these messages and every later write of the conversation (issue 406)
       responses:
         "200":
           description: The conversation, holding only the messages just added (with their ids)
@@ -7655,6 +7658,226 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/chat/conversations/{id}/feedback:
+    post:
+      tags:
+        - Chat Conversations
+      summary: Rate an answer
+      description: >-
+        Stores a rating (up or down) and an optional comment with one
+        assistant message (v2.19.0+, issue 406). Rating again replaces the
+        earlier rating; an ended conversation can still be rated. A comment of
+        a conversation with `redact` on is redacted.
+      operationId: rateChatMessage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The conversation id
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sub, messageId, rating]
+              properties:
+                sub: {type: string}
+                messageId: {type: string, description: The answer's id — the `done` frame's message_id}
+                rating: {type: string, enum: [up, down]}
+                comment: {type: string, maxLength: 2000, description: Trimmed; line breaks allowed}
+      responses:
+        "200":
+          description: The stored rating
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversationId: {type: string}
+                  messageId: {type: string}
+                  feedback:
+                    $ref: "#/components/schemas/ChatFeedback"
+        "400":
+          description: Missing messageId, a rating other than up/down, or a comment that is too long or holds control characters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: No write permission on the chat collection of the caller's tenant, or read-only mode
+        "404":
+          description: No such conversation for this `sub`, or no assistant message with that id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/chat/log:
+    get:
+      tags:
+        - Chat Conversations
+      summary: The conversation log
+      description: >-
+        Logged chat turns across users, newest first (v2.19.0+, issue 406):
+        assistant messages with an outcome, from scenarios with logging on,
+        in the caller's chat collection. Global admin only. Anonymous turns
+        carry `anonymous: true` and no identity.
+      operationId: listChatLog
+      parameters:
+        - name: scenario
+          in: query
+          schema: {type: string}
+        - name: from
+          in: query
+          description: Earliest turn, inclusive — unix seconds, RFC 3339 or YYYY-MM-DD
+          schema: {type: string}
+        - name: to
+          in: query
+          description: Latest turn, inclusive — unix seconds, RFC 3339 or YYYY-MM-DD (a date is its whole day, UTC)
+          schema: {type: string}
+        - name: rating
+          in: query
+          description: up, down, none (unrated) or any (rated)
+          schema: {type: string, enum: [up, down, none, any]}
+        - name: outcome
+          in: query
+          schema: {type: string, enum: [answered, noResults, refused, error]}
+        - name: cursor
+          in: query
+          schema: {type: string}
+        - name: limit
+          in: query
+          schema: {type: integer, default: 50, maximum: 200}
+      responses:
+        "200":
+          description: One page of turns
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatLogPage"
+        "400":
+          description: An unreadable time, rating, outcome, format, cursor or a negative number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Not a global administrator
+
+  /v1/chat/log/export:
+    get:
+      tags:
+        - Chat Conversations
+      summary: Export the conversation log
+      description: >-
+        Every turn the filters select (at most 100000), streamed row by row
+        as a download (v2.19.0+, issue 406). CSV is RFC 4180; a cell starting
+        with = + - @ or a tab gets a leading apostrophe (CSV injection).
+        Global admin only.
+      operationId: exportChatLog
+      parameters:
+        - name: format
+          in: query
+          schema: {type: string, enum: [csv, json], default: json}
+        - name: scenario
+          in: query
+          schema: {type: string}
+        - name: from
+          in: query
+          description: Earliest turn, inclusive — unix seconds, RFC 3339 or YYYY-MM-DD
+          schema: {type: string}
+        - name: to
+          in: query
+          description: Latest turn, inclusive — unix seconds, RFC 3339 or YYYY-MM-DD (a date is its whole day, UTC)
+          schema: {type: string}
+        - name: rating
+          in: query
+          description: up, down, none (unrated) or any (rated)
+          schema: {type: string, enum: [up, down, none, any]}
+        - name: outcome
+          in: query
+          schema: {type: string, enum: [answered, noResults, refused, error]}
+      responses:
+        "200":
+          description: The turns, as an attachment
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatLogTurn"
+            text/csv:
+              schema:
+                type: string
+                description: >-
+                  Header time, conversationId, messageId, scenario, sub,
+                  displayName, anonymous, question, answer, outcome, rating,
+                  comment, model, provider, latencyMs, promptTokens,
+                  completionTokens, tools, topScore
+        "400":
+          description: An unreadable time, rating, outcome, format, cursor or a negative number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Not a global administrator
+
+  /v1/chat/gaps:
+    get:
+      tags:
+        - Chat Conversations
+      summary: Docs gaps
+      description: >-
+        Questions whose searches found nothing or scored below a threshold,
+        grouped by normalised text (lowercase, punctuation stripped,
+        whitespace collapsed), most frequent first (v2.19.0+, issue 406).
+        Global admin only.
+      operationId: listChatGaps
+      parameters:
+        - name: scenario
+          in: query
+          schema: {type: string}
+        - name: from
+          in: query
+          description: Earliest turn, inclusive — unix seconds, RFC 3339 or YYYY-MM-DD
+          schema: {type: string}
+        - name: to
+          in: query
+          description: Latest turn, inclusive — unix seconds, RFC 3339 or YYYY-MM-DD (a date is its whole day, UTC)
+          schema: {type: string}
+        - name: minCount
+          in: query
+          schema: {type: integer, default: 1, minimum: 0}
+        - name: threshold
+          in: query
+          description: A best score below this is a gap; default MDDB_CHAT_GAP_SCORE or 0.3
+          schema: {type: number, minimum: 0}
+        - name: limit
+          in: query
+          schema: {type: integer, default: 100, maximum: 1000}
+      responses:
+        "200":
+          description: The gaps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatGapsResponse"
+        "400":
+          description: An unreadable time, rating, outcome, format, cursor or a negative number
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "403":
+          description: Not a global administrator
 
   /v1/aggregate:
     post:
@@ -8840,11 +9063,25 @@ components:
         name: {type: string, example: search}
         collection: {type: string, example: docs}
         durationMs: {type: integer, format: int64}
+        query: {type: string, maxLength: 4096, description: What a logged turn's tool searched for (issue 406)}
+        resultKeys:
+          type: array
+          maxItems: 50
+          description: The keys it found, best first (issue 406)
+          items: {type: string}
+        topScore: {type: number, description: The best result's score (issue 406)}
+    ChatFeedback:
+      type: object
+      description: A user's rating of one assistant message (issue 406)
+      properties:
+        rating: {type: string, enum: [up, down]}
+        comment: {type: string, maxLength: 2000}
+        at: {type: integer, format: int64, description: Unix seconds}
     ChatMessage:
       type: object
       required: [role]
       properties:
-        id: {type: string, readOnly: true, description: Set by the server}
+        id: {type: string, description: "The caller's id when it matches [A-Za-z0-9_-]{1,64} (issue 406), else set by the server"}
         role: {type: string, enum: [user, assistant, tool]}
         content: {type: string, description: Required unless toolCalls is set; at most 256000 bytes}
         toolCalls:
@@ -8859,6 +9096,79 @@ components:
             prompt: {type: integer, format: int64}
             completion: {type: integer, format: int64}
         createdAt: {type: integer, format: int64, description: Unix seconds; now when omitted}
+        outcome:
+          type: string
+          enum: [answered, noResults, refused, error]
+          description: Marks a logged turn (assistant only, issue 406); an answered redirect reply is stored as refused
+        latencyMs: {type: integer, format: int64, minimum: 0}
+        feedback:
+          allOf:
+            - $ref: "#/components/schemas/ChatFeedback"
+          readOnly: true
+          description: Set by POST /v1/chat/conversations/{id}/feedback
+    ChatLogTurn:
+      type: object
+      description: One logged turn (issue 406). sub and displayName only for a signed user.
+      properties:
+        conversationId: {type: string}
+        messageId: {type: string}
+        scenario: {type: string}
+        sub: {type: string}
+        displayName: {type: string}
+        anonymous: {type: boolean}
+        at: {type: integer, format: int64}
+        question: {type: string}
+        answer: {type: string}
+        answerExcerpt: {type: string, description: "The answer on one line, at most 280 characters"}
+        outcome: {type: string, enum: [answered, noResults, refused, error]}
+        rating: {type: string, enum: [up, down]}
+        comment: {type: string}
+        model: {type: string}
+        provider: {type: string}
+        latencyMs: {type: integer, format: int64}
+        tokens:
+          type: object
+          properties:
+            prompt: {type: integer, format: int64}
+            completion: {type: integer, format: int64}
+        toolCalls:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatToolCall"
+    ChatLogPage:
+      type: object
+      properties:
+        turns:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatLogTurn"
+        nextCursor: {type: string}
+    ChatGap:
+      type: object
+      properties:
+        question: {type: string, description: Normalised}
+        example: {type: string, description: The latest question as asked}
+        count: {type: integer}
+        noResults: {type: integer, description: "Of count, the turns that found nothing"}
+        lastAskedAt: {type: integer, format: int64}
+        scenarios:
+          type: array
+          items: {type: string}
+    ChatGapsResponse:
+      type: object
+      properties:
+        gaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatGap"
+        threshold: {type: number}
+    ChatLogging:
+      type: object
+      description: A scenario's turn log (issue 406)
+      properties:
+        enabled: {type: boolean, default: false}
+        retentionDays: {type: integer, minimum: 0, maximum: 3650, description: An anonymous session's log; 0 is the server default}
+        redact: {type: boolean, default: true, description: "Redact e-mails, tokens and card-like numbers before storage"}
     ChatConversationSummary:
       type: object
       properties:
@@ -8874,6 +9184,7 @@ components:
         retentionDays: {type: integer}
         expiresAt: {type: integer, format: int64, description: The conversation is removed after this unless it is written again}
         messageCount: {type: integer, description: Messages in the whole conversation}
+        redact: {type: boolean, description: Stored text is redacted (issue 406); set by an append with redact}
     ChatConversation:
       allOf:
         - $ref: "#/components/schemas/ChatConversationSummary"
@@ -12351,6 +12662,8 @@ components:
             checks every allowed tool against the server.
           items:
             $ref: "#/components/schemas/ChatMcpServer"
+        logging:
+          $ref: "#/components/schemas/ChatLogging"
         createdAt:
           type: string
           format: date-time

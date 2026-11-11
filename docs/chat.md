@@ -69,15 +69,16 @@ make docker-up
 
 ```html
 <!-- Add to your HTML before </body> -->
-<script>
-  window.MDDB_CHAT_CONFIG = {
-    serverUrl: 'ws://localhost:11030/ws',
-    title: 'Documentation Assistant',
-    primaryColor: '#2563eb'
-  };
-</script>
-<script src="http://localhost:11032/mddb-chat.min.js" defer></script>
+<script src="http://localhost:11032/mddb-chat.min.js"
+        data-server="ws://localhost:11030/ws"
+        data-scenario="assistant"
+        data-accent="#2563eb"
+        defer></script>
 ```
+
+The widget is configured by the `data-*` attributes of its own script tag
+(all of them in [Widget Configuration](#widget-configuration)); on a public
+page `data-server` must be `wss://`.
 
 ### Self-Hosted Widget
 
@@ -210,19 +211,128 @@ The scenario preview (`/v1/chat/scenarios/{name}/prompt`) reports each server's 
 
 ### Widget Configuration
 
-```javascript
-window.MDDB_CHAT_CONFIG = {
-  serverUrl: 'ws://localhost:11030/ws',  // Chat server WebSocket URL
-  title: 'Documentation Assistant',      // Widget header title
-  subtitle: 'Powered by MDDB',           // Widget header subtitle
-  primaryColor: '#2563eb',               // Accent color (hex)
-  position: 'bottom-right',             // bottom-right | bottom-left
-  welcomeMessage: 'Hello! How can I help you today?',
-  identityToken: '<signed join token>'   // 2.19.0, optional: a signed-in user (see above)
-};
+The widget reads the `data-*` attributes of the last `<script data-server>`
+tag on the page, and one key of `window.MDDB_CHAT_CONFIG`. Nothing else is
+read: earlier versions of this page listed `serverUrl`, `title`, `subtitle`,
+`primaryColor`, `welcomeMessage` and `position` keys of `MDDB_CHAT_CONFIG`,
+which the widget never used.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `data-server` | required | The chat server's WebSocket URL. It must be `wss://`; `ws://` is accepted only for `localhost`, `127.0.0.1` and `[::1]`. Anything else: the widget logs an error and does not start |
+| `data-scenario` | `assistant` | The scenario to join |
+| `data-theme` | `light` | `light` or `dark`; read, but it currently changes nothing |
+| `data-accent` | none | Accent colour (any CSS colour); unset, the stylesheet's `--mddb-accent` (`#3B82F6`) applies |
+| `data-position` | `bottom-right` | `bottom-right` or `bottom-left` |
+| `data-session-ttl` | `24` | Hours a session is kept in the browser for a resume |
+| `window.MDDB_CHAT_CONFIG.identityToken` | none (anonymous) | 2.19.0: a signed join token for a signed-in user ([above](#signed-in-users-2190)); a non-empty string, read again at every join so the host can refresh it |
+
+```html
+<script>window.MDDB_CHAT_CONFIG = { identityToken: '<token from your backend>' };</script>
+<script src="https://chat.example.org/mddb-chat.min.js"
+        data-server="wss://chat.example.org/ws"
+        data-scenario="support"
+        data-accent="#0b57d0"
+        data-position="bottom-left"
+        data-session-ttl="12"
+        defer></script>
 ```
 
-Each rating (thumbs up/down) carries the `message_id` of the answer it rates (2.19.0).
+The widget is also reachable as `window.__mddbChat` for programmatic control.
+Each rating (thumbs up/down) carries the `message_id` of the answer it rates
+(2.19.0); after a thumbs-down the widget offers an optional comment
+([below](#conversation-log-and-feedback-2190)).
+
+### Conversation log and feedback (2.19.0)
+
+Operators can see what people ask and which answers are bad (#406). A
+scenario stored in mddbd opts in with `logging`:
+
+```json
+"logging": {"enabled": true, "retentionDays": 30, "redact": true}
+```
+
+`enabled` is `false` unless set; `redact` is `true` unless set to `false`;
+`retentionDays` (0–3650, 0 = mddbd's `MDDB_CHAT_RETENTION_DAYS`, 30) is how
+long an anonymous session's log is kept. The panel's scenario editor has the
+same three fields under *Conversation log*. A TOML scenario does not log.
+
+**What is recorded.** With logging on, `mddb-chat` stores every turn of the
+scenario in mddbd's conversation store, anonymous sessions included:
+
+- the question and the final answer;
+- every tool call: its name, collection, the query (or a document key), the
+  keys it found, best first, the best score, and how long it took;
+- the model and provider, the latency of the whole turn and the tokens of
+  all its rounds;
+- the outcome: `answered`; `noResults` — the turn searched and nothing it
+  looked for was found; `refused` — the reply is the scenario's redirect text
+  in `offTopic.mode: redirect` (mddbd detects this when the turn is stored;
+  in the `refuse` and `brief` modes a decline counts as `answered`);
+  `error` — the model failed after the question was accepted;
+- later, the visitor's rating and comment.
+
+**Where.** A signed-in user's turns go to that user's own conversation
+([Signed-in users](#signed-in-users-2190)), with its retention. An anonymous
+session gets a conversation of its own, created at its first logged turn,
+whose `sub` is `anon:<session id>` and whose retention is
+`logging.retentionDays`. Without logging, a signed user's conversation is
+stored as before (#405) and an anonymous session stores nothing.
+
+**Feedback.** Every answer is stored under the `message_id` of the `done`
+frame that ended it, so a rating names it exactly. The `feedback` frame
+takes an optional `comment`:
+
+```json
+{"type": "feedback", "rating": "down", "question": "…", "answer": "…",
+ "message_id": "3f9a…", "comment": "The port is wrong."}
+```
+
+The rating is still logged and sent to the `feedback` webhook as before;
+it is now also stored with the answer (`POST /v1/chat/conversations/{id}/feedback`)
+for a signed session and for a logged anonymous session — trimmed, the
+comment cut to 2000 characters. Rating again replaces the earlier rating.
+The widget sends the thumbs-down at once and then offers a short comment box
+under the answer (a labelled text area, *Send* and *Skip*, Escape closes it);
+*Send* repeats the rating with the comment.
+
+**Reviewing.** The panel's Chat page has a *Log* tab: filters (scenario,
+dates, thumbs-down only, no results, refused, outcome), expandable turns with
+their tools, model, latency, tokens, rating and comment, CSV and JSON export,
+and *Docs gaps* — the questions whose searches found nothing or scored below
+a threshold (`MDDB_CHAT_GAP_SCORE`, default 0.3), grouped by their normalised
+text and counted, most frequent first: what to write next. The same is
+available as `GET /v1/chat/log`, `/v1/chat/log/export` and `/v1/chat/gaps`
+([API.md](API.md#chat-conversation-log-v1chatlog)), over gRPC and as the MCP
+tools `chat_log_list` and `chat_gaps`.
+
+**Privacy model.**
+
+- **Off by default.** Nothing is logged until an administrator turns
+  `logging.enabled` on for a scenario; turning it on is a decision to tell
+  visitors about.
+- **Redaction on by default**, done by mddbd before anything is stored, the
+  same for every writer: e-mail addresses; `Bearer`/`Basic` credentials;
+  JSON Web Tokens; keys with known prefixes (`sk-`/`pk-`/`rk-`, GitHub
+  `ghp_`…/`github_pat_`, Slack `xox…-`, AWS `AKIA…`, Google `AIza…`); the
+  value after `api_key=`, `token:`, `password=` and the like; card-like runs
+  of 13–19 digits (spaces or dashes allowed between them); and any unbroken
+  run of 32 or more letters and digits mixed. Each becomes `[redacted]` — in
+  the question, the answer, tool queries and feedback comments. Once a
+  conversation is written with redaction it stays redacted for every later
+  write. It is a best effort over common shapes, not a guarantee: a secret
+  that looks like a word passes.
+- **Identities only to global administrators.** The log, its export and the
+  gaps are global admin only. A signed user appears with their `sub` and
+  display name; an anonymous turn is marked `anonymous` and its session id is
+  never shown as an identity. A visitor's chosen name is not stored for an
+  anonymous session.
+- **Retention** is the stored document's TTL: an anonymous log is removed
+  `logging.retentionDays` after its last write, a signed user's with their
+  conversation. GDPR export and erasure per `sub` (#405) cover a signed
+  user's logged turns as well.
+- **Webhooks are unchanged**: the `message`, `answer` and `feedback` events
+  (#399) fire whether or not a scenario logs.
 
 ## LLM Provider Examples
 

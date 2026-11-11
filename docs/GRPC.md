@@ -192,6 +192,9 @@ The complete service definition is in [`proto/mddb.proto`](https://github.com/tr
 | | `DeleteChatConversation` | `DeleteChatConversationRequest` → `DeleteChatConversationResponse` |
 | | `DeleteChatConversationsForUser` | `DeleteChatConversationsForUserRequest` → `DeleteChatConversationsForUserResponse` |
 | | `ExportChatConversations` | `ExportChatConversationsRequest` → `stream ChatConversationProto` |
+| | `RateChatMessage` | `RateChatMessageRequest` → `RateChatMessageResponse` |
+| | `ListChatLog` | `ListChatLogRequest` → `ListChatLogResponse` |
+| | `ListChatGaps` | `ListChatGapsRequest` → `ListChatGapsResponse` |
 | **System** | `Stats` | `StatsRequest` → `StatsResponse` |
 
 A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/follower replication — see [Replication Service](#replication-service).
@@ -344,6 +347,37 @@ grpcurl -plaintext -d '{"sub":"user-42","scenario":"support"}' localhost:11024 m
 grpcurl -plaintext -d '{"id":"<id>","sub":"user-42","messages":[{"role":"user","content":"hi"}]}' \
   localhost:11024 mddb.MDDB/AppendChatMessages
 grpcurl -plaintext -d '{"sub":"user-42"}' localhost:11024 mddb.MDDB/ExportChatConversations
+```
+
+#### Answer feedback and the conversation log (v2.19.0, #406)
+
+The rating of an answer and the admin review of the turn log, as
+`POST /v1/chat/conversations/{id}/feedback`, `GET /v1/chat/log` and
+`GET /v1/chat/gaps` ([API.md](API.md#chat-conversation-log-v1chatlog)).
+
+| RPC | Permission | |
+|---|---|---|
+| `RateChatMessage` | write on the chat collection, writable server — as `AppendChatMessages` | `{id, sub, message_id, rating, comment}` → `{conversation_id, message_id, feedback}`; `rating` is `up` or `down`, `comment` at most 2000 characters; `NOT_FOUND` for a message that is not an answer of the conversation |
+| `ListChatLog` | global admin | `{scenario, from, to, rating, outcome, cursor, limit}` → `turns` (`ChatLogTurnProto`) newest first and `next_cursor`; `from`/`to` are unix seconds (0: no bound) |
+| `ListChatGaps` | global admin | `{scenario, from, to, min_count, threshold, limit}` → `gaps` (`ChatGapProto`: `question`, `example`, `count`, `no_results`, `last_asked_at`, `scenarios`) and the `threshold` used |
+
+The export (`GET /v1/chat/log/export`, CSV or JSON) is REST only: walk
+`ListChatLog` with its cursor for the same turns over gRPC.
+
+Additive message fields: `ChatMessageProto` gains `outcome` (`answered`,
+`noResults`, `refused`, `error` — a logged turn), `latency_ms` and `feedback`
+(`ChatFeedbackProto`: `rating`, `comment`, `at`), and keeps an `id` the
+client sends when it matches `[A-Za-z0-9_-]{1,64}`; `ChatToolCallProto` gains
+`query`, `result_keys` and `top_score`; `AppendChatMessagesRequest` gains
+`redact` (sticky: the conversation's `redact` is set and every later write of
+it is redacted). `ChatScenarioProto` gains `logging` (`ChatLoggingProto`:
+`enabled`, `retention_days`, `optional bool redact` — unset means on).
+
+```bash
+grpcurl -plaintext -d '{"id":"<id>","sub":"user-42","message_id":"<answer id>","rating":"down","comment":"Wrong port"}' \
+  localhost:11024 mddb.MDDB/RateChatMessage
+grpcurl -plaintext -H "authorization: Bearer $ADMIN_TOKEN" -d '{"rating":"down","limit":20}' localhost:11024 mddb.MDDB/ListChatLog
+grpcurl -plaintext -H "authorization: Bearer $ADMIN_TOKEN" -d '{"min_count":2}' localhost:11024 mddb.MDDB/ListChatGaps
 ```
 
 #### Corpus packs (v2.19.0)

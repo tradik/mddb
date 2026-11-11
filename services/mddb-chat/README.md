@@ -256,7 +256,7 @@ Every frame is a JSON object with a `type`.
 |--------------|--------|----------------|
 | `join` | `name`, `scenario` (default `assistant`); signed: `token`, `conversation_id`, `new_conversation` | `session` `{id, scenario, conversation_id?}` (then `history` `{messages}` when a stored conversation resumes), or `queued` `{position}` and `session` later |
 | `message` | `content` | `chunk` `{content}` repeatedly, then `done` `{message_id}` |
-| `feedback` | `rating`, `question`, `answer`, `message_id` (optional) | nothing |
+| `feedback` | `rating`, `question`, `answer`, `message_id` (optional), `comment` (optional, 2.19.0) | nothing |
 | `resume` | `session_id` | `session` `{id, scenario}` of the session reattached |
 | `end` | — | `ended` |
 | `ping` | — | `pong` |
@@ -349,6 +349,32 @@ rating names one answer unambiguously:
 
 Both fields are additions. A client written before them ignores the extra
 field on `done`, and a `feedback` without `message_id` is still accepted.
+
+### The turn log and stored ratings (2.19.0, #406)
+
+The answer is stored in mddbd under the same `message_id`, so a rating can
+be stored with it:
+
+- **Signed session** (#405): every answer goes to the user's conversation
+  under its `message_id`. A `feedback` with a `message_id` is stored there
+  (`RateChatMessage`), with its optional `comment` trimmed and cut to 2000
+  characters.
+- **Scenario with `logging.enabled`** (a scenario stored in mddbd; TOML
+  scenarios do not log): every turn is recorded, anonymous sessions included.
+  An anonymous session's turns go to a conversation of its own, `sub`
+  `anon:<session id>`, created at its first logged turn with the scenario's
+  `logging.retentionDays`; a signed session's go to the user's conversation.
+  The answer then also carries each tool call's query, result keys, best
+  score and duration, the turn's latency and its outcome — `answered`,
+  `noResults` (it searched and found nothing) or `error` (the model failed
+  after the question was accepted; mddbd turns a redirect reply into
+  `refused`). With `logging.redact` (the default) every append asks mddbd to
+  redact e-mails, tokens and card-like numbers; mddbd does it before storing.
+- **Neither**: the rating stays a log line and a `feedback` webhook, as before.
+
+Every write is best effort: a failure is logged and the visitor's turn goes
+on. The review side — the log, its export and the docs gaps — is mddbd's
+(`GET /v1/chat/log`, [docs/chat.md](../../docs/chat.md#conversation-log-and-feedback-2190)).
 
 ## Webhooks
 
@@ -489,6 +515,8 @@ src/
   session/           admission, queue, history, token budget, per-session pace
   security/          rate limiting, client IP, input sanitising
   chat/trace.rs      one turn's message ids, tools called and latency
+  chat/turnlog.rs    the turn log (#406): what an answer is stored with, the anonymous log
+  chat/rating.rs     a rating stored with the answer it rates (#406)
   webhook/           webhooks: session lifecycle, message, answer, feedback
 ```
 
