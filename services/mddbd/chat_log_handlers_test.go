@@ -163,9 +163,8 @@ func TestChatLogClosedStore(t *testing.T) {
 	if json.Unmarshal(rec.Body.Bytes(), &turns) != nil || len(turns) != 3 {
 		t.Fatalf("every turn: %s", rec.Body)
 	}
-	if err := s.DB.Close(); err != nil {
-		t.Fatal(err)
-	}
+	// Both storage layouts: the conversations may live in their own file.
+	closeStorage(t, s, chatConversationsCollection)
 	for _, target := range []string{"/v1/chat/log", "/v1/chat/log/export", "/v1/chat/gaps"} {
 		if rec := chatREST(t, s, root, http.MethodGet, target, ""); rec.Code == http.StatusOK {
 			t.Errorf("%s on a closed store: %d", target, rec.Code)

@@ -62,7 +62,13 @@ func TestGraphResolverEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := srv.DB.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket(srv.BucketNames.IdxMeta) }); err != nil {
+	// Both storage layouts: the index lives in the collection's own file when
+	// collections are stored per file.
+	db, err := srv.collectionDBForWrite("theme")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Update(func(tx *bolt.Tx) error { return tx.DeleteBucket(srv.BucketNames.IdxMeta) }); err != nil {
 		t.Fatal(err)
 	}
 	if edges, truncated := srv.neighbours(GraphRequest{Collection: "theme", Direction: GraphBoth, MaxDegree: 10}, ref); len(edges) != 0 || truncated {

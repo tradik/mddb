@@ -92,7 +92,8 @@ func TestDeleteHandlersRefuseAndReport(t *testing.T) {
 		t.Errorf("delete-collection to a gone client: %d", fw.code)
 	}
 
-	_ = s.DB.Close()
+	// Both storage layouts: the collection may live in its own file.
+	closeStorage(t, s, "blog")
 	rec := doRequest(t, s.handleDeleteBatch, map[string]any{"collection": "blog", "documents": []map[string]string{{"key": "a", "lang": "en"}}})
 	var resp map[string]any
 	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
