@@ -7,12 +7,13 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 
 vi.mock('../lib/mddb-client', () => ({
-  default: { vectorStats: vi.fn(), listCollectionConfigs: vi.fn(), deleteCollection: vi.fn(), getStats: vi.fn() },
+  default: { vectorStats: vi.fn(), listCollectionConfigs: vi.fn(), deleteCollection: vi.fn(), getStats: vi.fn(), listFeatures: vi.fn() },
 }));
 
 const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
 const { default: Sidebar } = await import('./Sidebar');
+const { resetFeatures } = await import('../lib/features');
 
 const initialStore = useStore.getState();
 const stats = {
@@ -34,6 +35,8 @@ beforeEach(() => {
   useStore.setState(initialStore, true);
   vi.mocked(mddbClient.vectorStats).mockReset().mockResolvedValue(null);
   vi.mocked(mddbClient.listCollectionConfigs).mockReset().mockResolvedValue({ configs: [] });
+  resetFeatures();
+  vi.mocked(mddbClient.listFeatures).mockReset().mockResolvedValue({ features: [], version: 0 });
 });
 afterEach(() => {
   cleanup();
@@ -159,5 +162,13 @@ describe('Sidebar administration', () => {
     await renderWith();
     fireEvent.click(screen.getByRole('button', { name: 'Agent Memory' }));
     expect(useStore.getState().viewMode).toBe('memory');
+  });
+
+  test('a page whose module is switched off leaves the menu; Features is always listed (GO-049)', async () => {
+    vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features: [{ name: 'geo', enabled: false }], version: 1 });
+    await renderWith();
+    expect(screen.queryByText('Geo Search')).toBeNull();
+    expect(screen.getByText('Features')).toBeTruthy();
+    expect(screen.getByText('Temporal Analytics', { exact: false })).toBeTruthy();
   });
 });

@@ -38,6 +38,9 @@ import AliasesPanel from './components/AliasesPanel';
 import EvalPanel from './components/EvalPanel';
 import CodeSymbolPanel from './components/CodeSymbolPanel';
 import ChatScenariosPanel from './components/ChatScenariosPanel';
+import FeaturesPanel from './components/FeaturesPanel';
+import FeatureDisabledNotice from './components/FeatureDisabledNotice';
+import { useFeatures, disabledFeatureForView } from './lib/features';
 import ComplianceBanner from './components/ComplianceBanner';
 import SSEToast from './components/SSEToast';
 import { useSSE } from './lib/useSSE';
@@ -53,13 +56,17 @@ function App() {
     setStatsError,
     currentDocument,
     searchMode,
-    viewMode,
+    viewMode: requestedView,
     sidebarWidth,
     sidebarCollapsed,
     setSidebarWidth,
     setSidebarCollapsed,
     setConfig,
   } = useStore();
+  // GO-049: a page whose server module is off shows a notice instead.
+  const { features, reload: reloadFeatures } = useFeatures();
+  const disabledFeature = disabledFeatureForView(requestedView, features);
+  const viewMode = disabledFeature ? 'featureDisabled' : requestedView;
 
   const [isAuthenticated, setIsAuthenticated] = useState(authManager.isAuthenticated());
   const [needsAuth, setNeedsAuth] = useState(false);
@@ -152,6 +159,7 @@ function App() {
     return <LoginForm onSuccess={() => {
       setIsAuthenticated(true);
       setNeedsAuth(false);
+      reloadFeatures();
       useStore.getState().setViewMode('system');
       loadStats();
     }} />;
@@ -210,6 +218,16 @@ function App() {
               <ConfigPanel />
             </div>
           )}
+            {viewMode === 'features' && (
+              <div className="flex-1 border-l border-gray-200">
+                <FeaturesPanel />
+              </div>
+            )}
+            {viewMode === 'featureDisabled' && (
+              <div className="flex-1 border-l border-gray-200">
+                <FeatureDisabledNotice feature={disabledFeature} />
+              </div>
+            )}
           {viewMode === 'mcp' && (
             <div className="flex-1 border-l border-gray-200">
               <MCPConfigPanel />

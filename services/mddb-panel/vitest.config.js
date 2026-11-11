@@ -100,6 +100,12 @@ const coverageFiles = [
   'src/lib/client/batch.js',
   'src/lib/client/imports.js',
   'src/lib/client/maintenance.js',
+  // 2.19.0: module on/off switches (GO-049).
+  'src/lib/client/features.js',
+  'src/lib/features.js',
+  'src/components/FeatureDisabledNotice.jsx',
+  'src/components/FeaturesPanel.jsx',
+  'src/components/FeatureRow.jsx',
   'src/lib/json-text.js',
   'src/lib/use-job-polling.js',
   'src/components/ConfirmDialog.jsx',

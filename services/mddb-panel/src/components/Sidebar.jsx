@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Folder, Database, Trash2, Brain, Server, Settings, Network, Users, UsersIcon, Upload, FolderPlus, Sliders, GitBranch, PanelLeftClose, BookOpen, Ban, Zap, Globe, Image, Music, FileText, Settings2, Shuffle, Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2, MessageSquare } from 'lucide-react';
+import { Folder, Database, Trash2, Brain, Server, Settings, Network, Users, UsersIcon, Upload, FolderPlus, Sliders, GitBranch, PanelLeftClose, BookOpen, Ban, Zap, Globe, Image, Music, FileText, Settings2, Shuffle, Clock, Type, Pin, FileSearch, Webhook, Shield, Lock, ScatterChart, Compass, Link2, Gauge, Code2, MessageSquare, ToggleRight } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
+import { useFeatures, isViewEnabled } from '../lib/features';
 import UploadModal from './UploadModal';
 import CreateCollectionModal from './CreateCollectionModal';
 import CollectionConfigModal from './CollectionConfigModal';
@@ -11,6 +12,9 @@ import AdminToolNav from './AdminToolNav';
 // One entry of the administration menu; the open page is highlighted.
 function NavButton({ mode, icon: Icon, label }) {
   const { viewMode, setViewMode } = useStore();
+  const { features } = useFeatures();
+  // GO-049: a page whose server module is off leaves the menu.
+  if (!isViewEnabled(mode, features)) return null;
   return (
     <button
       onClick={() => setViewMode(mode)}
@@ -298,6 +302,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
             <NavButton mode="cluster" icon={GitBranch} label="Cluster" />
           )}
           <NavButton mode="config" icon={Settings} label="Configuration" />
+          <NavButton mode="features" icon={ToggleRight} label="Features" />
           <NavButton mode="mcp" icon={Brain} label="LLM Connections" />
           <NavButton mode="endpoints" icon={Network} label="API Endpoints" />
           <NavButton mode="chat" icon={MessageSquare} label="Chat" />

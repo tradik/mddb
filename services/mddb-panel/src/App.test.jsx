@@ -5,7 +5,7 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 
-vi.mock('./lib/mddb-client', () => ({ default: { getStats: vi.fn(), getConfig: vi.fn() } }));
+vi.mock('./lib/mddb-client', () => ({ default: { getStats: vi.fn(), getConfig: vi.fn(), listFeatures: vi.fn() } }));
 vi.mock('./lib/auth', () => ({ authManager: { isAuthenticated: vi.fn(() => false) } }));
 vi.mock('./lib/useSSE', () => ({ useSSE: vi.fn(() => ({ connected: true, lastEvent: null })) }));
 // Every page has its own suite; here each one is a label.
@@ -46,6 +46,8 @@ vi.mock('./components/WebhooksPanel', () => ({ default: () => 'webhooks panel' }
 vi.mock('./components/SecurityDashboard', () => ({ default: () => 'security dashboard' }));
 vi.mock('./components/EncryptionPanel', () => ({ default: () => 'encryption panel' }));
 vi.mock('./components/AliasesPanel', () => ({ default: () => 'aliases panel' }));
+vi.mock('./components/FeaturesPanel', () => ({ default: () => 'features panel' }));
+vi.mock('./components/FeatureDisabledNotice', () => ({ default: ({ feature }) => `feature ${feature} is off` }));
 vi.mock('./components/ChatScenariosPanel', () => ({ default: () => 'chat scenarios panel' }));
 vi.mock('./components/EvalPanel', () => ({ default: () => 'eval panel' }));
 vi.mock('./components/CodeSymbolPanel', () => ({ default: () => 'code symbol panel' }));
@@ -56,6 +58,7 @@ const { default: mddbClient } = await import('./lib/mddb-client');
 const { useSSE } = await import('./lib/useSSE');
 const { useStore } = await import('./lib/store');
 const { default: App } = await import('./App');
+const { resetFeatures } = await import('./lib/features');
 
 const initialStore = useStore.getState();
 const stats = { totalDocuments: 3, collections: [] };
@@ -78,6 +81,8 @@ beforeEach(() => {
   useStore.setState(initialStore, true);
   vi.mocked(mddbClient.getStats).mockReset().mockResolvedValue(stats);
   vi.mocked(mddbClient.getConfig).mockReset().mockResolvedValue({ version: '2.19.0' });
+  resetFeatures();
+  vi.mocked(mddbClient.listFeatures).mockReset().mockResolvedValue({ features: [], version: 0 });
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(cleanup);
@@ -198,9 +203,15 @@ describe('App', () => {
     ['automation', 'automation panel'], ['settings', 'settings panel'], ['temporal', 'temporal panel'],
     ['spellcheck', 'spell check panel'], ['auditLog', 'audit log panel'], ['webhooks', 'webhooks panel'],
     ['security', 'security dashboard'], ['encryption', 'encryption panel'],
-    ['memory', 'admin tool page'],
+    ['memory', 'admin tool page'], ['features', 'features panel'],
   ])('view mode %s shows only %s', async (viewMode, label) => {
     const { container } = await renderWith({ viewMode, currentDocument: { key: 'a' } });
     expect(container.querySelector('.flex-1.flex.overflow-hidden').textContent).toBe(label);
+  });
+
+  test('a page whose module is switched off shows the notice instead (GO-049)', async () => {
+    vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features: [{ name: 'geo', enabled: false }], version: 1 });
+    const { container } = await renderWith({ viewMode: 'geo' });
+    expect(container.querySelector('.flex-1.flex.overflow-hidden').textContent).toBe('feature geo is off');
   });
 });
