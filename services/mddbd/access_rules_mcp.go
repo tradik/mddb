@@ -118,6 +118,7 @@ var mcpToolAccessRules = map[string]accessRule{
 	"geo_decode":           ruleAuthenticated,
 	"chat_scenario_list":   ruleAuthenticated, // #403: filtered to what the caller may read
 	"chat_scenario_get":    ruleHandler,       // #403: the scenario's collections, checked when it is read
+	"feature_list":         ruleAuthenticated, // GO-049: as GET /v1/features
 	"wordpress_set_status": ruleAuthenticated, // a post on the WordPress site, not in MDDB
 
 	// Global administration.
@@ -127,6 +128,7 @@ var mcpToolAccessRules = map[string]accessRule{
 	"corpus_remove":        ruleAdmin, // as POST /v1/corpus/remove
 	"chat_scenario_put":    ruleAdmin, // #403: as PUT /v1/chat/scenarios/{name}
 	"chat_scenario_delete": ruleAdmin, // #403: as DELETE /v1/chat/scenarios/{name}
+	"feature_set":          ruleAdmin, // GO-049: as PUT /v1/features/{name}
 	"chat_skill_list":      ruleAdmin, // #404: a skill's text is part of system prompts, so reads are admin too
 	"chat_skill_get":       ruleAdmin,
 	"chat_skill_put":       ruleAdmin,

@@ -95,6 +95,7 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/ListChatScenarios":     ruleAuthenticated,
 	"/mddb.MDDB/GetChatScenario":       ruleHandler,
 	"/mddb.MDDB/GetChatScenarioPrompt": ruleHandler,
+	"/mddb.MDDB/ListFeatures":          ruleAuthenticated, // GO-049: as GET /v1/features
 
 	// Global administration.
 	"/mddb.MDDB/Backup":            ruleAdmin,
@@ -126,6 +127,8 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/ImportChatSkill":    ruleAdmin,
 	"/mddb.MDDB/UpdateChatSkill":    ruleAdmin,
 	"/mddb.MDDB/GetChatSkillUsedBy": ruleAdmin,
+	// GO-049, as PUT /v1/features/{name}.
+	"/mddb.MDDB/SetFeature": ruleAdmin,
 
 	// Chat conversations (#405) authorize themselves, as /v1/chat/conversations:
 	// the collection is the chat collection of the caller's tenant.

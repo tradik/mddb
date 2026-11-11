@@ -75,19 +75,19 @@ func (f *FeatureManager) LoadAll() error {
 	var version uint64
 	err := f.handle().Update(func(tx *bolt.Tx) error {
 		b, err := tx.CreateBucketIfNotExists(bucketFeatures)
-		if err != nil {
-			return err
-		}
-		if v := b.Get(featureVersionKey); len(v) == 8 {
-			version = binary.BigEndian.Uint64(v)
-		}
-		return b.ForEach(func(k, v []byte) error {
-			var s featureSetting
-			if string(k) != string(featureVersionKey) && json.Unmarshal(v, &s) == nil {
-				m[string(k)] = s
+		if err == nil {
+			if v := b.Get(featureVersionKey); len(v) == 8 {
+				version = binary.BigEndian.Uint64(v)
 			}
-			return nil
-		})
+			err = b.ForEach(func(k, v []byte) error {
+				var s featureSetting
+				if string(k) != string(featureVersionKey) && json.Unmarshal(v, &s) == nil {
+					m[string(k)] = s
+				}
+				return nil
+			})
+		}
+		return err
 	})
 	if err != nil {
 		return err
@@ -142,10 +142,11 @@ func (f *FeatureManager) Set(name string, enabled bool, by string) error {
 		if b == nil {
 			return errFeatureUnavailable
 		}
-		if err := b.Put([]byte(name), val); err != nil {
-			return err
+		err := b.Put([]byte(name), val)
+		if err == nil {
+			err = b.Put(featureVersionKey, next)
 		}
-		return b.Put(featureVersionKey, next)
+		return err
 	}); err != nil {
 		return err
 	}

@@ -134,6 +134,10 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"chat_scenario_put":    writeIdempotent(), // a replace: the same call twice stores the same scenario
 	"chat_scenario_delete": destructive(),     // MCP-004 asks for the scenario's name
 
+	// --- Module switches (GO-049) ---
+	"feature_list": readOnly(),
+	"feature_set":  writeIdempotent(), // the same call twice leaves the same switch
+
 	// --- Chat skills (#404) ---
 	"chat_skill_list":   readOnly(),
 	"chat_skill_get":    readOnly(),
