@@ -144,6 +144,12 @@ const coverageFiles = [
   'src/components/TtlControl.jsx',
   'src/components/ClassifyBox.jsx',
   'src/components/CodeGraphCard.jsx',
+  'src/lib/postcode-lines.js',
+  'src/components/GeoPanel.jsx',
+  'src/components/GeoToolsPanel.jsx',
+  'src/components/GeoAreaSearch.jsx',
+  'src/components/GeohashTools.jsx',
+  'src/components/GeoReindexForm.jsx',
 ];
 
 export default mergeConfig(
