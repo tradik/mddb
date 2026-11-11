@@ -6342,8 +6342,8 @@ paths:
       summary: List chat MCP secrets
       description: |
         The credentials of the external MCP servers chat scenarios use
-        (MCP-005, v2.19.0): names, headers and set, never a value. Requires a
-        global administrator.
+        (MCP-005, v2.19.0): names, headers and set, never a value, and
+        whether a secret can be set at all. Requires a global administrator.
       operationId: listChatMcpSecrets
       responses:
         "200":
@@ -6357,6 +6357,12 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/ChatMcpSecret"
+                  encryptionReady:
+                    type: boolean
+                    description: |
+                      False while no at-rest key (MDDB_ENCRYPTION_KEY) is
+                      loaded: secrets are stored only sealed, so every put
+                      is then refused with 409.
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
 
@@ -6373,9 +6379,10 @@ paths:
         - Chat
       summary: Set or replace a chat MCP secret
       description: |
-        A bearer token, or the value of the header named in `header`. Sealed
-        with the at-rest key when MDDB_ENCRYPTION_KEY is set; never returned.
-        Requires a global administrator.
+        A bearer token, or the value of the header named in `header`. Stored
+        only sealed with the at-rest key: without MDDB_ENCRYPTION_KEY the put
+        is refused with 409 and nothing is stored. Never returned. Requires a
+        global administrator.
       operationId: putChatMcpSecret
       requestBody:
         required: true
@@ -6406,6 +6413,13 @@ paths:
         "400": {$ref: "#/components/responses/BadRequest"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
+        "409":
+          description: |
+            No at-rest key is configured, and a secret is never stored in
+            plain text. Set MDDB_ENCRYPTION_KEY and restart mddbd.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ChatMcpSecretNeedsKey"}
     delete:
       tags:
         - Chat
@@ -6504,6 +6518,11 @@ paths:
                     type: string
                   feature:
                     type: string
+        "409":
+          description: The secret named in secretRef is stored unsealed and is not used; set it again.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/ChatMcpSecretNeedsKey"}
         "502":
           description: The server cannot be reached or answered with an error
           content:
@@ -12746,6 +12765,17 @@ components:
         version:
           $ref: "#/components/schemas/ChatScenarioVersion"
 
+    ChatMcpSecretNeedsKey:
+      type: object
+      description: A secret refused for want of the at-rest key, or stored unsealed.
+      properties:
+        error:
+          type: string
+          example: "mcp secrets are never stored in plain text and no at-rest encryption key is configured: set MDDB_ENCRYPTION_KEY and restart mddbd"
+        requires:
+          type: string
+          enum: [MDDB_ENCRYPTION_KEY]
+
     ChatMcpSecret:
       type: object
       description: A secret as listed; the value is write-only and never returned.
@@ -12757,6 +12787,7 @@ components:
           description: Empty for Authorization Bearer.
         set:
           type: boolean
+          description: A sealed value is stored. False for a value stored unsealed, which is refused when used.
         updatedAt:
           type: string
           format: date-time

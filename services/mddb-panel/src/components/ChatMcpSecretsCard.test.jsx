@@ -57,6 +57,28 @@ describe('ChatMcpSecretsCard', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('API Error (409): in use by: support');
   });
 
+  test('without an encryption key the form is disabled and names the setting', () => {
+    render(<ChatMcpSecretsCard secrets={secrets} encryptionReady={false} onChanged={vi.fn()} />);
+    const note = screen.getByText(/this server has no encryption key/);
+    expect(note.textContent).toContain('Set MDDB_ENCRYPTION_KEY and restart mddbd');
+    expect(screen.getByRole('button', { name: 'Set or replace' }).closest('fieldset').disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Set or replace' }).closest('form').getAttribute('aria-describedby')).toBe(note.id);
+    expect(screen.getByText('used by support')).toBeTruthy();
+  });
+
+  test("a refused put shows the server's message as it is", async () => {
+    const msg = 'mcp secrets are never stored in plain text and no at-rest encryption key is configured: set MDDB_ENCRYPTION_KEY and restart mddbd';
+    vi.mocked(mddbClient.putChatMcpSecret).mockRejectedValueOnce(Object.assign(new Error(`API Error (409): ${msg}`),
+      { status: 409, body: { error: msg, requires: 'MDDB_ENCRYPTION_KEY' } }));
+    render(<ChatMcpSecretsCard secrets={[]} onChanged={vi.fn()} />);
+    expect(screen.queryByText(/no encryption key/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Set or replace' }).closest('fieldset').disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText('Secret name'), { target: { value: 'wiki' } });
+    fireEvent.change(screen.getByLabelText('Secret value'), { target: { value: 's3cr3t' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Set or replace' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(msg);
+  });
+
   test('without admin it says so', () => {
     render(<ChatMcpSecretsCard secrets={null} onChanged={vi.fn()} />);
     expect(screen.getByText(/Secrets need admin/)).toBeTruthy();

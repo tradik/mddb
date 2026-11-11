@@ -3,6 +3,7 @@ import { MessageSquare, Plus, Save, Trash2 } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { useStore } from '../lib/store';
 import { toForm, fromForm, formProblem } from '../lib/chat-scenario';
+import { secretsEncryptionReady } from '../lib/chat-mcp';
 import ChatScenarioForm from './ChatScenarioForm';
 import ChatScenarioList from './ChatScenarioList';
 import ChatScenarioPreview from './ChatScenarioPreview';
@@ -39,6 +40,7 @@ function ScenariosView() {
   const [scenarios, setScenarios] = useState([]);
   const [skills, setSkills] = useState([]); // null: the list is admin only and was refused
   const [secrets, setSecrets] = useState([]); // null, likewise (MCP-005)
+  const [secretsReady, setSecretsReady] = useState(true); // false: no at-rest key, a secret cannot be stored
   const [version, setVersion] = useState(0);
   const [form, setForm] = useState(null);
   const [stored, setStored] = useState(null); // the name being edited; null for a new scenario
@@ -54,7 +56,10 @@ function ScenariosView() {
     })
     .catch((err) => setError(err.message));
 
-  const loadSecrets = () => mddbClient.listChatMcpSecrets().then((data) => setSecrets(data.secrets || []), () => setSecrets(null));
+  const loadSecrets = () => mddbClient.listChatMcpSecrets().then((data) => {
+    setSecrets(data.secrets || []);
+    setSecretsReady(secretsEncryptionReady(data));
+  }, () => setSecrets(null));
 
   useEffect(() => {
     load();
@@ -162,7 +167,7 @@ function ScenariosView() {
           </div>
         )}
       </div>
-      <ChatMcpSecretsCard secrets={secrets} onChanged={loadSecrets} />
+      <ChatMcpSecretsCard secrets={secrets} encryptionReady={secretsReady} onChanged={loadSecrets} />
     </>
   );
 }

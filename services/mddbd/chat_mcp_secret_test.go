@@ -9,6 +9,7 @@ import (
 
 	"mddb/internal/binlog"
 	"mddb/internal/encryption"
+	json "mddb/internal/jsonx"
 
 	bolt "go.etcd.io/bbolt"
 )
@@ -33,7 +34,77 @@ func TestValidChatMcpSecret(t *testing.T) {
 	}
 }
 
+// chatMcpKey loads an at-rest key for the test: an MCP secret is stored only
+// sealed. The key goes away with the test.
+func chatMcpKey(t *testing.T) {
+	t.Helper()
+	t.Setenv("MDDB_ENCRYPTION_KEY", genKey(t))
+	e, err := encryption.NewEncryptor()
+	if err != nil {
+		t.Fatal(err)
+	}
+	SetGlobalEncryptor(e)
+	t.Cleanup(func() { SetGlobalEncryptor(nil) })
+}
+
+// Without an at-rest key a secret is refused and nothing reaches the disk.
+func TestChatMcpSecretNeedsKey(t *testing.T) {
+	SetGlobalEncryptor(nil)
+	db := openChatDB(t, filepath.Join(t.TempDir(), "chat.db"))
+	m := NewChatScenarioManager(db)
+	if err := m.LoadAll(); err != nil {
+		t.Fatal(err)
+	}
+	if chatMcpSecretsKeyReady() {
+		t.Error("ready without a key")
+	}
+	if _, err := m.PutMcpSecret("wiki", "", []byte("plain-tok")); !errors.Is(err, errChatMcpSecretsNeedKey) ||
+		!strings.Contains(err.Error(), "set MDDB_ENCRYPTION_KEY and restart") || strings.Contains(err.Error(), "plain-tok") {
+		t.Fatalf("put without a key: %v", err)
+	}
+	if m.HasMcpSecret("wiki") || m.Version() != 0 {
+		t.Error("a refused put was kept")
+	}
+	_ = db.View(func(tx *bolt.Tx) error {
+		if n := tx.Bucket(bucketChatMcpSecrets).Stats().KeyN; n != 0 {
+			t.Errorf("%d secrets on disk", n)
+		}
+		return nil
+	})
+}
+
+// A value stored unsealed (by a build before the key was required) is
+// refused when read, with or without a key, never used; the listing says it
+// is not set.
+func TestChatMcpSecretUnsealedRefused(t *testing.T) {
+	db := openChatDB(t, filepath.Join(t.TempDir(), "chat.db"))
+	m := NewChatScenarioManager(db)
+	if err := m.LoadAll(); err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketChatMcpSecrets).Put([]byte("old"), []byte(`{"name":"old","value":"cGxhaW4tdG9r"}`))
+	})
+	if err := m.LoadAll(); err != nil || !m.HasMcpSecret("old") {
+		t.Fatalf("reload: %v", err)
+	}
+	for _, withKey := range []bool{false, true} {
+		if withKey {
+			chatMcpKey(t)
+		}
+		h, value, err := m.McpSecretHeader("old")
+		if !errors.Is(err, errChatMcpSecretUnsealed) || h != nil || value != "" || strings.Contains(err.Error(), "plain-tok") ||
+			!strings.Contains(err.Error(), "MDDB_ENCRYPTION_KEY") {
+			t.Errorf("key %v: %v %q %v", withKey, h, value, err)
+		}
+	}
+	if list := m.ListMcpSecrets(); len(list) != 1 || list[0].Set {
+		t.Errorf("list: %+v", list[0])
+	}
+}
+
 func TestChatMcpSecretStore(t *testing.T) {
+	chatMcpKey(t)
 	db := openChatDB(t, filepath.Join(t.TempDir(), "chat.db"))
 	m := NewChatScenarioManager(db)
 	if (*ChatScenarioManager)(nil).HasMcpSecret("x") {
@@ -105,13 +176,7 @@ func TestChatMcpSecretStore(t *testing.T) {
 // With an at-rest key the value is sealed on disk; without the key it
 // cannot be opened, and the error says so without the value.
 func TestChatMcpSecretSealedAtRest(t *testing.T) {
-	t.Setenv("MDDB_ENCRYPTION_KEY", genKey(t))
-	e, err := encryption.NewEncryptor()
-	if err != nil {
-		t.Fatal(err)
-	}
-	SetGlobalEncryptor(e)
-	defer SetGlobalEncryptor(nil)
+	chatMcpKey(t)
 	db := openChatDB(t, filepath.Join(t.TempDir(), "chat.db"))
 	m := NewChatScenarioManager(db)
 	if err := m.LoadAll(); err != nil {
@@ -143,11 +208,21 @@ func TestChatMcpSecretsReplicate(t *testing.T) {
 	if err := s.ChatScenarios.LoadAll(); err != nil {
 		t.Fatal(err)
 	}
+	chatMcpKey(t)
+	sealed, err := globalEncryptor.EncryptAlways([]byte("tok"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	val, _ := json.Marshal(&chatMcpSecret{Name: "wiki", Value: sealed})
 	ra := NewReplicationApplier(s)
-	covKApply(t, ra, &binlog.BinlogEntry{LSN: 1, Type: binlog.BinlogPut, BucketName: string(bucketChatMcpSecrets), Key: []byte("wiki"),
-		Value: []byte(`{"name":"wiki","value":"dG9r"}`)})
+	covKApply(t, ra, &binlog.BinlogEntry{LSN: 1, Type: binlog.BinlogPut, BucketName: string(bucketChatMcpSecrets), Key: []byte("wiki"), Value: val})
 	covKApply(t, ra, &binlog.BinlogEntry{LSN: 2, Type: binlog.BinlogPut, BucketName: string(bucketChatMcpSecrets), Key: []byte("broken"), Value: []byte(`{`)})
+	covKApply(t, ra, &binlog.BinlogEntry{LSN: 3, Type: binlog.BinlogPut, BucketName: string(bucketChatMcpSecrets), Key: []byte("plain"),
+		Value: []byte(`{"name":"plain","value":"dG9r"}`)})
 	if _, value, err := s.ChatScenarios.McpSecretHeader("wiki"); err != nil || value != "tok" || s.ChatScenarios.HasMcpSecret("broken") {
 		t.Errorf("after replication: %q %v", value, err)
+	}
+	if _, _, err := s.ChatScenarios.McpSecretHeader("plain"); !errors.Is(err, errChatMcpSecretUnsealed) {
+		t.Errorf("a replicated plain value: %v", err)
 	}
 }

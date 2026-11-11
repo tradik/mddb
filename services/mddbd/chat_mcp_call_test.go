@@ -2,12 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
-	"mddb/internal/encryption"
 	json "mddb/internal/jsonx"
 )
 
@@ -120,13 +120,7 @@ func TestChatMcpCallRESTRefusals(t *testing.T) {
 func TestChatMcpCallWithAnUnopenableSecret(t *testing.T) {
 	f := newMcpFixture(t)
 	f.token = "sealed-tok"
-	t.Setenv("MDDB_ENCRYPTION_KEY", genKey(t))
-	e, err := encryption.NewEncryptor()
-	if err != nil {
-		t.Fatal(err)
-	}
-	SetGlobalEncryptor(e)
-	defer SetGlobalEncryptor(nil)
+	chatMcpKey(t)
 	s := chatServer(t)
 	externalMcpOn(t, s)
 	if _, err := s.PutChatMcpSecret("wiki", "", "sealed-tok"); err != nil {
@@ -150,9 +144,19 @@ func TestChatMcpCallWithAnUnopenableSecret(t *testing.T) {
 func TestChatMcpServiceEdges(t *testing.T) {
 	s := chatServer(t)
 	externalMcpOn(t, s)
+	if _, err := s.PutChatMcpSecret("a", "", "v"); !errors.Is(err, errChatMcpSecretsNeedKey) {
+		t.Errorf("put without a key: %v", err)
+	}
+	if l := s.ListChatMcpSecrets(); l.EncryptionReady || len(l.Secrets) != 0 {
+		t.Errorf("list without a key: %+v", l)
+	}
+	chatMcpKey(t)
+	if !s.ListChatMcpSecrets().EncryptionReady {
+		t.Error("not ready with a key")
+	}
 	s.ChatScenarios = nil
-	if len(s.ListChatMcpSecrets()) != 0 {
-		t.Error("secrets without a store")
+	if l := s.ListChatMcpSecrets(); len(l.Secrets) != 0 || !l.EncryptionReady {
+		t.Errorf("secrets without a store: %+v", l)
 	}
 	if _, err := s.PutChatMcpSecret("a", "", "v"); err != errChatScenariosUnavailable {
 		t.Errorf("put: %v", err)

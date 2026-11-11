@@ -360,7 +360,8 @@ type MDDBClient interface {
 	// returns a value. Admin, except CallChatMcpTool.
 	// The secrets: name, header, set and the scenarios using each.
 	ListChatMcpSecrets(ctx context.Context, in *ListChatMcpSecretsRequest, opts ...grpc.CallOption) (*ListChatMcpSecretsResponse, error)
-	// Sets or replaces a secret.
+	// Sets or replaces a secret, sealed with the at-rest key. FAILED_PRECONDITION
+	// without MDDB_ENCRYPTION_KEY: a secret is never stored in plain text.
 	PutChatMcpSecret(ctx context.Context, in *PutChatMcpSecretRequest, opts ...grpc.CallOption) (*PutChatMcpSecretResponse, error)
 	// FAILED_PRECONDITION while a scenario uses the secret.
 	DeleteChatMcpSecret(ctx context.Context, in *DeleteChatMcpSecretRequest, opts ...grpc.CallOption) (*DeleteChatMcpSecretResponse, error)
@@ -1822,7 +1823,8 @@ type MDDBServer interface {
 	// returns a value. Admin, except CallChatMcpTool.
 	// The secrets: name, header, set and the scenarios using each.
 	ListChatMcpSecrets(context.Context, *ListChatMcpSecretsRequest) (*ListChatMcpSecretsResponse, error)
-	// Sets or replaces a secret.
+	// Sets or replaces a secret, sealed with the at-rest key. FAILED_PRECONDITION
+	// without MDDB_ENCRYPTION_KEY: a secret is never stored in plain text.
 	PutChatMcpSecret(context.Context, *PutChatMcpSecretRequest) (*PutChatMcpSecretResponse, error)
 	// FAILED_PRECONDITION while a scenario uses the secret.
 	DeleteChatMcpSecret(context.Context, *DeleteChatMcpSecretRequest) (*DeleteChatMcpSecretResponse, error)

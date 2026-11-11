@@ -14,7 +14,22 @@ import (
 // MCP-005: the chat MCP secret tools, and one secret store behind REST,
 // gRPC and MCP.
 
+// Without an at-rest key the MCP tools say so: the listing reports
+// encryptionReady false and a put is refused with the fix.
+func TestChatMcpSecretMCPWithoutKey(t *testing.T) {
+	s := chatServer(t)
+	ts, admin := chatMCP(s), asClaims(root)
+	if out, err := ts.mcpCallTool(admin, "chat_mcp_secret_list", nil); err != nil || !strings.Contains(out, `"encryptionReady": false`) {
+		t.Errorf("list: %s %v", out, err)
+	}
+	_, err := ts.mcpCallTool(admin, "chat_mcp_secret_put", map[string]interface{}{"name": "wiki", "value": "tok-plain"})
+	if !errors.Is(err, errChatMcpSecretsNeedKey) || strings.Contains(err.Error(), "tok-plain") {
+		t.Errorf("put: %v", err)
+	}
+}
+
 func TestChatMcpSecretMCPLifecycle(t *testing.T) {
+	chatMcpKey(t)
 	s := chatServer(t)
 	ts, admin := chatMCP(s), asClaims(root)
 	out, err := ts.mcpCallTool(admin, "chat_mcp_secret_put", map[string]interface{}{"name": "wiki", "value": "tok-mcp", "header": "X-Api-Key"})
@@ -60,7 +75,7 @@ func TestChatMcpSecretMCPLifecycle(t *testing.T) {
 	}
 }
 
-func (c *covBAllErrClient) ChatMcpSecretList(context.Context) ([]*chatMcpSecretView, error) {
+func (c *covBAllErrClient) ChatMcpSecretList(context.Context) (*chatMcpSecretListing, error) {
 	return nil, errCovBClient
 }
 
@@ -85,6 +100,7 @@ func TestChatMcpSecretToolsClassification(t *testing.T) {
 // Parity: a secret set on each surface lists the same on all three, and a
 // scenario's servers written over MCP read the same over REST and gRPC.
 func TestChatMcpParityAcrossSurfaces(t *testing.T) {
+	chatMcpKey(t)
 	s := chatServer(t)
 	g, ts, admin := NewGRPCServer(s), chatMCP(s), asClaims(root)
 	if rec := chatREST(t, s, root, http.MethodPut, "/v1/chat/mcp-secrets/via-rest", `{"value":"v","header":"X-Key"}`); rec.Code != http.StatusCreated {

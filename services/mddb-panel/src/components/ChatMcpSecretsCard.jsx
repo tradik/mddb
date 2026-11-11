@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { KeyRound, Trash2 } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { inputClass, labelClass } from '../lib/chat-scenario';
+import { encryptionKeyVar, secretErrorText } from '../lib/chat-mcp';
 
 // MCP-005: the credentials of external MCP servers. Write-only: the server
 // never returns a value, so the card lists names and lets an administrator
 // set, replace or delete one. A scenario's server names one as its
 // credential. `secrets` is null when the list was refused (admin only).
+// A secret is only ever stored sealed: while `encryptionReady` is false (no
+// at-rest key on the server) the form is disabled and says why.
 
-export default function ChatMcpSecretsCard({ secrets, onChanged }) {
+export default function ChatMcpSecretsCard({ secrets, encryptionReady = true, onChanged }) {
   const [name, setName] = useState('');
   const [header, setHeader] = useState('');
   const [value, setValue] = useState('');
@@ -22,7 +25,7 @@ export default function ChatMcpSecretsCard({ secrets, onChanged }) {
       setMessage(await action());
       await onChanged();
     } catch (err) {
-      setError(err.message);
+      setError(secretErrorText(err));
     }
   };
   const save = (e) => {
@@ -70,20 +73,27 @@ export default function ChatMcpSecretsCard({ secrets, onChanged }) {
               ))}
             </ul>
           )}
-          <form onSubmit={save} className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
-            <div>
-              <label htmlFor="chat-mcp-secret-name" className={labelClass}>Secret name</label>
-              <input id="chat-mcp-secret-name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="wiki" className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="chat-mcp-secret-header" className={labelClass}>Header (optional)</label>
-              <input id="chat-mcp-secret-header" value={header} onChange={(e) => setHeader(e.target.value)} placeholder="X-Api-Key" className={inputClass} />
-            </div>
-            <div>
-              <label htmlFor="chat-mcp-secret-value" className={labelClass}>Secret value</label>
-              <input id="chat-mcp-secret-value" type="password" autoComplete="new-password" required value={value} onChange={(e) => setValue(e.target.value)} className={inputClass} />
-            </div>
-            <button type="submit" className="rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800">Set or replace</button>
+          {!encryptionReady && (
+            <p id="chat-mcp-secrets-locked" className="mt-3 rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+              Secrets are stored only encrypted, and this server has no encryption key. Set <code>{encryptionKeyVar}</code> and restart mddbd to add one.
+            </p>
+          )}
+          <form onSubmit={save} aria-describedby={encryptionReady ? undefined : 'chat-mcp-secrets-locked'}>
+            <fieldset disabled={!encryptionReady} className="mt-3 grid gap-2 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end disabled:opacity-60">
+              <div>
+                <label htmlFor="chat-mcp-secret-name" className={labelClass}>Secret name</label>
+                <input id="chat-mcp-secret-name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="wiki" className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="chat-mcp-secret-header" className={labelClass}>Header (optional)</label>
+                <input id="chat-mcp-secret-header" value={header} onChange={(e) => setHeader(e.target.value)} placeholder="X-Api-Key" className={inputClass} />
+              </div>
+              <div>
+                <label htmlFor="chat-mcp-secret-value" className={labelClass}>Secret value</label>
+                <input id="chat-mcp-secret-value" type="password" autoComplete="new-password" required value={value} onChange={(e) => setValue(e.target.value)} className={inputClass} />
+              </div>
+              <button type="submit" className="rounded bg-primary-700 px-3 py-1.5 text-sm text-white hover:bg-primary-800">Set or replace</button>
+            </fieldset>
           </form>
         </>
       )}

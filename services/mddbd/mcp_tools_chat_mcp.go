@@ -33,13 +33,15 @@ func mcpChatMcpTools() []MCPTool {
 		{
 			Name: "chat_mcp_secret_list",
 			Description: "List the credentials of the external MCP servers chat scenarios use: each one's name, header, set: true " +
-				"and the scenarios naming it. Values are write-only and never returned. Needs admin.",
+				"and the scenarios naming it, plus encryptionReady: false while no at-rest key (MDDB_ENCRYPTION_KEY) is loaded " +
+				"and secrets cannot be set. Values are write-only and never returned. Needs admin.",
 			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
 		},
 		{
 			Name: "chat_mcp_secret_put",
 			Description: "Set or replace a credential for external MCP servers: a bearer token, or the value of the header named in header. " +
-				"Stored sealed with the at-rest key when one is set; never returned. Needs admin.",
+				"Stored only sealed with the at-rest key: refused until MDDB_ENCRYPTION_KEY is set and the server restarted. " +
+				"Never returned. Needs admin.",
 			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{
 				"name":   name,
 				"value":  map[string]interface{}{"type": "string", "description": "The token or header value"},
@@ -59,7 +61,7 @@ func (s *MCPToolServer) toolChatMcpSecretList(ctx context.Context, _ map[string]
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]any{"secrets": list}, "", "  ")
+	data, _ := json.MarshalIndent(list, "", "  ")
 	return string(data), nil
 }
 

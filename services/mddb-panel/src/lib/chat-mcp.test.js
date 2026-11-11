@@ -2,6 +2,7 @@
 import { describe, test, expect } from 'vitest';
 import {
   newMcpServer, toMcpRows, fromMcpRows, mcpServerProblem, toolHints, toolInactiveReason, isFeatureOff, mcpFeature,
+  encryptionKeyVar, secretsEncryptionReady, secretErrorText,
 } from './chat-mcp';
 
 describe('rows', () => {
@@ -47,5 +48,23 @@ describe('tools', () => {
     expect(isFeatureOff({ status: 404, body: { error: 'feature disabled', feature: mcpFeature } })).toBe(true);
     expect(isFeatureOff({ status: 404, body: { error: 'mcp secret not found' } })).toBe(false);
     expect(isFeatureOff(undefined)).toBe(false);
+  });
+});
+
+describe('secrets', () => {
+  test('encryption readiness comes from the listing; a listing without it is ready', () => {
+    expect(secretsEncryptionReady({ secrets: [], encryptionReady: false })).toBe(false);
+    expect(secretsEncryptionReady({ secrets: [], encryptionReady: true })).toBe(true);
+    expect(secretsEncryptionReady({ secrets: [] })).toBe(true);
+    expect(secretsEncryptionReady(undefined)).toBe(true);
+    expect(encryptionKeyVar).toBe('MDDB_ENCRYPTION_KEY');
+  });
+
+  test("a refusal shows the server's message as it is", () => {
+    const err = Object.assign(new Error('API Error (409): set MDDB_ENCRYPTION_KEY and restart mddbd'), {
+      status: 409, body: { error: 'set MDDB_ENCRYPTION_KEY and restart mddbd', requires: 'MDDB_ENCRYPTION_KEY' },
+    });
+    expect(secretErrorText(err)).toBe('set MDDB_ENCRYPTION_KEY and restart mddbd');
+    expect(secretErrorText(new Error('network down'))).toBe('network down');
   });
 });

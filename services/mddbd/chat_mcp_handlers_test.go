@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	json "mddb/internal/jsonx"
+
+	bolt "go.etcd.io/bbolt"
 )
 
 // MCP-005: the REST surface — secrets, inspect, and the checks a scenario's
@@ -21,9 +23,44 @@ func chatMcpBody(t *testing.T, server map[string]any, collections ...string) str
 	return string(b)
 }
 
-func TestChatMcpSecretsREST(t *testing.T) {
+// Without an at-rest key the listing says so and a put is refused with 409
+// naming the fix; nothing is stored and the value is never echoed.
+func TestChatMcpSecretsRESTWithoutKey(t *testing.T) {
 	s := chatServer(t)
-	if rec := chatREST(t, s, root, http.MethodGet, "/v1/chat/mcp-secrets", ""); rec.Body.String() != `{"secrets":[]}` {
+	if rec := chatREST(t, s, root, http.MethodGet, "/v1/chat/mcp-secrets", ""); rec.Body.String() != `{"secrets":[],"encryptionReady":false}` {
+		t.Fatalf("list: %s", rec.Body.String())
+	}
+	rec := chatREST(t, s, root, http.MethodPut, "/v1/chat/mcp-secrets/wiki", `{"value":"tok-plain"}`)
+	want := `{"error":"` + errChatMcpSecretsNeedKey.Error() + `","requires":"MDDB_ENCRYPTION_KEY"}`
+	if rec.Code != http.StatusConflict || strings.TrimSpace(rec.Body.String()) != want {
+		t.Fatalf("put: %d %s", rec.Code, rec.Body.String())
+	}
+	if s.ChatScenarios.HasMcpSecret("wiki") {
+		t.Error("a refused put was stored")
+	}
+}
+
+// A secret stored unsealed is refused on use: inspect answers 409, not 502.
+func TestChatMcpInspectRESTUnsealedSecret(t *testing.T) {
+	s := chatServer(t)
+	f := newMcpFixture(t)
+	externalMcpOn(t, s)
+	_ = s.DB.Update(func(tx *bolt.Tx) error {
+		return tx.Bucket(bucketChatMcpSecrets).Put([]byte("old"), []byte(`{"name":"old","value":"cGxhaW4tdG9r"}`))
+	})
+	if err := s.ChatScenarios.LoadAll(); err != nil {
+		t.Fatal(err)
+	}
+	rec := chatREST(t, s, root, http.MethodPost, "/v1/chat/mcp/inspect", `{"url":"`+f.URL+`","secretRef":"old"}`)
+	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "stored unsealed") || strings.Contains(rec.Body.String(), "plain-tok") {
+		t.Errorf("inspect: %d %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestChatMcpSecretsREST(t *testing.T) {
+	chatMcpKey(t)
+	s := chatServer(t)
+	if rec := chatREST(t, s, root, http.MethodGet, "/v1/chat/mcp-secrets", ""); rec.Body.String() != `{"secrets":[],"encryptionReady":true}` {
 		t.Fatalf("empty: %s", rec.Body.String())
 	}
 	rec := chatREST(t, s, root, http.MethodPut, "/v1/chat/mcp-secrets/wiki", `{"value":"tok-123"}`)
@@ -69,6 +106,7 @@ func TestChatMcpSecretsREST(t *testing.T) {
 }
 
 func TestChatMcpInspectREST(t *testing.T) {
+	chatMcpKey(t)
 	s := chatServer(t)
 	inspect := func(body string) (int, string) {
 		rec := chatREST(t, s, root, http.MethodPost, "/v1/chat/mcp/inspect", body)

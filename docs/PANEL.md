@@ -300,7 +300,10 @@ read-only tools the assistant may call next to its collections.
 - **MCP secrets** (a card below the scenarios): set or replace a token, or
   the value of a named header, and delete one. Values are write-only and the
   field is a password field; the list shows names, the header and the
-  scenarios using each. Without admin on `*` the card says so.
+  scenarios using each. Without admin on `*` the card says so. Secrets are
+  stored only encrypted: while the server has no `MDDB_ENCRYPTION_KEY`
+  (`encryptionReady: false`) the form is disabled and says to set the key
+  and restart mddbd; a refusal from the server is shown as it is.
 
 ### Chat conversation log (2.19.0)
 

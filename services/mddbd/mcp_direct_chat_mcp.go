@@ -8,8 +8,9 @@ import (
 // Chat MCP secrets through the direct client (MCP-005): the functions the
 // REST handlers and the gRPC methods call.
 
-// ChatMcpSecretList returns the secrets without values.
-func (c *DirectClient) ChatMcpSecretList(_ context.Context) ([]*chatMcpSecretView, error) {
+// ChatMcpSecretList returns the secrets without values, and whether a
+// secret can be put (an at-rest key is loaded).
+func (c *DirectClient) ChatMcpSecretList(_ context.Context) (*chatMcpSecretListing, error) {
 	return c.server.ListChatMcpSecrets(), nil
 }
 

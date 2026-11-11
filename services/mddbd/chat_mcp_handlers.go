@@ -10,8 +10,8 @@ import (
 
 // The external MCP server API of the chat (MCP-005):
 //
-//	GET    /v1/chat/mcp-secrets          the secrets: name, header, set, usedBy — never a value (admin)
-//	PUT    /v1/chat/mcp-secrets/{name}   set or replace {value, header?} (admin)
+//	GET    /v1/chat/mcp-secrets          the secrets: name, header, set, usedBy — never a value — and encryptionReady (admin)
+//	PUT    /v1/chat/mcp-secrets/{name}   set or replace {value, header?}; 409 without MDDB_ENCRYPTION_KEY (admin)
 //	DELETE /v1/chat/mcp-secrets/{name}   remove; 409 with usedBy while a scenario uses it (admin)
 //	POST   /v1/chat/mcp/inspect          {url, secretRef?}: the server's tools and their annotations (admin)
 //	POST   /v1/chat/mcp/call             {scenario, server, tool, arguments}: call an allowed tool (scenario readers)
@@ -46,6 +46,10 @@ func chatMcpAnswer(w http.ResponseWriter, v any, err error) {
 		writeJSONError(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 	case errors.Is(err, errChatMcpNotAllowed):
 		writeJSONError(w, http.StatusForbidden, map[string]any{"error": err.Error()})
+	case errors.Is(err, errChatMcpSecretsNeedKey), errors.Is(err, errChatMcpSecretUnsealed):
+		// The server's configuration is in the way, as a feature locked by
+		// the environment is (409 with lockedBy): requires names the fix.
+		writeJSONError(w, http.StatusConflict, map[string]any{"error": err.Error(), "requires": "MDDB_ENCRYPTION_KEY"})
 	case errors.Is(err, errChatMcpUnreachable):
 		writeJSONError(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
 	case errors.Is(err, ErrForbidden), errors.Is(err, ErrUnauthorized):
@@ -59,7 +63,7 @@ func (s *Server) handleChatMcpSecrets(w http.ResponseWriter, r *http.Request) {
 	name := strings.Trim(strings.TrimPrefix(r.URL.Path, chatMcpSecretsPath), "/")
 	switch {
 	case r.Method == http.MethodGet && name == "":
-		ok(w, map[string]any{"secrets": s.ListChatMcpSecrets()})
+		ok(w, s.ListChatMcpSecrets())
 	case r.Method == http.MethodPut && name != "":
 		s.guardWrite(func(w http.ResponseWriter, r *http.Request) { s.putChatMcpSecret(w, r, name) })(w, r)
 	case r.Method == http.MethodDelete && name != "":

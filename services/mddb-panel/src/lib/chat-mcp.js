@@ -80,3 +80,20 @@ export function toolInactiveReason({ featureOff, scenarioEnabled, serverEnabled,
 export function isFeatureOff(err) {
   return err?.status === 404 && err.body?.feature === mcpFeature;
 }
+
+/** The setting mddbd needs before it stores an MCP secret: secrets are only ever stored sealed. */
+export const encryptionKeyVar = 'MDDB_ENCRYPTION_KEY';
+
+/**
+ * Whether the server can store an MCP secret, from its listing. A listing
+ * without the field is taken as ready: the server's own answer to a put then
+ * decides.
+ */
+export function secretsEncryptionReady(listing) {
+  return listing?.encryptionReady !== false;
+}
+
+/** The text of a refused secret request: the server's own message as it is. */
+export function secretErrorText(err) {
+  return typeof err?.body?.error === 'string' ? err.body.error : err.message;
+}

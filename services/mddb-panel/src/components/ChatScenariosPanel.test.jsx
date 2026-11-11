@@ -294,6 +294,13 @@ describe('external MCP servers (MCP-005)', () => {
     expect(await screen.findByText('No secrets yet.')).toBeTruthy();
   });
 
+  test('a server without an encryption key disables the secret form', async () => {
+    vi.mocked(mddbClient.listChatMcpSecrets).mockResolvedValue({ secrets: [], encryptionReady: false });
+    await renderWith();
+    expect(await screen.findByText(/this server has no encryption key/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Set or replace' }).closest('fieldset').disabled).toBe(true);
+  });
+
   test('a user who may not list secrets sees why', async () => {
     vi.mocked(mddbClient.listChatMcpSecrets).mockRejectedValue(new Error('HTTP 403'));
     await renderWith();

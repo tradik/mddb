@@ -292,10 +292,10 @@ MCP-005) over gRPC. Secrets are write-only: no RPC returns a value.
 
 | RPC | Permission | |
 |---|---|---|
-| `ListChatMcpSecrets` | admin | `secrets` (`ChatMcpSecretProto`: `name`, `header`, `set`, `updated_at`, `used_by`) |
-| `PutChatMcpSecret` | admin, writable server | `{name, value, header}` → `{secret, created, version}` |
+| `ListChatMcpSecrets` | admin | `secrets` (`ChatMcpSecretProto`: `name`, `header`, `set`, `updated_at`, `used_by`) and `encryption_ready`, `false` while no `MDDB_ENCRYPTION_KEY` is loaded |
+| `PutChatMcpSecret` | admin, writable server | `{name, value, header}` → `{secret, created, version}`; `FAILED_PRECONDITION` naming `MDDB_ENCRYPTION_KEY` without an at-rest key: a secret is stored only sealed |
 | `DeleteChatMcpSecret` | admin, writable server | `{name}` → `{deleted, version}`; `FAILED_PRECONDITION` naming the scenarios while one uses it |
-| `InspectChatMcpServer` | admin | `{url, secret_ref}` → `{url, server_name, server_version, protocol_version, tools}`; `FAILED_PRECONDITION` while the `chatExternalMcp` feature is off, `UNAVAILABLE` when the server cannot be reached |
+| `InspectChatMcpServer` | admin | `{url, secret_ref}` → `{url, server_name, server_version, protocol_version, tools}`; `FAILED_PRECONDITION` while the `chatExternalMcp` feature is off or for a `secret_ref` stored unsealed, `UNAVAILABLE` when the server cannot be reached |
 | `CallChatMcpTool` | read on the scenario | `{scenario, server, tool, arguments_json}` → `{content, is_error, truncated, duration_ms}`; `FAILED_PRECONDITION` for a switch that is off or a tool not allowed |
 
 `ChatMcpToolProto` carries `read_only_hint` and `destructive_hint`, each

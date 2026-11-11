@@ -2067,8 +2067,8 @@ The security model is in [chat.md](chat.md#external-knowledge-over-mcp-2190).
 
 | Method | Path | Answer |
 |---|---|---|
-| `GET` | `/v1/chat/mcp-secrets` | `{"secrets":[{name, header, set, updatedAt, usedBy}]}` — never a value (admin) |
-| `PUT` | `/v1/chat/mcp-secrets/{name}` | `{"value":"…","header":"X-Api-Key"}`; `201` when new, `200` when replaced; the answer has no value (admin) |
+| `GET` | `/v1/chat/mcp-secrets` | `{"secrets":[{name, header, set, updatedAt, usedBy}],"encryptionReady":true}` — never a value; `encryptionReady` is `false` while no `MDDB_ENCRYPTION_KEY` is loaded (admin) |
+| `PUT` | `/v1/chat/mcp-secrets/{name}` | `{"value":"…","header":"X-Api-Key"}`; `201` when new, `200` when replaced; the answer has no value; `409` `{"error":"…set MDDB_ENCRYPTION_KEY and restart mddbd","requires":"MDDB_ENCRYPTION_KEY"}` without an at-rest key (admin) |
 | `DELETE` | `/v1/chat/mcp-secrets/{name}` | `{"deleted":true,"version":N}`; `409` with `usedBy` while a scenario names it (admin) |
 | `POST` | `/v1/chat/mcp/inspect` | `{"url","secretRef"}` → `{url, serverName, serverVersion, protocolVersion, tools:[{name, title, description, annotations, allowable, reason}]}` (admin) |
 | `POST` | `/v1/chat/mcp/call` | `{"scenario","server","tool","arguments"}` → `{scenario, server, tool, content, isError, truncated, durationMs}` (read on the scenario) |
@@ -2108,8 +2108,9 @@ curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{"enabled":true
   `secretRef` naming no secret is `400`. With the feature off nothing is
   contacted and the servers are stored inactive.
 - **Inspect** answers `404` `{"error":"feature disabled","feature":"chatExternalMcp"}`
-  while the feature is off, `404` for an unknown `secretRef`, `502` when the
-  server cannot be reached or answers with an error.
+  while the feature is off, `404` for an unknown `secretRef`, `409` for a
+  `secretRef` stored unsealed, `502` when the server cannot be reached or
+  answers with an error.
 - **Call.** mddb-chat calls tools through mddbd, which holds the credential
   and checks every switch again, and checks again that the tool is still
   read-only in the server's own `tools/list`. A switch that is off or a tool
@@ -2121,10 +2122,14 @@ curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{"enabled":true
   a redirect may not leave https), the session's `Mcp-Session-Id` sent back,
   JSON or event-stream answers up to 4 MiB.
 - **Secrets** are write-only: no API returns a value. They are stored next to
-  the scenarios (backups carry them, the binlog replicates them), sealed with
-  the at-rest key when `MDDB_ENCRYPTION_KEY` is set. A secret's value never
-  appears in a log or an error; one quoted back by a server is replaced with
-  `[redacted]`.
+  the scenarios (backups carry them, the binlog replicates them), and only
+  ever sealed with the at-rest key: without `MDDB_ENCRYPTION_KEY` a `PUT` is
+  `409` with `requires: "MDDB_ENCRYPTION_KEY"` and stores nothing (set the
+  key and restart mddbd), and the listing's `encryptionReady` is `false`. A
+  stored value that is not sealed is refused when used (inspect `409`, a
+  call `isError: true`) and listed with `set: false`; set it again. A
+  secret's value never appears in a log or an error; one quoted back by a
+  server is replaced with `[redacted]`.
 - **Other surfaces.** gRPC `ListChatMcpSecrets`, `PutChatMcpSecret`,
   `DeleteChatMcpSecret`, `InspectChatMcpServer`, `CallChatMcpTool`
   ([GRPC.md](GRPC.md)) and the MCP tools `chat_mcp_secret_list`,

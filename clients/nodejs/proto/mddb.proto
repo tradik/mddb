@@ -301,7 +301,8 @@ service MDDB {
   // returns a value. Admin, except CallChatMcpTool.
   // The secrets: name, header, set and the scenarios using each.
   rpc ListChatMcpSecrets(ListChatMcpSecretsRequest) returns (ListChatMcpSecretsResponse);
-  // Sets or replaces a secret.
+  // Sets or replaces a secret, sealed with the at-rest key. FAILED_PRECONDITION
+  // without MDDB_ENCRYPTION_KEY: a secret is never stored in plain text.
   rpc PutChatMcpSecret(PutChatMcpSecretRequest) returns (PutChatMcpSecretResponse);
   // FAILED_PRECONDITION while a scenario uses the secret.
   rpc DeleteChatMcpSecret(DeleteChatMcpSecretRequest) returns (DeleteChatMcpSecretResponse);
@@ -2641,6 +2642,9 @@ message ListChatMcpSecretsRequest {}
 
 message ListChatMcpSecretsResponse {
   repeated ChatMcpSecretProto secrets = 1;
+  // False while no at-rest key (MDDB_ENCRYPTION_KEY) is loaded: every
+  // PutChatMcpSecret is then refused with FAILED_PRECONDITION.
+  bool encryption_ready = 2;
 }
 
 message PutChatMcpSecretRequest {

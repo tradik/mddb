@@ -19838,10 +19838,13 @@ func (*ListChatMcpSecretsRequest) Descriptor() ([]byte, []int) {
 }
 
 type ListChatMcpSecretsResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Secrets       []*ChatMcpSecretProto  `protobuf:"bytes,1,rep,name=secrets,proto3" json:"secrets,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Secrets []*ChatMcpSecretProto  `protobuf:"bytes,1,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	// False while no at-rest key (MDDB_ENCRYPTION_KEY) is loaded: every
+	// PutChatMcpSecret is then refused with FAILED_PRECONDITION.
+	EncryptionReady bool `protobuf:"varint,2,opt,name=encryption_ready,json=encryptionReady,proto3" json:"encryption_ready,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ListChatMcpSecretsResponse) Reset() {
@@ -19879,6 +19882,13 @@ func (x *ListChatMcpSecretsResponse) GetSecrets() []*ChatMcpSecretProto {
 		return x.Secrets
 	}
 	return nil
+}
+
+func (x *ListChatMcpSecretsResponse) GetEncryptionReady() bool {
+	if x != nil {
+		return x.EncryptionReady
+	}
+	return false
 }
 
 type PutChatMcpSecretRequest struct {
@@ -24232,9 +24242,10 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"updated_at\x18\x04 \x01(\x03R\tupdatedAt\x12\x17\n" +
 	"\aused_by\x18\x05 \x03(\tR\x06usedBy\"\x1b\n" +
-	"\x19ListChatMcpSecretsRequest\"P\n" +
+	"\x19ListChatMcpSecretsRequest\"{\n" +
 	"\x1aListChatMcpSecretsResponse\x122\n" +
-	"\asecrets\x18\x01 \x03(\v2\x18.mddb.ChatMcpSecretProtoR\asecrets\"[\n" +
+	"\asecrets\x18\x01 \x03(\v2\x18.mddb.ChatMcpSecretProtoR\asecrets\x12)\n" +
+	"\x10encryption_ready\x18\x02 \x01(\bR\x0fencryptionReady\"[\n" +
 	"\x17PutChatMcpSecretRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\x12\x16\n" +

@@ -21,8 +21,9 @@ func (g *GRPCServer) ListChatMcpSecrets(ctx context.Context, _ *proto.ListChatMc
 		return nil, err
 	}
 	list := g.server.ListChatMcpSecrets()
-	out := &proto.ListChatMcpSecretsResponse{Secrets: make([]*proto.ChatMcpSecretProto, 0, len(list))}
-	for _, v := range list {
+	out := &proto.ListChatMcpSecretsResponse{Secrets: make([]*proto.ChatMcpSecretProto, 0, len(list.Secrets)),
+		EncryptionReady: list.EncryptionReady}
+	for _, v := range list.Secrets {
 		out.Secrets = append(out.Secrets, &proto.ChatMcpSecretProto{Name: v.Name, Header: v.Header, Set: v.Set,
 			UpdatedAt: chatUnix(v.UpdatedAt), UsedBy: v.UsedBy})
 	}
@@ -99,7 +100,8 @@ func (g *GRPCServer) CallChatMcpTool(ctx context.Context, req *proto.CallChatMcp
 func chatMcpGRPCError(err error) error {
 	var code codes.Code
 	switch {
-	case errors.As(err, new(featureDisabledError)), errors.Is(err, errChatMcpNotAllowed):
+	case errors.As(err, new(featureDisabledError)), errors.Is(err, errChatMcpNotAllowed),
+		errors.Is(err, errChatMcpSecretsNeedKey), errors.Is(err, errChatMcpSecretUnsealed):
 		code = codes.FailedPrecondition
 	case errors.Is(err, errChatMcpSecretNotFound), errors.Is(err, errChatMcpServerNotFound):
 		code = codes.NotFound

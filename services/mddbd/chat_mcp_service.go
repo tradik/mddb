@@ -28,18 +28,32 @@ func (s *Server) chatMcpFeatureOff() string {
 	return ""
 }
 
+// chatMcpSecretListing is the secrets as every surface lists them, with
+// whether a secret can be put at all: EncryptionReady is false while no
+// at-rest key (MDDB_ENCRYPTION_KEY) is loaded, and every put is then refused.
+type chatMcpSecretListing struct {
+	Secrets         []*chatMcpSecretView `json:"secrets"`
+	EncryptionReady bool                 `json:"encryptionReady"`
+}
+
 // ListChatMcpSecrets lists the secrets: names, headers and set, never values.
-func (s *Server) ListChatMcpSecrets() []*chatMcpSecretView {
-	if s.ChatScenarios == nil {
-		return []*chatMcpSecretView{}
+func (s *Server) ListChatMcpSecrets() *chatMcpSecretListing {
+	out := &chatMcpSecretListing{Secrets: []*chatMcpSecretView{}, EncryptionReady: chatMcpSecretsKeyReady()}
+	if s.ChatScenarios != nil {
+		out.Secrets = s.ChatScenarios.ListMcpSecrets()
 	}
-	return s.ChatScenarios.ListMcpSecrets()
+	return out
 }
 
 // PutChatMcpSecret validates and stores a secret; true when it is new.
+// Refused with errChatMcpSecretsNeedKey while no at-rest key is loaded: a
+// secret is never stored in plain text.
 func (s *Server) PutChatMcpSecret(name, header, value string) (bool, error) {
 	if s.ChatScenarios == nil {
 		return false, errChatScenariosUnavailable
+	}
+	if !chatMcpSecretsKeyReady() {
+		return false, errChatMcpSecretsNeedKey
 	}
 	if err := validChatMcpSecret(name, header, value); err != nil {
 		return false, err

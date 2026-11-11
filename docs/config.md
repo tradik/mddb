@@ -237,7 +237,7 @@ Opt-in per-collection AES-256-GCM encryption for documents and revisions. Activa
 
 | Env Var | Default | Type | Description |
 |---------|---------|------|-------------|
-| `MDDB_ENCRYPTION_KEY` | *(unset)* | base64 string | 32 bytes of random key material, base64-encoded. Unset = encryption disabled globally. Invalid base64 or wrong length aborts startup. |
+| `MDDB_ENCRYPTION_KEY` | *(unset)* | base64 string | 32 bytes of random key material, base64-encoded. Unset = encryption disabled globally. Invalid base64 or wrong length aborts startup. Also guards the chat's MCP secrets (2.19.0): they are stored only sealed with this key, so without it none can be set. |
 | `MDDB_ENCRYPTION_KEY_ID` | `1` | integer 1..255 | Identifier stamped on every new ciphertext (V2 wire format). Pick a fresh value when you rotate so the new entries are distinguishable from legacy ones. |
 | `MDDB_ENCRYPTION_KEYS_PREVIOUS` | *(unset)* | JSON array | Read-only previous keys for rotation: `[{"id":1,"key":"<base64>"}, ...]`. KeyID 0 is reserved (legacy V1 marker); collisions with the primary keyID abort startup. |
 
@@ -256,6 +256,7 @@ Details:
 - **Scope**: only the `docs` and `rev` buckets carry ciphertext. FTS inverted indexes and vector embeddings remain plaintext because they are queryable structures — encrypting them would break search. Document this in your threat model.
 - **Key loss is terminal**: losing `MDDB_ENCRYPTION_KEY` makes the corresponding collections unrecoverable. Store the key in an HSM / secret manager and keep an offline escrow.
 - **Startup safety**: if a collection has `encrypted=true` but `MDDB_ENCRYPTION_KEY` is missing, the server refuses to start — writing plaintext into a collection that claims to be encrypted is treated as a compliance failure, not a warning.
+- **MCP secrets** (2.19.0): the credentials of external MCP servers for chat scenarios (`/v1/chat/mcp-secrets`) are stored only sealed with this key, regardless of any collection flag. Without the key a put is refused (REST `409` with `requires: "MDDB_ENCRYPTION_KEY"`, gRPC `FAILED_PRECONDITION`) and the listing reports `encryptionReady: false`; set the key and restart mddbd. Losing the key loses the secrets: set them again under the new key. See [chat.md](chat.md#external-knowledge-over-mcp-2190).
 - **Bootstrap key**: `openssl rand -base64 32`.
 
 Generate a fresh key:

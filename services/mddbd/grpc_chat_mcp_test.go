@@ -12,7 +12,27 @@ import (
 
 // MCP-005: external MCP servers of the chat over gRPC.
 
+// Without an at-rest key: the listing says encryption is not ready, and a
+// put is FAILED_PRECONDITION naming MDDB_ENCRYPTION_KEY; so is a secret
+// stored unsealed when it is used.
+func TestChatMcpGRPCWithoutKey(t *testing.T) {
+	s := chatServer(t)
+	g, admin := NewGRPCServer(s), asClaims(root)
+	if list, err := g.ListChatMcpSecrets(admin, &proto.ListChatMcpSecretsRequest{}); err != nil || list.GetEncryptionReady() {
+		t.Errorf("list: %+v %v", list, err)
+	}
+	_, err := g.PutChatMcpSecret(admin, &proto.PutChatMcpSecretRequest{Name: "wiki", Value: "tok-plain"})
+	if grpcCode(err) != codes.FailedPrecondition || !strings.Contains(err.Error(), "set MDDB_ENCRYPTION_KEY and restart") ||
+		strings.Contains(err.Error(), "tok-plain") {
+		t.Errorf("put: %v", err)
+	}
+	if err := chatMcpGRPCError(errChatMcpSecretUnsealed); grpcCode(err) != codes.FailedPrecondition {
+		t.Errorf("unsealed: %v", err)
+	}
+}
+
 func TestChatMcpGRPCLifecycle(t *testing.T) {
+	chatMcpKey(t)
 	s := chatServer(t)
 	g, admin, user := NewGRPCServer(s), asClaims(root), asClaims(alice)
 	if _, err := g.InspectChatMcpServer(admin, &proto.InspectChatMcpServerRequest{Url: "https://a"}); grpcCode(err) != codes.FailedPrecondition {
@@ -30,7 +50,8 @@ func TestChatMcpGRPCLifecycle(t *testing.T) {
 		t.Errorf("an empty value: %v", err)
 	}
 	list, err := g.ListChatMcpSecrets(admin, &proto.ListChatMcpSecretsRequest{})
-	if err != nil || len(list.GetSecrets()) != 1 || list.GetSecrets()[0].GetUpdatedAt() == 0 || strings.Contains(list.String(), "tok") {
+	if err != nil || len(list.GetSecrets()) != 1 || list.GetSecrets()[0].GetUpdatedAt() == 0 || strings.Contains(list.String(), "tok") ||
+		!list.GetEncryptionReady() {
 		t.Fatalf("list: %+v %v", list, err)
 	}
 	in, err := g.InspectChatMcpServer(admin, &proto.InspectChatMcpServerRequest{Url: f.URL, SecretRef: "wiki"})
