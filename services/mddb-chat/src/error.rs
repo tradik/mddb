@@ -14,6 +14,10 @@ pub enum AppError {
     TurnLimitReached(usize),
     /// The session has spent its token budget (RAG-005).
     TokenBudgetExceeded(u64),
+    /// The scenario's messages-per-minute limit for one session (#403).
+    SessionRateLimited(u32),
+    /// The scenario is stored in mddbd with `enabled: false` (#403).
+    ScenarioDisabled,
     GrpcError(tonic::Status),
     /// mddbd has not been reached yet (#401): the server is up, the
     /// knowledge base behind it is not.
@@ -38,6 +42,11 @@ impl std::fmt::Display for AppError {
             AppError::TurnLimitReached(max) => {
                 write!(f, "this conversation is limited to {max} turns")
             }
+            AppError::SessionRateLimited(per_minute) => write!(
+                f,
+                "this conversation is limited to {per_minute} messages per minute"
+            ),
+            AppError::ScenarioDisabled => write!(f, "scenario is disabled"),
             AppError::GrpcError(s) => write!(f, "grpc error: {s}"),
             AppError::MddbUnavailable => write!(
                 f,
@@ -66,6 +75,10 @@ impl IntoResponse for AppError {
             // Refusal, not backpressure: the conversation is over rather than
             // busy, so there is nothing to retry.
             AppError::TokenBudgetExceeded(_) => (StatusCode::FORBIDDEN, self.to_string()),
+            // Waiting helps: the window slides.
+            AppError::SessionRateLimited(_) => (StatusCode::TOO_MANY_REQUESTS, self.to_string()),
+            // An operator switched it off; asking again changes nothing.
+            AppError::ScenarioDisabled => (StatusCode::FORBIDDEN, self.to_string()),
             AppError::GrpcError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             // Waiting helps: the link comes up on its own.
             AppError::MddbUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
@@ -103,6 +116,8 @@ mod tests {
             AppError::NameTooLong,
             AppError::TurnLimitReached(10),
             AppError::TokenBudgetExceeded(120_000),
+            AppError::SessionRateLimited(20),
+            AppError::ScenarioDisabled,
             AppError::MddbUnavailable,
             AppError::LlmError("upstream refused".into()),
             AppError::Internal("boom".into()),
@@ -131,6 +146,14 @@ mod tests {
                 .contains("upstream refused")
         );
         assert!(AppError::TurnLimitReached(10).to_string().contains("10"));
+        assert_eq!(
+            AppError::SessionRateLimited(20).to_string(),
+            "this conversation is limited to 20 messages per minute"
+        );
+        assert_eq!(
+            AppError::ScenarioDisabled.to_string(),
+            "scenario is disabled"
+        );
     }
 
     #[test]
@@ -146,11 +169,16 @@ mod tests {
             (AppError::SessionNotFound, StatusCode::NOT_FOUND),
             // Waiting helps.
             (AppError::RateLimited, StatusCode::TOO_MANY_REQUESTS),
+            (
+                AppError::SessionRateLimited(20),
+                StatusCode::TOO_MANY_REQUESTS,
+            ),
             (AppError::SessionFull, StatusCode::SERVICE_UNAVAILABLE),
             (AppError::MddbUnavailable, StatusCode::SERVICE_UNAVAILABLE),
             // Waiting does not: the scenario caps the conversation, so this is
             // a refusal rather than backpressure.
             (AppError::TurnLimitReached(5), StatusCode::FORBIDDEN),
+            (AppError::ScenarioDisabled, StatusCode::FORBIDDEN),
             (
                 AppError::TokenBudgetExceeded(120_000),
                 StatusCode::FORBIDDEN,

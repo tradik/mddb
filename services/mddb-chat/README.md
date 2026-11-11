@@ -50,6 +50,15 @@ environment: `MDDB_CHAT_LLM_API_KEY`, `MDDB_CHAT_WEBHOOK_SECRET`,
 | `temperature` | `[llm] temperature` | Sampling temperature for this scenario. |
 | `max_turns` | unlimited | User messages one session may send. |
 
+### `[scenarios_source]` — scenarios stored in mddbd
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `poll_seconds` | `10` | Seconds between two looks at the version of mddbd's scenario store; the scenarios are reloaded when it changed. `0` = never read scenarios from mddbd. |
+
+See [Scenarios from mddbd](#scenarios-from-mddbd). A `config.toml` without
+this table behaves as before for as long as mddbd stores no scenarios.
+
 The `[server]`, `[llm]`, `[session]`, `[security]` and `[[webhooks]]` tables
 are documented inline in `config.example.toml`.
 
@@ -58,8 +67,8 @@ are documented inline in `config.example.toml`.
 | Path | What it is |
 |------|------------|
 | `GET /ws` | The chat WebSocket (protocol below) |
-| `GET /health` | Readiness and session counts: `200` once mddbd is reached, `503` before |
-| `GET /config` | Scenarios and limits a client needs before joining |
+| `GET /health` | Readiness and session counts: `200` once mddbd is reached, `503` before. Also `scenarios_source` (`"mddbd"` or `"toml"`) and `scenarios_version` |
+| `GET /config` | The scenarios a visitor can join right now (TOML and mddbd), their labels, and the limits a client needs before joining |
 
 ## Starting before mddbd
 
@@ -78,6 +87,63 @@ Set `connect_retry_max_seconds = 0` for the behaviour before 2.19.0: one attempt
 the port opens, and exit with `failed to connect to mddbd` if it fails.
 
 The process exits cleanly on `SIGTERM` and Ctrl-C.
+
+## Scenarios from mddbd
+
+Since 2.19.0 mddbd stores chat scenarios (`/v1/chat/scenarios`, edited in
+mddb-panel under "Chat") and mddb-chat reads them over its gRPC connection.
+Nothing has to be configured: with the default `[scenarios_source]
+poll_seconds = 10` the scenarios are loaded as soon as mddbd is reached, and
+the store's version is looked at every ten seconds. When it changed, they are
+loaded again — no restart, and no session is dropped: a turn that is being
+answered finishes under the scenario it started with, and the next message of
+the same session runs under the new one.
+
+Which scenario a name means:
+
+| mddbd has the name | TOML has `[scenarios.<name>]` | Result |
+|---|---|---|
+| yes, `enabled: true` | either | mddbd's scenario |
+| yes, `enabled: false` | either | `join` is refused with `scenario is disabled`; an open session gets the same error at its next message |
+| no | yes | the TOML scenario |
+| no | no | `join` is refused with `unknown scenario: <name>` |
+
+Until mddbd is reached, and next to an mddbd older than 2.19.0, only the TOML
+scenarios exist. If mddbd stops answering later, the scenarios already loaded
+stay in force.
+
+What a stored scenario sets, and what happens where it sets nothing:
+
+| Scenario field | Effect in mddb-chat | When 0 / empty / unset |
+|---|---|---|
+| `operatorPrompt`, `guardrails`, `offTopic`, `style`, collections' `responsePrompt` | The system prompt. mddbd composes it (`GetChatScenarioPrompt`) and mddb-chat uses it as is, so the panel's preview is what the model reads. Asked for on every turn, so a `responsePrompt` edit shows at the next message; if that fails, the prompt of the last reload is used. | — |
+| `allowedCollections` | The collections the tools may read, enforced and advertised as an `enum` exactly like the TOML's `allowed_collections`. The first one is the default. | `[mddb] default_collection` only |
+| `llm.model` | The model asked, also reported in the `answer` webhook. | `[llm] model` |
+| `llm.temperature` | Sampling temperature; `0` is a value. | `[llm] temperature` |
+| `llm.maxTokens` | Answer length. | `[llm] max_tokens` |
+| `llm.extraBody` | Merged over `[llm] extra_body` key by key (OpenAI-compatible provider only; the request's own fields still win). | `[llm] extra_body` alone |
+| `maxTurns` | User messages per session. | no limit |
+| `tokenBudgetPerSession` | Tokens per session; wins over `[security] max_tokens_per_session`. | `[security] max_tokens_per_session` |
+| `rateLimit.messagesPerMinute` | Messages per session in any 60 seconds, next to the per-address `[security] rate_limit_per_minute`. A message over it gets `this conversation is limited to N messages per minute` and is not counted as a turn. | no per-session limit |
+| `description` | The label in `GET /config` (`scenario_labels`). | the scenario's name |
+| `skills` | Ignored until the skill store exists (#404). | — |
+
+A stored scenario replaces the TOML one of the same name whole: a `max_turns`
+or `temperature` written in the TOML table does not leak into it.
+
+`GET /health` says which source is in use:
+
+```json
+{ "status": "ok", "mddb_connected": true,
+  "scenarios_source": "mddbd", "scenarios_version": 12 }
+```
+
+`scenarios_source` is `"mddbd"` once its scenario store has been loaded, even
+when it holds no scenario (the TOML ones then serve every name), and `"toml"`
+before that, with `"scenarios_version": null`.
+
+The service account (`[mddb] auth_username`) sees only the scenarios whose
+collections it may read; mddbd leaves the others out of the list.
 
 ## Extra LLM request fields
 
@@ -282,14 +348,17 @@ src/
   chat/outbound.rs   frames to the visitor
   chat/tools.rs      search_docs / get_document and the per-scenario policy
   chat/markdown.rs   result shaping: prose stripped, code kept, character-safe cuts
-  chat/scenario.rs   prompt composition, per-scenario temperature and collection
+  chat/scenario.rs   the scenario of a turn: mddbd's if it has one, else the TOML's
+  chat/scenario/     the scenarios loaded from mddbd, and the poll that reloads them
   app.rs             assembling the server: state, routes, maintenance, shutdown
   config.rs          config.toml schema and defaults
   grpc/client.rs     mddbd client (search, collection config)
+  grpc/scenarios.rs  mddbd client: the scenario list and the composed prompt
+  grpc/testing/      a scripted mddbd for tests (login and the gRPC methods used)
   grpc/link.rs       the connection to mddbd: retried in the background until up
   routes/            /health (readiness), /config, /ws
   llm/               OpenAI-compatible and Anthropic providers
-  session/           admission, queue, history, token budget
+  session/           admission, queue, history, token budget, per-session pace
   security/          rate limiting, client IP, input sanitising
   chat/trace.rs      one turn's message ids, tools called and latency
   webhook/           webhooks: session lifecycle, message, answer, feedback
@@ -297,5 +366,7 @@ src/
 
 The handler tests run the real WebSocket handler on a loopback port with a
 scripted model (`src/chat/testing/`) and a webhook receiver
-(`src/webhook/test_support.rs`); they need no mddbd and no network.
+(`src/webhook/test_support.rs`); they need no mddbd and no network. Tests of
+what mddbd answers — scenarios, searches, the login — run against
+`FakeMddbd` (`src/grpc/testing/`), which speaks real gRPC on a loopback port.
 `cargo llvm-cov --summary-only` prints per-file coverage.

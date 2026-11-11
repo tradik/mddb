@@ -1,4 +1,5 @@
 use crate::llm::provider::TokenUsage;
+use crate::session::pace::MessagePace;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -44,6 +45,9 @@ pub struct Session {
     /// inactivity, and a reconnecting client reattaches it. A detached session
     /// does not count toward `max_concurrent`: it costs memory, not an LLM.
     pub attached: bool,
+    /// When the recent messages were accepted, for the scenario's
+    /// per-session rate limit (#403).
+    pub pace: MessagePace,
 }
 
 impl Session {
@@ -64,6 +68,7 @@ impl Session {
             user_turns: 0,
             total_tokens_used: 0,
             attached: true,
+            pace: MessagePace::default(),
         }
     }
 

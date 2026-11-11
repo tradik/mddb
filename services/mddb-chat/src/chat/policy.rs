@@ -2,8 +2,7 @@
 
 use tracing::warn;
 
-use crate::chat::scenario;
-use crate::config::Config;
+use crate::chat::scenario::ActiveScenario;
 
 /// The bounds a scenario puts on its tools.
 ///
@@ -22,22 +21,16 @@ pub struct ToolPolicy {
 }
 
 impl ToolPolicy {
-    /// The policy for a scenario. A scenario with an empty
-    /// `allowed_collections` — or an unknown scenario — allows only the
-    /// default collection.
-    pub fn for_scenario(config: &Config, scenario_name: &str) -> Self {
-        let default_collection = scenario::get_collection(config, scenario_name);
-        let mut allowed_collections = config
-            .get_scenario(scenario_name)
-            .map(|s| s.allowed_collections.clone())
-            .unwrap_or_default();
-        if allowed_collections.is_empty() {
-            allowed_collections.push(default_collection.clone());
-        }
+    /// The policy for the scenario of a turn, wherever it came from: mddbd's
+    /// `allowedCollections` (#403) are enforced exactly like the TOML's. A
+    /// scenario that names no collection — or a session whose scenario is
+    /// gone — allows only the default collection, which `ActiveScenario`
+    /// has already settled.
+    pub fn for_scenario(scenario: &ActiveScenario, result_max_chars: usize) -> Self {
         Self {
-            default_collection,
-            allowed_collections,
-            result_max_chars: config.mddb.result_max_chars,
+            default_collection: scenario.default_collection.clone(),
+            allowed_collections: scenario.allowed_collections.clone(),
+            result_max_chars,
         }
     }
 
@@ -83,6 +76,7 @@ impl ToolPolicy {
 #[cfg(test)]
 mod tests {
     use super::ToolPolicy;
+    use crate::chat::scenario::{ActiveScenario, Resolved, ScenarioStore, resolve};
     use crate::config::Config;
 
     const BASE: &str = r#"
@@ -101,6 +95,15 @@ model = "test"
         toml::from_str(&format!("{BASE}\n{scenario}")).expect("the fixture should parse")
     }
 
+    /// The policy a turn in `scenario` gets, the way `turn.rs` builds it.
+    fn policy_of(config: &Config, scenario: &str) -> ToolPolicy {
+        let active = match resolve(config, &ScenarioStore::default(), scenario) {
+            Resolved::Active(active) => active,
+            _ => ActiveScenario::generic(config),
+        };
+        ToolPolicy::for_scenario(&active, config.mddb.result_max_chars)
+    }
+
     fn policy(allowed: &[&str]) -> ToolPolicy {
         ToolPolicy {
             default_collection: allowed[0].into(),
@@ -114,22 +117,19 @@ model = "test"
         let cfg = config(
             "[scenarios.support]\nname = \"s\"\nsystem_prompt = \"p\"\nallowed_collections = [\"faq\", \"docs\"]\n",
         );
-        assert_eq!(
-            ToolPolicy::for_scenario(&cfg, "support"),
-            policy(&["faq", "docs"])
-        );
+        assert_eq!(policy_of(&cfg, "support"), policy(&["faq", "docs"]));
     }
 
     #[test]
     fn a_scenario_without_collections_allows_only_the_default() {
         let cfg = config("[scenarios.plain]\nname = \"s\"\nsystem_prompt = \"p\"\n");
-        assert_eq!(ToolPolicy::for_scenario(&cfg, "plain"), policy(&["docs"]));
+        assert_eq!(policy_of(&cfg, "plain"), policy(&["docs"]));
     }
 
     #[test]
     fn an_unknown_scenario_allows_only_the_default() {
         let cfg = config("");
-        assert_eq!(ToolPolicy::for_scenario(&cfg, "missing"), policy(&["docs"]));
+        assert_eq!(policy_of(&cfg, "missing"), policy(&["docs"]));
     }
 
     #[test]

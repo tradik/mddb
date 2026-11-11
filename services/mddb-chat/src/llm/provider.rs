@@ -93,6 +93,36 @@ pub struct ApiMsg {
     pub tool_call_id: Option<String>,
 }
 
+/// How one call to the model is made: the `[llm]` settings as the scenario of
+/// the turn overrides them (#403).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct CallParams {
+    /// The model to ask; `None` means the provider's configured one.
+    pub model: Option<String>,
+    pub temperature: f32,
+    pub max_tokens: u32,
+    /// Merged over `[llm] extra_body` (#400), key by key. Only the
+    /// OpenAI-compatible provider sends it.
+    pub extra_body: serde_json::Map<String, serde_json::Value>,
+}
+
+impl CallParams {
+    /// The provider's own model and extra body, at this temperature and
+    /// length.
+    pub fn new(temperature: f32, max_tokens: u32) -> Self {
+        Self {
+            temperature,
+            max_tokens,
+            ..Self::default()
+        }
+    }
+
+    /// The model this call asks for, given the configured one.
+    pub fn model_or<'a>(&'a self, configured: &'a str) -> &'a str {
+        self.model.as_deref().unwrap_or(configured)
+    }
+}
+
 #[async_trait::async_trait]
 pub trait LlmProvider: Send + Sync {
     /// Send messages with tools, get either tool_calls or content (non-streaming)
@@ -102,15 +132,29 @@ pub trait LlmProvider: Send + Sync {
         &self,
         messages: &[ApiMsg],
         tools: &[ToolDef],
-        temperature: f32,
-        max_tokens: u32,
+        params: &CallParams,
     ) -> Result<ChatTurn, crate::error::AppError>;
 
     /// Stream the final response from tool-calling conversation
     async fn chat_stream_raw(
         &self,
         messages: &[ApiMsg],
-        temperature: f32,
-        max_tokens: u32,
+        params: &CallParams,
     ) -> Result<ChunkStream, crate::error::AppError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CallParams;
+
+    #[test]
+    fn a_call_uses_the_configured_model_unless_it_names_one() {
+        let mut params = CallParams::new(0.2, 64);
+        assert_eq!(params.model_or("configured"), "configured");
+        assert_eq!((params.temperature, params.max_tokens), (0.2, 64));
+        assert!(params.extra_body.is_empty());
+
+        params.model = Some("scenario-model".to_string());
+        assert_eq!(params.model_or("configured"), "scenario-model");
+    }
 }

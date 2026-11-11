@@ -5,6 +5,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use serde_json::{Value, json};
 
+use crate::chat::scenario;
 use crate::state::AppState;
 
 /// Readiness: 200 once mddbd has been reached, 503 until then (#401).
@@ -12,6 +13,11 @@ use crate::state::AppState;
 /// The server starts without mddbd and connects in the background, so the
 /// process being up no longer implies it can answer. A probe pointed here
 /// keeps traffic away until it can, without restarting the pod.
+///
+/// `scenarios_source` says where scenarios are read from (#403): `"mddbd"`
+/// once its scenario store has been loaded, `"toml"` until then — and for
+/// good next to an mddbd older than 2.19.0. `scenarios_version` is the
+/// version of that store the loaded scenarios are at, `null` under `"toml"`.
 pub async fn health(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Value>) {
     let connected = state.mddb.is_connected().await;
     let (code, status) = if connected {
@@ -27,22 +33,26 @@ pub async fn health(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Val
         "detached_sessions": state.session_manager.detached_count(),
         "queue_length": state.session_manager.queue_len().await,
         "max_concurrent": state.config.session.max_concurrent,
+        "scenarios_source": state.scenarios.source(),
+        "scenarios_version": state.scenarios.version(),
     });
     (code, Json(body))
 }
 
 pub async fn config_info(State(state): State<Arc<AppState>>) -> Json<Value> {
-    let scenarios: Vec<&str> = state.config.scenarios.keys().map(|k| k.as_str()).collect();
     // RUST-001: a scenario has two names — the map key that identifies it and
     // the `name` a TOML sets for people to read. Nothing read the second, so
     // the two silently disagreed whenever an operator set one. The key stays
     // the identifier; `name` is now the label, exposed beside it so a picker
     // can show something other than a slug.
-    let scenario_labels: serde_json::Map<String, Value> = state
-        .config
-        .scenarios
+    //
+    // #403: the scenarios a visitor can join right now — the TOML ones with
+    // mddbd's laid over them, where the label is the scenario's description.
+    let catalog = scenario::catalog(&state.config, &state.scenarios);
+    let scenarios: Vec<&str> = catalog.keys().map(|k| k.as_str()).collect();
+    let scenario_labels: serde_json::Map<String, Value> = catalog
         .iter()
-        .map(|(key, scenario)| (key.clone(), Value::from(scenario.name.clone())))
+        .map(|(key, label)| (key.clone(), Value::from(label.clone())))
         .collect();
     Json(json!({
         "scenarios": scenarios,
@@ -57,7 +67,10 @@ pub async fn config_info(State(state): State<Arc<AppState>>) -> Json<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chat::scenario::sync::sync_once;
+    use crate::grpc::client::proto::ChatScenarioProto;
     use crate::grpc::link::MddbLink;
+    use crate::grpc::testing::{FakeMddbd, scenario};
     use crate::llm::openai::OpenAiProvider;
     use crate::test_support::{stub_http_server, test_config, test_state, test_state_with_link};
 
@@ -77,6 +90,43 @@ mod tests {
         assert_eq!(body["status"], "starting");
         assert_eq!(body["mddb_connected"], false);
         assert_eq!(body["service"], "mddb-chat");
+        assert_eq!(body["scenarios_source"], "toml");
+        assert_eq!(body["scenarios_version"], Value::Null);
+    }
+
+    // #403: where the scenarios come from, and which version of mddbd's
+    // store they are at.
+    #[tokio::test]
+    async fn health_and_config_follow_the_scenarios_loaded_from_mddbd() {
+        let mddbd = FakeMddbd::start().await;
+        mddbd.put_scenario(
+            ChatScenarioProto {
+                description: "Sales desk".to_string(),
+                ..scenario("sales", &[])
+            },
+            "You sell.",
+        );
+        mddbd.put_scenario(
+            ChatScenarioProto {
+                enabled: false,
+                ..scenario("support", &[])
+            },
+            "Off.",
+        );
+        let config = test_config(&mddbd.grpc_addr());
+        let state = test_state_with_link(config.clone(), llm(&config), mddbd.link().await);
+        sync_once(&state.mddb, &state.scenarios).await;
+
+        let (code, Json(body)) = health(State(state.clone())).await;
+        assert_eq!(code, StatusCode::OK);
+        assert_eq!(body["scenarios_source"], "mddbd");
+        assert_eq!(body["scenarios_version"], 2);
+
+        let Json(body) = config_info(State(state)).await;
+        assert_eq!(body["scenarios"], json!(["assistant", "sales"]));
+        assert_eq!(body["scenario_labels"]["sales"], "Sales desk");
+        assert_eq!(body["scenario_labels"]["assistant"], "Assistant");
+        assert_eq!(body["scenario_labels"].get("support"), None);
     }
 
     #[tokio::test]

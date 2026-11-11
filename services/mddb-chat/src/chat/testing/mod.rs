@@ -1,7 +1,8 @@
 //! The chat server under test: a real axum server on loopback running
 //! `handle_ws`, a scripted model, and an mddbd stand-in that accepts the gRPC
 //! connection and closes it, so every lookup fails fast the way an unreachable
-//! mddbd would.
+//! mddbd would. Tests of what mddbd answers — scenarios, searches — start it
+//! against the scripted `FakeMddbd` instead (#403).
 
 pub mod llm;
 pub mod ws_client;
@@ -16,9 +17,11 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 
 use crate::chat::handler::handle_ws;
+use crate::chat::scenario::{ScenarioStore, sync};
 use crate::config::Config;
 use crate::grpc::client::MddbClient;
 use crate::grpc::link::MddbLink;
+use crate::grpc::testing::FakeMddbd;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
 use crate::security::sanitizer::Sanitizer;
@@ -114,12 +117,27 @@ impl Harness {
         Self::start_with_link(config, MddbLink::default()).await
     }
 
+    /// A server connected to a scripted mddbd, its scenarios already loaded
+    /// the way `build_state` loads them (#403).
+    pub async fn start_with_mddbd(config: ConfigToml, mddbd: &FakeMddbd) -> Self {
+        let config: Config = toml::from_str(&config.render()).expect("the test TOML parses");
+        let server = Self::start_with_link(config, mddbd.link().await).await;
+        server.sync().await;
+        server
+    }
+
+    /// One look at mddbd's scenarios, as the poll takes every few seconds.
+    pub async fn sync(&self) -> sync::Sync {
+        sync::sync_once(&self.state.mddb, &self.state.scenarios).await
+    }
+
     async fn start_with_link(config: Config, mddb: MddbLink) -> Self {
         crate::webhook::test_support::enable_logs();
         let llm = Arc::new(ScriptedLlm::default());
         let state = Arc::new(AppState {
             session_manager: SessionManager::new(config.session.clone()),
             mddb,
+            scenarios: ScenarioStore::default(),
             llm_provider: llm.clone(),
             webhook_dispatcher: WebhookDispatcher::new(
                 config.webhooks.clone(),
@@ -147,10 +165,15 @@ impl Harness {
         WsClient::connect(self.addr, "/ws").await
     }
 
-    /// Joins as `name` and returns the session id the server assigned.
+    /// Joins the default scenario as `name` and returns the session id the
+    /// server assigned.
     pub async fn join(&self, client: &mut WsClient, name: &str) -> String {
+        self.join_scenario(client, name, "assistant").await
+    }
+
+    pub async fn join_scenario(&self, client: &mut WsClient, name: &str, scenario: &str) -> String {
         client
-            .send_json(serde_json::json!({"type": "join", "name": name}))
+            .send_json(serde_json::json!({"type": "join", "name": name, "scenario": scenario}))
             .await;
         let frame = client.recv_json().await;
         assert_eq!(frame["type"], "session", "join failed: {frame}");

@@ -12,7 +12,32 @@ pub struct Config {
     #[serde(default)]
     pub scenarios: HashMap<String, Scenario>,
     #[serde(default)]
+    pub scenarios_source: ScenariosSourceConfig,
+    #[serde(default)]
     pub webhooks: Vec<WebhookConfig>,
+}
+
+/// Where scenarios come from besides this file (#403).
+///
+/// mddbd stores chat scenarios since 2.19.0 and mddb-chat reads them over the
+/// gRPC link it already has. The `[scenarios.*]` tables stay as the bootstrap
+/// and the fallback: they serve until mddbd is reached, and for every name
+/// mddbd has no scenario of.
+#[derive(Debug, Deserialize, Clone, PartialEq, Eq)]
+pub struct ScenariosSourceConfig {
+    /// Seconds between two looks at mddbd's scenario version; the scenarios
+    /// are reloaded when it changed. `0` turns reading from mddbd off, which
+    /// leaves the TOML scenarios as the only ones.
+    #[serde(default = "default_scenarios_poll_seconds")]
+    pub poll_seconds: u64,
+}
+
+impl Default for ScenariosSourceConfig {
+    fn default() -> Self {
+        Self {
+            poll_seconds: default_scenarios_poll_seconds(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -184,21 +209,6 @@ pub struct Scenario {
     pub max_turns: Option<usize>,
 }
 
-impl Scenario {
-    /// Whether a session that has already sent `turns_taken` user messages may
-    /// send another.
-    ///
-    /// TEST-001: `max_turns` was parsed from the TOML and never read, so a
-    /// scenario that declared a limit did not have one — an operator capping a
-    /// public demo at ten turns was serving an unbounded one.
-    pub fn allows_another_turn(&self, turns_taken: usize) -> bool {
-        match self.max_turns {
-            Some(max) => turns_taken < max,
-            None => true,
-        }
-    }
-}
-
 #[derive(Debug, Deserialize, Clone)]
 pub struct WebhookConfig {
     pub url: String,
@@ -281,6 +291,9 @@ fn default_grpc_addr() -> String {
 }
 fn default_connect_retry_max_seconds() -> u64 {
     30
+}
+fn default_scenarios_poll_seconds() -> u64 {
+    10
 }
 fn default_collection() -> String {
     "docs".to_string()
@@ -529,50 +542,6 @@ model = "test"
     }
 
     #[test]
-    fn a_scenario_without_a_turn_limit_never_runs_out() {
-        let scenario = Scenario {
-            name: "default".into(),
-            system_prompt: "be helpful".into(),
-            allowed_collections: vec![],
-            temperature: None,
-            max_turns: None,
-        };
-
-        assert!(scenario.allows_another_turn(0));
-        assert!(scenario.allows_another_turn(10_000));
-    }
-
-    #[test]
-    fn a_turn_limit_is_reached_after_that_many_turns() {
-        let scenario = Scenario {
-            name: "demo".into(),
-            system_prompt: "be brief".into(),
-            allowed_collections: vec![],
-            temperature: None,
-            max_turns: Some(3),
-        };
-
-        // Turns already taken, so the third message is the last one allowed.
-        assert!(scenario.allows_another_turn(0));
-        assert!(scenario.allows_another_turn(2));
-        assert!(!scenario.allows_another_turn(3));
-        assert!(!scenario.allows_another_turn(99));
-    }
-
-    #[test]
-    fn a_zero_turn_limit_refuses_the_first_message() {
-        let scenario = Scenario {
-            name: "closed".into(),
-            system_prompt: "".into(),
-            allowed_collections: vec![],
-            temperature: None,
-            max_turns: Some(0),
-        };
-
-        assert!(!scenario.allows_another_turn(0));
-    }
-
-    #[test]
     fn a_scenario_turn_limit_survives_the_toml() {
         let cfg = config_from(
             r#"
@@ -593,7 +562,6 @@ max_turns = 5
 
         let scenario = cfg.get_scenario("demo").expect("the scenario should load");
         assert_eq!(scenario.max_turns, Some(5));
-        assert!(!scenario.allows_another_turn(5));
     }
 
     // #400: a table of arbitrary values, passed through to the LLM endpoint.
@@ -638,6 +606,34 @@ max_turns = 5
             "retry-off",
         );
         assert_eq!(cfg.mddb.connect_retry_max_seconds, 0);
+    }
+
+    // #403: an old config.toml has no [scenarios_source] and gets the poll.
+    #[test]
+    fn scenarios_are_polled_from_mddbd_every_ten_seconds_by_default() {
+        let cfg = config_from(MINIMAL, "scenarios-source-default");
+        assert_eq!(cfg.scenarios_source.poll_seconds, 10);
+        assert_eq!(cfg.scenarios_source, ScenariosSourceConfig::default());
+    }
+
+    #[test]
+    fn the_scenario_poll_interval_is_read_from_the_toml() {
+        let with_section = format!("{MINIMAL}\n[scenarios_source]\npoll_seconds = 0\n");
+        assert_eq!(
+            config_from(&with_section, "scenarios-source-off")
+                .scenarios_source
+                .poll_seconds,
+            0
+        );
+
+        // The section without the key still means the default.
+        let empty_section = format!("{MINIMAL}\n[scenarios_source]\n");
+        assert_eq!(
+            config_from(&empty_section, "scenarios-source-empty")
+                .scenarios_source
+                .poll_seconds,
+            10
+        );
     }
 
     #[test]

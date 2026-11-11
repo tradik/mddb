@@ -5,9 +5,10 @@ use std::time::Duration;
 
 use crate::app::{
     build_state, connect_mddb, cors_layer, listen_addr, llm_provider, router, run_maintenance,
-    serve, spawn_maintenance,
+    serve, spawn_maintenance, spawn_scenario_poll,
 };
 use crate::config::Config;
+use crate::grpc::testing::{FakeMddbd, scenario};
 use crate::test_support::{stub_http_server, test_config};
 
 /// A port nothing listens on: reserved, then released.
@@ -84,6 +85,47 @@ async fn the_state_is_built_from_the_configuration() {
 
     assert!(!state.trusted_proxies.is_empty());
     assert_eq!(state.session_manager.attached_count(), 0);
+}
+
+// #403. With mddbd reachable at startup its scenarios are in place before
+// the first visitor is; the poll then follows every later edit.
+#[tokio::test]
+async fn scenarios_are_loaded_at_startup_and_followed_afterwards() {
+    let mddbd = FakeMddbd::start().await;
+    mddbd.put_scenario(scenario("support", &["kb"]), "You are Ada.");
+    let mut config = test_config(&mddbd.grpc_addr());
+    config.mddb.connect_retry_max_seconds = 0;
+    config.scenarios_source.poll_seconds = 1;
+
+    let state = build_state(config).await.expect("build");
+    assert_eq!(state.scenarios.version(), Some(1));
+    assert_eq!(state.scenarios.source(), "mddbd");
+
+    spawn_maintenance(state.clone());
+    mddbd.put_scenario(scenario("sales", &[]), "You sell.");
+    for _ in 0..600 {
+        if state.scenarios.version() == Some(2) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    panic!("the poll never picked up the new scenario");
+}
+
+// `poll_seconds = 0` is the switch back to a TOML-only server.
+#[tokio::test]
+async fn with_the_poll_off_mddbd_is_never_asked_for_scenarios() {
+    let mddbd = FakeMddbd::start().await;
+    mddbd.put_scenario(scenario("support", &["kb"]), "You are Ada.");
+    let mut config = test_config(&mddbd.grpc_addr());
+    config.mddb.connect_retry_max_seconds = 0;
+    config.scenarios_source.poll_seconds = 0;
+
+    let state = build_state(config).await.expect("build");
+
+    assert!(!spawn_scenario_poll(&state));
+    assert_eq!(state.scenarios.source(), "toml");
+    assert_eq!(mddbd.count("ListChatScenarios"), 0);
 }
 
 #[tokio::test]

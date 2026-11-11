@@ -10,7 +10,7 @@ pub mod proto {
 
 #[derive(Clone)]
 pub struct MddbClient {
-    client: proto::mddb_client::MddbClient<Channel>,
+    pub(super) client: proto::mddb_client::MddbClient<Channel>,
     config: MddbConfig,
     auth_token: Option<String>,
     /// Per-collection config (RAG-001 retrieval profile, RAG-002 response
@@ -85,7 +85,7 @@ impl MddbClient {
     }
 
     /// Create a tonic request with auth metadata
-    fn auth_request<T>(&self, inner: T) -> tonic::Request<T> {
+    pub(super) fn auth_request<T>(&self, inner: T) -> tonic::Request<T> {
         let mut req = tonic::Request::new(inner);
         if let Some(token) = &self.auth_token
             && let Ok(val) =
@@ -300,3 +300,7 @@ pub struct SearchResult {
     pub content: String,
     pub score: f32,
 }
+
+#[cfg(test)]
+#[path = "client_tests.rs"]
+mod tests;

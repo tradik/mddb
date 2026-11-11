@@ -112,6 +112,27 @@ max_tokens_per_session = 0
 #   trusted_proxies = ["10.0.0.7"]        # one nginx host
 trusted_proxies = []
 
+# Scenarios stored in mddbd (2.19.0). mddbd keeps chat scenarios — prompt,
+# guardrails, allowed collections, style, LLM parameters, limits — and
+# mddb-panel edits them ("Chat" in the sidebar). mddb-chat reads them over the
+# gRPC connection above and looks at the store's version every poll_seconds;
+# when it changed, the scenarios are reloaded without a restart and without
+# dropping a session (an open session gets the new scenario at its next
+# message).
+#
+# The [scenarios.*] tables below stay as the bootstrap and the fallback: they
+# serve until mddbd is reached, and for every name mddbd has no scenario of.
+# A scenario stored in mddbd wins over the table of the same name. One stored
+# with `enabled: false` is refused at join and does not fall back to its
+# table.
+#
+# 0 = never read scenarios from mddbd; only the tables below exist. Next to an
+# mddbd older than 2.19.0 the tables serve as well, whatever this says.
+# GET /health reports "scenarios_source" ("mddbd" or "toml") and
+# "scenarios_version".
+[scenarios_source]
+poll_seconds = 10
+
 [scenarios.assistant]
 name = "Documentation Assistant"
 system_prompt = """You are a helpful documentation assistant for our product.

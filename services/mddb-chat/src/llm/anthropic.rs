@@ -6,7 +6,7 @@ use tracing::debug;
 use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::llm::provider::{
-    ApiMsg, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall,
+    ApiMsg, CallParams, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall,
     ToolCallFunction, ToolDef,
 };
 
@@ -151,6 +151,25 @@ impl AnthropicProvider {
         req.header("x-api-key", &self.config.api_key)
             .header("anthropic-version", ANTHROPIC_VERSION)
             .header("content-type", "application/json")
+    }
+
+    /// Posts `request` and returns the response if the API accepted it.
+    async fn post(&self, request: &MessagesRequest) -> Result<reqwest::Response, AppError> {
+        let req = self.client.post(self.api_url()).json(request);
+        let response = self
+            .request_builder(req)
+            .send()
+            .await
+            .map_err(|e| AppError::LlmError(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(AppError::LlmError(format!(
+                "Anthropic API {status}: {body}"
+            )));
+        }
+        Ok(response)
     }
 
     /// Extract system prompt from messages and return (system, filtered_messages)
@@ -338,8 +357,7 @@ impl LlmProvider for AnthropicProvider {
         &self,
         messages: &[ApiMsg],
         tools: &[ToolDef],
-        temperature: f32,
-        max_tokens: u32,
+        params: &CallParams,
     ) -> Result<ChatTurn, AppError> {
         let (system, filtered) = Self::extract_system(messages);
         let converted = Self::convert_messages(&filtered);
@@ -351,33 +369,16 @@ impl LlmProvider for AnthropicProvider {
         };
 
         let request = MessagesRequest {
-            model: self.config.model.clone(),
-            max_tokens,
+            model: params.model_or(&self.config.model).to_string(),
+            max_tokens: params.max_tokens,
             system,
             messages: converted,
             tools: anthropic_tools,
-            temperature: Some(temperature),
+            temperature: Some(params.temperature),
             stream: false,
         };
 
-        let req = self.client.post(self.api_url()).json(&request);
-        let req = self.request_builder(req);
-
-        let response = req
-            .send()
-            .await
-            .map_err(|e| AppError::LlmError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!(
-                "Anthropic API {status}: {body}"
-            )));
-        }
+        let response = self.post(&request).await?;
 
         let resp: MessagesResponse = response
             .json()
@@ -429,90 +430,27 @@ impl LlmProvider for AnthropicProvider {
     async fn chat_stream_raw(
         &self,
         messages: &[ApiMsg],
-        temperature: f32,
-        max_tokens: u32,
+        params: &CallParams,
     ) -> Result<ChunkStream, AppError> {
         let (system, filtered) = Self::extract_system(messages);
         let converted = Self::convert_messages(&filtered);
 
         let request = MessagesRequest {
-            model: self.config.model.clone(),
-            max_tokens,
+            model: params.model_or(&self.config.model).to_string(),
+            max_tokens: params.max_tokens,
             system,
             messages: converted,
             tools: None,
-            temperature: Some(temperature),
+            temperature: Some(params.temperature),
             stream: true,
         };
 
-        let req = self.client.post(self.api_url()).json(&request);
-        let req = self.request_builder(req);
-
-        let response = req
-            .send()
-            .await
-            .map_err(|e| AppError::LlmError(e.to_string()))?;
-
-        if !response.status().is_success() {
-            let status = response.status();
-            let body = response
-                .text()
-                .await
-                .unwrap_or_else(|_| "unknown".to_string());
-            return Err(AppError::LlmError(format!(
-                "Anthropic API {status}: {body}"
-            )));
-        }
+        let response = self.post(&request).await?;
 
         Ok(self.build_sse_stream(response))
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    // RAG-005: the usage block is the whole measurement path, and until now
-    // neither provider parsed it. These tests pin the shape each one sends,
-    // because a field renamed upstream would otherwise show up as a session
-    // that costs nothing.
-
-    #[test]
-    fn usage_is_read_from_the_response() {
-        let body = r#"{
-            "content": [{"type": "text", "text": "hello"}],
-            "stop_reason": "end_turn",
-            "usage": {"input_tokens": 1234, "output_tokens": 56}
-        }"#;
-
-        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
-        let usage = parsed.usage.expect("usage block");
-
-        assert_eq!(usage.input_tokens, 1234);
-        assert_eq!(usage.output_tokens, 56);
-    }
-
-    #[test]
-    fn a_response_without_usage_still_parses() {
-        // A budget must not depend on a field the provider is free to omit:
-        // the turn succeeds and simply contributes nothing.
-        let body = r#"{"content": [{"type": "text", "text": "hi"}]}"#;
-
-        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
-        assert!(parsed.usage.is_none());
-    }
-
-    #[test]
-    fn a_partial_usage_block_counts_what_it_reports() {
-        let body = r#"{
-            "content": [],
-            "usage": {"output_tokens": 7}
-        }"#;
-
-        let parsed: MessagesResponse = serde_json::from_str(body).expect("parse");
-        let usage = parsed.usage.expect("usage block");
-
-        assert_eq!(usage.input_tokens, 0);
-        assert_eq!(usage.output_tokens, 7);
-    }
-}
+#[path = "anthropic_tests.rs"]
+mod tests;

@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use crate::error::AppError;
 use crate::llm::provider::{
-    ApiMsg, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall,
+    ApiMsg, CallParams, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall,
     ToolCallFunction, ToolDef,
 };
 
@@ -19,6 +19,10 @@ pub struct ScriptedLlm {
     stream: Mutex<Option<StreamScript>>,
     /// Every request the handler sent, for asserting on the prompt.
     pub requests: Mutex<Vec<Vec<ApiMsg>>>,
+    /// The parameters of every call, streaming ones included (#403).
+    pub params: Mutex<Vec<CallParams>>,
+    /// The tools offered with every non-streaming call.
+    pub tools: Mutex<Vec<Vec<ToolDef>>>,
 }
 
 impl ScriptedLlm {
@@ -78,10 +82,14 @@ impl LlmProvider for ScriptedLlm {
     async fn chat_with_tools(
         &self,
         messages: &[ApiMsg],
-        _tools: &[ToolDef],
-        _temperature: f32,
-        _max_tokens: u32,
+        tools: &[ToolDef],
+        params: &CallParams,
     ) -> Result<ChatTurn, AppError> {
+        self.params
+            .lock()
+            .expect("params lock")
+            .push(params.clone());
+        self.tools.lock().expect("tools lock").push(tools.to_vec());
         self.requests
             .lock()
             .expect("requests lock")
@@ -96,9 +104,12 @@ impl LlmProvider for ScriptedLlm {
     async fn chat_stream_raw(
         &self,
         _messages: &[ApiMsg],
-        _temperature: f32,
-        _max_tokens: u32,
+        params: &CallParams,
     ) -> Result<ChunkStream, AppError> {
+        self.params
+            .lock()
+            .expect("params lock")
+            .push(params.clone());
         let chunks = self
             .stream
             .lock()

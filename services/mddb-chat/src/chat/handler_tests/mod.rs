@@ -7,6 +7,8 @@ mod lifecycle;
 mod limits;
 mod message;
 mod resume;
+mod scenario_settings;
+mod scenarios;
 mod streaming;
 
 use std::collections::HashMap;
@@ -60,4 +62,18 @@ pub async fn resume(client: &mut WsClient, session_id: &str) -> serde_json::Valu
         .send_json(json!({"type": "resume", "session_id": session_id}))
         .await;
     client.recv_json().await
+}
+
+/// The system prompt of the `request`th call to the model, without the tool
+/// instructions every prompt ends in.
+pub fn prompt_of(server: &Harness, request: usize) -> String {
+    let requests = server.llm.requests.lock().unwrap();
+    let system = requests[request][0]
+        .content
+        .as_deref()
+        .expect("a system prompt");
+    let (prompt, _) = system
+        .split_once("\n\nYou have access to tools")
+        .expect("the tool instructions");
+    prompt.to_string()
 }

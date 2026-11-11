@@ -14,6 +14,7 @@ use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
+use crate::chat::scenario::{ScenarioStore, sync};
 use crate::config::{Config, MddbConfig, ServerConfig};
 use crate::error::AppError;
 use crate::grpc::client::MddbClient;
@@ -69,9 +70,18 @@ pub async fn build_state(config: Config) -> Result<Arc<AppState>, AppError> {
         tracing::info!("no trusted proxies configured; rate limits are charged to the TCP peer");
     }
 
+    // #403: with mddbd already reached — the fail-fast startup — its scenarios
+    // are in place before the first visitor is. Otherwise the poll loads them
+    // when the link comes up, and the TOML scenarios serve until then.
+    let scenarios = ScenarioStore::default();
+    if config.scenarios_source.poll_seconds > 0 {
+        sync::sync_once(&mddb, &scenarios).await;
+    }
+
     Ok(Arc::new(AppState {
         session_manager: SessionManager::new(config.session.clone()),
         mddb,
+        scenarios,
         llm_provider: llm_provider(&config),
         webhook_dispatcher: WebhookDispatcher::new(
             config.webhooks.clone(),
@@ -106,7 +116,28 @@ pub async fn run_maintenance(state: &AppState) -> usize {
     expired.len()
 }
 
+/// Starts following mddbd's scenarios (#403): a look at the store's version
+/// every `[scenarios_source] poll_seconds`, and a reload when it moved.
+/// Returns whether the poll runs; `poll_seconds = 0` leaves the TOML
+/// scenarios as the only ones.
+pub fn spawn_scenario_poll(state: &AppState) -> bool {
+    let poll_seconds = state.config.scenarios_source.poll_seconds;
+    if poll_seconds == 0 {
+        tracing::info!("scenarios_source.poll_seconds is 0; scenarios come from the TOML only");
+        return false;
+    }
+    tokio::spawn(sync::poll(
+        state.mddb.clone(),
+        state.scenarios.clone(),
+        Duration::from_secs(poll_seconds),
+    ));
+    true
+}
+
+/// The server's background work: the scenario poll, and the sweep of expired
+/// sessions and idle rate-limit budgets.
 pub fn spawn_maintenance(state: Arc<AppState>) {
+    spawn_scenario_poll(&state);
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(MAINTENANCE_INTERVAL);
         loop {

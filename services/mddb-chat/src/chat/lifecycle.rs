@@ -5,6 +5,7 @@ use tracing::info;
 
 use crate::chat::handler::Connection;
 use crate::chat::outbound::{Sender, send_error, send_json};
+use crate::chat::scenario::{self, Resolved};
 use crate::error::AppError;
 use crate::session::manager::{JoinResult, ResumeError};
 use crate::session::types::WsOutgoing;
@@ -36,10 +37,17 @@ impl Connection {
             .sanitizer
             .sanitize_name(&name, state.config.session.name_max_chars)?;
 
-        if state.config.get_scenario(&scenario_name).is_none() {
-            return Err(AppError::InvalidMessage(format!(
-                "unknown scenario: {scenario_name}"
-            )));
+        // #403: mddbd's scenario of that name if it has one, else the TOML's.
+        // One that mddbd holds switched off is refused outright — the TOML
+        // scenario of the same name does not stand in for it.
+        match scenario::resolve(&state.config, &state.scenarios, &scenario_name) {
+            Resolved::Active(_) => {}
+            Resolved::Disabled => return Err(AppError::ScenarioDisabled),
+            Resolved::Unknown => {
+                return Err(AppError::InvalidMessage(format!(
+                    "unknown scenario: {scenario_name}"
+                )));
+            }
         }
 
         if !state.rate_limiter.check(&self.client_ip) {

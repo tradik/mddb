@@ -5,7 +5,8 @@ use serde::Deserialize;
 use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::llm::provider::{
-    ApiMsg, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall, ToolDef,
+    ApiMsg, CallParams, ChatResponse, ChatTurn, ChunkStream, LlmProvider, TokenUsage, ToolCall,
+    ToolDef,
 };
 use tracing::debug;
 
@@ -151,22 +152,24 @@ impl OpenAiProvider {
 
     /// The JSON body of one request.
     ///
-    /// Starts from `[llm] extra_body` and writes the request's own fields
-    /// over it (#400), so extra_body can add a parameter this server does not
-    /// model but cannot swap the model or drop the conversation.
+    /// Starts from `[llm] extra_body`, lays the scenario's extra body over it
+    /// key by key (#403), and writes the request's own fields over both
+    /// (#400), so extra_body can add a parameter this server does not model
+    /// but cannot swap the model or drop the conversation.
     fn request_body(
         &self,
         messages: &[ApiMsg],
         tools: &[ToolDef],
-        temperature: f32,
-        max_tokens: u32,
+        params: &CallParams,
         stream: bool,
     ) -> serde_json::Value {
         let mut body = self.config.extra_body.clone();
-        body.insert("model".into(), self.config.model.clone().into());
+        body.extend(params.extra_body.clone());
+        let model = params.model_or(&self.config.model);
+        body.insert("model".into(), model.into());
         body.insert("messages".into(), Self::api_messages(messages).into());
-        body.insert("max_tokens".into(), max_tokens.into());
-        body.insert("temperature".into(), temperature.into());
+        body.insert("max_tokens".into(), params.max_tokens.into());
+        body.insert("temperature".into(), params.temperature.into());
         body.insert("stream".into(), stream.into());
         // No tools means no key at all — which also discards an extra_body
         // `tools`, since that one belongs to the request.
@@ -258,10 +261,9 @@ impl LlmProvider for OpenAiProvider {
         &self,
         messages: &[ApiMsg],
         tools: &[ToolDef],
-        temperature: f32,
-        max_tokens: u32,
+        params: &CallParams,
     ) -> Result<ChatTurn, AppError> {
-        let body = self.request_body(messages, tools, temperature, max_tokens, false);
+        let body = self.request_body(messages, tools, params, false);
         let response = self.post(&body).await?;
 
         let completion: ChatCompletion = response
@@ -297,10 +299,9 @@ impl LlmProvider for OpenAiProvider {
     async fn chat_stream_raw(
         &self,
         messages: &[ApiMsg],
-        temperature: f32,
-        max_tokens: u32,
+        params: &CallParams,
     ) -> Result<ChunkStream, AppError> {
-        let body = self.request_body(messages, &[], temperature, max_tokens, true);
+        let body = self.request_body(messages, &[], params, true);
         let response = self.post(&body).await?;
         Ok(self.build_sse_stream(response))
     }

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use axum::Router;
 use tokio::net::TcpListener;
 
+use crate::chat::scenario::ScenarioStore;
 use crate::config::Config;
 use crate::grpc::client::MddbClient;
 use crate::grpc::link::MddbLink;
@@ -93,6 +94,7 @@ pub fn test_state_with_link(
     Arc::new(AppState {
         session_manager: SessionManager::new(config.session.clone()),
         mddb,
+        scenarios: ScenarioStore::default(),
         llm_provider: llm,
         webhook_dispatcher: WebhookDispatcher::new(
             config.webhooks.clone(),

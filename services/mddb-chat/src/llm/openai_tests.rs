@@ -137,7 +137,7 @@ async fn a_plain_answer_comes_back_with_its_usage() {
     let (provider, endpoint) = provider_answering(StatusCode::OK, HELLO, |_| {}).await;
 
     let turn = provider
-        .chat_with_tools(&[user("hi")], &[], 0.5, 256)
+        .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 256))
         .await
         .expect("chat");
 
@@ -183,7 +183,7 @@ async fn the_api_key_tools_and_tool_messages_are_sent() {
     ];
 
     provider
-        .chat_with_tools(&messages, &[search_tool()], 0.0, 16)
+        .chat_with_tools(&messages, &[search_tool()], &CallParams::new(0.0, 16))
         .await
         .expect("chat");
 
@@ -202,7 +202,7 @@ async fn tool_calls_are_returned_as_tool_calls() {
     let (provider, _) = provider_answering(StatusCode::OK, body, |_| {}).await;
 
     let turn = provider
-        .chat_with_tools(&[user("hi")], &[search_tool()], 0.5, 64)
+        .chat_with_tools(&[user("hi")], &[search_tool()], &CallParams::new(0.5, 64))
         .await
         .expect("chat");
 
@@ -221,7 +221,9 @@ async fn an_empty_tool_call_list_is_an_answer_not_a_tool_round() {
     let body = r#"{"choices":[{"message":{"content":"done","tool_calls":[]}}]}"#;
     let (provider, _) = provider_answering(StatusCode::OK, body, |_| {}).await;
 
-    let turn = provider.chat_with_tools(&[user("hi")], &[], 0.5, 64).await;
+    let turn = provider
+        .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
+        .await;
 
     assert_eq!(content(turn.expect("chat")), "done");
 }
@@ -244,7 +246,7 @@ async fn extra_body_is_merged_into_every_request() {
     .await;
 
     provider
-        .chat_with_tools(&[user("hi")], &[], 0.5, 64)
+        .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
         .await
         .expect("chat");
     let (_, body) = sent(&endpoint);
@@ -253,10 +255,52 @@ async fn extra_body_is_merged_into_every_request() {
     assert_eq!(body["seed"], 7);
 
     // The streaming request carries it too.
-    let _ = provider.chat_stream_raw(&[user("hi")], 0.5, 64).await;
+    let _ = provider
+        .chat_stream_raw(&[user("hi")], &CallParams::new(0.5, 64))
+        .await;
     let (_, body) = sent(&endpoint);
     assert_eq!(body["stream"], true);
     assert_eq!(body["reasoning_effort"], "none");
+}
+
+// #403: a scenario stored in mddbd may name its own model and extra body.
+#[tokio::test]
+async fn a_scenarios_model_and_extra_body_are_laid_over_the_configured_ones() {
+    let (provider, endpoint) = provider_answering(StatusCode::OK, HELLO, |c| {
+        c.extra_body = json!({"reasoning_effort": "none", "seed": 7})
+            .as_object()
+            .cloned()
+            .unwrap();
+    })
+    .await;
+    let params = CallParams {
+        model: Some("scenario-model".into()),
+        extra_body: json!({"reasoning_effort": "low", "top_k": 40, "model": "smuggled"})
+            .as_object()
+            .cloned()
+            .unwrap(),
+        ..CallParams::new(0.0, 800)
+    };
+
+    provider
+        .chat_with_tools(&[user("hi")], &[], &params)
+        .await
+        .expect("chat");
+
+    let (_, body) = sent(&endpoint);
+    assert_eq!(body["model"], "scenario-model");
+    assert_eq!(body["temperature"], 0.0);
+    assert_eq!(body["max_tokens"], 800);
+    assert_eq!(body["reasoning_effort"], "low", "the scenario's key wins");
+    assert_eq!(body["seed"], 7, "a key only [llm] sets is kept");
+    assert_eq!(body["top_k"], 40);
+
+    // The streaming request is built the same way.
+    let _ = provider.chat_stream_raw(&[user("hi")], &params).await;
+    let (_, body) = sent(&endpoint);
+    assert_eq!(body["stream"], true);
+    assert_eq!(body["model"], "scenario-model");
+    assert_eq!(body["top_k"], 40);
 }
 
 #[tokio::test]
@@ -280,7 +324,7 @@ async fn request_fields_win_over_colliding_extra_body_keys() {
     .await;
 
     provider
-        .chat_with_tools(&[user("hi")], &[search_tool()], 0.5, 64)
+        .chat_with_tools(&[user("hi")], &[search_tool()], &CallParams::new(0.5, 64))
         .await
         .expect("chat");
 
@@ -306,7 +350,9 @@ async fn reasoning_without_content_is_never_shown_to_the_visitor() {
         );
         let (provider, _) = provider_answering(StatusCode::OK, &body, |_| {}).await;
 
-        let turn = provider.chat_with_tools(&[user("hi")], &[], 0.5, 64).await;
+        let turn = provider
+            .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
+            .await;
 
         assert_eq!(
             content(turn.expect("chat")),
@@ -321,7 +367,9 @@ async fn reasoning_next_to_content_changes_nothing() {
     let body = r#"{"choices":[{"message":{"content":"42","reasoning":"long thoughts"}}]}"#;
     let (provider, _) = provider_answering(StatusCode::OK, body, |_| {}).await;
 
-    let turn = provider.chat_with_tools(&[user("hi")], &[], 0.5, 64).await;
+    let turn = provider
+        .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
+        .await;
 
     assert_eq!(content(turn.expect("chat")), "42");
 }
@@ -350,10 +398,17 @@ async fn a_refusal_from_the_endpoint_carries_its_status_and_body() {
     let (provider, _) =
         provider_answering(StatusCode::TOO_MANY_REQUESTS, "slow down", |_| {}).await;
 
-    let err = llm_error(provider.chat_with_tools(&[user("hi")], &[], 0.5, 64).await);
+    let err = llm_error(
+        provider
+            .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
+            .await,
+    );
     assert!(err.contains("429") && err.contains("slow down"), "{err}");
 
-    let stream_err = provider.chat_stream_raw(&[user("hi")], 0.5, 64).await.err();
+    let stream_err = provider
+        .chat_stream_raw(&[user("hi")], &CallParams::new(0.5, 64))
+        .await
+        .err();
     assert!(
         matches!(&stream_err, Some(AppError::LlmError(m)) if m.contains("429")),
         "got {stream_err:?}"
@@ -363,11 +418,19 @@ async fn a_refusal_from_the_endpoint_carries_its_status_and_body() {
 #[tokio::test]
 async fn an_unparseable_or_empty_answer_is_an_error() {
     let (provider, _) = provider_answering(StatusCode::OK, "<html>", |_| {}).await;
-    let err = llm_error(provider.chat_with_tools(&[user("hi")], &[], 0.5, 64).await);
+    let err = llm_error(
+        provider
+            .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
+            .await,
+    );
     assert!(err.starts_with("failed to parse response"), "{err}");
 
     let (provider, _) = provider_answering(StatusCode::OK, r#"{"choices":[]}"#, |_| {}).await;
-    let err = llm_error(provider.chat_with_tools(&[user("hi")], &[], 0.5, 64).await);
+    let err = llm_error(
+        provider
+            .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
+            .await,
+    );
     assert_eq!(err, "no choices in response");
 }
 
@@ -378,7 +441,9 @@ async fn an_unreachable_endpoint_is_an_error() {
     drop(reserved);
     let provider = provider_at(addr, |_| {});
 
-    let result = provider.chat_with_tools(&[user("hi")], &[], 0.5, 64).await;
+    let result = provider
+        .chat_with_tools(&[user("hi")], &[], &CallParams::new(0.5, 64))
+        .await;
 
     assert!(!llm_error(result).is_empty());
 }
@@ -387,7 +452,7 @@ async fn an_unreachable_endpoint_is_an_error() {
 
 async fn collect(provider: &OpenAiProvider) -> Vec<Result<String, String>> {
     provider
-        .chat_stream_raw(&[user("hi")], 0.5, 64)
+        .chat_stream_raw(&[user("hi")], &CallParams::new(0.5, 64))
         .await
         .expect("the stream should start")
         .map(|chunk| chunk.map_err(|e| e.to_string()))

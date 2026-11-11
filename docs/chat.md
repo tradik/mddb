@@ -133,6 +133,18 @@ Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming 
 - `[llm] extra_body = { reasoning_effort = "none" }` adds fields to every OpenAI-compatible request, for thinking models that otherwise return an empty answer.
 - Scenarios can live in mddbd and be edited in the panel's Chat page (`/v1/chat/scenarios`); the TOML `[scenarios]` stay as bootstrap and fallback.
 
+### Scenarios from mddbd (2.19.0)
+
+`mddb-chat` loads the scenarios stored in mddbd as soon as it is connected and looks at the store's version every `[scenarios_source] poll_seconds` (default `10`; `0` turns it off). When the version changed they are reloaded without a restart, and no session is dropped: an open session gets the new scenario at its next message.
+
+- **Which one wins.** A scenario stored in mddbd wins over the TOML `[scenarios.<name>]` of the same name. A name mddbd does not have is served from the TOML, and so is every name until mddbd is reached or when mddbd is older than 2.19.0.
+- **Disabled.** A scenario stored with `enabled: false` is refused at `join` with `scenario is disabled`; the TOML scenario of the same name does not stand in.
+- **Prompt.** The system prompt is the one mddbd composes (operator prompt, guardrails, off-topic and style clauses, the collections' `responsePrompt`s), so the panel's preview is what the model reads.
+- **Applied fields.** `allowedCollections` bound the tools, `llm.model` / `temperature` / `maxTokens` / `extraBody` override `[llm]` for that scenario, and `maxTurns`, `tokenBudgetPerSession` and `rateLimit.messagesPerMinute` (per session) limit the conversation. A field left at 0 or empty keeps the server's own setting. `skills` are ignored for now.
+- **Health.** `GET /health` reports `"scenarios_source": "mddbd" | "toml"` and `"scenarios_version"`.
+
+The full table is in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#scenarios-from-mddbd).
+
 ### Widget Configuration
 
 ```javascript
