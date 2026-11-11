@@ -4656,8 +4656,13 @@ admin on `*`, "authenticated" for any valid token or API key. See
 | POST | `/v1/temporal/hot` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#hot-documents-leaderboard) (needs `MDDB_TEMPORAL=true`) |
 | POST | `/v1/temporal/histogram` | `read` | [TEMPORAL-TRACK.md](TEMPORAL-TRACK.md#activity-histogram) (needs `MDDB_TEMPORAL=true`) |
 
-Without `MDDB_SPELL` or `MDDB_TEMPORAL` the spell and temporal routes are not
-registered and answer 404.
+Without `MDDB_SPELL` or `MDDB_TEMPORAL` the spell and temporal routes answer
+404 with a JSON body naming the module that is off (2.19.0+; before, the mux's
+plain-text `404 page not found`):
+
+```json
+{"error": "feature disabled", "feature": "temporal"}
+```
 
 Two more groups are off by default and registered only when switched on:
 

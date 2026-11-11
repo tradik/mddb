@@ -23,7 +23,7 @@ type BulkIngestSubmitRequest struct {
 // for progress or supply a callbackUrl to receive a webhook on completion.
 func (s *Server) handleBulkIngestSubmit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 		return
 	}
 	if s.BulkIngest == nil {
@@ -80,12 +80,12 @@ func (s *Server) handleBulkIngestStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if r.Method != http.MethodGet && r.Method != http.MethodDelete {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 		return
 	}
 	job, err := s.BulkIngest.Get(jobID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		writeJSONError(w, http.StatusNotFound, map[string]any{"error": err.Error()})
 		return
 	}
 	// SEC-019: reading a job reads its collection; cancelling writes it.
@@ -107,7 +107,7 @@ func (s *Server) handleBulkIngestStatus(w http.ResponseWriter, r *http.Request) 
 // via ?collection=X.
 func (s *Server) handleBulkIngestList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, http.StatusMethodNotAllowed, map[string]any{"error": "method not allowed"})
 		return
 	}
 	if s.BulkIngest == nil {

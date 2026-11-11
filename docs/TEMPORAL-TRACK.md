@@ -17,6 +17,10 @@ Temporal tracking is **disabled by default**. Enable it via environment variable
 MDDB_TEMPORAL=true mddbd
 ```
 
+While it is off, the `/v1/temporal/*` routes answer 404 with a JSON body naming the
+module (2.19.0+; before, the plain-text `404 page not found`):
+`{"error":"feature disabled","feature":"temporal"}`.
+
 Or with Docker:
 
 ```yaml

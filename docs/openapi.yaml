@@ -574,6 +574,11 @@ paths:
                 $ref: "#/components/schemas/BulkIngestJob"
         "404":
           description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example: {error: job 1731330000000000000 not found}
     delete:
       tags:
         - Documents
@@ -592,6 +597,16 @@ paths:
           description: Job cancelled
         "400":
           description: Job already started or completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /v1/bulk-ingest-jobs:
     get:
@@ -7869,7 +7884,8 @@ paths:
                   total:
                     type: integer
         "400":
-          description: Missing required fields or temporal not available
+          description: Missing required fields
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
 
   /v1/temporal/hot:
     post:
@@ -7921,7 +7937,8 @@ paths:
                         document:
                           $ref: "#/components/schemas/Document"
         "400":
-          description: Missing required field or temporal not available
+          description: Missing required field
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
 
   /v1/temporal/histogram:
     post:
@@ -7982,7 +7999,8 @@ paths:
                         count:
                           type: integer
         "400":
-          description: Missing required field or temporal not available
+          description: Missing required field
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
 
   /v1/spell-suggest:
     post:
@@ -8036,6 +8054,7 @@ paths:
         "503":
           description: Spell index still loading — retry
         "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "413": {$ref: "#/components/responses/PayloadTooLarge"}
@@ -8079,6 +8098,7 @@ paths:
         "503":
           description: Spell index still loading — retry
         "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "413": {$ref: "#/components/responses/PayloadTooLarge"}
@@ -8118,6 +8138,7 @@ paths:
                     items:
                       type: string
         "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "429": {$ref: "#/components/responses/RateLimited"}
@@ -8156,6 +8177,7 @@ paths:
                   added:
                     type: integer
         "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "413": {$ref: "#/components/responses/PayloadTooLarge"}
@@ -8196,6 +8218,7 @@ paths:
   # follow the Elasticsearch REST API; see docs/ELASTICSEARCH-COMPAT.md for
   # what is translated and what is refused (400, naming the clause).
         "400": {$ref: "#/components/responses/BadRequest"}
+        "404": {$ref: "#/components/responses/FeatureDisabled"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "403": {$ref: "#/components/responses/Forbidden"}
         "413": {$ref: "#/components/responses/PayloadTooLarge"}
@@ -14625,6 +14648,27 @@ components:
         application/json:
           schema: {$ref: "#/components/schemas/ErrorResponse"}
           example: {error: chat skill not found}
+    FeatureDisabled:
+      description: >
+        The module this route belongs to is off: switched off at
+        /v1/features (GO-049), or — temporal and spell — not started
+        (MDDB_TEMPORAL or MDDB_SPELL not set to true). Before 2.19.0 the routes
+        of a module not started were not registered and answered a
+        plain-text 404.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ error, feature ]
+            properties:
+              error:
+                type: string
+                enum: [ feature disabled ]
+              feature:
+                type: string
+                description: The module that is off.
+                example: temporal
+          example: {error: feature disabled, feature: temporal}
     # Refusals shared by many operations. Each matches what the server
     # writes; an operation with a narrower meaning documents it inline.
     BadRequest:

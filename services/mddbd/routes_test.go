@@ -100,8 +100,9 @@ func TestAuthRoutesFollowTheAuthFlag(t *testing.T) {
 }
 
 // Temporal tracking and spell correction are opt-in (MDDB_TEMPORAL,
-// MDDB_SPELL). Their endpoints must exist exactly when the subsystem does:
-// served without it they would dereference a nil manager.
+// MDDB_SPELL). Their handlers must be served exactly when the subsystem is:
+// served without it they would dereference a nil manager. Off, the paths
+// answer the JSON "feature disabled" 404 (feature_disabled_http_test.go).
 func TestOptionalSubsystemRoutesFollowTheirManagers(t *testing.T) {
 	srv, cleanup := routeServer(t)
 	defer cleanup()
@@ -117,8 +118,12 @@ func TestOptionalSubsystemRoutesFollowTheirManagers(t *testing.T) {
 
 	off := http.NewServeMux()
 	srv.registerRoutes(off, false)
-	if got := registeredRoutes(t, off, optional); len(got) != 0 {
-		t.Errorf("optional routes are served without their managers: %v", got)
+	for _, p := range optional {
+		rec := httptest.NewRecorder()
+		off.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, p, strings.NewReader(`{}`)))
+		if rec.Code != http.StatusNotFound || !strings.Contains(rec.Body.String(), `"feature disabled"`) {
+			t.Errorf("%s without its manager: %d %s", p, rec.Code, rec.Body.String())
+		}
 	}
 
 	srv.TemporalManager = temporal.NewTemporalManager(srv.DB)

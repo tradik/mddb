@@ -17,6 +17,10 @@ Spell correction is **disabled by default**. Enable it via environment variable:
 MDDB_SPELL=true mddbd
 ```
 
+While it is off, the `/v1/spell-*` routes answer 404 with a JSON body naming the
+module (2.19.0+; before, the plain-text `404 page not found`):
+`{"error":"feature disabled","feature":"spell"}`.
+
 Or with Docker:
 
 ```yaml

@@ -148,17 +148,22 @@ func (s *Server) registerRoutes(m routeMux, authEnabled bool) {
 	mux.HandleFunc("/v1/cross-search", s.handleCrossSearch)
 	mux.HandleFunc("/v1/find-duplicates", s.handleFindDuplicates)
 	mux.HandleFunc("/v1/aggregate", s.withSearchLimit(s.handleAggregate))
-	// Temporal event tracking
+	// Temporal event tracking. Switched off, its routes answer the JSON
+	// "feature disabled" 404 rather than the mux's plain-text one.
 	if s.TemporalManager != nil {
 		mux.HandleFunc("/v1/temporal/query", s.handleTemporalQuery)
 		mux.HandleFunc("/v1/temporal/hot", s.handleTemporalHot)
 		mux.HandleFunc("/v1/temporal/histogram", s.handleTemporalHistogram)
+	} else {
+		handleFeatureDisabled(mux, FeatureTemporal, "/v1/temporal/query", "/v1/temporal/hot", "/v1/temporal/histogram")
 	}
-	// Spell correction
+	// Spell correction, likewise.
 	if s.SpellManager != nil {
 		mux.HandleFunc("/v1/spell-suggest", s.handleSpellSuggest)
 		mux.HandleFunc("/v1/spell-cleanup", s.handleSpellCleanup)
 		mux.HandleFunc("/v1/spell-dictionary", s.handleSpellDictionary)
+	} else {
+		handleFeatureDisabled(mux, FeatureSpell, "/v1/spell-suggest", "/v1/spell-cleanup", "/v1/spell-dictionary")
 	}
 	mux.HandleFunc("/metrics", s.Metrics.HandleMetrics)
 	// INT-019: the Elasticsearch-compatible subset under /es, off by default.

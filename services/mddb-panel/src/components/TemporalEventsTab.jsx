@@ -7,7 +7,7 @@ import ApiErrorNotice from './ApiErrorNotice';
 /**
  * TemporalEventsTab lists one document's create, update and access events
  * (/v1/temporal/query) in a time range — by default the last 30 days. A
- * server without MDDB_TEMPORAL=true has no such route (404).
+ * server without MDDB_TEMPORAL=true answers 404 (`{"error":"feature disabled"}`).
  */
 export default function TemporalEventsTab({ collection }) {
   const [key, setKey] = useState('');
