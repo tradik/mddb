@@ -7,7 +7,7 @@
 # only main.go was copied and the client was outside the context.
 
 # Build stage
-FROM golang:1.27.3-alpine AS builder
+FROM golang:1.27.4-alpine AS builder
 
 WORKDIR /src
 

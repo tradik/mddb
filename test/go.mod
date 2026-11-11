@@ -2,7 +2,7 @@ module mddb-test
 
 go 1.27
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/go-sql-driver/mysql v1.10.1

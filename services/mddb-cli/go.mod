@@ -2,7 +2,7 @@ module mddb-cli
 
 go 1.27
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/spf13/cobra v1.10.2
