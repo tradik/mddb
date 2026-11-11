@@ -10,7 +10,8 @@ pub async fn health(State(state): State<Arc<AppState>>) -> Json<Value> {
     Json(json!({
         "status": "ok",
         "service": "mddb-chat",
-        "active_sessions": state.session_manager.active_count(),
+        "active_sessions": state.session_manager.attached_count(),
+        "detached_sessions": state.session_manager.detached_count(),
         "queue_length": state.session_manager.queue_len().await,
         "max_concurrent": state.config.session.max_concurrent,
     }))

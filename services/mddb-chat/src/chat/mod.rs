@@ -1,9 +1,13 @@
 pub mod handler;
+mod lifecycle;
 pub mod markdown;
+mod outbound;
 pub mod policy;
+mod prompt;
 pub mod scenario;
 pub mod tools;
 pub mod trace;
+mod turn;
 
 #[cfg(test)]
 mod handler_tests;

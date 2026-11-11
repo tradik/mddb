@@ -36,6 +36,14 @@ pub struct Session {
     /// every provider response carries, summed across every tool-calling round
     /// rather than only the round that produced the answer.
     pub total_tokens_used: u64,
+    /// Whether a WebSocket currently owns this session (#402).
+    ///
+    /// A session used to be removed the moment its socket closed, which made
+    /// `resume` impossible: every network blip lost the conversation. It now
+    /// stays in the manager as *detached* until `session_ttl_minutes` of
+    /// inactivity, and a reconnecting client reattaches it. A detached session
+    /// does not count toward `max_concurrent`: it costs memory, not an LLM.
+    pub attached: bool,
 }
 
 impl Session {
@@ -55,7 +63,24 @@ impl Session {
             message_count: 0,
             user_turns: 0,
             total_tokens_used: 0,
+            attached: true,
         }
+    }
+
+    /// Marks the session as having no socket (#402).
+    ///
+    /// The idle clock restarts here: the TTL is "how long after the visitor
+    /// went away do we keep their conversation", so it counts from the
+    /// disconnect, not from whatever they last said.
+    pub fn detach(&mut self) {
+        self.attached = false;
+        self.last_active = Instant::now();
+    }
+
+    /// Gives the session back to a socket (#402).
+    pub fn attach(&mut self) {
+        self.attached = true;
+        self.last_active = Instant::now();
     }
 
     /// Whether this session may spend more, given a budget (RAG-005).
@@ -371,6 +396,53 @@ mod tests {
             WsIncoming::Feedback { ref message_id, ref rating, .. }
                 if message_id.is_none() && rating == "up"
         ));
+    }
+
+    #[test]
+    fn a_join_without_a_scenario_gets_the_default_one() {
+        let incoming: WsIncoming =
+            serde_json::from_str(r#"{"type":"join","name":"Ada"}"#).expect("parse");
+        assert!(
+            matches!(&incoming, WsIncoming::Join { scenario, .. } if scenario == "assistant"),
+            "parsed as {incoming:?}"
+        );
+    }
+
+    // #402: a session used to be removed the moment its socket closed, so a
+    // resume after a reconnect always found nothing. It now survives a
+    // disconnect as "detached" until its TTL runs out.
+
+    #[test]
+    fn a_new_session_is_attached_to_its_socket() {
+        assert!(session().attached);
+    }
+
+    #[test]
+    fn detaching_marks_the_session_and_restarts_its_idle_clock() {
+        let mut s = session();
+        let before = s.last_active;
+        std::thread::sleep(std::time::Duration::from_millis(5));
+
+        s.detach();
+
+        assert!(!s.attached);
+        assert!(
+            s.last_active > before,
+            "the TTL must count from the disconnect, not from the last message"
+        );
+    }
+
+    #[test]
+    fn attaching_reverses_a_detach_and_marks_the_session_active() {
+        let mut s = session();
+        s.detach();
+        let before = s.last_active;
+        std::thread::sleep(std::time::Duration::from_millis(5));
+
+        s.attach();
+
+        assert!(s.attached);
+        assert!(s.last_active > before);
     }
 
     // RAG-005: the counter that used to exist and never counted.

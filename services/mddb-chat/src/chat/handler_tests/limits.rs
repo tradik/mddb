@@ -86,6 +86,8 @@ async fn a_session_whose_scenario_is_gone_still_gets_an_answer() {
     let mut client = server.connect().await;
 
     if let JoinResult::Admitted { session_id } = joined {
+        // No socket ever held it; #402 resumes only what is detached.
+        server.state.session_manager.detach(&session_id).await;
         client
             .send_json(json!({"type": "resume", "session_id": session_id}))
             .await;

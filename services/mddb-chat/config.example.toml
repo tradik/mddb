@@ -51,6 +51,10 @@ temperature = 0.7
 max_concurrent = 2
 queue_size = 10
 max_history_length = 50
+# How long a session is kept without activity. A session outlives its
+# WebSocket: on disconnect it is detached (it stops counting toward
+# max_concurrent) and a reconnecting client's `resume` picks it up again.
+# Only `end` or this many idle minutes remove it.
 session_ttl_minutes = 60
 max_response_length = 4096
 name_max_chars = 50
@@ -115,7 +119,8 @@ max_turns = 30
 # Events are opt-in per entry:
 #
 #   session.start  a visitor was admitted
-#   session.end    a session ended (by the visitor or by disconnect)
+#   session.end    a session ended (the visitor sent `end`, or it timed out
+#                  after session_ttl_minutes; a disconnect only detaches it)
 #   queue.full     a visitor was turned away
 #   message        a visitor's question, as sanitized (session id, scenario,
 #                  message id, text)

@@ -31,6 +31,7 @@ use security::sanitizer::Sanitizer;
 use session::manager::SessionManager;
 use state::AppState;
 use webhook::dispatcher::WebhookDispatcher;
+use webhook::types::WebhookPayload;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -98,7 +99,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut interval = tokio::time::interval(Duration::from_secs(60));
         loop {
             interval.tick().await;
-            cleanup_state.session_manager.cleanup_expired().await;
+            // #402: a session that times out ended just as surely as one the
+            // visitor closed, so its webhook fires here rather than on the
+            // disconnect that merely detached it.
+            for expired in cleanup_state.session_manager.cleanup_expired().await {
+                cleanup_state
+                    .webhook_dispatcher
+                    .dispatch(WebhookPayload::session_end(
+                        &expired.id,
+                        &expired.name,
+                        &expired.scenario,
+                    ));
+            }
             cleanup_state.rate_limiter.cleanup();
         }
     });

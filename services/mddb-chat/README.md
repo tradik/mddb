@@ -61,11 +61,35 @@ Every frame is a JSON object with a `type`.
 | `join` | `name`, `scenario` (default `assistant`) | `session` `{id, scenario}`, or `queued` `{position}` and `session` later |
 | `message` | `content` | `chunk` `{content}` repeatedly, then `done` `{message_id}` |
 | `feedback` | `rating`, `question`, `answer`, `message_id` (optional) | nothing |
-| `resume` | `session_id` | `session` |
+| `resume` | `session_id` | `session` `{id, scenario}` of the session reattached |
 | `end` | — | `ended` |
 | `ping` | — | `pong` |
 
 Any refusal arrives as `error` `{message}`.
+
+### Sessions outlive their connection
+
+A closed socket does not end a session (2.19.0). On disconnect the session is
+**detached**: its history is kept, and it stops counting toward
+`[session] max_concurrent`, so the next visitor in the queue is admitted at
+once. A client that reconnects sends `resume` and carries on where it left off.
+
+A session is removed only when the visitor sends `end`, or when it has been
+idle for `[session] session_ttl_minutes` (counted from the last message, or
+from the disconnect if that came later). Both fire `session.end`; a disconnect
+alone does not.
+
+`resume` is refused with an `error` when:
+
+| Message | Meaning |
+|---------|---------|
+| `session not found or expired` | Ended, timed out, or never existed. Join again. |
+| `session is open in another connection` | Another live socket holds it; two connections never share a session. |
+| `server is at capacity; try resuming again shortly` | The freed seat went to someone else. The session is kept; retry. |
+| `rate limited` | `resume` is charged to the per-address rate limit, like `join`. |
+
+`GET /health` reports attached sessions as `active_sessions` and the ones
+waiting for a `resume` as `detached_sessions`.
 
 ### Message ids
 
@@ -100,7 +124,7 @@ headers = { "Authorization" = "Bearer your-token" }
 | Event | Fired when |
 |-------|------------|
 | `session.start` | a visitor is admitted |
-| `session.end` | a session ends, by `end` or by disconnect |
+| `session.end` | a session ends: the visitor sent `end`, or it sat idle past `session_ttl_minutes`. A disconnect alone only detaches it |
 | `queue.full` | a visitor is turned away |
 | `message` | a question is accepted (after sanitizing and the turn and token limits) |
 | `answer` | an answer has been sent in full |
@@ -196,7 +220,11 @@ client typed, and the id already names the answer.
 
 ```
 src/
-  chat/handler.rs    WebSocket session: join, turns, the tool-calling loop
+  chat/handler.rs    the WebSocket loop: frames in, messages dispatched, feedback
+  chat/lifecycle.rs  join, resume, end, and detaching on disconnect
+  chat/turn.rs       one message through the tool-calling loop
+  chat/prompt.rs     the system prompt and history as the model sees them
+  chat/outbound.rs   frames to the visitor
   chat/tools.rs      search_docs / get_document and the per-scenario policy
   chat/markdown.rs   result shaping: prose stripped, code kept, character-safe cuts
   chat/scenario.rs   prompt composition, per-scenario temperature and collection

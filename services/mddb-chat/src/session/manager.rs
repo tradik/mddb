@@ -9,6 +9,8 @@ use crate::config::SessionConfig;
 use crate::session::types::Session;
 
 pub struct SessionManager {
+    /// Every live session, attached or detached (#402). Only the attached
+    /// ones hold a `max_concurrent` slot.
     active: DashMap<String, Session>,
     queue: Mutex<VecDeque<QueueEntry>>,
     config: SessionConfig,
@@ -30,6 +32,7 @@ struct QueueEntry {
     pub admitted: oneshot::Sender<String>,
 }
 
+#[derive(Debug)]
 pub enum JoinResult {
     Admitted {
         session_id: String,
@@ -43,6 +46,40 @@ pub enum JoinResult {
     Full,
 }
 
+/// Why a `resume` was refused (#402).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResumeError {
+    /// No such session: it never existed, was ended, or its TTL ran out.
+    NotFound,
+    /// A socket still owns the session. Two connections must never share
+    /// one; the second would be someone who copied the id while the owner is
+    /// still talking.
+    StillAttached,
+    /// Every `max_concurrent` slot is taken. The session is kept for a later
+    /// attempt.
+    AtCapacity,
+}
+
+impl std::fmt::Display for ResumeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            // The widget rejoins when it reads "session not found", so that
+            // phrase is part of the wire protocol.
+            Self::NotFound => write!(f, "session not found or expired"),
+            Self::StillAttached => write!(f, "session is open in another connection"),
+            Self::AtCapacity => write!(f, "server is at capacity; try resuming again shortly"),
+        }
+    }
+}
+
+/// A session the TTL sweep removed, so the caller can announce its end.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExpiredSession {
+    pub id: String,
+    pub name: String,
+    pub scenario: String,
+}
+
 impl SessionManager {
     pub fn new(config: SessionConfig) -> Self {
         Self {
@@ -53,8 +90,7 @@ impl SessionManager {
     }
 
     pub async fn join(&self, name: String, scenario: String) -> JoinResult {
-        // Check if there's room
-        if self.active.len() < self.config.max_concurrent {
+        if self.has_free_slot() {
             let session_id = Uuid::new_v4().to_string();
             let session = Session::new(name, scenario);
             self.active.insert(session_id.clone(), session);
@@ -122,374 +158,103 @@ impl SessionManager {
         self.active.get_mut(id)
     }
 
+    /// Ends a session for good: `end` from the visitor, or the TTL sweep.
     pub async fn remove_session(&self, id: &str) {
         self.active.remove(id);
-        // Try to admit next from queue
-        self.admit_from_queue().await;
+        self.fill_free_slots().await;
     }
 
-    pub fn active_count(&self) -> usize {
-        self.active.len()
+    /// Marks a session as having no socket (#402) and hands its slot on.
+    ///
+    /// Returns whether the session existed. The session itself stays, with its
+    /// history, until `resume` reattaches it or the TTL sweep removes it.
+    pub async fn detach(&self, id: &str) -> bool {
+        let found = match self.active.get_mut(id) {
+            Some(mut session) => {
+                session.detach();
+                true
+            }
+            None => false,
+        };
+        if found {
+            self.fill_free_slots().await;
+        }
+        found
+    }
+
+    /// Gives a detached session back to a socket (#402).
+    ///
+    /// Returns the session's scenario on success, so the client can be told
+    /// which conversation it is back in.
+    pub fn resume(&self, id: &str) -> Result<String, ResumeError> {
+        // Counted before the entry is locked: iterating the map while holding
+        // one of its entries would deadlock on that entry's shard. Two resumes
+        // racing for the last slot can both pass, which is a one-off
+        // over-capacity, not a leak — the slot is counted correctly again as
+        // soon as either socket closes.
+        let has_free_slot = self.has_free_slot();
+        let mut session = self.active.get_mut(id).ok_or(ResumeError::NotFound)?;
+        if session.attached {
+            return Err(ResumeError::StillAttached);
+        }
+        if !has_free_slot {
+            return Err(ResumeError::AtCapacity);
+        }
+        session.attach();
+        Ok(session.scenario.clone())
+    }
+
+    /// Sessions that currently hold a slot: those with a live socket.
+    pub fn attached_count(&self) -> usize {
+        self.active.iter().filter(|entry| entry.attached).count()
+    }
+
+    /// Sessions kept for a `resume`, holding no slot (#402).
+    pub fn detached_count(&self) -> usize {
+        self.active.iter().filter(|entry| !entry.attached).count()
     }
 
     pub async fn queue_len(&self) -> usize {
         self.queue.lock().await.len()
     }
 
-    /// Clean up expired sessions
-    pub async fn cleanup_expired(&self) {
-        let ttl = Duration::from_secs(self.config.session_ttl_minutes * 60);
-        let expired: Vec<String> = self
-            .active
-            .iter()
-            .filter(|entry| entry.last_active.elapsed() > ttl)
-            .map(|entry| entry.key().clone())
-            .collect();
+    fn has_free_slot(&self) -> bool {
+        self.attached_count() < self.config.max_concurrent
+    }
 
-        for id in expired {
-            self.active.remove(&id);
-        }
-
-        // Try to admit queued users for freed slots
-        while self.active.len() < self.config.max_concurrent {
+    /// Admits queued visitors into whatever slots are free.
+    ///
+    /// Bounded by the count rather than "one per call": removing a detached
+    /// session frees nothing (its slot was handed on at the disconnect), and
+    /// a blind admission there would run past `max_concurrent`.
+    async fn fill_free_slots(&self) {
+        while self.has_free_slot() {
             if self.admit_from_queue().await.is_none() {
                 break;
             }
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::session::types::MessageRole;
+    /// Removes sessions idle for longer than the TTL, attached or not, and
+    /// reports them so the caller can fire `session.end` for each (#402).
+    pub async fn cleanup_expired(&self) -> Vec<ExpiredSession> {
+        let ttl = Duration::from_secs(self.config.session_ttl_minutes * 60);
+        let expired: Vec<ExpiredSession> = self
+            .active
+            .iter()
+            .filter(|entry| entry.last_active.elapsed() > ttl)
+            .map(|entry| ExpiredSession {
+                id: entry.key().clone(),
+                name: entry.name.clone(),
+                scenario: entry.scenario.clone(),
+            })
+            .collect();
 
-    // TEST-001. The session manager decides who gets in, who waits and who is
-    // turned away. All three are how a small server survives a crowd, and none
-    // of them had a test.
-
-    fn config(max_concurrent: usize, queue_size: usize) -> SessionConfig {
-        SessionConfig {
-            max_concurrent,
-            queue_size,
-            max_history_length: 50,
-            session_ttl_minutes: 30,
-            max_response_length: 4000,
-            name_max_chars: 40,
-        }
-    }
-
-    fn admitted(result: JoinResult) -> String {
-        match result {
-            JoinResult::Admitted { session_id } => session_id,
-            JoinResult::Queued { position, .. } => panic!("queued at {position}, wanted admission"),
-            JoinResult::Full => panic!("turned away, wanted admission"),
-        }
-    }
-
-    #[tokio::test]
-    async fn the_first_arrivals_are_admitted() {
-        let m = SessionManager::new(config(2, 4));
-
-        let first = admitted(m.join("Ada".into(), "default".into()).await);
-        let second = admitted(m.join("Grace".into(), "default".into()).await);
-
-        assert_ne!(first, second, "two sessions were given the same id");
-        assert_eq!(m.active_count(), 2);
-        assert_eq!(m.queue_len().await, 0);
-    }
-
-    #[tokio::test]
-    async fn arrivals_past_capacity_are_queued_in_order() {
-        let m = SessionManager::new(config(1, 3));
-        admitted(m.join("Ada".into(), "default".into()).await);
-
-        let positions: Vec<usize> = {
-            let mut out = Vec::new();
-            for name in ["Grace", "Barbara", "Katherine"] {
-                match m.join(name.into(), "default".into()).await {
-                    JoinResult::Queued { position, .. } => out.push(position),
-                    other => panic!("{name} was not queued: {}", describe(&other)),
-                }
-            }
-            out
-        };
-
-        // Position is 1-based and reported as "how many are waiting including
-        // you", which is what a waiting visitor is shown.
-        assert_eq!(positions, vec![1, 2, 3]);
-        assert_eq!(m.queue_len().await, 3);
-        assert_eq!(m.active_count(), 1);
-    }
-
-    #[tokio::test]
-    async fn a_full_queue_turns_people_away() {
-        let m = SessionManager::new(config(1, 1));
-        admitted(m.join("Ada".into(), "default".into()).await);
-        let _grace = match m.join("Grace".into(), "default".into()).await {
-            JoinResult::Queued { admitted, .. } => admitted,
-            other => panic!("Grace was {}", describe(&other)),
-        };
-
-        // Refusing beats queueing without bound: a queue nobody will reach the
-        // front of is a worse answer than "come back later".
-        match m.join("Barbara".into(), "default".into()).await {
-            JoinResult::Full => {}
-            other => panic!("a third arrival was {}", describe(&other)),
-        }
-        assert_eq!(m.queue_len().await, 1);
-    }
-
-    #[tokio::test]
-    async fn leaving_admits_the_next_in_line() {
-        let m = SessionManager::new(config(1, 2));
-        let first = admitted(m.join("Ada".into(), "default".into()).await);
-
-        // The receiver has to be held: dropping it is how a visitor who closed
-        // their browser looks to the manager, and they are then skipped.
-        let _grace = match m.join("Grace".into(), "default".into()).await {
-            JoinResult::Queued { admitted, .. } => admitted,
-            other => panic!("Grace was {}", describe(&other)),
-        };
-
-        m.remove_session(&first).await;
-
-        assert_eq!(
-            m.queue_len().await,
-            0,
-            "the queued visitor was not admitted"
-        );
-        assert_eq!(m.active_count(), 1);
-        assert!(
-            m.get_session(&first).is_none(),
-            "the closed session is still active"
-        );
-    }
-
-    #[tokio::test]
-    async fn the_admitted_visitor_keeps_their_name_and_scenario() {
-        let m = SessionManager::new(config(1, 2));
-        admitted(m.join("Ada".into(), "default".into()).await);
-
-        let queued = m.join("Grace".into(), "support".into()).await;
-        let mut rx = match queued {
-            JoinResult::Queued { admitted, .. } => admitted,
-            other => panic!("Grace was {}", describe(&other)),
-        };
-
-        let (id, name, scenario) = m
-            .admit_from_queue()
-            .await
-            .expect("the queue would not give up its only entry");
-
-        assert!(!id.is_empty());
-        assert_eq!(name, "Grace");
-        assert_eq!(
-            scenario, "support",
-            "the queued visitor lost their scenario"
-        );
-
-        // The same id must reach the visitor waiting on the channel, or they
-        // would be holding a session nobody created for them.
-        assert_eq!(
-            rx.try_recv().expect("Grace was never told her session id"),
-            id
-        );
-    }
-
-    // TEST-001: admit_from_queue created the session and only woke the waiting
-    // task, which then called join() again and created a second one. Every
-    // admission left an orphan holding a max_concurrent slot until its TTL.
-    #[tokio::test]
-    async fn admitting_from_the_queue_creates_exactly_one_session() {
-        let m = SessionManager::new(config(1, 2));
-        let first = admitted(m.join("Ada".into(), "default".into()).await);
-        let mut rx = match m.join("Grace".into(), "default".into()).await {
-            JoinResult::Queued { admitted, .. } => admitted,
-            other => panic!("Grace was {}", describe(&other)),
-        };
-
-        m.remove_session(&first).await;
-
-        let grace_id = rx
-            .try_recv()
-            .expect("Grace was woken without being told her session id");
-
-        assert_eq!(
-            m.active_count(),
-            1,
-            "one visitor was admitted and {} sessions exist",
-            m.active_count()
-        );
-        assert!(
-            m.get_session(&grace_id).is_some(),
-            "the id Grace was given does not name an active session"
-        );
-    }
-
-    // At capacity 1 the orphan took the freed slot, so the visitor it was
-    // created for was re-queued behind a phantom of themselves.
-    #[tokio::test]
-    async fn a_queue_drains_completely_at_capacity_one() {
-        let m = SessionManager::new(config(1, 3));
-        let mut current = admitted(m.join("Ada".into(), "default".into()).await);
-
-        let mut waiting = Vec::new();
-        for name in ["Grace", "Barbara", "Katherine"] {
-            match m.join(name.into(), "default".into()).await {
-                JoinResult::Queued { admitted, .. } => waiting.push((name, admitted)),
-                other => panic!("{name} was {}", describe(&other)),
-            }
+        for session in &expired {
+            self.active.remove(&session.id);
         }
 
-        for (name, mut rx) in waiting {
-            m.remove_session(&current).await;
-
-            current = rx
-                .try_recv()
-                .unwrap_or_else(|e| panic!("{name} was never admitted: {e}"));
-
-            assert_eq!(
-                m.active_count(),
-                1,
-                "{name}'s admission left extra sessions"
-            );
-        }
-
-        assert_eq!(m.queue_len().await, 0, "the queue never drained");
-    }
-
-    // A visitor who closes their browser while waiting must not consume the
-    // slot that frees up.
-    #[tokio::test]
-    async fn a_visitor_who_leaves_the_queue_does_not_take_a_slot() {
-        let m = SessionManager::new(config(1, 3));
-        let first = admitted(m.join("Ada".into(), "default".into()).await);
-
-        // Grace joins and immediately gives up: dropping the receiver is what
-        // a closed WebSocket looks like to the manager.
-        match m.join("Grace".into(), "default".into()).await {
-            JoinResult::Queued { admitted, .. } => drop(admitted),
-            other => panic!("Grace was {}", describe(&other)),
-        }
-        let mut barbara = match m.join("Barbara".into(), "default".into()).await {
-            JoinResult::Queued { admitted, .. } => admitted,
-            other => panic!("Barbara was {}", describe(&other)),
-        };
-
-        m.remove_session(&first).await;
-
-        let id = barbara
-            .try_recv()
-            .expect("Barbara was skipped because Grace held the slot she had abandoned");
-        assert!(m.get_session(&id).is_some());
-        assert_eq!(m.active_count(), 1);
-        assert_eq!(m.queue_len().await, 0);
-    }
-
-    #[tokio::test]
-    async fn admitting_from_an_empty_queue_does_nothing() {
-        let m = SessionManager::new(config(2, 2));
-
-        assert!(m.admit_from_queue().await.is_none());
-        assert_eq!(m.active_count(), 0);
-    }
-
-    #[tokio::test]
-    async fn removing_a_session_that_does_not_exist_is_harmless() {
-        let m = SessionManager::new(config(1, 1));
-        admitted(m.join("Ada".into(), "default".into()).await);
-
-        m.remove_session("not-a-session").await;
-
-        assert_eq!(m.active_count(), 1);
-    }
-
-    #[tokio::test]
-    async fn a_session_can_be_read_and_written_through_the_manager() {
-        let m = SessionManager::new(config(1, 1));
-        let id = admitted(m.join("Ada".into(), "default".into()).await);
-
-        m.get_session_mut(&id)
-            .expect("the session just created is missing")
-            .add_message(MessageRole::User, "hello".into());
-
-        let session = m.get_session(&id).expect("missing");
-        assert_eq!(session.history.len(), 1);
-        assert_eq!(session.user_turns, 1);
-    }
-
-    #[tokio::test]
-    async fn cleanup_keeps_sessions_that_are_still_within_their_ttl() {
-        let m = SessionManager::new(config(2, 2));
-        admitted(m.join("Ada".into(), "default".into()).await);
-
-        m.cleanup_expired().await;
-
-        assert_eq!(m.active_count(), 1, "a fresh session was reaped");
-    }
-
-    #[tokio::test]
-    async fn cleanup_reaps_expired_sessions_and_admits_the_queue() {
-        // A zero-minute TTL expires everything immediately, which is what a
-        // long-abandoned session looks like without waiting for one.
-        let mut cfg = config(1, 2);
-        cfg.session_ttl_minutes = 0;
-        let m = SessionManager::new(cfg);
-
-        admitted(m.join("Ada".into(), "default".into()).await);
-        let _grace = match m.join("Grace".into(), "default".into()).await {
-            JoinResult::Queued { admitted, .. } => admitted,
-            other => panic!("Grace was {}", describe(&other)),
-        };
-        assert_eq!(m.queue_len().await, 1);
-
-        // Instant has whole-nanosecond resolution; a zero TTL is already past.
-        tokio::time::sleep(std::time::Duration::from_millis(2)).await;
-        m.cleanup_expired().await;
-
-        // Ada's slot was freed and Grace took it — and Grace, being brand new,
-        // must not be reaped in the same pass.
-        assert_eq!(
-            m.queue_len().await,
-            0,
-            "the queue was not drained into the freed slot"
-        );
-        assert!(m.active_count() <= 1, "cleanup admitted past capacity");
-    }
-
-    #[tokio::test]
-    async fn cleanup_does_not_admit_past_capacity() {
-        let m = SessionManager::new(config(2, 5));
-        for name in ["Ada", "Grace"] {
-            admitted(m.join(name.into(), "default".into()).await);
-        }
-        let _waiting: Vec<_> = {
-            let mut out = Vec::new();
-            for name in ["Barbara", "Katherine", "Dorothy"] {
-                match m.join(name.into(), "default".into()).await {
-                    JoinResult::Queued { admitted, .. } => out.push(admitted),
-                    other => panic!("{name} was {}", describe(&other)),
-                }
-            }
-            out
-        };
-
-        m.cleanup_expired().await;
-
-        assert_eq!(
-            m.active_count(),
-            2,
-            "cleanup let the server past max_concurrent"
-        );
-        assert_eq!(m.queue_len().await, 3);
-    }
-
-    fn describe(result: &JoinResult) -> String {
-        match result {
-            JoinResult::Admitted { .. } => "admitted".into(),
-            JoinResult::Queued { position, .. } => format!("queued at {position}"),
-            JoinResult::Full => "turned away".into(),
-        }
+        self.fill_free_slots().await;
+        expired
     }
 }

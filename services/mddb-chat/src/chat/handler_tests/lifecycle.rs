@@ -24,7 +24,7 @@ async fn joining_and_ending_fire_the_session_events() {
     let end = sink.next().await;
     assert_eq!(end.event, "session.end");
     assert_eq!(end.body["data"]["session_id"], id);
-    assert_eq!(server.state.session_manager.active_count(), 0);
+    assert_eq!(server.state.session_manager.attached_count(), 0);
 }
 
 #[tokio::test]
@@ -84,58 +84,8 @@ async fn pings_are_answered_and_binary_frames_are_ignored() {
     // A visitor who never joined leaves nothing behind when they close.
     client.send_close().await;
     while client.recv_opcode().await.is_some() {}
-    assert_eq!(server.state.session_manager.active_count(), 0);
-}
-
-#[tokio::test]
-async fn closing_the_socket_ends_the_session() {
-    let mut sink = WebhookSink::start().await;
-    let server = Harness::start(ConfigToml::default().webhook(&sink.url, &["session.end"])).await;
-    let mut client = server.connect().await;
-    let id = server.join(&mut client, "Ada").await;
-
-    client.send_close().await;
-
-    let end = sink.next().await;
-    assert_eq!(end.body["data"]["session_id"], id);
-    assert_eq!(end.body["data"]["user_name"], "Ada");
-    assert_eq!(server.state.session_manager.active_count(), 0);
-}
-
-#[tokio::test]
-async fn a_protocol_error_ends_the_session_too() {
-    let mut sink = WebhookSink::start().await;
-    let server = Harness::start(ConfigToml::default().webhook(&sink.url, &["session.end"])).await;
-    let mut client = server.connect().await;
-    let id = server.join(&mut client, "Ada").await;
-
-    client.send_garbage().await;
-
-    assert_eq!(sink.next().await.body["data"]["session_id"], id);
-    assert_eq!(server.state.session_manager.active_count(), 0);
-}
-
-#[tokio::test]
-async fn resume_returns_to_an_existing_session() {
-    let server = Harness::start(ConfigToml::default()).await;
-    let mut first = server.connect().await;
-    let id = server.join(&mut first, "Ada").await;
-
-    let mut second = server.connect().await;
-    second
-        .send_json(json!({"type": "resume", "session_id": id}))
-        .await;
-    let frame = second.recv_json().await;
-    assert_eq!(frame["type"], "session", "got {frame}");
-    assert_eq!(frame["id"], id);
-
-    second
-        .send_json(json!({"type": "resume", "session_id": "no-such-session"}))
-        .await;
-    assert_eq!(
-        second.recv_json().await["message"],
-        "session not found or expired"
-    );
+    assert_eq!(server.state.session_manager.attached_count(), 0);
+    assert_eq!(server.state.session_manager.detached_count(), 0);
 }
 
 #[tokio::test]
