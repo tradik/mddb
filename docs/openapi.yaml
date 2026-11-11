@@ -938,8 +938,16 @@ paths:
                   deleted:
                     type: integer
                     example: 2
+                  notFound:
+                    type: integer
+                    description: Documents that did not exist (2.19.0+).
+                    example: 0
                   not_found:
                     type: integer
+                    deprecated: true
+                    description: >
+                      Deprecated since 2.19.0 — `notFound` under its old snake_case
+                      name, kept for existing callers; to be removed in a later minor.
                     example: 0
                   failed:
                     type: integer

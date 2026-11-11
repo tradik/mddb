@@ -2748,11 +2748,18 @@ Delete multiple documents in a single request.
 ```json
 {
   "deleted": 2,
+  "notFound": 0,
   "not_found": 0,
   "failed": 0,
   "errors": null
 }
 ```
+
+`not_found` is **deprecated** since 2.19.0: it is `notFound` under its old
+snake_case spelling, kept so existing callers keep working, and will be removed
+in a later minor release. Read `notFound`. The MCP tools `delete_batch` and
+`update_batch` answer the same pair; gRPC's `DeleteBatchResponse.not_found` is
+`notFound` in its JSON mapping already.
 
 ---
 

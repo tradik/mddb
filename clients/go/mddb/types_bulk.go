@@ -4,6 +4,8 @@ package mddb
 // /v1/aggregate, after the server's IngestRequestHTTP, handleDeleteBatch and
 // AggregateRequest.
 
+import "encoding/json"
+
 // IngestRequest loads many documents into one collection in a single call.
 type IngestRequest struct {
 	Collection string           `json:"collection"`
@@ -99,9 +101,27 @@ type DeleteBatchRequest struct {
 // DeleteBatchResponse counts the outcome of a batch delete.
 type DeleteBatchResponse struct {
 	Deleted  int      `json:"deleted"`
-	NotFound int      `json:"not_found"` // the server's tag is snake_case
+	NotFound int      `json:"notFound"` // read from not_found too, see UnmarshalJSON
 	Failed   int      `json:"failed"`
 	Errors   []string `json:"errors"`
+}
+
+// UnmarshalJSON reads notFound, and falls back to not_found: the only
+// spelling of a server before 2.19.0, deprecated since and to be removed.
+func (r *DeleteBatchResponse) UnmarshalJSON(b []byte) error {
+	type plain DeleteBatchResponse
+	var aux struct {
+		plain
+		LegacyNotFound int `json:"not_found"`
+	}
+	if err := json.Unmarshal(b, &aux); err != nil {
+		return err
+	}
+	*r = DeleteBatchResponse(aux.plain)
+	if r.NotFound == 0 {
+		r.NotFound = aux.LegacyNotFound
+	}
+	return nil
 }
 
 // AggregateRequest asks for facet counts and date histograms over a

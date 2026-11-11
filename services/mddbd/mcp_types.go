@@ -154,10 +154,14 @@ type MCPUpdateBatchRequest struct {
 
 // MCPUpdateBatchResponse represents result of updating multiple documents.
 type MCPUpdateBatchResponse struct {
-	Updated  int      `json:"updated"`
-	NotFound int      `json:"not_found"`
-	Failed   int      `json:"failed"`
-	Errors   []string `json:"errors,omitempty"`
+	Updated  int `json:"updated"`
+	NotFound int `json:"notFound"`
+	// NotFoundDeprecated is NotFound under its old snake_case name, kept for
+	// callers written against it. Deprecated since 2.19.0; to be removed in a
+	// later minor.
+	NotFoundDeprecated int      `json:"not_found"`
+	Failed             int      `json:"failed"`
+	Errors             []string `json:"errors,omitempty"`
 }
 
 // MCPDeleteDocument represents a document to delete.
@@ -174,10 +178,14 @@ type MCPDeleteBatchRequest struct {
 
 // MCPDeleteBatchResponse represents result of deleting multiple documents.
 type MCPDeleteBatchResponse struct {
-	Deleted  int      `json:"deleted"`
-	NotFound int      `json:"not_found"`
-	Failed   int      `json:"failed"`
-	Errors   []string `json:"errors,omitempty"`
+	Deleted  int `json:"deleted"`
+	NotFound int `json:"notFound"`
+	// NotFoundDeprecated is NotFound under its old snake_case name, kept for
+	// callers written against it. Deprecated since 2.19.0; to be removed in a
+	// later minor.
+	NotFoundDeprecated int      `json:"not_found"`
+	Failed             int      `json:"failed"`
+	Errors             []string `json:"errors,omitempty"`
 }
 
 // MCPExportRequest represents export request.

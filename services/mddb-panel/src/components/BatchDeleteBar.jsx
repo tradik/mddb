@@ -12,8 +12,9 @@ const LISTED = 5;
  * BatchDeleteBar acts on the documents selected in the list: it says how
  * many are selected and deletes them in one /v1/delete-batch request after a
  * confirmation naming the collection and the first keys. `onDeleted`
- * receives one line summing up the server's counts (deleted, not_found,
- * failed); the list reloads, so the caller shows it.
+ * receives one line summing up the server's counts (deleted, notFound —
+ * not_found from a server before 2.19.0 — and failed); the list reloads, so
+ * the caller shows it.
  */
 export default function BatchDeleteBar({ collection, documents, onClear, onDeleted }) {
   const [confirming, setConfirming] = useState(false);
@@ -24,7 +25,8 @@ export default function BatchDeleteBar({ collection, documents, onClear, onDelet
     const result = await mddbClient.deleteBatch({ collection, documents });
     setConfirming(false);
     const parts = [`Deleted ${result.deleted || 0}`];
-    if (result.not_found) parts.push(`${result.not_found} already gone`);
+    const notFound = result.notFound ?? result.not_found;
+    if (notFound) parts.push(`${notFound} already gone`);
     if (result.failed) parts.push(`${result.failed} failed${result.errors?.length ? `: ${result.errors.join('; ')}` : ''}`);
     onDeleted(`${parts.join(', ')}.`);
   });

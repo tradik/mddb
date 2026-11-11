@@ -11,8 +11,8 @@ export const batchMethods = {
   },
 
   /**
-   * `documents`: [{ key, lang }] → `{ deleted, not_found, failed, errors }`
-   * (the server spells `not_found` in snake case).
+   * `documents`: [{ key, lang }] → `{ deleted, notFound, failed, errors }`
+   * (plus the deprecated `not_found`, the only spelling before 2.19.0).
    */
   deleteBatch({ collection, documents }) {
     const keys = documents.map(({ key, lang }) => ({ key, lang }));

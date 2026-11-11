@@ -122,8 +122,10 @@ for {
 - **Escape hatch:** `Do(ctx, method, path, body)` for any endpoint not yet wrapped.
 
 Field names and JSON tags follow the server's own request and response
-structs. A few response tags are snake_case (`not_found`, `index_ready`,
+structs. A few response tags are snake_case (`index_ready`,
 `total_documents`) because the server writes them that way.
+`DeleteBatchResponse.NotFound` reads the server's `notFound` (2.19.0+) and falls
+back to the deprecated `not_found` of an older server.
 
 Any HTTP status ≥ 400 is returned as an `*APIError{StatusCode, Body}`, except a
 503 warm-up answer to `Status`.

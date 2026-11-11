@@ -133,10 +133,11 @@ func (c *DirectClient) UpdateBatch(ctx context.Context, req *MCPUpdateBatchReque
 	}
 
 	return &MCPUpdateBatchResponse{
-		Updated:  int(resp.Updated),
-		NotFound: int(resp.NotFound),
-		Failed:   int(resp.Failed),
-		Errors:   resp.Errors,
+		Updated:            int(resp.Updated),
+		NotFound:           int(resp.NotFound),
+		NotFoundDeprecated: int(resp.NotFound),
+		Failed:             int(resp.Failed),
+		Errors:             resp.Errors,
 	}, nil
 }
 
@@ -157,10 +158,11 @@ func (c *DirectClient) DeleteBatch(ctx context.Context, req *MCPDeleteBatchReque
 	}
 
 	return &MCPDeleteBatchResponse{
-		Deleted:  int(resp.Deleted),
-		NotFound: int(resp.NotFound),
-		Failed:   int(resp.Failed),
-		Errors:   resp.Errors,
+		Deleted:            int(resp.Deleted),
+		NotFound:           int(resp.NotFound),
+		NotFoundDeprecated: int(resp.NotFound),
+		Failed:             int(resp.Failed),
+		Errors:             resp.Errors,
 	}, nil
 }
 

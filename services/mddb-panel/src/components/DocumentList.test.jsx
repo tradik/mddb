@@ -356,7 +356,7 @@ describe('DocumentList read-only collection', () => {
 
 describe('DocumentList batch delete', () => {
   test('ticks documents, deletes them in one request after a confirmation, and reloads', async () => {
-    vi.mocked(mddbClient.deleteBatch).mockResolvedValueOnce({ deleted: 1, not_found: 1, failed: 0, errors: null });
+    vi.mocked(mddbClient.deleteBatch).mockResolvedValueOnce({ deleted: 1, notFound: 1, failed: 0, errors: null });
     await renderList({ currentDocument: { key: 'alpha', lang: 'en' } });
     expect(screen.queryByText(/selected$/)).toBeNull();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select alpha (en)' }));
@@ -377,7 +377,7 @@ describe('DocumentList batch delete', () => {
   });
 
   test('select all shown follows the key filter; clear and toggling off', async () => {
-    vi.mocked(mddbClient.deleteBatch).mockResolvedValueOnce({ deleted: 0, failed: 1, errors: ['gamma: locked'] }).mockResolvedValueOnce({ failed: 1 });
+    vi.mocked(mddbClient.deleteBatch).mockResolvedValueOnce({ deleted: 0, not_found: 2, failed: 1, errors: ['gamma: locked'] }).mockResolvedValueOnce({ failed: 1 });
     await renderList();
     fireEvent.change(screen.getByPlaceholderText('Filter by key...'), { target: { value: 'a' } });
     const all = screen.getByRole('checkbox', { name: 'Select all shown' });
@@ -398,7 +398,7 @@ describe('DocumentList batch delete', () => {
     expect(mddbClient.deleteBatch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Delete' })));
-    expect(screen.getByText('Deleted 0, 1 failed: gamma: locked.')).toBeTruthy();
+    expect(screen.getByText('Deleted 0, 2 already gone, 1 failed: gamma: locked.')).toBeTruthy(); // not_found: a server before 2.19.0
   });
 
   test('a refused batch delete says not permitted; no selection on a read-only or empty list', async () => {

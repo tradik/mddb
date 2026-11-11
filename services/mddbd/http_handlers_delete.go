@@ -94,7 +94,10 @@ func (s *Server) handleDeleteBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ok(w, map[string]interface{}{
-		"deleted":   deleted,
+		"deleted":  deleted,
+		"notFound": notFound,
+		// Deprecated since 2.19.0: the snake_case spelling of notFound, kept
+		// for callers written against it; to be removed in a later minor.
 		"not_found": notFound,
 		"failed":    failed,
 		"errors":    errs,
