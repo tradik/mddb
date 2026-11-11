@@ -19,97 +19,105 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	MDDB_Add_FullMethodName                   = "/mddb.MDDB/Add"
-	MDDB_AddBatch_FullMethodName              = "/mddb.MDDB/AddBatch"
-	MDDB_DeleteBatch_FullMethodName           = "/mddb.MDDB/DeleteBatch"
-	MDDB_UpdateBatch_FullMethodName           = "/mddb.MDDB/UpdateBatch"
-	MDDB_Get_FullMethodName                   = "/mddb.MDDB/Get"
-	MDDB_Search_FullMethodName                = "/mddb.MDDB/Search"
-	MDDB_Export_FullMethodName                = "/mddb.MDDB/Export"
-	MDDB_Backup_FullMethodName                = "/mddb.MDDB/Backup"
-	MDDB_Restore_FullMethodName               = "/mddb.MDDB/Restore"
-	MDDB_Truncate_FullMethodName              = "/mddb.MDDB/Truncate"
-	MDDB_Stats_FullMethodName                 = "/mddb.MDDB/Stats"
-	MDDB_VectorSearch_FullMethodName          = "/mddb.MDDB/VectorSearch"
-	MDDB_VectorReindex_FullMethodName         = "/mddb.MDDB/VectorReindex"
-	MDDB_VectorStats_FullMethodName           = "/mddb.MDDB/VectorStats"
-	MDDB_GeoSearch_FullMethodName             = "/mddb.MDDB/GeoSearch"
-	MDDB_GeoWithin_FullMethodName             = "/mddb.MDDB/GeoWithin"
-	MDDB_GeoReindex_FullMethodName            = "/mddb.MDDB/GeoReindex"
-	MDDB_GeoStats_FullMethodName              = "/mddb.MDDB/GeoStats"
-	MDDB_GeoEncode_FullMethodName             = "/mddb.MDDB/GeoEncode"
-	MDDB_GeoDecode_FullMethodName             = "/mddb.MDDB/GeoDecode"
-	MDDB_ImportURL_FullMethodName             = "/mddb.MDDB/ImportURL"
-	MDDB_SetTTL_FullMethodName                = "/mddb.MDDB/SetTTL"
-	MDDB_FTS_FullMethodName                   = "/mddb.MDDB/FTS"
-	MDDB_FTSReindex_FullMethodName            = "/mddb.MDDB/FTSReindex"
-	MDDB_FTSLanguages_FullMethodName          = "/mddb.MDDB/FTSLanguages"
-	MDDB_HybridSearch_FullMethodName          = "/mddb.MDDB/HybridSearch"
-	MDDB_RegisterWebhook_FullMethodName       = "/mddb.MDDB/RegisterWebhook"
-	MDDB_ListWebhooks_FullMethodName          = "/mddb.MDDB/ListWebhooks"
-	MDDB_DeleteWebhook_FullMethodName         = "/mddb.MDDB/DeleteWebhook"
-	MDDB_SetSchema_FullMethodName             = "/mddb.MDDB/SetSchema"
-	MDDB_GetSchema_FullMethodName             = "/mddb.MDDB/GetSchema"
-	MDDB_DeleteSchema_FullMethodName          = "/mddb.MDDB/DeleteSchema"
-	MDDB_ListSchemas_FullMethodName           = "/mddb.MDDB/ListSchemas"
-	MDDB_ValidateDocument_FullMethodName      = "/mddb.MDDB/ValidateDocument"
-	MDDB_UpdateDocument_FullMethodName        = "/mddb.MDDB/UpdateDocument"
-	MDDB_GetDocumentMeta_FullMethodName       = "/mddb.MDDB/GetDocumentMeta"
-	MDDB_Classify_FullMethodName              = "/mddb.MDDB/Classify"
-	MDDB_SearchAdvisor_FullMethodName         = "/mddb.MDDB/SearchAdvisor"
-	MDDB_GetIndexingStatus_FullMethodName     = "/mddb.MDDB/GetIndexingStatus"
-	MDDB_CodeSymbol_FullMethodName            = "/mddb.MDDB/CodeSymbol"
-	MDDB_RunEval_FullMethodName               = "/mddb.MDDB/RunEval"
-	MDDB_AddEvalQuery_FullMethodName          = "/mddb.MDDB/AddEvalQuery"
-	MDDB_ListEvalQueries_FullMethodName       = "/mddb.MDDB/ListEvalQueries"
-	MDDB_DeleteEvalQuery_FullMethodName       = "/mddb.MDDB/DeleteEvalQuery"
-	MDDB_GetGain_FullMethodName               = "/mddb.MDDB/GetGain"
-	MDDB_DeleteWhere_FullMethodName           = "/mddb.MDDB/DeleteWhere"
-	MDDB_UpdateWhere_FullMethodName           = "/mddb.MDDB/UpdateWhere"
-	MDDB_SetTTLWhere_FullMethodName           = "/mddb.MDDB/SetTTLWhere"
-	MDDB_DeleteDocument_FullMethodName        = "/mddb.MDDB/DeleteDocument"
-	MDDB_DeleteCollection_FullMethodName      = "/mddb.MDDB/DeleteCollection"
-	MDDB_ListSynonyms_FullMethodName          = "/mddb.MDDB/ListSynonyms"
-	MDDB_AddSynonym_FullMethodName            = "/mddb.MDDB/AddSynonym"
-	MDDB_DeleteSynonym_FullMethodName         = "/mddb.MDDB/DeleteSynonym"
-	MDDB_ListStopwords_FullMethodName         = "/mddb.MDDB/ListStopwords"
-	MDDB_AddStopwords_FullMethodName          = "/mddb.MDDB/AddStopwords"
-	MDDB_DeleteStopwords_FullMethodName       = "/mddb.MDDB/DeleteStopwords"
-	MDDB_GetMetaKeys_FullMethodName           = "/mddb.MDDB/GetMetaKeys"
-	MDDB_GetChecksum_FullMethodName           = "/mddb.MDDB/GetChecksum"
-	MDDB_ListAutomation_FullMethodName        = "/mddb.MDDB/ListAutomation"
-	MDDB_CreateAutomation_FullMethodName      = "/mddb.MDDB/CreateAutomation"
-	MDDB_GetAutomation_FullMethodName         = "/mddb.MDDB/GetAutomation"
-	MDDB_UpdateAutomation_FullMethodName      = "/mddb.MDDB/UpdateAutomation"
-	MDDB_DeleteAutomation_FullMethodName      = "/mddb.MDDB/DeleteAutomation"
-	MDDB_TestAutomation_FullMethodName        = "/mddb.MDDB/TestAutomation"
-	MDDB_GetAutomationLogs_FullMethodName     = "/mddb.MDDB/GetAutomationLogs"
-	MDDB_GetCollectionConfig_FullMethodName   = "/mddb.MDDB/GetCollectionConfig"
-	MDDB_SetCollectionConfig_FullMethodName   = "/mddb.MDDB/SetCollectionConfig"
-	MDDB_ListCollectionConfigs_FullMethodName = "/mddb.MDDB/ListCollectionConfigs"
-	MDDB_CrossSearch_FullMethodName           = "/mddb.MDDB/CrossSearch"
-	MDDB_FindDuplicates_FullMethodName        = "/mddb.MDDB/FindDuplicates"
-	MDDB_Ingest_FullMethodName                = "/mddb.MDDB/Ingest"
-	MDDB_ListRevisions_FullMethodName         = "/mddb.MDDB/ListRevisions"
-	MDDB_RestoreRevision_FullMethodName       = "/mddb.MDDB/RestoreRevision"
-	MDDB_TemporalQuery_FullMethodName         = "/mddb.MDDB/TemporalQuery"
-	MDDB_TemporalHot_FullMethodName           = "/mddb.MDDB/TemporalHot"
-	MDDB_SpellSuggest_FullMethodName          = "/mddb.MDDB/SpellSuggest"
-	MDDB_SpellCleanup_FullMethodName          = "/mddb.MDDB/SpellCleanup"
-	MDDB_ListCurationRules_FullMethodName     = "/mddb.MDDB/ListCurationRules"
-	MDDB_CreateCurationRule_FullMethodName    = "/mddb.MDDB/CreateCurationRule"
-	MDDB_UpdateCurationRule_FullMethodName    = "/mddb.MDDB/UpdateCurationRule"
-	MDDB_DeleteCurationRule_FullMethodName    = "/mddb.MDDB/DeleteCurationRule"
-	MDDB_RunAutomation_FullMethodName         = "/mddb.MDDB/RunAutomation"
-	MDDB_ListCorpusPacks_FullMethodName       = "/mddb.MDDB/ListCorpusPacks"
-	MDDB_InstallCorpusPack_FullMethodName     = "/mddb.MDDB/InstallCorpusPack"
-	MDDB_RemoveCorpusPack_FullMethodName      = "/mddb.MDDB/RemoveCorpusPack"
-	MDDB_BuildCorpusPack_FullMethodName       = "/mddb.MDDB/BuildCorpusPack"
-	MDDB_ListChatScenarios_FullMethodName     = "/mddb.MDDB/ListChatScenarios"
-	MDDB_GetChatScenario_FullMethodName       = "/mddb.MDDB/GetChatScenario"
-	MDDB_PutChatScenario_FullMethodName       = "/mddb.MDDB/PutChatScenario"
-	MDDB_DeleteChatScenario_FullMethodName    = "/mddb.MDDB/DeleteChatScenario"
-	MDDB_GetChatScenarioPrompt_FullMethodName = "/mddb.MDDB/GetChatScenarioPrompt"
+	MDDB_Add_FullMethodName                            = "/mddb.MDDB/Add"
+	MDDB_AddBatch_FullMethodName                       = "/mddb.MDDB/AddBatch"
+	MDDB_DeleteBatch_FullMethodName                    = "/mddb.MDDB/DeleteBatch"
+	MDDB_UpdateBatch_FullMethodName                    = "/mddb.MDDB/UpdateBatch"
+	MDDB_Get_FullMethodName                            = "/mddb.MDDB/Get"
+	MDDB_Search_FullMethodName                         = "/mddb.MDDB/Search"
+	MDDB_Export_FullMethodName                         = "/mddb.MDDB/Export"
+	MDDB_Backup_FullMethodName                         = "/mddb.MDDB/Backup"
+	MDDB_Restore_FullMethodName                        = "/mddb.MDDB/Restore"
+	MDDB_Truncate_FullMethodName                       = "/mddb.MDDB/Truncate"
+	MDDB_Stats_FullMethodName                          = "/mddb.MDDB/Stats"
+	MDDB_VectorSearch_FullMethodName                   = "/mddb.MDDB/VectorSearch"
+	MDDB_VectorReindex_FullMethodName                  = "/mddb.MDDB/VectorReindex"
+	MDDB_VectorStats_FullMethodName                    = "/mddb.MDDB/VectorStats"
+	MDDB_GeoSearch_FullMethodName                      = "/mddb.MDDB/GeoSearch"
+	MDDB_GeoWithin_FullMethodName                      = "/mddb.MDDB/GeoWithin"
+	MDDB_GeoReindex_FullMethodName                     = "/mddb.MDDB/GeoReindex"
+	MDDB_GeoStats_FullMethodName                       = "/mddb.MDDB/GeoStats"
+	MDDB_GeoEncode_FullMethodName                      = "/mddb.MDDB/GeoEncode"
+	MDDB_GeoDecode_FullMethodName                      = "/mddb.MDDB/GeoDecode"
+	MDDB_ImportURL_FullMethodName                      = "/mddb.MDDB/ImportURL"
+	MDDB_SetTTL_FullMethodName                         = "/mddb.MDDB/SetTTL"
+	MDDB_FTS_FullMethodName                            = "/mddb.MDDB/FTS"
+	MDDB_FTSReindex_FullMethodName                     = "/mddb.MDDB/FTSReindex"
+	MDDB_FTSLanguages_FullMethodName                   = "/mddb.MDDB/FTSLanguages"
+	MDDB_HybridSearch_FullMethodName                   = "/mddb.MDDB/HybridSearch"
+	MDDB_RegisterWebhook_FullMethodName                = "/mddb.MDDB/RegisterWebhook"
+	MDDB_ListWebhooks_FullMethodName                   = "/mddb.MDDB/ListWebhooks"
+	MDDB_DeleteWebhook_FullMethodName                  = "/mddb.MDDB/DeleteWebhook"
+	MDDB_SetSchema_FullMethodName                      = "/mddb.MDDB/SetSchema"
+	MDDB_GetSchema_FullMethodName                      = "/mddb.MDDB/GetSchema"
+	MDDB_DeleteSchema_FullMethodName                   = "/mddb.MDDB/DeleteSchema"
+	MDDB_ListSchemas_FullMethodName                    = "/mddb.MDDB/ListSchemas"
+	MDDB_ValidateDocument_FullMethodName               = "/mddb.MDDB/ValidateDocument"
+	MDDB_UpdateDocument_FullMethodName                 = "/mddb.MDDB/UpdateDocument"
+	MDDB_GetDocumentMeta_FullMethodName                = "/mddb.MDDB/GetDocumentMeta"
+	MDDB_Classify_FullMethodName                       = "/mddb.MDDB/Classify"
+	MDDB_SearchAdvisor_FullMethodName                  = "/mddb.MDDB/SearchAdvisor"
+	MDDB_GetIndexingStatus_FullMethodName              = "/mddb.MDDB/GetIndexingStatus"
+	MDDB_CodeSymbol_FullMethodName                     = "/mddb.MDDB/CodeSymbol"
+	MDDB_RunEval_FullMethodName                        = "/mddb.MDDB/RunEval"
+	MDDB_AddEvalQuery_FullMethodName                   = "/mddb.MDDB/AddEvalQuery"
+	MDDB_ListEvalQueries_FullMethodName                = "/mddb.MDDB/ListEvalQueries"
+	MDDB_DeleteEvalQuery_FullMethodName                = "/mddb.MDDB/DeleteEvalQuery"
+	MDDB_GetGain_FullMethodName                        = "/mddb.MDDB/GetGain"
+	MDDB_DeleteWhere_FullMethodName                    = "/mddb.MDDB/DeleteWhere"
+	MDDB_UpdateWhere_FullMethodName                    = "/mddb.MDDB/UpdateWhere"
+	MDDB_SetTTLWhere_FullMethodName                    = "/mddb.MDDB/SetTTLWhere"
+	MDDB_DeleteDocument_FullMethodName                 = "/mddb.MDDB/DeleteDocument"
+	MDDB_DeleteCollection_FullMethodName               = "/mddb.MDDB/DeleteCollection"
+	MDDB_ListSynonyms_FullMethodName                   = "/mddb.MDDB/ListSynonyms"
+	MDDB_AddSynonym_FullMethodName                     = "/mddb.MDDB/AddSynonym"
+	MDDB_DeleteSynonym_FullMethodName                  = "/mddb.MDDB/DeleteSynonym"
+	MDDB_ListStopwords_FullMethodName                  = "/mddb.MDDB/ListStopwords"
+	MDDB_AddStopwords_FullMethodName                   = "/mddb.MDDB/AddStopwords"
+	MDDB_DeleteStopwords_FullMethodName                = "/mddb.MDDB/DeleteStopwords"
+	MDDB_GetMetaKeys_FullMethodName                    = "/mddb.MDDB/GetMetaKeys"
+	MDDB_GetChecksum_FullMethodName                    = "/mddb.MDDB/GetChecksum"
+	MDDB_ListAutomation_FullMethodName                 = "/mddb.MDDB/ListAutomation"
+	MDDB_CreateAutomation_FullMethodName               = "/mddb.MDDB/CreateAutomation"
+	MDDB_GetAutomation_FullMethodName                  = "/mddb.MDDB/GetAutomation"
+	MDDB_UpdateAutomation_FullMethodName               = "/mddb.MDDB/UpdateAutomation"
+	MDDB_DeleteAutomation_FullMethodName               = "/mddb.MDDB/DeleteAutomation"
+	MDDB_TestAutomation_FullMethodName                 = "/mddb.MDDB/TestAutomation"
+	MDDB_GetAutomationLogs_FullMethodName              = "/mddb.MDDB/GetAutomationLogs"
+	MDDB_GetCollectionConfig_FullMethodName            = "/mddb.MDDB/GetCollectionConfig"
+	MDDB_SetCollectionConfig_FullMethodName            = "/mddb.MDDB/SetCollectionConfig"
+	MDDB_ListCollectionConfigs_FullMethodName          = "/mddb.MDDB/ListCollectionConfigs"
+	MDDB_CrossSearch_FullMethodName                    = "/mddb.MDDB/CrossSearch"
+	MDDB_FindDuplicates_FullMethodName                 = "/mddb.MDDB/FindDuplicates"
+	MDDB_Ingest_FullMethodName                         = "/mddb.MDDB/Ingest"
+	MDDB_ListRevisions_FullMethodName                  = "/mddb.MDDB/ListRevisions"
+	MDDB_RestoreRevision_FullMethodName                = "/mddb.MDDB/RestoreRevision"
+	MDDB_TemporalQuery_FullMethodName                  = "/mddb.MDDB/TemporalQuery"
+	MDDB_TemporalHot_FullMethodName                    = "/mddb.MDDB/TemporalHot"
+	MDDB_SpellSuggest_FullMethodName                   = "/mddb.MDDB/SpellSuggest"
+	MDDB_SpellCleanup_FullMethodName                   = "/mddb.MDDB/SpellCleanup"
+	MDDB_ListCurationRules_FullMethodName              = "/mddb.MDDB/ListCurationRules"
+	MDDB_CreateCurationRule_FullMethodName             = "/mddb.MDDB/CreateCurationRule"
+	MDDB_UpdateCurationRule_FullMethodName             = "/mddb.MDDB/UpdateCurationRule"
+	MDDB_DeleteCurationRule_FullMethodName             = "/mddb.MDDB/DeleteCurationRule"
+	MDDB_RunAutomation_FullMethodName                  = "/mddb.MDDB/RunAutomation"
+	MDDB_ListCorpusPacks_FullMethodName                = "/mddb.MDDB/ListCorpusPacks"
+	MDDB_InstallCorpusPack_FullMethodName              = "/mddb.MDDB/InstallCorpusPack"
+	MDDB_RemoveCorpusPack_FullMethodName               = "/mddb.MDDB/RemoveCorpusPack"
+	MDDB_BuildCorpusPack_FullMethodName                = "/mddb.MDDB/BuildCorpusPack"
+	MDDB_ListChatScenarios_FullMethodName              = "/mddb.MDDB/ListChatScenarios"
+	MDDB_GetChatScenario_FullMethodName                = "/mddb.MDDB/GetChatScenario"
+	MDDB_PutChatScenario_FullMethodName                = "/mddb.MDDB/PutChatScenario"
+	MDDB_DeleteChatScenario_FullMethodName             = "/mddb.MDDB/DeleteChatScenario"
+	MDDB_GetChatScenarioPrompt_FullMethodName          = "/mddb.MDDB/GetChatScenarioPrompt"
+	MDDB_CreateChatConversation_FullMethodName         = "/mddb.MDDB/CreateChatConversation"
+	MDDB_ListChatConversations_FullMethodName          = "/mddb.MDDB/ListChatConversations"
+	MDDB_GetChatConversation_FullMethodName            = "/mddb.MDDB/GetChatConversation"
+	MDDB_AppendChatMessages_FullMethodName             = "/mddb.MDDB/AppendChatMessages"
+	MDDB_EndChatConversation_FullMethodName            = "/mddb.MDDB/EndChatConversation"
+	MDDB_DeleteChatConversation_FullMethodName         = "/mddb.MDDB/DeleteChatConversation"
+	MDDB_DeleteChatConversationsForUser_FullMethodName = "/mddb.MDDB/DeleteChatConversationsForUser"
+	MDDB_ExportChatConversations_FullMethodName        = "/mddb.MDDB/ExportChatConversations"
 )
 
 // MDDBClient is the client API for MDDB service.
@@ -304,6 +312,25 @@ type MDDBClient interface {
 	// The composed system prompt: operator prompt, guardrails, off-topic and
 	// style clauses, then each allowed collection's responsePrompt.
 	GetChatScenarioPrompt(ctx context.Context, in *GetChatScenarioPromptRequest, opts ...grpc.CallOption) (*GetChatScenarioPromptResponse, error)
+	// ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
+	// /v1/chat/conversations. The caller is the host application; every call
+	// names the user (sub), and a conversation of another sub is NOT_FOUND.
+	// Permission is on the chat collection of the caller's tenant: read for
+	// List/Get/Export, write for the rest.
+	CreateChatConversation(ctx context.Context, in *CreateChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error)
+	// One page of a user's conversations, newest first, without messages.
+	ListChatConversations(ctx context.Context, in *ListChatConversationsRequest, opts ...grpc.CallOption) (*ListChatConversationsResponse, error)
+	// A conversation with its last `limit` messages (all when 0).
+	GetChatConversation(ctx context.Context, in *GetChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error)
+	// Returns the conversation holding only the messages added, with their ids.
+	AppendChatMessages(ctx context.Context, in *AppendChatMessagesRequest, opts ...grpc.CallOption) (*ChatConversationProto, error)
+	EndChatConversation(ctx context.Context, in *EndChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error)
+	DeleteChatConversation(ctx context.Context, in *DeleteChatConversationRequest, opts ...grpc.CallOption) (*DeleteChatConversationResponse, error)
+	// Everything of one user (GDPR erasure).
+	DeleteChatConversationsForUser(ctx context.Context, in *DeleteChatConversationsForUserRequest, opts ...grpc.CallOption) (*DeleteChatConversationsForUserResponse, error)
+	// Everything of one user (GDPR export): one conversation per message,
+	// newest first, each with all its messages.
+	ExportChatConversations(ctx context.Context, in *ExportChatConversationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatConversationProto], error)
 }
 
 type mDDBClient struct {
@@ -1245,6 +1272,95 @@ func (c *mDDBClient) GetChatScenarioPrompt(ctx context.Context, in *GetChatScena
 	return out, nil
 }
 
+func (c *mDDBClient) CreateChatConversation(ctx context.Context, in *CreateChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatConversationProto)
+	err := c.cc.Invoke(ctx, MDDB_CreateChatConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) ListChatConversations(ctx context.Context, in *ListChatConversationsRequest, opts ...grpc.CallOption) (*ListChatConversationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListChatConversationsResponse)
+	err := c.cc.Invoke(ctx, MDDB_ListChatConversations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) GetChatConversation(ctx context.Context, in *GetChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatConversationProto)
+	err := c.cc.Invoke(ctx, MDDB_GetChatConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) AppendChatMessages(ctx context.Context, in *AppendChatMessagesRequest, opts ...grpc.CallOption) (*ChatConversationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatConversationProto)
+	err := c.cc.Invoke(ctx, MDDB_AppendChatMessages_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) EndChatConversation(ctx context.Context, in *EndChatConversationRequest, opts ...grpc.CallOption) (*ChatConversationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ChatConversationProto)
+	err := c.cc.Invoke(ctx, MDDB_EndChatConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) DeleteChatConversation(ctx context.Context, in *DeleteChatConversationRequest, opts ...grpc.CallOption) (*DeleteChatConversationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteChatConversationResponse)
+	err := c.cc.Invoke(ctx, MDDB_DeleteChatConversation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) DeleteChatConversationsForUser(ctx context.Context, in *DeleteChatConversationsForUserRequest, opts ...grpc.CallOption) (*DeleteChatConversationsForUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteChatConversationsForUserResponse)
+	err := c.cc.Invoke(ctx, MDDB_DeleteChatConversationsForUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mDDBClient) ExportChatConversations(ctx context.Context, in *ExportChatConversationsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChatConversationProto], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &MDDB_ServiceDesc.Streams[3], MDDB_ExportChatConversations_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExportChatConversationsRequest, ChatConversationProto]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDB_ExportChatConversationsClient = grpc.ServerStreamingClient[ChatConversationProto]
+
 // MDDBServer is the server API for MDDB service.
 // All implementations must embed UnimplementedMDDBServer
 // for forward compatibility.
@@ -1437,6 +1553,25 @@ type MDDBServer interface {
 	// The composed system prompt: operator prompt, guardrails, off-topic and
 	// style clauses, then each allowed collection's responsePrompt.
 	GetChatScenarioPrompt(context.Context, *GetChatScenarioPromptRequest) (*GetChatScenarioPromptResponse, error)
+	// ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
+	// /v1/chat/conversations. The caller is the host application; every call
+	// names the user (sub), and a conversation of another sub is NOT_FOUND.
+	// Permission is on the chat collection of the caller's tenant: read for
+	// List/Get/Export, write for the rest.
+	CreateChatConversation(context.Context, *CreateChatConversationRequest) (*ChatConversationProto, error)
+	// One page of a user's conversations, newest first, without messages.
+	ListChatConversations(context.Context, *ListChatConversationsRequest) (*ListChatConversationsResponse, error)
+	// A conversation with its last `limit` messages (all when 0).
+	GetChatConversation(context.Context, *GetChatConversationRequest) (*ChatConversationProto, error)
+	// Returns the conversation holding only the messages added, with their ids.
+	AppendChatMessages(context.Context, *AppendChatMessagesRequest) (*ChatConversationProto, error)
+	EndChatConversation(context.Context, *EndChatConversationRequest) (*ChatConversationProto, error)
+	DeleteChatConversation(context.Context, *DeleteChatConversationRequest) (*DeleteChatConversationResponse, error)
+	// Everything of one user (GDPR erasure).
+	DeleteChatConversationsForUser(context.Context, *DeleteChatConversationsForUserRequest) (*DeleteChatConversationsForUserResponse, error)
+	// Everything of one user (GDPR export): one conversation per message,
+	// newest first, each with all its messages.
+	ExportChatConversations(*ExportChatConversationsRequest, grpc.ServerStreamingServer[ChatConversationProto]) error
 	mustEmbedUnimplementedMDDBServer()
 }
 
@@ -1719,6 +1854,30 @@ func (UnimplementedMDDBServer) DeleteChatScenario(context.Context, *DeleteChatSc
 }
 func (UnimplementedMDDBServer) GetChatScenarioPrompt(context.Context, *GetChatScenarioPromptRequest) (*GetChatScenarioPromptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetChatScenarioPrompt not implemented")
+}
+func (UnimplementedMDDBServer) CreateChatConversation(context.Context, *CreateChatConversationRequest) (*ChatConversationProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateChatConversation not implemented")
+}
+func (UnimplementedMDDBServer) ListChatConversations(context.Context, *ListChatConversationsRequest) (*ListChatConversationsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListChatConversations not implemented")
+}
+func (UnimplementedMDDBServer) GetChatConversation(context.Context, *GetChatConversationRequest) (*ChatConversationProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetChatConversation not implemented")
+}
+func (UnimplementedMDDBServer) AppendChatMessages(context.Context, *AppendChatMessagesRequest) (*ChatConversationProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method AppendChatMessages not implemented")
+}
+func (UnimplementedMDDBServer) EndChatConversation(context.Context, *EndChatConversationRequest) (*ChatConversationProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method EndChatConversation not implemented")
+}
+func (UnimplementedMDDBServer) DeleteChatConversation(context.Context, *DeleteChatConversationRequest) (*DeleteChatConversationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteChatConversation not implemented")
+}
+func (UnimplementedMDDBServer) DeleteChatConversationsForUser(context.Context, *DeleteChatConversationsForUserRequest) (*DeleteChatConversationsForUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteChatConversationsForUser not implemented")
+}
+func (UnimplementedMDDBServer) ExportChatConversations(*ExportChatConversationsRequest, grpc.ServerStreamingServer[ChatConversationProto]) error {
+	return status.Error(codes.Unimplemented, "method ExportChatConversations not implemented")
 }
 func (UnimplementedMDDBServer) mustEmbedUnimplementedMDDBServer() {}
 func (UnimplementedMDDBServer) testEmbeddedByValue()              {}
@@ -3354,6 +3513,143 @@ func _MDDB_GetChatScenarioPrompt_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MDDB_CreateChatConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateChatConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).CreateChatConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_CreateChatConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).CreateChatConversation(ctx, req.(*CreateChatConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_ListChatConversations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListChatConversationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).ListChatConversations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_ListChatConversations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).ListChatConversations(ctx, req.(*ListChatConversationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_GetChatConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetChatConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).GetChatConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_GetChatConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).GetChatConversation(ctx, req.(*GetChatConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_AppendChatMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppendChatMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).AppendChatMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_AppendChatMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).AppendChatMessages(ctx, req.(*AppendChatMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_EndChatConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EndChatConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).EndChatConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_EndChatConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).EndChatConversation(ctx, req.(*EndChatConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_DeleteChatConversation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteChatConversationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).DeleteChatConversation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_DeleteChatConversation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).DeleteChatConversation(ctx, req.(*DeleteChatConversationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_DeleteChatConversationsForUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteChatConversationsForUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MDDBServer).DeleteChatConversationsForUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MDDB_DeleteChatConversationsForUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MDDBServer).DeleteChatConversationsForUser(ctx, req.(*DeleteChatConversationsForUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MDDB_ExportChatConversations_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportChatConversationsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(MDDBServer).ExportChatConversations(m, &grpc.GenericServerStream[ExportChatConversationsRequest, ChatConversationProto]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type MDDB_ExportChatConversationsServer = grpc.ServerStreamingServer[ChatConversationProto]
+
 // MDDB_ServiceDesc is the grpc.ServiceDesc for MDDB service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -3713,6 +4009,34 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetChatScenarioPrompt",
 			Handler:    _MDDB_GetChatScenarioPrompt_Handler,
 		},
+		{
+			MethodName: "CreateChatConversation",
+			Handler:    _MDDB_CreateChatConversation_Handler,
+		},
+		{
+			MethodName: "ListChatConversations",
+			Handler:    _MDDB_ListChatConversations_Handler,
+		},
+		{
+			MethodName: "GetChatConversation",
+			Handler:    _MDDB_GetChatConversation_Handler,
+		},
+		{
+			MethodName: "AppendChatMessages",
+			Handler:    _MDDB_AppendChatMessages_Handler,
+		},
+		{
+			MethodName: "EndChatConversation",
+			Handler:    _MDDB_EndChatConversation_Handler,
+		},
+		{
+			MethodName: "DeleteChatConversation",
+			Handler:    _MDDB_DeleteChatConversation_Handler,
+		},
+		{
+			MethodName: "DeleteChatConversationsForUser",
+			Handler:    _MDDB_DeleteChatConversationsForUser_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -3728,6 +4052,11 @@ var MDDB_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "BuildCorpusPack",
 			Handler:       _MDDB_BuildCorpusPack_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExportChatConversations",
+			Handler:       _MDDB_ExportChatConversations_Handler,
 			ServerStreams: true,
 		},
 	},

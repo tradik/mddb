@@ -118,6 +118,17 @@ var grpcAccessRules = map[string]accessRule{
 	"/mddb.MDDB/PutChatScenario":    ruleAdmin,
 	"/mddb.MDDB/DeleteChatScenario": ruleAdmin,
 
+	// Chat conversations (#405) authorize themselves, as /v1/chat/conversations:
+	// the collection is the chat collection of the caller's tenant.
+	"/mddb.MDDB/CreateChatConversation":         ruleHandler,
+	"/mddb.MDDB/ListChatConversations":          ruleHandler,
+	"/mddb.MDDB/GetChatConversation":            ruleHandler,
+	"/mddb.MDDB/AppendChatMessages":             ruleHandler,
+	"/mddb.MDDB/EndChatConversation":            ruleHandler,
+	"/mddb.MDDB/DeleteChatConversation":         ruleHandler,
+	"/mddb.MDDB/DeleteChatConversationsForUser": ruleHandler,
+	"/mddb.MDDB/ExportChatConversations":        ruleHandler,
+
 	// Replication authorizes itself: a replication secret, a verified mTLS
 	// certificate or an administrator (authorizeReplication, SEC-001).
 	"/mddb.MDDBReplication/RequestSnapshot":   ruleHandler,

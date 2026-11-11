@@ -268,6 +268,26 @@ service MDDB {
   // The composed system prompt: operator prompt, guardrails, off-topic and
   // style clauses, then each allowed collection's responsePrompt.
   rpc GetChatScenarioPrompt(GetChatScenarioPromptRequest) returns (GetChatScenarioPromptResponse);
+
+  // ---- (v2.19.0+, #405) Persistent per-user chat conversations, as
+  // /v1/chat/conversations. The caller is the host application; every call
+  // names the user (sub), and a conversation of another sub is NOT_FOUND.
+  // Permission is on the chat collection of the caller's tenant: read for
+  // List/Get/Export, write for the rest.
+  rpc CreateChatConversation(CreateChatConversationRequest) returns (ChatConversationProto);
+  // One page of a user's conversations, newest first, without messages.
+  rpc ListChatConversations(ListChatConversationsRequest) returns (ListChatConversationsResponse);
+  // A conversation with its last `limit` messages (all when 0).
+  rpc GetChatConversation(GetChatConversationRequest) returns (ChatConversationProto);
+  // Returns the conversation holding only the messages added, with their ids.
+  rpc AppendChatMessages(AppendChatMessagesRequest) returns (ChatConversationProto);
+  rpc EndChatConversation(EndChatConversationRequest) returns (ChatConversationProto);
+  rpc DeleteChatConversation(DeleteChatConversationRequest) returns (DeleteChatConversationResponse);
+  // Everything of one user (GDPR erasure).
+  rpc DeleteChatConversationsForUser(DeleteChatConversationsForUserRequest) returns (DeleteChatConversationsForUserResponse);
+  // Everything of one user (GDPR export): one conversation per message,
+  // newest first, each with all its messages.
+  rpc ExportChatConversations(ExportChatConversationsRequest) returns (stream ChatConversationProto);
 }
 
 // Document represents a markdown document
@@ -2374,4 +2394,99 @@ message GetChatScenarioPromptResponse {
   string name = 1;
   string prompt = 2;
   uint64 version = 3;
+}
+
+// ---- v2.19.0: persistent per-user chat conversations (#405) ----
+
+message ChatToolCallProto {
+  string name = 1;
+  string collection = 2;
+  int64 duration_ms = 3;
+}
+
+message ChatMessageProto {
+  string id = 1;                                 // set by the server
+  string role = 2;                               // user, assistant or tool
+  string content = 3;
+  repeated ChatToolCallProto tool_calls = 4;
+  string model = 5;
+  string provider = 6;
+  int64 prompt_tokens = 7;
+  int64 completion_tokens = 8;
+  int64 created_at = 9;                          // unix seconds; 0 on append = now
+}
+
+message ChatConversationProto {
+  string id = 1;
+  string scenario = 2;
+  string sub = 3;                                // opaque user id from the host's signed token
+  string display_name = 4;
+  string title = 5;                              // start of the first user message
+  int64 created_at = 6;
+  int64 updated_at = 7;
+  int64 last_message_at = 8;
+  bool ended = 9;
+  int32 retention_days = 10;
+  int64 expires_at = 11;                         // removed after this unless written again
+  int32 message_count = 12;                      // of the whole conversation
+  repeated ChatMessageProto messages = 13;       // oldest first; empty in a listing
+}
+
+message CreateChatConversationRequest {
+  string sub = 1;
+  string scenario = 2;
+  string display_name = 3;
+  int32 retention_days = 4;                      // 0 = server default (MDDB_CHAT_RETENTION_DAYS, 30)
+}
+
+message ListChatConversationsRequest {
+  string sub = 1;
+  string scenario = 2;                           // optional filter
+  int32 limit = 3;                               // default 50, max 200
+  string cursor = 4;                             // next_cursor of the previous page
+}
+
+message ListChatConversationsResponse {
+  repeated ChatConversationProto conversations = 1;
+  string next_cursor = 2;
+}
+
+message GetChatConversationRequest {
+  string id = 1;
+  string sub = 2;
+  int32 limit = 3;                               // last N messages; 0 = all
+}
+
+message AppendChatMessagesRequest {
+  string id = 1;
+  string sub = 2;
+  repeated ChatMessageProto messages = 3;        // 1 to 100
+}
+
+message EndChatConversationRequest {
+  string id = 1;
+  string sub = 2;
+}
+
+message DeleteChatConversationRequest {
+  string id = 1;
+  string sub = 2;
+}
+
+message DeleteChatConversationResponse {
+  bool deleted = 1;
+  string id = 2;
+}
+
+message DeleteChatConversationsForUserRequest {
+  string sub = 1;
+}
+
+message DeleteChatConversationsForUserResponse {
+  int32 deleted = 1;
+  string sub = 2;
+}
+
+message ExportChatConversationsRequest {
+  string sub = 1;
 }
