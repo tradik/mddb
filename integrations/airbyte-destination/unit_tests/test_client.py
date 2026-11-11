@@ -7,6 +7,8 @@ import logging
 import unittest
 from unittest.mock import MagicMock, patch
 
+import requests
+
 from destination_mddb.client import (
     MddbClient,
     _RedactingFilter,
@@ -44,6 +46,11 @@ class TestKeyExtraction(unittest.TestCase):
     def test_hashIsDeterministic(self):
         record = {"b": 2, "a": 1}
         self.assertEqual(_hashFallback(record), _hashFallback({"a": 1, "b": 2}))
+
+    def test_hashFallbackKeyIsUnchangedAcrossVersions(self):
+        # Keys written by earlier versions must keep matching, or a re-sync
+        # would create a second copy of every keyless record.
+        self.assertEqual(_hashFallback({"b": 2, "a": 1}), "1744f53e00fc23bd3e515b298e42936485061dba")
 
     def test_oversizeKeyFallsBackToHash(self):
         # INT-006: a multi-KB key field must not become the document key.
@@ -186,6 +193,21 @@ class TestMddbClient(unittest.TestCase):
         with patch.object(self.client.session, "post") as post:
             post.return_value = MagicMock(status_code=401, ok=False, text="nope")
             with self.assertRaises(PermissionError):
+                self.client.ping()
+
+    def test_pingAcceptsOkAndRaisesOnOtherClientErrors(self):
+        # Any other status goes through raise_for_status: 200 passes, a 400
+        # surfaces as the HTTP error requests raises.
+        with patch.object(self.client.session, "post") as post:
+            ok = MagicMock(status_code=200, ok=True)
+            post.return_value = ok
+            self.client.ping()
+            ok.raise_for_status.assert_called_once()
+
+            bad = MagicMock(status_code=400, ok=False)
+            bad.raise_for_status.side_effect = requests.HTTPError("400 Client Error")
+            post.return_value = bad
+            with self.assertRaises(requests.HTTPError):
                 self.client.ping()
 
     def test_pingSurfacesServerError(self):
