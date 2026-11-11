@@ -346,6 +346,16 @@ collection aliases, cross search, search tuning and full-text tuning.
 Documents, collections,
 full-text and vector search, auth and backups are always on and not listed.
 
+- **Categories**: the modules sit under the same headings as their pages in
+  the menu — Search, Data, Chat, Automation & Integrations — and a module a
+  newer server reports but the panel does not know yet appears under Other.
+- **Turn on all / Turn off all**: for every module at the top of the page,
+  and for one category next to its heading. A confirmation names each module
+  that changes and each one skipped because the operator forced it off.
+  Modules are switched one at a time in dependency order (chat before
+  external MCP servers when turning on, the other way round when turning
+  off); a module that fails is reported and the rest still run. Stored data
+  stays either way.
 - **Switch**: one per module, with its description, its default, the modules
   it requires and who changed it last and when. Switching calls
   `PUT /v1/features/{name}` and needs admin on `"*"`; the server's 403 is

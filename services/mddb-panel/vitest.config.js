@@ -106,6 +106,9 @@ const coverageFiles = [
   'src/components/FeatureDisabledNotice.jsx',
   'src/components/FeaturesPanel.jsx',
   'src/components/FeatureRow.jsx',
+  // 2.19.0: Features in categories, turn on all / turn off all.
+  'src/lib/feature-groups.js',
+  'src/components/FeatureBulkBar.jsx',
   'src/lib/json-text.js',
   'src/lib/use-job-polling.js',
   'src/components/ConfirmDialog.jsx',

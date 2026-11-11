@@ -28,7 +28,7 @@ async function renderWith(features = [geo, chat, chatExternalMcp, temporal, imag
   vi.mocked(mddbClient.listFeatures).mockResolvedValue({ features, version });
   render(<FeaturesPanel />);
   await screen.findByText(`version ${version}`);
-  await screen.findByRole('list', { name: 'Modules' });
+  await screen.findByRole('region', { name: 'Modules' });
 }
 
 const toggle = (name) => screen.getByRole('switch', { name });
