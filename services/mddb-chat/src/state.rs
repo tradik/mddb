@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::chat::features::FeatureFlags;
 use crate::chat::scenario::ScenarioStore;
 use crate::config::Config;
 use crate::grpc::link::MddbLink;
@@ -18,6 +19,9 @@ pub struct AppState {
     /// The scenarios last read from mddbd (#403); empty until then, and the
     /// TOML ones in `config` fill in for every name it does not have.
     pub scenarios: ScenarioStore,
+    /// mddbd's module switches (GO-049), read by the scenario poll: chat on
+    /// and external MCP off until mddbd says otherwise.
+    pub features: FeatureFlags,
     pub llm_provider: Arc<dyn LlmProvider>,
     pub webhook_dispatcher: WebhookDispatcher,
     pub rate_limiter: RateLimiter,

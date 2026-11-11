@@ -14,6 +14,7 @@ use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
+use crate::chat::features::FeatureFlags;
 use crate::chat::scenario::{ScenarioStore, sync};
 use crate::config::{Config, MddbConfig, ServerConfig};
 use crate::error::AppError;
@@ -74,14 +75,16 @@ pub async fn build_state(config: Config) -> Result<Arc<AppState>, AppError> {
     // are in place before the first visitor is. Otherwise the poll loads them
     // when the link comes up, and the TOML scenarios serve until then.
     let scenarios = ScenarioStore::default();
+    let features = FeatureFlags::default();
     if config.scenarios_source.poll_seconds > 0 {
-        sync::sync_once(&mddb, &scenarios).await;
+        sync::sync_once(&mddb, &scenarios, &features).await;
     }
 
     Ok(Arc::new(AppState {
         session_manager: SessionManager::new(config.session.clone()),
         mddb,
         scenarios,
+        features,
         llm_provider: llm_provider(&config),
         webhook_dispatcher: WebhookDispatcher::new(
             config.webhooks.clone(),
@@ -129,6 +132,7 @@ pub fn spawn_scenario_poll(state: &AppState) -> bool {
     tokio::spawn(sync::poll(
         state.mddb.clone(),
         state.scenarios.clone(),
+        state.features.clone(),
         Duration::from_secs(poll_seconds),
     ));
     true

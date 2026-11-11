@@ -6,7 +6,10 @@
 //! Compiled only for tests.
 
 mod conversations;
+mod features;
 mod service;
+
+pub use features::FakeFeatures;
 
 use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
@@ -48,6 +51,8 @@ pub(super) struct FakeState {
     /// When set, every gRPC call fails with this code.
     pub failing: Option<tonic::Code>,
     pub login: Login,
+    /// What `ListFeatures` answers (GO-049).
+    pub features: FakeFeatures,
     pub calls: Vec<Call>,
     /// Chat conversations by id (#405), and the clock their times come from.
     pub conversations: BTreeMap<String, proto::ChatConversationProto>,
@@ -72,6 +77,7 @@ impl FakeMddbd {
             hits: Vec::new(),
             failing: None,
             login: Login::Token("fake-token".to_string()),
+            features: FakeFeatures::Unimplemented,
             calls: Vec::new(),
             conversations: BTreeMap::new(),
             clock: 0,

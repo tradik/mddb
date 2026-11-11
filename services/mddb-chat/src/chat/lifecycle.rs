@@ -37,6 +37,10 @@ impl Connection {
         scenario_name: String,
     ) -> Result<(String, String), AppError> {
         let state = &self.state;
+        // GO-049: an administrator switched the chat module off in mddbd.
+        if !state.features.chat() {
+            return Err(AppError::ChatDisabled);
+        }
         let name = state
             .sanitizer
             .sanitize_name(&name, state.config.session.name_max_chars)?;

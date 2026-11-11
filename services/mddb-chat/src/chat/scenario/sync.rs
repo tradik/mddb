@@ -5,6 +5,10 @@
 //! moved, so an edit in mddb-panel reaches the chat without a restart. Open
 //! sessions are untouched: a session is bound to a scenario by name, and the
 //! next turn looks the name up again.
+//!
+//! GO-049: each look first reads mddbd's module switches. While `chat` is
+//! off, mddbd refuses the scenario calls, so they are not made: the scenarios
+//! already loaded stay, and are reloaded once the module is back on.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -12,6 +16,7 @@ use std::time::Duration;
 use tracing::{debug, info, warn};
 
 use super::{ScenarioStore, StoredScenario};
+use crate::chat::features::FeatureFlags;
 use crate::error::AppError;
 use crate::grpc::client::MddbClient;
 use crate::grpc::link::MddbLink;
@@ -32,13 +37,25 @@ pub enum Sync {
     Unchanged,
     /// This many scenarios were loaded.
     Reloaded(usize),
+    /// mddbd has the `chat` module switched off (GO-049); the scenarios were
+    /// not asked for.
+    ChatDisabled,
 }
 
-/// Looks at mddbd once and reloads the store if its version changed.
-pub async fn sync_once(link: &MddbLink, store: &ScenarioStore) -> Sync {
+/// Looks at mddbd once: reads its module switches into `features`, then
+/// reloads the store if its version changed and the chat is switched on.
+pub async fn sync_once(link: &MddbLink, store: &ScenarioStore, features: &FeatureFlags) -> Sync {
     let Some(mut client) = link.client().await else {
         return Sync::NotConnected;
     };
+    match client.list_features().await {
+        Ok(read) => features.set(read),
+        Err(e) => warn!(error = %e, "could not read mddbd's modules; keeping the last known"),
+    }
+    if !features.chat() {
+        debug!("the chat module is off in mddbd; scenarios not reloaded");
+        return Sync::ChatDisabled;
+    }
     match reload(&mut client, store).await {
         Ok(outcome) => outcome,
         Err(AppError::GrpcError(status)) if status.code() == tonic::Code::Unimplemented => {
@@ -77,9 +94,9 @@ async fn reload(client: &mut MddbClient, store: &ScenarioStore) -> Result<Sync, 
 }
 
 /// Polls mddbd every `every`, for as long as the server runs.
-pub async fn poll(link: MddbLink, store: ScenarioStore, every: Duration) {
+pub async fn poll(link: MddbLink, store: ScenarioStore, features: FeatureFlags, every: Duration) {
     loop {
-        let wait = match sync_once(&link, &store).await {
+        let wait = match sync_once(&link, &store, &features).await {
             Sync::NotConnected => every.min(NOT_CONNECTED_RETRY),
             _ => every,
         };
@@ -98,15 +115,16 @@ mod tests {
         mddbd.put_scenario(scenario("support", &["kb"]), "You are Ada.");
         let link = mddbd.link().await;
         let store = ScenarioStore::default();
+        let features = FeatureFlags::default();
 
-        assert_eq!(sync_once(&link, &store).await, Sync::Reloaded(1));
-        assert_eq!(sync_once(&link, &store).await, Sync::Unchanged);
+        assert_eq!(sync_once(&link, &store, &features).await, Sync::Reloaded(1));
+        assert_eq!(sync_once(&link, &store, &features).await, Sync::Unchanged);
 
         assert_eq!(store.get("support").expect("loaded").prompt, "You are Ada.");
         assert_eq!(mddbd.count("ListChatScenarios"), 2);
         assert_eq!(mddbd.count("GetChatScenarioPrompt"), 1);
         assert_eq!(
-            sync_once(&MddbLink::default(), &store).await,
+            sync_once(&MddbLink::default(), &store, &features).await,
             Sync::NotConnected
         );
     }
@@ -129,7 +147,12 @@ mod tests {
         mddbd.put_scenario(scenario("support", &["kb"]), "You are Ada.");
         let link = MddbLink::default();
         let store = ScenarioStore::default();
-        let task = tokio::spawn(poll(link.clone(), store.clone(), Duration::from_millis(10)));
+        let task = tokio::spawn(poll(
+            link.clone(),
+            store.clone(),
+            FeatureFlags::default(),
+            Duration::from_millis(10),
+        ));
 
         tokio::time::sleep(Duration::from_millis(30)).await;
         assert_eq!(store.source(), "toml", "nothing to load from yet");

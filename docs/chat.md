@@ -144,6 +144,7 @@ Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming 
 - **Prompt.** The system prompt is the one mddbd composes (operator prompt, guardrails, off-topic clause, the scenario's skills, style clause, the collections' `responsePrompt`s), so the panel's preview is what the model reads.
 - **Applied fields.** `allowedCollections` bound the tools, `llm.model` / `temperature` / `maxTokens` / `extraBody` override `[llm]` for that scenario, and `maxTurns`, `tokenBudgetPerSession` and `rateLimit.messagesPerMinute` (per session) limit the conversation. A field left at 0 or empty keeps the server's own setting. `skills` reach the model through that composed prompt (see Skills below).
 - **Health.** `GET /health` reports `"scenarios_source": "mddbd" | "toml"` and `"scenarios_version"`.
+- **The `chat` feature (GO-049).** `mddb-chat` follows mddbd's `chat` module switch on the same poll: while it is off, `join` is refused with `chat is disabled on this server`, the scenarios are not reloaded (the cached ones stay), and `GET /health` shows `"chat_enabled": false` (`chat_external_mcp_enabled` mirrors `chatExternalMcp`). An mddbd without `ListFeatures` counts as chat on.
 
 The full table is in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#scenarios-from-mddbd).
 

@@ -16,6 +16,7 @@ use axum::extract::ws::WebSocketUpgrade;
 use axum::response::IntoResponse;
 use axum::routing::get;
 
+use crate::chat::features::FeatureFlags;
 use crate::chat::handler::handle_ws;
 use crate::chat::scenario::{ScenarioStore, sync};
 use crate::config::Config;
@@ -137,7 +138,12 @@ impl Harness {
 
     /// One look at mddbd's scenarios, as the poll takes every few seconds.
     pub async fn sync(&self) -> sync::Sync {
-        sync::sync_once(&self.state.mddb, &self.state.scenarios).await
+        sync::sync_once(
+            &self.state.mddb,
+            &self.state.scenarios,
+            &self.state.features,
+        )
+        .await
     }
 
     async fn start_with_link(config: Config, mddb: MddbLink) -> Self {
@@ -147,6 +153,7 @@ impl Harness {
             session_manager: SessionManager::new(config.session.clone()),
             mddb,
             scenarios: ScenarioStore::default(),
+            features: FeatureFlags::default(),
             llm_provider: llm.clone(),
             webhook_dispatcher: WebhookDispatcher::new(
                 config.webhooks.clone(),

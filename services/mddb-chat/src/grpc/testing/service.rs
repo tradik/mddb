@@ -108,6 +108,7 @@ async fn grpc(State(state): State<Shared>, request: Request<Body>) -> Response<B
         "DeleteChatConversationsForUser" => {
             unary(state, method, request, conversations::delete_for_user).await
         }
+        "ListFeatures" => unary(state, method, request, super::features::list_features).await,
         _ => Status::unimplemented(format!("unknown method {path}")).into_http(),
     }
 }

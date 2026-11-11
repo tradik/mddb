@@ -18,6 +18,11 @@ use crate::state::AppState;
 /// once its scenario store has been loaded, `"toml"` until then — and for
 /// good next to an mddbd older than 2.19.0. `scenarios_version` is the
 /// version of that store the loaded scenarios are at, `null` under `"toml"`.
+///
+/// `chat_enabled` is mddbd's `chat` module switch (GO-049); while it is
+/// `false`, joins are refused. Always `true` next to an mddbd without the
+/// switches. `chat_external_mcp_enabled` is the `chatExternalMcp` switch,
+/// reported for MCP-005, which nothing in mddb-chat acts on yet.
 pub async fn health(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Value>) {
     let connected = state.mddb.is_connected().await;
     let (code, status) = if connected {
@@ -35,6 +40,8 @@ pub async fn health(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Val
         "max_concurrent": state.config.session.max_concurrent,
         "scenarios_source": state.scenarios.source(),
         "scenarios_version": state.scenarios.version(),
+        "chat_enabled": state.features.chat(),
+        "chat_external_mcp_enabled": state.features.chat_external_mcp(),
     });
     (code, Json(body))
 }
@@ -115,7 +122,7 @@ mod tests {
         );
         let config = test_config(&mddbd.grpc_addr());
         let state = test_state_with_link(config.clone(), llm(&config), mddbd.link().await);
-        sync_once(&state.mddb, &state.scenarios).await;
+        sync_once(&state.mddb, &state.scenarios, &state.features).await;
 
         let (code, Json(body)) = health(State(state.clone())).await;
         assert_eq!(code, StatusCode::OK);

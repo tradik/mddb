@@ -2,6 +2,7 @@
 //! scripted and mddbd unreachable. Split by what they exercise: the session
 //! lifecycle, and a message's way through the tool loop.
 
+mod features;
 mod feedback;
 mod lifecycle;
 mod limits;

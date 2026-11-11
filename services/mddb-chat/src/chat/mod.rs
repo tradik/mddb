@@ -1,5 +1,6 @@
 mod controls;
 mod conversation;
+pub mod features;
 pub mod handler;
 mod lifecycle;
 pub mod markdown;

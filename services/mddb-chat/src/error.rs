@@ -18,6 +18,8 @@ pub enum AppError {
     SessionRateLimited(u32),
     /// The scenario is stored in mddbd with `enabled: false` (#403).
     ScenarioDisabled,
+    /// mddbd has the `chat` module switched off (GO-049).
+    ChatDisabled,
     GrpcError(tonic::Status),
     /// mddbd has not been reached yet (#401): the server is up, the
     /// knowledge base behind it is not.
@@ -55,6 +57,7 @@ impl std::fmt::Display for AppError {
                 "this conversation is limited to {per_minute} messages per minute"
             ),
             AppError::ScenarioDisabled => write!(f, "scenario is disabled"),
+            AppError::ChatDisabled => write!(f, "chat is disabled on this server"),
             AppError::GrpcError(s) => write!(f, "grpc error: {s}"),
             AppError::MddbUnavailable => write!(
                 f,
@@ -92,6 +95,9 @@ impl IntoResponse for AppError {
             AppError::SessionRateLimited(_) => (StatusCode::TOO_MANY_REQUESTS, self.to_string()),
             // An operator switched it off; asking again changes nothing.
             AppError::ScenarioDisabled => (StatusCode::FORBIDDEN, self.to_string()),
+            // The whole service is switched off until an administrator turns
+            // it back on, which is what 503 says.
+            AppError::ChatDisabled => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
             AppError::GrpcError(_) => (StatusCode::BAD_GATEWAY, self.to_string()),
             // Waiting helps: the link comes up on its own.
             AppError::MddbUnavailable => (StatusCode::SERVICE_UNAVAILABLE, self.to_string()),
@@ -173,6 +179,10 @@ mod tests {
             AppError::ScenarioDisabled.to_string(),
             "scenario is disabled"
         );
+        assert_eq!(
+            AppError::ChatDisabled.to_string(),
+            "chat is disabled on this server"
+        );
     }
 
     #[test]
@@ -197,6 +207,7 @@ mod tests {
             ),
             (AppError::SessionFull, StatusCode::SERVICE_UNAVAILABLE),
             (AppError::MddbUnavailable, StatusCode::SERVICE_UNAVAILABLE),
+            (AppError::ChatDisabled, StatusCode::SERVICE_UNAVAILABLE),
             // Waiting does not: the scenario caps the conversation, so this is
             // a refusal rather than backpressure.
             (AppError::TurnLimitReached(5), StatusCode::FORBIDDEN),

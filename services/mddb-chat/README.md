@@ -79,7 +79,7 @@ are documented inline in `config.example.toml`.
 | Path | What it is |
 |------|------------|
 | `GET /ws` | The chat WebSocket (protocol below) |
-| `GET /health` | Readiness and session counts: `200` once mddbd is reached, `503` before. Also `scenarios_source` (`"mddbd"` or `"toml"`) and `scenarios_version` |
+| `GET /health` | Readiness and session counts: `200` once mddbd is reached, `503` before. Also `scenarios_source` (`"mddbd"` or `"toml"`), `scenarios_version`, `chat_enabled` and `chat_external_mcp_enabled` |
 | `GET /config` | The scenarios a visitor can join right now (TOML and mddbd), their labels, and the limits a client needs before joining |
 
 ## Starting before mddbd
@@ -153,6 +153,23 @@ or `temperature` written in the TOML table does not leak into it.
 `scenarios_source` is `"mddbd"` once its scenario store has been loaded, even
 when it holds no scenario (the TOML ones then serve every name), and `"toml"`
 before that, with `"scenarios_version": null`.
+
+### The `chat` feature switch
+
+mddbd 2.19.0 can switch whole modules off (GO-049). The scenario poll also
+reads `ListFeatures` and follows two of them:
+
+- `chat`: while it is off, a `join` is refused with
+  `chat is disabled on this server`, the scenarios are not asked for (mddbd
+  would refuse) and the ones loaded stay cached; `GET /health` shows
+  `"chat_enabled": false`. Sessions already open are not cut off. The next
+  poll after it is switched back on reloads the scenarios and joins work again.
+- `chatExternalMcp`: reported as `chat_external_mcp_enabled` for MCP-005;
+  nothing acts on it yet.
+
+An mddbd without `ListFeatures` counts as chat on and external MCP off; a
+failed read keeps the switches last read. With `poll_seconds = 0` the switches
+are not followed either.
 
 The service account (`[mddb] auth_username`) sees only the scenarios whose
 collections it may read; mddbd leaves the others out of the list.
