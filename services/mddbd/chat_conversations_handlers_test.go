@@ -53,7 +53,7 @@ func chatSay(t *testing.T, s *Server, id, sub, content string, at int64) {
 	}
 }
 
-func chatServer(t *testing.T) *Server {
+func chatConvServer(t *testing.T) *Server {
 	t.Helper()
 	s, cleanup := newHandlerTestServer(t)
 	t.Cleanup(cleanup)
@@ -61,7 +61,7 @@ func chatServer(t *testing.T) *Server {
 }
 
 func TestChatConversationLifecycle(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	code, conv := chatCall(t, s, nil, http.MethodPost, chatConversationsPath,
 		`{"sub":"user-1","scenario":"support","displayName":"Ada","retentionDays":7}`)
 	if code != http.StatusOK {
@@ -130,7 +130,7 @@ func TestChatConversationLifecycle(t *testing.T) {
 // A conversation of another sub is not found on every read and write: the
 // answer is the one a missing id gets.
 func TestChatConversationOfAnotherSubIsNotFound(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	id := chatNew(t, s, nil, "user-1", "support")
 	base := chatConversationsPath + "/" + id
 	append2 := `{"sub":"user-2","messages":[{"role":"user","content":"x"}]}`
@@ -173,7 +173,7 @@ func TestChatConversationOfAnotherSubIsNotFound(t *testing.T) {
 }
 
 func TestChatConversationListNewestFirst(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	a := chatNew(t, s, nil, "user-1", "support")
 	b := chatNew(t, s, nil, "user-1", "sales")
 	c := chatNew(t, s, nil, "user-1", "support")
@@ -222,7 +222,7 @@ func TestChatConversationListNewestFirst(t *testing.T) {
 }
 
 func TestChatExportAndDeleteForUser(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	a := chatNew(t, s, nil, "user-1", "support")
 	chatNew(t, s, nil, "user-1", "sales")
 	keep := chatNew(t, s, nil, "user-2", "support")
@@ -256,7 +256,7 @@ func TestChatExportAndDeleteForUser(t *testing.T) {
 // Retention is the document's TTL: an expired conversation is gone for every
 // read before the reaper removes it, and the reaper does remove it.
 func TestChatRetentionExpires(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	_, conv := chatCall(t, s, nil, http.MethodPost, chatConversationsPath, `{"sub":"user-1","scenario":"support","retentionDays":1}`)
 	id := conv["id"].(string)
 	real := chatNow
@@ -278,7 +278,7 @@ func TestChatRetentionExpires(t *testing.T) {
 // A write refreshes the retention, and the transcript stays out of the
 // full-text index.
 func TestChatConversationIsNotIndexed(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	id := chatNew(t, s, nil, "user-1", "support")
 	chatSay(t, s, id, "user-1", "xylophone", 0)
 	hits, err := s.FTSIndex.Search(chatConversationsCollection, "xylophone", 5)
@@ -305,7 +305,7 @@ func TestChatConversationIsNotIndexed(t *testing.T) {
 }
 
 func TestChatHostAPIRefusals(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	id := chatNew(t, s, nil, "user-1", "support")
 	for _, c := range []struct{ method, target string }{
 		{http.MethodPut, chatConversationsPath},
@@ -433,7 +433,7 @@ func TestChatHostAPIPermissions(t *testing.T) {
 
 // Two appends to one conversation both land: the store is read-modify-write.
 func TestChatConcurrentAppendsAllLand(t *testing.T) {
-	s := chatServer(t)
+	s := chatConvServer(t)
 	id := chatNew(t, s, nil, "user-1", "support")
 	const writers = 8
 	done := make(chan error, writers)

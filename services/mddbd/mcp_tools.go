@@ -218,6 +218,10 @@ func (s *MCPToolServer) mcpCallTool(ctx context.Context, name string, args map[s
 		return s.toolChatScenarioPut(ctx, args)
 	case "chat_scenario_delete":
 		return s.toolChatScenarioDelete(ctx, args)
+	case "chat_conversation_list":
+		return s.toolChatConversationList(ctx, args)
+	case "chat_conversation_get":
+		return s.toolChatConversationGet(ctx, args)
 	case "cross_search":
 		return s.toolCrossSearch(ctx, args)
 	case "find_duplicates":

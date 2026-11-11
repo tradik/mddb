@@ -99,6 +99,11 @@ var mcpToolAccessRules = map[string]accessRule{
 	"update_curation_rule":    ruleAllWrite,
 	"delete_curation_rule":    ruleAllWrite,
 
+	// Chat conversations (#405): authorized in the direct client, which knows
+	// the chat collection of the caller's tenant.
+	"chat_conversation_list": ruleHandler,
+	"chat_conversation_get":  ruleHandler,
+
 	// The memory store.
 	"memory_start_session":   memoryRule(PermWrite),
 	"memory_add_message":     memoryRule(PermWrite),

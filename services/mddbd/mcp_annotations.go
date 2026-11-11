@@ -134,6 +134,10 @@ var mcpToolAnnotations = map[string]*MCPToolAnnotations{
 	"chat_scenario_put":    writeIdempotent(), // a replace: the same call twice stores the same scenario
 	"chat_scenario_delete": destructive(),     // MCP-004 asks for the scenario's name
 
+	// --- Chat conversations (#405): read-only, the host writes over REST/gRPC ---
+	"chat_conversation_list": readOnly(),
+	"chat_conversation_get":  readOnly(),
+
 	// --- Write, open world (network calls) ---
 	"import_url":     writeOpenWorld(),
 	"corpus_install": writeOpenWorld(), // #378: the server downloads the pack

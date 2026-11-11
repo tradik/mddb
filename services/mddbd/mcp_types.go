@@ -1068,6 +1068,9 @@ type MCPClient interface {
 	ChatScenarioGet(ctx context.Context, name string) (*ChatScenario, string, error)
 	ChatScenarioPut(ctx context.Context, sc *ChatScenario) (bool, error)
 	ChatScenarioDelete(ctx context.Context, name string) error
+	// Chat conversations (#405): read-only here, the host writes over REST/gRPC.
+	ChatConversationList(ctx context.Context, sub, scenario string, limit int, cursor string) (*ChatListResponse, error)
+	ChatConversationGet(ctx context.Context, id, sub string, limit int) (*ChatConversation, error)
 	Close() error
 }
 

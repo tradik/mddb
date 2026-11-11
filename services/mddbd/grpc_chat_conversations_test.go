@@ -35,7 +35,7 @@ func (c *chatExportStream) Send(m *proto.ChatConversationProto) error {
 
 func chatGRPC(t *testing.T) (*GRPCServer, *Server) {
 	t.Helper()
-	s := chatServer(t)
+	s := chatConvServer(t)
 	return NewGRPCServer(s), s
 }
 
