@@ -20,6 +20,17 @@ export function isPlainObject(value) {
 }
 
 /**
+ * The error to show under a field that must hold a JSON object: the parse
+ * error, `notObject` for valid JSON of another kind, null when fine or blank.
+ */
+export function jsonObjectError(text, notObject) {
+  const { value, error } = parseJson(text);
+  if (error) return error;
+  if (value !== undefined && !isPlainObject(value)) return notObject;
+  return null;
+}
+
+/**
  * Documents from pasted text: a JSON array of documents, or NDJSON (one
  * document per line). A document without `lang` gets `defaultLang`. Returns
  * `{ documents }` or `{ error }` naming the line that failed.

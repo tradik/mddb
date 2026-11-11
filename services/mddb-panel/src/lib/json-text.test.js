@@ -1,7 +1,7 @@
 // json-text: JSON typed into a form, and documents pasted as a JSON array
 // or NDJSON.
 import { describe, test, expect } from 'vitest';
-import { parseJson, isPlainObject, parseDocuments } from './json-text';
+import { parseJson, isPlainObject, parseDocuments, jsonObjectError } from './json-text';
 import { getWithQuery } from './client/http';
 
 describe('parseJson', () => {
@@ -14,6 +14,15 @@ describe('parseJson', () => {
 
 describe('isPlainObject', () => {
   test.each([[{}, true], [[], false], [null, false], ['x', false]])('%o → %s', (v, want) => expect(isPlainObject(v)).toBe(want));
+});
+
+describe('jsonObjectError', () => {
+  test('parse error, not an object, or fine', () => {
+    expect(jsonObjectError('{', 'nope')).toMatch(/JSON/);
+    expect(jsonObjectError('[1]', 'nope')).toBe('nope');
+    expect(jsonObjectError('{}', 'nope')).toBeNull();
+    expect(jsonObjectError('', 'nope')).toBeNull();
+  });
 });
 
 describe('parseDocuments', () => {

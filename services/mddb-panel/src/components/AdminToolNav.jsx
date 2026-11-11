@@ -1,4 +1,4 @@
-import { MessagesSquare } from 'lucide-react';
+import { MessagesSquare, FileCheck } from 'lucide-react';
 
 /**
  * AdminToolNav adds the sidebar entries of the pages added in 2.19.0 to the
@@ -10,6 +10,7 @@ export default function AdminToolNav({ NavButton }) {
   return (
     <>
       <NavButton mode="memory" icon={MessagesSquare} label="Agent Memory" />
+      <NavButton mode="schemas" icon={FileCheck} label="Collection Schemas" />
     </>
   );
 }

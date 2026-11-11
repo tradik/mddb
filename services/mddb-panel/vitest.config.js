@@ -117,6 +117,9 @@ const coverageFiles = [
   'src/components/MemoryMessageForm.jsx',
   'src/components/MemoryRecallBox.jsx',
   'src/components/MemorySessionForm.jsx',
+  'src/components/SchemasPanel.jsx',
+  'src/components/SchemaEditor.jsx',
+  'src/components/SchemaValidateBox.jsx',
 ];
 
 export default mergeConfig(

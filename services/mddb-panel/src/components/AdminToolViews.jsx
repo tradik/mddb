@@ -1,8 +1,10 @@
 import MemoryPanel from './MemoryPanel';
+import SchemasPanel from './SchemasPanel';
 
 /** The pages added in 2.19.0, by view mode. */
 const PAGES = {
   memory: MemoryPanel,
+  schemas: SchemasPanel,
 };
 
 /**
