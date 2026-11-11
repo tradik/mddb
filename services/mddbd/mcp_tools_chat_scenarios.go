@@ -27,7 +27,8 @@ var chatScenarioSchema = map[string]interface{}{
 		}},
 		"allowedCollections": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"},
 			"description": "Existing collections or aliases the assistant may search"},
-		"skills": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
+		"skills": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"},
+			"description": "Names of chat skills, appended to the prompt in this order after the guardrails"},
 		"style": map[string]interface{}{"type": "object", "properties": map[string]interface{}{
 			"emoji":            map[string]interface{}{"type": "string", "enum": []string{EmojiOff, EmojiSparingly, EmojiFree}},
 			"verbosity":        map[string]interface{}{"type": "string", "enum": []string{VerbosityShort, VerbosityNormal, VerbosityLong}},
@@ -59,8 +60,9 @@ func mcpChatScenarioTools() []MCPTool {
 			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{}},
 		},
 		{
-			Name:        "chat_scenario_get",
-			Description: "Get one chat scenario and its composed system prompt: operator prompt, guardrails, off-topic and style clauses, then each allowed collection's responsePrompt.",
+			Name: "chat_scenario_get",
+			Description: "Get one chat scenario and its composed system prompt — operator prompt, guardrails, off-topic clause, its skills in order, " +
+				"style clause, then each allowed collection's responsePrompt — with the prompt's size and the skills it names that do not exist.",
 			InputSchema: map[string]interface{}{"type": "object", "properties": map[string]interface{}{"name": name}, "required": []string{"name"}},
 		},
 		{
@@ -101,11 +103,18 @@ func (s *MCPToolServer) toolChatScenarioGet(ctx context.Context, args map[string
 	if err != nil {
 		return "", err
 	}
-	sc, prompt, err := s.client.ChatScenarioGet(ctx, name)
+	sc, p, err := s.client.ChatScenarioGet(ctx, name)
 	if err != nil {
 		return "", err
 	}
-	data, _ := json.MarshalIndent(map[string]any{"scenario": sc, "prompt": prompt}, "", "  ")
+	out := map[string]any{"scenario": sc, "prompt": p.Prompt, "bytes": p.Bytes, "approxTokens": p.ApproxTokens}
+	if p.Warning != "" {
+		out["warning"] = p.Warning
+	}
+	if len(p.MissingSkills) > 0 {
+		out["missingSkills"] = p.MissingSkills
+	}
+	data, _ := json.MarshalIndent(out, "", "  ")
 	return string(data), nil
 }
 

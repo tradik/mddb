@@ -59,6 +59,7 @@ var mcpToolsets = map[string][]string{
 		"list_collection_configs", "list_curation_rules", "create_curation_rule", "update_curation_rule",
 		"delete_curation_rule", "corpus_list", "corpus_install", "corpus_remove",
 		"chat_scenario_list", "chat_scenario_get", "chat_scenario_put", "chat_scenario_delete",
+		"chat_skill_list", "chat_skill_get", "chat_skill_put", "chat_skill_delete",
 		"chat_conversation_list", "chat_conversation_get"},
 	ToolsetGeo:        {"geo_search", "geo_within", "geo_polygon", "geo_stats", "geo_encode", "geo_decode"},
 	ToolsetAutomation: {"list_automation", "create_automation", "get_automation", "update_automation", "delete_automation", "test_automation", "get_automation_logs", "run_automation"},

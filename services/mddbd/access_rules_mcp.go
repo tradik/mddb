@@ -127,6 +127,10 @@ var mcpToolAccessRules = map[string]accessRule{
 	"corpus_remove":        ruleAdmin, // as POST /v1/corpus/remove
 	"chat_scenario_put":    ruleAdmin, // #403: as PUT /v1/chat/scenarios/{name}
 	"chat_scenario_delete": ruleAdmin, // #403: as DELETE /v1/chat/scenarios/{name}
+	"chat_skill_list":      ruleAdmin, // #404: a skill's text is part of system prompts, so reads are admin too
+	"chat_skill_get":       ruleAdmin,
+	"chat_skill_put":       ruleAdmin,
+	"chat_skill_delete":    ruleAdmin,
 	"list_webhooks":        ruleAdmin,
 	"list_automation":      ruleAdmin,
 	"create_automation":    ruleAdmin,

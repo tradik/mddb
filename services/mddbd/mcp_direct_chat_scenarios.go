@@ -11,13 +11,15 @@ func (c *DirectClient) ChatScenarioList(ctx context.Context) ([]*ChatScenario, u
 	return c.server.ListChatScenarios(ctx), c.server.ChatScenariosVersion(), nil
 }
 
-// ChatScenarioGet returns one scenario and its composed system prompt.
-func (c *DirectClient) ChatScenarioGet(ctx context.Context, name string) (*ChatScenario, string, error) {
+// ChatScenarioGet returns one scenario and its composed system prompt, with
+// the prompt's size and the skills it names that do not exist (#404).
+func (c *DirectClient) ChatScenarioGet(ctx context.Context, name string) (*ChatScenario, *chatScenarioPrompt, error) {
 	sc, err := c.server.GetChatScenario(ctx, name)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
-	return sc, c.server.ChatScenarioPrompt(sc), nil
+	p := c.server.ChatScenarioPrompt(sc)
+	return sc, &p, nil
 }
 
 // ChatScenarioPut creates or replaces a scenario; true when it is new.
