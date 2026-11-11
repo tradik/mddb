@@ -175,6 +175,31 @@ What the user then gets:
 
 The user id is the token's `sub`, and only that: a user id sent by the browser is never read, and mddbd answers "not found" for any conversation of another `sub`. Every refusal and frame is listed in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#signed-in-users).
 
+### External knowledge over MCP (2.19.0)
+
+A scenario can name external MCP servers whose read-only tools the assistant calls next to its collections (MCP-005): live data such as an order's status or a service's health, knowledge someone else keeps behind their own MCP server, or another MDDB instance without copying its data. For static knowledge a collection is still the better choice: it is faster and cheaper, ranks hybrid, and cites by key.
+
+**Switches.** Every level has its own, and turning a higher one off turns the lower ones off:
+
+| Level | Switch | Off means |
+|---|---|---|
+| 1 | the `chat` feature (GO-049) | no external tool for any scenario |
+| 2 | the scenario's `enabled` | the scenario takes no conversation |
+| 3 | the `chatExternalMcp` feature, **off by default** | mddbd contacts no foreign server: no inspect, no check on save, no call |
+| 4 | `mcpServers[].enabled` | that server's tools are hidden |
+| 5 | `mcpServers[].allowedTools` | a tool not listed does not exist for the model |
+
+The scenario preview (`/v1/chat/scenarios/{name}/prompt`) reports each server's `active` state and the first switch that is off as `reason`; the panel shows the same next to each tool. Both features are switched on the panel's Features page (`PUT /v1/features/{name}`); `chatExternalMcp` requires `chat`.
+
+**Security model.**
+
+- **Read-only tools only.** Saving a scenario connects to each server and refuses, with `400` naming the tool, any allowed tool without `readOnlyHint: true` or with `destructiveHint: true`, or one the server does not offer. It is checked again on every call against the server's own `tools/list`, so a server that turns a tool into a writer later is refused then too.
+- **Credentials stay in mddbd.** A token or header value is stored as a write-only secret (`/v1/chat/mcp-secrets`), sealed with `MDDB_ENCRYPTION_KEY` when that is set, never returned by any API, never written to a log, and replaced with `[redacted]` when a server quotes it back in an error. Scenarios name it in `secretRef`. Nothing goes into the chat's `config.toml`.
+- **mddbd makes the call.** `mddb-chat` asks mddbd (`POST /v1/chat/mcp/call`, gRPC `CallChatMcpTool`) with its own key, which must be able to read the scenario. mddbd checks all five switches, attaches the credential, calls the tool and cuts the result to `resultMaxChars`.
+- **Transport.** `https` only, through mddbd's SSRF guard (private and loopback addresses are refused), a redirect may not leave https, `timeoutMs` per call (default 8000), answers up to 4 MiB.
+- **Untrusted results.** A result goes to the model as data from a third party: the composed prompt ends with a clause saying so, after the guardrails and skills, and `mddb-chat` frames each result and keeps it out of the instructions.
+- **No broken turns.** A timeout, a refused connection, an oversized or failing result returns `isError: true` with one short line for the model; the turn goes on.
+
 ### Widget Configuration
 
 ```javascript
