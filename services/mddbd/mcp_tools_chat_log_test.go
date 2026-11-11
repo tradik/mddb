@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -49,10 +50,25 @@ func TestMCPChatLogTools(t *testing.T) {
 	if _, err := ts.mcpCallTool(ctx, "chat_gaps", map[string]interface{}{"limit": float64(-1)}); err == nil {
 		t.Error("bad limit: no error")
 	}
+	// A client that fails: the tools pass its error on.
+	failing := &MCPToolServer{client: covBNewAllErr(), globalMode: ModeRW}
+	for _, name := range []string{"chat_log_list", "chat_gaps"} {
+		if _, err := failing.mcpCallTool(ctx, name, map[string]interface{}{}); !errors.Is(err, errCovBClient) {
+			t.Errorf("%s through a failing client: %v", name, err)
+		}
+	}
 	// Both are listed, read-only, in the admin toolset.
 	for _, name := range []string{"chat_log_list", "chat_gaps"} {
 		if mcpToolGroup[name] != ToolsetAdmin {
 			t.Errorf("%s toolset: %q", name, mcpToolGroup[name])
 		}
 	}
+}
+
+func (c *covBAllErrClient) ChatLogList(context.Context, ChatLogFilter) (*ChatLogPage, error) {
+	return nil, errCovBClient
+}
+
+func (c *covBAllErrClient) ChatGaps(context.Context, ChatGapsFilter) (*ChatGapsResponse, error) {
+	return nil, errCovBClient
 }
