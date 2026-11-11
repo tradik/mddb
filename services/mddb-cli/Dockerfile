@@ -7,7 +7,10 @@
 # only main.go was copied and the client was outside the context.
 
 # Build stage
-FROM golang:1.27.4-alpine AS builder
+# Cross-compiled on the host's platform for the target (#410).
+FROM --platform=$BUILDPLATFORM golang:1.27.4-alpine AS builder
+ARG TARGETOS=linux
+ARG TARGETARCH
 
 WORKDIR /src
 
@@ -21,7 +24,7 @@ RUN go mod download
 
 COPY services/mddb-cli/ ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /build/mddb-cli .
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /build/mddb-cli .
 
 # Runtime stage
 FROM alpine:3.24
