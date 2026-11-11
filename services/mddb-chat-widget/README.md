@@ -24,7 +24,7 @@ chat server over WebSocket. Drop one `<script>` tag onto any page.
 | `data-theme`        | no       | `light`          | `light` or `dark`. |
 | `data-accent`       | no       | —                | Accent colour (any CSS colour). |
 | `data-position`     | no       | `bottom-right`   | `bottom-right` or `bottom-left`. |
-| `data-session-ttl`  | no       | —                | Session persistence TTL in hours. |
+| `data-session-ttl`  | no       | `24`             | Session persistence TTL in hours. |
 
 ### Signed-in users (2.19.0)
 
@@ -42,6 +42,16 @@ anonymous, as before. The token is never stored by the widget.
 
 Ratings carry the `message_id` of the answer they rate, taken from the
 `done` frame that ended it.
+
+### Answer feedback (2.19.0)
+
+A thumbs-up or thumbs-down is sent at once. After a thumbs-down the widget
+offers a short, optional comment box under the answer (labelled, at most 2000
+characters, **Send** or **Skip**, Escape closes it); a sent comment goes as a
+second `feedback` frame with the same rating and `message_id` and a `comment`
+field. The server stores the latest rating with the answer when the session
+is signed in or its scenario logs turns (`docs/chat.md`, "Conversation log and
+feedback").
 
 ## Security
 

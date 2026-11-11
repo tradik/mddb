@@ -1,5 +1,6 @@
 import { WsClient } from './ws/client';
-import { feedbackMessage, joinMessage } from './ws/messages';
+import { feedbackMessage, joinMessage, ratedTurn } from './ws/messages';
+import { buildCommentBox } from './ui/feedbackComment';
 import type { WsIncoming } from './ws/protocol';
 import { Store, type WidgetState, type Message } from './store/state';
 import { saveSession, loadSession, clearSession, setSessionTtl } from './store/session';
@@ -46,6 +47,12 @@ export class ChatWidget {
   private errorEl!: HTMLDivElement;
   private endBtn!: HTMLButtonElement;
   private ratedMessages: Set<number> = new Set();
+  // #406: the answer whose comment box is open after a thumbs-down, what has
+  // been typed in it (a re-render must not lose it), and whether it still
+  // needs the focus.
+  private commentFor: number | null = null;
+  private commentDraft = '';
+  private focusComment = false;
 
   constructor(hostEl: HTMLElement, options: WidgetOptions) {
     this.options = options;
@@ -322,22 +329,46 @@ export class ChatWidget {
     if (this.ratedMessages.has(msgIndex)) return;
     this.ratedMessages.add(msgIndex);
 
-    const messages = this.store.getState().messages;
-    const answer = messages[msgIndex]?.content || '';
-    const messageId = messages[msgIndex]?.messageId;
-    // Find the preceding user message
-    let question = '';
-    for (let i = msgIndex - 1; i >= 0; i--) {
-      if (messages[i].role === 'user') {
-        question = messages[i].content;
-        break;
-      }
-    }
-
+    const { question, answer, messageId } = ratedTurn(this.store.getState().messages, msgIndex);
     this.ws.send(feedbackMessage(rating, question, answer, messageId));
+    if (rating === 'down') {
+      // #406: offer a comment; the rating is already stored without one.
+      this.commentFor = msgIndex;
+      this.commentDraft = '';
+      this.focusComment = true;
+    }
 
     // Re-render to update button states
     this.render(this.store.getState());
+  }
+
+  /** Sends the comment with the same rating again (#406), then closes the box. */
+  private sendComment(msgIndex: number, text: string): void {
+    const { question, answer, messageId } = ratedTurn(this.store.getState().messages, msgIndex);
+    if (text.trim()) this.ws.send(feedbackMessage('down', question, answer, messageId, text));
+    this.closeComment();
+  }
+
+  private closeComment(): void {
+    this.commentFor = null;
+    this.commentDraft = '';
+    this.render(this.store.getState());
+  }
+
+  /** The comment box under answer `i`, focused the first time it is shown. */
+  private commentBox(i: number): HTMLFormElement {
+    const form = buildCommentBox(document, {
+      id: `mddb-comment-${i}`,
+      draft: this.commentDraft,
+      onInput: (text) => { this.commentDraft = text; },
+      onSend: (text) => this.sendComment(i, text),
+      onSkip: () => this.closeComment(),
+    });
+    if (this.focusComment) {
+      this.focusComment = false;
+      queueMicrotask(() => form.querySelector('textarea')?.focus());
+    }
+    return form;
   }
 
   private persistMessages(): void {
@@ -507,6 +538,7 @@ export class ChatWidget {
         feedbackBar.appendChild(upBtn);
         feedbackBar.appendChild(downBtn);
         wrap.appendChild(feedbackBar);
+        if (this.commentFor === i) wrap.appendChild(this.commentBox(i));
       }
 
       this.messagesEl.appendChild(wrap);

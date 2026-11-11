@@ -309,6 +309,59 @@
   fill: var(--mddb-text-secondary);
 }
 
+/* #406: the optional comment after a thumbs-down */
+.mddb-feedback-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 0 4px;
+  max-width: 85%;
+}
+
+.mddb-feedback-comment label {
+  font-size: 12px;
+  color: var(--mddb-text-secondary);
+}
+
+.mddb-feedback-comment textarea {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  /* WCAG 2.2 1.4.11: the field's edge needs 3:1, so not --mddb-border */
+  border: 1px solid var(--mddb-text-secondary);
+  border-radius: 6px;
+  background: var(--mddb-bg);
+  color: var(--mddb-text);
+  resize: vertical;
+}
+
+.mddb-feedback-comment-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.mddb-feedback-comment button {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--mddb-text-secondary);
+  background: var(--mddb-bg);
+  color: var(--mddb-text);
+  cursor: pointer;
+}
+
+/* Dark text on the page colour keeps 4.5:1 whatever the accent is. */
+.mddb-feedback-comment button[type='submit'] {
+  border: 2px solid var(--mddb-accent);
+  font-weight: 600;
+}
+
+.mddb-feedback-comment textarea:focus-visible,
+.mddb-feedback-comment button:focus-visible {
+  outline: 2px solid var(--mddb-accent);
+  outline-offset: 1px;
+}
+
 /* Typing indicator */
 .mddb-typing {
   display: flex;

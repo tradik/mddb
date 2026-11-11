@@ -32,6 +32,8 @@ export interface FeedbackMessage {
   answer: string;
   /** The `message_id` of the rated answer's `done` frame (#399). */
   message_id?: string;
+  /** What the visitor wrote after a thumbs-down, at most 2000 characters (#406). */
+  comment?: string;
 }
 
 export type WsOutgoing = JoinMessage | ChatMessage | ResumeMessage | EndMessage | FeedbackMessage | PingMessage;
