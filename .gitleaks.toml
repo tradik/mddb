@@ -15,7 +15,8 @@ paths = [
   '''(^|/)vendor/''',               # vendored third-party code (e.g. phpstan.phar)
   '''\.example\.''',                # *.example.* config templates (placeholders)
   '''_test\.go$''',                 # Go test fixtures
-  '''\.test\.(js|ts|mjs|tsx)$''',   # JS/TS test fixtures
+  '''\.test\.(js|jsx|ts|mjs|tsx)$''', # JS/TS test fixtures (panel suites are .test.jsx)
+  '''(^|/)services/mddb-chat/src/(.*/)?testing/''', # mddb-chat test harness (a fixed RFC 6455 handshake key)
   '''\.1$''',                       # manpages with example commands
   '''(^|/)services/mddb-panel/src/lib/markdown-templates\.js$''',     # UI example snippets
   '''(^|/)services/mddb-panel/src/components/MCPConfigPanel\.jsx$''', # UI example config
