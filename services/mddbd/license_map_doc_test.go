@@ -92,7 +92,7 @@ func licenseFor(entries []licenseMapEntry, rel string) string {
 // Tradik Limited as licensor with Apache-2.0 as the change licence.
 func TestLicenseFilesMatchMap(t *testing.T) {
 	for _, e := range readLicenseMap(t) {
-		data, err := os.ReadFile(filepath.Join(licenseMapRepoRoot, e.file))
+		data, err := os.ReadFile(filepath.Join(licenseMapRepoRoot, e.file)) //nolint:gosec // G304: a LICENSE path read from LICENSING.md in this repository
 		if err != nil {
 			t.Errorf("%s: %v", e.file, err)
 			continue
@@ -133,7 +133,7 @@ func TestManifestsDeclareDirectoryLicense(t *testing.T) {
 		}
 		rel, _ := filepath.Rel(licenseMapRepoRoot, path)
 		rel = filepath.ToSlash(rel)
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec // G304: a manifest found by walking the repository, not input
 		if err != nil {
 			return err
 		}
@@ -175,7 +175,7 @@ func TestReleasePackagingDeclaresLicense(t *testing.T) {
 		{"integrations/airbyte-destination/Dockerfile", regexp.MustCompile(`org\.opencontainers\.image\.licenses="([^"]+)"`), 1},
 	}
 	for _, c := range checks {
-		data, err := os.ReadFile(filepath.Join(licenseMapRepoRoot, c.file))
+		data, err := os.ReadFile(filepath.Join(licenseMapRepoRoot, c.file)) //nolint:gosec // G304: c.file comes from the fixed table above
 		if err != nil {
 			t.Fatalf("read %s: %v", c.file, err)
 		}
@@ -206,7 +206,7 @@ func TestNoOpenSourceClaimAboutMDDB(t *testing.T) {
 		"services/ssg-template/base.html", "services/ssg-template/index.html", ".ssg.yaml", "server.json"}
 	var bad []string
 	for _, f := range files {
-		data, err := os.ReadFile(filepath.Join(licenseMapRepoRoot, f))
+		data, err := os.ReadFile(filepath.Join(licenseMapRepoRoot, f)) //nolint:gosec // G304: f comes from the fixed list above, not from input
 		if err != nil {
 			continue // optional: LISTING.md, DOCKER_HUB_SHORT.txt and server.json arrive with MKT-001/005
 		}
