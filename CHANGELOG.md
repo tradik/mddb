@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **mddb-chat: `session.end` fires when a session ends, not when its socket closes (#402).** Webhook consumers that treated it as "disconnected" now get it on `end` and on TTL expiry only. `/health` counts attached sessions in `active_sessions`, adds `detached_sessions` and `mddb_connected`, and answers 503 with `status: "starting"` until mddbd is connected, so a container is unhealthy until then.
 - **mddb-chat handles SIGTERM and Ctrl-C** by shutting down cleanly.
 
+### Deprecated
+
+- **`not_found` in `/v1/delete-batch` and in the MCP `delete_batch` and `update_batch` answers.** Use `notFound`, added in 2.19.0 so the field is camelCase like the rest of the API. The alias stays for backward compatibility and will be removed in a later minor release. The Go client reads either.
+
 ### Fixed
 
 - **Panel upload stored frontmatter lists wrong.** The upload dialog parsed Markdown frontmatter itself, line by line: `tags: [a, b]` became `["[a", "b]"]`, a block list (`tags:` then `- a`) was lost, and a value holding a comma was split. Markdown now goes to `/v1/upload` like every other format, so the server's parser reads it (the one `/v1/ingest`, `mddb-cli` and the folder loader use). A Markdown file keeps the key earlier panels gave it (its name without `.md`), so uploading it again replaces the same document.
@@ -97,6 +101,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Panel: Geo Search listed collections as `0`, `1`, … instead of their names**, and its fields had no labels.
 - **Panel: collection export never worked.** The client parsed the NDJSON or ZIP answer as JSON; it now downloads the file.
 - **mddb-chat logged in to mddbd at the wrong port** whenever `grpc_addr` did not use 11024: the login URL was made by replacing the text "11024" with "11023". The login URL is now `[mddb] http_url`; it is still derived when the gRPC port is exactly 11024, and any other port with credentials stops startup with an error naming the key.
+- **`/v1/find-duplicates`: every document in a group carries `lang`** (REST, gRPC and MCP), so the panel no longer parses it out of `docId`. `minhashGroups`, `minhashPairs` and the `minhash` mode are now documented.
+- **`/v1/memory/sessions` and MCP `memory_list_sessions` return the session's `title`.** Create never stored it; sessions created before 2.19.0 show the title from their body.
+- **`/v1/memory/history` and MCP `memory_session_history` keep the order of messages written in the same second.** They are ordered by creation time to the nanosecond, then by id; older messages keep their order.
+- **Switched-off temporal and spell routes answered plain text.** With `MDDB_TEMPORAL` or `MDDB_SPELL` off they now answer 404 `{"error":"feature disabled","feature":"temporal"|"spell"}`, like a module switched off on the Features page; the documented 400 "temporal not available" was wrong. A missing bulk ingest job and a wrong method on it also answer JSON.
+- **`/v1/bulk-ingest-jobs` answers `"jobs": []`** instead of `null` when there are none.
+- **`/v1/export` names the file** with `Content-Disposition: attachment; filename="<collection>.ndjson|.zip"`, exposed through CORS.
+- **`/v1/code-graph` with `direction=both` listed each edge twice** at depth above 1. Each edge is now listed once, with the direction found nearest the root (REST, gRPC, MCP).
 
 ### Documentation
 
@@ -111,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Guards (`mcp_tool_count_doc_test.go`, `site_claims_doc_test.go`) fail when the MCP tool count, algorithm, language or format counts, or the stated sizes drift from the code or from `.ssg.yaml`.
 
 - The REST spec (`docs/openapi.yaml`) passes Redocly's `recommended-strict` ruleset with no warnings (`make openapi-lint`, pinned `@redocly/cli` 2.72.1). Every operation has a camelCase, verb-first `operationId` (44 added, none renamed) and documents the 4xx it can really return, from shared responses (BadRequest, Unauthorized, Forbidden, NotFound, PayloadTooLarge, RateLimited, ServiceUnavailable, InsufficientStorage, and JSON-RPC variants for the MCP listener). Wrong examples fixed (`bm25B` and the field-weights object were swapped; collection code `role` showed a path list). `servers` defaults to `http://localhost:11023`. Search responses document `highlights`, `signals`/`signalBreakdown` and the `format: passages` response. The lint runs in the Tests workflow and before the docs site is published.
+- `docs/openapi.yaml` has real 200 response schemas for geo-search, geo-within, geo-reindex, geo-stats, geo-encode and geo-decode; a test checks every field those handlers write against them.
 
 ### Upgrading
 
