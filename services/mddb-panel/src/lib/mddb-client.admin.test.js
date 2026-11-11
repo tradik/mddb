@@ -151,3 +151,13 @@ describe('chat skills', () => {
     ['inspectChatMcpServer', (c) => c.inspectChatMcpServer({ url: 'https://w/mcp' }), '/v1/chat/mcp/inspect', POST, { url: 'https://w/mcp' }],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });
+
+describe('chat conversation log (#406)', () => {
+  test.each([
+    ['chatLog without filters', (c) => c.chatLog(), '/v1/chat/log', GET],
+    ['chatLog leaves out empty filters', (c) => c.chatLog({ scenario: 'a b', rating: 'down', outcome: '', from: null, to: undefined, limit: 50 }),
+      '/v1/chat/log?scenario=a+b&rating=down&limit=50', GET],
+    ['chatGaps', (c) => c.chatGaps({ minCount: 2, threshold: 0.4 }), '/v1/chat/gaps?minCount=2&threshold=0.4', GET],
+    ['chatGaps without filters', (c) => c.chatGaps(), '/v1/chat/gaps', GET],
+  ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
+});

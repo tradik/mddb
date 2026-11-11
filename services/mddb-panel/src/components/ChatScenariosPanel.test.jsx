@@ -14,6 +14,7 @@ vi.mock('../lib/mddb-client', () => ({
     listChatSkills: vi.fn(),
     listChatMcpSecrets: vi.fn(),
     putChatMcpSecret: vi.fn(),
+    chatLog: vi.fn(),
   },
 }));
 
@@ -129,6 +130,9 @@ describe('editing a stored scenario', () => {
     type('Max turns per session', '8');
     type('Token budget per session', '20000');
     type('Messages per minute', '10');
+    fireEvent.click(field('Log every turn of this scenario'));
+    type('Log retention (days)', '7');
+    fireEvent.click(field('Redact e-mails, tokens and card numbers'));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect((await screen.findByRole('status')).textContent).toBe('Saved support. The chat service picks it up on its next poll.');
@@ -145,6 +149,7 @@ describe('editing a stored scenario', () => {
       maxTurns: 8,
       tokenBudgetPerSession: 20000,
       rateLimit: { messagesPerMinute: 10 },
+      logging: { enabled: true, retentionDays: 7, redact: false },
     });
     expect(mddbClient.listChatScenarios).toHaveBeenCalledTimes(2);
   });
@@ -224,6 +229,14 @@ describe('the tabs and the skill list (#404)', () => {
     expect(await screen.findByRole('heading', { name: 'Chat skills' })).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'Scenarios' }));
     expect(await screen.findByRole('heading', { name: 'Chat scenarios' })).toBeTruthy();
+  });
+
+  test('the Log tab shows the conversation log (#406)', async () => {
+    vi.mocked(mddbClient.chatLog).mockResolvedValue({ turns: [] });
+    await renderWith();
+    fireEvent.click(screen.getByRole('tab', { name: 'Log' }));
+    expect(screen.getByRole('tabpanel').getAttribute('aria-labelledby')).toBe('chat-tab-log');
+    expect(await screen.findByText('No logged turns match.')).toBeTruthy();
   });
 
   test('a user who may not list skills keeps the scenario\'s names', async () => {

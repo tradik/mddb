@@ -51,7 +51,7 @@ export function parseExtraValue(text) {
 
 /** The form state of a scenario; of a new one when none is given. */
 export function toForm(scenario = {}) {
-  const { offTopic = {}, style = {}, llm = {}, rateLimit = {} } = scenario;
+  const { offTopic = {}, style = {}, llm = {}, rateLimit = {}, logging = {} } = scenario;
   return {
     name: scenario.name || '',
     description: scenario.description || '',
@@ -74,6 +74,10 @@ export function toForm(scenario = {}) {
     tokenBudgetPerSession: numberText(scenario.tokenBudgetPerSession),
     messagesPerMinute: numberText(rateLimit.messagesPerMinute),
     mcpServers: toMcpRows(scenario.mcpServers), // MCP-005, lib/chat-mcp.js
+    // #406: the turn log — off unless enabled, redaction on unless turned off.
+    loggingEnabled: logging.enabled ?? false,
+    logRetentionDays: numberText(logging.retentionDays),
+    logRedact: logging.redact ?? true,
   };
 }
 
@@ -109,6 +113,7 @@ export function fromForm(form) {
     maxTurns: wholeNumber(form.maxTurns),
     tokenBudgetPerSession: wholeNumber(form.tokenBudgetPerSession),
     rateLimit: { messagesPerMinute: wholeNumber(form.messagesPerMinute) },
+    logging: { enabled: form.loggingEnabled, retentionDays: wholeNumber(form.logRetentionDays), redact: form.logRedact },
   };
   // A scenario without servers is sent as before; the PUT replaces it whole.
   if (form.mcpServers.length > 0) scenario.mcpServers = fromMcpRows(form.mcpServers);
@@ -122,5 +127,7 @@ export function formProblem(form) {
   if (/[|/\s]/.test(name) || name === 'version') return 'The name may not contain spaces, "/" or "|", or be "version".';
   const temperature = Number(form.temperature);
   if (form.temperature !== '' && !(temperature >= 0 && temperature <= 2)) return 'Temperature must be between 0 and 2.';
+  const days = Number(form.logRetentionDays);
+  if (form.logRetentionDays !== '' && !(Number.isInteger(days) && days >= 0 && days <= 3650)) return 'Log retention must be 0 to 3650 days.';
   return mcpServerProblem(form.mcpServers);
 }

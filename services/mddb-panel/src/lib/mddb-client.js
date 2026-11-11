@@ -67,6 +67,16 @@ export function planningOptions({ explain, queryDecomposition, positive, negativ
   return out;
 }
 
+/** A query string of the set values of `params` ("" when none is set). */
+export function chatQuery(params) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+  });
+  const text = query.toString();
+  return text ? `?${text}` : '';
+}
+
 /** The file name a Content-Disposition header names, or null. */
 export function dispositionFilename(header) {
   const match = /filename="?([^";]+)"?/.exec(header || '');
@@ -1186,6 +1196,27 @@ class MDDBClient {
   /** A server's tools, `{ url, secretRef }` → `{ serverName, tools }`; 404 with `feature` while chatExternalMcp is off. */
   async inspectChatMcpServer(target) {
     return this.request('/chat/mcp/inspect', { method: 'POST', body: JSON.stringify(target) });
+  }
+
+  // ---- Chat conversation log (#406, 2.19.0+): global admin only ----
+
+  /**
+   * One page of logged chat turns, newest first: `{ turns, nextCursor }`.
+   * `params`: scenario, from, to (unix seconds, RFC 3339 or YYYY-MM-DD),
+   * rating (up, down, none, any), outcome, cursor, limit; empty ones are left out.
+   */
+  async chatLog(params = {}) {
+    return this.request(`/chat/log${chatQuery(params)}`, { method: 'GET' });
+  }
+
+  /** The log's turns selected by `params` as a file: `{ blob, filename }`, CSV or JSON. */
+  async chatLogExport(params = {}, format = 'csv') {
+    return this.requestBlob(`/chat/log/export${chatQuery({ ...params, format })}`);
+  }
+
+  /** Docs gaps — questions whose searches found little — grouped: `{ gaps, threshold }`. */
+  async chatGaps(params = {}) {
+    return this.request(`/chat/gaps${chatQuery(params)}`, { method: 'GET' });
   }
 
   // ---- Corpus packs (AGT-005, 2.18.10+) ----

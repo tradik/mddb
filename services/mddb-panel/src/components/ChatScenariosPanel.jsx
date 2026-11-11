@@ -9,13 +9,15 @@ import ChatScenarioPreview from './ChatScenarioPreview';
 import ChatSkillsPanel from './ChatSkillsPanel';
 import ChatTabs from './ChatTabs';
 import ChatMcpSecretsCard from './ChatMcpSecretsCard';
+import ChatLogPanel from './ChatLogPanel';
 
 // #403: chat scenarios — an assistant's prompt, guardrails, allowed
 // collections, style, model and limits — stored in MDDB and picked up by the
 // chat service without a restart. Everyone who may read a scenario's
 // collections sees it; saving and deleting need admin on "*".
 //
-// #404: the page has two tabs, the scenarios and the skills they attach.
+// #404: the page has tabs, the scenarios and the skills they attach;
+// #406 adds the conversation log.
 // MCP-005: a scenario's external MCP servers, and a card for their secrets.
 
 export default function ChatScenariosPanel() {
@@ -24,7 +26,9 @@ export default function ChatScenariosPanel() {
     <div className="h-full overflow-y-auto bg-gray-50 p-6">
       <ChatTabs tab={tab} onChange={setTab} />
       <div role="tabpanel" id={`chat-panel-${tab}`} aria-labelledby={`chat-tab-${tab}`}>
-        {tab === 'scenarios' ? <ScenariosView /> : <ChatSkillsPanel />}
+        {tab === 'scenarios' && <ScenariosView />}
+        {tab === 'skills' && <ChatSkillsPanel />}
+        {tab === 'log' && <ChatLogPanel />}
       </div>
     </div>
   );

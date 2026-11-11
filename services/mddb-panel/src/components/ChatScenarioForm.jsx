@@ -1,6 +1,7 @@
 import { inputClass, labelClass } from '../lib/chat-scenario';
 import ChatScenarioStyleFields from './ChatScenarioStyleFields';
 import ChatScenarioLlmFields from './ChatScenarioLlmFields';
+import ChatScenarioLoggingFields from './ChatScenarioLoggingFields';
 import ChatSkillPicker from './ChatSkillPicker';
 import ChatMcpServers from './ChatMcpServers';
 
@@ -106,6 +107,7 @@ export default function ChatScenarioForm({ form, set, collections, skills, secre
 
       <ChatScenarioStyleFields form={form} set={set} />
       <ChatScenarioLlmFields form={form} set={set} />
+      <ChatScenarioLoggingFields form={form} set={set} />
     </div>
   );
 }

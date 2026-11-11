@@ -17,6 +17,7 @@ const stored = {
   maxTurns: 12,
   tokenBudgetPerSession: 50000,
   rateLimit: { messagesPerMinute: 20 },
+  logging: { enabled: true, retentionDays: 14, redact: false },
   createdAt: '2026-11-10T12:00:00Z',
   updatedAt: '2026-11-10T12:00:00Z',
 };
@@ -29,6 +30,7 @@ describe('toForm', () => {
       emoji: 'off', verbosity: 'normal', markdown: true, citationTemplate: '',
       model: '', temperature: '', maxTokens: '', extraBody: [],
       maxTurns: '', tokenBudgetPerSession: '', messagesPerMinute: '', mcpServers: [],
+      loggingEnabled: false, logRetentionDays: '', logRedact: true,
     });
   });
 
@@ -38,6 +40,7 @@ describe('toForm', () => {
       name: 'support', enabled: false, offTopicMode: 'redirect', redirectTemplate: 'Ask me about MDDB.',
       skills: ['triage', 'refunds'], emoji: 'sparingly', verbosity: 'short', markdown: false,
       temperature: '0', maxTokens: '800', maxTurns: '12', tokenBudgetPerSession: '50000', messagesPerMinute: '20',
+      loggingEnabled: true, logRetentionDays: '14', logRedact: false,
     });
     expect(form.extraBody).toEqual([
       { key: 'reasoning_effort', value: 'low' },
@@ -60,6 +63,8 @@ describe('fromForm', () => {
     expect(body.skills).toEqual(['b', 'a']);
     expect(body.maxTurns).toBe(0);
     expect(fromForm(toForm()).llm).toEqual({ model: '', maxTokens: 0 });
+    // #406: a scenario without logging stays off, with redaction on.
+    expect(fromForm(toForm()).logging).toEqual({ enabled: false, retentionDays: 0, redact: true });
   });
 
   test('MCP servers (MCP-005) are sent only when there are some', () => {
@@ -94,6 +99,10 @@ describe('formProblem', () => {
     [{ name: 'ok', temperature: '-1' }, 'Temperature must be between 0 and 2.'],
     [{ name: 'ok', temperature: 'warm' }, 'Temperature must be between 0 and 2.'],
     [{ name: 'ok', temperature: '0' }, null],
+    [{ name: 'ok', logRetentionDays: '3651' }, 'Log retention must be 0 to 3650 days.'],
+    [{ name: 'ok', logRetentionDays: '1.5' }, 'Log retention must be 0 to 3650 days.'],
+    [{ name: 'ok', logRetentionDays: '-1' }, 'Log retention must be 0 to 3650 days.'],
+    [{ name: 'ok', logRetentionDays: '30' }, null],
     [{ name: 'ok' }, null],
   ])('%j → %j', (fields, problem) => {
     expect(formProblem({ ...toForm(), ...fields })).toBe(problem);

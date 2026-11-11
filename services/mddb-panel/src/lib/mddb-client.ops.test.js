@@ -162,6 +162,15 @@ describe('corpus packs and diagnose', () => {
     expect(req.body).toEqual({ collection: 'kb', license: 'MIT', version: '1', description: 'docs' });
   });
 
+  test('chatLogExport fetches the file with the filters and the format', async () => {
+    const fetchMock = stubFetch(new Response('time,question', { headers: { 'Content-Disposition': 'attachment; filename="chat-log.csv"' } }));
+    const out = await client.chatLogExport({ rating: 'down', scenario: '' });
+    expect(out.filename).toBe('chat-log.csv');
+    expect(lastRequest(fetchMock).url).toBe('/v1/chat/log/export?rating=down&format=csv');
+    stubFetch(new Response('[]'));
+    await client.chatLogExport(undefined, 'json');
+  });
+
   test('buildCorpus leaves out an empty version and description', async () => {
     const fetchMock = stubFetch(new Response('PACK'));
     const out = await client.buildCorpus({ collection: 'kb', license: 'MIT' });

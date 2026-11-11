@@ -66,12 +66,12 @@ describe('ChatTabs', () => {
     fireEvent.keyDown(scenarios, { key: 'ArrowRight' });
     expect(onChange).toHaveBeenLastCalledWith('skills');
     expect(document.activeElement).toBe(skills);
-    fireEvent.keyDown(scenarios, { key: 'ArrowLeft' }); // wraps round
-    expect(onChange).toHaveBeenLastCalledWith('skills');
+    fireEvent.keyDown(scenarios, { key: 'ArrowLeft' }); // wraps round to the last tab, Log (#406)
+    expect(onChange).toHaveBeenLastCalledWith('log');
     fireEvent.keyDown(skills, { key: 'Home' });
     expect(onChange).toHaveBeenLastCalledWith('scenarios');
     fireEvent.keyDown(skills, { key: 'End' });
-    expect(onChange).toHaveBeenLastCalledWith('skills');
+    expect(onChange).toHaveBeenLastCalledWith('log');
     onChange.mockClear();
     fireEvent.keyDown(skills, { key: 'Enter' });
     expect(onChange).not.toHaveBeenCalled();

@@ -181,6 +181,13 @@ const coverageFiles = [
   'src/components/ChatMcpToolList.jsx',
   'src/components/ChatMcpSecretsCard.jsx',
   'src/components/ChatMcpStates.jsx',
+  // 2.19.0: the conversation log, answer feedback and docs gaps (#406).
+  'src/lib/chat-log.js',
+  'src/components/ChatLogPanel.jsx',
+  'src/components/ChatLogFilters.jsx',
+  'src/components/ChatLogRow.jsx',
+  'src/components/ChatGaps.jsx',
+  'src/components/ChatScenarioLoggingFields.jsx',
 ];
 
 export default mergeConfig(

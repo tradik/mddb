@@ -1,12 +1,13 @@
 import { useRef } from 'react';
 
-// #404: the Chat page's tabs — scenarios and skills — as an ARIA tab list:
+// #404: the Chat page's tabs — scenarios, skills and (#406) the log — as an ARIA tab list:
 // the selected tab is the one in the tab order, the arrow keys, Home and End
 // move between tabs, and each tab names the panel it controls.
 
 const chatTabs = [
   { id: 'scenarios', label: 'Scenarios' },
   { id: 'skills', label: 'Skills' },
+  { id: 'log', label: 'Log' }, // #406
 ];
 
 export default function ChatTabs({ tab, onChange }) {
