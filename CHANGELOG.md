@@ -122,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/v1/bulk-ingest-jobs` answers `"jobs": []`** instead of `null` when there are none.
 - **`/v1/export` names the file** with `Content-Disposition: attachment; filename="<collection>.ndjson|.zip"`, exposed through CORS.
 - **`/v1/code-graph` with `direction=both` listed each edge twice** at depth above 1. Each edge is now listed once, with the direction found nearest the root (REST, gRPC, MCP).
+- **Release: the .rpm packages build on the Ubuntu 26.04 runners.** `ubuntu-latest` moved to 26.04, whose rpm builds a `-debuginfo` package by default and stops on its empty file list, because the Go binaries are built without symbols (`-s -w`). The release turns that package off.
 
 ### Documentation
 

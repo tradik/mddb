@@ -336,7 +336,10 @@ jobs:
           tar czf dist/rpm/SOURCES/mddbd-${VERSION_NUM}.tar.gz mddbd-${VERSION_NUM}
           
           # Build RPM
-          rpmbuild --define "_topdir $(pwd)/dist/rpm" -bb dist/rpm/SPECS/mddbd.spec
+          # The Go binaries are built with -s -w, so there is nothing for a
+          # -debuginfo package; newer runner images build one by default and
+          # fail on its empty file list ("Empty %files file debugfiles.list").
+          rpmbuild --define "_topdir $(pwd)/dist/rpm" --define "debug_package %{nil}" -bb dist/rpm/SPECS/mddbd.spec
           
           # Copy RPM to dist
           find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddbd-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
@@ -574,7 +577,10 @@ jobs:
           tar czf dist/rpm/SOURCES/mddb-cli-${VERSION_NUM}.tar.gz mddb-cli-${VERSION_NUM}
           
           # Build RPM
-          rpmbuild --define "_topdir $(pwd)/dist/rpm" -bb dist/rpm/SPECS/mddb-cli.spec
+          # The Go binaries are built with -s -w, so there is nothing for a
+          # -debuginfo package; newer runner images build one by default and
+          # fail on its empty file list ("Empty %files file debugfiles.list").
+          rpmbuild --define "_topdir $(pwd)/dist/rpm" --define "debug_package %{nil}" -bb dist/rpm/SPECS/mddb-cli.spec
           
           # Copy RPM to dist
           find dist/rpm/RPMS -name "*.rpm" -exec cp {} dist/mddb-cli-${VERSION_NUM}-${{ matrix.platform }}.rpm \;
