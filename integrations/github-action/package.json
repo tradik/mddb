@@ -41,5 +41,11 @@
     "prettier": "^3.9.10",
     "ts-jest": "^29.4.15",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "minimatch@>=7.0.0 <11.0.1": "^11.0.1",
+    "@actions/glob": {
+      "minimatch": "^10.2.6"
+    }
   }
 }

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **minimatch 11.0.8 in the GitHub Action, the Grafana data source and the Chrome extension** (GHSA-g3hv-75wg-m249, denial of service through glob-part amplification; Dependabot alerts 170–172). An npm override lifts every copy in the vulnerable range. One copy stays on 10.x: `@actions/glob` 0.7.0, the newest release, calls `minimatch.matchOne`, which minimatch 11 removed. Its patterns come from the workflow that uses the action, not from outside input.
+- **Go:** `golang.org/x/crypto` 0.59.0, `x/sys` 0.50.0, `x/text` 0.44.0, `x/sync` 0.25.0 and `klauspost/compress` 1.20.4 in mddbd; `spf13/pflag` 1.1.0 and the Go client 2.19.1 in mddb-cli. govulncheck reports no reachable vulnerability.
+- **mddb-chat:** 122 crates raised to their newest compatible versions, among them `aws-lc-rs` 1.19.0 / `aws-lc-sys` 0.47.0 under rustls. `cargo audit` is clean.
+- **Images:** the panel and the chat widget build on `node:26.13-alpine3.24`.
+
+### Fixed
+
+- **An embedding configuration created in the panel no longer mixes two providers (#415).** The form opened as OpenAI with `text-embedding-3-small` and 1536 dimensions. Switching to Ollama filled in `http://localhost:11434` but kept the OpenAI model and dimensions, so the saved configuration sent every query to an Ollama server that does not have that model. Changing the provider now replaces the model, dimensions and API URL with the new provider's defaults, and keeps values the user typed. The Ollama URL field also says that `localhost` is wrong when mddbd runs in a container.
+- **`/v1/vector-stats`, the gRPC `VectorStats` and the MCP vector stats report the provider's name (#415).** `provider` repeated the model name, so the panel showed "Text-Embedding-3-Small" as the provider of a configuration that called Ollama. It is now `openai`, `ollama`, `cohere`, `voyage` or `lexical`. The startup log line had the same mistake. *Import Current Config* on the Embedding Models page used this field as the provider and was refused by the server; it works again.
+
 ## [2.19.1] - 2026-11-11
 
 2.19.0 was tagged, but its release run failed before anything but the panel image was published: no binaries, packages, server image, snaps, Homebrew formula or MCP Registry entry. 2.19.1 is the first published release of everything listed under 2.19.0, plus the fixes below. If you pulled `tradik/mddb-panel:2.19.0`, it is the same code as 2.19.1.
