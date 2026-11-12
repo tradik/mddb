@@ -119,7 +119,12 @@ pub async fn handle_message(
     // so, so a well-behaved model never asks for anything else.
     let tool_policy =
         tools::ToolPolicy::for_scenario(&scenario, state.config.mddb.result_max_chars).with_mcp(
-            external_tools(state, &scenario_name, &scenario, &mcp_states),
+            external_tools(
+                state,
+                (&scenario_name, &scenario),
+                &mcp_states,
+                stored.as_ref(),
+            ),
         );
     let tool_defs = tools::tool_definitions(&tool_policy);
     trace.offer_mcp(&tool_policy.mcp);
@@ -251,15 +256,18 @@ pub async fn handle_message(
 /// The external MCP tools of one turn (MCP-005): the ones mddbd reports
 /// active right now, offered only while mddb-chat's own reading of the `chat`
 /// and `chatExternalMcp` features is on, so a switch turned off in mddbd
-/// hides them at the next poll even if a preview says otherwise.
+/// hides them at the next poll even if a preview says otherwise. A signed
+/// session's verified `sub` goes to the servers that forward the user's
+/// identity (#414); an anonymous one is not offered their tools.
 fn external_tools(
     state: &AppState,
-    name: &str,
-    scenario: &ActiveScenario,
+    (name, scenario): (&str, &ActiveScenario),
     states: &[ChatMcpServerStateProto],
+    signed: Option<&ConversationRef>,
 ) -> McpToolset {
     let enabled = state.features.chat() && state.features.chat_external_mcp();
-    McpToolset::for_turn(name, states, &scenario.mcp.limits, enabled)
+    let sub = signed.map(|to| to.sub.as_str());
+    McpToolset::for_turn(name, states, &scenario.mcp.limits, enabled, sub)
 }
 
 /// The system prompt of one turn, and the state of its external MCP servers

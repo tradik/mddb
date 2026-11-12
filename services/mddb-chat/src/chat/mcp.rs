@@ -10,6 +10,11 @@
 //! mddbd does not store a tool's description or input schema, so each tool is
 //! declared with a generic description and a schema that takes any JSON
 //! object. The operator's prompt is where the model learns what to pass.
+//!
+//! A server that forwards the user's identity (#414) answers about the
+//! signed-in user's own data: its tools are offered only to a session with a
+//! verified join token, and each call carries that token's `sub` — never one
+//! the model or a tool argument names.
 
 pub mod call;
 
@@ -18,7 +23,7 @@ mod tests;
 
 use std::collections::BTreeMap;
 
-use tracing::warn;
+use tracing::{debug, warn};
 
 use crate::grpc::client::proto::{ChatMcpServerProto, ChatMcpServerStateProto};
 use crate::llm::provider::{ToolDef, ToolFunction};
@@ -88,6 +93,9 @@ pub struct McpTool {
     /// The tool's own name on its server.
     pub tool: String,
     pub limits: McpLimits,
+    /// The signed-in user mddbd forwards to the server (#414): the verified
+    /// join token's `sub`, set only for a server with `forwardIdentity`.
+    pub sub: Option<String>,
 }
 
 /// The external tools of one turn.
@@ -101,12 +109,15 @@ pub struct McpToolset {
 impl McpToolset {
     /// The tools mddbd reports `active` for an `active` server, or none while
     /// `enabled` — mddb-chat's own reading of the `chat` and
-    /// `chatExternalMcp` features — is off.
+    /// `chatExternalMcp` features — is off. `sub` is the session's verified
+    /// user (#414), `None` for an anonymous session, which is not offered
+    /// the tools of a server that forwards the user's identity.
     pub fn for_turn(
         scenario: &str,
         states: &[ChatMcpServerStateProto],
         limits: &BTreeMap<String, McpLimits>,
         enabled: bool,
+        sub: Option<&str>,
     ) -> Self {
         let mut set = Self {
             scenario: scenario.to_string(),
@@ -116,6 +127,14 @@ impl McpToolset {
             return set;
         }
         for server in states.iter().filter(|s| s.active) {
+            if server.forward_identity && sub.is_none() {
+                debug!(
+                    server = server.name,
+                    "external tools not offered: the server needs a signed-in user"
+                );
+                continue;
+            }
+            let sub = sub.filter(|_| server.forward_identity).map(str::to_string);
             let limits = limits.get(&server.name).copied().unwrap_or_default();
             for tool in server.tools.iter().filter(|t| t.active) {
                 set.add(McpTool {
@@ -123,6 +142,7 @@ impl McpToolset {
                     server: server.name.clone(),
                     tool: tool.name.clone(),
                     limits,
+                    sub: sub.clone(),
                 });
             }
         }

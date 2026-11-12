@@ -190,6 +190,19 @@ never sees a secret and never contacts a server itself.
   `chat` or `chatExternalMcp` feature is off. A scenario without
   `mcpServers`, a TOML scenario, and an mddbd older than 2.19.0 offer exactly
   the two built-in tools.
+- **Signed-in users only** (2.19.2, #414). A server with `forwardIdentity`
+  (its state says `forwardIdentity: true`) answers about the user's own
+  account, so its tools are offered only to a session opened with a verified
+  join token. An anonymous session never sees them, and a call it makes by
+  name anyway is refused locally like any tool the turn did not offer. A
+  signed session's call carries `sub` from that join token — never from the
+  model, the tool arguments or the browser; an argument named `sub` is passed
+  to the server as an argument and changes nothing. mddbd then signs a
+  short-lived identity token for that user and sends it to the server next to
+  its credential ([The MCP identity token](../../docs/API.md#the-mcp-identity-token-mddbd--mcp-server)).
+  Servers without `forwardIdentity` get no `sub` and are offered to every
+  session as before. A forwarded call is logged at info with `sub`, scenario,
+  server and tool, never the arguments.
 - **Names.** A tool is offered as `mcp__<server>__<tool>`, every character
   outside `[A-Za-z0-9_-]` replaced with `_` and cut at 64 characters (what
   OpenAI and Anthropic accept). No built-in tool starts with `mcp__`. When two
@@ -200,7 +213,8 @@ never sees a secret and never contacts a server itself.
   parameters that accept any JSON object. Say in the operator prompt what a
   tool is for and what to pass to it.
 - **Calls.** Through mddbd only: `CallChatMcpTool {scenario, server, tool,
-  arguments_json}` with the service account's token, and a deadline of the
+  arguments_json, sub}` with the service account's token (`sub` only for a
+  `forwardIdentity` server), and a deadline of the
   server's `timeoutMs` plus two seconds (mddbd enforces `timeoutMs` itself).
   A name the turn did not offer is refused locally with `Error: the tool '<name>'
   is not available in this scenario.`; arguments that are not a JSON object

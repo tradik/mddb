@@ -66,6 +66,7 @@ fn tool(result_max_chars: usize) -> McpTool {
             timeout_ms: 1500,
             result_max_chars,
         },
+        sub: None,
     }
 }
 
@@ -100,6 +101,30 @@ async fn a_call_goes_to_mddbd_by_real_name_and_comes_back_framed() {
         Duration::from_millis(3500),
         "timeout plus margin"
     );
+    assert_eq!(request.sub, "", "no identity for a server without it");
+}
+
+/// #414: the session's `sub` goes to mddbd beside the arguments; an argument
+/// named `sub` is the server's business and changes nothing.
+#[tokio::test]
+async fn the_sessions_sub_is_forwarded_and_an_argument_cannot_replace_it() {
+    let mut mddbd = answering("Order 7 shipped.", false, false);
+    let signed = McpTool {
+        sub: Some("user-42".into()),
+        ..tool(100)
+    };
+
+    execute(
+        &mut mddbd,
+        &call(r#"{"id":7,"sub":"someone-else"}"#),
+        &signed,
+        "support",
+    )
+    .await;
+
+    let (request, _) = &mddbd.asked[0];
+    assert_eq!(request.sub, "user-42");
+    assert_eq!(request.arguments_json, r#"{"id":7,"sub":"someone-else"}"#);
 }
 
 #[tokio::test]

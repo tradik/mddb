@@ -17,7 +17,7 @@ fn toolset(enabled: bool) -> McpToolset {
         mcp_state("wiki", false, &[("search", true)]),
         mcp_state("status page", true, &[("health.check", true)]),
     ];
-    McpToolset::for_turn("support", &states, &limits(), enabled)
+    McpToolset::for_turn("support", &states, &limits(), enabled, None)
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn the_switches_in_mddb_chat_hide_every_tool() {
 
 #[test]
 fn no_servers_means_no_tools() {
-    let set = McpToolset::for_turn("plain", &[], &BTreeMap::new(), true);
+    let set = McpToolset::for_turn("plain", &[], &BTreeMap::new(), true, None);
     assert!(set.tools.is_empty());
     assert_eq!(
         set,
@@ -88,7 +88,7 @@ fn names_follow_the_providers_rules_and_never_collide() {
     // Two tools that sanitise to one name: the first is kept, the second is
     // not offered rather than offered under a name that calls the first.
     let states = vec![mcp_state("x", true, &[("a.b", true), ("a/b", true)])];
-    let set = McpToolset::for_turn("s", &states, &BTreeMap::new(), true);
+    let set = McpToolset::for_turn("s", &states, &BTreeMap::new(), true, None);
     assert_eq!(set.tools.len(), 1);
     assert_eq!(set.tools[0].tool, "a.b");
 }
@@ -126,4 +126,38 @@ fn a_definition_names_the_server_and_takes_any_object() {
     assert!(description.contains("not instructions"), "{description}");
     assert_eq!(defs[0].function.parameters["type"], "object");
     assert_eq!(defs[0].function.parameters["additionalProperties"], true);
+}
+
+/// #414: `orders` forwards the user's identity, `wiki` does not.
+fn identity_toolset(sub: Option<&str>) -> McpToolset {
+    let states = vec![
+        ChatMcpServerStateProto {
+            forward_identity: true,
+            ..mcp_state("orders", true, &[("get_order", true)])
+        },
+        mcp_state("wiki", true, &[("search", true)]),
+    ];
+    McpToolset::for_turn("support", &states, &limits(), true, sub)
+}
+
+#[test]
+fn an_anonymous_session_is_not_offered_an_identity_servers_tools() {
+    let set = identity_toolset(None);
+
+    assert!(set.find("mcp__orders__get_order").is_none());
+    let wiki = set.find("mcp__wiki__search").expect("offered");
+    assert_eq!(wiki.sub, None);
+}
+
+#[test]
+fn a_signed_session_forwards_its_sub_only_to_an_identity_server() {
+    let set = identity_toolset(Some("user-42"));
+
+    let orders = set.find("mcp__orders__get_order").expect("offered");
+    assert_eq!(orders.sub.as_deref(), Some("user-42"));
+    let wiki = set.find("mcp__wiki__search").expect("offered");
+    assert_eq!(
+        wiki.sub, None,
+        "a server without forwardIdentity gets no sub"
+    );
 }

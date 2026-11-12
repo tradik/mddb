@@ -81,7 +81,7 @@ func (g *GRPCServer) InspectChatMcpServer(ctx context.Context, req *proto.Inspec
 
 // CallChatMcpTool calls an allowed tool, as POST /v1/chat/mcp/call.
 func (g *GRPCServer) CallChatMcpTool(ctx context.Context, req *proto.CallChatMcpToolRequest) (*proto.CallChatMcpToolResponse, error) {
-	call := &chatMcpCallRequest{Scenario: req.GetScenario(), Server: req.GetServer(), Tool: req.GetTool()}
+	call := &chatMcpCallRequest{Scenario: req.GetScenario(), Server: req.GetServer(), Tool: req.GetTool(), Sub: req.GetSub()}
 	if raw := req.GetArgumentsJson(); raw != "" {
 		if err := json.Unmarshal([]byte(raw), &call.Arguments); err != nil {
 			return nil, status.Error(codes.InvalidArgument, "arguments_json must be a JSON object: "+err.Error())
@@ -118,8 +118,12 @@ func chatMcpGRPCError(err error) error {
 func chatMcpServersToProto(servers []ChatMcpServer) []*proto.ChatMcpServerProto {
 	out := make([]*proto.ChatMcpServerProto, 0, len(servers))
 	for _, m := range servers {
-		out = append(out, &proto.ChatMcpServerProto{Name: m.Name, Url: m.URL, Enabled: m.Enabled, SecretRef: m.SecretRef,
-			AllowedTools: m.AllowedTools, TimeoutMs: safeInt32(m.TimeoutMs), ResultMaxChars: safeInt32(m.ResultMaxChars)})
+		p := &proto.ChatMcpServerProto{Name: m.Name, Url: m.URL, Enabled: m.Enabled, SecretRef: m.SecretRef,
+			AllowedTools: m.AllowedTools, TimeoutMs: safeInt32(m.TimeoutMs), ResultMaxChars: safeInt32(m.ResultMaxChars)}
+		if f := m.ForwardIdentity; f != nil {
+			p.ForwardIdentity = &proto.ChatMcpForwardIdentityProto{SecretRef: f.SecretRef, Header: f.Header, TtlSeconds: safeInt32(f.TTLSeconds)}
+		}
+		out = append(out, p)
 	}
 	return out
 }
@@ -127,8 +131,12 @@ func chatMcpServersToProto(servers []ChatMcpServer) []*proto.ChatMcpServerProto 
 func chatMcpServersFromProto(servers []*proto.ChatMcpServerProto) []ChatMcpServer {
 	var out []ChatMcpServer
 	for _, p := range servers {
-		out = append(out, ChatMcpServer{Name: p.GetName(), URL: p.GetUrl(), Enabled: p.GetEnabled(), SecretRef: p.GetSecretRef(),
-			AllowedTools: p.GetAllowedTools(), TimeoutMs: int(p.GetTimeoutMs()), ResultMaxChars: int(p.GetResultMaxChars())})
+		m := ChatMcpServer{Name: p.GetName(), URL: p.GetUrl(), Enabled: p.GetEnabled(), SecretRef: p.GetSecretRef(),
+			AllowedTools: p.GetAllowedTools(), TimeoutMs: int(p.GetTimeoutMs()), ResultMaxChars: int(p.GetResultMaxChars())}
+		if f := p.GetForwardIdentity(); f != nil {
+			m.ForwardIdentity = &ChatMcpForwardIdentity{SecretRef: f.GetSecretRef(), Header: f.GetHeader(), TTLSeconds: int(f.GetTtlSeconds())}
+		}
+		out = append(out, m)
 	}
 	return out
 }
@@ -137,7 +145,8 @@ func chatMcpServersFromProto(servers []*proto.ChatMcpServerProto) []ChatMcpServe
 func chatMcpStatesToProto(states []chatMcpServerState) []*proto.ChatMcpServerStateProto {
 	out := make([]*proto.ChatMcpServerStateProto, 0, len(states))
 	for _, st := range states {
-		p := &proto.ChatMcpServerStateProto{Name: st.Name, Url: st.URL, Enabled: st.Enabled, Active: st.Active, Reason: st.Reason}
+		p := &proto.ChatMcpServerStateProto{Name: st.Name, Url: st.URL, Enabled: st.Enabled, Active: st.Active, Reason: st.Reason,
+			ForwardIdentity: st.ForwardIdentity}
 		for _, t := range st.Tools {
 			p.Tools = append(p.Tools, &proto.ChatMcpToolStateProto{Name: t.Name, Active: t.Active, Reason: t.Reason})
 		}

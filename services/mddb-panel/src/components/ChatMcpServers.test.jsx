@@ -37,7 +37,7 @@ describe('servers', () => {
     fireEvent.change(screen.getByLabelText('Credential'), { target: { value: 'wiki-token' } });
     fireEvent.change(screen.getByLabelText('Timeout, ms'), { target: { value: '500' } });
     fireEvent.change(screen.getByLabelText('Result limit, chars'), { target: { value: '900' } });
-    fireEvent.click(screen.getByRole('switch'));
+    fireEvent.click(screen.getByRole('switch', { name: 'Server enabled' }));
     expect(spy.mock.lastCall[0][0]).toMatchObject({ name: 'wiki', url: 'https://w/mcp', secretRef: 'wiki-token', timeoutMs: '500',
       resultMaxChars: '900', enabled: false });
     fireEvent.click(screen.getByRole('button', { name: 'Remove server wiki' }));

@@ -4,9 +4,10 @@ import mddbClient from '../lib/mddb-client';
 import { inputClass, labelClass } from '../lib/chat-scenario';
 import { isFeatureOff, mcpFeature } from '../lib/chat-mcp';
 import ChatMcpToolList from './ChatMcpToolList';
+import ChatMcpIdentity from './ChatMcpIdentity';
 
 // MCP-005: one external MCP server of a scenario — its name, https URL,
-// credential, switches and limits — and "Test connection", which asks mddbd
+// credential, switches, limits and identity forwarding (#414) — and "Test connection", which asks mddbd
 // to inspect the server and lists its tools to allow.
 
 export default function ChatMcpServerRow({ index, row, set, remove, secrets, scenarioEnabled }) {
@@ -79,6 +80,7 @@ export default function ChatMcpServerRow({ index, row, set, remove, secrets, sce
           <X className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
+      <ChatMcpIdentity id={id} row={row} set={set} secretNames={(secrets || []).map((s) => s.name)} />
       {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{error}</p>}
       {inspected && (
         <p className="text-xs text-gray-700">

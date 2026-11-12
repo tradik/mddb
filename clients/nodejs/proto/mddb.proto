@@ -2423,6 +2423,17 @@ message ChatMcpServerProto {
   repeated string allowed_tools = 5;             // read-only tools only
   int32 timeout_ms = 6;                          // 0: 8000
   int32 result_max_chars = 7;                    // 0: 4000
+  ChatMcpForwardIdentityProto forward_identity = 8; // (v2.19.2+, #414) absent: no identity is forwarded
+}
+
+// (v2.19.2+, #414) Forward the signed-in user's identity to an MCP server: a
+// short-lived token signed by mddbd with a separate sealed secret, sent in
+// a header next to the server's own credential (docs/API.md, "The MCP
+// identity token").
+message ChatMcpForwardIdentityProto {
+  string secret_ref = 1;                         // the signing key's secret, >= 32 bytes, never the server's secret_ref
+  string header = 2;                             // empty: X-MDDB-Chat-Identity
+  int32 ttl_seconds = 3;                         // 0: 120; at most 300
 }
 
 // Whether the model sees a server's tools, and the first switch that hides them.
@@ -2433,6 +2444,7 @@ message ChatMcpServerStateProto {
   bool active = 4;
   string reason = 5;                             // e.g. "feature chatExternalMcp is off"
   repeated ChatMcpToolStateProto tools = 6;
+  bool forward_identity = 7;                     // (v2.19.2+, #414) only signed-in sessions are offered its tools
 }
 
 message ChatMcpToolStateProto {
@@ -2698,6 +2710,7 @@ message CallChatMcpToolRequest {
   string server = 2;
   string tool = 3;
   string arguments_json = 4;                     // a JSON object; empty: {}
+  string sub = 5;                                // (v2.19.2+, #414) the verified join token's user; required by a forward_identity server
 }
 
 message CallChatMcpToolResponse {

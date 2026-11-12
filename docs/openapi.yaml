@@ -6541,6 +6541,12 @@ paths:
         credential and calls the tool. A timeout or an upstream failure is
         200 with isError and a short content. Needs read permission on every
         collection the scenario allows.
+
+        (v2.19.2, #414) A server with forwardIdentity also needs `sub` —
+        the verified join token's user — and write permission on the chat
+        collection; without `sub` the call is 403 and nothing is sent. Every
+        request to the server then carries a fresh MCP identity token
+        (docs/API.md, "The MCP identity token"). Other servers ignore `sub`.
       operationId: callChatMcpTool
       requestBody:
         required: true
@@ -6559,6 +6565,10 @@ paths:
                 arguments:
                   type: object
                   additionalProperties: true
+                sub:
+                  type: string
+                  maxLength: 256
+                  description: (v2.19.2, #414) The signed-in user a forwardIdentity server is called for.
       responses:
         "200":
           description: The tool's result, cut to the server's resultMaxChars
@@ -12729,6 +12739,29 @@ components:
           minimum: 100
           maximum: 100000
           default: 4000
+        forwardIdentity:
+          $ref: "#/components/schemas/ChatMcpForwardIdentity"
+
+    ChatMcpForwardIdentity:
+      type: object
+      description: |
+        (v2.19.2, #414) Send the signed-in chat user's identity to the server
+        as a short-lived token signed with a separate secret, next to its
+        credential. Only signed-in chat sessions are offered the server's
+        tools. Off when absent.
+      required: [secretRef]
+      properties:
+        secretRef:
+          type: string
+          description: A chat MCP secret of at least 32 bytes, not the server's secretRef.
+        header:
+          type: string
+          default: X-MDDB-Chat-Identity
+        ttlSeconds:
+          type: integer
+          minimum: 10
+          maximum: 300
+          default: 120
 
     ChatMcpServerState:
       type: object
@@ -12745,6 +12778,9 @@ components:
         reason:
           type: string
           example: feature chatExternalMcp is off
+        forwardIdentity:
+          type: boolean
+          description: (v2.19.2, #414) Its tools are offered to signed-in sessions only.
         tools:
           type: array
           items:

@@ -24,6 +24,8 @@ type mcpFixture struct {
 	calls    atomic.Int32 // tools/call requests
 	searchRO atomic.Bool  // "search" is read-only; false turns it into a writer
 	failList atomic.Bool  // tools/list answers with an error
+	// seen, when set, sees every request first (#414).
+	seen atomic.Pointer[func(r *http.Request)]
 }
 
 var mcpFixtureTrue, mcpFixtureFalse = true, false
@@ -84,6 +86,9 @@ func (f *mcpFixture) authorized(r *http.Request) bool {
 }
 
 func (f *mcpFixture) serve(w http.ResponseWriter, r *http.Request) {
+	if seen := f.seen.Load(); seen != nil {
+		(*seen)(r)
+	}
 	if !f.authorized(r) {
 		http.Error(w, "who are you", http.StatusUnauthorized)
 		return

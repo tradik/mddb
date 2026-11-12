@@ -30,6 +30,9 @@ type chatMcpCallRequest struct {
 	Server    string         `json:"server"`
 	Tool      string         `json:"tool"`
 	Arguments map[string]any `json:"arguments"`
+	// Sub is the signed-in user a forwardIdentity server is called for
+	// (#414): mddb-chat's verified join token, never the model's arguments.
+	Sub string `json:"sub,omitempty"`
 }
 
 // chatMcpCallResult is the tool's answer, cut to the server's resultMaxChars.
@@ -83,6 +86,9 @@ func (s *Server) CallChatMcpTool(ctx context.Context, req *chatMcpCallRequest) (
 	if err != nil {
 		return nil, err
 	}
+	if err := s.admitChatMcpIdentity(ctx, m, req); err != nil {
+		return nil, err
+	}
 	start := time.Now()
 	timeout := time.Duration(m.TimeoutMs) * time.Millisecond
 	callCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -103,9 +109,15 @@ func (s *Server) CallChatMcpTool(ctx context.Context, req *chatMcpCallRequest) (
 }
 
 // callChatMcp opens a session, checks the tool is still read-only in the
-// server's own list, and calls it.
+// server's own list, and calls it — every request carrying the user's
+// identity when the server forwards it (#414).
 func (s *Server) callChatMcp(ctx context.Context, m *ChatMcpServer, req *chatMcpCallRequest) (string, bool, error) {
-	c, _, err := s.connectChatMcp(ctx, m.URL, m.SecretRef, time.Duration(m.TimeoutMs)*time.Millisecond)
+	identity, token, err := s.chatMcpIdentityHeader(m, req)
+	if err != nil {
+		return "", false, err
+	}
+	c, _, err := s.connectChatMcp(ctx, m.URL, m.SecretRef, chatMcpExtraAuth{header: identity, secret: token},
+		time.Duration(m.TimeoutMs)*time.Millisecond)
 	if err != nil {
 		return "", false, err
 	}

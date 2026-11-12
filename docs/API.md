@@ -2071,7 +2071,7 @@ The security model is in [chat.md](chat.md#external-knowledge-over-mcp-2190).
 | `PUT` | `/v1/chat/mcp-secrets/{name}` | `{"value":"…","header":"X-Api-Key"}`; `201` when new, `200` when replaced; the answer has no value; `409` `{"error":"…set MDDB_ENCRYPTION_KEY and restart mddbd","requires":"MDDB_ENCRYPTION_KEY"}` without an at-rest key (admin) |
 | `DELETE` | `/v1/chat/mcp-secrets/{name}` | `{"deleted":true,"version":N}`; `409` with `usedBy` while a scenario names it (admin) |
 | `POST` | `/v1/chat/mcp/inspect` | `{"url","secretRef"}` → `{url, serverName, serverVersion, protocolVersion, tools:[{name, title, description, annotations, allowable, reason}]}` (admin) |
-| `POST` | `/v1/chat/mcp/call` | `{"scenario","server","tool","arguments"}` → `{scenario, server, tool, content, isError, truncated, durationMs}` (read on the scenario) |
+| `POST` | `/v1/chat/mcp/call` | `{"scenario","server","tool","arguments","sub"}` → `{scenario, server, tool, content, isError, truncated, durationMs}` (read on the scenario; a `forwardIdentity` server also needs write on the chat collection) |
 
 ```bash
 # A credential: a bearer token, or a header value when header is given.
@@ -2094,6 +2094,10 @@ curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{"enabled":true
 | `allowedTools` | up to 64 tool names; each must be read-only on the server | none |
 | `timeoutMs` | 100 to 60000 | 8000 |
 | `resultMaxChars` | 100 to 100000; a longer result is cut and marked `truncated` | 4000 |
+| `forwardIdentity` | (v2.19.2, #414) `{"secretRef","header","ttlSeconds"}`: send the signed-in user's identity, see [The MCP identity token](#the-mcp-identity-token-mddbd--mcp-server) | off |
+| `forwardIdentity.secretRef` | a stored secret of at least 32 bytes, never the server's own `secretRef` | — |
+| `forwardIdentity.header` | the header the token is sent in; not `Authorization` or a header the client sets | `X-MDDB-Chat-Identity` |
+| `forwardIdentity.ttlSeconds` | 10 to 300 | 120 |
 
 - **Switches.** A tool reaches the model only when every level is on: the
   `chat` feature, the scenario's `enabled`, the `chatExternalMcp` feature
@@ -2117,6 +2121,21 @@ curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{"enabled":true
   not allowed is `403`; an unknown scenario or server `404`. A timeout, a
   refused connection or the tool's own error is `200` with `isError: true`
   and a short `content`, so the chat turn goes on.
+- **Identity** (v2.19.2, #414). A server with `forwardIdentity` answers about
+  the signed-in user's own data. A call to it must carry `sub` — mddb-chat
+  sends the verified join token's — or it is refused (`403`, gRPC
+  `FAILED_PRECONDITION`) before anything is sent; the caller also needs
+  write on the chat collection, as storing a user's conversation does, so a
+  reader of the scenario cannot name another user. Every request of the call
+  (`initialize`, `tools/list`, `tools/call`) carries the server's credential
+  **and** a fresh [identity token](#the-mcp-identity-token-mddbd--mcp-server).
+  Checking a scenario on save and inspect carry no identity: the host should
+  answer `tools/list` to the credential alone. A server without
+  `forwardIdentity` gets no new header, and a `sub` sent for it is ignored.
+  mddbd logs `sub`, scenario, server and tool of each forwarded call, never
+  the token, the key or the arguments. The prompt's server state has
+  `forwardIdentity: true`; mddb-chat offers such a server's tools only to a
+  signed-in session.
 - **Transport.** `https` only, through the server's SSRF guard (private and
   loopback addresses are refused unless `MDDB_OUTBOUND_ALLOW_PRIVATE=true`;
   a redirect may not leave https), the session's `Mcp-Session-Id` sent back,
@@ -2129,7 +2148,8 @@ curl -X PUT http://localhost:11023/v1/chat/scenarios/support -d '{"enabled":true
   stored value that is not sealed is refused when used (inspect `409`, a
   call `isError: true`) and listed with `set: false`; set it again. A
   secret's value never appears in a log or an error; one quoted back by a
-  server is replaced with `[redacted]`.
+  server is replaced with `[redacted]`, as is an identity token. A secret
+  named as a credential or as an identity key is in `usedBy`.
 - **Other surfaces.** gRPC `ListChatMcpSecrets`, `PutChatMcpSecret`,
   `DeleteChatMcpSecret`, `InspectChatMcpServer`, `CallChatMcpTool`
   ([GRPC.md](GRPC.md)) and the MCP tools `chat_mcp_secret_list`,
@@ -3863,6 +3883,78 @@ function joinToken(secret, sub, scenario, name, ttlSeconds = 300) {
   const body = "v1." + b64(JSON.stringify({ sub, name, scenario, exp: Math.floor(Date.now() / 1000) + ttlSeconds }));
   return body + "." + createHmac("sha256", secret).update(body).digest("base64url");
 }
+```
+
+#### The MCP identity token (mddbd → MCP server)
+
+(v2.19.2, #414) What an external MCP server with
+[`forwardIdentity`](#external-mcp-servers-v1chatmcp) receives on every
+request of a chat user's call, in `X-MDDB-Chat-Identity` (or the configured
+header), next to its own credential. The shape is the join token's, so a host
+can reuse its verifier, with an audience a join token never carries:
+
+```text
+token   = "v1." + payloadB64 + "." + signatureB64
+payload = {"aud":"mcp","sub":"<sub>","scenario":"<scenario>","server":"<server name>","iat":<unix>,"exp":<unix>}
+payloadB64   = base64url(UTF-8 JSON of payload), no padding
+signatureB64 = base64url(HMAC-SHA256(identityKey, "v1." + payloadB64)), no padding
+```
+
+| Claim | Meaning |
+|---|---|
+| `aud` | Always `"mcp"`. Require it: a join token has no `aud`, so it can never pass as an identity token |
+| `sub` | The user's id at the host, exactly as in the join token that opened the session |
+| `scenario`, `server` | Where the call came from: log it, or restrict a key to one server |
+| `iat`, `exp` | Issue and expiry time, Unix seconds; `exp - iat` is `ttlSeconds` (default 120, at most 300) |
+
+Verification, in this order: three dot-separated parts and the first is `v1`;
+the signature equals HMAC-SHA256 over the ASCII bytes of `"v1." + payloadB64`
+with the identity key, compared in constant time; only then the payload is
+decoded; `aud == "mcp"`; `exp` is in the future and at most 300 seconds away;
+`sub` is present. Check the server's static credential as well: the token says
+*on behalf of whom*, the credential says *that this is the chat service*.
+
+- **The key never travels.** mddbd sends the HMAC, not the key, which is a
+  sealed MCP secret of its own (at least 32 bytes, write-only), never the
+  server's credential and never the join-token secret. A leaked request
+  shows one user's identity until `exp`, not the means to mint one.
+- **Identity from the session only.** `sub` comes from the verified join
+  token; the model and the tool arguments cannot name another user. An
+  anonymous session is never offered the server's tools.
+- **Nothing is granted by the token.** The host decides what an identified
+  chat caller may do (read-only tools, say). There is no `jti` yet: the short
+  lifetime, the required credential and TLS are the controls against replay.
+
+Test vector — identity key `0123456789abcdef0123456789abcdef`, payload
+`{"aud":"mcp","sub":"user-42","scenario":"support","server":"account","iat":1767225600,"exp":1767225720}`:
+
+```text
+v1.eyJhdWQiOiJtY3AiLCJzdWIiOiJ1c2VyLTQyIiwic2NlbmFyaW8iOiJzdXBwb3J0Iiwic2VydmVyIjoiYWNjb3VudCIsImlhdCI6MTc2NzIyNTYwMCwiZXhwIjoxNzY3MjI1NzIwfQ.hlY9TBl5ZxNybqBHuIRuWJI5jDKgH6N0GDHDj6fGaog
+```
+
+```python
+# Host side (Python): verify an identity token.
+import base64, hashlib, hmac, json, time
+
+def b64d(s):
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+def verify_identity(token, key, now=None):
+    now = int(time.time()) if now is None else now
+    parts = token.split(".")
+    if len(parts) != 3 or parts[0] != "v1":
+        raise ValueError("not a v1 token")
+    mac = hmac.new(key, (parts[0] + "." + parts[1]).encode(), hashlib.sha256).digest()
+    if not hmac.compare_digest(mac, b64d(parts[2])):
+        raise ValueError("bad signature")
+    claims = json.loads(b64d(parts[1]))
+    if claims.get("aud") != "mcp":
+        raise ValueError("not an identity token")
+    if not now < claims["exp"] <= now + 300:
+        raise ValueError("expired or too far ahead")
+    if not claims.get("sub"):
+        raise ValueError("no sub")
+    return claims
 ```
 
 ---

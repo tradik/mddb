@@ -86,10 +86,20 @@ type chatMcpInspection struct {
 	Tools           []chatMcpToolView `json:"tools"`
 }
 
+// chatMcpExtraAuth is a header sent next to a server's credential — the
+// user's identity token (#414) — and its value, kept out of errors. The zero
+// value adds nothing.
+type chatMcpExtraAuth struct {
+	header http.Header
+	secret string
+}
+
 // connectChatMcp opens a session with a server, its credential read from
-// secretRef. The URL was checked by the caller (a scenario's when it was
-// saved); the SSRF guard applies to every request regardless.
-func (s *Server) connectChatMcp(ctx context.Context, rawURL, secretRef string, timeout time.Duration) (*mcpRemoteClient, *mcpRemoteServerInfo, error) {
+// secretRef, plus extra on every request. The URL was checked by the caller
+// (a scenario's when it was saved); the SSRF guard applies to every request
+// regardless.
+func (s *Server) connectChatMcp(ctx context.Context, rawURL, secretRef string, extra chatMcpExtraAuth,
+	timeout time.Duration) (*mcpRemoteClient, *mcpRemoteServerInfo, error) {
 	var auth http.Header
 	var secret string
 	if secretRef != "" {
@@ -98,7 +108,11 @@ func (s *Server) connectChatMcp(ctx context.Context, rawURL, secretRef string, t
 			return nil, nil, err
 		}
 	}
-	c := newMcpRemoteClient(rawURL, auth, secret, timeout)
+	auth, err := mergeChatMcpIdentity(auth, extra.header)
+	if err != nil {
+		return nil, nil, err
+	}
+	c := newMcpRemoteClient(rawURL, auth, timeout, secret, extra.secret)
 	info, err := c.initialize(ctx)
 	return c, info, err
 }
@@ -121,7 +135,7 @@ func (s *Server) InspectChatMcpServer(ctx context.Context, rawURL, secretRef str
 	if secretRef != "" && !s.ChatScenarios.HasMcpSecret(secretRef) {
 		return nil, fmt.Errorf("%w: %s", errChatMcpSecretNotFound, secretRef)
 	}
-	c, info, err := s.connectChatMcp(ctx, rawURL, secretRef, timeout)
+	c, info, err := s.connectChatMcp(ctx, rawURL, secretRef, chatMcpExtraAuth{}, timeout)
 	var tools []mcpRemoteTool
 	if err == nil {
 		tools, err = c.listTools(ctx)
@@ -139,7 +153,9 @@ func (s *Server) InspectChatMcpServer(ctx context.Context, rawURL, secretRef str
 }
 
 // checkChatMcpServers refuses a scenario whose servers name a missing
-// secret, or allow a tool the server does not offer read-only. With the
+// secret or identity key (#414), or allow a tool the server does not offer
+// read-only. Checking a server's tools carries no user's identity: a host
+// answers tools/list to the chat service's credential alone. With the
 // chatExternalMcp module off nothing is contacted: the servers are stored,
 // inactive. A server that cannot be reached refuses the save unless it is
 // disabled.
@@ -147,6 +163,9 @@ func (s *Server) checkChatMcpServers(ctx context.Context, sc *ChatScenario) erro
 	for i := range sc.McpServers {
 		if ref := sc.McpServers[i].SecretRef; ref != "" && !s.ChatScenarios.HasMcpSecret(ref) {
 			return fmt.Errorf("mcp server %s: secret %s does not exist", sc.McpServers[i].Name, ref)
+		}
+		if err := s.checkChatMcpIdentityKey(&sc.McpServers[i]); err != nil {
+			return err
 		}
 	}
 	if !s.featureEnabled(FeatureChatExternalMCP) {
@@ -186,7 +205,7 @@ func (s *Server) checkChatMcpServer(ctx context.Context, m *ChatMcpServer) error
 
 // chatMcpTools connects to a scenario's server and returns its tools by name.
 func (s *Server) chatMcpTools(ctx context.Context, m *ChatMcpServer, timeout time.Duration) (map[string]mcpRemoteTool, error) {
-	c, _, err := s.connectChatMcp(ctx, m.URL, m.SecretRef, timeout)
+	c, _, err := s.connectChatMcp(ctx, m.URL, m.SecretRef, chatMcpExtraAuth{}, timeout)
 	if err != nil {
 		return nil, err
 	}

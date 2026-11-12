@@ -9,7 +9,8 @@ describe('rows', () => {
   test('a stored server round-trips; defaults stay unset', () => {
     const stored = [{ name: 'wiki', url: 'https://w/mcp', enabled: true, secretRef: 'k', allowedTools: ['search'], timeoutMs: 500, resultMaxChars: 900 }];
     const rows = toMcpRows(stored);
-    expect(rows[0]).toEqual({ uid: expect.any(Number), name: 'wiki', url: 'https://w/mcp', enabled: true, secretRef: 'k', allowedTools: ['search'], timeoutMs: '500', resultMaxChars: '900' });
+    expect(rows[0]).toEqual({ uid: expect.any(Number), name: 'wiki', url: 'https://w/mcp', enabled: true, secretRef: 'k', allowedTools: ['search'], timeoutMs: '500', resultMaxChars: '900',
+      forwardIdentity: false, identitySecretRef: '', identityHeader: '', identityTtl: '' });
     expect(fromMcpRows(rows)).toEqual(stored);
     expect(toMcpRows([{}])[0]).toEqual({ ...newMcpServer(), uid: expect.any(Number), enabled: false });
     expect(newMcpServer().uid).not.toBe(newMcpServer().uid);

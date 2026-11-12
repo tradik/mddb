@@ -5,7 +5,7 @@
 use std::borrow::Cow;
 use std::time::Duration;
 
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use super::McpTool;
 use crate::chat::markdown::clip;
@@ -45,7 +45,18 @@ pub async fn execute<S: DocSearch>(
         server: tool.server.clone(),
         tool: tool.tool.clone(),
         arguments_json,
+        // #414: the session's verified user, never the model's arguments.
+        sub: tool.sub.clone().unwrap_or_default(),
     };
+    if let Some(sub) = &tool.sub {
+        info!(
+            sub,
+            scenario,
+            server = tool.server,
+            tool = tool.tool,
+            "external tool called with the user's identity"
+        );
+    }
     let deadline = Duration::from_millis(u64::from(tool.limits.timeout_ms)) + DEADLINE_MARGIN;
     match client.call_mcp_tool(request, deadline).await {
         Ok(answer) => {

@@ -188,6 +188,8 @@ const coverageFiles = [
   'src/components/ChatMcpToolList.jsx',
   'src/components/ChatMcpSecretsCard.jsx',
   'src/components/ChatMcpStates.jsx',
+  'src/lib/chat-mcp-identity.js', // #414
+  'src/components/ChatMcpIdentity.jsx',
   // 2.19.0: the conversation log, answer feedback and docs gaps (#406).
   'src/lib/chat-log.js',
   'src/components/ChatLogPanel.jsx',

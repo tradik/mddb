@@ -5,6 +5,7 @@
 mod external_tools;
 mod features;
 mod feedback;
+mod identity_tools;
 mod lifecycle;
 mod limits;
 mod message;

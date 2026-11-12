@@ -297,6 +297,7 @@ async fn an_external_tool_call_carries_the_token_and_the_answer_comes_back() {
         server: "orders".into(),
         tool: "get_order".into(),
         arguments_json: "{}".into(),
+        sub: String::new(),
     };
     let deadline = Duration::from_secs(3);
 

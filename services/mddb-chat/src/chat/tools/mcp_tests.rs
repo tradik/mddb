@@ -15,6 +15,7 @@ fn with_orders(enabled: bool) -> super::ToolPolicy {
         &states,
         &BTreeMap::new(),
         enabled,
+        None,
     ))
 }
 

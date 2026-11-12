@@ -22,6 +22,17 @@ var chatMcpServerSchema = map[string]interface{}{
 		"allowedTools":   map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}, "description": "Read-only tools of the server the assistant may call"},
 		"timeoutMs":      map[string]interface{}{"type": "integer", "description": "Default 8000"},
 		"resultMaxChars": map[string]interface{}{"type": "integer", "description": "Default 4000"},
+		"forwardIdentity": map[string]interface{}{
+			"type": "object",
+			"description": "Send the signed-in chat user's identity as a short-lived token signed with a separate secret (#414); " +
+				"only signed-in sessions are offered the server's tools. Off when left out",
+			"properties": map[string]interface{}{
+				"secretRef":  map[string]interface{}{"type": "string", "description": "The signing key's chat MCP secret, at least 32 bytes, not the server's secretRef"},
+				"header":     map[string]interface{}{"type": "string", "description": "Default X-MDDB-Chat-Identity"},
+				"ttlSeconds": map[string]interface{}{"type": "integer", "description": "Token lifetime, 10 to 300; default 120"},
+			},
+			"required": []string{"secretRef"},
+		},
 	},
 	"required": []string{"name", "url"},
 }

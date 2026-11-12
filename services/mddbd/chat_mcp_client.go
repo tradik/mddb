@@ -44,16 +44,17 @@ var chatMcpHTTPClient = func(timeout time.Duration) *http.Client {
 type mcpRemoteClient struct {
 	endpoint string
 	auth     http.Header // the credential, when the server needs one
-	secret   string      // its value, replaced in errors
+	secrets  []string    // its values, replaced in errors
 	http     *http.Client
 	session  string
 	protocol string
 	nextID   int
 }
 
-// newMcpRemoteClient builds a client; auth may be nil.
-func newMcpRemoteClient(endpoint string, auth http.Header, secret string, timeout time.Duration) *mcpRemoteClient {
-	return &mcpRemoteClient{endpoint: endpoint, auth: auth, secret: secret, http: chatMcpHTTPClient(timeout)}
+// newMcpRemoteClient builds a client; auth may be nil, and secrets are the
+// values auth carries, replaced in errors.
+func newMcpRemoteClient(endpoint string, auth http.Header, timeout time.Duration, secrets ...string) *mcpRemoteClient {
+	return &mcpRemoteClient{endpoint: endpoint, auth: auth, secrets: secrets, http: chatMcpHTTPClient(timeout)}
 }
 
 // jsonRPCError is a JSON-RPC error object.
@@ -70,12 +71,21 @@ type jsonRPCReply struct {
 	Error  *jsonRPCError   `json:"error"`
 }
 
-// redact replaces the credential in an error's text.
+// redact replaces the credentials in an error's text.
 func (c *mcpRemoteClient) redact(err error) error {
-	if err == nil || c.secret == "" || !strings.Contains(err.Error(), c.secret) {
+	if err == nil {
+		return nil
+	}
+	text := err.Error()
+	for _, secret := range c.secrets {
+		if secret != "" {
+			text = strings.ReplaceAll(text, secret, "[redacted]")
+		}
+	}
+	if text == err.Error() {
 		return err
 	}
-	return errors.New(strings.ReplaceAll(err.Error(), c.secret, "[redacted]"))
+	return errors.New(text)
 }
 
 // post sends one JSON-RPC message and returns the answer, its body unread.

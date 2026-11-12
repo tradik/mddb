@@ -144,12 +144,13 @@ func (c *ChatScenarioManager) ListMcpSecrets() []*chatMcpSecretView {
 	return out
 }
 
-// mcpSecretUsedBy names the scenarios whose servers use a secret. Under the lock.
+// mcpSecretUsedBy names the scenarios whose servers use a secret, as their
+// credential or as their identity key (#414). Under the lock.
 func (c *ChatScenarioManager) mcpSecretUsedBy(name string) []string {
 	out := []string{}
 	for _, sc := range c.m {
 		for _, m := range sc.McpServers {
-			if m.SecretRef == name {
+			if m.SecretRef == name || (m.ForwardIdentity != nil && m.ForwardIdentity.SecretRef == name) {
 				out = append(out, sc.Name)
 				break
 			}

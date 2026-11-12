@@ -33,6 +33,9 @@ type ChatMcpServer struct {
 	AllowedTools   []string `json:"allowedTools"`
 	TimeoutMs      int      `json:"timeoutMs"`
 	ResultMaxChars int      `json:"resultMaxChars"`
+	// ForwardIdentity sends the signed-in user's identity (#414,
+	// chat_mcp_identity.go); nil is off.
+	ForwardIdentity *ChatMcpForwardIdentity `json:"forwardIdentity,omitempty"`
 }
 
 // validChatMcpURL accepts an absolute https URL without credentials in it:
@@ -87,6 +90,9 @@ func (m *ChatMcpServer) normalize() error {
 	if m.AllowedTools == nil {
 		m.AllowedTools = []string{}
 	}
+	if m.ForwardIdentity != nil {
+		return m.ForwardIdentity.normalize(m.Name, m.SecretRef)
+	}
 	return nil
 }
 
@@ -125,6 +131,8 @@ type chatMcpServerState struct {
 	Active  bool               `json:"active"`
 	Reason  string             `json:"reason,omitempty"`
 	Tools   []chatMcpToolState `json:"tools"`
+	// ForwardIdentity: only a signed-in session is offered the tools (#414).
+	ForwardIdentity bool `json:"forwardIdentity,omitempty"`
 }
 
 // chatMcpInactiveReason is why a server of sc is off, "" when it is on —
@@ -141,6 +149,8 @@ func chatMcpInactiveReason(sc *ChatScenario, m *ChatMcpServer, featureOff string
 		return "server is disabled"
 	case m.SecretRef != "" && !secretSet(m.SecretRef):
 		return "secret " + m.SecretRef + " does not exist"
+	case m.ForwardIdentity != nil && !secretSet(m.ForwardIdentity.SecretRef):
+		return "identity secret " + m.ForwardIdentity.SecretRef + " does not exist"
 	}
 	return ""
 }
@@ -152,7 +162,7 @@ func chatMcpStates(sc *ChatScenario, featureOff string, secretSet func(string) b
 		m := &sc.McpServers[i]
 		reason := chatMcpInactiveReason(sc, m, featureOff, secretSet)
 		st := chatMcpServerState{Name: m.Name, URL: m.URL, Enabled: m.Enabled, Active: reason == "", Reason: reason,
-			Tools: make([]chatMcpToolState, 0, len(m.AllowedTools))}
+			Tools: make([]chatMcpToolState, 0, len(m.AllowedTools)), ForwardIdentity: m.ForwardIdentity != nil}
 		for _, tool := range m.AllowedTools {
 			st.Tools = append(st.Tools, chatMcpToolState{Name: tool, Active: reason == "", Reason: reason})
 		}

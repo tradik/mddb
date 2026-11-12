@@ -222,10 +222,12 @@ the same server functions and gated with the same permissions:
 because 0 is a meaningful temperature, `max_tokens`, and `extra_body_json`,
 a JSON object as a string), `rate_limit` (`messages_per_minute`),
 `mcp_servers` (`ChatMcpServerProto`, since 2.19.0: `name`, `url`, `enabled`,
-`secret_ref`, `allowed_tools`, `timeout_ms`, `result_max_chars`), and
-`created_at` / `updated_at` in Unix seconds. `GetChatScenarioPrompt` also
-returns `mcp_servers` (`ChatMcpServerStateProto`: `active` and `reason` per
-server and per allowed tool).
+`secret_ref`, `allowed_tools`, `timeout_ms`, `result_max_chars`, and since
+2.19.2 `forward_identity` — `ChatMcpForwardIdentityProto {secret_ref, header,
+ttl_seconds}`, #414), and `created_at` / `updated_at` in Unix seconds.
+`GetChatScenarioPrompt` also returns `mcp_servers` (`ChatMcpServerStateProto`:
+`active` and `reason` per server and per allowed tool, and
+`forward_identity`).
 
 Errors map as on REST: `INVALID_ARGUMENT` (400), `NOT_FOUND` (404),
 `PERMISSION_DENIED` (403), `UNAUTHENTICATED` (401).
@@ -296,7 +298,7 @@ MCP-005) over gRPC. Secrets are write-only: no RPC returns a value.
 | `PutChatMcpSecret` | admin, writable server | `{name, value, header}` → `{secret, created, version}`; `FAILED_PRECONDITION` naming `MDDB_ENCRYPTION_KEY` without an at-rest key: a secret is stored only sealed |
 | `DeleteChatMcpSecret` | admin, writable server | `{name}` → `{deleted, version}`; `FAILED_PRECONDITION` naming the scenarios while one uses it |
 | `InspectChatMcpServer` | admin | `{url, secret_ref}` → `{url, server_name, server_version, protocol_version, tools}`; `FAILED_PRECONDITION` while the `chatExternalMcp` feature is off or for a `secret_ref` stored unsealed, `UNAVAILABLE` when the server cannot be reached |
-| `CallChatMcpTool` | read on the scenario | `{scenario, server, tool, arguments_json}` → `{content, is_error, truncated, duration_ms}`; `FAILED_PRECONDITION` for a switch that is off or a tool not allowed |
+| `CallChatMcpTool` | read on the scenario; write on the chat collection for a `forward_identity` server | `{scenario, server, tool, arguments_json, sub}` → `{content, is_error, truncated, duration_ms}`; `FAILED_PRECONDITION` for a switch that is off, a tool not allowed, or a `forward_identity` server called without `sub` (2.19.2, #414) |
 
 `ChatMcpToolProto` carries `read_only_hint` and `destructive_hint`, each
 with a `*_set` flag (an absent hint is not `false`), `allowable` and the

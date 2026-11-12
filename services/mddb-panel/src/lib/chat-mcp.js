@@ -3,8 +3,10 @@
  * `mcpServers`, and why a tool is not shown to the model.
  *
  * Numbers are held as the strings the inputs produce; empty means the
- * server's default (timeoutMs 8000, resultMaxChars 4000).
+ * server's default (timeoutMs 8000, resultMaxChars 4000). The identity
+ * fields (#414) are chat-mcp-identity.js's.
  */
+import { identityFromRow, identityProblem, identityRowFields } from './chat-mcp-identity';
 
 /** The GO-049 feature that lets mddbd talk to foreign MCP servers. */
 export const mcpFeature = 'chatExternalMcp';
@@ -15,7 +17,7 @@ let lastUid = 0;
 /** A new, enabled server row. */
 export function newMcpServer() {
   lastUid += 1;
-  return { uid: lastUid, name: '', url: '', enabled: true, secretRef: '', allowedTools: [], timeoutMs: '', resultMaxChars: '' };
+  return { uid: lastUid, name: '', url: '', enabled: true, secretRef: '', allowedTools: [], timeoutMs: '', resultMaxChars: '', ...identityRowFields() };
 }
 
 /** The editor rows of a scenario's servers. */
@@ -29,6 +31,7 @@ export function toMcpRows(servers = []) {
     allowedTools: [...(s.allowedTools || [])],
     timeoutMs: s.timeoutMs ? String(s.timeoutMs) : '',
     resultMaxChars: s.resultMaxChars ? String(s.resultMaxChars) : '',
+    ...identityRowFields(s),
   }));
 }
 
@@ -42,6 +45,7 @@ export function fromMcpRows(rows) {
     allowedTools: r.allowedTools,
     timeoutMs: Number.parseInt(r.timeoutMs, 10) || 0,
     resultMaxChars: Number.parseInt(r.resultMaxChars, 10) || 0,
+    ...identityFromRow(r),
   }));
 }
 
@@ -54,6 +58,8 @@ export function mcpServerProblem(rows) {
     if (seen.has(name)) return `The MCP server name "${name}" is used twice.`;
     seen.add(name);
     if (!/^https:\/\/[^\s/@]+(\/\S*)?$/.test(r.url.trim())) return `The MCP server "${name}" needs an https:// URL without a user or password.`;
+    const identity = identityProblem(r, name);
+    if (identity) return identity;
   }
   return null;
 }

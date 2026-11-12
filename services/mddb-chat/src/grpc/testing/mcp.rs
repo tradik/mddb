@@ -53,6 +53,7 @@ pub fn mcp_state(
                 reason: reason(*on),
             })
             .collect(),
+        forward_identity: false,
     }
 }
 

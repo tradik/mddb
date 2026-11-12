@@ -219,7 +219,7 @@ model = "claude-x"
     fn an_external_tool_is_recorded_with_its_server_and_no_collection() {
         use crate::grpc::testing::mcp_state;
         let states = vec![mcp_state("orders", true, &[("get.order", true)])];
-        let mcp = McpToolset::for_turn("support", &states, &Default::default(), true);
+        let mcp = McpToolset::for_turn("support", &states, &Default::default(), true, None);
         let mut trace = TurnTrace::start();
         trace.offer_mcp(&mcp);
 

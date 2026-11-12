@@ -24,7 +24,7 @@ func TestMcpRemoteClientSession(t *testing.T) {
 	f := newMcpFixture(t)
 	for _, sse := range []bool{false, true} {
 		f.sse.Store(sse)
-		c := newMcpRemoteClient(f.URL, nil, "", time.Second)
+		c := newMcpRemoteClient(f.URL, nil, time.Second)
 		ctx := context.Background()
 		info, err := c.initialize(ctx)
 		if err != nil || info.ServerInfo.Name != "wiki" || c.session != "sess-1" || c.protocol != "2025-11-25" {
@@ -68,11 +68,11 @@ func TestMcpRemoteToolRefusal(t *testing.T) {
 func TestMcpRemoteClientCredentialAndRedaction(t *testing.T) {
 	f := newMcpFixture(t)
 	f.token = "s3cr3t-token"
-	if _, err := newMcpRemoteClient(f.URL, nil, "", time.Second).initialize(context.Background()); err == nil ||
+	if _, err := newMcpRemoteClient(f.URL, nil, time.Second).initialize(context.Background()); err == nil ||
 		!strings.Contains(err.Error(), "401") {
 		t.Fatalf("no credential: %v", err)
 	}
-	c := newMcpRemoteClient(f.URL, http.Header{"Authorization": {"Bearer s3cr3t-token"}}, "s3cr3t-token", time.Second)
+	c := newMcpRemoteClient(f.URL, http.Header{"Authorization": {"Bearer s3cr3t-token"}}, time.Second, "s3cr3t-token")
 	if _, err := c.initialize(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func edgeServer(t *testing.T, handler http.HandlerFunc) *mcpRemoteClient {
 	t.Helper()
 	f := newMcpFixture(t)
 	f.Config.Handler = handler
-	return newMcpRemoteClient(f.URL, nil, "", time.Second)
+	return newMcpRemoteClient(f.URL, nil, time.Second)
 }
 
 func TestMcpRemoteClientFailures(t *testing.T) {
@@ -150,7 +150,7 @@ func TestMcpRemoteClientFailures(t *testing.T) {
 	}
 
 	// Nothing reaches a URL the guard refuses.
-	c := newMcpRemoteClient("ftp://example.com/mcp", nil, "", time.Second)
+	c := newMcpRemoteClient("ftp://example.com/mcp", nil, time.Second)
 	if _, err := c.initialize(ctx); err == nil || !strings.HasPrefix(err.Error(), "initialize: ") {
 		t.Errorf("initialize: %v", err)
 	}
