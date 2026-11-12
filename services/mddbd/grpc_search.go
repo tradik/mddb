@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"mddb/internal/embedding"
 	"mddb/internal/storage"
 	proto "mddb/proto"
 	"time"
@@ -113,7 +114,7 @@ func (g *GRPCServer) VectorStats(ctx context.Context, req *proto.VectorStatsRequ
 	}
 
 	if g.server.Embedding != nil {
-		resp.Provider = g.server.Embedding.Model()
+		resp.Provider = embedding.NameOf(g.server.Embedding) // #415
 		resp.Model = g.server.Embedding.Model()
 		resp.Dimensions = safeInt32(g.server.Embedding.Dimensions())
 	}

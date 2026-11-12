@@ -11182,8 +11182,12 @@ components:
           example: true
         provider:
           type: string
-          description: Embedding provider name
-          example: text-embedding-3-small
+          enum: [ openai, ollama, cohere, voyage, lexical ]
+          description: >-
+            The embedding service that is called. Since 2.19.2 (#415) this is
+            the provider's name; before, it repeated the model name, which hid
+            a provider configured with another provider's model.
+          example: openai
         model:
           type: string
           description: Embedding model name

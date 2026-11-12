@@ -612,7 +612,7 @@ func (s *Server) handleVectorStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.Embedding != nil {
-		resp["provider"] = s.Embedding.Model()
+		resp["provider"] = embedding.NameOf(s.Embedding) // #415: the service called, not the model
 		resp["model"] = s.Embedding.Model()
 		resp["dimensions"] = s.Embedding.Dimensions()
 	}

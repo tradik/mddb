@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"mddb/internal/embedding"
 	"mddb/internal/metrics"
 	"time"
 )
@@ -31,7 +32,7 @@ func (c *DirectClient) VectorStats(ctx context.Context) (*MCPVectorStatsResponse
 	}
 
 	if s.Embedding != nil {
-		resp.Provider = s.Embedding.Model()
+		resp.Provider = embedding.NameOf(s.Embedding) // #415
 		resp.Model = s.Embedding.Model()
 		resp.Dimensions = s.Embedding.Dimensions()
 	}

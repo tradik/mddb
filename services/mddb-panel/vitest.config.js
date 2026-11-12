@@ -195,6 +195,10 @@ const coverageFiles = [
   'src/components/ChatLogRow.jsx',
   'src/components/ChatGaps.jsx',
   'src/components/ChatScenarioLoggingFields.jsx',
+  // 2.19.2: the embedding configuration form (#415).
+  'src/lib/embedding-defaults.js',
+  'src/components/EmbeddingConfigModal.jsx',
+  'src/components/EmbeddingModelsPanel.jsx',
 ];
 
 export default mergeConfig(

@@ -271,7 +271,7 @@ func TestCovEVectorStatsWithProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !resp.Enabled || resp.Model != "test-model" || resp.Provider != "test-model" || resp.Dimensions != 3 ||
+	if !resp.Enabled || resp.Model != "test-model" || resp.Provider != "" || resp.Dimensions != 3 ||
 		resp.Collections["repo"] == nil || resp.Collections["repo"].TotalDocuments != 3 {
 		t.Fatalf("vector stats: %+v", resp)
 	}

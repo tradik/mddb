@@ -727,7 +727,7 @@ func (s *Server) initEmbedding() {
 	if s.Embedding != nil {
 		s.startEmbeddingWorker(s.Embedding)
 		slog.Info("vector search enabled", "source", "environment",
-			"provider", s.Embedding.Model(), "model", s.Embedding.Model(), "dimensions", s.Embedding.Dimensions())
+			"provider", embedding.NameOf(s.Embedding), "model", s.Embedding.Model(), "dimensions", s.Embedding.Dimensions())
 	} else if detected := embedding.DetectLocalProvider(context.Background()); detected != nil {
 		// SRCH-001: nothing configured, but this machine is already
 		// running a model. Most installs with no semantic search have one
