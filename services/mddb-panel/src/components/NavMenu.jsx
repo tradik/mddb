@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
 import { useStore } from '../lib/store';
 import { useFeatures } from '../lib/features';
@@ -10,17 +10,28 @@ import NavGroup from './NavGroup';
  * The sidebar menu (2.19.0): a "Search the menu" box over the groups of
  * nav-groups.js. Only entries the server and the user allow are listed;
  * typing filters them by label and opens every group with a match, Escape
- * clears the box. The open page's group is always open; a group with nothing
+ * clears the box. Every group folds, the open page's too (2.19.2: the
+ * default page is System Info, so pinning its group made "System" unfoldable);
+ * moving to a page in a folded group unfolds that group. A group with nothing
  * to show is left out.
  */
 export default function NavMenu({ authEnabled = false, clusterEnabled = false, automationsEnabled = true }) {
   const { viewMode } = useStore();
   const { features } = useFeatures();
-  const { collapsed, toggle } = useCollapsedGroups();
+  const { collapsed, toggle, expand } = useCollapsedGroups();
   const [query, setQuery] = useState('');
   const searching = query.trim() !== '';
   const groups = visibleGroups({ features, authEnabled, clusterEnabled, automationsEnabled }, query);
   const activeGroup = groupOfView(viewMode);
+  const shownGroup = useRef(activeGroup);
+
+  // Unfold the group of a page reached from elsewhere (a link, a shortcut);
+  // not on mount, so a group folded by the user stays folded after a reload.
+  useEffect(() => {
+    if (shownGroup.current === activeGroup) return;
+    shownGroup.current = activeGroup;
+    if (activeGroup) expand(activeGroup);
+  }, [activeGroup]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <nav aria-label="Panel menu">
@@ -41,13 +52,12 @@ export default function NavMenu({ authEnabled = false, clusterEnabled = false, a
       )}
       <div className="space-y-2">
         {groups.map((group) => {
-          const pinned = searching || group.id === activeGroup;
           return (
             <NavGroup
               key={group.id}
               group={group}
-              pinned={pinned}
-              open={pinned || !collapsed.includes(group.id)}
+              pinned={searching}
+              open={searching || !collapsed.includes(group.id)}
               onToggle={toggle}
             />
           );

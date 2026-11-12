@@ -401,7 +401,10 @@ open, so a first visit shows the same pages as before.
 - **Search the menu**: the box above the groups filters pages by name,
   ignoring case and accents, and opens every group with a match; Escape
   clears it.
-- **Always open**: the group of the page on screen cannot be folded.
+- **Every group folds**, the one of the page on screen too (2.19.2; before,
+  System could not be folded on the default page, System Info). Reaching a
+  page in a folded group from elsewhere unfolds that group; a fold is kept
+  across reloads.
 - **Empty groups go**: a group whose pages are all hidden — by a module
   switched off, no authentication or no replication — is not shown.
 - The placement lives in one data file, `src/lib/nav-groups.js`; the sidebar

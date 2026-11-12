@@ -26,15 +26,21 @@ export function writeCollapsed(ids, storage = globalThis.localStorage) {
   }
 }
 
-/** `{ collapsed, toggle }`: the folded ids and a toggle that remembers them. */
+/**
+ * `{ collapsed, toggle, expand }`: the folded ids, a toggle that remembers
+ * them, and `expand(id)`, which unfolds one group (a no-op when it is open).
+ */
 export function useCollapsedGroups() {
   const [collapsed, setCollapsed] = useState(() => readCollapsed());
-  const toggle = (id) => {
+  const update = (change) => {
     setCollapsed((current) => {
-      const next = current.includes(id) ? current.filter((c) => c !== id) : [...current, id];
+      const next = change(current);
+      if (next === current) return current;
       writeCollapsed(next);
       return next;
     });
   };
-  return { collapsed, toggle };
+  const toggle = (id) => update((current) => (current.includes(id) ? current.filter((c) => c !== id) : [...current, id]));
+  const expand = (id) => update((current) => (current.includes(id) ? current.filter((c) => c !== id) : current));
+  return { collapsed, toggle, expand };
 }

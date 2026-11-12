@@ -47,6 +47,17 @@ describe('useCollapsedGroups', () => {
     expect(readCollapsed()).toEqual(['search']);
   });
 
+  test('expand unfolds a folded group and leaves an open one alone', () => {
+    writeCollapsed(['system', 'data']);
+    const { result } = renderHook(() => useCollapsedGroups());
+    act(() => result.current.expand('data'));
+    expect(result.current.collapsed).toEqual(['system']);
+    const before = result.current.collapsed;
+    act(() => result.current.expand('chat'));
+    expect(result.current.collapsed).toBe(before);
+    expect(readCollapsed()).toEqual(['system']);
+  });
+
   test('works without storage', () => {
     const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
     const { result } = renderHook(() => useCollapsedGroups());

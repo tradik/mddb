@@ -3,8 +3,8 @@ import NavButton from './NavButton';
 
 /**
  * One collapsible group of the sidebar menu. The header is a disclosure
- * button (aria-expanded, aria-controls); a `pinned` group — the open page's,
- * or any group while the menu is searched — stays open and ignores clicks.
+ * button (aria-expanded, aria-controls); a `pinned` group — any group while
+ * the menu is searched — stays open and ignores clicks.
  */
 export default function NavGroup({ group, open, pinned = false, onToggle }) {
   const listId = `nav-group-${group.id}`;
@@ -17,7 +17,7 @@ export default function NavGroup({ group, open, pinned = false, onToggle }) {
         aria-controls={listId}
         aria-label={`${group.label} group`}
         aria-disabled={pinned || undefined}
-        title={pinned ? 'Kept open: it holds the open page or a match' : undefined}
+        title={pinned ? 'Kept open while the menu is searched' : undefined}
         onClick={() => !pinned && onToggle(group.id)}
         className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded text-left text-xs font-semibold text-gray-600 uppercase tracking-wide hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
       >

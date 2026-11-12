@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // NavMenu, NavGroup and NavButton (2.19.0): the grouped sidebar menu —
 // disclosure headers, folding remembered across mounts, the active page's
-// group kept open, the "Search the menu" box and the module switches.
+// group foldable and unfolded on navigation, the "Search the menu" box and the module switches.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react';
 
@@ -54,17 +54,40 @@ describe('groups', () => {
     expect(screen.getByRole('button', { name: 'Stop Words' })).toBeTruthy();
   });
 
-  test("the open page's group stays open and its header ignores clicks", async () => {
-    localStorage.setItem('mddb.nav.collapsed', '["system"]');
-    useStore.setState({ viewMode: 'config' });
+  test("the open page's group folds too (System on the default page, 2.19.2)", async () => {
+    useStore.setState({ viewMode: 'system' });
     await renderMenu();
     const h = header('System');
     expect(h.getAttribute('aria-expanded')).toBe('true');
+    expect(h.getAttribute('aria-disabled')).toBeNull();
+    fireEvent.click(h);
+    expect(header('System').getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('button', { name: 'System Info' })).toBeNull();
+    fireEvent.click(header('System'));
+    expect(screen.getByRole('button', { name: 'System Info' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  test('a fold of the open page survives a reload; moving to a page in a folded group unfolds it', async () => {
+    localStorage.setItem('mddb.nav.collapsed', '["system","data"]');
+    useStore.setState({ viewMode: 'config' });
+    await renderMenu();
+    expect(header('System').getAttribute('aria-expanded')).toBe('false');
+    act(() => useStore.setState({ viewMode: 'embeddings' }));
+    expect(header('Data').getAttribute('aria-expanded')).toBe('true');
+    expect(JSON.parse(localStorage.getItem('mddb.nav.collapsed'))).toEqual(['system']);
+    act(() => useStore.setState({ viewMode: 'documents' }));
+    act(() => useStore.setState({ viewMode: 'import' }));
+    expect(JSON.parse(localStorage.getItem('mddb.nav.collapsed'))).toEqual(['system']);
+  });
+
+  test('while searching, headers are kept open and ignore clicks', async () => {
+    await renderMenu();
+    fireEvent.change(box(), { target: { value: 'info' } });
+    const h = header('System');
     expect(h.getAttribute('aria-disabled')).toBe('true');
+    expect(h.getAttribute('title')).toBe('Kept open while the menu is searched');
     fireEvent.click(h);
     expect(header('System').getAttribute('aria-expanded')).toBe('true');
-    expect(screen.getByRole('button', { name: 'Configuration' }).getAttribute('aria-current')).toBe('page');
-    expect(header('Data').getAttribute('aria-disabled')).toBeNull();
   });
 
   test('an entry switches the page and is highlighted', async () => {

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **An embedding configuration created in the panel no longer mixes two providers (#415).** The form opened as OpenAI with `text-embedding-3-small` and 1536 dimensions. Switching to Ollama filled in `http://localhost:11434` but kept the OpenAI model and dimensions, so the saved configuration sent every query to an Ollama server that does not have that model. Changing the provider now replaces the model, dimensions and API URL with the new provider's defaults, and keeps values the user typed. The Ollama URL field also says that `localhost` is wrong when mddbd runs in a container.
 - **`/v1/vector-stats`, the gRPC `VectorStats` and the MCP vector stats report the provider's name (#415).** `provider` repeated the model name, so the panel showed "Text-Embedding-3-Small" as the provider of a configuration that called Ollama. It is now `openai`, `ollama`, `cohere`, `voyage` or `lexical`. The startup log line had the same mistake. *Import Current Config* on the Embedding Models page used this field as the provider and was refused by the server; it works again.
+- **The panel's System menu group folds again.** The group of the page on screen ignored clicks on its header, and the panel opens on System Info, so System could not be folded. Every group now folds; reaching a page in a folded group from elsewhere unfolds that group, and a fold is kept across reloads.
 
 ## [2.19.1] - 2026-11-11
 
