@@ -529,3 +529,43 @@ async fn a_stream_cut_off_mid_body_reports_an_error() {
         "a truncated body ended without an error: {chunks:?}"
     );
 }
+
+// #413: the loop guard cancels a request by dropping its stream. That must
+// close the connection, or the model keeps generating for nobody.
+#[tokio::test]
+async fn dropping_a_stream_hangs_up_on_the_endpoint() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let (hung_up, hang_up_seen) = tokio::sync::oneshot::channel();
+    tokio::spawn(async move {
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut request = [0u8; 4096];
+        let _ = socket.read(&mut request).await;
+        let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\
+                    transfer-encoding: chunked\r\n\r\n";
+        socket.write_all(head.as_bytes()).await.unwrap();
+        // An endless answer, until the client goes away.
+        let chunk = delta("loop ");
+        let framed = format!("{:x}\r\n{chunk}\r\n", chunk.len());
+        while socket.write_all(framed.as_bytes()).await.is_ok() {
+            tokio::time::sleep(std::time::Duration::from_millis(2)).await;
+        }
+        let _ = hung_up.send(());
+    });
+    let provider = provider_at(addr, |_| {});
+
+    let mut stream = provider
+        .chat_stream_raw(&[user("hi")], &CallParams::new(0.5, 64))
+        .await
+        .expect("the stream should start");
+    for _ in 0..3 {
+        assert_eq!(stream.next().await.unwrap().unwrap(), "loop ");
+    }
+    drop(stream);
+
+    let seen = tokio::time::timeout(std::time::Duration::from_secs(10), hang_up_seen).await;
+    assert!(
+        matches!(seen, Ok(Ok(()))),
+        "the endpoint kept writing after the stream was dropped"
+    );
+}

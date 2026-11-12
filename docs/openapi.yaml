@@ -7847,7 +7847,8 @@ paths:
                   Header time, conversationId, messageId, scenario, sub,
                   displayName, anonymous, question, answer, outcome, rating,
                   comment, model, provider, latencyMs, promptTokens,
-                  completionTokens, tools, topScore
+                  completionTokens, tools, topScore, loopStopped (2.19.2+,
+                  issue 413)
         "400":
           description: An unreadable time, rating, outcome, format, cursor or a negative number
           content:
@@ -9131,6 +9132,7 @@ components:
           enum: [answered, noResults, refused, error]
           description: Marks a logged turn (assistant only, issue 406); an answered redirect reply is stored as refused
         latencyMs: {type: integer, format: int64, minimum: 0}
+        loopStopped: {type: boolean, description: "mddb-chat's loop guard cut this answer short (assistant only, 2.19.2+, issue 413)"}
         feedback:
           allOf:
             - $ref: "#/components/schemas/ChatFeedback"
@@ -9165,6 +9167,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ChatToolCall"
+        loopStopped: {type: boolean, description: "The loop guard cut the answer short (2.19.2+, issue 413)"}
     ChatLogPage:
       type: object
       properties:
@@ -12675,6 +12678,38 @@ components:
               type: object
               additionalProperties: true
               description: Sent to the model API as is, e.g. reasoning_effort.
+            loopGuard:
+              type: object
+              description: >-
+                Overrides mddb-chat's repetition-loop guard ([llm.loop_guard])
+                for this scenario, field by field (2.19.2+, issue 413). 0, an
+                empty unit or an absent field keeps the chat service's setting.
+              properties:
+                enabled:
+                  type: boolean
+                ngram:
+                  type: integer
+                  minimum: 0
+                  maximum: 4096
+                  description: Units per compared fragment.
+                window:
+                  type: integer
+                  minimum: 0
+                  maximum: 65536
+                  description: Latest units the repeated share is measured over; not shorter than ngram.
+                ratio:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                  description: Repeated share that counts as a loop.
+                minOutput:
+                  type: integer
+                  minimum: 0
+                  maximum: 1000000
+                  description: Units an answer has before it is judged.
+                unit:
+                  type: string
+                  enum: [chars, words]
         maxTurns:
           type: integer
           minimum: 0

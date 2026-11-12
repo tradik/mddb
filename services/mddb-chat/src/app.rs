@@ -23,6 +23,7 @@ use crate::grpc::link::{MddbLink, connect_with_retry};
 use crate::llm::anthropic::AnthropicProvider;
 use crate::llm::openai::OpenAiProvider;
 use crate::llm::provider::LlmProvider;
+use crate::metrics::Metrics;
 use crate::routes;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
@@ -93,6 +94,7 @@ pub async fn build_state(config: Config) -> Result<Arc<AppState>, AppError> {
         rate_limiter: RateLimiter::new(config.security.rate_limit_per_minute),
         sanitizer: Sanitizer::new(config.security.clone()),
         trusted_proxies,
+        metrics: Metrics::default(),
         config,
     }))
 }
@@ -177,6 +179,7 @@ pub fn router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(routes::health::health))
         .route("/config", get(routes::health::config_info))
+        .route("/metrics", get(routes::metrics::metrics))
         .route("/ws", get(routes::ws::ws_handler))
         .layer(cors)
         .layer(TraceLayer::new_for_http())

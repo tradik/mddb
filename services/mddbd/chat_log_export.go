@@ -18,7 +18,7 @@ import (
 // chatLogCSVHeader is the first row of a CSV export.
 var chatLogCSVHeader = []string{"time", "conversationId", "messageId", "scenario", "sub", "displayName", "anonymous",
 	"question", "answer", "outcome", "rating", "comment", "model", "provider", "latencyMs", "promptTokens",
-	"completionTokens", "tools", "topScore"}
+	"completionTokens", "tools", "topScore", "loopStopped"}
 
 // exportChatLog writes the export in the format the query asks for.
 func (s *Server) exportChatLog(w http.ResponseWriter, r *http.Request, f ChatLogFilter) {
@@ -98,7 +98,7 @@ func chatLogCSVRow(t ChatLogTurn) []string {
 	row := []string{time.Unix(t.At, 0).UTC().Format(time.RFC3339), t.ConversationID, t.MessageID, t.Scenario, t.Sub,
 		t.DisplayName, strconv.FormatBool(t.Anonymous), t.Question, t.Answer, t.Outcome, t.Rating, t.Comment, t.Model,
 		t.Provider, strconv.FormatInt(t.LatencyMs, 10), strconv.FormatInt(prompt, 10), strconv.FormatInt(completion, 10),
-		strings.Join(tools, "; "), strconv.FormatFloat(best, 'f', -1, 64)}
+		strings.Join(tools, "; "), strconv.FormatFloat(best, 'f', -1, 64), strconv.FormatBool(t.LoopStopped)}
 	for i, cell := range row {
 		row[i] = csvSafeCell(cell)
 	}

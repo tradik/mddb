@@ -6,6 +6,7 @@ import { outcomeLabels, ratingText, scoreText, whoOf } from '../lib/chat-log';
 // #406: one logged turn — a summary row, and on demand the whole turn: the
 // question and answer, every tool call with its query, result keys and best
 // score, the model, latency, tokens and the visitor's rating and comment.
+// #413: an answer the loop guard stopped is marked "loop stopped".
 
 function Detail({ label, children }) {
   return (
@@ -63,7 +64,10 @@ export default function ChatLogRow({ turn }) {
         <td className="p-2">{whoOf(turn)}</td>
         <td className="p-2">{turn.question || '—'}</td>
         <td className="p-2 text-gray-800">{turn.answerExcerpt}</td>
-        <td className="p-2">{outcomeLabels[turn.outcome] || turn.outcome}</td>
+        <td className="p-2">
+          {outcomeLabels[turn.outcome] || turn.outcome}
+          {turn.loopStopped && <span className="ml-1 whitespace-nowrap rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-900">loop stopped</span>}
+        </td>
         <td className="whitespace-nowrap p-2">{ratingText(turn.rating)}</td>
       </tr>
       {open && (
@@ -77,6 +81,7 @@ export default function ChatLogRow({ turn }) {
               <Detail label="Latency and tokens">{`${turn.latencyMs ? `${turn.latencyMs} ms` : '—'} · ${tokens}`}</Detail>
               <Detail label="Rating">{ratingText(turn.rating)}{turn.comment ? ` — ${turn.comment}` : ''}</Detail>
               <Detail label="Conversation">{`${turn.conversationId} / ${turn.messageId}`}</Detail>
+              {turn.loopStopped && <Detail label="Loop guard">The answer repeated itself and was stopped where the repetition began (#413).</Detail>}
             </dl>
             <h4 className="mb-1 mt-3 text-xs font-semibold text-gray-900">Tools</h4>
             <ToolCalls calls={turn.toolCalls} />

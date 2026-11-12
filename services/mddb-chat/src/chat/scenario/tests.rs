@@ -6,7 +6,9 @@ use std::collections::HashMap;
 use serde_json::json;
 
 use super::*;
-use crate::grpc::client::proto::{ChatLlmProto, ChatRateLimitProto, ChatScenarioProto};
+use crate::grpc::client::proto::{
+    ChatLlmProto, ChatLoopGuardProto, ChatRateLimitProto, ChatScenarioProto,
+};
 use crate::grpc::testing::scenario;
 use crate::test_support::test_config;
 
@@ -30,7 +32,7 @@ fn store_of(scenarios: Vec<ChatScenarioProto>) -> ScenarioStore {
 
 fn active(config: &Config, store: &ScenarioStore, name: &str) -> ActiveScenario {
     match resolve(config, store, name) {
-        Resolved::Active(active) => active,
+        Resolved::Active(active) => *active,
         other => panic!("wanted an active scenario, got {other:?}"),
     }
 }
@@ -111,6 +113,7 @@ fn a_toml_scenario_resolves_against_the_server_settings() {
 fn a_stored_scenario_wins_and_overrides_only_what_it_sets() {
     let mut config = config();
     config.security.max_tokens_per_session = 1000;
+    config.llm.loop_guard.window = Some(512);
     let store = store_of(vec![
         ChatScenarioProto {
             llm: Some(ChatLlmProto {
@@ -119,6 +122,10 @@ fn a_stored_scenario_wins_and_overrides_only_what_it_sets() {
                 temperature_set: true,
                 max_tokens: 800,
                 extra_body_json: r#"{"seed":7}"#.to_string(),
+                loop_guard: Some(ChatLoopGuardProto {
+                    ratio: 0.95,
+                    ..Default::default()
+                }),
             }),
             max_turns: 12,
             token_budget_per_session: 50,
@@ -148,12 +155,20 @@ fn a_stored_scenario_wins_and_overrides_only_what_it_sets() {
     assert_eq!(support.max_turns, Some(12), "not the TOML's 2");
     assert_eq!(support.token_budget, 50);
     assert_eq!(support.messages_per_minute, 20);
+    // #413: the scenario's ratio over the [llm.loop_guard] window.
+    let guard = support.loop_guard.expect("on by default");
+    assert_eq!((guard.ratio, guard.window), (0.95, 512));
 
     let plain = active(&config, &store, "plain");
     assert_eq!(plain.llm, CallParams::new(0.7, 64));
     assert_eq!(plain.allowed_collections, vec!["docs"]);
     assert_eq!(plain.max_turns, None);
     assert_eq!(plain.token_budget, 1000, "the [security] budget");
+    assert_eq!(
+        plain.loop_guard,
+        config.llm.loop_guard.settings(),
+        "no override"
+    );
 
     // Switched off in mddbd: the TOML scenario of that name does not serve.
     assert_eq!(resolve(&config, &store, "assistant"), Resolved::Disabled);

@@ -81,6 +81,7 @@ are documented inline in `config.example.toml`.
 | `GET /ws` | The chat WebSocket (protocol below) |
 | `GET /health` | Readiness and session counts: `200` once mddbd is reached, `503` before. Also `scenarios_source` (`"mddbd"` or `"toml"`), `scenarios_version`, `chat_enabled` and `chat_external_mcp_enabled` |
 | `GET /config` | The scenarios a visitor can join right now (TOML and mddbd), their labels, and the limits a client needs before joining |
+| `GET /metrics` | Counters in the Prometheus text format (2.19.2): `mddb_chat_loop_guard_triggered_total{scenario}`, the answers the loop guard stopped |
 
 ## Starting before mddbd
 
@@ -134,6 +135,7 @@ What a stored scenario sets, and what happens where it sets nothing:
 | `llm.temperature` | Sampling temperature; `0` is a value. | `[llm] temperature` |
 | `llm.maxTokens` | Answer length. | `[llm] max_tokens` |
 | `llm.extraBody` | Merged over `[llm] extra_body` key by key (OpenAI-compatible provider only; the request's own fields still win). | `[llm] extra_body` alone |
+| `llm.loopGuard` | Overrides `[llm.loop_guard]` field by field (2.19.2): `enabled`, `ngram`, `window`, `ratio`, `minOutput`, `unit`. | `[llm.loop_guard]` |
 | `maxTurns` | User messages per session. | no limit |
 | `tokenBudgetPerSession` | Tokens per session; wins over `[security] max_tokens_per_session`. | `[security] max_tokens_per_session` |
 | `rateLimit.messagesPerMinute` | Messages per session in any 60 seconds, next to the per-address `[security] rate_limit_per_minute`. A message over it gets `this conversation is limited to N messages per minute` and is not counted as a turn. | no per-session limit |
@@ -261,6 +263,58 @@ empty. mddb-chat never shows reasoning to the visitor; with
 `RUST_LOG=mddb_chat=debug` it logs that an answer was reasoning-only, with the
 first 400 characters. Fix it with `extra_body = { reasoning_effort = "none" }`
 or a larger `max_tokens`.
+
+## Repetition-loop guard
+
+Small models sometimes fall into a loop and repeat the same lines until
+`max_tokens` runs out. `max_tokens` and `max_response_length` bound that only
+after the budget is spent; the loop guard (2.19.2, #413) stops it early.
+
+```toml
+[llm.loop_guard]
+enabled = true      # on by default
+ngram = 64          # units per compared fragment
+window = 256        # how many of the latest units the repeated share covers
+ratio = 0.8         # repeated share that counts as a loop, (0, 1]
+min_output = 200    # units an answer must have before it is judged
+unit = "chars"      # or "words" (defaults then: ngram 16, window 64, min_output 50)
+```
+
+- **How a loop is found.** A unit counts as repeated when the `ngram` units
+  ending at it already occurred earlier in the same answer — a rolling hash
+  and a set of the n-grams seen, constant work per character. Once the answer
+  is `min_output` units long and at least `ratio` of the last `window` units
+  are repeats, it is a loop.
+- **Code and tables are exempt.** Characters inside fenced code blocks
+  (```` ``` ```` or `~~~`, fence lines included) and Markdown table rows
+  (lines starting with `|`) are not counted at all, so a config file with ten
+  identical lines or a table of identical rows is never cut. The regression
+  fixtures are in `tests/fixtures/loop_guard/`.
+- **What happens.** The answer is cut where the repetition began and ends
+  with `[Response stopped: repetition detected]`; the turn then finishes
+  normally (`done`, the `answer` webhook, the session history, the log). In
+  the streaming call after the last tool round the stream is dropped, which
+  closes the connection and cancels the request; the visitor may have seen up
+  to one `window` of the repeat, the stored answer ends at the loop. A
+  non-streaming answer — the usual path — is cut before the visitor sees any
+  of it; the call is already over, so its tokens are what the provider
+  reports. The content a provider returns next to tool calls is not kept, so
+  a looping tool round cannot feed the next round.
+- **Reporting.** One warning per stop with the session, scenario, round,
+  position and repeat ratio — never the text; the counter
+  `mddb_chat_loop_guard_triggered_total{scenario}` at `GET /metrics`; the
+  webhook event `message.loop_stopped`; and `loopStopped: true` on the stored
+  answer (conversation log, panel *Chat → Log*).
+- **Per scenario.** A scenario stored in mddbd overrides any field with
+  `llm.loopGuard` — a code-heavy one may raise `ratio` or turn the guard off.
+- **Penalties complement it.** `extra_body = { frequency_penalty = 0.3,
+  presence_penalty = 0.3 }` makes loops rarer to begin with, at the cost of
+  answers that legitimately repeat terms (code, tables, lists of keys). The
+  guard does not retry a stopped answer with other settings.
+- **Why on by default.** With 64-character fragments a legitimate answer
+  rarely repeats itself enough: quoting a sentence twice or listing items with
+  a shared prefix stays far below 80% of a 256-character window, and code and
+  tables are not counted. Set `enabled = false` to turn it off.
 
 ## WebSocket protocol
 
@@ -409,6 +463,7 @@ headers = { "Authorization" = "Bearer your-token" }
 | `message` | a question is accepted (after sanitizing and the turn and token limits) |
 | `answer` | an answer has been sent in full |
 | `feedback` | a visitor with a session rates an answer |
+| `message.loop_stopped` | the loop guard stopped an answer (2.19.2) |
 
 Events are opt-in. An entry without `events` receives `session.start`,
 `session.end` and `queue.full` only — the set that existed before the
@@ -498,6 +553,29 @@ external MCP tool (2.19.0) has its own name and `server` instead;
 strings of the WebSocket message are not forwarded: they are whatever the
 client typed, and the id already names the answer.
 
+### `message.loop_stopped`
+
+```json
+{
+  "event": "message.loop_stopped",
+  "timestamp": 1794268830,
+  "data": {
+    "session_id": "0b6f2d0e-8f0a-4a39-b0f3-3f1d0c0f7a10",
+    "scenario": "support",
+    "message_id": "7f0c1a52-6f0e-4c58-9a51-0f4a1c6f2b11",
+    "round": 5,
+    "position": 412,
+    "ratio": 0.82
+  }
+}
+```
+
+`message_id` is the stopped answer's, the one `done` and the `answer` event
+carry. `round` is the model call that looped: a tool-calling round from 0, or
+`5` for the streamed answer after the last one. `position` is how many units
+had been judged and `ratio` the repeated share of the window when the loop
+was declared. The text is not in it.
+
 ## Layout
 
 ```
@@ -509,6 +587,9 @@ src/
   chat/conversation.rs  which stored conversation a join opens; what a turn stores
   identity/          the join token (verification) and the [identity] rules
   chat/turn.rs       one message through the tool-calling loop
+  chat/answer.rs     the answer of a turn through the loop guard: a round's content, or the stream
+  chat/loop_guard/   the repetition-loop guard (#413): settings, detector, Markdown exemptions, reporting
+  metrics.rs         the counters served at /metrics
   chat/prompt.rs     the system prompt and history as the model sees them
   chat/outbound.rs   frames to the visitor
   chat/tools.rs      search_docs / get_document and the per-scenario policy
@@ -524,14 +605,14 @@ src/
   grpc/conversations.rs  mddbd client: a signed user's conversations
   grpc/testing/      a scripted mddbd for tests (login and the gRPC methods used)
   grpc/link.rs       the connection to mddbd: retried in the background until up
-  routes/            /health (readiness), /config, /ws
+  routes/            /health (readiness), /config, /metrics, /ws
   llm/               OpenAI-compatible and Anthropic providers
   session/           admission, queue, history, token budget, per-session pace
   security/          rate limiting, client IP, input sanitising
   chat/trace.rs      one turn's message ids, tools called and latency
   chat/turnlog.rs    the turn log (#406): what an answer is stored with, the anonymous log
   chat/rating.rs     a rating stored with the answer it rates (#406)
-  webhook/           webhooks: session lifecycle, message, answer, feedback
+  webhook/           webhooks: session lifecycle, message, answer, feedback, message.loop_stopped
 ```
 
 The handler tests run the real WebSocket handler on a loopback port with a

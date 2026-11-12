@@ -1,20 +1,12 @@
 import { Plus, Trash2 } from 'lucide-react';
+import NumberField from './ChatNumberField';
+import ChatScenarioLoopGuardFields from './ChatScenarioLoopGuardFields';
 import { inputClass, labelClass } from '../lib/chat-scenario';
 
 // #403: the model and its parameters, the extra request body (for example
 // reasoning_effort) as a key/value list, and the session limits. An empty
 // number means "not set by the scenario": the chat service's own default
-// applies.
-
-function NumberField({ id, label, value, onChange, hint, step = '1', max }) {
-  return (
-    <div>
-      <label htmlFor={id} className={labelClass}>{label}</label>
-      <input id={id} type="number" min="0" max={max} step={step} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass} />
-      {hint && <p className="mt-1 text-xs text-gray-600">{hint}</p>}
-    </div>
-  );
-}
+// applies. #413 adds the repetition-loop guard.
 
 function ExtraBodyEditor({ entries, onChange }) {
   const update = (index, field, value) => onChange(entries.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry)));
@@ -75,6 +67,7 @@ export default function ChatScenarioLlmFields({ form, set }) {
         <NumberField id="chat-max-tokens" label="Max answer tokens" value={form.maxTokens} onChange={(v) => set('maxTokens', v)} />
       </div>
       <ExtraBodyEditor entries={form.extraBody} onChange={(entries) => set('extraBody', entries)} />
+      <ChatScenarioLoopGuardFields form={form} set={set} />
       <div className="mt-3 grid gap-3 md:grid-cols-3">
         <NumberField id="chat-max-turns" label="Max turns per session" value={form.maxTurns} onChange={(v) => set('maxTurns', v)} />
         <NumberField id="chat-token-budget" label="Token budget per session" value={form.tokenBudgetPerSession} onChange={(v) => set('tokenBudgetPerSession', v)} />

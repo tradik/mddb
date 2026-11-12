@@ -7,6 +7,7 @@
  */
 
 import { toMcpRows, fromMcpRows, mcpServerProblem } from './chat-mcp';
+import { toLoopGuardForm, fromLoopGuardForm, loopGuardProblem } from './chat-loop-guard';
 
 export const inputClass = 'w-full px-2 py-1.5 border border-gray-300 rounded text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-500';
 export const labelClass = 'block text-xs font-medium text-gray-700 mb-1';
@@ -70,6 +71,7 @@ export function toForm(scenario = {}) {
     temperature: llm.temperature === undefined ? '' : String(llm.temperature),
     maxTokens: numberText(llm.maxTokens),
     extraBody: Object.entries(llm.extraBody || {}).map(([key, value]) => ({ key, value: extraText(value) })),
+    ...toLoopGuardForm(llm.loopGuard), // #413, lib/chat-loop-guard.js
     maxTurns: numberText(scenario.maxTurns),
     tokenBudgetPerSession: numberText(scenario.tokenBudgetPerSession),
     messagesPerMinute: numberText(rateLimit.messagesPerMinute),
@@ -95,6 +97,8 @@ export function fromForm(form) {
     if (key.trim()) extraBody[key.trim()] = parseExtraValue(value);
   });
   if (Object.keys(extraBody).length > 0) llm.extraBody = extraBody;
+  const loopGuard = fromLoopGuardForm(form);
+  if (loopGuard) llm.loopGuard = loopGuard;
   const scenario = {
     description: form.description,
     enabled: form.enabled,
@@ -129,5 +133,5 @@ export function formProblem(form) {
   if (form.temperature !== '' && !(temperature >= 0 && temperature <= 2)) return 'Temperature must be between 0 and 2.';
   const days = Number(form.logRetentionDays);
   if (form.logRetentionDays !== '' && !(Number.isInteger(days) && days >= 0 && days <= 3650)) return 'Log retention must be 0 to 3650 days.';
-  return mcpServerProblem(form.mcpServers);
+  return loopGuardProblem(form) || mcpServerProblem(form.mcpServers);
 }

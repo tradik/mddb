@@ -84,6 +84,9 @@ const coverageFiles = [
   'src/components/ChatScenarioForm.jsx',
   'src/components/ChatScenarioStyleFields.jsx',
   'src/components/ChatScenarioLlmFields.jsx',
+  'src/components/ChatNumberField.jsx',
+  'src/components/ChatScenarioLoopGuardFields.jsx',
+  'src/lib/chat-loop-guard.js',
   'src/components/ChatScenarioPreview.jsx',
   // 2.19.0: every admin feature of the server reachable from the panel —
   // agent memory, schemas, bulk import, personal API keys, facets,

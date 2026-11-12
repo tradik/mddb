@@ -2387,6 +2387,18 @@ message ChatLLMProto {
   bool temperature_set = 3;                      // 0 is a meaningful temperature
   int32 max_tokens = 4;
   string extra_body_json = 5;                    // a JSON object sent to the model API as is
+  ChatLoopGuardProto loop_guard = 6;             // (v2.19.2+, #413) overrides mddb-chat's [llm.loop_guard]; absent: no override
+}
+
+// ChatLoopGuardProto is a scenario's repetition-loop guard (#413). Every
+// field is an override of mddb-chat's [llm.loop_guard]; 0 or empty: not set.
+message ChatLoopGuardProto {
+  optional bool enabled = 1;
+  int32 ngram = 2;                               // units per compared fragment
+  int32 window = 3;                              // units the repeated share is measured over
+  double ratio = 4;                              // repeated share that counts as a loop, (0, 1]
+  int32 min_output = 5;                          // units before an answer is judged
+  string unit = 6;                               // chars or words
 }
 
 message ChatRateLimitProto {
@@ -2755,6 +2767,7 @@ message ChatMessageProto {
   string outcome = 10;                           // (#406) a logged turn: answered, noResults, refused or error
   int64 latency_ms = 11;                         // (#406)
   ChatFeedbackProto feedback = 12;               // (#406) set by RateChatMessage
+  bool loop_stopped = 13;                        // (v2.19.2+, #413) the loop guard stopped this answer
 }
 
 message ChatConversationProto {
@@ -2880,6 +2893,7 @@ message ChatLogTurnProto {
   int64 prompt_tokens = 17;
   int64 completion_tokens = 18;
   repeated ChatToolCallProto tool_calls = 19;
+  bool loop_stopped = 20;                        // (v2.19.2+, #413) the loop guard stopped this answer
 }
 
 message ListChatLogResponse {

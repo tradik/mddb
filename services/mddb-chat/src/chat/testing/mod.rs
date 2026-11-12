@@ -23,6 +23,7 @@ use crate::config::Config;
 use crate::grpc::client::MddbClient;
 use crate::grpc::link::MddbLink;
 use crate::grpc::testing::FakeMddbd;
+use crate::metrics::Metrics;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
 use crate::security::sanitizer::Sanitizer;
@@ -36,6 +37,8 @@ pub use ws_client::WsClient;
 /// The TOML for a server. Each section is a string the test may replace, so a
 /// test states only what it cares about.
 pub struct ConfigToml {
+    /// Lines under `[llm]`, such as a `[llm.loop_guard]` table (#413).
+    pub llm: String,
     pub session: String,
     pub security: String,
     pub scenarios: String,
@@ -47,6 +50,7 @@ pub struct ConfigToml {
 impl Default for ConfigToml {
     fn default() -> Self {
         Self {
+            llm: String::new(),
             session: String::new(),
             security: String::new(),
             scenarios: r#"
@@ -74,6 +78,11 @@ impl ConfigToml {
         self
     }
 
+    pub fn llm(mut self, toml: &str) -> Self {
+        self.llm = toml.to_string();
+        self
+    }
+
     pub fn session(mut self, toml: &str) -> Self {
         self.session = toml.to_string();
         self
@@ -98,8 +107,8 @@ impl ConfigToml {
     fn render(&self) -> String {
         format!(
             "[server]\n[mddb]\n[llm]\nprovider = \"scripted\"\napi_url = \"http://llm.test\"\n\
-             model = \"test-model\"\n[session]\n{}\n[security]\nwebhook_secret = \"hook-secret\"\n{}\n{}\n{}\n{}",
-            self.session, self.security, self.scenarios, self.webhooks, self.identity
+             model = \"test-model\"\n{}\n[session]\n{}\n[security]\nwebhook_secret = \"hook-secret\"\n{}\n{}\n{}\n{}",
+            self.llm, self.session, self.security, self.scenarios, self.webhooks, self.identity
         )
     }
 }
@@ -162,6 +171,7 @@ impl Harness {
             rate_limiter: RateLimiter::new(config.security.rate_limit_per_minute),
             sanitizer: Sanitizer::new(config.security.clone()),
             trusted_proxies: TrustedProxies::parse(&[]),
+            metrics: Metrics::default(),
             config,
         });
 

@@ -18,6 +18,7 @@ use crate::config::Config;
 use crate::grpc::client::MddbClient;
 use crate::grpc::link::MddbLink;
 use crate::llm::provider::LlmProvider;
+use crate::metrics::Metrics;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
 use crate::security::sanitizer::Sanitizer;
@@ -105,6 +106,7 @@ pub fn test_state_with_link(
         rate_limiter: RateLimiter::new(config.security.rate_limit_per_minute),
         sanitizer: Sanitizer::new(config.security.clone()),
         trusted_proxies: TrustedProxies::parse(&config.security.trusted_proxies),
+        metrics: Metrics::default(),
         config,
     })
 }

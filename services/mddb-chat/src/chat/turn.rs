@@ -2,12 +2,13 @@
 
 use std::time::Instant;
 
-use futures::StreamExt;
-use tracing::{debug, error};
+use tracing::debug;
 
+use crate::chat::answer::{self, Reply};
 use crate::chat::conversation;
+use crate::chat::loop_guard::report::StopSite;
 use crate::chat::mcp::McpToolset;
-use crate::chat::outbound::{Sender, send_error, send_json};
+use crate::chat::outbound::{Sender, send_json};
 use crate::chat::scenario::{self, ActiveScenario, Resolved};
 use crate::chat::trace::TurnTrace;
 use crate::chat::turnlog::{self, LogPolicy};
@@ -16,7 +17,7 @@ use crate::config::LlmConfig;
 use crate::error::AppError;
 use crate::grpc::client::MddbClient;
 use crate::grpc::client::proto::ChatMcpServerStateProto;
-use crate::llm::provider::{ApiMsg, CallParams, ChatResponse, TokenUsage};
+use crate::llm::provider::{ApiMsg, ChatResponse, TokenUsage};
 use crate::session::conversation::ConversationRef;
 use crate::session::types::{MessageRole, WsOutgoing};
 use crate::state::AppState;
@@ -47,7 +48,7 @@ pub async fn handle_message(
         // the whole of it. A reload from mddbd therefore reaches an open
         // session at its next message, and never in the middle of an answer.
         let scenario = match scenario::resolve(&state.config, &state.scenarios, &session.scenario) {
-            Resolved::Active(scenario) => scenario,
+            Resolved::Active(scenario) => *scenario,
             Resolved::Disabled => return Err(AppError::ScenarioDisabled),
             // The scenario was validated at join; the generic prompt is the
             // fallback for one that was removed underneath a live session.
@@ -144,6 +145,16 @@ pub async fn handle_message(
         logging: &scenario.logging,
     };
 
+    // #413: the loop guard of this scenario, and where a stop is reported.
+    let guard = scenario.loop_guard;
+    let answer_id = trace.answer_id.clone();
+    let site = StopSite {
+        session_id,
+        scenario: &scenario_name,
+        message_id: &answer_id,
+        round: MAX_TOOL_ROUNDS,
+    };
+
     // Accumulated across every round of this turn and charged to the session
     // once, whichever way the loop ends (RAG-005).
     let mut spent = TokenUsage::default();
@@ -213,7 +224,12 @@ pub async fn handle_message(
                 }
             }
             ChatResponse::Content(text) => {
-                for chunk in text.chars().collect::<Vec<_>>().chunks(50) {
+                // #413: a looping answer is cut before the visitor sees it.
+                // The content a provider returns next to tool calls is not
+                // kept (see `ChatResponse::ToolCalls`), so a looping round
+                // cannot feed the next one either.
+                let reply = answer::guard_content(state, &site.at_round(round), guard, text);
+                for chunk in reply.text.chars().collect::<Vec<_>>().chunks(50) {
                     let piece: String = chunk.iter().collect();
                     send_json(out, &WsOutgoing::Chunk { content: piece }).await;
                 }
@@ -223,7 +239,7 @@ pub async fn handle_message(
                     &mut mddb_client,
                     &trace,
                     &closing,
-                    (text, spent),
+                    (reply, spent),
                 )
                 .await;
                 return Ok(());
@@ -232,8 +248,9 @@ pub async fn handle_message(
     }
 
     debug!("max tool rounds reached, streaming final response");
-    let answer = match stream_final_answer(state, out, &api_messages, &scenario.llm).await {
-        Ok(answer) => answer,
+    let streamed = answer::stream(state, out, (&api_messages, &scenario.llm), guard, &site).await;
+    let reply = match streamed {
+        Ok(reply) => reply,
         Err(e) => return Err(failed(state, &mut mddb_client, &trace, &closing, e).await),
     };
     // RAG-005: the tool-calling rounds are charged here too, so a turn that
@@ -241,13 +258,15 @@ pub async fn handle_message(
     // is NOT counted: its usage arrives in an SSE frame this reader discards
     // along with everything that is not a text delta, so a turn that reaches
     // this path undercounts by its final response. Stated rather than hidden.
+    // A stream the loop guard stops (#413) is cancelled, so it costs no more
+    // than what was generated before the stop.
     finish(
         state,
         out,
         &mut mddb_client,
         &trace,
         &closing,
-        (answer, spent),
+        (reply, spent),
     )
     .await;
     Ok(())
@@ -303,42 +322,6 @@ async fn system_prompt(
     }
 }
 
-/// Streams the model's answer to the visitor as it arrives, returning what
-/// was sent. Stops at `max_response_length` or at the first stream error,
-/// either of which the visitor is told about.
-async fn stream_final_answer(
-    state: &AppState,
-    out: &mut Sender,
-    api_messages: &[ApiMsg],
-    params: &CallParams,
-) -> Result<String, AppError> {
-    let mut stream = state
-        .llm_provider
-        .chat_stream_raw(api_messages, params)
-        .await?;
-
-    let mut full_response = String::new();
-    while let Some(chunk) = stream.next().await {
-        match chunk {
-            Ok(text) => {
-                full_response.push_str(&text);
-                if full_response.len() > state.config.session.max_response_length {
-                    let content = "\n\n[Response truncated]".to_string();
-                    send_json(out, &WsOutgoing::Chunk { content }).await;
-                    break;
-                }
-                send_json(out, &WsOutgoing::Chunk { content: text }).await;
-            }
-            Err(e) => {
-                error!(error = %e, "LLM stream error");
-                send_error(out, "error generating response").await;
-                break;
-            }
-        }
-    }
-    Ok(full_response)
-}
-
 /// Whose turn `finish` closes, and which model answered it.
 struct Closing<'a> {
     session_id: &'a str,
@@ -390,8 +373,9 @@ async fn finish(
     client: &mut MddbClient,
     trace: &TurnTrace,
     closing: &Closing<'_>,
-    (answer, spent): (String, TokenUsage),
+    (reply, spent): (Reply, TokenUsage),
 ) {
+    let answer = reply.text;
     let message_id = trace.answer_id.clone();
     send_json(out, &WsOutgoing::Done { message_id }).await;
     state.webhook_dispatcher.dispatch(trace.answer(
@@ -407,7 +391,8 @@ async fn finish(
         .logging
         .enabled
         .then(|| turnlog::outcome(trace.runs()));
-    let stored = turnlog::answer(trace, &answer, (closing.llm, spent), logged);
+    let mut stored = turnlog::answer(trace, &answer, (closing.llm, spent), logged);
+    stored.loop_stopped = reply.loop_stopped;
     let to = closing.destination();
     turnlog::record(state, client, &to, closing.question, stored).await;
 

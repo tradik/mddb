@@ -13,7 +13,10 @@ const stored = {
   allowedCollections: ['docs', 'runbooks'],
   skills: ['triage', 'refunds'],
   style: { emoji: 'sparingly', verbosity: 'short', markdown: false, citationTemplate: '[{{key}}]' },
-  llm: { model: 'gpt-x', temperature: 0, maxTokens: 800, extraBody: { reasoning_effort: 'low', top_k: 40, nested: { a: 1 } } },
+  llm: {
+    model: 'gpt-x', temperature: 0, maxTokens: 800, extraBody: { reasoning_effort: 'low', top_k: 40, nested: { a: 1 } },
+    loopGuard: { enabled: false, window: 512 }, // #413
+  },
   maxTurns: 12,
   tokenBudgetPerSession: 50000,
   rateLimit: { messagesPerMinute: 20 },
@@ -29,6 +32,7 @@ describe('toForm', () => {
       offTopicMode: 'refuse', redirectTemplate: '', allowedCollections: [], skills: [],
       emoji: 'off', verbosity: 'normal', markdown: true, citationTemplate: '',
       model: '', temperature: '', maxTokens: '', extraBody: [],
+      loopGuardMode: 'default', loopGuardNgram: '', loopGuardWindow: '', loopGuardRatio: '', loopGuardMinOutput: '', loopGuardUnit: '',
       maxTurns: '', tokenBudgetPerSession: '', messagesPerMinute: '', mcpServers: [],
       loggingEnabled: false, logRetentionDays: '', logRedact: true,
     });
@@ -41,6 +45,7 @@ describe('toForm', () => {
       skills: ['triage', 'refunds'], emoji: 'sparingly', verbosity: 'short', markdown: false,
       temperature: '0', maxTokens: '800', maxTurns: '12', tokenBudgetPerSession: '50000', messagesPerMinute: '20',
       loggingEnabled: true, logRetentionDays: '14', logRedact: false,
+      loopGuardMode: 'off', loopGuardWindow: '512',
     });
     expect(form.extraBody).toEqual([
       { key: 'reasoning_effort', value: 'low' },
@@ -103,6 +108,7 @@ describe('formProblem', () => {
     [{ name: 'ok', logRetentionDays: '1.5' }, 'Log retention must be 0 to 3650 days.'],
     [{ name: 'ok', logRetentionDays: '-1' }, 'Log retention must be 0 to 3650 days.'],
     [{ name: 'ok', logRetentionDays: '30' }, null],
+    [{ name: 'ok', loopGuardRatio: '1.2' }, 'The loop guard ratio must be above 0 and at most 1.'],
     [{ name: 'ok' }, null],
   ])('%j → %j', (fields, problem) => {
     expect(formProblem({ ...toForm(), ...fields })).toBe(problem);

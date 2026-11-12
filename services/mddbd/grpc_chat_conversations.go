@@ -166,7 +166,8 @@ func chatConversationToProto(c ChatConversationSummary, msgs []ChatMessage) *pro
 	}
 	for _, m := range msgs {
 		pm := &proto.ChatMessageProto{Id: m.ID, Role: m.Role, Content: m.Content, Model: m.Model, Provider: m.Provider,
-			CreatedAt: m.CreatedAt, Outcome: m.Outcome, LatencyMs: m.LatencyMs, ToolCalls: chatToolCallsToProto(m.ToolCalls)}
+			CreatedAt: m.CreatedAt, Outcome: m.Outcome, LatencyMs: m.LatencyMs, ToolCalls: chatToolCallsToProto(m.ToolCalls),
+			LoopStopped: m.LoopStopped}
 		if m.Tokens != nil {
 			pm.PromptTokens, pm.CompletionTokens = m.Tokens.Prompt, m.Tokens.Completion
 		}
@@ -191,7 +192,7 @@ func chatToolCallsToProto(calls []ChatToolCall) []*proto.ChatToolCallProto {
 // chatMessageFromProto is the REST body of one appended message.
 func chatMessageFromProto(m *proto.ChatMessageProto) ChatMessage {
 	out := ChatMessage{ID: m.GetId(), Role: m.GetRole(), Content: m.GetContent(), Model: m.GetModel(), Provider: m.GetProvider(),
-		CreatedAt: m.GetCreatedAt(), Outcome: m.GetOutcome(), LatencyMs: m.GetLatencyMs()}
+		CreatedAt: m.GetCreatedAt(), Outcome: m.GetOutcome(), LatencyMs: m.GetLatencyMs(), LoopStopped: m.GetLoopStopped()}
 	if m.GetPromptTokens() != 0 || m.GetCompletionTokens() != 0 {
 		out.Tokens = &ChatTokens{Prompt: m.GetPromptTokens(), Completion: m.GetCompletionTokens()}
 	}

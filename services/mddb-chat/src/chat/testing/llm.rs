@@ -1,7 +1,10 @@
 //! A scripted `LlmProvider`: the tests decide what the model says.
 
 use std::collections::VecDeque;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+
+use futures::StreamExt;
 
 use crate::error::AppError;
 use crate::llm::provider::{
@@ -17,6 +20,9 @@ pub struct ScriptedLlm {
     turns: Mutex<VecDeque<Result<ChatTurn, AppError>>>,
     /// What `chat_stream_raw` yields.
     stream: Mutex<Option<StreamScript>>,
+    /// An endless stream instead (#413): an intro, then one paragraph for
+    /// ever, and the flag raised when the stream is dropped.
+    endless: Mutex<Option<(String, String, Arc<AtomicBool>)>>,
     /// Every request the handler sent, for asserting on the prompt.
     pub requests: Mutex<Vec<Vec<ApiMsg>>>,
     /// The parameters of every call, streaming ones included (#403).
@@ -69,6 +75,16 @@ impl ScriptedLlm {
         self
     }
 
+    /// The streaming fallback yields `intro`, then `paragraph` for ever
+    /// (#413). The flag returned is raised once the stream is dropped — the
+    /// request cancelled.
+    pub fn stream_forever(&self, intro: &str, paragraph: &str) -> Arc<AtomicBool> {
+        let dropped = Arc::new(AtomicBool::new(false));
+        *self.endless.lock().expect("endless lock") =
+            Some((intro.to_string(), paragraph.to_string(), dropped.clone()));
+        dropped
+    }
+
     /// The streaming call itself fails.
     pub fn fail_stream(&self, message: &str) -> &Self {
         *self.stream.lock().expect("stream lock") =
@@ -110,6 +126,17 @@ impl LlmProvider for ScriptedLlm {
             .lock()
             .expect("params lock")
             .push(params.clone());
+        if let Some((intro, paragraph, dropped)) = self.endless.lock().expect("endless lock").take()
+        {
+            let raised = Raise(dropped);
+            let endless = futures::stream::once(async { Ok(intro) })
+                .chain(futures::stream::repeat(paragraph).map(Ok))
+                .map(move |chunk| {
+                    let _held = &raised;
+                    chunk
+                });
+            return Ok(Box::pin(endless));
+        }
         let chunks = self
             .stream
             .lock()
@@ -117,5 +144,14 @@ impl LlmProvider for ScriptedLlm {
             .take()
             .expect("the test scripted the stream")?;
         Ok(Box::pin(futures::stream::iter(chunks)))
+    }
+}
+
+/// Raises its flag when dropped.
+struct Raise(Arc<AtomicBool>);
+
+impl Drop for Raise {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::SeqCst);
     }
 }

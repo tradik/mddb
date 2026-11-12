@@ -90,6 +90,7 @@ type ChatLLM struct {
 	Temperature *float64       `json:"temperature,omitempty"`
 	MaxTokens   int            `json:"maxTokens,omitempty"`
 	ExtraBody   map[string]any `json:"extraBody,omitempty"`
+	LoopGuard   *ChatLoopGuard `json:"loopGuard,omitempty"` // #413, chat_loop_guard.go
 }
 
 // ChatRateLimit bounds a session's traffic.
@@ -174,6 +175,9 @@ func (c *ChatScenario) Normalize(exists func(string) bool) error {
 		if n < 0 {
 			return fmt.Errorf("%s may not be negative", field)
 		}
+	}
+	if err := c.LLM.LoopGuard.validate(); err != nil {
+		return err
 	}
 	if len(c.Skills) > maxChatScenarioSkills {
 		return fmt.Errorf("at most %d skills", maxChatScenarioSkills)

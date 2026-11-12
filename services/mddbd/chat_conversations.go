@@ -96,6 +96,8 @@ type ChatMessage struct {
 	Outcome   string        `json:"outcome,omitempty"`
 	LatencyMs int64         `json:"latencyMs,omitempty"`
 	Feedback  *ChatFeedback `json:"feedback,omitempty"`
+	// LoopStopped marks an answer mddb-chat's loop guard cut short (#413).
+	LoopStopped bool `json:"loopStopped,omitempty"`
 }
 
 // ChatConversationSummary is a conversation without its messages, as a

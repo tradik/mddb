@@ -63,6 +63,16 @@ describe('turns', () => {
     fireEvent.click(screen.getAllByRole('button', { name: /Hide the turn/ })[0]);
   });
 
+  // #413: an answer the loop guard stopped is marked in the row and the detail.
+  test('a turn the loop guard stopped is marked', async () => {
+    vi.mocked(mddbClient.chatLog).mockResolvedValue({ turns: [{ ...anon, loopStopped: true }, signed] });
+    render(<ChatLogPanel />);
+    expect(await screen.findByText('loop stopped')).toBeTruthy();
+    expect(screen.getAllByText('loop stopped')).toHaveLength(1);
+    fireEvent.click(screen.getAllByRole('button', { name: /^Show the turn of/ })[0]);
+    expect(screen.getByText(/was stopped where the repetition began/)).toBeTruthy();
+  });
+
   test('a next page without turns keeps what is shown', async () => {
     render(<ChatLogPanel />);
     await screen.findByText('Where is the backup guide?');

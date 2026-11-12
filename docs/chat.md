@@ -125,7 +125,8 @@ Everything else is a TOML key, not an environment variable:
 | Listen port | `[server] port` | `11030` |
 | Concurrent sessions | `[session] max_concurrent` | `2` |
 | Messages per minute | `[security] rate_limit_per_minute` | `30` |
-| Webhook events (2.19.0) | `[[webhooks]] events` | `["session.start", "session.end", "queue.full"]` when omitted; add `"message"`, `"answer"`, `"feedback"` to log questions, answers and ratings |
+| Webhook events (2.19.0) | `[[webhooks]] events` | `["session.start", "session.end", "queue.full"]` when omitted; add `"message"`, `"answer"`, `"feedback"` to log questions, answers and ratings, and `"message.loop_stopped"` (2.19.2) for answers the loop guard stopped |
+| Repetition-loop guard (2.19.2) | `[llm.loop_guard]` | on; `ngram = 64`, `window = 256`, `ratio = 0.8`, `min_output = 200`, `unit = "chars"` — see below |
 
 Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming another collection is refused. Each answer ends with a `done` frame carrying `message_id`, which a `feedback` message can name. Payloads of the webhook events are in [`services/mddb-chat/README.md`](../services/mddb-chat/README.md#webhooks).
 
@@ -136,6 +137,17 @@ Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming 
 - `[llm] extra_body = { reasoning_effort = "none" }` adds fields to every OpenAI-compatible request, for thinking models that otherwise return an empty answer.
 - Scenarios can live in mddbd and be edited in the panel's Chat page (`/v1/chat/scenarios`); the TOML `[scenarios]` stay as bootstrap and fallback.
 
+### Repetition-loop guard (2.19.2)
+
+Small models behind Ollama sometimes repeat the same lines until `max_tokens` runs out. `mddb-chat` watches every answer and stops one that has fallen into such a loop:
+
+- **Detection.** A unit (a character by default, or a word with `unit = "words"`) counts as repeated when the `ngram` units ending at it already occurred earlier in the same answer. Once the answer is `min_output` units long, a loop is declared when at least `ratio` of the last `window` units are repeats. The check is a rolling hash, constant work per streamed character.
+- **Code and tables.** Fenced code blocks (```` ``` ```` or `~~~`) and Markdown table rows (lines starting with `|`) are never counted, so repeated config lines and table rows are not cut.
+- **On detection.** A streamed answer's request is cancelled (the connection to the model is closed), the answer is kept up to where the repetition began and ends with `[Response stopped: repetition detected]`, and the turn finishes normally. The visitor may already have seen up to one `window` of the repeat; the stored answer — session history, conversation log, `answer` webhook — ends at the loop. A non-streaming answer (the usual path) is cut before the visitor sees any of the repeat; its tokens are what the provider reports.
+- **Reporting.** One log line (session, scenario, round, position, ratio — never the text), the counter `mddb_chat_loop_guard_triggered_total{scenario}` at `GET /metrics`, the opt-in webhook event `message.loop_stopped`, and `loopStopped: true` on the stored answer, shown as *loop stopped* in the panel's Chat log.
+- **Per scenario.** A scenario stored in mddbd overrides the guard field by field with `llm.loopGuard` (`enabled`, `ngram`, `window`, `ratio`, `minOutput`, `unit`), so a code-heavy scenario can loosen it or turn it off; the panel's scenario editor has these fields under *Model and limits*.
+- **Complement.** `[llm] extra_body = { frequency_penalty = 0.3, presence_penalty = 0.3 }` makes a loop less likely in the first place, at the price of answers that legitimately repeat terms. The guard does not retry a stopped answer.
+
 ### Scenarios from mddbd (2.19.0)
 
 `mddb-chat` loads the scenarios stored in mddbd as soon as it is connected and looks at the store's version every `[scenarios_source] poll_seconds` (default `10`; `0` turns it off). When the version changed they are reloaded without a restart, and no session is dropped: an open session gets the new scenario at its next message.
@@ -143,7 +155,7 @@ Since 2.19.0 a scenario's `allowed_collections` is enforced: a tool call naming 
 - **Which one wins.** A scenario stored in mddbd wins over the TOML `[scenarios.<name>]` of the same name. A name mddbd does not have is served from the TOML, and so is every name until mddbd is reached or when mddbd is older than 2.19.0.
 - **Disabled.** A scenario stored with `enabled: false` is refused at `join` with `scenario is disabled`; the TOML scenario of the same name does not stand in.
 - **Prompt.** The system prompt is the one mddbd composes (operator prompt, guardrails, off-topic clause, the scenario's skills, style clause, the collections' `responsePrompt`s), so the panel's preview is what the model reads.
-- **Applied fields.** `allowedCollections` bound the tools, `llm.model` / `temperature` / `maxTokens` / `extraBody` override `[llm]` for that scenario, and `maxTurns`, `tokenBudgetPerSession` and `rateLimit.messagesPerMinute` (per session) limit the conversation. A field left at 0 or empty keeps the server's own setting. `skills` reach the model through that composed prompt (see Skills below).
+- **Applied fields.** `allowedCollections` bound the tools, `llm.model` / `temperature` / `maxTokens` / `extraBody` / `loopGuard` (2.19.2) override `[llm]` for that scenario, and `maxTurns`, `tokenBudgetPerSession` and `rateLimit.messagesPerMinute` (per session) limit the conversation. A field left at 0 or empty keeps the server's own setting. `skills` reach the model through that composed prompt (see Skills below).
 - **Health.** `GET /health` reports `"scenarios_source": "mddbd" | "toml"` and `"scenarios_version"`.
 - **The `chat` feature (GO-049).** `mddb-chat` follows mddbd's `chat` module switch on the same poll: while it is off, `join` is refused with `chat is disabled on this server`, the scenarios are not reloaded (the cached ones stay), and `GET /health` shows `"chat_enabled": false` (`chat_external_mcp_enabled` mirrors `chatExternalMcp`). An mddbd without `ListFeatures` counts as chat on.
 

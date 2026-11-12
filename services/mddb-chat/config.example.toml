@@ -71,6 +71,30 @@ temperature = 0.7
 # Other examples:
 #   extra_body = { seed = 7, top_p = 0.9, options = { num_ctx = 8192 } }
 
+# The repetition-loop guard (#413). Small models sometimes repeat the same
+# lines until max_tokens runs out; the guard stops such an answer early. A
+# unit counts as repeated when the `ngram` units ending at it already occurred
+# earlier in the same answer; once the answer is `min_output` units long and
+# at least `ratio` of the last `window` units are repeats, the answer is cut
+# where the repetition began and ends with "[Response stopped: repetition
+# detected]". A streamed answer's request is cancelled at that point.
+# Fenced code blocks and Markdown table rows are never counted, so repeated
+# config lines and table rows are not cut.
+#
+# On by default, with these conservative values. A scenario stored in mddbd
+# overrides them field by field (llm.loopGuard). Penalties sent through
+# extra_body — { frequency_penalty = 0.3, presence_penalty = 0.3 } — make a
+# loop less likely in the first place; they complement the guard, at the
+# price of answers that legitimately repeat terms.
+[llm.loop_guard]
+enabled = true
+ngram = 64          # units per compared fragment
+window = 256        # how many of the latest units the repeated share covers
+ratio = 0.8         # repeated share that counts as a loop, above 0 and at most 1
+min_output = 200    # units an answer must have before it is judged
+unit = "chars"      # "chars" (no tokenizer needed) or "words"; in words the
+                    # defaults are ngram 16, window 64, min_output 50
+
 [session]
 max_concurrent = 2
 queue_size = 10

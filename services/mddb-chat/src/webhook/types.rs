@@ -41,6 +41,15 @@ pub enum WebhookData {
         tools: Vec<ToolCallRecord>,
         latency_ms: u64,
     },
+    /// An answer the loop guard stopped (#413).
+    LoopStopped {
+        session_id: String,
+        scenario: String,
+        message_id: String,
+        round: usize,
+        position: usize,
+        ratio: f64,
+    },
     /// A visitor's rating of an answer (#399).
     Feedback {
         session_id: String,

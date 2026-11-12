@@ -94,6 +94,8 @@ func validChatTurn(i int, m *ChatMessage) error {
 		return chatInvalid("message %d: outcome must be answered, noResults, refused or error", i)
 	case m.Outcome != "" && m.Role != "assistant":
 		return chatInvalid("message %d: only an assistant message has an outcome", i)
+	case m.LoopStopped && m.Role != "assistant":
+		return chatInvalid("message %d: only an assistant message is stopped by the loop guard", i)
 	case m.LatencyMs < 0:
 		return chatInvalid("message %d: latencyMs is negative", i)
 	case len(m.ToolCalls) > chatMaxToolCallsPerMs:

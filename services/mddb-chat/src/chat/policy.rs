@@ -122,7 +122,7 @@ model = "test"
     /// The policy a turn in `scenario` gets, the way `turn.rs` builds it.
     fn policy_of(config: &Config, scenario: &str) -> ToolPolicy {
         let active = match resolve(config, &ScenarioStore::default(), scenario) {
-            Resolved::Active(active) => active,
+            Resolved::Active(active) => *active,
             _ => ActiveScenario::generic(config),
         };
         ToolPolicy::for_scenario(&active, config.mddb.result_max_chars)

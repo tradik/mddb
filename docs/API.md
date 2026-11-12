@@ -1935,6 +1935,7 @@ curl http://localhost:11023/v1/chat/scenarios/version
 | `style.markdown` | boolean | `false` |
 | `style.citationTemplate` | how a source is cited, e.g. a link template with `{{key}}` | none |
 | `llm.model`, `llm.maxTokens`, `llm.extraBody` | model name, token cap, an object sent to the model API as is | unset |
+| `llm.loopGuard` | overrides mddb-chat's repetition-loop guard (2.19.2, #413): `enabled` (boolean), `ngram` (0–4096), `window` (0–65536, not shorter than `ngram`), `ratio` (0–1), `minOutput` (0–1000000), `unit` (`chars` or `words`); 0 or empty keeps mddb-chat's `[llm.loop_guard]` value ([chat.md](chat.md#repetition-loop-guard-2192)) | unset |
 | `llm.temperature` | 0 to 2; `0` is kept as 0, leaving it out means unset | unset |
 | `maxTurns`, `tokenBudgetPerSession`, `rateLimit.messagesPerMinute` | 0 or more; 0 means no limit from the scenario | 0 |
 | `logging.enabled` | boolean: record every turn, anonymous sessions included, for the [conversation log](#chat-conversation-log-v1chatlog) (#406) | `false` |
@@ -3828,6 +3829,7 @@ New, additive message fields — everything above keeps working unchanged:
 | `messages[].id` | Kept when the caller sends one matching `[A-Za-z0-9_-]{1,64}` (so a rating can name the answer by the id the client saw — `mddb-chat` sends the `done` frame's `message_id`); otherwise set by the server |
 | `messages[].outcome` | Marks a **logged turn** (assistant messages only): `answered`, `noResults`, `refused` or `error`. An `answered` reply that is the scenario's redirect text (`offTopic.mode: redirect`) is stored as `refused`. A message with an outcome may have empty content (a failed turn) |
 | `messages[].latencyMs` | How long the turn took, 0 or more |
+| `messages[].loopStopped` | `true` on an answer mddb-chat's loop guard cut short (2.19.2, #413); assistant messages only |
 | `messages[].toolCalls[].query`, `.resultKeys`, `.topScore` | What a tool searched for (at most 4096 bytes), the keys it found, best first (at most 50), and the best score |
 | `messages[].toolCalls[].server` | The external MCP server of the tool (MCP-005); absent for a built-in tool. `name` is the tool's own name |
 | `messages[].feedback` | `{"rating","comment"?,"at"}` — set only by the feedback call; a `feedback` sent in an append is dropped |
@@ -4001,7 +4003,8 @@ A turn:
 `question` is the user message before the answer; `answerExcerpt` is the
 answer on one line, at most 280 characters. An anonymous session's turn has
 `anonymous: true` and no `sub` or `displayName` — its session id is never
-shown as an identity. Identities (`sub`, `displayName`) appear only because
+shown as an identity. A turn mddb-chat's loop guard cut short carries
+`"loopStopped": true` (2.19.2, #413). Identities (`sub`, `displayName`) appear only because
 the API is for global administrators.
 
 **Export.** Every turn the filters select, at most 100 000, written and
@@ -4009,7 +4012,7 @@ flushed row by row. JSON is one array of turns. CSV is RFC 4180 (fields with
 commas, quotes or line breaks are quoted, quotes doubled) under the header
 `time, conversationId, messageId, scenario, sub, displayName, anonymous,
 question, answer, outcome, rating, comment, model, provider, latencyMs,
-promptTokens, completionTokens, tools, topScore` — `time` in RFC 3339 UTC,
+promptTokens, completionTokens, tools, topScore, loopStopped` — `time` in RFC 3339 UTC,
 `tools` as `name(query) → key key; …` (`server/name` for an external MCP tool), `topScore` the best of the turn. A
 cell that starts with `=`, `+`, `-`, `@` or a tab gets a leading apostrophe,
 so a spreadsheet does not run visitor text as a formula (CSV injection).

@@ -66,6 +66,7 @@ async fn llm_settings_override_the_llm_section_for_that_scenario() {
             temperature_set: true,
             max_tokens: 800,
             extra_body_json: r#"{"reasoning_effort":"low"}"#.to_string(),
+            loop_guard: None,
         }),
         ..scenario("support", &["kb"])
     };

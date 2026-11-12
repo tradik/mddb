@@ -95,7 +95,8 @@ func chatScenarioGRPCError(err error) error {
 
 // chatScenarioToProto is the scenario on the wire.
 func chatScenarioToProto(sc *ChatScenario) *proto.ChatScenarioProto {
-	llm := &proto.ChatLLMProto{Model: sc.LLM.Model, MaxTokens: safeInt32(sc.LLM.MaxTokens)}
+	llm := &proto.ChatLLMProto{Model: sc.LLM.Model, MaxTokens: safeInt32(sc.LLM.MaxTokens),
+		LoopGuard: chatLoopGuardToProto(sc.LLM.LoopGuard)}
 	if t := sc.LLM.Temperature; t != nil {
 		llm.Temperature, llm.TemperatureSet = *t, true
 	}
@@ -139,7 +140,8 @@ func chatScenarioFromProto(p *proto.ChatScenarioProto) (*ChatScenario, error) {
 		AllowedCollections: p.GetAllowedCollections(), Skills: p.GetSkills(),
 		Style: ChatStyle{Emoji: p.GetStyle().GetEmoji(), Verbosity: p.GetStyle().GetVerbosity(), Markdown: p.GetStyle().GetMarkdown(),
 			CitationTemplate: p.GetStyle().GetCitationTemplate()},
-		LLM:      ChatLLM{Model: p.GetLlm().GetModel(), MaxTokens: int(p.GetLlm().GetMaxTokens())},
+		LLM: ChatLLM{Model: p.GetLlm().GetModel(), MaxTokens: int(p.GetLlm().GetMaxTokens()),
+			LoopGuard: chatLoopGuardFromProto(p.GetLlm().GetLoopGuard())},
 		MaxTurns: int(p.GetMaxTurns()), TokenBudgetPerSession: int(p.GetTokenBudgetPerSession()),
 		RateLimit:  ChatRateLimit{MessagesPerMinute: int(p.GetRateLimit().GetMessagesPerMinute())},
 		McpServers: chatMcpServersFromProto(p.GetMcpServers()),

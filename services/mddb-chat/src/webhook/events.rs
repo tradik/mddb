@@ -16,15 +16,19 @@ pub const QUEUE_FULL: &str = "queue.full";
 pub const MESSAGE: &str = "message";
 pub const ANSWER: &str = "answer";
 pub const FEEDBACK: &str = "feedback";
+/// An answer the loop guard stopped (#413). Dotted, being a kind of message
+/// event rather than one of the three words #399 named.
+pub const LOOP_STOPPED: &str = "message.loop_stopped";
 
 /// Every event this server can emit, in documentation order.
-pub const ALL: [&str; 6] = [
+pub const ALL: [&str; 7] = [
     SESSION_START,
     SESSION_END,
     QUEUE_FULL,
     MESSAGE,
     ANSWER,
     FEEDBACK,
+    LOOP_STOPPED,
 ];
 
 /// What a webhook receives when its config names no events: the set that
@@ -68,6 +72,22 @@ pub struct AnswerReport<'a> {
     pub latency_ms: u64,
 }
 
+/// Everything a `message.loop_stopped` event says (#413).
+#[derive(Debug)]
+pub struct LoopStopReport<'a> {
+    pub session_id: &'a str,
+    pub scenario: &'a str,
+    /// The id the stopped answer is stored and reported under.
+    pub message_id: &'a str,
+    /// The model call that looped: a tool-calling round from 0, or the
+    /// streamed answer after the last one.
+    pub round: usize,
+    /// Units judged when the loop was declared.
+    pub position: usize,
+    /// The repeated share of the window at that moment.
+    pub ratio: f64,
+}
+
 impl WebhookPayload {
     /// A visitor's question, after sanitising.
     pub fn message(session_id: &str, scenario: &str, message_id: &str, text: &str) -> Self {
@@ -99,6 +119,23 @@ impl WebhookPayload {
                 usage: usage_report(report.spent),
                 tools: report.tools,
                 latency_ms: report.latency_ms,
+            },
+        }
+    }
+
+    /// An answer the loop guard stopped (#413): where, never what — the
+    /// text stays out of it, as it does out of the log line.
+    pub fn loop_stopped(report: LoopStopReport<'_>) -> Self {
+        Self {
+            event: LOOP_STOPPED.to_string(),
+            timestamp: now_unix(),
+            data: WebhookData::LoopStopped {
+                session_id: report.session_id.to_string(),
+                scenario: report.scenario.to_string(),
+                message_id: report.message_id.to_string(),
+                round: report.round,
+                position: report.position,
+                ratio: report.ratio,
             },
         }
     }

@@ -60,7 +60,8 @@ func chatLogTurnToProto(t ChatLogTurn) *proto.ChatLogTurnProto {
 	out := &proto.ChatLogTurnProto{ConversationId: t.ConversationID, MessageId: t.MessageID, Scenario: t.Scenario,
 		Sub: t.Sub, DisplayName: t.DisplayName, Anonymous: t.Anonymous, At: t.At, Question: t.Question,
 		Answer: t.Answer, AnswerExcerpt: t.AnswerExcerpt, Outcome: t.Outcome, Rating: t.Rating, Comment: t.Comment,
-		Model: t.Model, Provider: t.Provider, LatencyMs: t.LatencyMs, ToolCalls: chatToolCallsToProto(t.ToolCalls)}
+		Model: t.Model, Provider: t.Provider, LatencyMs: t.LatencyMs, ToolCalls: chatToolCallsToProto(t.ToolCalls),
+		LoopStopped: t.LoopStopped}
 	if t.Tokens != nil {
 		out.PromptTokens, out.CompletionTokens = t.Tokens.Prompt, t.Tokens.Completion
 	}

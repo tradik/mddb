@@ -68,6 +68,42 @@ fn a_message_event_names_the_question_and_where_it_was_asked() {
     assert_eq!(v["data"].as_object().unwrap().len(), 4);
 }
 
+// #413: where an answer was stopped, never what it said.
+#[test]
+fn a_loop_stopped_event_says_where_and_how_much_and_nothing_of_the_text() {
+    let v = json(&WebhookPayload::loop_stopped(LoopStopReport {
+        session_id: "sess-1",
+        scenario: "support",
+        message_id: "ans-1",
+        round: 5,
+        position: 412,
+        ratio: 0.85,
+    }));
+
+    assert_eq!(v["event"], "message.loop_stopped");
+    assert!(is_known("message.loop_stopped"));
+    assert!(
+        !legacy_events().contains(&LOOP_STOPPED.to_string()),
+        "opt-in"
+    );
+    let data = v["data"].as_object().unwrap();
+    assert_eq!(data.len(), 6, "{data:?}");
+    assert_eq!(
+        (
+            &data["message_id"],
+            &data["round"],
+            &data["position"],
+            &data["ratio"]
+        ),
+        (
+            &serde_json::json!("ans-1"),
+            &serde_json::json!(5),
+            &serde_json::json!(412),
+            &serde_json::json!(0.85)
+        )
+    );
+}
+
 #[test]
 fn an_answer_event_reports_the_model_its_cost_and_its_tools() {
     let spent = TokenUsage {

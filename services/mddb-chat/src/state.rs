@@ -5,6 +5,7 @@ use crate::chat::scenario::ScenarioStore;
 use crate::config::Config;
 use crate::grpc::link::MddbLink;
 use crate::llm::provider::LlmProvider;
+use crate::metrics::Metrics;
 use crate::security::client_ip::TrustedProxies;
 use crate::security::rate_limiter::RateLimiter;
 use crate::security::sanitizer::Sanitizer;
@@ -28,4 +29,6 @@ pub struct AppState {
     pub sanitizer: Sanitizer,
     /// Parsed once at startup (SEC-014); see security/client_ip.rs.
     pub trusted_proxies: TrustedProxies,
+    /// The counters `/metrics` serves (#413).
+    pub metrics: Metrics,
 }

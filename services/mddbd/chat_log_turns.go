@@ -44,6 +44,7 @@ type ChatLogTurn struct {
 	LatencyMs      int64          `json:"latencyMs,omitempty"`
 	Tokens         *ChatTokens    `json:"tokens,omitempty"`
 	ToolCalls      []ChatToolCall `json:"toolCalls,omitempty"`
+	LoopStopped    bool           `json:"loopStopped,omitempty"` // #413: the loop guard cut the answer short
 }
 
 // ChatLogPage is one page of the log, newest first.
@@ -116,7 +117,7 @@ func chatLogTurn(c *ChatConversation, m *ChatMessage, question string) ChatLogTu
 		ConversationID: c.ID, MessageID: m.ID, Scenario: c.Scenario, Anonymous: chatAnonymous(c.Sub),
 		At: m.CreatedAt, Question: question, Answer: m.Content, AnswerExcerpt: chatExcerpt(m.Content),
 		Outcome: m.Outcome, Model: m.Model, Provider: m.Provider, LatencyMs: m.LatencyMs,
-		Tokens: m.Tokens, ToolCalls: m.ToolCalls,
+		Tokens: m.Tokens, ToolCalls: m.ToolCalls, LoopStopped: m.LoopStopped,
 	}
 	if !t.Anonymous {
 		t.Sub, t.DisplayName = c.Sub, c.DisplayName

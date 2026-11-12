@@ -71,6 +71,16 @@ fn a_short_secret_is_a_startup_error() {
     assert!(err.contains("at least 32 bytes"), "{err}");
 }
 
+// #413: the loop guard is on unless turned off; a ratio that can never
+// match is refused at startup rather than silently never stopping a loop.
+#[test]
+fn the_loop_guard_is_on_by_default_and_checked_at_startup() {
+    let cfg = load("loop-guard-default", MINIMAL).expect("loads");
+    assert!(cfg.llm.loop_guard.settings().is_some());
+    let err = load("loop-guard-bad", &with("[llm.loop_guard]\nratio = 2.0")).expect_err("refused");
+    assert!(err.contains("ratio"), "{err}");
+}
+
 #[test]
 fn requiring_identity_without_a_secret_is_a_startup_error() {
     let err = load("identity-required", &with("[identity]\nrequired = true")).expect_err("refused");
@@ -166,6 +176,11 @@ fn the_example_config_loads_with_identity_off() {
     let cfg = Config::load(&path).expect("config.example.toml loads");
     assert!(!cfg.identity.required);
     assert_eq!(cfg.mddb.http_url, "");
+    let guard = cfg.llm.loop_guard.settings().expect("documented as on");
+    assert_eq!(
+        (guard.ngram, guard.window, guard.min_output),
+        (64, 256, 200)
+    );
     assert_eq!(
         cfg.get_scenario("support").unwrap().retention_days,
         Some(30)

@@ -127,6 +127,12 @@ describe('editing a stored scenario', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add field' }));
     type('Extra field 2 name', 'top_k');
     type('Extra field 2 value', '40');
+    type('Guard', 'on');
+    type('Unit', 'words');
+    type('Repeated share', '0.9');
+    type('Fragment length', '16');
+    type('Window', '64');
+    type('Judge after', '50');
     type('Max turns per session', '8');
     type('Token budget per session', '20000');
     type('Messages per minute', '10');
@@ -145,7 +151,10 @@ describe('editing a stored scenario', () => {
       allowedCollections: ['docs', 'runbooks'],
       skills: ['triage', 'refunds'],
       style: { emoji: 'free', verbosity: 'long', markdown: false, citationTemplate: '[{{key}}]' },
-      llm: { model: 'gpt-y', maxTokens: 900, temperature: 0, extraBody: { reasoning_effort: 'high', top_k: 40 } },
+      llm: {
+        model: 'gpt-y', maxTokens: 900, temperature: 0, extraBody: { reasoning_effort: 'high', top_k: 40 },
+        loopGuard: { enabled: true, ngram: 16, window: 64, ratio: 0.9, minOutput: 50, unit: 'words' }, // #413
+      },
       maxTurns: 8,
       tokenBudgetPerSession: 20000,
       rateLimit: { messagesPerMinute: 10 },

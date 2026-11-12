@@ -219,8 +219,11 @@ the same server functions and gated with the same permissions:
 `ChatScenarioProto` mirrors the REST body: `off_topic` (`mode`,
 `redirect_template`), `style` (`emoji`, `verbosity`, `markdown`,
 `citation_template`), `llm` (`model`, `temperature` with `temperature_set`,
-because 0 is a meaningful temperature, `max_tokens`, and `extra_body_json`,
-a JSON object as a string), `rate_limit` (`messages_per_minute`),
+because 0 is a meaningful temperature, `max_tokens`, `extra_body_json`,
+a JSON object as a string, and since 2.19.2 `loop_guard` — `ChatLoopGuardProto`:
+`optional bool enabled`, `ngram`, `window`, `ratio`, `min_output`, `unit`, each
+0 or empty for "keep mddb-chat's `[llm.loop_guard]` value", #413),
+`rate_limit` (`messages_per_minute`),
 `mcp_servers` (`ChatMcpServerProto`, since 2.19.0: `name`, `url`, `enabled`,
 `secret_ref`, `allowed_tools`, `timeout_ms`, `result_max_chars`, and since
 2.19.2 `forward_identity` — `ChatMcpForwardIdentityProto {secret_ref, header,
@@ -365,6 +368,10 @@ The rating of an answer and the admin review of the turn log, as
 
 The export (`GET /v1/chat/log/export`, CSV or JSON) is REST only: walk
 `ListChatLog` with its cursor for the same turns over gRPC.
+
+Since 2.19.2 (#413) `ChatMessageProto` (field 13) and `ChatLogTurnProto`
+(field 20) carry `loop_stopped`: mddb-chat's repetition-loop guard cut that
+answer short.
 
 Additive message fields: `ChatMessageProto` gains `outcome` (`answered`,
 `noResults`, `refused`, `error` — a logged turn), `latency_ms` and `feedback`

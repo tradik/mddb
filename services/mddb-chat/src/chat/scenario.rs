@@ -17,6 +17,7 @@ mod tests;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::chat::loop_guard::LoopGuardSettings;
 use crate::chat::mcp::McpServers;
 use crate::chat::turnlog::LogPolicy;
 use crate::config::{Config, Scenario};
@@ -79,6 +80,9 @@ pub struct ActiveScenario {
     pub mcp: Arc<McpServers>,
     /// The turn log (#406); off unless a scenario in mddbd turns it on.
     pub logging: LogPolicy,
+    /// The loop guard (#413): `[llm.loop_guard]` with the scenario's
+    /// `llm.loopGuard` laid over it, settled; `None` when it is off.
+    pub loop_guard: Option<LoopGuardSettings>,
 }
 
 impl ActiveScenario {
@@ -102,6 +106,7 @@ impl ActiveScenario {
             retention_days: 0,
             mcp: Arc::default(),
             logging: LogPolicy::default(),
+            loop_guard: config.llm.loop_guard.settings(),
         }
     }
 
@@ -145,6 +150,7 @@ impl ActiveScenario {
         active.messages_per_minute = stored.messages_per_minute;
         active.mcp = stored.mcp.clone();
         active.logging = stored.logging.clone();
+        active.loop_guard = config.llm.loop_guard.overlay(&stored.loop_guard).settings();
         active
     }
 
@@ -165,7 +171,8 @@ impl ActiveScenario {
 /// What a scenario name leads to.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Resolved {
-    Active(ActiveScenario),
+    /// Boxed: a scenario is large next to the other two variants.
+    Active(Box<ActiveScenario>),
     /// mddbd has it with `enabled: false`. A TOML scenario of the same name
     /// does not stand in: switching a scenario off must switch it off.
     Disabled,
@@ -176,7 +183,7 @@ impl Resolved {
     /// The scenario when it may be served, `None` when disabled or unknown.
     pub fn active(self) -> Option<ActiveScenario> {
         match self {
-            Resolved::Active(scenario) => Some(scenario),
+            Resolved::Active(scenario) => Some(*scenario),
             Resolved::Disabled | Resolved::Unknown => None,
         }
     }
@@ -186,12 +193,12 @@ impl Resolved {
 pub fn resolve(config: &Config, store: &ScenarioStore, name: &str) -> Resolved {
     if let Some(stored) = store.get(name) {
         return match stored.enabled {
-            true => Resolved::Active(ActiveScenario::from_stored(config, &stored)),
+            true => Resolved::Active(Box::new(ActiveScenario::from_stored(config, &stored))),
             false => Resolved::Disabled,
         };
     }
     match config.get_scenario(name) {
-        Some(scenario) => Resolved::Active(ActiveScenario::from_toml(config, scenario)),
+        Some(scenario) => Resolved::Active(Box::new(ActiveScenario::from_toml(config, scenario))),
         None => Resolved::Unknown,
     }
 }

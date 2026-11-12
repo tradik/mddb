@@ -107,6 +107,11 @@ model = "qwen3:8b"
 max_tokens = 1024
 temperature = 0.7
 
+# On by default (2.19.2): stops an answer that keeps repeating itself, which
+# small local models sometimes do. See docs/chat.md, "Repetition-loop guard".
+[llm.loop_guard]
+enabled = true
+
 [session]
 max_concurrent = 2
 queue_size = 10

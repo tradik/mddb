@@ -8,6 +8,7 @@ mod feedback;
 mod identity_tools;
 mod lifecycle;
 mod limits;
+mod loop_guard;
 mod message;
 mod resume;
 mod scenario_settings;

@@ -226,6 +226,10 @@ pub struct LlmConfig {
     /// are ignored here: the request wins. Not used by the Anthropic provider.
     #[serde(default)]
     pub extra_body: serde_json::Map<String, serde_json::Value>,
+    /// `[llm.loop_guard]` (#413): stops an answer caught in a repetition
+    /// loop. On with conservative defaults when the table is absent.
+    #[serde(default)]
+    pub loop_guard: crate::chat::loop_guard::LoopGuardConfig,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -370,6 +374,7 @@ impl Config {
     /// whose login URL cannot be found.
     pub fn validate(&self) -> Result<(), String> {
         self.identity.validate()?;
+        self.llm.loop_guard.validate()?;
         if !self.mddb.auth_username.is_empty() {
             self.mddb.http_base()?;
         }

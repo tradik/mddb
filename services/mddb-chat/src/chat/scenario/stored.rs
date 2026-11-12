@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use tracing::warn;
 
+use crate::chat::loop_guard::LoopGuardConfig;
 use crate::chat::mcp::{McpServers, limits_of};
 use crate::chat::turnlog::LogPolicy;
 use crate::grpc::client::proto::{ChatMcpServerStateProto, ChatScenarioProto};
@@ -38,6 +39,8 @@ pub struct StoredScenario {
     pub mcp: Arc<McpServers>,
     /// The turn log (#406).
     pub logging: LogPolicy,
+    /// The scenario's overrides of `[llm.loop_guard]` (#413).
+    pub loop_guard: LoopGuardConfig,
 }
 
 impl StoredScenario {
@@ -57,6 +60,7 @@ impl StoredScenario {
             prompt,
             allowed_collections: scenario.allowed_collections,
             extra_body: parse_extra_body(&scenario.name, &llm.extra_body_json),
+            loop_guard: LoopGuardConfig::from_proto(llm.loop_guard),
             model: Some(llm.model).filter(|model| !model.is_empty()),
             // 0 is a temperature, so mddbd says separately whether it is set.
             temperature: llm.temperature_set.then_some(llm.temperature as f32),
@@ -122,7 +126,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::grpc::client::proto::{ChatLlmProto, ChatRateLimitProto};
+    use crate::grpc::client::proto::{ChatLlmProto, ChatLoopGuardProto, ChatRateLimitProto};
     use crate::grpc::testing::scenario;
 
     fn stored(scenario: ChatScenarioProto) -> StoredScenario {
@@ -139,6 +143,10 @@ mod tests {
                 temperature_set: true,
                 max_tokens: 800,
                 extra_body_json: r#"{"reasoning_effort":"low"}"#.to_string(),
+                loop_guard: Some(ChatLoopGuardProto {
+                    enabled: Some(false),
+                    ..Default::default()
+                }),
             }),
             max_turns: 12,
             token_budget_per_session: 50_000,
@@ -160,6 +168,7 @@ mod tests {
         assert_eq!(full.max_turns, Some(12));
         assert_eq!(full.token_budget, 50_000);
         assert_eq!(full.messages_per_minute, 20);
+        assert_eq!(full.loop_guard.enabled, Some(false));
 
         let bare = stored(scenario("bare", &[]));
         assert_eq!(bare.label, "bare", "no description: the name is the label");
@@ -167,6 +176,7 @@ mod tests {
         assert_eq!(bare.temperature, None);
         assert_eq!(bare.max_tokens, None);
         assert!(bare.extra_body.is_empty());
+        assert_eq!(bare.loop_guard, LoopGuardConfig::default());
         assert_eq!(bare.max_turns, None);
         assert_eq!((bare.token_budget, bare.messages_per_minute), (0, 0));
     }
