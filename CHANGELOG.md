@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.2] - 2026-11-14
+
 ### Security
 
 - **minimatch 11.0.8 in the GitHub Action, the Grafana data source and the Chrome extension** (GHSA-g3hv-75wg-m249, denial of service through glob-part amplification; Dependabot alerts 170–172). An npm override lifts every copy in the vulnerable range. One copy stays on 10.x: `@actions/glob` 0.7.0, the newest release, calls `minimatch.matchOne`, which minimatch 11 removed. Its patterns come from the workflow that uses the action, not from outside input.
