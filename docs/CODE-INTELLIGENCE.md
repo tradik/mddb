@@ -1,7 +1,7 @@
 ---
 title: "Code Intelligence"
 slug: "docs/code-intelligence"
-description: "How MDDB answers where a symbol is defined, who calls it and what implements it: heuristic symbols for 13 languages, and precise facts from gopls, basedpyright and phpactor with mddb-cli autoindex --semantic."
+description: "How MDDB answers where a symbol is defined, who calls it and what implements it: heuristic symbols for 13 programming languages, and precise facts from gopls, basedpyright and phpactor with mddb-cli autoindex --semantic."
 status: publish
 ---
 

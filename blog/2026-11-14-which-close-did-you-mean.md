@@ -17,7 +17,7 @@ the text alone there is no telling which `Close` that is.
 
 Until now `code_symbol` answered from text. It read each file on its own,
 found the names a file defines and the names it uses, and matched them. That is
-quick, needs nothing installed, and works for 13 languages. It also merges every
+quick, needs nothing installed, and works for 13 programming languages. It also merges every
 `Close` into one answer. 2.19.3 adds a second level: a language server reads the
 whole checkout, the way your editor does, and MDDB keeps what it learns.
 
