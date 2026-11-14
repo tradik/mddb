@@ -14,6 +14,9 @@ type CodeLanguagesResponse struct {
 	Extensions map[string]string `json:"extensions"`
 	// Languages lists the language names, sorted.
 	Languages []string `json:"languages"`
+	// Semantic marks the languages `mddb-cli autoindex --semantic` computes
+	// semantic facts for (CODE-010); a language not listed gets none.
+	Semantic map[string]bool `json:"semantic"`
 }
 
 // handleCodeLanguages serves GET /v1/code-languages.
@@ -36,5 +39,9 @@ func codeLanguages() CodeLanguagesResponse {
 		}
 	}
 	sort.Strings(resp.Languages)
+	resp.Semantic = make(map[string]bool, len(semanticFactLanguages))
+	for _, lang := range semanticFactLanguages {
+		resp.Semantic[lang] = true
+	}
 	return resp
 }

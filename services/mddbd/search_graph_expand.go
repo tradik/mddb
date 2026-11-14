@@ -315,6 +315,7 @@ func (s *Server) appendGraphNeighbours(collection string, items []VectorSearchRe
 			// cannot fetch.
 			continue
 		}
+		hideSemanticFacts(doc) // a result, like every other hit (CODE-010)
 		if !includeContent {
 			doc.ContentMD = ""
 		}

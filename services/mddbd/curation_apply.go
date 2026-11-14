@@ -231,7 +231,7 @@ func resolvePinnedDoc(bDocs, bByK *bolt.Bucket, collection string, p pinResolved
 	if v == nil {
 		return storage.Doc{}, false
 	}
-	docPtr, err := loadDoc(v)
+	docPtr, err := loadResultDoc(v)
 	if err != nil {
 		return storage.Doc{}, false
 	}

@@ -391,7 +391,7 @@ func liveHybridDoc(bDocs *bolt.Bucket, collection, id string) (storage.Doc, bool
 	if v == nil {
 		return storage.Doc{}, false
 	}
-	docPtr, err := loadDoc(v)
+	docPtr, err := loadResultDoc(v)
 	if err != nil || (docPtr.ExpiresAt > 0 && docPtr.ExpiresAt < currentUnix()) {
 		return storage.Doc{}, false
 	}

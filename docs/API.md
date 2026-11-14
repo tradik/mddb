@@ -5534,6 +5534,49 @@ Three deliberate limits:
 Only new writes are enriched. Re-save (or bulk re-ingest) an existing code
 collection to populate symbols for documents stored before this version.
 
+### Semantic code facts
+
+`defines`/`uses` come from scanners. Precise answers — where a symbol is
+defined, every line that references it, which types implement an interface —
+need a language server, and mddbd neither runs one nor has the checkout.
+`mddb-cli autoindex --semantic` does both and sends what it learnt with each
+code document as four meta keys (v2.19.3+, opt-in; without the flag nothing
+changes):
+
+| Key | One value |
+|---|---|
+| `symIndex` | `v1 <contentHash> <factsDigest> <source>[ truncated]` — exactly one |
+| `symDefs` | `<name> <kind> <start>-<end>[ <container>]` |
+| `symRefs` | `<defPath>#<name> <line>,<line>,...` (at most 64 lines per value) |
+| `symImpls` | `<ifacePath>#<name> <localName>` |
+
+The full format, with the shared test cases the server and the CLI both run,
+is [testdata/semantic-facts/README.md](../testdata/semantic-facts/README.md).
+What the server does with them on every write (add, batch, bulk ingest,
+update, from any transport):
+
+- **Facts describe one content.** `contentHash` is the first 12 hex digits of
+  SHA-256 over the content as stored. When it does not match — the content was
+  edited after the facts were computed — every `sym*` key is dropped, and so it
+  is for a document that is not code or has no valid `symIndex`. A meta-only
+  update that sends the keys back, a TTL change or an `updateWhere` keeps them.
+- **Malformed values are dropped**, the rest kept, sorted. A value is at most
+  1024 bytes and never contains `|`, so a large one cannot break the write.
+- **Capped.** At most `MDDB_CODE_MAX_FACTS` (default 2048) values across the
+  three keys: definitions first, then implementations, then references;
+  `symIndex` then ends in ` truncated`.
+- **Hidden from results.** Full-text, vector (graph neighbours and pending
+  documents included), hybrid and cross-collection search, curated pins,
+  metadata search and listing leave the `sym*` keys out on every transport
+  (REST, gRPC, GraphQL, MCP); a hit would otherwise carry hundreds of
+  reference lines. Reading one document (`POST /v1/get`, gRPC `Get`,
+  GraphQL `document`, MCP `get_document_meta`) returns them, as does export.
+  Metadata filters and facets work on them like on any key, but the format is
+  not an API to build on: it may become `v2`.
+
+`GET /v1/code-languages` lists the languages the CLI computes facts for in
+`semantic` (`{"go": true, "php": true, "python": true}`).
+
 ### The connection graph
 
 Symbols answer "which file declares this". The graph answers the questions that

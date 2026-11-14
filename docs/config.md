@@ -668,6 +668,7 @@ Access log lines take their level from the status: 5xx is `error`, 4xx is
 | `MDDB_FTS_SYNONYMS` | `true` | bool | Enable synonym expansion in FTS queries |
 | `MDDB_FTS_DEFAULT_LANG` | `"en"` | string | Default language for stemming and stop words |
 | `MDDB_CODE_MAX_SYMBOLS` | `512` | int | Most `defines`, `uses` and `imports` entries kept per code document ([API.md](API.md#symbols-which-file-declares-this)) |
+| `MDDB_CODE_MAX_FACTS` | `2048` | int | Most semantic-fact values (`symDefs`, `symImpls`, `symRefs` together) kept per code document; over it, `symIndex` gains ` truncated` ([API.md](API.md#semantic-code-facts)) |
 
 ---
 

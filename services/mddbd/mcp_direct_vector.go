@@ -277,7 +277,7 @@ func (r *vectorRun) loadItems(ctx context.Context, results []vec.VectorResult) [
 			if v == nil {
 				continue
 			}
-			docPtr, err := loadDoc(v)
+			docPtr, err := loadResultDoc(v)
 			if err != nil {
 				continue
 			}

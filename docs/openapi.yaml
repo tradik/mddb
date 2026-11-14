@@ -4153,6 +4153,15 @@ paths:
                   languages:
                     type: array
                     items: { type: string }
+                  semantic:
+                    type: object
+                    description: |
+                      Languages `mddb-cli autoindex --semantic` computes
+                      semantic facts for (`symIndex`, `symDefs`, `symRefs`,
+                      `symImpls` meta; CODE-010, v2.19.3), so the CLI keeps
+                      no list of its own. Languages not listed are absent.
+                    additionalProperties: { type: boolean }
+                    example: { go: true, php: true, python: true }
         "405":
           description: Method not allowed
 

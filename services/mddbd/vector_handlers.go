@@ -423,7 +423,7 @@ func (s *Server) handleVectorSearch(w http.ResponseWriter, r *http.Request) {
 			if v == nil {
 				continue
 			}
-			docPtr, err := loadDoc(v)
+			docPtr, err := loadResultDoc(v)
 			if err != nil {
 				continue
 			}

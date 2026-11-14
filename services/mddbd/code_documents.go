@@ -154,6 +154,11 @@ func EnrichCodeSymbolsWith(doc *storage.Doc, includePaths []string) {
 	if doc == nil {
 		return
 	}
+	// CODE-010: semantic facts come from the client, not the extractor, so
+	// they are kept or dropped by their own rules rather than rewritten
+	// below — and checked before the early return, since a document that
+	// stopped being code must lose them too.
+	enforceSemanticFacts(doc)
 	// A document that is no longer code must not keep symbols from when it was.
 	if DocumentKind(doc) != fts.KindCode || doc.ContentMD == "" {
 		clearSymbolMeta(doc)

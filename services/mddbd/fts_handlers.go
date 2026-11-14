@@ -461,7 +461,7 @@ func (s *Server) searchFTS(req FTSSearchRequest, start time.Time) (*FTSSearchRes
 			if v == nil {
 				continue
 			}
-			docPtr, err := loadDoc(v)
+			docPtr, err := loadResultDoc(v)
 			if err != nil {
 				continue
 			}

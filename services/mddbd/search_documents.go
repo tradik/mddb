@@ -20,7 +20,7 @@ func (s *Server) searchDocuments(collection string, filter MetaFilter, sortField
 	var docs []storage.Doc
 	now := time.Now().Unix()
 	keep := func(v []byte) error {
-		d, err := loadDoc(v)
+		d, err := loadResultDoc(v)
 		if err != nil {
 			return err
 		}

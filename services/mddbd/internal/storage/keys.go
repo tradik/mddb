@@ -99,3 +99,11 @@ func RevPrefix(coll, id string) []byte { return []byte("rev|" + coll + "|" + id 
 func MetaKeyPrefix(coll, mk, mv string) []byte {
 	return []byte("meta|" + coll + "|" + mk + "|" + mv + "|")
 }
+
+// MetaValuePrefix is the metadata-index prefix of every value of mk that
+// starts with valuePrefix (CODE-010). Unlike MetaKeyPrefix it does not close
+// the value, so `MetaValuePrefix(c, "symRefs", "a.go#Run ")` covers every
+// value naming that symbol.
+func MetaValuePrefix(coll, mk, valuePrefix string) []byte {
+	return []byte("meta|" + coll + "|" + mk + "|" + valuePrefix)
+}

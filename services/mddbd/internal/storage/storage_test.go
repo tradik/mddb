@@ -44,6 +44,7 @@ func TestKeyBuilders(t *testing.T) {
 		{"ByKeyPathPrefix", ByKeyPathPrefix("Blog", "Docs/"), "bykey|Blog|docs/"},
 		{"RevPrefix", RevPrefix("blog", "d1"), "rev|blog|d1|"},
 		{"MetaKeyPrefix", MetaKeyPrefix("blog", "author", "alice"), "meta|blog|author|alice|"},
+		{"MetaValuePrefix", MetaValuePrefix("c", "symRefs", "a.go#Run "), "meta|c|symRefs|a.go#Run "},
 	}
 	for _, c := range cases {
 		if string(c.got) != c.want {

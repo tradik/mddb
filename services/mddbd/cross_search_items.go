@@ -92,7 +92,7 @@ func (s *Server) crossSearchItems(p crossSearchParams) []CrossSearchResultItem {
 	// #336: documents of several collections, each read from its own file.
 	items := make([]CrossSearchResultItem, 0, len(cands))
 	for _, c := range cands {
-		docPtr, err := loadDoc(s.docBytes(c.collection, c.result.DocID))
+		docPtr, err := loadResultDoc(s.docBytes(c.collection, c.result.DocID))
 		if err != nil || docPtr == nil {
 			continue
 		}

@@ -269,7 +269,7 @@ func pendingDocsFor[T any](s *Server, collection, query string, filterMeta map[s
 	ids := s.pendingMatches(collection, query, filterMeta, filter, limit, seen)
 	docs := make([]storage.Doc, 0, len(ids))
 	for _, docID := range ids {
-		if doc, err := loadDoc(s.docBytes(collection, docID)); err == nil && doc != nil {
+		if doc, err := loadResultDoc(s.docBytes(collection, docID)); err == nil && doc != nil {
 			docs = append(docs, *doc)
 		}
 	}
