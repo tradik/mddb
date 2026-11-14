@@ -72,19 +72,7 @@ var ErrNoServer = errors.New("language server not found")
 func (s ServerSpec) resolve(getenv func(string) string, lookPath func(string) (string, error)) (Candidate, error) {
 	if s.EnvVar != "" {
 		if argv := strings.Fields(getenv(s.EnvVar)); len(argv) > 0 {
-			prog, err := lookPath(argv[0])
-			if err != nil {
-				return Candidate{}, fmt.Errorf("%w: %s=%q: %v", ErrNoServer, s.EnvVar, getenv(s.EnvVar), err)
-			}
-			// A table program at another path keeps the table's name, so
-			// symIndex says pyrefly/1.4.1 however pyrefly was found.
-			found := Candidate{Argv: append([]string{prog}, argv[1:]...)}
-			for _, c := range s.Candidates {
-				if c.Argv[0] == filepath.Base(argv[0]) {
-					found.Name, found.VersionArgs = c.Name, c.VersionArgs
-				}
-			}
-			return found, nil
+			return s.override(argv, getenv(s.EnvVar), lookPath)
 		}
 	}
 	var tried []string
@@ -97,6 +85,23 @@ func (s ServerSpec) resolve(getenv func(string) string, lookPath func(string) (s
 	}
 	return Candidate{}, fmt.Errorf("%w for %s: none of [%s] is on PATH; install one or set %s to a command line",
 		ErrNoServer, s.Language, strings.Join(tried, "; "), s.EnvVar)
+}
+
+// override resolves the operator's command line from the spec's EnvVar.
+// A table program at another path keeps the table's name, so symIndex says
+// pyrefly/1.4.1 however pyrefly was found.
+func (s ServerSpec) override(argv []string, raw string, lookPath func(string) (string, error)) (Candidate, error) {
+	prog, err := lookPath(argv[0])
+	if err != nil {
+		return Candidate{}, fmt.Errorf("%w: %s=%q: %v", ErrNoServer, s.EnvVar, raw, err)
+	}
+	found := Candidate{Argv: append([]string{prog}, argv[1:]...)}
+	for _, c := range s.Candidates {
+		if c.Argv[0] == filepath.Base(argv[0]) {
+			found.Name, found.VersionArgs = c.Name, c.VersionArgs
+		}
+	}
+	return found, nil
 }
 
 // command is the command line Index starts: the candidate's, plus the

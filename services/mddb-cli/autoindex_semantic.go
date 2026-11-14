@@ -82,12 +82,7 @@ type semanticPlan struct {
 // planSemantic picks the languages to index. announced is the server's
 // `semantic` map from /v1/code-languages, nil when it has none.
 func planSemantic(o semanticOptions, files []autoFile, announced map[string]bool, rep *semanticReport) ([]semanticPlan, error) {
-	byLang := map[string][]string{}
-	for _, f := range files {
-		if f.Format == "" && f.Language != "" {
-			byLang[f.Language] = append(byLang[f.Language], f.Rel)
-		}
-	}
+	byLang := sourcesByLanguage(files)
 	explicit := o.langs != semanticAuto
 	langs := lspindex.Languages()
 	if explicit {
@@ -116,6 +111,18 @@ func planSemantic(o semanticOptions, files []autoFile, announced map[string]bool
 		plans = append(plans, *p)
 	}
 	return joinPlans(plans), nil
+}
+
+// sourcesByLanguage groups the files sent as source (not converted from
+// another format) by their language.
+func sourcesByLanguage(files []autoFile) map[string][]string {
+	byLang := map[string][]string{}
+	for _, f := range files {
+		if f.Format == "" && f.Language != "" {
+			byLang[f.Language] = append(byLang[f.Language], f.Rel)
+		}
+	}
+	return byLang
 }
 
 // errNotAnnounced is a language the server does not keep facts for.
