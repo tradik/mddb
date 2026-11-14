@@ -48,6 +48,32 @@ func bareName(name string) string { return name[strings.LastIndexByte(name, '.')
 // defined is the second, already loaded for the heuristic path when the name
 // has no dots.
 func semanticDefinitions(r *factReader, req SymbolRequest, defined []*sourceText) []semanticDef {
+	var out []semanticDef
+	seen := map[string]bool{}
+	for _, st := range definitionCandidates(r, req, defined) {
+		if st.facts == nil || seen[st.doc.ID] || (req.Path != "" && docPath(st.doc) != req.Path) {
+			continue
+		}
+		seen[st.doc.ID] = true
+		for _, d := range st.facts.Defs {
+			if matchesSymbol(d.Name, req.Name) {
+				out = append(out, semanticDef{st: st, def: d})
+			}
+		}
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		if pi, pj := docPath(out[i].st.doc), docPath(out[j].st.doc); pi != pj {
+			return pi < pj
+		}
+		return out[i].def.Start < out[j].def.Start
+	})
+	return out
+}
+
+// definitionCandidates gathers the documents that may define req.Name, from
+// the three places semanticDefinitions describes; duplicates are dropped by
+// the caller.
+func definitionCandidates(r *factReader, req SymbolRequest, defined []*sourceText) []*sourceText {
 	candidates := append([]*sourceText{}, defined...)
 	if bare := bareName(req.Name); bare != req.Name && bare != "" && r.bIdx != nil {
 		ids, _ := docIDsWithMeta(nil, r.bIdx, req.Collection, MetaKeyDefines, bare, symbolScanDocs)
@@ -66,26 +92,7 @@ func semanticDefinitions(r *factReader, req SymbolRequest, defined []*sourceText
 			candidates = append(candidates, st)
 		}
 	}
-	var out []semanticDef
-	seen := map[string]bool{}
-	for _, st := range candidates {
-		if st.facts == nil || seen[st.doc.ID] || (req.Path != "" && docPath(st.doc) != req.Path) {
-			continue
-		}
-		seen[st.doc.ID] = true
-		for _, d := range st.facts.Defs {
-			if matchesSymbol(d.Name, req.Name) {
-				out = append(out, semanticDef{st: st, def: d})
-			}
-		}
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if pi, pj := docPath(out[i].st.doc), docPath(out[j].st.doc); pi != pj {
-			return pi < pj
-		}
-		return out[i].def.Start < out[j].def.Start
-	})
-	return out
+	return candidates
 }
 
 // semanticAnswer is what the facts say about the definitions found, each

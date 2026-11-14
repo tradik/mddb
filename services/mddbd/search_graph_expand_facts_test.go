@@ -47,3 +47,11 @@ func TestGraphNeighboursCarryNoSemanticFacts(t *testing.T) {
 		t.Fatalf("c.js not expanded: %+v", items)
 	}
 }
+
+// A relation that facts do not answer adds no neighbours.
+func TestFactNeighboursOfAnUnknownRelation(t *testing.T) {
+	st := &sourceText{doc: &storage.Doc{Key: "a.go", Meta: map[string][]string{"path": {"a.go"}}}}
+	if got := factNeighbours(nil, st, "siblings"); got != nil {
+		t.Errorf("siblings from facts: %+v", got)
+	}
+}

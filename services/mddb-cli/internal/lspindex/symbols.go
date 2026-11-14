@@ -27,62 +27,76 @@ var callableKinds = map[string]bool{"function": true, "method": true, "construct
 // qualified names. unencodable counts definitions whose name the format
 // cannot carry.
 func (s ServerSpec) flatten(path string, src []byte, nodes []documentSymbol) (syms []symbol, unencodable int) {
-	ns := func(int) string { return "" }
+	f := flattener{spec: s, path: path, ns: func(int) string { return "" }, normalize: s.Normalize}
 	if s.Namespace != nil {
-		ns = s.Namespace(src)
+		f.ns = s.Namespace(src)
 	}
-	normalize := s.Normalize
-	if normalize == nil {
-		normalize = func(n string) string { return n }
+	if f.normalize == nil {
+		f.normalize = func(n string) string { return n }
 	}
-	var walk func(nodes []documentSymbol, parent string)
-	walk = func(nodes []documentSymbol, parent string) {
-		for _, n := range nodes {
-			span, sel, ok := n.ranges()
-			if !ok {
-				continue
-			}
-			kind := s.kindOf(n.Kind)
-			if kind == "" {
-				// Not a definition, but it may group some: a namespace or
-				// module node, or the comment sections pyrefly turns into
-				// String symbols ("# -- calls"). Its children are named as
-				// if it were not there (a namespace prefix comes from the
-				// source).
-				walk(n.Children, parent)
-				continue
-			}
-			name := normalize(n.Name)
-			owner := parent
-			if owner == "" && n.ContainerName != "" {
-				// Flat SymbolInformation: the hierarchy is only a name.
-				owner = ns(span.Start.Line) + normalize(n.ContainerName)
-			}
-			var qname, container string
-			if owner != "" {
-				qname, container = owner+"."+name, owner
-			} else {
-				qname = ns(span.Start.Line) + name
-				if i := strings.LastIndex(qname, "."); i > 0 {
-					container = qname[:i]
-				}
-			}
-			start, end := span.lines()
-			d := Def{Name: qname, Kind: kind, Start: start, End: end, Container: container, Detail: n.Detail}
-			if defEncodable(d) {
-				syms = append(syms, symbol{path: path, def: d, pos: sel.Start, span: span, lspKind: n.Kind,
-					skipRefs: s.SkipRefs != nil && s.SkipRefs(path, d)})
-			} else {
-				unencodable++
-			}
-			if !callableKinds[kind] {
-				walk(n.Children, qname)
-			}
+	f.walk(nodes, "")
+	sort.SliceStable(f.syms, func(i, j int) bool { return lessDef(f.syms[i].def, f.syms[j].def) })
+	return f.syms, f.unencodable
+}
+
+// flattener carries one file's walk through its symbol tree.
+type flattener struct {
+	spec        ServerSpec
+	path        string
+	ns          func(line int) string
+	normalize   func(string) string
+	syms        []symbol
+	unencodable int
+}
+
+func (f *flattener) walk(nodes []documentSymbol, parent string) {
+	for i := range nodes {
+		n := &nodes[i]
+		span, sel, ok := n.ranges()
+		if !ok {
+			continue
+		}
+		kind := f.spec.kindOf(n.Kind)
+		if kind == "" {
+			// Not a definition, but it may group some: a namespace or module
+			// node, or the comment sections pyrefly turns into String
+			// symbols ("# -- calls"). Its children are named as if it were
+			// not there (a namespace prefix comes from the source).
+			f.walk(n.Children, parent)
+			continue
+		}
+		qname, container := f.qualify(n, span, parent)
+		start, end := span.lines()
+		d := Def{Name: qname, Kind: kind, Start: start, End: end, Container: container, Detail: n.Detail}
+		if defEncodable(d) {
+			f.syms = append(f.syms, symbol{path: f.path, def: d, pos: sel.Start, span: span, lspKind: n.Kind,
+				skipRefs: f.spec.SkipRefs != nil && f.spec.SkipRefs(f.path, d)})
+		} else {
+			f.unencodable++
+		}
+		if !callableKinds[kind] {
+			f.walk(n.Children, qname)
 		}
 	}
-	walk(nodes, "")
-	sort.SliceStable(syms, func(i, j int) bool { return lessDef(syms[i].def, syms[j].def) })
-	return syms, unencodable
+}
+
+// qualify names a definition from its parent in the tree, or — for a flat
+// SymbolInformation answer, where the hierarchy is only a name — from its
+// containerName, with the file's namespace in front of a top-level name.
+func (f *flattener) qualify(n *documentSymbol, span lspRange, parent string) (qname, container string) {
+	name := f.normalize(n.Name)
+	owner := parent
+	if owner == "" && n.ContainerName != "" {
+		owner = f.ns(span.Start.Line) + f.normalize(n.ContainerName)
+	}
+	if owner != "" {
+		return owner + "." + name, owner
+	}
+	qname = f.ns(span.Start.Line) + name
+	if i := strings.LastIndex(qname, "."); i > 0 {
+		container = qname[:i]
+	}
+	return qname, container
 }
 
 // ranges returns the definition's span and the range of its name.

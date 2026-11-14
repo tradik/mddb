@@ -143,11 +143,11 @@ func (s *semanticSync) reconcile(ctx context.Context, client *mddb.Client, colle
 func (s *semanticSync) updateFacts(ctx context.Context, client *mddb.Client, collection, lang string, d sentFacts) {
 	doc, err := client.Get(ctx, mddb.GetRequest{Collection: collection, Key: d.key, Lang: lang})
 	if err != nil {
-		s.rep.warn("facts for " + d.key + ": " + err.Error())
+		s.rep.warn(factsWarning(d.key, ": "+err.Error()))
 		return
 	}
 	if contentHash, _, _ := strings.Cut(d.pair, " "); lspindex.ContentHash(doc.ContentMD) != contentHash {
-		s.rep.warn("facts for " + d.key + " not stored: the collection holds other content than the file")
+		s.rep.warn(factsWarning(d.key, " not stored: the collection holds other content than the file"))
 		return
 	}
 	meta := make(map[string][]string, len(doc.Meta)+len(d.meta))
@@ -162,8 +162,12 @@ func (s *semanticSync) updateFacts(ctx context.Context, client *mddb.Client, col
 	}
 	body := map[string]any{"collection": collection, "key": d.key, "lang": lang, "meta": meta}
 	if _, err := client.Do(ctx, "PATCH", "/v1/update", body); err != nil {
-		s.rep.warn("facts for " + d.key + ": " + err.Error())
+		s.rep.warn(factsWarning(d.key, ": "+err.Error()))
 		return
 	}
 	s.rep.FactsUpdated++
 }
+
+// factsWarning words a warning about one document's facts; rest follows the
+// key as written (": <error>", " not stored: ...").
+func factsWarning(key, rest string) string { return "facts for " + key + rest }

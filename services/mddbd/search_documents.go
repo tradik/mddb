@@ -18,37 +18,10 @@ import (
 // order. It returns the page and how many documents matched in total.
 func (s *Server) searchDocuments(collection string, filter MetaFilter, sortField string, asc bool, offset, limit int) ([]storage.Doc, int, error) {
 	var docs []storage.Doc
-	now := time.Now().Unix()
-	keep := func(v []byte) error {
-		d, err := loadResultDoc(v)
-		if err != nil {
-			return err
-		}
-		if d.ExpiresAt == 0 || d.ExpiresAt >= now {
-			docs = append(docs, *d)
-		}
-		return nil
-	}
 	err := s.DBViewC(collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if len(filter) == 0 {
-			prefix := []byte("doc|" + collection + "|")
-			c := bDocs.Cursor()
-			for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
-				if err := keep(v); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-		for _, id := range sortedIDs(metaFilterIDs(tx, collection, filter)) {
-			if v := bDocs.Get(storage.DocKey(collection, id)); v != nil {
-				if err := keep(v); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+		var err error
+		docs, err = liveDocs(tx, collection, filter, time.Now().Unix())
+		return err
 	})
 	if err != nil {
 		return nil, 0, err
@@ -61,4 +34,50 @@ func (s *Server) searchDocuments(collection string, filter MetaFilter, sortField
 	start := min(max(offset, 0), total)
 	end := min(start+max(limit, 0), total)
 	return docs[start:end], total, nil
+}
+
+// liveDocs reads the collection's documents that match filter (all of them
+// when it is empty) and have not expired, as search results — without the
+// semantic facts (CODE-010).
+func liveDocs(tx *bolt.Tx, collection string, filter MetaFilter, now int64) ([]storage.Doc, error) {
+	bDocs := tx.Bucket([]byte("docs"))
+	l := liveDocList{now: now}
+	if len(filter) == 0 {
+		prefix := []byte("doc|" + collection + "|")
+		c := bDocs.Cursor()
+		for k, v := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = c.Next() {
+			if err := l.add(v); err != nil {
+				return nil, err
+			}
+		}
+		return l.docs, nil
+	}
+	for _, id := range sortedIDs(metaFilterIDs(tx, collection, filter)) {
+		if err := l.add(bDocs.Get(storage.DocKey(collection, id))); err != nil {
+			return nil, err
+		}
+	}
+	return l.docs, nil
+}
+
+// liveDocList collects the documents that have not expired.
+type liveDocList struct {
+	now  int64
+	docs []storage.Doc
+}
+
+// add keeps one stored document unless it has expired; a missing one (nil,
+// an index entry whose document is gone) is skipped.
+func (l *liveDocList) add(v []byte) error {
+	if v == nil {
+		return nil
+	}
+	d, err := loadResultDoc(v)
+	if err != nil {
+		return err
+	}
+	if d.ExpiresAt == 0 || d.ExpiresAt >= l.now {
+		l.docs = append(l.docs, *d)
+	}
+	return nil
 }

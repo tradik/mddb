@@ -24,25 +24,32 @@ type factNeighbour struct {
 // factNeighbours lists the documents related to st by one relation.
 func factNeighbours(r *factReader, st *sourceText, kind string) []factNeighbour {
 	self := docPath(st.doc)
-	var out []factNeighbour
 	switch kind {
-	case RelCallers, RelTests:
-		for _, d := range st.facts.Defs {
-			for _, use := range r.refsTo(self + "#" + d.Name) {
-				if kind == RelCallers || isTestPath(use.st.doc.Key) {
-					out = append(out, factNeighbour{st: use.st, symbol: d.Name})
-				}
-			}
-		}
+	case RelCallers:
+		return usesOfDefs(st, self, r.refsTo, func(*sourceText) bool { return true })
+	case RelTests:
+		return usesOfDefs(st, self, r.refsTo, func(u *sourceText) bool { return isTestPath(u.doc.Key) })
+	case RelImplementations:
+		return usesOfDefs(st, self, r.implsOf, func(*sourceText) bool { return true })
 	case RelCallees:
+		var out []factNeighbour
 		for _, ref := range st.facts.Refs {
 			if to := r.atPath(ref.Path); to != nil {
 				out = append(out, factNeighbour{st: to, symbol: ref.Name})
 			}
 		}
-	case RelImplementations:
-		for _, d := range st.facts.Defs {
-			for _, use := range r.implsOf(self + "#" + d.Name) {
+		return out
+	}
+	return nil
+}
+
+// usesOfDefs lists, for each definition in st, the documents lookup finds for
+// it (references or implementations) that keep accepts.
+func usesOfDefs(st *sourceText, self string, lookup func(string) []factUse, keep func(*sourceText) bool) []factNeighbour {
+	var out []factNeighbour
+	for _, d := range st.facts.Defs {
+		for _, use := range lookup(self + "#" + d.Name) {
+			if keep(use.st) {
 				out = append(out, factNeighbour{st: use.st, symbol: d.Name})
 			}
 		}
