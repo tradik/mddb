@@ -67,7 +67,9 @@ Versions tested on 2026-11-14: gopls 0.24.0, basedpyright 1.40.2, pyrefly
 1.98.0. basedpyright comes before pyrefly
 because pyrefly 1.4.1 returns no implementations of classes. An `MDDB_LSP_*`
 variable replaces the built-in command (split on spaces, no shell), e.g.
-`MDDB_LSP_PHP="php /opt/phpactor.phar language-server"`.
+`MDDB_LSP_PHP="php /opt/phpactor.phar language-server"`. A versioned binary such as
+`MDDB_LSP_C=/usr/bin/clangd-22` is still recognised as the server in the table,
+so it gets the table's arguments (for clangd, `--compile-commands-dir`).
 
 **Assembly stays on the heuristic level.** The one maintained assembly
 language server (asm-lsp 0.10) resolves definitions and references only

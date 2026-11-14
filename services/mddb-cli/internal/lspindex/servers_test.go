@@ -100,6 +100,32 @@ func TestEnvOverrideSplitsArgv(t *testing.T) {
 	}
 }
 
+// Distributions install versioned binaries; they are the table's program and
+// get its arguments (#420).
+func TestSameProgram(t *testing.T) {
+	for base, want := range map[string]bool{
+		"clangd": true, "clangd-22": true, "clangd-22.1": true, "clangd.exe": true, "clangd-22.exe": true,
+		"clangd-": false, "clangd-x": false, "clangd22": false, "myclangd": false, "clangd-22-wrapper": false,
+	} {
+		if got := sameProgram("clangd", base); got != want {
+			t.Errorf("sameProgram(clangd, %q) = %v", base, got)
+		}
+	}
+	c, _ := Spec("c")
+	cand, err := c.resolve(func(string) string { return "/usr/bin/clangd-22" }, func(name string) (string, error) { return name, nil })
+	if err != nil || cand.Name != "clangd" {
+		t.Fatalf("candidate = %+v, %v", cand, err)
+	}
+	argv := c.command(cand, Options{CompileCommandsDir: "/build"})
+	if argv[len(argv)-1] != "--compile-commands-dir=/build" || c.droppedArgs(cand, Options{CompileCommandsDir: "/build"}) != nil {
+		t.Errorf("argv = %q", argv)
+	}
+	other := Candidate{Argv: []string{"/opt/wrap"}}
+	if got := c.droppedArgs(other, Options{CompileCommandsDir: "/build"}); len(got) != 1 {
+		t.Errorf("dropped = %q", got)
+	}
+}
+
 func TestLanguages(t *testing.T) {
 	if got := Languages(); !reflect.DeepEqual(got, []string{"c", "cpp", "go", "php", "python", "rust"}) {
 		t.Errorf("Languages = %v", got)

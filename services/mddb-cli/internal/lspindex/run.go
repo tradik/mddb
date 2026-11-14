@@ -29,6 +29,7 @@ type run struct {
 	retry     []openFile                         // documentSymbol to ask again
 	opened    map[string]bool                    // files sent with didOpen
 	fallbacks *fallbacks                         // nil unless the spec reads stderr
+	dropped   []string                           // spec arguments the operator's command lacks
 	stats     Stats
 }
 

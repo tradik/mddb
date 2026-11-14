@@ -58,6 +58,7 @@ func Index(ctx context.Context, root string, files []string, spec ServerSpec, op
 	}
 	r := newRun(spec, opt, root, srv.conn)
 	r.fallbacks = fb
+	r.dropped = spec.droppedArgs(cand, opt)
 	err = r.execute(ctx, cand, files)
 	r.stats.PeakRssMb = srv.peakRssMb() // VmHWM is gone once the server exits
 	srv.stop()

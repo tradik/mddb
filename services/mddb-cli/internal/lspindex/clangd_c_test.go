@@ -1,6 +1,7 @@
 package lspindex
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"strings"
@@ -64,6 +65,21 @@ func TestIndexClangdRefusesFallbackFlags(t *testing.T) {
 	res, f, err := clangdRun(t, "c", cTree, []string{"net.c", "disk.c"}, sc)
 	se := wantServerError(t, res, err)
 	if !errors.Is(err, ErrFallbackFlags) || !strings.Contains(se.Error(), "disk.c, net.c") || !strings.Contains(se.Error(), "--compile-commands") {
+		t.Errorf("err = %v", err)
+	}
+	_ = f.record(t)
+}
+
+// A database named with --compile-commands that an unrecognised command never
+// received: the error says so instead of suggesting a new database (#420).
+func TestIndexClangdSaysTheDatabaseFlagWasNotPassed(t *testing.T) {
+	sc := cScript()
+	sc.StderrOnOpen = "I[11:26:19.331] Failed to find compilation database for {file}"
+	spec, _ := Spec("c")
+	f := newFakeRun(t, cTree, sc)
+	_, err := Index(context.Background(), f.root, []string{"net.c"}, spec, f.options(spec, Options{CompileCommandsDir: "/out/build"}))
+	if !errors.Is(err, ErrFallbackFlags) || !strings.Contains(err.Error(), "--compile-commands-dir=/out/build was not passed") ||
+		!strings.Contains(err.Error(), "MDDB_LSP_C") {
 		t.Errorf("err = %v", err)
 	}
 	_ = f.record(t)

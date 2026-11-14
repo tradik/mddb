@@ -97,11 +97,33 @@ func (s ServerSpec) override(argv []string, raw string, lookPath func(string) (s
 	}
 	found := Candidate{Argv: append([]string{prog}, argv[1:]...)}
 	for _, c := range s.Candidates {
-		if c.Argv[0] == filepath.Base(argv[0]) {
+		if sameProgram(c.Argv[0], filepath.Base(argv[0])) {
 			found.Name, found.VersionArgs = c.Name, c.VersionArgs
 		}
 	}
 	return found, nil
+}
+
+// sameProgram reports whether base names the table's program: exactly, with
+// the version suffix distributions install it under (clangd-22, clangd-22.1;
+// #420 — without it the database flag never reached clangd), or with .exe.
+func sameProgram(table, base string) bool {
+	base = strings.TrimSuffix(base, ".exe")
+	if base == table {
+		return true
+	}
+	version, ok := strings.CutPrefix(base, table+"-")
+	return ok && version != "" && strings.Trim(version, "0123456789.") == ""
+}
+
+// droppedArgs are the spec's arguments that command leaves out because the
+// program is not recognised as the table's: the operator's command line must
+// then carry them itself.
+func (s ServerSpec) droppedArgs(cand Candidate, opt Options) []string {
+	if s.Args == nil || cand.Name != "" {
+		return nil
+	}
+	return s.Args(opt)
 }
 
 // command is the command line Index starts: the candidate's, plus the

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--compile-commands` reaches a versioned clangd (#420).** With `MDDB_LSP_C=/usr/bin/clangd-22`, which is how Debian and Ubuntu install clangd, autoindex did not recognise the program as clangd. It therefore never passed `--compile-commands-dir`, so an out-of-tree database (`make O=…`, `cmake -B …`) never reached clangd, and the run stopped with advice to generate a database that already existed. Program names with a version suffix (`clangd-22`, `clangd-22.1`) or `.exe` now count as the server in the table and get its arguments. When the command really is another program, the error now names the argument to add to `MDDB_LSP_C`.
+
 ## [2.19.4] - 2026-11-14
 
 ### Added

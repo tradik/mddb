@@ -91,5 +91,11 @@ func (r *run) fallbackError() error {
 		return nil
 	}
 	slices.Sort(hit)
-	return fmt.Errorf("%w: %s; %s", ErrFallbackFlags, strings.Join(hit, ", "), r.spec.FallbackHint)
+	hint := r.spec.FallbackHint
+	if len(r.dropped) > 0 {
+		// The database exists; it never reached the server (#420).
+		hint = fmt.Sprintf("the command in %s is not recognised as %s, so %s was not passed to it; add it to %s",
+			r.spec.EnvVar, r.spec.Candidates[0].Name, strings.Join(r.dropped, " "), r.spec.EnvVar)
+	}
+	return fmt.Errorf("%w: %s; %s", ErrFallbackFlags, strings.Join(hit, ", "), hint)
 }
