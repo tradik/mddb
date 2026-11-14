@@ -219,7 +219,7 @@ Embeddings came from `nomic-embed-text` through Ollama. Tokens are bytes
 divided by 4.
 
 ```bash
-cd tools/bench
+cd ../../../../tools/bench
 go run ./agent -url http://localhost:11023 -collection mddb -root ../.. \
   -tasks evalsets/agent-tasks.json -search vector
 ```
@@ -252,6 +252,147 @@ go run ./agent -url http://localhost:11023 -collection mddb -root ../.. \
 
 The tool prints per-task rows as well, and `-json` writes them for further
 processing.
+
+## Symbol lookup: heuristics vs language-server facts (v2.19.3)
+
+Before a refactor an agent asks `code_symbol` where a symbol is used. This
+measures how often that answer is right, with and without the facts
+`mddb-cli autoindex --semantic` sends, and what the facts cost.
+
+**Method.** Two collections are made from the same tree, one with
+`autoindex` and one with `autoindex --semantic`. The ground truth comes from
+the language server directly, not through MDDB: the `lspindex` driver's local
+test writes every definition, reference and implementation it is told, for
+exactly the files `autoindex --dry-run` lists. For WAL.Close the truth agrees
+line for line with `gopls references` run by hand (55 of 55). From the truth,
+50 definitions are drawn with seed 13, outside test files: 40% functions, 40%
+methods whose bare name another definition shares (`Close`), 20% interfaces
+(Python and PHP have none here; their places go to functions and methods).
+Each is asked of both collections as an agent changing it would:
+`GET /v1/symbol?name=<bare name>&path=<its file>&include=references,implementations&limit=200`.
+A reference counts when its document and line are in the truth; the
+definition's own line is left out of both. References labelled with another
+definition (`target`) are not this symbol's answer and are not counted.
+Tokens are the response's bytes divided by 4. Latency is 5 runs of each
+lookup on a 32-core machine that was running other work (load 4–10).
+
+Corpora: `services/mddbd` at 184006a9 (Go, 1,349 files, gopls 0.24.0);
+`clients/python` and `integrations/langchain-mddb` (Python, 14 files,
+basedpyright 1.40.2); `services/php-extension` and
+`integrations/wordpress-plugin` (PHP, 39 files, phpactor 2026.10.07). The
+Python and PHP trees are small, so their numbers say less than Go's.
+
+```bash
+# 1. the server and the two collections
+mddb-cli autoindex services/mddbd -c go-heur
+mddb-cli autoindex services/mddbd -c go-sem --semantic=go
+mddb-cli --json autoindex services/mddbd -c go-heur --dry-run > plan.json
+python3 -c 'import json; [print(p["path"]) for p in json.load(open("plan.json"))["plan"] if p.get("language") == "go"]' > files.txt
+# 2. the truth, straight from the language server (local test, needs gopls)
+cd services/mddb-cli/internal/lspindex
+LSPREAL_DIR=$PWD/../../../mddbd LSPREAL_LANG=go LSPREAL_FILES=$OLDPWD/files.txt \
+  LSPREAL_OUT=$OLDPWD/go-truth.json go test -tags lspreal -run 'TestRealDir$' .
+# 3. the comparison, the facts' size and the search regression
+cd ../../../../tools/bench
+go run ./codesymbol -url http://localhost:11023 -heuristic go-heur -semantic go-sem \
+  -truth ../../go-truth.json -queries evalsets/docs.json,evalsets/agent-tasks.json
+```
+
+Python and PHP the same way, from the repository root with
+`--include 'clients/python/**' --include 'integrations/langchain-mddb/**'`
+(`--include 'services/php-extension/**' --include 'integrations/wordpress-plugin/**'`)
+and `LSPREAL_LANG=python` (`php`).
+
+| Language | Symbols | Mode | Reference precision | Reference recall | Exactly right | Implementations right | Tokens (median) | p50 / p95 ms |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| Go | functions (20) | heuristic | 92.3% (108/117) | 99.1% (108/109) | 18 | 20 | 218 | 212 / 261 |
+| Go | functions (20) | semantic | 92.4% (109/118) | 100% (109/109) | 19 | 20 | 273 | 178 / 214 |
+| Go | ambiguous methods (20) | heuristic | 4.4% (30/681) | 58.8% (30/51) | 2 | 20 | 1144 | 267 / 371 |
+| Go | ambiguous methods (20) | semantic | 100% (51/51) | 100% (51/51) | 20 | 20 | 385 | 228 / 318 |
+| Go | interfaces (10) | heuristic | 99.6% (275/276) | 90.2% (275/305) | 8 | 0 | 236 | 203 / 287 |
+| Go | interfaces (10) | semantic | 100% (275/275) | 90.2% (275/305) | 9 | 10 | 1351 | 173 / 246 |
+| **Go** | **all 50** | heuristic | **38.5%** (413/1074) | **88.8%** (413/465) | 28 | 40 | 374 | 221 / 357 |
+| **Go** | **all 50** | semantic | **98.0%** (435/444) | **93.5%** (435/465) | 48 | 50 | 385 | 186 / 309 |
+| Python | all 50 | heuristic | 57.8% (93/161) | 70.5% (93/132) | 24 | 50 | 179 | 4.7 / 7.9 |
+| Python | all 50 | semantic | 100% (132/132) | 100% (132/132) | 50 | 50 | 223 | 4.4 / 8.1 |
+| PHP | all 50 | heuristic | 84.2% (144/171) | 91.7% (144/157) | 40 | 50 | 253 | 8.0 / 12.3 |
+| PHP | all 50 | semantic | 100% (157/157) | 100% (157/157) | 50 | 50 | 254 | 7.0 / 10.2 |
+
+- **Methods are where the heuristics fail.** A bare name such as `Close` or
+  `String` matches every type's method of that name: 681 lines returned for
+  51 true ones. The facts answer per definition.
+- **Every answer the facts gave was right.** 49 of the 50 Go answers carry
+  `precision: semantic`, and all 435 of their references are in the truth.
+  The one wrong answer is `init` in `proto/mddb.pb.go`: that generated file
+  has 3,581 fact values, over `MDDB_CODE_MAX_FACTS` (2048), so the server
+  kept the first 2048 definitions and dropped the rest, `init` among them.
+  The lookup then fell back to the heuristics (`precision: heuristic`) and
+  returned 9 lines of other `init` functions. Only that file is over the
+  limit in this tree. Indexed again with `MDDB_CODE_MAX_FACTS=4096`, nothing
+  is cut, all 50 answers are semantic and precision is 100% (435/435); the
+  largest document's facts then take 246 KB.
+- **The first run found three bugs.** Before they were fixed (in this
+  release), the semantic collection scored 39.3% (435/1107): with a path,
+  interface methods and methods past the scanner's 512-name `defines` cap
+  were not looked up in the facts, and the heuristic fallback in a document
+  with facts counted the definition's own lines as uses. A namespaced PHP
+  class was not found by its short name. The table is after the fixes.
+- **Recall below 100% is the limit, not the facts.** `MDDBServer` has 230
+  references and a lookup returns at most 200 per relation. Without it,
+  semantic recall is 235/235 and heuristic 213/235.
+- **"References" means what the language server means.** gopls counts a call
+  through an interface the method satisfies: 46 of WAL.Close's 55
+  references are `resp.Body.Close()` and the like, through `io.Closer`.
+- **Implementations come only from facts.** The heuristics return none; the
+  facts returned the truth's count for every symbol, and `backupTarget` 3,
+  `chunkIndexer` 4.
+
+**What the facts cost.** Go, `services/mddbd` unless noted, with no
+embedding provider running. The machine was busy with other work (load
+5–50), so timings vary by ±20% between identical runs; both runs are given
+where there were two.
+
+| Measure | Without `--semantic` | With `--semantic=go` |
+|---|---:|---:|
+| `autoindex` wall time | 26 s | 171–194 s |
+| of which gopls (load, documentSymbol, references, implementations) | — | 143–167 s |
+| gopls peak RSS (VmHWM) | — | 3.3–5.3 GB |
+| Collection file (per-collection layout) | 205–209 MB | 263–273 MB |
+| `sym*` meta per code document: median / p99 / max | — | 1,216 B / 9,232 B / 155,740 B |
+| Documents over 64 KiB of facts / cut at `MDDB_CODE_MAX_FACTS` | — | 3 / 1 (all generated: `mddb.pb.go`, `generated.go`, `mddb_grpc.pb.go`) |
+| `code_symbol` p50 / p95 over the 50 lookups | 221 / 357 ms | 186 / 309 ms |
+| Whole repository (2,593 files, 1,537 Go) | 144 s | 255 s, gopls 160 s, 4.7 GB |
+
+| `--semantic-concurrency` | gopls time | gopls peak RSS |
+|---:|---:|---:|
+| 1 | 157 s | 3.9 GB |
+| 4 (default) | 149 s, 167 s | 3.7 GB, 3.3 GB |
+| 8 | 161 s, 145 s | 3.8 GB, 3.3 GB |
+
+Concurrency changes neither time nor memory beyond the noise: gopls spends
+the time checking packages, which it parallelises itself, not waiting on
+requests. The default stays at 4. `--semantic-memory-mb` passes gopls a
+memory limit; its effect was not measured. Python and PHP took 2.5 s and 5.7 s; the RSS the
+driver reports for basedpyright (12 MB) is the Python launcher's, not the
+Node.js server it starts, so it is left out.
+
+**Search does not change.** The 50 queries of the two evaluation sets
+(`evalsets/docs.json`, SRCH-019; `evalsets/agent-tasks.json`) were run with
+`/v1/fts` and `/v1/hybrid-search` (top 10) against each pair of collections,
+after normalizing what differs between two identical requests: the
+collection name, scores past the ninth decimal, the order of equal scores,
+and the results tied at the cut. The first row adds `-baseline <URL of a
+2.19.2 server holding the same collection>`.
+
+| Compared | FTS | Hybrid |
+|---|---|---|
+| 2.19.2 vs 2.19.3, collection without facts (Go, Python, PHP) | 50/50 byte-identical | 50/50 byte-identical |
+| without facts vs with facts, 2.19.3 (Go, Python, PHP) | 50/50 same results | 50/50 same results |
+
+With facts the documents, lines, scores and order are the same; what
+differs is the passage's `symbol` label, which names the definition by its
+qualified name (`FakeClient.SearchAdvisor` for `SearchAdvisor`) in 27–41 of
+the 50 answers.
 
 ## Relevance feedback (v2.18.9)
 
@@ -768,7 +909,7 @@ Benchmark tool for measuring MDDB document insertion throughput. Inserts documen
 ## Build
 
 ```bash
-cd tools/bench
+cd ../../../../tools/bench
 go build -o mddb-bench .
 ```
 
@@ -780,7 +921,7 @@ cd services/mddbd
 go run . -db /tmp/bench.db
 
 # Run benchmark (default: 10K docs, batches of 100)
-cd tools/bench
+cd ../../../../tools/bench
 ./mddb-bench
 
 # Custom parameters
@@ -866,7 +1007,7 @@ xychart-beta
 ## How to Run
 
 ```bash
-cd tools/bench
+cd ../../../../tools/bench
 go build -o mddb-bench .
 ./mddb-bench -url http://localhost:7890 -total 10000 -batch 100 -output bench_report.html -cleanup
 ```
