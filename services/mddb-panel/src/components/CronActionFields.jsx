@@ -1,47 +1,10 @@
 // The fields of a cron rule: its schedule and its one action — fire a webhook,
-// take a backup (OPS-023) or sync a sitemap, URL list or S3 prefix into a
-// collection (INT-022). Laid out in the AutomationPanel form grid. Controls
-// sit inside their labels (no ids), because the add form and an inline edit
-// row can be open at once.
+// take a backup (OPS-023) or sync a sitemap, URL list, S3 prefix or git
+// repository (2.19.5, #421) into a collection (INT-022). Laid out in the
+// AutomationPanel form grid; the controls are CronFormControls'.
 
-const field = 'mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm text-gray-900';
-const labelClass = 'block text-xs text-gray-600';
-
-function Text({ name, value, onChange, placeholder, type = 'text', mono = false, hint }) {
-  return (
-    <label className={labelClass}>
-      {name}
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`${field}${mono ? ' font-mono' : ''}`}
-      />
-      {hint && <span className="mt-0.5 block text-[11px] text-gray-600">{hint}</span>}
-    </label>
-  );
-}
-
-function Select({ name, value, onChange, children }) {
-  return (
-    <label className={labelClass}>
-      {name}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={field}>
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function Check({ checked, onChange, children, wide = false }) {
-  return (
-    <label className={`${wide ? 'md:col-span-2 ' : ''}flex items-center gap-2 text-sm text-gray-700`}>
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="w-4 h-4 rounded border-gray-300" />
-      {children}
-    </label>
-  );
-}
+import { Check, Select, Text, TextArea } from './CronFormControls';
+import GitSyncFields from './GitSyncFields';
 
 /** Endpoint, region, keys and TLS of an S3-compatible store. */
 function StorageFields({ value, onChange }) {
@@ -100,6 +63,7 @@ function SyncFields({ value, onChange, collections }) {
         <option value="sitemap">Sitemap (or sitemap index)</option>
         <option value="urls">List of URLs</option>
         <option value="s3">S3 prefix (read only)</option>
+        <option value="git">Git repository (branch, tag or latest release)</option>
       </Select>
       <Select name="Into collection" value={value.collection} onChange={set('collection')}>
         <option value="">Select collection</option>
@@ -109,12 +73,7 @@ function SyncFields({ value, onChange, collections }) {
       {value.source === 'sitemap' && (
         <Text name="Sitemap URL" type="url" value={value.url} onChange={set('url')} placeholder="https://example.com/sitemap.xml" />
       )}
-      {value.source === 'urls' && (
-        <label className={`${labelClass} md:col-span-2`}>
-          {'URLs (one per line)'}
-          <textarea rows={3} value={value.urls} onChange={(e) => set('urls')(e.target.value)} className={`${field} font-mono`} />
-        </label>
-      )}
+      {value.source === 'urls' && <TextArea wide name="URLs (one per line)" value={value.urls} onChange={set('urls')} />}
       {value.source === 's3' && (
         <>
           <Text name="Bucket" value={value.bucket} onChange={set('bucket')} />
@@ -122,6 +81,7 @@ function SyncFields({ value, onChange, collections }) {
           <StorageFields value={value.storageConfig} onChange={set('storageConfig')} />
         </>
       )}
+      {value.source === 'git' && <GitSyncFields value={value} onChange={onChange} />}
       <Text name="Max documents per run" type="number" value={value.maxDocuments} onChange={set('maxDocuments')} placeholder="1000 (max 50000)" />
       <Text name="Max MiB per document" type="number" value={value.maxMiB} onChange={set('maxMiB')} placeholder="10 (max 100)" />
       <Check wide checked={value.prune} onChange={set('prune')}>

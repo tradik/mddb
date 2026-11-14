@@ -40,6 +40,21 @@ describe('CollectionSources', () => {
     expect(screen.getByText('Hook')).toBeTruthy();
   });
 
+  test('a git source shows its repository, ref and the commit its last run read (2.19.5)', async () => {
+    const commit = 'f00dbabe0123456789abcdef0123456789abcdef';
+    const git = {
+      id: 'g1', name: 'Project docs', type: 'cron', enabled: true, schedule: '0 4 * * *',
+      sync: { source: 'git', url: 'https://github.com/tradik/mddb.git', ref: 'latest-release', collection: 'docs', prune: true },
+      lastResult: { status: 'success', upToDate: true, ref: 'v2.19.4', commit, commitUrl: `https://github.com/tradik/mddb/commit/${commit}` },
+    };
+    client.listAutomation.mockResolvedValue({ rules: [git] });
+    render(<CollectionSources collection="docs" />);
+    expect(await screen.findByText('sync git https://github.com/tradik/mddb.git @ latest-release → docs (prune)')).toBeTruthy();
+    expect(screen.getByText(/up to date at f00dbab: nothing downloaded or written/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: `Commit ${commit} on the forge` }).textContent).toBe('f00dbab');
+    expect(screen.getByRole('button', { name: 'Run Project docs now' })).toBeTruthy();
+  });
+
   test('accepts a bare list and refreshes', async () => {
     client.listAutomation.mockResolvedValue([sync]);
     render(<CollectionSources collection="docs" />);

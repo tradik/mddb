@@ -143,6 +143,7 @@ describe('ruleToForm', () => {
     expect(form.sync).toEqual({
       source: 'sitemap', collection: 'd', lang: 'en', url: '', urls: '', bucket: '', prefix: '', prune: false,
       maxDocuments: '', maxMiB: '', storageConfig: { ...EMPTY_SYNC.storageConfig, useTLS: false },
+      ref: '', include: '', exclude: '', forge: '', tokenSecretRef: '', hookSecretRef: '', adopt: false,
     });
   });
 
@@ -226,6 +227,8 @@ describe('describeLastResult', () => {
     ['a sync with no counts sent', { sync: {}, lastResult: { status: 'skipped', error: 'still going' } },
       'skipped · +0 ~0 =0 −0 ✕0 · still going'],
     ['a backup', { backup: {}, lastResult: { status: 'error', error: 'disk full' } }, 'error · disk full'],
+    ['a git sync whose commit the last run read', { sync: {}, lastResult: { status: 'success', upToDate: true, commit: '0123456789' } },
+      'success · up to date at 0123456: nothing downloaded or written'],
   ])('%s', (_label, rule, want) => {
     expect(describeLastResult(rule)).toBe(want);
   });

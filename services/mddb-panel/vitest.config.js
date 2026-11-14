@@ -55,6 +55,10 @@ const coverageFiles = [
   'src/components/ConfigPanel.jsx',
   // 2.19.0: run a sync or backup now, and its last result (#377).
   'src/components/CronRunNow.jsx',
+  // 2.19.5: a git repository as a synced source (#421).
+  'src/lib/automation-sync-form.js',
+  'src/components/CronFormControls.jsx',
+  'src/components/GitSyncFields.jsx',
   // 2.19.0: the panel reaches the 2.18.2–2.19.0 features it lacked —
   // upload through the server's frontmatter parser, a collection's sources,
   // aliases, evaluation, storage, indexing status, async vector reindex,

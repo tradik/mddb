@@ -5,17 +5,17 @@
  * (OPS-023) or sync a source into a collection (INT-022). Stored S3 secret
  * keys are never sent back by the server (`secretKeySet` says one exists), so
  * a blank secret in the form means "keep it" and is left out of the payload.
+ * The sync action's own state lives in automation-sync-form.js.
  */
 
-const EMPTY_STORAGE = { endpoint: '', region: '', accessKey: '', secretKey: '', useTLS: true, secretKeySet: false };
+import {
+  EMPTY_STORAGE, EMPTY_SYNC, buildStorage, buildSync, compact, positive, shortCommit, storageToForm, syncSourceText, syncToForm,
+} from './automation-sync-form';
+
+export { EMPTY_SYNC, buildStorage, buildSync };
 
 export const EMPTY_BACKUP = {
   target: 'local', path: '', bucket: '', prefix: '', keep: '', collections: '*', storageConfig: EMPTY_STORAGE,
-};
-
-export const EMPTY_SYNC = {
-  source: 'sitemap', collection: '', lang: 'en', url: '', urls: '', bucket: '', prefix: '',
-  prune: false, maxDocuments: '', maxMiB: '', storageConfig: EMPTY_STORAGE,
 };
 
 export const EMPTY_RULE = {
@@ -44,30 +44,6 @@ export const EMPTY_RULE = {
   sync: EMPTY_SYNC,
 };
 
-const MIB = 1024 * 1024;
-
-/** A positive whole number from a form field, or undefined. */
-function positive(value) {
-  const n = Number(value);
-  return Number.isInteger(n) && n > 0 ? n : undefined;
-}
-
-/** Copies the keys of `obj` whose values are not undefined or ''. */
-function compact(obj) {
-  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined && v !== ''));
-}
-
-/** The S3 block of a backup or sync; a blank secret keeps the stored one. */
-export function buildStorage(sc) {
-  return compact({
-    endpoint: sc.endpoint.trim(),
-    region: sc.region.trim(),
-    accessKey: sc.accessKey.trim(),
-    secretKey: sc.secretKey || undefined,
-    useTLS: sc.useTLS,
-  });
-}
-
 /** The `backup` action of a cron rule (OPS-023). */
 export function buildBackup(b) {
   const collections = b.collections.split(',').map((c) => c.trim()).filter(Boolean);
@@ -81,24 +57,6 @@ export function buildBackup(b) {
     Object.assign(out, compact({ bucket: b.bucket.trim() }), { storageConfig: buildStorage(b.storageConfig) });
   } else if (b.path.trim()) {
     out.path = b.path.trim();
-  }
-  return out;
-}
-
-/** The `sync` action of a cron rule (INT-022). */
-export function buildSync(s) {
-  const out = compact({
-    source: s.source,
-    collection: s.collection,
-    lang: s.lang.trim(),
-    maxDocuments: positive(s.maxDocuments),
-    maxBytes: positive(s.maxMiB) && positive(s.maxMiB) * MIB,
-  });
-  if (s.prune) out.prune = true;
-  if (s.source === 'sitemap') out.url = s.url.trim();
-  if (s.source === 'urls') out.urls = s.urls.split('\n').map((u) => u.trim()).filter(Boolean);
-  if (s.source === 's3') {
-    Object.assign(out, compact({ bucket: s.bucket.trim(), prefix: s.prefix.trim() }), { storageConfig: buildStorage(s.storageConfig) });
   }
   return out;
 }
@@ -160,11 +118,6 @@ export function buildPayload(form) {
   };
 }
 
-/** The form state of a stored S3 block (its secret is never returned). */
-function storageToForm(sc) {
-  return { ...EMPTY_STORAGE, ...sc, secretKey: '', useTLS: sc?.useTLS ?? false };
-}
-
 /** The form state of a stored backup block. */
 function backupToForm(b) {
   return {
@@ -175,23 +128,6 @@ function backupToForm(b) {
     keep: b.keep ? String(b.keep) : '',
     collections: (b.collections || ['*']).join(', '),
     storageConfig: storageToForm(b.storageConfig),
-  };
-}
-
-/** The form state of a stored sync block. */
-function syncToForm(s) {
-  return {
-    source: s.source,
-    collection: s.collection,
-    lang: s.lang,
-    url: s.url || '',
-    urls: (s.urls || []).join('\n'),
-    bucket: s.bucket || '',
-    prefix: s.prefix || '',
-    prune: s.prune === true,
-    maxDocuments: s.maxDocuments ? String(s.maxDocuments) : '',
-    maxMiB: s.maxBytes ? String(Math.round(s.maxBytes / MIB)) : '',
-    storageConfig: storageToForm(s.storageConfig),
   };
 }
 
@@ -228,13 +164,6 @@ export function ruleToForm(rule) {
   };
 }
 
-/** Where a sync reads from: a URL count, an S3 location or the sitemap URL. */
-function syncSourceText(s) {
-  if (s.source === 'urls') return `${(s.urls || []).length} URLs`;
-  if (s.source === 's3') return `s3://${s.bucket}/${s.prefix || ''}`;
-  return s.url;
-}
-
 /** One line saying what a cron rule does, for the rules table. */
 export function describeCronAction(rule) {
   if (rule.sync) {
@@ -267,7 +196,9 @@ export function describeLastResult(rule) {
   const r = rule.lastResult;
   if (!r) return '';
   const parts = [r.status];
-  if (rule.sync) {
+  if (r.upToDate) {
+    parts.push(`up to date at ${shortCommit(r.commit)}: nothing downloaded or written`);
+  } else if (rule.sync) {
     parts.push(`+${r.added || 0} ~${r.updated || 0} =${r.unchanged || 0} −${r.deleted || 0} ✕${r.failed || 0}`);
   }
   if (r.error) parts.push(r.error);

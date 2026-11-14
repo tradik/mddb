@@ -2,23 +2,53 @@ import { useState } from 'react';
 import { PlayCircle } from 'lucide-react';
 import mddbClient from '../lib/mddb-client';
 import { describeLastResult } from '../lib/automation-form';
+import { shortCommit } from '../lib/automation-sync-form';
 
 /**
  * LastRunResult shows what the latest run of a sync or backup rule did
- * (2.19.0): the status, a sync's counts and the error. Nothing before the
- * first run.
+ * (2.19.0): the status, a sync's counts and the error — and for a git sync
+ * (2.19.5) the ref and commit it read, the commit linked to its page on the
+ * forge. Nothing before the first run.
  */
 export function LastRunResult({ rule }) {
   const text = describeLastResult(rule);
   if (!text) return null;
-  const failed = rule.lastResult.status === 'error';
+  const r = rule.lastResult;
+  const failed = r.status === 'error';
   return (
     <div
       className={`text-xs mt-0.5 ${failed ? 'text-red-700' : 'text-gray-600'}`}
       title="Last run: status, added +, updated ~, unchanged =, deleted −, failed ✕"
     >
       Last run: {text}
+      {r.commit && <GitRunAt result={r} />}
     </div>
+  );
+}
+
+/** The ref and commit a git sync read: "at v2.19.4 (1a2b3c4)". */
+function GitRunAt({ result }) {
+  const short = shortCommit(result.commit);
+  return (
+    <span>
+      {' · at '}
+      <span className="font-mono">{result.ref}</span>
+      {' ('}
+      {result.commitUrl ? (
+        <a
+          href={result.commitUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-blue-800 underline hover:text-blue-900"
+          aria-label={`Commit ${result.commit} on the forge`}
+        >
+          {short}
+        </a>
+      ) : (
+        <span className="font-mono">{short}</span>
+      )}
+      )
+    </span>
   );
 }
 

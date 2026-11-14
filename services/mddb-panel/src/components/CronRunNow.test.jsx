@@ -51,6 +51,26 @@ describe('LastRunResult', () => {
     expect(line.className).toContain('text-red-700');
   });
 
+  test('a git sync names the ref and links the commit to the forge (2.19.5)', () => {
+    const commit = '1a2b3c4d5e6f7a8b9c0d1a2b3c4d5e6f7a8b9c0d';
+    const rule = { ...sync, sync: { source: 'git' }, lastResult: { status: 'success', added: 3, ref: 'v2.19.4', commit,
+      commitUrl: `https://github.com/tradik/mddb/commit/${commit}` } };
+    render(<LastRunResult rule={rule} />);
+    const link = screen.getByRole('link', { name: `Commit ${commit} on the forge` });
+    expect(link.textContent).toBe('1a2b3c4');
+    expect(link.getAttribute('href')).toBe(`https://github.com/tradik/mddb/commit/${commit}`);
+    expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(screen.getByText(/Last run:/).textContent).toContain('+3 ~0 =0 −0 ✕0 · at v2.19.4 (1a2b3c4)');
+  });
+
+  test('an up-to-date git run says nothing was downloaded; a commit without a page is plain text', () => {
+    const rule = { ...sync, sync: { source: 'git' }, lastResult: { status: 'success', upToDate: true, ref: 'main', commit: 'abcdef0123' } };
+    render(<LastRunResult rule={rule} />);
+    expect(screen.getByText(/Last run:/).textContent).toBe(
+      'Last run: success · up to date at abcdef0: nothing downloaded or written · at main (abcdef0)');
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   test('a successful backup without counts', () => {
     render(<LastRunResult rule={{ id: 'b1', backup: {}, lastResult: { status: 'success' } }} />);
     const line = screen.getByText(/Last run:/);
