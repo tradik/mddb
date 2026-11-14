@@ -71,7 +71,7 @@ func TestChatMcpCallREST(t *testing.T) {
 		t.Errorf("a failing tools/list: %+v", out)
 	}
 	f.failList.Store(false)
-	f.token = "tok"
+	f.setToken("tok")
 	if _, out, _ := chatMcpCallAs(t, s, alice, "search"); !out.IsError || !strings.Contains(out.Content, "401") {
 		t.Errorf("a refused connection: %+v", out)
 	}
@@ -119,7 +119,7 @@ func TestChatMcpCallRESTRefusals(t *testing.T) {
 // short, without the value.
 func TestChatMcpCallWithAnUnopenableSecret(t *testing.T) {
 	f := newMcpFixture(t)
-	f.token = "sealed-tok"
+	f.setToken("sealed-tok")
 	chatMcpKey(t)
 	s := chatServer(t)
 	externalMcpOn(t, s)

@@ -50,7 +50,7 @@ func (r *identityRequests) take() (auth, ids []string) {
 func identityServer(t *testing.T, f *mcpFixture, forward bool) *Server {
 	t.Helper()
 	chatMcpKey(t)
-	f.token = "tok"
+	f.setToken("tok")
 	s := chatServer(t)
 	externalMcpOn(t, s)
 	for name, value := range map[string]string{"wiki": "tok", "wiki-id": identityKey} {

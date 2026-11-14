@@ -18,8 +18,11 @@ import (
 // stall or flood.
 type mcpFixture struct {
 	*httptest.Server
-	sse      atomic.Bool  // answer as an event stream
-	token    string       // the bearer token or header value it wants; "" for none
+	sse atomic.Bool // answer as an event stream
+	// token is the bearer token or header value it wants; "" for none. Tests
+	// change it while the server's goroutines may still read it, so it is
+	// atomic: use setToken and wantToken.
+	token    atomic.Pointer[string]
 	header   string       // the header carrying token; "" for Authorization: Bearer
 	calls    atomic.Int32 // tools/call requests
 	searchRO atomic.Bool  // "search" is read-only; false turns it into a writer
@@ -61,7 +64,7 @@ func (f *mcpFixture) callResult(name string, args map[string]any) (any, *jsonRPC
 	case "big":
 		return text(strings.Repeat("ż", 5000)), nil
 	case "boom":
-		return nil, &jsonRPCError{Code: -32000, Message: "exploded with " + f.token}
+		return nil, &jsonRPCError{Code: -32000, Message: "exploded with " + f.wantToken()}
 	case "mixed":
 		return map[string]any{"content": []any{map[string]any{"type": "image", "data": "AA=="},
 			map[string]any{"type": "resource", "resource": map[string]any{"uri": "wiki://a", "text": "resource text"}}}}, nil
@@ -75,14 +78,26 @@ func (f *mcpFixture) callResult(name string, args map[string]any) (any, *jsonRPC
 	return text(fmt.Sprintf("found %v", args["q"])), nil
 }
 
+// setToken sets the credential the fixture demands from now on.
+func (f *mcpFixture) setToken(token string) { f.token.Store(&token) }
+
+// wantToken is the credential the fixture demands; "" for none.
+func (f *mcpFixture) wantToken() string {
+	if t := f.token.Load(); t != nil {
+		return *t
+	}
+	return ""
+}
+
 func (f *mcpFixture) authorized(r *http.Request) bool {
+	token := f.wantToken()
 	switch {
-	case f.token == "":
+	case token == "":
 		return true
 	case f.header == "":
-		return r.Header.Get("Authorization") == "Bearer "+f.token
+		return r.Header.Get("Authorization") == "Bearer "+token
 	}
-	return r.Header.Get(f.header) == f.token
+	return r.Header.Get(f.header) == token
 }
 
 func (f *mcpFixture) serve(w http.ResponseWriter, r *http.Request) {

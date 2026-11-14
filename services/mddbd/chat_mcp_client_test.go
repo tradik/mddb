@@ -67,7 +67,7 @@ func TestMcpRemoteToolRefusal(t *testing.T) {
 
 func TestMcpRemoteClientCredentialAndRedaction(t *testing.T) {
 	f := newMcpFixture(t)
-	f.token = "s3cr3t-token"
+	f.setToken("s3cr3t-token")
 	if _, err := newMcpRemoteClient(f.URL, nil, time.Second).initialize(context.Background()); err == nil ||
 		!strings.Contains(err.Error(), "401") {
 		t.Fatalf("no credential: %v", err)

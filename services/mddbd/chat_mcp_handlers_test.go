@@ -127,7 +127,7 @@ func TestChatMcpInspectREST(t *testing.T) {
 	if w := in.Tools[8]; w.Name != "write_doc" || w.Allowable || w.Reason != "it is not marked readOnlyHint: true" {
 		t.Errorf("a writer: %+v", w)
 	}
-	f.token = "tok"
+	f.setToken("tok")
 	for body, want := range map[string]int{
 		`{"url":"` + f.URL + `"}`:                     http.StatusBadGateway,
 		`{"url":"` + f.URL + `","secretRef":"ghost"}`: http.StatusNotFound,
@@ -198,7 +198,7 @@ func TestChatScenarioSaveChecksMcpTools(t *testing.T) {
 		!strings.Contains(body, "cannot be reached") {
 		t.Errorf("an unreachable enabled server: %d %s", code, body)
 	}
-	f.token = "tok" // initialize itself is refused
+	f.setToken("tok") // initialize itself is refused
 	if code, body := put(map[string]any{"name": "w", "url": f.URL, "enabled": true}); code != http.StatusBadRequest ||
 		!strings.Contains(body, "401") {
 		t.Errorf("a server refusing the session: %d %s", code, body)

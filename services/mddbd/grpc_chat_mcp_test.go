@@ -40,7 +40,7 @@ func TestChatMcpGRPCLifecycle(t *testing.T) {
 	}
 	f := newMcpFixture(t)
 	externalMcpOn(t, s)
-	f.token = "tok"
+	f.setToken("tok")
 
 	put, err := g.PutChatMcpSecret(admin, &proto.PutChatMcpSecretRequest{Name: "wiki", Value: "tok"})
 	if err != nil || !put.GetCreated() || !put.GetSecret().GetSet() || put.GetVersion() != 1 {
