@@ -707,6 +707,7 @@ func (s *MCPToolServer) toolCodeSymbol(ctx context.Context, args map[string]inte
 	req := &SymbolRequest{
 		Collection:     mcpGetString(args, "collection"),
 		Name:           mcpGetString(args, "name"),
+		Path:           mcpGetString(args, "path"),
 		Limit:          mcpGetInt(args, "limit"),
 		IncludeContent: mcpGetBool(args, "include_content"),
 	}

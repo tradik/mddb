@@ -17,7 +17,7 @@ func (s *Server) handleSymbol(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		q := r.URL.Query()
-		req.Collection, req.Name = q.Get("collection"), q.Get("name")
+		req.Collection, req.Name, req.Path = q.Get("collection"), q.Get("name"), q.Get("path")
 		if inc := q.Get("include"); inc != "" {
 			req.Include = strings.Split(inc, ",")
 		}

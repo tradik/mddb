@@ -22,7 +22,7 @@ type typedCase struct {
 func typedCases() []typedCase {
 	alpha := 0.0
 	off := false
-	return []typedCase{
+	return append([]typedCase{
 		{
 			name:   "CodeLanguages",
 			call:   func(ctx context.Context, c *Client) (any, error) { return c.CodeLanguages(ctx) },
@@ -292,5 +292,5 @@ func typedCases() []typedCase {
 				}
 			},
 		},
-	}
+	}, symbolCases()...)
 }

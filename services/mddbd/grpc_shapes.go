@@ -113,7 +113,8 @@ func passagesToProto(ps []Passage) []*proto.Passage {
 	for i, p := range ps {
 		out[i] = &proto.Passage{Collection: p.Collection, Key: p.Key, Lang: p.Lang, Path: p.Path,
 			StartLine: safeInt32(p.Lines.Start), EndLine: safeInt32(p.Lines.End), Symbol: p.Symbol, Kind: p.Kind,
-			Content: p.Content, Score: p.Score, Source: p.Source, Tokens: safeInt32(p.Tokens), Images: imageRefsToProto(p.Images)}
+			Content: p.Content, Score: p.Score, Source: p.Source, Tokens: safeInt32(p.Tokens), Images: imageRefsToProto(p.Images),
+			Container: p.Container, Target: p.Target}
 	}
 	return out
 }

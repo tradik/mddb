@@ -86,17 +86,22 @@ type ComplexityRoot struct {
 	}
 
 	CodeSymbol struct {
-		Callees     func(childComplexity int) int
-		Callers     func(childComplexity int) int
-		Collection  func(childComplexity int) int
-		Definitions func(childComplexity int) int
-		Limit       func(childComplexity int) int
-		LimitCapped func(childComplexity int) int
-		References  func(childComplexity int) int
-		Siblings    func(childComplexity int) int
-		Symbol      func(childComplexity int) int
-		Tests       func(childComplexity int) int
-		Truncated   func(childComplexity int) int
+		Ambiguous       func(childComplexity int) int
+		Callees         func(childComplexity int) int
+		Callers         func(childComplexity int) int
+		Candidates      func(childComplexity int) int
+		Collection      func(childComplexity int) int
+		Definitions     func(childComplexity int) int
+		Implementations func(childComplexity int) int
+		Limit           func(childComplexity int) int
+		LimitCapped     func(childComplexity int) int
+		Precision       func(childComplexity int) int
+		References      func(childComplexity int) int
+		SemanticSource  func(childComplexity int) int
+		Siblings        func(childComplexity int) int
+		Symbol          func(childComplexity int) int
+		Tests           func(childComplexity int) int
+		Truncated       func(childComplexity int) int
 	}
 
 	CollectionStats struct {
@@ -252,6 +257,7 @@ type ComplexityRoot struct {
 
 	Passage struct {
 		Collection func(childComplexity int) int
+		Container  func(childComplexity int) int
 		Content    func(childComplexity int) int
 		Images     func(childComplexity int) int
 		Key        func(childComplexity int) int
@@ -262,6 +268,7 @@ type ComplexityRoot struct {
 		Score      func(childComplexity int) int
 		Source     func(childComplexity int) int
 		Symbol     func(childComplexity int) int
+		Target     func(childComplexity int) int
 		Tokens     func(childComplexity int) int
 	}
 
@@ -319,6 +326,12 @@ type ComplexityRoot struct {
 		TotalDocuments   func(childComplexity int) int
 		TotalMetaIndices func(childComplexity int) int
 		TotalRevisions   func(childComplexity int) int
+	}
+
+	SymbolCandidate struct {
+		Kind func(childComplexity int) int
+		Name func(childComplexity int) int
+		Path func(childComplexity int) int
 	}
 
 	User struct {
@@ -632,6 +645,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.CodeGraphNode.Language(childComplexity), true
 
+	case "CodeSymbol.ambiguous":
+		if e.ComplexityRoot.CodeSymbol.Ambiguous == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Ambiguous(childComplexity), true
 	case "CodeSymbol.callees":
 		if e.ComplexityRoot.CodeSymbol.Callees == nil {
 			break
@@ -644,6 +663,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CodeSymbol.Callers(childComplexity), true
+	case "CodeSymbol.candidates":
+		if e.ComplexityRoot.CodeSymbol.Candidates == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Candidates(childComplexity), true
 	case "CodeSymbol.collection":
 		if e.ComplexityRoot.CodeSymbol.Collection == nil {
 			break
@@ -656,6 +681,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CodeSymbol.Definitions(childComplexity), true
+	case "CodeSymbol.implementations":
+		if e.ComplexityRoot.CodeSymbol.Implementations == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Implementations(childComplexity), true
 	case "CodeSymbol.limit":
 		if e.ComplexityRoot.CodeSymbol.Limit == nil {
 			break
@@ -668,12 +699,24 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.CodeSymbol.LimitCapped(childComplexity), true
+	case "CodeSymbol.precision":
+		if e.ComplexityRoot.CodeSymbol.Precision == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.Precision(childComplexity), true
 	case "CodeSymbol.references":
 		if e.ComplexityRoot.CodeSymbol.References == nil {
 			break
 		}
 
 		return e.ComplexityRoot.CodeSymbol.References(childComplexity), true
+	case "CodeSymbol.semanticSource":
+		if e.ComplexityRoot.CodeSymbol.SemanticSource == nil {
+			break
+		}
+
+		return e.ComplexityRoot.CodeSymbol.SemanticSource(childComplexity), true
 	case "CodeSymbol.siblings":
 		if e.ComplexityRoot.CodeSymbol.Siblings == nil {
 			break
@@ -1466,6 +1509,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Passage.Collection(childComplexity), true
+	case "Passage.container":
+		if e.ComplexityRoot.Passage.Container == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Container(childComplexity), true
 	case "Passage.content":
 		if e.ComplexityRoot.Passage.Content == nil {
 			break
@@ -1526,6 +1575,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Passage.Symbol(childComplexity), true
+	case "Passage.target":
+		if e.ComplexityRoot.Passage.Target == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Passage.Target(childComplexity), true
 	case "Passage.tokens":
 		if e.ComplexityRoot.Passage.Tokens == nil {
 			break
@@ -1822,6 +1877,25 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Stats.TotalRevisions(childComplexity), true
+
+	case "SymbolCandidate.kind":
+		if e.ComplexityRoot.SymbolCandidate.Kind == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SymbolCandidate.Kind(childComplexity), true
+	case "SymbolCandidate.name":
+		if e.ComplexityRoot.SymbolCandidate.Name == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SymbolCandidate.Name(childComplexity), true
+	case "SymbolCandidate.path":
+		if e.ComplexityRoot.SymbolCandidate.Path == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SymbolCandidate.Path(childComplexity), true
 
 	case "User.admin":
 		if e.ComplexityRoot.User.Admin == nil {
@@ -2313,6 +2387,16 @@ func (ec *executionContext) childFields_CodeSymbol(ctx context.Context, field gr
 		return ec.fieldContext_CodeSymbol_limitCapped(ctx, field)
 	case "limit":
 		return ec.fieldContext_CodeSymbol_limit(ctx, field)
+	case "implementations":
+		return ec.fieldContext_CodeSymbol_implementations(ctx, field)
+	case "precision":
+		return ec.fieldContext_CodeSymbol_precision(ctx, field)
+	case "semanticSource":
+		return ec.fieldContext_CodeSymbol_semanticSource(ctx, field)
+	case "ambiguous":
+		return ec.fieldContext_CodeSymbol_ambiguous(ctx, field)
+	case "candidates":
+		return ec.fieldContext_CodeSymbol_candidates(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type CodeSymbol", field.Name)
 }
@@ -2595,6 +2679,10 @@ func (ec *executionContext) childFields_Passage(ctx context.Context, field graph
 		return ec.fieldContext_Passage_tokens(ctx, field)
 	case "images":
 		return ec.fieldContext_Passage_images(ctx, field)
+	case "container":
+		return ec.fieldContext_Passage_container(ctx, field)
+	case "target":
+		return ec.fieldContext_Passage_target(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Passage", field.Name)
 }
@@ -2669,6 +2757,18 @@ func (ec *executionContext) childFields_Stats(ctx context.Context, field graphql
 		return ec.fieldContext_Stats_totalMetaIndices(ctx, field)
 	}
 	return nil, fmt.Errorf("no field named %q was found under type Stats", field.Name)
+}
+
+func (ec *executionContext) childFields_SymbolCandidate(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+	switch field.Name {
+	case "path":
+		return ec.fieldContext_SymbolCandidate_path(ctx, field)
+	case "name":
+		return ec.fieldContext_SymbolCandidate_name(ctx, field)
+	case "kind":
+		return ec.fieldContext_SymbolCandidate_kind(ctx, field)
+	}
+	return nil, fmt.Errorf("no field named %q was found under type SymbolCandidate", field.Name)
 }
 
 func (ec *executionContext) childFields_User(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
@@ -3585,8 +3685,8 @@ func (ec *executionContext) field___Directive_args_args(ctx context.Context, raw
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated",
-		func(ctx context.Context, v any) (*bool, error) {
-			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		func(ctx context.Context, v any) (bool, error) {
+			return ec.unmarshalOBoolean2bool(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -3599,8 +3699,8 @@ func (ec *executionContext) field___Field_args_args(ctx context.Context, rawArgs
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated",
-		func(ctx context.Context, v any) (*bool, error) {
-			return ec.unmarshalOBoolean2ᚖbool(ctx, v)
+		func(ctx context.Context, v any) (bool, error) {
+			return ec.unmarshalOBoolean2bool(ctx, v)
 		})
 	if err != nil {
 		return nil, err
@@ -3624,6 +3724,20 @@ func (ec *executionContext) field___Type_enumValues_args(ctx context.Context, ra
 }
 
 func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated",
+		func(ctx context.Context, v any) (bool, error) {
+			return ec.unmarshalOBoolean2bool(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["includeDeprecated"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field___Type_inputFields_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated",
@@ -4631,6 +4745,139 @@ func (ec *executionContext) _CodeSymbol_limit(ctx context.Context, field graphql
 }
 func (ec *executionContext) fieldContext_CodeSymbol_limit(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "Int")
+}
+
+func (ec *executionContext) _CodeSymbol_implementations(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_implementations(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Implementations, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*Passage) graphql.Marshaler {
+			return ec.marshalNPassage2ᚕᚖmddbᚋgraphqlᚐPassageᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_implementations(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_Passage(ctx, field)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSymbol_precision(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_precision(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Precision, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_precision(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "String")
+}
+
+func (ec *executionContext) _CodeSymbol_semanticSource(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_semanticSource(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.SemanticSource, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_semanticSource(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "String")
+}
+
+func (ec *executionContext) _CodeSymbol_ambiguous(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_ambiguous(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Ambiguous, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v bool) graphql.Marshaler {
+			return ec.marshalNBoolean2bool(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_ambiguous(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("CodeSymbol", field, false, false, "Boolean")
+}
+
+func (ec *executionContext) _CodeSymbol_candidates(ctx context.Context, field graphql.CollectedField, obj *CodeSymbol) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_CodeSymbol_candidates(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Candidates, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v []*SymbolCandidate) graphql.Marshaler {
+			return ec.marshalNSymbolCandidate2ᚕᚖmddbᚋgraphqlᚐSymbolCandidateᚄ(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_CodeSymbol_candidates(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSymbol",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.childFields_SymbolCandidate(ctx, field)
+		},
+	}
+	return fc, nil
 }
 
 func (ec *executionContext) _CollectionStats_name(ctx context.Context, field graphql.CollectedField, obj *CollectionStats) (ret graphql.Marshaler) {
@@ -8292,6 +8539,52 @@ func (ec *executionContext) fieldContext_Passage_images(_ context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Passage_container(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_container(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Container, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_container(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
+func (ec *executionContext) _Passage_target(ctx context.Context, field graphql.CollectedField, obj *Passage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_Passage_target(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Target, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v *string) graphql.Marshaler {
+			return ec.marshalOString2ᚖstring(ctx, selections, v)
+		},
+		true,
+		false,
+	)
+}
+func (ec *executionContext) fieldContext_Passage_target(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("Passage", field, false, false, "String")
+}
+
 func (ec *executionContext) _PassageLines_start(ctx context.Context, field graphql.CollectedField, obj *PassageLines) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -9352,10 +9645,10 @@ func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.C
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v *introspection.Schema) graphql.Marshaler {
-			return ec.marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx, selections, v)
+			return ec.marshalN__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx, selections, v)
 		},
 		true,
-		false,
+		true,
 	)
 }
 func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -9833,6 +10126,75 @@ func (ec *executionContext) _Stats_totalMetaIndices(ctx context.Context, field g
 }
 func (ec *executionContext) fieldContext_Stats_totalMetaIndices(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	return graphql.NewScalarFieldContext("Stats", field, false, false, "Int")
+}
+
+func (ec *executionContext) _SymbolCandidate_path(ctx context.Context, field graphql.CollectedField, obj *SymbolCandidate) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SymbolCandidate_path(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Path, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SymbolCandidate_path(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SymbolCandidate", field, false, false, "String")
+}
+
+func (ec *executionContext) _SymbolCandidate_name(ctx context.Context, field graphql.CollectedField, obj *SymbolCandidate) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SymbolCandidate_name(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Name, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SymbolCandidate_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SymbolCandidate", field, false, false, "String")
+}
+
+func (ec *executionContext) _SymbolCandidate_kind(ctx context.Context, field graphql.CollectedField, obj *SymbolCandidate) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return ec.fieldContext_SymbolCandidate_kind(ctx, field)
+		},
+		func(ctx context.Context) (any, error) {
+			return obj.Kind, nil
+		},
+		nil,
+		func(ctx context.Context, selections ast.SelectionSet, v string) graphql.Marshaler {
+			return ec.marshalNString2string(ctx, selections, v)
+		},
+		true,
+		true,
+	)
+}
+func (ec *executionContext) fieldContext_SymbolCandidate_kind(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	return graphql.NewScalarFieldContext("SymbolCandidate", field, false, false, "String")
 }
 
 func (ec *executionContext) _User_username(ctx context.Context, field graphql.CollectedField, obj *User) (ret graphql.Marshaler) {
@@ -10919,7 +11281,8 @@ func (ec *executionContext) ___Directive_args(ctx context.Context, field graphql
 			return ec.fieldContext___Directive_args(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Args, nil
+			fc := graphql.GetFieldContext(ctx)
+			return obj.VisibleArgs(fc.Args["includeDeprecated"].(bool)), nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []introspection.InputValue) graphql.Marshaler {
@@ -10933,7 +11296,7 @@ func (ec *executionContext) fieldContext___Directive_args(ctx context.Context, f
 	fc = &graphql.FieldContext{
 		Object:     "__Directive",
 		Field:      field,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields___InputValue(ctx, field)
@@ -11100,7 +11463,8 @@ func (ec *executionContext) ___Field_args(ctx context.Context, field graphql.Col
 			return ec.fieldContext___Field_args(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.Args, nil
+			fc := graphql.GetFieldContext(ctx)
+			return obj.VisibleArgs(fc.Args["includeDeprecated"].(bool)), nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []introspection.InputValue) graphql.Marshaler {
@@ -11114,7 +11478,7 @@ func (ec *executionContext) fieldContext___Field_args(ctx context.Context, field
 	fc = &graphql.FieldContext{
 		Object:     "__Field",
 		Field:      field,
-		IsMethod:   false,
+		IsMethod:   true,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields___InputValue(ctx, field)
@@ -11795,7 +12159,8 @@ func (ec *executionContext) ___Type_inputFields(ctx context.Context, field graph
 			return ec.fieldContext___Type_inputFields(ctx, field)
 		},
 		func(ctx context.Context) (any, error) {
-			return obj.InputFields(), nil
+			fc := graphql.GetFieldContext(ctx)
+			return obj.VisibleInputFields(fc.Args["includeDeprecated"].(bool)), nil
 		},
 		nil,
 		func(ctx context.Context, selections ast.SelectionSet, v []introspection.InputValue) graphql.Marshaler {
@@ -11805,7 +12170,7 @@ func (ec *executionContext) ___Type_inputFields(ctx context.Context, field graph
 		false,
 	)
 }
-func (ec *executionContext) fieldContext___Type_inputFields(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext___Type_inputFields(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "__Type",
 		Field:      field,
@@ -11814,6 +12179,17 @@ func (ec *executionContext) fieldContext___Type_inputFields(_ context.Context, f
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return ec.childFields___InputValue(ctx, field)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field___Type_inputFields_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
 	}
 	return fc, nil
 }
@@ -12112,7 +12488,7 @@ func (ec *executionContext) unmarshalInputCodeSymbolInput(ctx context.Context, o
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "name", "include", "limit", "includeContent"}
+	fieldsInOrder := [...]string{"collection", "name", "path", "include", "limit", "includeContent"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12133,6 +12509,13 @@ func (ec *executionContext) unmarshalInputCodeSymbolInput(ctx context.Context, o
 				return it, err
 			}
 			it.Name = data
+		case "path":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("path"))
+			data, err := ec.unmarshalOString2ᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Path = data
 		case "include":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("include"))
 			data, err := ec.unmarshalOString2ᚕstringᚄ(ctx, v)
@@ -13734,6 +14117,31 @@ func (ec *executionContext) _CodeSymbol(ctx context.Context, sel ast.SelectionSe
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "implementations":
+			out.Values[i] = ec._CodeSymbol_implementations(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "precision":
+			out.Values[i] = ec._CodeSymbol_precision(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "semanticSource":
+			out.Values[i] = ec._CodeSymbol_semanticSource(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "ambiguous":
+			out.Values[i] = ec._CodeSymbol_ambiguous(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "candidates":
+			out.Values[i] = ec._CodeSymbol_candidates(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -14824,6 +15232,16 @@ func (ec *executionContext) _Passage(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.RequiredNull {
 				out.Invalids++
 			}
+		case "container":
+			out.Values[i] = ec._Passage_container(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
+		case "target":
+			out.Values[i] = ec._Passage_target(ctx, field, obj)
+			if out.Values[i] == graphql.RequiredNull {
+				out.Invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -15011,7 +15429,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
-			if out.Values[i] == graphql.RequiredNull {
+			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
 		default:
@@ -15218,6 +15636,49 @@ func (ec *executionContext) _Stats(ctx context.Context, sel ast.SelectionSet, ob
 			}
 		case "totalMetaIndices":
 			out.Values[i] = ec._Stats_totalMetaIndices(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	if n := len(deferred.Defers); n > 0 {
+		atomic.AddInt32(&ec.Deferred, int32(min(n, math.MaxInt32)))
+		ec.ProcessDeferredGroup(deferred)
+	}
+
+	return out
+}
+
+var symbolCandidateImplementors = []string{"SymbolCandidate"}
+
+func (ec *executionContext) _SymbolCandidate(ctx context.Context, sel ast.SelectionSet, obj *SymbolCandidate) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, symbolCandidateImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := graphql.NewDeferredGroup(ctx)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SymbolCandidate")
+		case "path":
+			out.Values[i] = ec._SymbolCandidate_path(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "name":
+			out.Values[i] = ec._SymbolCandidate_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "kind":
+			out.Values[i] = ec._SymbolCandidate_kind(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -16548,6 +17009,30 @@ func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel
 	return ret
 }
 
+func (ec *executionContext) marshalNSymbolCandidate2ᚕᚖmddbᚋgraphqlᚐSymbolCandidateᚄ(ctx context.Context, sel ast.SelectionSet, v []*SymbolCandidate) graphql.Marshaler {
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNSymbolCandidate2ᚖmddbᚋgraphqlᚐSymbolCandidate(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNSymbolCandidate2ᚖmddbᚋgraphqlᚐSymbolCandidate(ctx context.Context, sel ast.SelectionSet, v *SymbolCandidate) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "SymbolCandidate!")
+		return graphql.Null
+	}
+	return ec._SymbolCandidate(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNTime2int64(ctx context.Context, v any) (int64, error) {
 	res, err := graphql.UnmarshalInt64(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -16798,6 +17283,14 @@ func (ec *executionContext) marshalN__InputValue2ᚕgithubᚗcomᚋ99designsᚋg
 	}
 
 	return ret
+}
+
+func (ec *executionContext) marshalN__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx context.Context, sel ast.SelectionSet, v *introspection.Schema) graphql.Marshaler {
+	if v == nil {
+		graphql.AddInvalidNullError(ctx, "__Schema!")
+		return graphql.Null
+	}
+	return ec.___Schema(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx context.Context, sel ast.SelectionSet, v introspection.Type) graphql.Marshaler {
@@ -17280,13 +17773,6 @@ func (ec *executionContext) marshalO__InputValue2ᚕgithubᚗcomᚋ99designsᚋg
 	}
 
 	return ret
-}
-
-func (ec *executionContext) marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx context.Context, sel ast.SelectionSet, v *introspection.Schema) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec.___Schema(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalO__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.Type) graphql.Marshaler {

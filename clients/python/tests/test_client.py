@@ -62,6 +62,18 @@ class RecordingServicer(mddb_pb2_grpc.MDDBServicer):
         self._record("Stats", request, context)
         return mddb_pb2.StatsResponse(total_documents=42)
 
+    def CodeSymbol(self, request, context):
+        self._record("CodeSymbol", request, context)
+        return mddb_pb2.CodeSymbolResponse(
+            symbol=request.name,
+            definitions=[mddb_pb2.Passage(path=request.path, symbol="Conn.Close", kind="method", container="Conn")],
+            references=[mddb_pb2.Passage(path="app/main.go", start_line=4, target="net/conn.go#Conn.Close")],
+            precision="semantic",
+            semantic_source="gopls/0.24.0",
+            ambiguous=True,
+            candidates=[mddb_pb2.SymbolCandidate(path="net/conn.go", name="Conn.Close", kind="method")],
+        )
+
 
 @pytest.fixture
 def server():
@@ -158,6 +170,25 @@ def test_search_returns_what_the_server_sent(server, client):
     assert response.total == 2
     assert [d.key for d in response.documents] == ["a", "b"]
     assert servicer.last[1].limit == 10
+
+
+def test_code_symbol_carries_path_and_the_semantic_fields(server, client):
+    # CODE-012: path picks one definition; the answer says how precise it is.
+    _, servicer = server
+
+    response = client.CodeSymbol(
+        mddb_pb2.CodeSymbolRequest(collection="src", name="Close", path="net/conn.go", include=["implementations"])
+    )
+
+    assert servicer.last[1].path == "net/conn.go"
+    assert list(servicer.last[1].include) == ["implementations"]
+    assert response.precision == "semantic"
+    assert response.semantic_source == "gopls/0.24.0"
+    assert response.ambiguous
+    assert response.candidates[0].name == "Conn.Close"
+    assert response.definitions[0].container == "Conn"
+    assert response.references[0].target == "net/conn.go#Conn.Close"
+    assert len(response.implementations) == 0
 
 
 # -- credentials ------------------------------------------------------------

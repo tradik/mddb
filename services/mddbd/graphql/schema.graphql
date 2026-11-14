@@ -117,12 +117,19 @@ type Passage {
   tokens: Int!
   "The document's images, with includeImages (RAG-010)."
   images: [ImageRef!]
+  "Type or class holding the definition, from semantic facts (CODE-012)."
+  container: String
+  "<path>#<qualified name> of the looked-up definition this passage is about, from semantic facts (CODE-012)."
+  target: String
 }
 
 input CodeSymbolInput {
   collection: String!
+  "Bare (Close) or, with semantic facts, qualified (Server.Close)."
   name: String!
-  "definitions, references, callers, callees, tests, siblings; default all"
+  "The file (meta.path) of the one definition wanted (CODE-012)."
+  path: String
+  "definitions, references, callers, callees, tests, siblings, implementations; default all"
   include: [String!]
   limit: Int
   includeContent: Boolean
@@ -143,6 +150,23 @@ type CodeSymbol {
   limitCapped: Boolean
   "The limit used; set only when limitCapped."
   limit: Int
+  "Types implementing the interface; needs semantic facts (CODE-012)."
+  implementations: [Passage!]!
+  "semantic, mixed or heuristic (CODE-012); null for a heuristic answer to a request without path or implementations."
+  precision: String
+  "Language servers behind the facts used, e.g. gopls/0.24.0."
+  semanticSource: String
+  "Several definitions and no path chose one: see candidates."
+  ambiguous: Boolean!
+  candidates: [SymbolCandidate!]!
+}
+
+"A definition an ambiguous name may mean; ask again with name and path (CODE-012)."
+type SymbolCandidate {
+  path: String!
+  "Qualified, e.g. Conn.Close."
+  name: String!
+  kind: String!
 }
 
 "Queued indexing work (GO-042); fields match GET /v1/indexing-status."

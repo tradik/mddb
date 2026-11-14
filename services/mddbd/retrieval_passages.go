@@ -178,9 +178,7 @@ func passageAround(collection string, doc *storage.Doc, hit, radius int, score f
 		start, end = sp.StartLine, sp.EndLine
 	}
 	p := st.passage(collection, start, end, source, true)
-	if sp := st.enclosing(hit); sp != nil {
-		p.Symbol = sp.Symbol
-	}
+	p.Symbol = st.symbolAt(hit)
 	p.Score = score
 	return p
 }
@@ -232,17 +230,18 @@ func (s *Server) buildPassages(collection string, hits []passageSource, opts Pas
 	out := make([]Passage, 0, len(hits))
 	for i := range hits {
 		h := &hits[i]
+		doc := s.withSemanticFacts(collection, &h.doc) // names the definition by its qualified name (CODE-012)
 		switch {
 		case h.chunkText != "":
-			out = append(out, passageOfChunk(collection, &h.doc, h.chunkText, h.startLine, h.endLine, h.score, source))
+			out = append(out, passageOfChunk(collection, doc, h.chunkText, h.startLine, h.endLine, h.score, source))
 		case len(h.chunks) > 0:
 			for _, c := range h.chunks {
-				out = append(out, s.passageOfChunkIndex(collection, &h.doc, c, h.score, source))
+				out = append(out, s.passageOfChunkIndex(collection, doc, c, h.score, source))
 			}
 		case h.bestChunk >= 0:
-			out = append(out, s.passageOfChunkIndex(collection, &h.doc, h.bestChunk, h.score, source))
+			out = append(out, s.passageOfChunkIndex(collection, doc, h.bestChunk, h.score, source))
 		default:
-			out = append(out, passageAtHit(collection, &h.doc, h.terms, h.highlights, opts, h.score, source))
+			out = append(out, passageAtHit(collection, doc, h.terms, h.highlights, opts, h.score, source))
 		}
 	}
 	return out

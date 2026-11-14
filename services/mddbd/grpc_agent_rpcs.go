@@ -29,16 +29,22 @@ func (g *GRPCServer) CodeSymbol(ctx context.Context, req *proto.CodeSymbolReques
 	if err := g.permit(ctx, req.Collection, PermRead); err != nil {
 		return nil, err
 	}
-	res, err := g.server.LookupSymbol(SymbolRequest{Collection: req.Collection, Name: req.Name, Include: req.Include,
-		Limit: int(req.Limit), IncludeContent: req.IncludeContent})
+	res, err := g.server.LookupSymbol(SymbolRequest{Collection: req.Collection, Name: req.Name, Path: req.Path,
+		Include: req.Include, Limit: int(req.Limit), IncludeContent: req.IncludeContent})
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
-	return &proto.CodeSymbolResponse{Collection: res.Collection, Symbol: res.Symbol,
+	out := &proto.CodeSymbolResponse{Collection: res.Collection, Symbol: res.Symbol,
 		Definitions: passagesToProto(res.Definitions), References: passagesToProto(res.References),
 		Callers: passagesToProto(res.Callers), Callees: passagesToProto(res.Callees), Tests: passagesToProto(res.Tests),
 		Siblings: passagesToProto(res.Siblings), Truncated: res.Truncated,
-		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit)}, nil
+		LimitCapped: res.LimitCapped, Limit: safeInt32(res.Limit),
+		Implementations: passagesToProto(res.Implementations), Precision: res.Precision,
+		SemanticSource: res.SemanticSource, Ambiguous: res.Ambiguous}
+	for _, c := range res.Candidates {
+		out.Candidates = append(out.Candidates, &proto.SymbolCandidate{Path: c.Path, Name: c.Name, Kind: c.Kind})
+	}
+	return out, nil
 }
 
 func evalQueryFromProto(q *proto.EvalQueryProto) EvalQuery {

@@ -3,14 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 
 	bolt "go.etcd.io/bbolt"
 
 	"mddb/internal/fts"
-	"mddb/internal/sliceutil"
-	"mddb/internal/storage"
 )
 
 // Symbol lookup (CODE-008).
@@ -27,18 +24,21 @@ import (
 // restore or rebuild — a reindex cannot make it disagree with the documents,
 // because it is the documents.
 //
-// Out of scope until there is evidence it is needed: "implementations"
-// (interfaces, traits). Telling an implementation from a namesake takes type
-// information a scanner does not have.
+// Documents indexed with `mddb-cli autoindex --semantic` also carry a
+// language server's facts (CODE-010); where they do, the answer comes from
+// them (code_symbol_semantic.go, CODE-012) and says so in Precision.
+// Implementations are answered only from facts: telling an implementation
+// from a namesake takes type information a scanner does not have.
 
 // Symbol relations a lookup can return.
 const (
-	RelDefinitions = "definitions"
-	RelReferences  = "references"
-	RelCallers     = "callers"
-	RelCallees     = "callees"
-	RelTests       = "tests"
-	RelSiblings    = "siblings"
+	RelDefinitions     = "definitions"
+	RelReferences      = "references"
+	RelCallers         = "callers"
+	RelCallees         = "callees"
+	RelTests           = "tests"
+	RelSiblings        = "siblings"
+	RelImplementations = "implementations"
 
 	symbolDefaultLimit = 20
 	symbolMaxLimit     = 200
@@ -47,12 +47,17 @@ const (
 	symbolScanDocs = 500
 )
 
-var allRelations = []string{RelDefinitions, RelReferences, RelCallers, RelCallees, RelTests, RelSiblings}
+var allRelations = []string{RelDefinitions, RelReferences, RelCallers, RelCallees, RelTests, RelSiblings, RelImplementations}
 
 // SymbolRequest asks about one symbol in one collection.
 type SymbolRequest struct {
 	Collection string `json:"collection"`
-	Name       string `json:"name"`
+	// Name is a bare name (Close), or a qualified one (Server.Close) where
+	// documents carry semantic facts.
+	Name string `json:"name"`
+	// Path picks the definition in this file (meta.path) when a name has
+	// several (CODE-012).
+	Path string `json:"path,omitempty"`
 	// Include limits the relations returned; empty means all of them.
 	Include []string `json:"include,omitempty"`
 	// Limit caps each relation's passages (default 20, max 200, and never
@@ -66,14 +71,23 @@ type SymbolRequest struct {
 
 // SymbolResult is the answer: one list of passages per relation.
 type SymbolResult struct {
-	Collection  string    `json:"collection"`
-	Symbol      string    `json:"symbol"`
-	Definitions []Passage `json:"definitions"`
-	References  []Passage `json:"references,omitempty"`
-	Callers     []Passage `json:"callers,omitempty"`
-	Callees     []Passage `json:"callees,omitempty"`
-	Tests       []Passage `json:"tests,omitempty"`
-	Siblings    []Passage `json:"siblings,omitempty"`
+	Collection      string    `json:"collection"`
+	Symbol          string    `json:"symbol"`
+	Definitions     []Passage `json:"definitions"`
+	References      []Passage `json:"references,omitempty"`
+	Callers         []Passage `json:"callers,omitempty"`
+	Callees         []Passage `json:"callees,omitempty"`
+	Tests           []Passage `json:"tests,omitempty"`
+	Siblings        []Passage `json:"siblings,omitempty"`
+	Implementations []Passage `json:"implementations,omitempty"`
+	// Precision says where the answer came from (CODE-012): see precision.
+	Precision string `json:"precision,omitempty"`
+	// SemanticSource names the language servers behind the facts used.
+	SemanticSource string `json:"semanticSource,omitempty"`
+	// Ambiguous: the name has several definitions in the facts and no Path
+	// chose one. Candidates lists them; ask again with name and path.
+	Ambiguous  bool              `json:"ambiguous,omitempty"`
+	Candidates []SymbolCandidate `json:"candidates,omitempty"`
 	// Truncated says some relation held more than Limit.
 	Truncated   bool `json:"truncated,omitempty"`
 	LimitReport      // limit, limitCapped: set when the server's cap lowered the request's limit (#368)
@@ -83,7 +97,7 @@ var errSymbolRequest = errors.New("collection and name are required")
 
 // normalize validates the request and fills defaults.
 func (r *SymbolRequest) normalize() error {
-	r.Name = strings.TrimSpace(r.Name)
+	r.Name, r.Path = strings.TrimSpace(r.Name), strings.TrimSpace(r.Path)
 	if r.Collection == "" || r.Name == "" {
 		return errSymbolRequest
 	}
@@ -102,6 +116,13 @@ func (r *SymbolRequest) wants(rel string) bool {
 	return len(r.Include) == 0 || containsString(r.Include, rel)
 }
 
+// symbolDocs is what one read transaction finds for a lookup.
+type symbolDocs struct {
+	defs, users []*sourceText
+	semantic    semanticAnswer
+	cut         bool
+}
+
 // LookupSymbol answers a SymbolRequest.
 func (s *Server) LookupSymbol(req SymbolRequest) (*SymbolResult, error) {
 	if err := req.normalize(); err != nil {
@@ -111,6 +132,60 @@ func (s *Server) LookupSymbol(req SymbolRequest) (*SymbolResult, error) {
 	// #368: the lookup's own bound of 200 per relation, under the server's
 	// cap and the collection's maxTopK — the one cap every search shares.
 	req.Limit, res.LimitReport = s.CapLimit(req.Collection, req.Limit, symbolMaxLimit)
+	found := s.symbolDocuments(req)
+	sem := found.semantic
+
+	// The heuristic path covers what the facts do not: definitions in
+	// documents without facts, or of names facts do not list (constants,
+	// selectors). Where facts define the name, a text match in a document
+	// with facts is a namesake — its uses are in its symRefs or nowhere.
+	defs := heuristicDefinitions(req, found.defs, sem.defs)
+	users := found.users
+	if len(sem.defs) > 0 {
+		users = withoutFacts(users)
+	}
+	hDefs := s.symbolDefinitions(req, defs)
+	res.Definitions = append(append([]Passage{}, sem.definitions...), hDefs...)
+	hRefs := symbolReferences(req, users, callableOnly(res.Definitions))
+	refs := append(append([]Passage(nil), sem.references...), hRefs...)
+	if req.wants(RelReferences) {
+		res.References = refs
+	}
+	if req.wants(RelCallers) {
+		res.Callers = append(append([]Passage(nil), sem.callers...), symbolCallers(req, users, hRefs)...)
+	}
+	if req.wants(RelTests) {
+		res.Tests = filterPassages(refs, func(p Passage) bool { return isTestPath(p.Path) })
+		for i := range res.Tests {
+			res.Tests[i].Source = RelTests
+		}
+	}
+	var hCallees []Passage
+	if req.wants(RelCallees) {
+		hCallees = s.symbolCallees(req, defs)
+		res.Callees = append(append([]Passage(nil), sem.callees...), hCallees...)
+	}
+	if req.wants(RelSiblings) {
+		res.Siblings = s.symbolSiblings(req, append(defs, sem.documents()...))
+	}
+	if req.wants(RelImplementations) {
+		res.Implementations = sem.implementations
+	}
+	if !req.wants(RelDefinitions) {
+		res.Definitions = []Passage{}
+	}
+	res.Precision = precision(req, len(sem.defs) > 0, len(hDefs)+len(hRefs)+len(hCallees) > 0)
+	res.SemanticSource = sem.source()
+	if req.Path == "" && len(sem.defs) > 1 {
+		res.Ambiguous, res.Candidates = true, sem.candidates()
+	}
+	res.Truncated = found.cut || cutRelations(res, req.Limit)
+	return res, nil
+}
+
+// symbolDocuments reads what the lookup needs in one transaction: the
+// documents defining and using the name, and what the facts say about it.
+func (s *Server) symbolDocuments(req SymbolRequest) symbolDocs {
 	wantUsers := req.wants(RelReferences) || req.wants(RelCallers) || req.wants(RelTests)
 	// The extractors leave out calls through a value or a package — x.f(),
 	// pkg.F() — because from text alone they cannot tell what f is. So the
@@ -124,108 +199,39 @@ func (s *Server) LookupSymbol(req SymbolRequest) (*SymbolResult, error) {
 			}
 		}
 	}
-	var defs, users []*sourceText
+	var out symbolDocs
 	_ = s.DBViewC(req.Collection, func(tx *bolt.Tx) error {
 		bIdx, bDocs := tx.Bucket(s.BucketNames.IdxMeta), tx.Bucket(s.BucketNames.Docs)
 		if bIdx == nil || bDocs == nil {
 			return nil
 		}
 		defIDs, _ := docIDsWithMeta(tx, bIdx, req.Collection, MetaKeyDefines, req.Name, symbolScanDocs)
-		defs = loadSourceTexts(tx, bDocs, req.Collection, defIDs)
+		out.defs = loadSourceTexts(tx, bDocs, req.Collection, defIDs)
+		r := s.newFactReader(tx, req.Collection)
+		out.semantic = semanticRelations(r, req, semanticDefinitions(r, req, out.defs))
+		out.cut = r.more
 		if wantUsers {
 			useIDs, _ := docIDsWithMeta(tx, bIdx, req.Collection, MetaKeyUses, req.Name, symbolScanDocs)
-			users = loadSourceTexts(tx, bDocs, req.Collection, append(useIDs, textIDs...))
+			out.users = loadSourceTexts(tx, bDocs, req.Collection, append(useIDs, textIDs...))
 		}
 		return nil
 	})
-
-	res.Definitions = s.symbolDefinitions(req, defs)
-	refs := symbolReferences(req, users, callableOnly(res.Definitions))
-	if req.wants(RelReferences) {
-		res.References = refs
-	}
-	if req.wants(RelCallers) {
-		res.Callers = symbolCallers(req, users, refs)
-	}
-	if req.wants(RelTests) {
-		res.Tests = filterPassages(refs, func(p Passage) bool { return isTestPath(p.Path) })
-		for i := range res.Tests {
-			res.Tests[i].Source = RelTests
-		}
-	}
-	if req.wants(RelCallees) {
-		res.Callees = s.symbolCallees(req, defs)
-	}
-	if req.wants(RelSiblings) {
-		res.Siblings = s.symbolSiblings(req, defs)
-	}
-	if !req.wants(RelDefinitions) {
-		res.Definitions = []Passage{}
-	}
-	for _, list := range []*[]Passage{&res.Definitions, &res.References, &res.Callers, &res.Callees, &res.Tests, &res.Siblings} {
-		if len(*list) > req.Limit {
-			*list = (*list)[:req.Limit]
-			res.Truncated = true
-		}
-	}
-	return res, nil
-}
-
-// loadSourceTexts loads the documents with these IDs once each, in a stable
-// order.
-func loadSourceTexts(tx *bolt.Tx, bDocs *bolt.Bucket, collection string, ids []string) []*sourceText {
-	ids = sliceutil.Unique(ids)
-	sort.Strings(ids)
-	out := make([]*sourceText, 0, len(ids))
-	for _, id := range ids {
-		if doc, err := loadDoc(bDocs.Get(storage.DocKey(collection, id))); err == nil && doc != nil {
-			out = append(out, newSourceText(doc))
-		}
-	}
 	return out
 }
 
-// symbolDefinitions places the name in each defining document: at its span,
-// or — for a language without spans — on the line it first appears.
-func (s *Server) symbolDefinitions(req SymbolRequest, defs []*sourceText) []Passage {
-	out := []Passage{}
-	for _, st := range defs {
-		found := false
-		for _, sp := range st.spans {
-			if sp.Symbol == req.Name {
-				p := st.passage(req.Collection, sp.StartLine, sp.EndLine, RelDefinitions, req.IncludeContent)
-				p.Symbol, p.Kind = sp.Symbol, sp.Kind
-				out = append(out, p)
-				found = true
-			}
-		}
-		if !found {
-			if line := firstSymbolLine(st.doc.ContentMD, req.Name); line > 0 {
-				out = append(out, st.passage(req.Collection, line, line, RelDefinitions, req.IncludeContent))
-			}
+// cutRelations trims every relation to limit and reports whether any held
+// more.
+func cutRelations(res *SymbolResult, limit int) bool {
+	cut := false
+	for _, list := range []*[]Passage{&res.Definitions, &res.References, &res.Callers, &res.Callees, &res.Tests,
+		&res.Siblings, &res.Implementations} {
+		if len(*list) > limit {
+			*list = (*list)[:limit]
+			cut = true
 		}
 	}
-	return out
-}
-
-func filterPassages(in []Passage, keep func(Passage) bool) []Passage {
-	var out []Passage
-	for _, p := range in {
-		if keep(p) {
-			out = append(out, p)
-		}
+	if len(res.Candidates) > limit {
+		res.Candidates, cut = res.Candidates[:limit], true
 	}
-	return out
-}
-
-// callableOnly reports whether every definition found is a function or a
-// method: then a use is a call, and a variable or parameter that happens to
-// share the name is not one.
-func callableOnly(defs []Passage) bool {
-	for _, d := range defs {
-		if d.Kind != "function" && d.Kind != "method" {
-			return false
-		}
-	}
-	return len(defs) > 0
+	return cut
 }

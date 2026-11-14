@@ -112,7 +112,7 @@ func TestLookupSymbol_IncludeLimitAndCSS(t *testing.T) {
 	if _, err := s.LookupSymbol(SymbolRequest{Collection: "repo"}); err == nil {
 		t.Fatal("missing name")
 	}
-	if _, err := s.LookupSymbol(SymbolRequest{Collection: "repo", Name: "x", Include: []string{"implementations"}}); err == nil {
+	if _, err := s.LookupSymbol(SymbolRequest{Collection: "repo", Name: "x", Include: []string{"overrides"}}); err == nil {
 		t.Fatal("unknown relation")
 	}
 	none := lookup(t, s, SymbolRequest{Collection: "empty", Name: "x", Limit: 999})
@@ -199,7 +199,7 @@ func TestGraphExpand_SymbolKinds(t *testing.T) {
 	if got := kinds(RelSiblings); got["internal/search/score.go"] != RelSiblings || got["cmd/tool.go"] != "" {
 		t.Fatalf("siblings: %v", got)
 	}
-	if err := (GraphExpandOptions{Kinds: []string{"implementations"}}).ValidateKinds(); err == nil {
+	if err := (GraphExpandOptions{Kinds: []string{"overrides"}}).ValidateKinds(); err == nil {
 		t.Fatal("unknown kind")
 	}
 	rec := doRequest(t, s.handleVectorSearch, VectorSearchRequest{Collection: "repo", QueryVector: []float32{1, 0, 0},

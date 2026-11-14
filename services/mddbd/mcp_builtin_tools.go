@@ -535,12 +535,18 @@ func mcpBuiltinToolsCore() []MCPTool {
 				"code collection, as path + line passages: definitions (with the span start-end), references " +
 				"(each use, with the definition it sits in), callers, callees, tests that touch it and siblings " +
 				"(other definitions in the same directory). Use it before changing a symbol instead of " +
-				"searching for its name and reading files.",
+				"searching for its name and reading files. When the collection was indexed with " +
+				"`mddb-cli autoindex --semantic`, the answer comes from a language server's facts and says " +
+				"precision: semantic (mixed when only some files have facts; absent or heuristic otherwise): " +
+				"qualified names (Server.Close), references per definition (passage target), and " +
+				"implementations of an interface, which need those facts. A name with several definitions " +
+				"returns ambiguous: true and candidates; ask again with name and path.",
 			InputSchema: map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
 					"collection": map[string]interface{}{"type": "string"},
-					"name":       map[string]interface{}{"type": "string", "description": "Symbol name as written: SearchHybrid, .hero-banner, aws_instance.web"},
+					"name":       map[string]interface{}{"type": "string", "description": "Symbol name as written: SearchHybrid, .hero-banner, aws_instance.web; or qualified, Server.Close, with semantic facts"},
+					"path":       map[string]interface{}{"type": "string", "description": "File (meta.path) of the one definition wanted, e.g. a candidate's path"},
 					"include": map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string",
 						"enum": allRelations}, "description": "Relations to return; default all"},
 					"limit":           map[string]interface{}{"type": "integer", "description": "Passages per relation (default 20, max 200)"},

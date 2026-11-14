@@ -107,12 +107,24 @@ type CodeSymbol struct {
 	LimitCapped *bool `json:"limitCapped,omitempty"`
 	// The limit used; set only when limitCapped.
 	Limit *int `json:"limit,omitempty"`
+	// Types implementing the interface; needs semantic facts (CODE-012).
+	Implementations []*Passage `json:"implementations"`
+	// semantic, mixed or heuristic (CODE-012); null for a heuristic answer to a request without path or implementations.
+	Precision *string `json:"precision,omitempty"`
+	// Language servers behind the facts used, e.g. gopls/0.24.0.
+	SemanticSource *string `json:"semanticSource,omitempty"`
+	// Several definitions and no path chose one: see candidates.
+	Ambiguous  bool               `json:"ambiguous"`
+	Candidates []*SymbolCandidate `json:"candidates"`
 }
 
 type CodeSymbolInput struct {
 	Collection string `json:"collection"`
-	Name       string `json:"name"`
-	// definitions, references, callers, callees, tests, siblings; default all
+	// Bare (Close) or, with semantic facts, qualified (Server.Close).
+	Name string `json:"name"`
+	// The file (meta.path) of the one definition wanted (CODE-012).
+	Path *string `json:"path,omitempty"`
+	// definitions, references, callers, callees, tests, siblings, implementations; default all
 	Include        []string `json:"include,omitempty"`
 	Limit          *int     `json:"limit,omitempty"`
 	IncludeContent *bool    `json:"includeContent,omitempty"`
@@ -349,6 +361,10 @@ type Passage struct {
 	Tokens     int           `json:"tokens"`
 	// The document's images, with includeImages (RAG-010).
 	Images []*ImageRef `json:"images,omitempty"`
+	// Type or class holding the definition, from semantic facts (CODE-012).
+	Container *string `json:"container,omitempty"`
+	// <path>#<qualified name> of the looked-up definition this passage is about, from semantic facts (CODE-012).
+	Target *string `json:"target,omitempty"`
 }
 
 // A 1-based, inclusive line range.
@@ -445,6 +461,14 @@ type Stats struct {
 	TotalDocuments   int                `json:"totalDocuments"`
 	TotalRevisions   int                `json:"totalRevisions"`
 	TotalMetaIndices int                `json:"totalMetaIndices"`
+}
+
+// A definition an ambiguous name may mean; ask again with name and path (CODE-012).
+type SymbolCandidate struct {
+	Path string `json:"path"`
+	// Qualified, e.g. Conn.Close.
+	Name string `json:"name"`
+	Kind string `json:"kind"`
 }
 
 type UpdateDocumentInput struct {

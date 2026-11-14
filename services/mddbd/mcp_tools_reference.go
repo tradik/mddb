@@ -63,7 +63,22 @@ type referenceSymbolResult struct {
 	Definitions []Passage `json:"definitions"`
 	References  []Passage `json:"references,omitempty"`
 	Callers     []Passage `json:"callers,omitempty"`
-	Truncated   bool      `json:"truncated,omitempty"`
+	// Precision combines the lookups' (CODE-012): semantic when every
+	// collection answered from facts, mixed when some did.
+	Precision string `json:"precision,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
+}
+
+// combinePrecision folds one more lookup's precision into the answer so
+// far; "" (a heuristic lookup that did not say so) counts as heuristic.
+func combinePrecision(sofar, next string, first bool) string {
+	if first || sofar == next {
+		return next
+	}
+	if sofar == "" && next == PrecisionHeuristic || sofar == PrecisionHeuristic && next == "" {
+		return PrecisionHeuristic
+	}
+	return PrecisionMixed
 }
 
 // symbolAcross runs a symbol lookup in every target and concatenates the
@@ -74,7 +89,7 @@ func (s *MCPToolServer) symbolAcross(ctx context.Context, args map[string]interf
 		return "", err
 	}
 	out := referenceSymbolResult{Symbol: mcpGetString(args, "name"), Definitions: []Passage{}}
-	for _, coll := range targets {
+	for i, coll := range targets {
 		res, err := s.client.CodeSymbol(ctx, &SymbolRequest{Collection: coll, Name: out.Symbol,
 			Include: include, Limit: mcpGetInt(args, "limit"), IncludeContent: content})
 		if err != nil {
@@ -83,6 +98,7 @@ func (s *MCPToolServer) symbolAcross(ctx context.Context, args map[string]interf
 		out.Definitions = append(out.Definitions, res.Definitions...)
 		out.References = append(out.References, res.References...)
 		out.Callers = append(out.Callers, res.Callers...)
+		out.Precision = combinePrecision(out.Precision, res.Precision, i == 0)
 		out.Truncated = out.Truncated || res.Truncated
 	}
 	data, _ := json.MarshalIndent(out, "", "  ")

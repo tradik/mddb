@@ -35,7 +35,15 @@ type Passage struct {
 	// empty for prose and for lines outside any definition.
 	Symbol string `json:"symbol,omitempty"`
 	// Kind is the definition's kind when the passage is one (function, type…).
-	Kind    string  `json:"kind,omitempty"`
+	Kind string `json:"kind,omitempty"`
+	// Container is the type or class holding the definition, from semantic
+	// facts (CODE-012); empty at top level and without facts.
+	Container string `json:"container,omitempty"`
+	// Target is the definition a symbol lookup's passage belongs to, as
+	// "<path>#<qualified name>", when the lookup answered from semantic facts
+	// (CODE-012): with two definitions of one name it says which one each
+	// reference, caller, callee or implementation is about.
+	Target  string  `json:"target,omitempty"`
 	Content string  `json:"content,omitempty"`
 	Score   float64 `json:"score,omitempty"`
 	// Source says what produced the passage: fts, vector, hybrid, cross, or a
@@ -64,12 +72,19 @@ type sourceText struct {
 	doc   *storage.Doc
 	lines []string
 	spans []codeintel.Span
+	// facts are the document's semantic facts (CODE-010) when it carries
+	// them: the definition holding a line is then the language server's, by
+	// its qualified name (CODE-012).
+	facts *SemanticFacts
 }
 
 func newSourceText(doc *storage.Doc) *sourceText {
 	st := &sourceText{doc: doc, lines: strings.Split(doc.ContentMD, "\n")}
 	if DocumentKind(doc) == fts.KindCode {
 		st.spans = codeintel.Spans(CodeLanguage(doc), doc.ContentMD)
+		if facts, ok := decodeSemanticFacts(doc.Meta); ok {
+			st.facts = &facts
+		}
 	}
 	return st
 }
@@ -89,6 +104,34 @@ func (st *sourceText) enclosing(line int) *codeintel.Span {
 	return codeintel.SymbolAt(st.spans, line)
 }
 
+// definitionAt is the innermost definition the facts place around line, or
+// nil without facts or outside every definition.
+func (st *sourceText) definitionAt(line int) *SymbolDefFact {
+	if st.facts == nil {
+		return nil
+	}
+	var best *SymbolDefFact
+	for i := range st.facts.Defs {
+		d := &st.facts.Defs[i]
+		if d.Start <= line && line <= d.End && (best == nil || d.End-d.Start < best.End-best.Start) {
+			best = d
+		}
+	}
+	return best
+}
+
+// symbolAt names the innermost definition holding line: the facts' qualified
+// name (Server.LookupSymbol) when the document has them, else the scanner's.
+func (st *sourceText) symbolAt(line int) string {
+	if d := st.definitionAt(line); d != nil {
+		return d.Name
+	}
+	if sp := st.enclosing(line); sp != nil {
+		return sp.Symbol
+	}
+	return ""
+}
+
 // passage builds a Passage over lines start..end; withContent includes their
 // text.
 func (st *sourceText) passage(collection string, start, end int, source string, withContent bool) Passage {
@@ -96,9 +139,7 @@ func (st *sourceText) passage(collection string, start, end int, source string, 
 		Collection: collection, Key: st.doc.Key, Lang: st.doc.Lang, Path: docPath(st.doc),
 		Lines: PassageLines{Start: start, End: end}, Source: source, docTokens: approxTokens(st.doc.ContentMD),
 	}
-	if sp := st.enclosing(start); sp != nil {
-		p.Symbol = sp.Symbol
-	}
+	p.Symbol = st.symbolAt(start)
 	if withContent {
 		p.Content = st.text(start, end)
 		p.Tokens = approxTokens(p.Content)

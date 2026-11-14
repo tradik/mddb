@@ -67,14 +67,17 @@ type GraphExpandOptions struct {
 	Direction string `json:"graphDirection,omitempty"`
 	// Kinds switches expansion to symbol relations (CODE-008): "callers"
 	// (documents using what a result defines), "callees" (documents defining
-	// what it uses), "tests" (callers that are test files) and "siblings"
-	// (code in the same directory). Each expansion reports its kind. Empty
+	// what it uses), "tests" (callers that are test files), "siblings"
+	// (code in the same directory) and "implementations" (documents
+	// implementing an interface a result defines; needs semantic facts,
+	// CODE-012). A result with semantic facts expands callers, callees and
+	// tests by its facts, one hop. Each expansion reports its kind. Empty
 	// keeps the document-graph expansion, following Direction.
 	Kinds []string `json:"graphKinds,omitempty"`
 }
 
-// Symbol-relation expansion kinds (CODE-008).
-var graphKinds = []string{RelCallers, RelCallees, RelTests, RelSiblings}
+// Symbol-relation expansion kinds (CODE-008, CODE-012).
+var graphKinds = []string{RelCallers, RelCallees, RelTests, RelSiblings, RelImplementations}
 
 // ValidateKinds rejects an expansion kind that does not exist.
 func (o GraphExpandOptions) ValidateKinds() error {
@@ -256,6 +259,11 @@ func (s *Server) graphNeighbours(collection string, seed graphSeed, direction Gr
 // symbolNeighbours expands one seed by one symbol relation (CODE-008).
 func (s *Server) symbolNeighbours(collection string, seed graphSeed, kind string, opts GraphExpandOptions, seedKeys map[string]bool) []GraphExpansion {
 	var out []GraphExpansion
+	if kind != RelSiblings {
+		if found, ok := s.semanticNeighbours(collection, seed, kind, opts, seedKeys); ok {
+			return found // the seed's facts answer (CODE-012)
+		}
+	}
 	switch kind {
 	case RelCallers:
 		out = s.graphNeighbours(collection, seed, GraphIn, opts, seedKeys, nil)

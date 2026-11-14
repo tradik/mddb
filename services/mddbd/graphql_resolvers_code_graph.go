@@ -93,7 +93,7 @@ func (a *GraphQLAdapter) CodeSymbol(ctx context.Context, input gql.CodeSymbolInp
 		return nil, err
 	}
 	res, err := a.mcp.CodeSymbol(ctx, &SymbolRequest{
-		Collection: input.Collection, Name: input.Name, Include: input.Include,
+		Collection: input.Collection, Name: input.Name, Path: derefString(input.Path), Include: input.Include,
 		Limit: derefInt(input.Limit, 0), IncludeContent: derefBool(input.IncludeContent, false),
 	})
 	if err != nil {
@@ -104,6 +104,12 @@ func (a *GraphQLAdapter) CodeSymbol(ctx context.Context, input gql.CodeSymbolInp
 		Definitions: passagesToGQL(res.Definitions), References: passagesToGQL(res.References),
 		Callers: passagesToGQL(res.Callers), Callees: passagesToGQL(res.Callees),
 		Tests: passagesToGQL(res.Tests), Siblings: passagesToGQL(res.Siblings),
+		Implementations: passagesToGQL(res.Implementations), Precision: optString(res.Precision),
+		SemanticSource: optString(res.SemanticSource), Ambiguous: res.Ambiguous,
+		Candidates: make([]*gql.SymbolCandidate, 0, len(res.Candidates)),
+	}
+	for _, c := range res.Candidates {
+		out.Candidates = append(out.Candidates, &gql.SymbolCandidate{Path: c.Path, Name: c.Name, Kind: c.Kind})
 	}
 	out.LimitCapped, out.Limit = limitToGQL(res.LimitReport)
 	return out, nil
@@ -120,6 +126,7 @@ func passagesToGQL(in []Passage) []*gql.Passage {
 			Lines: &gql.PassageLines{Start: p.Lines.Start, End: p.Lines.End},
 			Lang:  optString(p.Lang), Symbol: optString(p.Symbol), Kind: optString(p.Kind),
 			Content: optString(p.Content), Source: optString(p.Source),
+			Container: optString(p.Container), Target: optString(p.Target),
 		}
 		if p.Score != 0 {
 			score := p.Score

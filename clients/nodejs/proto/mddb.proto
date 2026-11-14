@@ -2136,6 +2136,8 @@ message Passage {
   string source = 11;                            // fts, vector, hybrid, cross, or a symbol relation
   int32 tokens = 12;
   repeated ImageRef images = 13;                 // (v2.18.9, RAG-010) the document's images, with include_images
+  string container = 14;                         // (v2.19.3, CODE-012) type or class holding the definition, from semantic facts
+  string target = 15;                            // (v2.19.3, CODE-012) "<path>#<qualified name>" of the looked-up definition this passage is about
 }
 
 // How long a search waited for queued embeddings (GO-042).
@@ -2152,6 +2154,14 @@ message CodeSymbolRequest {
   repeated string include = 3;                   // relations to return; empty = all
   int32 limit = 4;                               // passages per relation (default 20, max 200)
   bool include_content = 5;
+  string path = 6;                               // (v2.19.3, CODE-012) the file (meta.path) of the one definition wanted
+}
+
+// A definition an ambiguous name may mean (v2.19.3, CODE-012).
+message SymbolCandidate {
+  string path = 1;
+  string name = 2;                               // qualified, e.g. Conn.Close
+  string kind = 3;
 }
 
 message CodeSymbolResponse {
@@ -2166,6 +2176,11 @@ message CodeSymbolResponse {
   bool truncated = 9;
   bool limit_capped = 10;                        // (v2.18.10, #368) the requested limit was above the server's cap
   int32 limit = 11;                              // (v2.18.10, #368) the limit used, set when limit_capped
+  repeated Passage implementations = 12;         // (v2.19.3, CODE-012) types implementing the interface; needs semantic facts
+  string precision = 13;                         // (v2.19.3, CODE-012) semantic | mixed | heuristic; empty for a heuristic answer to a request without path or implementations
+  string semantic_source = 14;                   // (v2.19.3, CODE-012) language servers behind the facts, e.g. gopls/0.24.0
+  bool ambiguous = 15;                           // (v2.19.3, CODE-012) several definitions and no path chose one
+  repeated SymbolCandidate candidates = 16;      // (v2.19.3, CODE-012) the definitions an ambiguous name may mean
 }
 
 // ---- v2.18.8: retrieval evaluation (SRCH-019) ----

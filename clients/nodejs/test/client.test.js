@@ -59,6 +59,19 @@ describe('MddbClient', () => {
         lastCall = { method: 'Stats', request: call.request, metadata: call.metadata.getMap() };
         cb(null, { total_documents: 42 });
       },
+      CodeSymbol: (call, cb) => {
+        lastCall = { method: 'CodeSymbol', request: call.request, metadata: call.metadata.getMap() };
+        cb(null, {
+          symbol: call.request.name,
+          definitions: [{ path: call.request.path, symbol: 'Conn.Close', kind: 'method', container: 'Conn' }],
+          references: [{ path: 'app/main.go', start_line: 4, target: 'net/conn.go#Conn.Close' }],
+          implementations: [],
+          precision: 'semantic',
+          semantic_source: 'gopls/0.24.0',
+          ambiguous: true,
+          candidates: [{ path: 'net/conn.go', name: 'Conn.Close', kind: 'method' }],
+        });
+      },
     });
     server = started.server;
     address = started.address;
@@ -113,6 +126,30 @@ describe('MddbClient', () => {
       assert.equal(lastCall.request.collection, 'blog');
       assert.equal(lastCall.request.content_md, '# Hello');
       assert.deepEqual(lastCall.request.meta.tag.values, ['go', 'grpc']);
+    } finally {
+      client.close();
+    }
+  });
+
+  test('CodeSymbol carries path and the semantic fields (CODE-012)', async () => {
+    const client = new MddbClient(address);
+    try {
+      const res = await client.CodeSymbol({
+        collection: 'src',
+        name: 'Close',
+        path: 'net/conn.go',
+        include: ['references', 'implementations'],
+      });
+
+      assert.equal(lastCall.request.path, 'net/conn.go');
+      assert.deepEqual(lastCall.request.include, ['references', 'implementations']);
+      assert.equal(res.precision, 'semantic');
+      assert.equal(res.semantic_source, 'gopls/0.24.0');
+      assert.equal(res.ambiguous, true);
+      assert.equal(res.candidates[0].name, 'Conn.Close');
+      assert.equal(res.definitions[0].container, 'Conn');
+      assert.equal(res.references[0].target, 'net/conn.go#Conn.Close');
+      assert.deepEqual(res.implementations, []);
     } finally {
       client.close();
     }
