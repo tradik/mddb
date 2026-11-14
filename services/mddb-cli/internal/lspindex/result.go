@@ -2,6 +2,7 @@ package lspindex
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 )
 
@@ -23,7 +24,7 @@ const canaryMinFiles = 20
 func (r *run) canary() error {
 	withDefs := 0
 	for _, syms := range r.defs {
-		if len(syms) > 0 {
+		if slices.ContainsFunc(syms, isDefinition) {
 			withDefs++
 		}
 	}
@@ -47,10 +48,7 @@ func (r *run) canary() error {
 func (r *run) result() *Result {
 	res := &Result{Server: r.server, Files: make(map[string]*FileFacts, len(r.defs)), Stats: r.stats}
 	for path, syms := range r.defs {
-		ff := &FileFacts{}
-		for _, s := range syms {
-			ff.Defs = append(ff.Defs, s.def)
-		}
+		ff := &FileFacts{Defs: definitions(syms)}
 		for target, set := range r.refs[path] {
 			ref := Ref{Target: target, Lines: sortedLines(set)}
 			if !refEncodable(ref) {
@@ -78,6 +76,17 @@ func (r *run) result() *Result {
 	}
 	res.Stats.Files = len(res.Files)
 	return res
+}
+
+// definitions are the reported definitions among syms: owners are not.
+func definitions(syms []symbol) []Def {
+	var out []Def
+	for _, s := range syms {
+		if !s.owner {
+			out = append(out, s.def)
+		}
+	}
+	return out
 }
 
 func sortedLines(set map[int]bool) []int {

@@ -26,6 +26,9 @@ type script struct {
 	Raw            map[string]json.RawMessage `json:"raw"`            // request key -> literal result
 	ProgressToken  string                     `json:"progressToken"`  // the progress token; default "load"
 	StderrOnOpen   string                     `json:"stderrOnOpen"`   // written to stderr per didOpen, {file} the file's path
+	Statuses       []json.RawMessage          `json:"statuses"`       // experimental/serverStatus params sent after initialized
+	StatusLater    json.RawMessage            `json:"statusLater"`    // one more, sent StatusLaterMs after initialized
+	StatusLaterMs  int                        `json:"statusLaterMs"`
 }
 
 func (s script) progressToken() string {

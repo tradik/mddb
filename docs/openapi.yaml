@@ -4161,7 +4161,7 @@ paths:
                       `symImpls` meta; CODE-010, v2.19.3), so the CLI keeps
                       no list of its own. Languages not listed are absent.
                     additionalProperties: { type: boolean }
-                    example: { c: true, cpp: true, go: true, php: true, python: true }
+                    example: { c: true, cpp: true, go: true, php: true, python: true, rust: true }
         "405":
           description: Method not allowed
 

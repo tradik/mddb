@@ -13,6 +13,13 @@ type symbol struct {
 	span     lspRange // the whole definition, to find what encloses a location
 	lspKind  int
 	skipRefs bool
+	// parentKind is the LSP kind of the enclosing definition or owner, 0
+	// at top level (ServerSpec.ImplParents).
+	parentKind int
+	// owner marks a node that is no definition but stands for a type (a
+	// Rust impl block, ServerSpec.Owner): implementation answers land on
+	// it; it is neither reported nor asked about.
+	owner bool
 }
 
 // target is how references and implementations name this symbol.
@@ -49,9 +56,13 @@ type flattener struct {
 	unencodable int
 }
 
-// scope is where a walk is: the qualified name of the enclosing definition,
-// and the namespace prefix a top-level name takes (geo. for C++ namespace geo).
-type scope struct{ parent, prefix string }
+// scope is where a walk is: the qualified name of the enclosing definition
+// and its LSP kind, and the namespace prefix a top-level name takes (geo.
+// for C++ namespace geo).
+type scope struct {
+	parent, prefix string
+	parentKind     int
+}
 
 func (f *flattener) walk(nodes []documentSymbol, sc scope) {
 	for i := range nodes {
@@ -66,13 +77,13 @@ func (f *flattener) walk(nodes []documentSymbol, sc scope) {
 			// node, the comment sections pyrefly turns into String symbols
 			// ("# -- calls"), an anonymous struct. Its children are named as
 			// if it were not there, but for a namespace's prefix.
-			f.walk(n.Children, f.inside(n, name, sc))
+			f.walk(n.Children, f.inside(n, name, sc, span, sel))
 			continue
 		}
 		qname, container := f.qualify(n, name, span, sc)
-		f.add(n, kind, Def{Name: qname, Container: container}, span, sel)
+		f.add(n, kind, Def{Name: qname, Container: container}, span, sel, sc.parentKind)
 		if !callableKinds[kind] {
-			f.walk(n.Children, scope{parent: qname})
+			f.walk(n.Children, scope{parent: qname, parentKind: n.Kind})
 		}
 	}
 }
@@ -86,11 +97,19 @@ func (f *flattener) kindOf(n *documentSymbol) string {
 	return kind
 }
 
-// inside is the scope of the children of a node that is no definition: a
-// namespace node adds its name to the prefix where the spec asks for that
-// (a PHP namespace prefix comes from the source instead).
-func (f *flattener) inside(n *documentSymbol, name string, sc scope) scope {
-	if f.spec.NamespaceNodes && n.Kind == symbolNamespace && name != "" {
+// inside is the scope of the children of a node that is no definition: an
+// owner (a Rust impl block) is their parent; a namespace or module node
+// adds its name to the prefix where the spec asks for that (a PHP namespace
+// prefix comes from the source instead).
+func (f *flattener) inside(n *documentSymbol, name string, sc scope, span, sel lspRange) scope {
+	if f.spec.Owner != nil {
+		if owner := f.spec.Owner(n); owner != "" {
+			qname := f.ns(span.Start.Line) + sc.prefix + owner
+			f.addOwner(n, qname, span, sel)
+			return scope{parent: qname, parentKind: n.Kind}
+		}
+	}
+	if f.spec.NamespaceNodes && (n.Kind == symbolNamespace || n.Kind == symbolModule) && name != "" {
 		sc.prefix += name + "."
 	}
 	return sc
@@ -98,7 +117,7 @@ func (f *flattener) inside(n *documentSymbol, name string, sc scope) scope {
 
 // add records a definition named by d, or counts it when the format cannot
 // carry it.
-func (f *flattener) add(n *documentSymbol, kind string, d Def, span, sel lspRange) {
+func (f *flattener) add(n *documentSymbol, kind string, d Def, span, sel lspRange, parentKind int) {
 	d.Kind, d.Detail = kind, n.Detail
 	d.Start, d.End = span.lines()
 	if !defEncodable(d) {
@@ -106,7 +125,18 @@ func (f *flattener) add(n *documentSymbol, kind string, d Def, span, sel lspRang
 		return
 	}
 	f.syms = append(f.syms, symbol{path: f.path, def: d, pos: sel.Start, span: span, lspKind: n.Kind,
-		skipRefs: f.spec.SkipRefs != nil && f.spec.SkipRefs(f.path, d)})
+		skipRefs: f.spec.SkipRefs != nil && f.spec.SkipRefs(f.path, d), parentKind: parentKind})
+}
+
+// addOwner records an owner. One whose name the format cannot carry is left
+// out: implementations pointing at it are dropped, its children still count.
+func (f *flattener) addOwner(n *documentSymbol, qname string, span, sel lspRange) {
+	if !validName(qname) {
+		return
+	}
+	d := Def{Name: qname}
+	d.Start, d.End = span.lines()
+	f.syms = append(f.syms, symbol{path: f.path, def: d, pos: sel.Start, span: span, lspKind: n.Kind, owner: true, skipRefs: true})
 }
 
 // qualify names a definition from its parent in the tree, or — for a flat

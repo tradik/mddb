@@ -1,7 +1,7 @@
 ---
 title: "Code Intelligence"
 slug: "docs/code-intelligence"
-description: "How MDDB answers where a symbol is defined, who calls it and what implements it: heuristic symbols for 13 programming languages, and precise facts from gopls, basedpyright, phpactor and clangd with mddb-cli autoindex --semantic."
+description: "How MDDB answers where a symbol is defined, who calls it and what implements it: heuristic symbols for 13 programming languages, and precise facts from gopls, basedpyright, phpactor, clangd and rust-analyzer with mddb-cli autoindex --semantic."
 status: publish
 ---
 
@@ -14,13 +14,13 @@ implement an interface. It answers on two levels of precision, through the same
 
 | | Heuristic (always on) | Semantic (`autoindex --semantic`, 2.19.3+) |
 |---|---|---|
-| Languages | 13: Go, Python, PHP, JS/TS, Rust, Java, C/C++, Ruby, CSS, Terraform, YAML, HTML, assembly | Go, Python, PHP, C, C++ (2.19.4) |
+| Languages | 13: Go, Python, PHP, JS/TS, Rust, Java, C/C++, Ruby, CSS, Terraform, YAML, HTML, assembly | Go, Python, PHP, C, C++, Rust (2.19.4) |
 | Where it comes from | mddbd reads each file alone with scanners | a language server reads the whole checkout, with its dependencies |
 | Definitions | name and span | qualified name (`Conn.Close`), kind, span, enclosing type |
 | References | name matches, plus full-text hits for `x.f()` calls | the exact lines that refer to this definition |
 | Same name, several definitions | one merged answer | `ambiguous: true` and a list of candidates |
 | Callers, callees, tests | from the spans around each match | from the facts, per definition |
-| Implementations | — | interfaces, abstract classes, protocols, C++ subclasses and overrides |
+| Implementations | — | interfaces, abstract classes, protocols, C++ subclasses and overrides, Rust trait impls |
 | Needs | nothing | a language server on the machine running `mddb-cli` |
 | `precision` in the answer | omitted, or `heuristic` | `semantic`, or `mixed` when only part of the collection has facts |
 
@@ -60,9 +60,11 @@ changed.
 | Python | basedpyright, else pyrefly | `uv tool install basedpyright` (or `pip install basedpyright`; Node comes with it) / `uv tool install pyrefly` | MIT | `MDDB_LSP_PYTHON` |
 | PHP | phpactor, else PHPantom | the `phpactor.phar` from the phpactor releases (PHP 8.2+), or a PHPantom release binary | MIT | `MDDB_LSP_PHP` |
 | C, C++ | clangd (23 or later) | the static `clangd-<os>-<version>.zip` from the clangd releases, or the `clangd` package of the distribution or LLVM; needs the build's `compile_commands.json` | Apache-2.0 WITH LLVM-exception | `MDDB_LSP_C`, `MDDB_LSP_CPP` |
+| Rust | rust-analyzer | `rustup component add rust-analyzer` (cargo must be on `PATH`: it reads the workspace with `cargo metadata`) | MIT OR Apache-2.0 | `MDDB_LSP_RUST` |
 
 Versions tested on 2026-11-14: gopls 0.24.0, basedpyright 1.40.2, pyrefly
-1.4.1, phpactor 2026.10.07.0, PHPantom 0.11.1. basedpyright comes before pyrefly
+1.4.1, phpactor 2026.10.07.0, PHPantom 0.11.1, clangd 23.1.0, rust-analyzer
+1.98.0. basedpyright comes before pyrefly
 because pyrefly 1.4.1 returns no implementations of classes. An `MDDB_LSP_*`
 variable replaces the built-in command (split on spaces, no shell), e.g.
 `MDDB_LSP_PHP="php /opt/phpactor.phar language-server"`.
@@ -106,6 +108,43 @@ elsewhere (keep `--log=info` in an override: the check below reads it).
   large tree. The index is kept in `.cache/clangd/` next to the database,
   which makes the next run faster; add it to `.gitignore`.
 - Cross-compilers: add `--query-driver=<glob>` through `MDDB_LSP_C`.
+
+### Rust (rust-analyzer, 2.19.4)
+
+rust-analyzer 1.98.0 (the rustup component) was tested on 2026-11-14. It runs
+as `rust-analyzer` with no arguments, and with `checkOnSave` off: the run
+saves nothing, and the `cargo check` it would start compiles the crate for no
+fact.
+
+- **The workspace must load.** rust-analyzer reads the project with
+  `cargo metadata`, from a `Cargo.toml` at the indexed root or one directory
+  below it. Index the crate or the workspace (`autoindex services/my-crate`),
+  not a monorepo root with the crate deeper down. When it cannot load the
+  workspace it says so (`Failed to load workspaces.`, `Failed to discover
+  workspace`) while still answering every request from single files; the run
+  then returns no Rust facts.
+- **Readiness.** The client asks for rust-analyzer's `experimental/serverStatus`
+  and asks references only once the server reports itself quiescent: the
+  workspace loaded, build scripts run, proc-macros expanded and caches
+  primed. On a large crate that takes minutes, within `--semantic-timeout`.
+  Build scripts and proc-macros are built into the crate's `target/`
+  directory, as an editor would.
+- **Names.** Methods sit in impl blocks: `impl Square`, `impl Shape for
+  Square`, `impl fmt::Display for Square` and `impl<T> Wrapper<T>` all give
+  `Square.area`, `Wrapper.get` — the self type without generics or path
+  (`impl crate::Square` is `Square`, `impl Shape for &'static str` is
+  `str`). An inline module prefixes its items (`mod inner { struct Hidden }`
+  is `inner.Hidden`); a module in its own file adds nothing, its path says
+  where it is. A trait is `interface`, its methods `method`; a type alias is
+  `type`; an associated function without `self` (`new`) stays a `function`,
+  in its type (`Square.new`). Look a name up as `Square::new` or `Square.new`.
+- **Implementations** are asked for traits and trait methods: a trait's are
+  the types that implement it (`LlmProvider` → `OpenAiProvider`), a trait
+  method's the methods of those impls. Implementations through
+  `#[async_trait]` and other proc-macros are found.
+- Functions in a `mod tests` (or `mod test`) are not asked for references:
+  the harness calls `#[test]` functions by attribute, and their helpers are
+  used only there.
 
 ## Flags
 
@@ -193,6 +232,7 @@ Measured on mddbd's own code (1343 Go files, 300 000 lines), gopls 0.24.0:
 | First run | about 2.5 minutes; 18 272 definitions, 89 551 reference lines, 192 implementations |
 | Second run, nothing changed | the language server runs again, 0 documents sent |
 | Language server memory | 3.3–5.5 GB peak (gopls) |
+| Rust: services/mddb-chat (118 files), rust-analyzer 1.98.0 | 1120 definitions, 5449 reference lines, 19 implementations; 12.7 s with a cold `target/` (11 s of it loading), 5.5–6 s after; 2.2 GB peak |
 | Facts in meta | median 1.2 KB, p99 9.2 KB per document; +55–65 MB on disk for the collection |
 | Without `--semantic` | unchanged from 2.19.2 |
 
@@ -216,6 +256,7 @@ reading a single document returns them.
 | `--semantic=php` stops with `semantic facts for php: ...` | a listed language is required | install the server, or use `--semantic` (auto) |
 | `no compilation database (compile_commands.json) in <root> or <root>/build; ...` | clangd has no build flags for the tree | generate `compile_commands.json`, or name it with `--compile-commands` |
 | `language server compiled files without the project's build settings: a.c, ...` | clangd fell back to guessed flags for those files (not in the database, or an override without `--log=info` hid the check — then this message never appears) | regenerate the database from a build that compiles those files, or pass the right `--compile-commands`; no C/C++ facts are sent until then |
+| `language server did not load the workspace: the server reports "Failed to load workspaces."; ...` | rust-analyzer found no `Cargo.toml` at the root or one directory below, or `cargo metadata` failed there (a broken manifest, an offline registry) | run autoindex on the crate or workspace directory and check that `cargo metadata` succeeds there; no Rust facts are sent until then |
 | `the server keeps no semantic facts (it predates 2.19.3)` | mddbd is older than the CLI | upgrade mddbd |
 | `precision: mixed` | some files have no facts | index those languages with a server, or accept the mix |
 | `symIndex` ends in ` truncated` | the file had more than `MDDB_CODE_MAX_FACTS` (4096) facts | references were cut first; raise the limit on mddbd if needed |
@@ -236,7 +277,7 @@ a tool call is a separate security decision.
 The language-server table is one place in mddb-cli
 (`services/mddb-cli/internal/lspindex/servers.go`). A new language is a new
 entry — the command, the language id, how its symbol names nest (clangd's
-hooks are in `servers_clangd.go`) — plus a test
+hooks are in `servers_clangd.go`, rust-analyzer's in `servers_rust.go`) — plus a test
 against the fake server, and `semantic: true` for it in mddbd's
 `/v1/code-languages`. The fact format is in
 [testdata/semantic-facts/README.md](https://github.com/tradik/mddb/blob/main/testdata/semantic-facts/README.md).

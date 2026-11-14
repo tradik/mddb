@@ -116,7 +116,7 @@ func (r *run) execute(ctx context.Context, cand Candidate, files []string) error
 		limit = r.opt.Timeout
 	}
 	if err := r.conn.waitIdle(ctx, limit); err != nil {
-		return err
+		return r.unhealthy(err)
 	}
 	r.stats.LoadWait = time.Since(waited)
 	if err := forEach(ctx, r.opt.Concurrency, r.symbolsWhere(func(s *symbol) bool { return !s.skipRefs }), r.referencesOf); err != nil {
@@ -126,48 +126,6 @@ func (r *run) execute(ctx context.Context, cand Candidate, files []string) error
 		return err
 	}
 	return forEach(ctx, r.opt.Concurrency, r.symbolsWhere(r.wantsImpls), r.implementationsOf)
-}
-
-// initialize performs the handshake and names the server for Result.Server.
-func (r *run) initialize(ctx context.Context, cand Candidate) error {
-	rootURI := fileURI(r.root)
-	params := map[string]any{
-		"processId": os.Getpid(),
-		"rootUri":   rootURI,
-		"rootPath":  r.root,
-		"workspaceFolders": []workspaceFolder{
-			{URI: rootURI, Name: "root"},
-		},
-		"capabilities": map[string]any{
-			"window": map[string]any{"workDoneProgress": true},
-			"workspace": map[string]any{
-				"configuration":    true,
-				"workspaceFolders": true,
-				// clangd reads the kinds a client knows from here, for
-				// documentSymbol too, and otherwise reports a struct as a
-				// class and an enum's members as enums.
-				"symbol": map[string]any{"symbolKind": allSymbolKinds},
-			},
-			"textDocument": map[string]any{
-				"documentSymbol": map[string]any{"hierarchicalDocumentSymbolSupport": true, "symbolKind": allSymbolKinds},
-				"references":     map[string]any{},
-				"implementation": map[string]any{},
-			},
-		},
-	}
-	if r.spec.Settings != nil {
-		if s := r.spec.Settings(r.opt); s != nil {
-			params["initializationOptions"] = s
-		}
-	}
-	var res struct {
-		ServerInfo serverInfo `json:"serverInfo"`
-	}
-	if err := r.conn.call(ctx, "initialize", params, &res); err != nil {
-		return fmt.Errorf("initialize: %w", err)
-	}
-	r.server = serverName(cand, res.ServerInfo)
-	return r.conn.notify("initialized", map[string]any{})
 }
 
 // relFiles cleans the caller's paths to slash form and drops those outside
@@ -188,4 +146,15 @@ func (r *run) relFiles(files []string) []string {
 		}
 	}
 	return out
+}
+
+// unhealthy turns the server's report that it could not load the project
+// into ErrWorkspaceNotLoaded with the server's words and the spec's hint;
+// any other error passes.
+func (r *run) unhealthy(err error) error {
+	var u *errUnhealthy
+	if !errors.As(err, &u) {
+		return err
+	}
+	return fmt.Errorf("%w: the server reports %q; %s", ErrWorkspaceNotLoaded, u.Error(), r.spec.StatusHint)
 }

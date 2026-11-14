@@ -189,8 +189,11 @@ symbol is defined, referenced and implemented \(em with the documents as meta
 symIndex, symDefs, symRefs and symImpls (v2.19.3). Off by default; alone it
 means \fBauto\fR. Servers: gopls for go; basedpyright\-langserver, else pyrefly,
 for python; phpactor, else phpantom_lsp, for php; clangd for c and cpp
-(v2.19.4); MDDB_LSP_GO, MDDB_LSP_PYTHON, MDDB_LSP_PHP, MDDB_LSP_C and
-MDDB_LSP_CPP replace them with a command line. \fBauto\fR indexes every
+(v2.19.4); rust\-analyzer for rust (v2.19.4); MDDB_LSP_GO, MDDB_LSP_PYTHON,
+MDDB_LSP_PHP, MDDB_LSP_C, MDDB_LSP_CPP and MDDB_LSP_RUST replace them with a
+command line. rust\-analyzer loads the workspace with cargo metadata from a
+Cargo.toml at the root or one directory below it; when it reports that it
+could not, the run sends no Rust facts. \fBauto\fR indexes every
 language in the tree that the server keeps facts for and that has a language
 server installed; a missing or failing server is a warning and those files go
 without facts. A comma\-separated \fILIST\fR (go,python,php) fails before

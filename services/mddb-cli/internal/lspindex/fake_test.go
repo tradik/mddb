@@ -77,6 +77,9 @@ type fakeScript struct {
 	Raw            map[string]any    `json:"raw,omitempty"`
 	ProgressToken  string            `json:"progressToken,omitempty"`
 	StderrOnOpen   string            `json:"stderrOnOpen,omitempty"`
+	Statuses       []map[string]any  `json:"statuses,omitempty"`
+	StatusLater    map[string]any    `json:"statusLater,omitempty"`
+	StatusLaterMs  int               `json:"statusLaterMs,omitempty"`
 }
 
 // loc is a location in the script: a path relative to the root, an

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // opened records a didOpen's languageId and logs about the file as clangd
@@ -24,6 +25,23 @@ func (f *fake) opened(m *msg) {
 	if f.s.StderrOnOpen != "" {
 		fmt.Fprintln(os.Stderr, strings.ReplaceAll(f.s.StderrOnOpen, "{file}", uriToPath(p.TextDocument.URI)))
 	}
+}
+
+// statuses sends rust-analyzer's experimental/serverStatus: Statuses at
+// once, StatusLater after StatusLaterMs (recorded as "status later").
+func (f *fake) statuses() {
+	for _, st := range f.s.Statuses {
+		f.write(map[string]any{"jsonrpc": "2.0", "method": "experimental/serverStatus", "params": st})
+	}
+	if f.s.StatusLaterMs <= 0 {
+		return
+	}
+	time.AfterFunc(time.Duration(f.s.StatusLaterMs)*time.Millisecond, func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		f.write(map[string]any{"jsonrpc": "2.0", "method": "experimental/serverStatus", "params": f.s.StatusLater})
+		f.record["asked"] = append(asSlice(f.record["asked"]), "status later")
+	})
 }
 
 func asSlice(v any) []any {

@@ -37,8 +37,12 @@ func (c *conn) answer(m *message) {
 // observe keeps the server's error messages: an unloaded workspace is often
 // reported only there, while every request still succeeds.
 func (c *conn) observe(m *message) {
-	if m.Method == "$/progress" {
+	switch m.Method {
+	case "$/progress":
 		c.trackProgress(m.Params)
+		return
+	case "experimental/serverStatus":
+		c.trackStatus(m.Params)
 		return
 	}
 	if m.Method != "window/showMessage" && m.Method != "window/logMessage" {

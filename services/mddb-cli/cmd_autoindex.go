@@ -62,14 +62,16 @@ above wins for a key both name, and --no-frontmatter turns this off.
 A second run only rewrites files whose content changed.
 
 --semantic runs a language server (gopls; basedpyright or pyrefly; phpactor or
-PHPantom; clangd for C and C++) over the checkout, one language after another,
-and sends where each symbol is defined, referenced and implemented with the
-documents. Alone it means auto: every language in the tree that the server
-keeps facts for and that has a server installed; a missing server is a
-warning. --semantic=go,python names the languages: a missing or failing server
-is then an error and nothing is sent. Write the list with '=': a separate word
-is the path. clangd needs the build's compile_commands.json: --compile-commands
-names it (or its directory); by default the root and <root>/build are searched.`,
+PHPantom; clangd for C and C++; rust-analyzer for Rust) over the checkout, one
+language after another, and sends where each symbol is defined, referenced and
+implemented with the documents. Alone it means auto: every language in the tree
+that the server keeps facts for and that has a server installed; a missing
+server is a warning. --semantic=go,python names the languages: a missing or
+failing server is then an error and nothing is sent. Write the list with '=': a
+separate word is the path. clangd needs the build's compile_commands.json:
+--compile-commands names it (or its directory); by default the root and
+<root>/build are searched. rust-analyzer needs the workspace's Cargo.toml at the
+root or one directory below it.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.root = "."

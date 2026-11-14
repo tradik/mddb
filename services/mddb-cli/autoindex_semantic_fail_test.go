@@ -97,14 +97,14 @@ func TestSemantic_ServerWithoutSemantic(t *testing.T) {
 }
 
 func TestSemantic_PlanEdges(t *testing.T) {
-	// go must resolve, so that the run reaches rust; the machine running the
+	// go must resolve, so that the run reaches kotlin; the machine running the
 	// tests need not have gopls.
 	t.Setenv("MDDB_LSP_GO", fakeLSP(t))
 	files := []autoFile{{Rel: "a.go", Language: "go"}, {Rel: "doc.pdf", Language: "go", Format: "pdf"}}
 	announced := map[string]bool{"go": true}
 
 	rep := &semanticReport{}
-	if _, err := planSemantic(semanticOptions{langs: "go,rust"}, files, announced, rep); !errors.Is(err, lspindex.ErrUnsupportedLanguage) {
+	if _, err := planSemantic(semanticOptions{langs: "go,kotlin"}, files, announced, rep); !errors.Is(err, lspindex.ErrUnsupportedLanguage) {
 		t.Errorf("unsupported language: %v", err)
 	}
 	rep = &semanticReport{}

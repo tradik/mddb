@@ -31,6 +31,7 @@ func TestServerArgv(t *testing.T) {
 		// The compilation database autoindex found goes on clangd's line.
 		{"c", []string{"clangd"}, "clangd", []string{"--background-index", "--log=info", "--compile-commands-dir=/src/build"}, "clangd/1.0", "/src/build"},
 		{"cpp", []string{"clangd"}, "clangd", []string{"--background-index", "--log=info"}, "clangd/1.0", ""},
+		{"rust", []string{"rust-analyzer"}, "rust-analyzer", []string{}, "rust-analyzer/1.0", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.lang+"/"+c.wantProg, func(t *testing.T) {
@@ -100,7 +101,7 @@ func TestEnvOverrideSplitsArgv(t *testing.T) {
 }
 
 func TestLanguages(t *testing.T) {
-	if got := Languages(); !reflect.DeepEqual(got, []string{"c", "cpp", "go", "php", "python"}) {
+	if got := Languages(); !reflect.DeepEqual(got, []string{"c", "cpp", "go", "php", "python", "rust"}) {
 		t.Errorf("Languages = %v", got)
 	}
 }
@@ -114,6 +115,7 @@ func TestServerName(t *testing.T) {
 		{Candidate{Name: "gopls", Argv: []string{"/x/gopls"}}, serverInfo{Version: `{"Version":"v0.24.0"}`}, "gopls/0.24.0"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{Name: "my server", Version: "2 beta|1#x"}, "my-server/2-beta-1-x"},
 		{Candidate{Name: "clangd", Argv: []string{"/x/clangd"}}, serverInfo{Version: "clangd version 23.1.0 (https://github.com/llvm/llvm-project ea7d852a) linux+grpc"}, "clangd/23.1.0"},
+		{Candidate{Name: "rust-analyzer", Argv: []string{"/x/rust-analyzer"}}, serverInfo{Version: "1.98.0 (88d9e12 2026-08-18)"}, "rust-analyzer/1.98.0"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{}, "srv/unknown"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{Version: "{broken"}, "srv/unknown"},
 		{Candidate{Name: "phpactor", Argv: []string{"/x/phpactor"}}, serverInfo{Version: "phpactor/2026.10.07.0"}, "phpactor/2026.10.07.0"},

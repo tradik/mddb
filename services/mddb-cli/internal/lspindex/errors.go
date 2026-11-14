@@ -10,6 +10,8 @@ import (
 // single files: no reference crossed a file boundary in a tree large enough
 // that some must. gopls does this when the go on PATH is older than go.work
 // requires — 168 reference locations instead of 2591, without one error.
+// rust-analyzer says so itself (serverStatus health "error", "Failed to
+// load workspaces." when `cargo metadata` fails or finds no Cargo.toml).
 // Index returns no facts then: heuristics beat false precision.
 var ErrWorkspaceNotLoaded = errors.New("language server did not load the workspace")
 

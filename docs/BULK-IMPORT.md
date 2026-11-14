@@ -59,6 +59,7 @@ mddb-cli autoindex . --semantic              # auto: every language it can do
 mddb-cli autoindex . --semantic=go,python    # these languages, or fail
 mddb-cli autoindex . --semantic --dry-run    # run the servers, report, send nothing
 mddb-cli autoindex . --semantic=c,cpp --compile-commands build/   # C and C++ (2.19.4)
+mddb-cli autoindex services/my-crate --semantic=rust                # Rust (2.19.4)
 ```
 
 | Language | Server (first found on `PATH`) | Override |
@@ -67,6 +68,7 @@ mddb-cli autoindex . --semantic=c,cpp --compile-commands build/   # C and C++ (2
 | Python | `basedpyright-langserver --stdio`, else `pyrefly lsp --indexing-mode lazy-blocking` | `MDDB_LSP_PYTHON` |
 | PHP | `phpactor language-server`, else `phpantom_lsp` | `MDDB_LSP_PHP` |
 | C, C++ | `clangd --background-index --log=info --compile-commands-dir=<dir>` | `MDDB_LSP_C`, `MDDB_LSP_CPP` |
+| Rust | `rust-analyzer` (`rustup component add rust-analyzer`) | `MDDB_LSP_RUST` |
 
 basedpyright comes before pyrefly because pyrefly 1.4.1 finds no
 implementations of classes (ABC subclasses, Protocols) and basedpyright does.
@@ -101,6 +103,15 @@ and their versions.
   clangd answers references from its background index, which the run waits
   for within `--semantic-timeout`. Details:
   [Code Intelligence](CODE-INTELLIGENCE.md#c-and-c-clangd-2194).
+- **Rust** needs the workspace's `Cargo.toml` at the indexed root or one
+  directory below it, and `cargo metadata` to succeed there: rust-analyzer
+  loads the workspace that way, and when it cannot it says so and the
+  language gets no facts. The run waits until rust-analyzer reports itself
+  quiescent (workspace loaded, build scripts and proc-macros built, within
+  `--semantic-timeout`). Methods are named after their impl's self type
+  (`impl Shape for Square` gives `Square.area`); traits get their
+  implementations. Over `services/mddb-chat` (118 files) it took 6–13 s and
+  2.2 GB. Details: [Code Intelligence](CODE-INTELLIGENCE.md#rust-rust-analyzer-2194).
 - Languages run one after another; two servers at once would need the sum of
   their memory. gopls over `services/mddbd` (1343 files) took about two
   minutes and peaked between 3.5 and 5.5 GB.

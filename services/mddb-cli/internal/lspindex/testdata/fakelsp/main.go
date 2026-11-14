@@ -158,6 +158,7 @@ func (f *fake) handle(m *msg) {
 		}
 		// A progress report without begin is noise the client must ignore.
 		f.write(map[string]any{"jsonrpc": "2.0", "method": "$/progress", "params": map[string]any{"token": 1}})
+		f.statuses()
 		if f.s.ProgressOpen || f.s.ProgressEndMs > 0 {
 			f.progress("begin")
 		}

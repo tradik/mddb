@@ -15,7 +15,8 @@ import (
 // `pyrefly lsp --help`; basedpyright 1.40.2 docs, `--stdio` required;
 // phpactor 2026.10.07.0 `phpactor language-server --help`, stdio by default;
 // PHPantom 0.11.1 `phpantom_lsp --help`, stdio by default; clangd 23.1.0
-// `clangd --help`, see servers_clangd.go). servers_test.go pins them.
+// `clangd --help`, see servers_clangd.go; rust-analyzer 1.98.0, stdio with
+// no arguments, see servers_rust.go). servers_test.go pins them.
 
 // ServerSpec describes how to index one language.
 type ServerSpec struct {
@@ -76,6 +77,24 @@ type ServerSpec struct {
 	// WaitIndexed waits for the server's progress to end however long it
 	// takes, within Options.Timeout, instead of at most maxLoadWait.
 	WaitIndexed bool
+
+	// The hooks below exist for rust-analyzer (servers_rust.go).
+
+	// Owner returns, for a node that is no definition, the name of the type
+	// its children belong to (a Rust impl block's self type), or "". The
+	// node then qualifies its children (Square.area) and stands for the type
+	// where an implementation answer points at it; it is not reported.
+	Owner func(n *documentSymbol) string
+	// ImplParents, when set, asks implementation of a definition of
+	// ImplKinds only when it is top-level or its parent is of one of these
+	// kinds: a trait's methods, not an impl block's.
+	ImplParents []int
+	// ServerStatus declares rust-analyzer's experimental/serverStatus
+	// notification; the run then waits for the server to report itself
+	// quiescent before references are asked, and refuses facts when it
+	// reports health "error", with StatusHint saying what to do.
+	ServerStatus bool
+	StatusHint   string
 }
 
 // Candidate is one way to start a server.
@@ -128,8 +147,9 @@ var servers = map[string]ServerSpec{
 		ImplKinds: []int{symbolInterface, symbolClass},
 		Namespace: phpNamespace,
 	},
-	"c":   clangdSpec("c", "MDDB_LSP_C"),
-	"cpp": clangdSpec("cpp", "MDDB_LSP_CPP"),
+	"c":    clangdSpec("c", "MDDB_LSP_C"),
+	"cpp":  clangdSpec("cpp", "MDDB_LSP_CPP"),
+	"rust": rustSpec(),
 }
 
 // Spec returns the table entry for a language.

@@ -28,7 +28,7 @@ func repoFiles(t *testing.T, dir, ext string) []string {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() && (d.Name() == "vendor" || d.Name() == "testdata" || d.Name() == "node_modules" || strings.HasPrefix(d.Name(), ".")) && p != dir {
+		if d.IsDir() && (d.Name() == "vendor" || d.Name() == "testdata" || d.Name() == "node_modules" || d.Name() == "target" || strings.HasPrefix(d.Name(), ".")) && p != dir {
 			return filepath.SkipDir
 		}
 		if !d.IsDir() && strings.HasSuffix(p, ext) {

@@ -36,6 +36,11 @@ func serverVersion(v string) string {
 			v = f[0]
 		}
 	}
+	// rust-analyzer reports "1.98.0 (88d9e12 2026-08-18)": the commit and
+	// date in parentheses are no part of the release.
+	if i := strings.Index(v, " ("); i > 0 {
+		v = v[:i]
+	}
 	// phpactor reports "phpactor/2026.10.07.0"; the name is already in front
 	// of the slash serverName adds, so keep only what follows the last one.
 	if i := strings.LastIndexByte(v, '/'); i >= 0 {

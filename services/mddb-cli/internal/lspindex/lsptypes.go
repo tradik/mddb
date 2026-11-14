@@ -101,6 +101,7 @@ var allSymbolKinds = map[string]any{"valueSet": func() []int {
 
 // LSP SymbolKind values the driver treats specially.
 const (
+	symbolModule      = 2
 	symbolNamespace   = 3
 	symbolClass       = 5
 	symbolMethod      = 6
@@ -108,7 +109,10 @@ const (
 	symbolEnum        = 10
 	symbolInterface   = 11
 	symbolFunction    = 12
+	symbolObject      = 19
 	symbolStruct      = 23
+	// symbolTypeParameter is what rust-analyzer reports a type alias as.
+	symbolTypeParameter = 26
 )
 
 // windowsPaths says whether paths carry a drive letter (C:\src). A variable,

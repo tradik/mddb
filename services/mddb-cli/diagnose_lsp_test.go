@@ -28,7 +28,7 @@ func fakeVersionTools(t *testing.T) string {
 	write("phpactor", "exit 0")
 	write("clangd", `[ "$1" = --version ] && printf 'clangd version 23.1.0 (https://github.com/llvm/llvm-project ea7d852a)\nFeatures: linux+grpc\n'`)
 	t.Setenv("PATH", bin)
-	for _, v := range []string{"MDDB_LSP_GO", "MDDB_LSP_PYTHON", "MDDB_LSP_PHP", "MDDB_LSP_C", "MDDB_LSP_CPP"} {
+	for _, v := range []string{"MDDB_LSP_GO", "MDDB_LSP_PYTHON", "MDDB_LSP_PHP", "MDDB_LSP_C", "MDDB_LSP_CPP", "MDDB_LSP_RUST"} {
 		t.Setenv(v, "")
 	}
 	return bin
@@ -44,7 +44,7 @@ func TestDiagnoseListsLanguageServers(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, want := range []string{"Language servers (for autoindex --semantic):",
-			"go      gopls: golang.org/x/tools/gopls v9.9.9", "php     phpactor (version unknown)", "python  not found",
+			"go      gopls: golang.org/x/tools/gopls v9.9.9", "php     phpactor (version unknown)", "python  not found", "rust    not found",
 			"c       clangd: clangd version 23.1.0 (https://github.com/llvm/llvm-project ea7d852a)", "cpp     clangd: clangd version 23.1.0"} {
 			mustContain(t, stdout, want)
 		}
@@ -60,7 +60,7 @@ func TestDiagnoseListsLanguageServers(t *testing.T) {
 	var res struct {
 		LanguageServers []languageServer `json:"languageServers"`
 	}
-	if err := json.Unmarshal([]byte(stdout), &res); err != nil || len(res.LanguageServers) != 5 ||
+	if err := json.Unmarshal([]byte(stdout), &res); err != nil || len(res.LanguageServers) != 6 ||
 		res.LanguageServers[2] != (languageServer{Language: "go", Found: true, Program: "gopls", Version: "golang.org/x/tools/gopls v9.9.9"}) {
 		t.Fatalf("%q %v", stdout, err)
 	}

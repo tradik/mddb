@@ -28,6 +28,7 @@ type conn struct {
 	errMsgs      []string        // window/showMessage and window/logMessage errors
 	progress     map[string]bool // work-done progress begun and not ended, by token
 	lastProgress time.Time       // the last progress event, or the start
+	status       *serverStatus   // the latest experimental/serverStatus, nil before one
 
 	folders []workspaceFolder // answer to workspace/workspaceFolders
 

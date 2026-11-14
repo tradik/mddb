@@ -155,12 +155,13 @@ func (r *run) symbolsOf(ctx context.Context, f openFile) error {
 	return nil
 }
 
-// symbolsWhere lists the definitions passing keep, in a fixed order.
+// symbolsWhere lists the definitions passing keep, in a fixed order; an
+// owner is no definition and never listed.
 func (r *run) symbolsWhere(keep func(*symbol) bool) []*symbol {
 	var out []*symbol
 	for _, path := range sortedKeys(r.defs) {
 		for i := range r.defs[path] {
-			if s := &r.defs[path][i]; keep(s) {
+			if s := &r.defs[path][i]; !s.owner && keep(s) {
 				out = append(out, s)
 			}
 		}
@@ -168,9 +169,17 @@ func (r *run) symbolsWhere(keep func(*symbol) bool) []*symbol {
 	return out
 }
 
+// wantsImpls reports whether implementation is asked for s: a kind the
+// spec names, where ImplParents allows it.
 func (r *run) wantsImpls(s *symbol) bool {
-	return slices.Contains(r.spec.ImplKinds, s.lspKind)
+	if !slices.Contains(r.spec.ImplKinds, s.lspKind) {
+		return false
+	}
+	return r.spec.ImplParents == nil || s.parentKind == 0 || slices.Contains(r.spec.ImplParents, s.parentKind)
 }
+
+// isDefinition reports whether s is reported: not an owner.
+func isDefinition(s symbol) bool { return !s.owner }
 
 // sortedKeys returns m's keys in order.
 func sortedKeys[V any](m map[string]V) []string {
