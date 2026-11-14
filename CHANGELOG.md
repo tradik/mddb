@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.5] - 2026-11-14
+
 ### Added
 
 - **A git repository as a synced source (#421).** A cron rule's `sync` takes `source: "git"`, which keeps a collection in step with a repository:
