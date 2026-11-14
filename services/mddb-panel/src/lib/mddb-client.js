@@ -1462,9 +1462,13 @@ class MDDBClient {
     return this.request(`/vector-reindex/jobs/${encodeURIComponent(id)}`, { method: 'GET' });
   }
 
-  /** Where a code symbol is defined, used, called and tested (2.18.8). */
-  async codeSymbol({ collection, name, include = [], limit, includeContent = false, signal }) {
+  /**
+   * Where a code symbol is defined, used, called and tested (2.18.8); path
+   * picks one definition of an ambiguous name (2.19.3).
+   */
+  async codeSymbol({ collection, name, path = '', include = [], limit, includeContent = false, signal }) {
     const params = new URLSearchParams({ collection, name });
+    if (path) params.set('path', path);
     if (include.length) params.set('include', include.join(','));
     if (limit) params.set('limit', String(limit));
     if (includeContent) params.set('includeContent', 'true');

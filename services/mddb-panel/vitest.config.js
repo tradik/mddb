@@ -73,6 +73,7 @@ const coverageFiles = [
   'src/components/IndexingStatusCard.jsx',
   'src/components/ReindexJobsTable.jsx',
   'src/components/CodeSymbolPanel.jsx',
+  'src/components/CodeSymbolParts.jsx', // 2.19.3: split from CodeSymbolPanel
   'src/components/ImagePreview.jsx',
   // 2.19.0: files touched by the panel catch-up that had no tests.
   'src/App.jsx',

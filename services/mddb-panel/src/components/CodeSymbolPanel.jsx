@@ -2,83 +2,24 @@ import { useRef, useState } from 'react';
 import { Code2, Search, X } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
-import { MAX_SYMBOL_LIMIT, RELATIONS, passageLocation } from '../lib/code-symbol';
+import { DEFAULT_RELATIONS, MAX_SYMBOL_LIMIT, RELATIONS } from '../lib/code-symbol';
+import { CandidatePicker, LanguagesList, PrecisionBadge, RelationSection } from './CodeSymbolParts';
 import CodeGraphCard from './CodeGraphCard';
-
-/** One relation: its passages, or a line saying there are none. */
-function RelationSection({ label, passages }) {
-  return (
-    <section className="mb-4">
-      <h3 className="text-sm font-semibold text-gray-900 mb-1">
-        {label} <span className="text-gray-600 font-normal">({passages.length})</span>
-      </h3>
-      {passages.length === 0 ? (
-        <p className="text-xs text-gray-600">None.</p>
-      ) : (
-        <ul className="space-y-2">
-          {passages.map((p, i) => (
-            <li key={`${passageLocation(p)}-${i}`} className="border border-gray-200 rounded p-2">
-              <div className="text-xs">
-                <span className="font-mono text-blue-800">{passageLocation(p)}</span>
-                {p.symbol && <span className="ml-2 text-gray-700">in {p.symbol}</span>}
-                {p.kind && <span className="ml-2 text-gray-600">{p.kind}</span>}
-              </div>
-              {p.content && (
-                <pre className="mt-1 text-xs bg-gray-50 p-2 rounded overflow-x-auto">{p.content}</pre>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** The extension → language table, loaded the first time it is opened. */
-function LanguagesList() {
-  const [table, setTable] = useState(null);
-  const [error, setError] = useState(null);
-  const requested = useRef(false);
-
-  const onToggle = async (e) => {
-    if (!e.currentTarget.open || requested.current) return;
-    requested.current = true;
-    try {
-      setTable(await mddbClient.codeLanguages());
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  const extensions = Object.entries(table?.extensions || {}).sort(([a], [b]) => a.localeCompare(b));
-
-  return (
-    <details onToggle={onToggle} className="mt-4 text-sm">
-      <summary className="cursor-pointer text-gray-800 font-medium">Recognised languages</summary>
-      {error && <p role="alert" className="text-xs text-red-700 mt-1">{error}</p>}
-      {!error && !table && <p className="text-xs text-gray-600 mt-1">Loading…</p>}
-      {table && (
-        <ul className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-1 text-xs">
-          {extensions.map(([ext, lang]) => (
-            <li key={ext}><span className="font-mono">{ext}</span> → {lang}</li>
-          ))}
-        </ul>
-      )}
-    </details>
-  );
-}
 
 /**
  * CodeSymbolPanel answers where a code symbol is defined, used, called and
  * tested (2.18.8, `GET /v1/symbol`): each answer is a list of passages to
- * read, not documents to read through.
+ * read, not documents to read through. Since 2.19.3 it shows how precise the
+ * answer is, the implementations of an interface, and — when a name has
+ * several definitions — the candidates to choose from.
  */
 export default function CodeSymbolPanel() {
   const { stats, currentCollection } = useStore();
   const collections = (stats?.collections || []).map((c) => c.name);
   const [collection, setCollection] = useState(currentCollection || collections[0] || '');
   const [name, setName] = useState('');
-  const [include, setInclude] = useState(RELATIONS.map((r) => r.id));
+  const [path, setPath] = useState('');
+  const [include, setInclude] = useState(DEFAULT_RELATIONS);
   const [limit, setLimit] = useState(20);
   const [includeContent, setIncludeContent] = useState(false);
   const [result, setResult] = useState(null);
@@ -90,8 +31,7 @@ export default function CodeSymbolPanel() {
     setInclude((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const lookup = async (e) => {
-    e.preventDefault();
+  const run = async (symbol, file) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -100,7 +40,8 @@ export default function CodeSymbolPanel() {
     try {
       const data = await mddbClient.codeSymbol({
         collection,
-        name: name.trim(),
+        name: symbol.trim(),
+        path: file.trim(),
         include,
         limit: Math.min(Math.max(Number(limit) || 20, 1), MAX_SYMBOL_LIMIT),
         includeContent,
@@ -117,13 +58,25 @@ export default function CodeSymbolPanel() {
     }
   };
 
+  const lookup = (e) => {
+    e.preventDefault();
+    run(name, path);
+  };
+
+  // A candidate is asked for by its qualified name in its own file.
+  const pick = (candidate) => {
+    setName(candidate.name);
+    setPath(candidate.path);
+    run(candidate.name, candidate.path);
+  };
+
   const cancel = () => {
     abortRef.current?.abort();
     abortRef.current = null;
     setLoading(false);
   };
 
-  const shown = RELATIONS.filter((r) => Array.isArray(result?.[r.id]));
+  const shown = RELATIONS.filter((r) => Array.isArray(result?.[r.id]) || (r.id === 'implementations' && result && include.includes(r.id)));
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -132,6 +85,7 @@ export default function CodeSymbolPanel() {
       </h2>
       <p className="text-sm text-gray-600 mb-4">
         Where a function, type or selector is defined, used, called and tested, as passages with line ranges.
+        Collections indexed with <code>mddb-cli autoindex --semantic</code> answer from a language server&apos;s facts.
       </p>
       <form onSubmit={lookup} className="space-y-3 mb-6">
         <div className="flex flex-wrap gap-3 items-end">
@@ -150,7 +104,16 @@ export default function CodeSymbolPanel() {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="SearchHybrid"
+              placeholder="SearchHybrid or Server.Close"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono"
+            />
+          </label>
+          <label className="text-sm text-gray-800 min-w-[10rem]">
+            <span className="block mb-1">Definition file (optional)</span>
+            <input
+              value={path}
+              onChange={(e) => setPath(e.target.value)}
+              placeholder="internal/server/conn.go"
               className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono"
             />
           </label>
@@ -199,9 +162,13 @@ export default function CodeSymbolPanel() {
         <div>
           <p className="text-sm text-gray-700 mb-3">
             <span className="font-mono">{result.symbol}</span> in {result.collection}
+            <PrecisionBadge precision={result.precision} source={result.semanticSource} />
             {result.truncated && <span className="ml-2 text-amber-800">Some relations were cut at the limit.</span>}
           </p>
-          {shown.map((r) => <RelationSection key={r.id} label={r.label} passages={result[r.id]} />)}
+          {result.ambiguous && result.candidates?.length > 0 && (
+            <CandidatePicker candidates={result.candidates} onPick={pick} />
+          )}
+          {shown.map((r) => <RelationSection key={r.id} label={r.label} passages={result[r.id] || []} />)}
         </div>
       )}
       <LanguagesList />

@@ -45,6 +45,8 @@ describe('endpoints', () => {
     ['codeSymbol minimal', (c) => c.codeSymbol({ collection: 'repo', name: 'Run' }), '/v1/symbol?collection=repo&name=Run', GET],
     ['codeSymbol every option', (c) => c.codeSymbol({ collection: 'repo', name: 'Run', include: ['definitions', 'tests'], limit: 5, includeContent: true }),
       '/v1/symbol?collection=repo&name=Run&include=definitions%2Ctests&limit=5&includeContent=true', GET],
+    ['codeSymbol with a path', (c) => c.codeSymbol({ collection: 'repo', name: 'Conn.Close', path: 'net/conn.go', include: ['implementations'] }),
+      '/v1/symbol?collection=repo&name=Conn.Close&path=net%2Fconn.go&include=implementations', GET],
     ['codeLanguages', (c) => c.codeLanguages(), '/v1/code-languages', GET],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));
 });

@@ -73,6 +73,51 @@ describe('CodeSymbolPanel', () => {
     expect(screen.queryByText('Siblings', { selector: 'h3' })).toBeNull();
   });
 
+  test('a heuristic answer says so in words', async () => {
+    client.codeSymbol.mockResolvedValue(answer);
+    render(<CodeSymbolPanel />);
+    lookUp();
+    expect((await screen.findByText(/Precision:/)).textContent).toBe('Precision: heuristic');
+    expect(screen.queryByRole('region', { name: 'Candidates' })).toBeNull();
+  });
+
+  test('semantic answer: precision, source, implementations and a candidate to pick (2.19.3)', async () => {
+    client.codeSymbol
+      .mockResolvedValueOnce({
+        collection: 'repo', symbol: 'Close', precision: 'semantic', semanticSource: 'gopls/0.24.0', ambiguous: true,
+        definitions: [{ path: 'net/conn.go', lines: { start: 5, end: 7 }, symbol: 'Conn.Close', kind: 'method' }],
+        references: [{ path: 'app/main.go', lines: { start: 4, end: 4 }, symbol: 'run', target: 'net/conn.go#Conn.Close' }],
+        candidates: [
+          { path: 'file/file.go', name: 'File.Close', kind: 'method' },
+          { path: 'net/conn.go', name: 'Conn.Close', kind: 'method' },
+        ],
+      })
+      .mockResolvedValueOnce({ collection: 'repo', symbol: 'Conn.Close', precision: 'mixed', definitions: [] });
+    render(<CodeSymbolPanel />);
+    fireEvent.click(screen.getByLabelText('Implementations'));
+    fireEvent.change(screen.getByLabelText('Definition file (optional)'), { target: { value: ' ' } });
+    lookUp('Close');
+    expect((await screen.findByText(/Precision:/)).textContent).toBe('Precision: semantic(gopls/0.24.0)');
+    expect(client.codeSymbol.mock.calls[0][0]).toMatchObject({ path: '', include: expect.arrayContaining(['implementations']) });
+    expect(screen.getByText('net/conn.go#Conn.Close')).toBeTruthy();
+    // Asked for but absent from the answer: shown as none.
+    expect(screen.getByText('Implementations', { selector: 'h3' })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Candidates' }).textContent).toContain('This name has 2 definitions');
+    fireEvent.click(screen.getByRole('button', { name: /File\.Close/ }));
+    expect(await screen.findByText('Precision: mixed')).toBeTruthy();
+    expect(client.codeSymbol.mock.calls[1][0]).toMatchObject({ name: 'File.Close', path: 'file/file.go' });
+    expect(screen.getByLabelText('Symbol').value).toBe('File.Close');
+    expect(screen.getByLabelText('Definition file (optional)').value).toBe('file/file.go');
+  });
+
+  test('ambiguous without candidates shows no picker', async () => {
+    client.codeSymbol.mockResolvedValue({ collection: 'repo', symbol: 'X', ambiguous: true, definitions: [] });
+    render(<CodeSymbolPanel />);
+    lookUp('X');
+    await screen.findByText(/Precision:/);
+    expect(screen.queryByRole('region', { name: 'Candidates' })).toBeNull();
+  });
+
   test('an empty limit falls back to 20; no truncation note', async () => {
     client.codeSymbol.mockResolvedValue({ collection: 'repo', symbol: 'X', definitions: [] });
     useStore.setState({ currentCollection: 'docs' });
