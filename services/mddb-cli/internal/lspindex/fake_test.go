@@ -75,6 +75,8 @@ type fakeScript struct {
 	ProgressEndMs  int               `json:"progressEndMs,omitempty"`
 	ProgressOpen   bool              `json:"progressOpen,omitempty"`
 	Raw            map[string]any    `json:"raw,omitempty"`
+	ProgressToken  string            `json:"progressToken,omitempty"`
+	StderrOnOpen   string            `json:"stderrOnOpen,omitempty"`
 }
 
 // loc is a location in the script: a path relative to the root, an
@@ -94,6 +96,8 @@ type record struct {
 	Answers    []json.RawMessage `json:"answers"`
 	Cancelled  []string          `json:"cancelled"`
 	Asked      []string          `json:"asked"`
+	// LanguageIDs are the languageId of each didOpen, in order.
+	LanguageIDs []string `json:"languageIds"`
 }
 
 // sym builds a DocumentSymbol: span lines l1..l2 (0-based), name at

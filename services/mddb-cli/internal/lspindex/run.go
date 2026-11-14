@@ -27,6 +27,8 @@ type run struct {
 	refsLost  int                                // of those, failed or timed out
 	reqErrors []string                           // distinct error answers, for the canary
 	retry     []openFile                         // documentSymbol to ask again
+	opened    map[string]bool                    // files sent with didOpen
+	fallbacks *fallbacks                         // nil unless the spec reads stderr
 	stats     Stats
 }
 
@@ -35,7 +37,7 @@ const maxReqErrors = 5
 
 func newRun(spec ServerSpec, opt Options, root string, c *conn) *run {
 	return &run{spec: spec, opt: opt, root: root, conn: c,
-		defs: map[string][]symbol{}, refs: map[string]map[string]map[int]bool{}, impls: map[string]map[Impl]bool{}}
+		defs: map[string][]symbol{}, opened: map[string]bool{}, refs: map[string]map[string]map[int]bool{}, impls: map[string]map[Impl]bool{}}
 }
 
 // count updates the stats under the lock.
@@ -112,10 +114,11 @@ func (r *run) openAll(files []string) ([]openFile, error) {
 			continue
 		}
 		err = r.conn.notify("textDocument/didOpen", map[string]any{"textDocument": map[string]any{
-			"uri": fileURI(abs), "languageId": r.spec.LanguageID, "version": 1, "text": string(src)}})
+			"uri": fileURI(abs), "languageId": r.spec.languageID(rel), "version": 1, "text": string(src)}})
 		if err != nil {
 			return nil, err
 		}
+		r.opened[rel] = true
 		out = append(out, openFile{rel: rel, src: src})
 	}
 	return out, nil

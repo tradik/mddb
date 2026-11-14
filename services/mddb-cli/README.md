@@ -130,14 +130,17 @@ kept, so you can roll back with `alias set`.
 mddb-cli autoindex [path] [-c collection] [--lang en] [--include glob]... [--exclude glob]...
                    [--max-file-size bytes] [--profile fast] [--images] [--no-frontmatter]
                    [--prune] [--dry-run]
-                   [--semantic[=go,python,php]] [--semantic-timeout 20m]
+                   [--semantic[=go,python,php,c,cpp]] [--semantic-timeout 20m]
                    [--semantic-concurrency 4] [--semantic-memory-mb N]
+                   [--compile-commands build/]
 ```
 
 `--semantic` runs a language server over the checkout (gopls, basedpyright or
-pyrefly, phpactor or PHPantom) and sends definitions, references and
-implementations with the documents. Alone it means `auto`; a list after `=`
-makes those languages required. See
+pyrefly, phpactor or PHPantom, clangd for C and C++) and sends definitions,
+references and implementations with the documents. Alone it means `auto`; a
+list after `=` makes those languages required. clangd needs the build's
+`compile_commands.json`: the root and `build/` are searched, or name it with
+`--compile-commands`. See
 [docs/BULK-IMPORT.md](../../docs/BULK-IMPORT.md#semantic-facts-from-a-language-server---semantic-v2193).
 
 A Markdown file's frontmatter becomes metadata (v2.19.0+): the file is sent as

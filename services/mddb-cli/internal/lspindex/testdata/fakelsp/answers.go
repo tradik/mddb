@@ -2,12 +2,29 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 )
+
+// opened records a didOpen's languageId and logs about the file as clangd
+// does when it has no compilation database for it.
+func (f *fake) opened(m *msg) {
+	var p struct {
+		TextDocument struct {
+			URI        string `json:"uri"`
+			LanguageID string `json:"languageId"`
+		} `json:"textDocument"`
+	}
+	_ = json.Unmarshal(m.Params, &p)
+	f.record["languageIds"] = append(asSlice(f.record["languageIds"]), p.TextDocument.LanguageID)
+	if f.s.StderrOnOpen != "" {
+		fmt.Fprintln(os.Stderr, strings.ReplaceAll(f.s.StderrOnOpen, "{file}", uriToPath(p.TextDocument.URI)))
+	}
+}
 
 func asSlice(v any) []any {
 	s, _ := v.([]any)

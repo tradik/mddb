@@ -112,6 +112,9 @@ type Options struct {
 	Timeout time.Duration
 	// MemoryLimitMb > 0 is passed to servers that accept a memory limit.
 	MemoryLimitMb int
+	// CompileCommandsDir is the directory holding compile_commands.json,
+	// passed to servers that need one (FindCompileCommands finds it).
+	CompileCommandsDir string
 	// Getenv and LookPath replace os.Getenv and exec.LookPath when choosing
 	// the server command; nil means the real ones.
 	Getenv   func(string) string

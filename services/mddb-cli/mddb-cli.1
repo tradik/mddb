@@ -188,8 +188,9 @@ Run a language server over the checkout and send its facts \(em where each
 symbol is defined, referenced and implemented \(em with the documents as meta
 symIndex, symDefs, symRefs and symImpls (v2.19.3). Off by default; alone it
 means \fBauto\fR. Servers: gopls for go; basedpyright\-langserver, else pyrefly,
-for python; phpactor, else phpantom_lsp, for php; MDDB_LSP_GO, MDDB_LSP_PYTHON
-and MDDB_LSP_PHP replace them with a command line. \fBauto\fR indexes every
+for python; phpactor, else phpantom_lsp, for php; clangd for c and cpp
+(v2.19.4); MDDB_LSP_GO, MDDB_LSP_PYTHON, MDDB_LSP_PHP, MDDB_LSP_C and
+MDDB_LSP_CPP replace them with a command line. \fBauto\fR indexes every
 language in the tree that the server keeps facts for and that has a language
 server installed; a missing or failing server is a warning and those files go
 without facts. A comma\-separated \fILIST\fR (go,python,php) fails before
@@ -208,6 +209,14 @@ Requests in flight to a language server (default 4).
 .TP
 .BR \-\-semantic\-memory\-mb " " \fIMIB\fR
 Memory limit for servers that take one (gopls); 0, the default, sets none.
+.TP
+.BR \-\-compile\-commands " " \fIPATH\fR
+compile_commands.json, or the directory holding it, for clangd (C and C++,
+v2.19.4); by default the root, then \fIroot\fR/build. Without one \fBauto\fR
+leaves C and C++ files to the heuristics and a list naming c or cpp fails.
+A run where clangd still compiles an indexed file with guessed flags (it logs
+"Failed to find compilation database" or "clangd fallback") sends no C or C++
+facts. C and C++ indexed together share one clangd, reported as c+cpp.
 .SS add
 Add or update a markdown document in the database.
 .PP

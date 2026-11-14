@@ -38,6 +38,7 @@ func semanticFacts(ctx context.Context, root string, files []autoFile, rep *auto
 	if o.langs == semanticAuto {
 		rep.Semantic.Mode = semanticAuto
 	}
+	o.root = root
 	plans, err := planSemantic(o, files, rep.announced, rep.Semantic)
 	if err != nil {
 		return nil, err
@@ -52,6 +53,11 @@ type semanticOptions struct {
 	timeout     time.Duration
 	concurrency int
 	memoryMb    int
+	// compileCommands is --compile-commands: compile_commands.json or its
+	// directory, for C and C++.
+	compileCommands string
+	// root is the checkout, set by semanticFacts.
+	root string
 	// lookPath replaces exec.LookPath in tests; nil means the real one.
 	lookPath func(string) (string, error)
 }
@@ -67,6 +73,10 @@ type semanticPlan struct {
 	language string
 	spec     lspindex.ServerSpec
 	files    []string
+	argv     []string // the command Find chose
+	// compileCommands is the compilation database's directory, for a
+	// server that needs one.
+	compileCommands string
 }
 
 // planSemantic picks the languages to index. announced is the server's
@@ -105,14 +115,15 @@ func planSemantic(o semanticOptions, files []autoFile, announced map[string]bool
 		}
 		plans = append(plans, *p)
 	}
-	return plans, nil
+	return joinPlans(plans), nil
 }
 
 // errNotAnnounced is a language the server does not keep facts for.
 var errNotAnnounced = errors.New("the server keeps no semantic facts for this language (upgrade mddbd to 2.19.3 or later)")
 
 // planLanguage checks one language: the driver knows it, the server keeps
-// its facts, a server binary is installed. nil, nil means nothing to do: no
+// its facts, a server binary is installed, and the compilation database a
+// C or C++ server needs is there. nil, nil means nothing to do: no
 // files of the language in the tree, or (auto) a language the server does
 // not announce.
 func planLanguage(lang string, o semanticOptions, files []string, announced map[string]bool) (*semanticPlan, error) {
@@ -129,10 +140,17 @@ func planLanguage(lang string, o semanticOptions, files []string, announced map[
 	if len(files) == 0 {
 		return nil, nil
 	}
-	if _, err := lspindex.Find(spec, lspindex.Options{LookPath: o.lookPath}); err != nil {
+	cand, err := lspindex.Find(spec, lspindex.Options{LookPath: o.lookPath})
+	if err != nil {
 		return nil, err
 	}
-	return &semanticPlan{language: lang, spec: spec, files: files}, nil
+	p := &semanticPlan{language: lang, spec: spec, files: files, argv: cand.Argv}
+	if spec.CompileCommands {
+		if p.compileCommands, err = findCompileCommands(o); err != nil {
+			return nil, err
+		}
+	}
+	return p, nil
 }
 
 // splitLanguages parses a --semantic list: comma-separated, trimmed,
@@ -156,6 +174,7 @@ func runSemantic(ctx context.Context, root string, plans []semanticPlan, o seman
 	facts := map[string]fileFacts{}
 	opt := lspindex.Options{Concurrency: o.concurrency, Timeout: o.timeout, MemoryLimitMb: o.memoryMb, LookPath: o.lookPath}
 	for _, p := range plans {
+		opt.CompileCommandsDir = p.compileCommands
 		res, err := lspindex.Index(ctx, root, p.files, p.spec, opt)
 		if err != nil {
 			if o.langs != semanticAuto {

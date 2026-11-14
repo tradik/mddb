@@ -16,7 +16,7 @@ import (
 func noLanguageServers(t *testing.T) {
 	t.Helper()
 	t.Setenv("PATH", t.TempDir())
-	for _, v := range []string{"MDDB_LSP_GO", "MDDB_LSP_PYTHON", "MDDB_LSP_PHP"} {
+	for _, v := range []string{"MDDB_LSP_GO", "MDDB_LSP_PYTHON", "MDDB_LSP_PHP", "MDDB_LSP_C", "MDDB_LSP_CPP"} {
 		t.Setenv(v, "")
 	}
 }

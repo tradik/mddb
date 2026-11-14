@@ -2,6 +2,7 @@ package lspindex
 
 import (
 	"context"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -33,12 +34,13 @@ const stderrBytes = 64 << 10
 var shutdownTimeout = 5 * time.Second
 
 // startServer runs argv in root with its stdio connected to a JSON-RPC conn.
-// ctx ending kills the process.
+// ctx ending kills the process. onLine, when set, also gets each line the
+// server writes to stderr.
 //
 // Plain pipes (*os.File) rather than cmd.StdoutPipe: exec closes those in
 // Wait, possibly before the read loop has read the server's last words, and
 // the read loop must see EOF, not "file already closed", to report a crash.
-func startServer(ctx context.Context, root string, argv []string) (*server, error) {
+func startServer(ctx context.Context, root string, argv []string, onLine func(string)) (*server, error) {
 	inR, inW, err := osPipe()
 	if err != nil {
 		return nil, err
@@ -56,6 +58,9 @@ func startServer(ctx context.Context, root string, argv []string) (*server, erro
 	cmd.Stdin, cmd.Stdout = inR, outW
 	s := &server{cmd: cmd, stdin: inW, stdout: outR, stderr: &ringBuffer{limit: stderrBytes}, waitDone: make(chan struct{})}
 	cmd.Stderr = s.stderr
+	if onLine != nil {
+		cmd.Stderr = io.MultiWriter(s.stderr, &lineWriter{fn: onLine})
+	}
 	// A server's children may inherit stderr and outlive it; Wait must not
 	// block on them forever.
 	cmd.WaitDelay = shutdownTimeout

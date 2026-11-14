@@ -122,7 +122,9 @@ TSV, EML and MBOX. Every converted document has `meta.conversionConfidence`
 
 With `--semantic` (2.19.3+) autoindex also runs a language server over the
 checkout — gopls for Go, basedpyright or pyrefly for Python, phpactor or
-PHPantom for PHP — and sends where each symbol is defined, referenced and
+PHPantom for PHP, clangd for C and C++ (2.19.4; it needs the build's
+`compile_commands.json`, found in the root or `build/` or named with
+`--compile-commands`) — and sends where each symbol is defined, referenced and
 implemented with the documents. `code_symbol` and graph retrieval then answer
 from the compiler's view instead of name matching; files without facts keep
 the heuristics. Alone the flag means `auto` (a missing server is a warning);

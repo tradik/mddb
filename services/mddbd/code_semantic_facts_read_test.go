@@ -91,7 +91,7 @@ func TestCodeLanguagesAnnouncesSemanticLanguages(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"go": true, "php": true, "python": true}
+	want := map[string]bool{"c": true, "cpp": true, "go": true, "php": true, "python": true}
 	if !reflect.DeepEqual(resp.Semantic, want) {
 		t.Errorf("semantic = %v, want %v", resp.Semantic, want)
 	}

@@ -1,7 +1,7 @@
 ---
 title: "Code Intelligence"
 slug: "docs/code-intelligence"
-description: "How MDDB answers where a symbol is defined, who calls it and what implements it: heuristic symbols for 13 programming languages, and precise facts from gopls, basedpyright and phpactor with mddb-cli autoindex --semantic."
+description: "How MDDB answers where a symbol is defined, who calls it and what implements it: heuristic symbols for 13 programming languages, and precise facts from gopls, basedpyright, phpactor and clangd with mddb-cli autoindex --semantic."
 status: publish
 ---
 
@@ -14,13 +14,13 @@ implement an interface. It answers on two levels of precision, through the same
 
 | | Heuristic (always on) | Semantic (`autoindex --semantic`, 2.19.3+) |
 |---|---|---|
-| Languages | 13: Go, Python, PHP, JS/TS, Rust, Java, C/C++, Ruby, CSS, Terraform, YAML, HTML, assembly | Go, Python, PHP |
+| Languages | 13: Go, Python, PHP, JS/TS, Rust, Java, C/C++, Ruby, CSS, Terraform, YAML, HTML, assembly | Go, Python, PHP, C, C++ (2.19.4) |
 | Where it comes from | mddbd reads each file alone with scanners | a language server reads the whole checkout, with its dependencies |
 | Definitions | name and span | qualified name (`Conn.Close`), kind, span, enclosing type |
 | References | name matches, plus full-text hits for `x.f()` calls | the exact lines that refer to this definition |
 | Same name, several definitions | one merged answer | `ambiguous: true` and a list of candidates |
 | Callers, callees, tests | from the spans around each match | from the facts, per definition |
-| Implementations | — | interfaces, abstract classes, protocols |
+| Implementations | — | interfaces, abstract classes, protocols, C++ subclasses and overrides |
 | Needs | nothing | a language server on the machine running `mddb-cli` |
 | `precision` in the answer | omitted, or `heuristic` | `semantic`, or `mixed` when only part of the collection has facts |
 
@@ -59,6 +59,7 @@ changed.
 | Go | gopls | `go install golang.org/x/tools/gopls@latest` | BSD-3-Clause | `MDDB_LSP_GO` |
 | Python | basedpyright, else pyrefly | `uv tool install basedpyright` (or `pip install basedpyright`; Node comes with it) / `uv tool install pyrefly` | MIT | `MDDB_LSP_PYTHON` |
 | PHP | phpactor, else PHPantom | the `phpactor.phar` from the phpactor releases (PHP 8.2+), or a PHPantom release binary | MIT | `MDDB_LSP_PHP` |
+| C, C++ | clangd (23 or later) | the static `clangd-<os>-<version>.zip` from the clangd releases, or the `clangd` package of the distribution or LLVM; needs the build's `compile_commands.json` | Apache-2.0 WITH LLVM-exception | `MDDB_LSP_C`, `MDDB_LSP_CPP` |
 
 Versions tested on 2026-11-14: gopls 0.24.0, basedpyright 1.40.2, pyrefly
 1.4.1, phpactor 2026.10.07.0, PHPantom 0.11.1. basedpyright comes before pyrefly
@@ -66,12 +67,48 @@ because pyrefly 1.4.1 returns no implementations of classes. An `MDDB_LSP_*`
 variable replaces the built-in command (split on spaces, no shell), e.g.
 `MDDB_LSP_PHP="php /opt/phpactor.phar language-server"`.
 
+### C and C++ (clangd, 2.19.4)
+
+clangd 23.1.0 was tested on 2026-11-14. It runs as
+`clangd --background-index --log=info --compile-commands-dir=<dir>`; the last
+flag is added whenever the program is clangd, also when `MDDB_LSP_C` names it
+elsewhere (keep `--log=info` in an override: the check below reads it).
+
+- **compile_commands.json is required.** clangd learns each file's include
+  paths and defines from the build's compilation database. `autoindex` looks
+  for it in the root, then `<root>/build`, or takes `--compile-commands
+  <file-or-dir>`. Generate one with CMake
+  (`-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`), `bear -- make`, or Meson/Ninja
+  (which write it). Without one, `auto` warns and the C and C++ files keep the
+  heuristics; `--semantic=c` stops before anything is written.
+- **Guessed flags are refused.** If clangd still compiles an indexed file
+  without the database (it logs `Failed to find compilation database for …`
+  or `with command clangd fallback`), the run returns no facts for C and C++:
+  answers from guessed flags are partial and nothing in the protocol says so.
+- **One server for both.** A C++ project's `.h` headers count as C, so when
+  both languages are indexed they run in one clangd (`c+cpp` in the report)
+  and references between headers and `.cpp` files are kept.
+- **Names.** `geo::Square::area` is stored as `geo.Square.area`; namespaces
+  prefix names but are not containers; anonymous namespaces add nothing;
+  template arguments are dropped (`List<T>::push` is `List.push`). A function
+  is defined where its body is: header prototypes and in-class member
+  declarations are not definitions (pure virtual methods are). `typedef` and
+  `using` aliases are `type`.
+- **Implementations** are asked for C++ classes and methods only (subclasses
+  and overrides); C has neither, so nothing is asked.
+- clangd waits for its background index to finish before references are
+  asked, however long that takes within `--semantic-timeout`; raise it for a
+  large tree. The index is kept in `.cache/clangd/` next to the database,
+  which makes the next run faster; add it to `.gitignore`.
+- Cross-compilers: add `--query-driver=<glob>` through `MDDB_LSP_C`.
+
 ## Flags
 
 ```bash
 mddb-cli autoindex . --semantic                # auto: every language it can do
 mddb-cli autoindex . --semantic=go,python      # these languages, or stop
 mddb-cli autoindex . --semantic --dry-run      # run the servers, report, send nothing
+mddb-cli autoindex . --semantic=c,cpp --compile-commands build/   # C and C++
 ```
 
 - **auto** indexes each language that is in the tree, that the server accepts
@@ -81,7 +118,7 @@ mddb-cli autoindex . --semantic --dry-run      # run the servers, report, send n
 - **A list** is a requirement: a missing server, a failing server or an mddbd
   older than 2.19.3 stops the run before anything is written.
 - `--semantic-timeout` (default `20m`), `--semantic-concurrency` (`4`),
-  `--semantic-memory-mb` (gopls only). Full reference:
+  `--semantic-memory-mb` (gopls only), `--compile-commands` (clangd). Full reference:
   [Bulk Import](BULK-IMPORT.md#semantic-facts-from-a-language-server---semantic-v2193).
 
 ## Reading an answer
@@ -172,6 +209,8 @@ reading a single document returns them.
 | `language server did not load the workspace: N of M references requests failed` | the server could not build the project — most often a wrong toolchain (`go.work requires go >= 1.27`) or missing dependencies (`vendor/`, a virtualenv, `composer install`) | fix `PATH`/`GOTOOLCHAIN` or install the dependencies, then run again; no facts are sent from a half-loaded project |
 | `language server not found for python: none of [...] is on PATH; ... python files keep the heuristics` | none of the servers is on `PATH` | install one, or set `MDDB_LSP_PYTHON` |
 | `--semantic=php` stops with `semantic facts for php: ...` | a listed language is required | install the server, or use `--semantic` (auto) |
+| `no compilation database (compile_commands.json) in <root> or <root>/build; ...` | clangd has no build flags for the tree | generate `compile_commands.json`, or name it with `--compile-commands` |
+| `language server compiled files without the project's build settings: a.c, ...` | clangd fell back to guessed flags for those files (not in the database, or an override without `--log=info` hid the check — then this message never appears) | regenerate the database from a build that compiles those files, or pass the right `--compile-commands`; no C/C++ facts are sent until then |
 | `the server keeps no semantic facts (it predates 2.19.3)` | mddbd is older than the CLI | upgrade mddbd |
 | `precision: mixed` | some files have no facts | index those languages with a server, or accept the mix |
 | `symIndex` ends in ` truncated` | the file had more than `MDDB_CODE_MAX_FACTS` (4096) facts | references were cut first; raise the limit on mddbd if needed |
@@ -191,7 +230,8 @@ a tool call is a separate security decision.
 
 The language-server table is one place in mddb-cli
 (`services/mddb-cli/internal/lspindex/servers.go`). A new language is a new
-entry — the command, the language id, how its symbol names nest — plus a test
+entry — the command, the language id, how its symbol names nest (clangd's
+hooks are in `servers_clangd.go`) — plus a test
 against the fake server, and `semantic: true` for it in mddbd's
 `/v1/code-languages`. The fact format is in
 [testdata/semantic-facts/README.md](https://github.com/tradik/mddb/blob/main/testdata/semantic-facts/README.md).

@@ -46,10 +46,10 @@ func (c *conn) trackProgress(params json.RawMessage) {
 }
 
 // waitIdle returns once no progress is open and none was reported for
-// progressSettle, after maxLoadWait, or when the stream ends (the next
-// request reports that). Only ctx ending is an error.
-func (c *conn) waitIdle(ctx context.Context) error {
-	deadline := time.Now().Add(maxLoadWait)
+// progressSettle, after limit, or when the stream ends (the next request
+// reports that). Only ctx ending is an error.
+func (c *conn) waitIdle(ctx context.Context, limit time.Duration) error {
+	deadline := time.Now().Add(limit)
 	tick := time.NewTicker(progressSettle / 10)
 	defer tick.Stop()
 	for {

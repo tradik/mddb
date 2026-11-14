@@ -62,12 +62,14 @@ above wins for a key both name, and --no-frontmatter turns this off.
 A second run only rewrites files whose content changed.
 
 --semantic runs a language server (gopls; basedpyright or pyrefly; phpactor or
-PHPantom) over the checkout, one language after another, and sends where each
-symbol is defined, referenced and implemented with the documents. Alone it
-means auto: every language in the tree that the server keeps facts for and
-that has a server installed; a missing server is a warning. --semantic=go,python
-names the languages: a missing or failing server is then an error and nothing
-is sent. Write the list with '=': a separate word is the path.`,
+PHPantom; clangd for C and C++) over the checkout, one language after another,
+and sends where each symbol is defined, referenced and implemented with the
+documents. Alone it means auto: every language in the tree that the server
+keeps facts for and that has a server installed; a missing server is a
+warning. --semantic=go,python names the languages: a missing or failing server
+is then an error and nothing is sent. Write the list with '=': a separate word
+is the path. clangd needs the build's compile_commands.json: --compile-commands
+names it (or its directory); by default the root and <root>/build are searched.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.root = "."
@@ -93,6 +95,7 @@ is sent. Write the list with '=': a separate word is the path.`,
 	f.DurationVar(&o.semantic.timeout, "semantic-timeout", defaultSemanticTimeout, "Stop a language's server after this long")
 	f.IntVar(&o.semantic.concurrency, "semantic-concurrency", defaultSemanticConcurrency, "Requests in flight to a language server")
 	f.IntVar(&o.semantic.memoryMb, "semantic-memory-mb", 0, "Memory limit passed to servers that take one (gopls), in MiB; 0 = none")
+	f.StringVar(&o.semantic.compileCommands, "compile-commands", "", "compile_commands.json or its directory, for C and C++ (default: the root, then <root>/build)")
 	return cmd
 }
 

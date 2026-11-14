@@ -5575,7 +5575,7 @@ update, from any transport):
   not an API to build on: it may become `v2`.
 
 `GET /v1/code-languages` lists the languages the CLI computes facts for in
-`semantic` (`{"go": true, "php": true, "python": true}`).
+`semantic` (`{"c": true, "cpp": true, "go": true, "php": true, "python": true}`).
 
 ### The connection graph
 

@@ -58,6 +58,7 @@ and the server keeps them only while they describe the content it stores.
 mddb-cli autoindex . --semantic              # auto: every language it can do
 mddb-cli autoindex . --semantic=go,python    # these languages, or fail
 mddb-cli autoindex . --semantic --dry-run    # run the servers, report, send nothing
+mddb-cli autoindex . --semantic=c,cpp --compile-commands build/   # C and C++ (2.19.4)
 ```
 
 | Language | Server (first found on `PATH`) | Override |
@@ -65,6 +66,7 @@ mddb-cli autoindex . --semantic --dry-run    # run the servers, report, send not
 | Go | `gopls serve` | `MDDB_LSP_GO` |
 | Python | `basedpyright-langserver --stdio`, else `pyrefly lsp --indexing-mode lazy-blocking` | `MDDB_LSP_PYTHON` |
 | PHP | `phpactor language-server`, else `phpantom_lsp` | `MDDB_LSP_PHP` |
+| C, C++ | `clangd --background-index --log=info --compile-commands-dir=<dir>` | `MDDB_LSP_C`, `MDDB_LSP_CPP` |
 
 basedpyright comes before pyrefly because pyrefly 1.4.1 finds no
 implementations of classes (ABC subclasses, Protocols) and basedpyright does.
@@ -78,6 +80,7 @@ and their versions.
 | `--semantic-timeout` | `20m` | Stops one language's server after this long. |
 | `--semantic-concurrency` | `4` | Requests in flight to a server. |
 | `--semantic-memory-mb` | `0` (none) | Memory limit for servers that take one (gopls `memoryLimit`). |
+| `--compile-commands` | the root, then `<root>/build` | `compile_commands.json`, or its directory, for clangd (C and C++). |
 
 - **auto** indexes each language that is in the tree, that the server keeps
   facts for (`semantic` in `GET /v1/code-languages`) and that has a server
@@ -88,6 +91,16 @@ and their versions.
 - **A list** is a demand: a language the driver does not know, a server
   that keeps no facts for it, a missing language server, or one that fails
   stops the run with a non-zero exit before anything is written.
+- **C and C++** need the build's `compile_commands.json` (CMake
+  `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`, `bear -- make`, Meson/Ninja). Without
+  one `auto` warns and those files keep the heuristics, and a list stops. If
+  clangd still compiles an indexed file with guessed flags (`Failed to find
+  compilation database`, `clangd fallback` on its stderr), the language gets
+  no facts. C and C++ indexed together run in one clangd, reported as
+  `c+cpp`, so references between `.h` headers (C) and `.cpp` files are kept.
+  clangd answers references from its background index, which the run waits
+  for within `--semantic-timeout`. Details:
+  [Code Intelligence](CODE-INTELLIGENCE.md#c-and-c-clangd-2194).
 - Languages run one after another; two servers at once would need the sum of
   their memory. gopls over `services/mddbd` (1343 files) took about two
   minutes and peaked between 3.5 and 5.5 GB.

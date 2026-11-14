@@ -52,7 +52,7 @@ var semanticFactPriority = [...]string{MetaKeySymDefs, MetaKeySymImpls, MetaKeyS
 
 // semanticFactLanguages are the languages mddb-cli computes facts for; GET
 // /v1/code-languages announces them so the CLI keeps no list of its own.
-var semanticFactLanguages = [...]string{"go", "php", "python"}
+var semanticFactLanguages = [...]string{"c", "cpp", "go", "php", "python"}
 
 var semanticFactKinds = map[string]bool{
 	"function": true, "method": true, "class": true, "interface": true,

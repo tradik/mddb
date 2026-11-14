@@ -29,6 +29,13 @@ func serverVersion(v string) string {
 		_ = json.Unmarshal([]byte(v), &bi)
 		v = bi.Version
 	}
+	// clangd reports "clangd version 23.1.0 (https://github.com/...) ...":
+	// the release is the word after "version".
+	if _, rest, ok := strings.Cut(v, "version "); ok {
+		if f := strings.Fields(rest); len(f) > 0 {
+			v = f[0]
+		}
+	}
 	// phpactor reports "phpactor/2026.10.07.0"; the name is already in front
 	// of the slash serverName adds, so keep only what follows the last one.
 	if i := strings.LastIndexByte(v, '/'); i >= 0 {

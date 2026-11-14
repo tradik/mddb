@@ -34,7 +34,7 @@ func (s ServerSpec) flatten(path string, src []byte, nodes []documentSymbol) (sy
 	if f.normalize == nil {
 		f.normalize = func(n string) string { return n }
 	}
-	f.walk(nodes, "")
+	f.walk(nodes, scope{})
 	sort.SliceStable(f.syms, func(i, j int) bool { return lessDef(f.syms[i].def, f.syms[j].def) })
 	return f.syms, f.unencodable
 }
@@ -49,52 +49,85 @@ type flattener struct {
 	unencodable int
 }
 
-func (f *flattener) walk(nodes []documentSymbol, parent string) {
+// scope is where a walk is: the qualified name of the enclosing definition,
+// and the namespace prefix a top-level name takes (geo. for C++ namespace geo).
+type scope struct{ parent, prefix string }
+
+func (f *flattener) walk(nodes []documentSymbol, sc scope) {
 	for i := range nodes {
 		n := &nodes[i]
 		span, sel, ok := n.ranges()
 		if !ok {
 			continue
 		}
-		kind := f.spec.kindOf(n.Kind)
-		if kind == "" {
+		kind, name := f.kindOf(n), f.normalize(n.Name)
+		if kind == "" || name == "" {
 			// Not a definition, but it may group some: a namespace or module
-			// node, or the comment sections pyrefly turns into String
-			// symbols ("# -- calls"). Its children are named as if it were
-			// not there (a namespace prefix comes from the source).
-			f.walk(n.Children, parent)
+			// node, the comment sections pyrefly turns into String symbols
+			// ("# -- calls"), an anonymous struct. Its children are named as
+			// if it were not there, but for a namespace's prefix.
+			f.walk(n.Children, f.inside(n, name, sc))
 			continue
 		}
-		qname, container := f.qualify(n, span, parent)
-		start, end := span.lines()
-		d := Def{Name: qname, Kind: kind, Start: start, End: end, Container: container, Detail: n.Detail}
-		if defEncodable(d) {
-			f.syms = append(f.syms, symbol{path: f.path, def: d, pos: sel.Start, span: span, lspKind: n.Kind,
-				skipRefs: f.spec.SkipRefs != nil && f.spec.SkipRefs(f.path, d)})
-		} else {
-			f.unencodable++
-		}
+		qname, container := f.qualify(n, name, span, sc)
+		f.add(n, kind, Def{Name: qname, Container: container}, span, sel)
 		if !callableKinds[kind] {
-			f.walk(n.Children, qname)
+			f.walk(n.Children, scope{parent: qname})
 		}
 	}
+}
+
+// kindOf is the fact kind of a node, "" for no definition.
+func (f *flattener) kindOf(n *documentSymbol) string {
+	kind := f.spec.kindOf(n.Kind)
+	if kind != "" && f.spec.Classify != nil {
+		kind = f.spec.Classify(n, kind)
+	}
+	return kind
+}
+
+// inside is the scope of the children of a node that is no definition: a
+// namespace node adds its name to the prefix where the spec asks for that
+// (a PHP namespace prefix comes from the source instead).
+func (f *flattener) inside(n *documentSymbol, name string, sc scope) scope {
+	if f.spec.NamespaceNodes && n.Kind == symbolNamespace && name != "" {
+		sc.prefix += name + "."
+	}
+	return sc
+}
+
+// add records a definition named by d, or counts it when the format cannot
+// carry it.
+func (f *flattener) add(n *documentSymbol, kind string, d Def, span, sel lspRange) {
+	d.Kind, d.Detail = kind, n.Detail
+	d.Start, d.End = span.lines()
+	if !defEncodable(d) {
+		f.unencodable++
+		return
+	}
+	f.syms = append(f.syms, symbol{path: f.path, def: d, pos: sel.Start, span: span, lspKind: n.Kind,
+		skipRefs: f.spec.SkipRefs != nil && f.spec.SkipRefs(f.path, d)})
 }
 
 // qualify names a definition from its parent in the tree, or — for a flat
 // SymbolInformation answer, where the hierarchy is only a name — from its
 // containerName, with the file's namespace in front of a top-level name.
-func (f *flattener) qualify(n *documentSymbol, span lspRange, parent string) (qname, container string) {
-	name := f.normalize(n.Name)
-	owner := parent
+// The container is the enclosing definition, or the qualifier a normalized
+// name carries (Square.area defined out of class is in Square), never a
+// namespace.
+func (f *flattener) qualify(n *documentSymbol, name string, span lspRange, sc scope) (qname, container string) {
+	top := f.ns(span.Start.Line) + sc.prefix
+	owner := sc.parent
 	if owner == "" && n.ContainerName != "" {
-		owner = f.ns(span.Start.Line) + f.normalize(n.ContainerName)
+		owner = top + f.normalize(n.ContainerName)
 	}
 	if owner != "" {
-		return owner + "." + name, owner
+		qname, container = owner+"."+name, owner
+	} else {
+		qname = top + name
 	}
-	qname = f.ns(span.Start.Line) + name
-	if i := strings.LastIndex(qname, "."); i > 0 {
-		container = qname[:i]
+	if i := strings.LastIndex(name, "."); i > 0 {
+		container = qname[:len(qname)-len(name)+i]
 	}
 	return qname, container
 }

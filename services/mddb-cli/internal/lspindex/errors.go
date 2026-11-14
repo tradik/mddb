@@ -13,6 +13,12 @@ import (
 // Index returns no facts then: heuristics beat false precision.
 var ErrWorkspaceNotLoaded = errors.New("language server did not load the workspace")
 
+// ErrFallbackFlags means the server compiled an indexed file with guessed
+// flags instead of the project's (clangd without compile_commands.json): it
+// answers anyway, from a partial view, and nothing in the protocol says so.
+// Index returns no facts then.
+var ErrFallbackFlags = errors.New("language server compiled files without the project's build settings")
+
 // ServerError is a failed run, with what the server said about it.
 type ServerError struct {
 	Server string // the command that ran

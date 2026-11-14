@@ -8,7 +8,7 @@ import "encoding/json"
 type script struct {
 	ServerInfo     map[string]string          `json:"serverInfo"`
 	Record         string                     `json:"record"`         // file to write what the fake saw
-	Stderr         string                     `json:"stderr"`         // written to stderr at start
+	Stderr         string                     `json:"stderr"`         // written to stderr at start, {root} the working directory
 	Messages       []json.RawMessage          `json:"messages"`       // window/logMessage params sent after initialized
 	ServerRequests []string                   `json:"serverRequests"` // sent before the first documentSymbol answer
 	Symbols        map[string]json.RawMessage `json:"symbols"`        // path -> documentSymbol result
@@ -24,6 +24,15 @@ type script struct {
 	ProgressEndMs  int                        `json:"progressEndMs"`  // >0: "loading" progress from initialized, ended after this
 	ProgressOpen   bool                       `json:"progressOpen"`   // a progress that never ends
 	Raw            map[string]json.RawMessage `json:"raw"`            // request key -> literal result
+	ProgressToken  string                     `json:"progressToken"`  // the progress token; default "load"
+	StderrOnOpen   string                     `json:"stderrOnOpen"`   // written to stderr per didOpen, {file} the file's path
+}
+
+func (s script) progressToken() string {
+	if s.ProgressToken == "" {
+		return "load"
+	}
+	return s.ProgressToken
 }
 
 // loc is a location: a path relative to the root, an absolute path or a URI.

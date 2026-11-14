@@ -2,6 +2,8 @@ package lspindex
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,4 +61,50 @@ func Version(ctx context.Context, c Candidate) string {
 		}
 	}
 	return ""
+}
+
+// ErrNoServer is returned when neither the environment nor PATH provides a
+// server for the language.
+var ErrNoServer = errors.New("language server not found")
+
+// resolve picks the command to run: the operator's override first, then the
+// first candidate on PATH.
+func (s ServerSpec) resolve(getenv func(string) string, lookPath func(string) (string, error)) (Candidate, error) {
+	if s.EnvVar != "" {
+		if argv := strings.Fields(getenv(s.EnvVar)); len(argv) > 0 {
+			prog, err := lookPath(argv[0])
+			if err != nil {
+				return Candidate{}, fmt.Errorf("%w: %s=%q: %v", ErrNoServer, s.EnvVar, getenv(s.EnvVar), err)
+			}
+			// A table program at another path keeps the table's name, so
+			// symIndex says pyrefly/1.4.1 however pyrefly was found.
+			found := Candidate{Argv: append([]string{prog}, argv[1:]...)}
+			for _, c := range s.Candidates {
+				if c.Argv[0] == filepath.Base(argv[0]) {
+					found.Name, found.VersionArgs = c.Name, c.VersionArgs
+				}
+			}
+			return found, nil
+		}
+	}
+	var tried []string
+	for _, c := range s.Candidates {
+		prog, err := lookPath(c.Argv[0])
+		if err == nil {
+			return Candidate{Name: c.Name, Argv: append([]string{prog}, c.Argv[1:]...), VersionArgs: c.VersionArgs}, nil
+		}
+		tried = append(tried, strings.Join(c.Argv, " "))
+	}
+	return Candidate{}, fmt.Errorf("%w for %s: none of [%s] is on PATH; install one or set %s to a command line",
+		ErrNoServer, s.Language, strings.Join(tried, "; "), s.EnvVar)
+}
+
+// command is the command line Index starts: the candidate's, plus the
+// spec's Args when the program is the table's (Name is set then).
+func (s ServerSpec) command(cand Candidate, opt Options) []string {
+	argv := append([]string(nil), cand.Argv...)
+	if s.Args != nil && cand.Name != "" {
+		argv = append(argv, s.Args(opt)...)
+	}
+	return argv
 }

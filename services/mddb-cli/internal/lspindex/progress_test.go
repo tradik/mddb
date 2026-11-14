@@ -60,7 +60,7 @@ func TestWaitIdleEndsWithTheStream(t *testing.T) {
 	c.trackProgress(json.RawMessage(`{"token":"t","value":{"kind":"begin"}}`))
 	c.trackProgress(json.RawMessage(`not json`))
 	stop()
-	if err := c.waitIdle(context.Background()); err != nil {
+	if err := c.waitIdle(context.Background(), maxLoadWait); err != nil {
 		t.Errorf("err = %v", err)
 	}
 }

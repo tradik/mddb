@@ -53,7 +53,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "fakelsp: script:", err)
 		os.Exit(2)
 	}
-	fmt.Fprint(os.Stderr, s.Stderr)
+	cwd, _ := os.Getwd() // the client starts the server in the root
+	fmt.Fprint(os.Stderr, strings.ReplaceAll(s.Stderr, "{root}", cwd))
 	f := &fake{s: s, out: os.Stdout, hanging: map[string]bool{}, failed: map[string]bool{},
 		record: map[string]any{"argv": os.Args[1:], "pid": os.Getpid()}}
 	in := bufio.NewReader(os.Stdin)
@@ -104,7 +105,7 @@ func (f *fake) write(v any) {
 
 func (f *fake) progress(kind string) {
 	f.write(map[string]any{"jsonrpc": "2.0", "method": "$/progress",
-		"params": map[string]any{"token": "load", "value": map[string]any{"kind": kind, "title": "Loading"}}})
+		"params": map[string]any{"token": f.s.progressToken(), "value": map[string]any{"kind": kind, "title": "Loading"}}})
 }
 
 func (f *fake) reply(id json.RawMessage, result any) {
@@ -168,6 +169,8 @@ func (f *fake) handle(m *msg) {
 				f.record["asked"] = append(asSlice(f.record["asked"]), "progress end")
 			})
 		}
+	case m.Method == "textDocument/didOpen":
+		f.opened(m)
 	case m.Method == "shutdown":
 		f.save()
 		f.reply(m.ID, nil)

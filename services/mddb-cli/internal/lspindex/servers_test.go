@@ -20,13 +20,17 @@ func TestServerArgv(t *testing.T) {
 		wantProg  string
 		wantArgs  []string
 		wantName  string
+		ccDir     string
 	}{
-		{"go", []string{"gopls"}, "gopls", []string{"serve"}, "gopls/1.0"},
+		{"go", []string{"gopls"}, "gopls", []string{"serve"}, "gopls/1.0", ""},
 		// basedpyright is preferred: it finds class implementations.
-		{"python", []string{"pyrefly", "basedpyright-langserver"}, "basedpyright-langserver", []string{"--stdio"}, "basedpyright/1.0"},
-		{"python", []string{"pyrefly"}, "pyrefly", []string{"lsp", "--indexing-mode", "lazy-blocking"}, "pyrefly/1.0"},
-		{"php", []string{"phpactor", "phpantom_lsp"}, "phpactor", []string{"language-server"}, "phpactor/1.0"},
-		{"php", []string{"phpantom_lsp"}, "phpantom_lsp", []string{}, "phpantom/1.0"},
+		{"python", []string{"pyrefly", "basedpyright-langserver"}, "basedpyright-langserver", []string{"--stdio"}, "basedpyright/1.0", ""},
+		{"python", []string{"pyrefly"}, "pyrefly", []string{"lsp", "--indexing-mode", "lazy-blocking"}, "pyrefly/1.0", ""},
+		{"php", []string{"phpactor", "phpantom_lsp"}, "phpactor", []string{"language-server"}, "phpactor/1.0", ""},
+		{"php", []string{"phpantom_lsp"}, "phpantom_lsp", []string{}, "phpantom/1.0", ""},
+		// The compilation database autoindex found goes on clangd's line.
+		{"c", []string{"clangd"}, "clangd", []string{"--background-index", "--log=info", "--compile-commands-dir=/src/build"}, "clangd/1.0", "/src/build"},
+		{"cpp", []string{"clangd"}, "clangd", []string{"--background-index", "--log=info"}, "clangd/1.0", ""},
 	}
 	for _, c := range cases {
 		t.Run(c.lang+"/"+c.wantProg, func(t *testing.T) {
@@ -46,7 +50,8 @@ func TestServerArgv(t *testing.T) {
 			})
 			t.Setenv("FAKELSP_SCRIPT", f.script)
 			opt := Options{
-				Getenv: func(string) string { return "" },
+				CompileCommandsDir: c.ccDir,
+				Getenv:             func(string) string { return "" },
 				LookPath: func(name string) (string, error) {
 					p := filepath.Join(bin, name+exeSuffix)
 					if _, err := os.Lstat(p); err != nil {
@@ -95,7 +100,7 @@ func TestEnvOverrideSplitsArgv(t *testing.T) {
 }
 
 func TestLanguages(t *testing.T) {
-	if got := Languages(); !reflect.DeepEqual(got, []string{"go", "php", "python"}) {
+	if got := Languages(); !reflect.DeepEqual(got, []string{"c", "cpp", "go", "php", "python"}) {
 		t.Errorf("Languages = %v", got)
 	}
 }
@@ -108,6 +113,7 @@ func TestServerName(t *testing.T) {
 	}{
 		{Candidate{Name: "gopls", Argv: []string{"/x/gopls"}}, serverInfo{Version: `{"Version":"v0.24.0"}`}, "gopls/0.24.0"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{Name: "my server", Version: "2 beta|1#x"}, "my-server/2-beta-1-x"},
+		{Candidate{Name: "clangd", Argv: []string{"/x/clangd"}}, serverInfo{Version: "clangd version 23.1.0 (https://github.com/llvm/llvm-project ea7d852a) linux+grpc"}, "clangd/23.1.0"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{}, "srv/unknown"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{Version: "{broken"}, "srv/unknown"},
 		{Candidate{Name: "phpactor", Argv: []string{"/x/phpactor"}}, serverInfo{Version: "phpactor/2026.10.07.0"}, "phpactor/2026.10.07.0"},

@@ -78,6 +78,9 @@ type documentSymbol struct {
 	Children       []documentSymbol `json:"children"`
 	Location       *location        `json:"location"`
 	ContainerName  string           `json:"containerName"`
+	// Tags are SymbolTag values; clangd 23 marks a definition (19) apart
+	// from a declaration (18), the LSP 3.18 proposal's values.
+	Tags []int `json:"tags"`
 }
 
 // serverInfo is InitializeResult.serverInfo.
@@ -86,8 +89,19 @@ type serverInfo struct {
 	Version string `json:"version"`
 }
 
+// allSymbolKinds declares every SymbolKind of LSP 3.17 (File=1 to
+// TypeParameter=26) known to the client.
+var allSymbolKinds = map[string]any{"valueSet": func() []int {
+	kinds := make([]int, 26)
+	for i := range kinds {
+		kinds[i] = i + 1
+	}
+	return kinds
+}()}
+
 // LSP SymbolKind values the driver treats specially.
 const (
+	symbolNamespace   = 3
 	symbolClass       = 5
 	symbolMethod      = 6
 	symbolConstructor = 9

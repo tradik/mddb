@@ -45,20 +45,31 @@ func Index(ctx context.Context, root string, files []string, spec ServerSpec, op
 	}
 	ctx, cancel := context.WithTimeout(ctx, opt.Timeout)
 	defer cancel()
-	srv, err := startServer(ctx, root, cand.Argv)
+	argv := spec.command(cand, opt)
+	var fb *fallbacks
+	var onLine func(string)
+	if spec.Fallback != nil {
+		fb = &fallbacks{read: spec.Fallback}
+		onLine = fb.line
+	}
+	srv, err := startServer(ctx, root, argv, onLine)
 	if err != nil {
-		return nil, &ServerError{Server: strings.Join(cand.Argv, " "), Err: err}
+		return nil, &ServerError{Server: strings.Join(argv, " "), Err: err}
 	}
 	r := newRun(spec, opt, root, srv.conn)
+	r.fallbacks = fb
 	err = r.execute(ctx, cand, files)
 	r.stats.PeakRssMb = srv.peakRssMb() // VmHWM is gone once the server exits
 	srv.stop()
 	r.stats.Requests = int(srv.conn.requests.Load())
+	if err == nil {
+		err = r.fallbackError() // the server is gone: every stderr line has been read
+	}
 	if err != nil {
 		if ctx.Err() != nil && !errors.Is(err, ErrWorkspaceNotLoaded) {
 			err = fmt.Errorf("indexing %s stopped: %w", spec.Language, ctx.Err())
 		}
-		return nil, &ServerError{Server: strings.Join(cand.Argv, " "), Err: err,
+		return nil, &ServerError{Server: strings.Join(argv, " "), Err: err,
 			Messages: append(srv.conn.serverErrors(), r.reqErrors...), Stderr: srv.stderr.String()}
 	}
 	res := r.result()
@@ -94,8 +105,17 @@ func (r *run) execute(ctx context.Context, cand Candidate, files []string) error
 	if err := forEach(ctx, r.opt.Concurrency, r.retry, r.symbolsOf); err != nil {
 		return err
 	}
+	// Every file has been parsed: a fallback compile has been logged by now,
+	// and references would be asked for nothing.
+	if err := r.fallbackError(); err != nil {
+		return err
+	}
 	waited := time.Now()
-	if err := r.conn.waitIdle(ctx); err != nil {
+	limit := maxLoadWait
+	if r.spec.WaitIndexed {
+		limit = r.opt.Timeout
+	}
+	if err := r.conn.waitIdle(ctx, limit); err != nil {
 		return err
 	}
 	r.stats.LoadWait = time.Since(waited)
@@ -123,9 +143,13 @@ func (r *run) initialize(ctx context.Context, cand Candidate) error {
 			"workspace": map[string]any{
 				"configuration":    true,
 				"workspaceFolders": true,
+				// clangd reads the kinds a client knows from here, for
+				// documentSymbol too, and otherwise reports a struct as a
+				// class and an enum's members as enums.
+				"symbol": map[string]any{"symbolKind": allSymbolKinds},
 			},
 			"textDocument": map[string]any{
-				"documentSymbol": map[string]any{"hierarchicalDocumentSymbolSupport": true},
+				"documentSymbol": map[string]any{"hierarchicalDocumentSymbolSupport": true, "symbolKind": allSymbolKinds},
 				"references":     map[string]any{},
 				"implementation": map[string]any{},
 			},

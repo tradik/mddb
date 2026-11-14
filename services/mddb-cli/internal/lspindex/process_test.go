@@ -55,7 +55,7 @@ func TestStartServerPipeFailure(t *testing.T) {
 			}
 			return os.Pipe()
 		}
-		if _, err := startServer(context.Background(), t.TempDir(), []string{fakePath(t)}); !errors.Is(err, boom) {
+		if _, err := startServer(context.Background(), t.TempDir(), []string{fakePath(t)}, nil); !errors.Is(err, boom) {
 			t.Errorf("pipe %d failing: err = %v", fail, err)
 		}
 	}

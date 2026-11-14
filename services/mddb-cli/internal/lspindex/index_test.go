@@ -44,7 +44,11 @@ func TestIndexHappyPath(t *testing.T) {
 		t.Errorf("initializationOptions = %v", got)
 	}
 	caps := init["capabilities"].(map[string]any)["textDocument"].(map[string]any)["documentSymbol"]
-	if !reflect.DeepEqual(caps, map[string]any{"hierarchicalDocumentSymbolSupport": true}) {
+	kinds := map[string]any{"valueSet": []any{}}
+	for k := 1; k <= 26; k++ {
+		kinds["valueSet"] = append(kinds["valueSet"].([]any), float64(k))
+	}
+	if !reflect.DeepEqual(caps, map[string]any{"hierarchicalDocumentSymbolSupport": true, "symbolKind": kinds}) {
 		t.Errorf("documentSymbol capabilities = %v", caps)
 	}
 	assertNoGoroutineLeak(t, before)
