@@ -1,0 +1,651 @@
+[
+  {
+    "name": "go: method, interface and implementation",
+    "key": "store/file.go",
+    "path": "store/file.go",
+    "language": "go",
+    "content": "package store\n\ntype Closer interface {\n\tClose() error\n}\n\ntype File struct{ name string }\n\nfunc (f *File) Close() error {\n\treturn flush(f.name)\n}\n\nfunc flush(name string) error { return nil }\n",
+    "source": "gopls/0.24.0",
+    "facts": {
+      "defs": [
+        {
+          "name": "Closer",
+          "kind": "interface",
+          "start": 3,
+          "end": 5
+        },
+        {
+          "name": "File",
+          "kind": "struct",
+          "start": 7,
+          "end": 7
+        },
+        {
+          "name": "File.Close",
+          "kind": "method",
+          "start": 9,
+          "end": 11,
+          "container": "File"
+        },
+        {
+          "name": "flush",
+          "kind": "function",
+          "start": 13,
+          "end": 13
+        }
+      ],
+      "refs": [
+        {
+          "target": "store/file.go#flush",
+          "lines": [
+            10
+          ]
+        },
+        {
+          "target": "store/file.go#File",
+          "lines": [
+            9
+          ]
+        }
+      ],
+      "impls": [
+        {
+          "target": "store/file.go#Closer",
+          "local": "File"
+        }
+      ]
+    },
+    "isCode": true,
+    "maxFacts": 2048,
+    "encoded": {
+      "symDefs": [
+        "Closer interface 3-5",
+        "File struct 7-7",
+        "File.Close method 9-11 File",
+        "flush function 13-13"
+      ],
+      "symRefs": [
+        "store/file.go#File 9",
+        "store/file.go#flush 10"
+      ],
+      "symImpls": [
+        "store/file.go#Closer File"
+      ],
+      "symIndex": [
+        "v1 c9332cc79af9 f5718f67477f gopls/0.24.0"
+      ]
+    },
+    "stored": {
+      "symDefs": [
+        "Closer interface 3-5",
+        "File struct 7-7",
+        "File.Close method 9-11 File",
+        "flush function 13-13"
+      ],
+      "symImpls": [
+        "store/file.go#Closer File"
+      ],
+      "symRefs": [
+        "store/file.go#File 9",
+        "store/file.go#flush 10"
+      ],
+      "symIndex": [
+        "v1 c9332cc79af9 f5718f67477f gopls/0.24.0"
+      ]
+    }
+  },
+  {
+    "name": "python: nested class, qualified names",
+    "key": "pkg/outer.py",
+    "path": "pkg/outer.py",
+    "language": "python",
+    "content": "class Outer:\n    class Inner:\n        def method(self):\n            return helper()\n\ndef helper():\n    return 1\n",
+    "source": "pyrefly/1.4.1",
+    "facts": {
+      "defs": [
+        {
+          "name": "Outer",
+          "kind": "class",
+          "start": 1,
+          "end": 4
+        },
+        {
+          "name": "Outer.Inner",
+          "kind": "class",
+          "start": 2,
+          "end": 4,
+          "container": "Outer"
+        },
+        {
+          "name": "Outer.Inner.method",
+          "kind": "method",
+          "start": 3,
+          "end": 4,
+          "container": "Outer.Inner"
+        },
+        {
+          "name": "helper",
+          "kind": "function",
+          "start": 6,
+          "end": 7
+        }
+      ],
+      "refs": [
+        {
+          "target": "pkg/outer.py#helper",
+          "lines": [
+            4
+          ]
+        }
+      ]
+    },
+    "isCode": true,
+    "maxFacts": 2048,
+    "encoded": {
+      "symDefs": [
+        "Outer class 1-4",
+        "Outer.Inner class 2-4 Outer",
+        "Outer.Inner.method method 3-4 Outer.Inner",
+        "helper function 6-7"
+      ],
+      "symRefs": [
+        "pkg/outer.py#helper 4"
+      ],
+      "symIndex": [
+        "v1 ccd8431e8329 4254b46448a9 pyrefly/1.4.1"
+      ]
+    },
+    "stored": {
+      "symDefs": [
+        "Outer class 1-4",
+        "Outer.Inner class 2-4 Outer",
+        "Outer.Inner.method method 3-4 Outer.Inner",
+        "helper function 6-7"
+      ],
+      "symRefs": [
+        "pkg/outer.py#helper 4"
+      ],
+      "symIndex": [
+        "v1 ccd8431e8329 4254b46448a9 pyrefly/1.4.1"
+      ]
+    }
+  },
+  {
+    "name": "php: namespaced names keep their backslashes",
+    "key": "src/Http/Kernel.php",
+    "path": "src/Http/Kernel.php",
+    "language": "php",
+    "content": "<?php\nnamespace App\\Http;\n\ninterface Handler { public function handle(): void; }\n\nclass Kernel implements Handler {\n    public function handle(): void { $this->boot(); }\n    private function boot(): void {}\n}\n",
+    "source": "phpactor/2026.10.07.0",
+    "facts": {
+      "defs": [
+        {
+          "name": "App\\Http\\Handler",
+          "kind": "interface",
+          "start": 4,
+          "end": 4
+        },
+        {
+          "name": "App\\Http\\Kernel",
+          "kind": "class",
+          "start": 6,
+          "end": 9
+        },
+        {
+          "name": "App\\Http\\Kernel.handle",
+          "kind": "method",
+          "start": 7,
+          "end": 7,
+          "container": "App\\Http\\Kernel"
+        },
+        {
+          "name": "App\\Http\\Kernel.boot",
+          "kind": "method",
+          "start": 8,
+          "end": 8,
+          "container": "App\\Http\\Kernel"
+        }
+      ],
+      "refs": [
+        {
+          "target": "src/Http/Kernel.php#App\\Http\\Kernel.boot",
+          "lines": [
+            7
+          ]
+        },
+        {
+          "target": "src/Http/Kernel.php#App\\Http\\Handler",
+          "lines": [
+            6
+          ]
+        }
+      ],
+      "impls": [
+        {
+          "target": "src/Http/Kernel.php#App\\Http\\Handler",
+          "local": "App\\Http\\Kernel"
+        }
+      ]
+    },
+    "isCode": true,
+    "maxFacts": 2048,
+    "encoded": {
+      "symDefs": [
+        "App\\Http\\Handler interface 4-4",
+        "App\\Http\\Kernel class 6-9",
+        "App\\Http\\Kernel.boot method 8-8 App\\Http\\Kernel",
+        "App\\Http\\Kernel.handle method 7-7 App\\Http\\Kernel"
+      ],
+      "symRefs": [
+        "src/Http/Kernel.php#App\\Http\\Handler 6",
+        "src/Http/Kernel.php#App\\Http\\Kernel.boot 7"
+      ],
+      "symImpls": [
+        "src/Http/Kernel.php#App\\Http\\Handler App\\Http\\Kernel"
+      ],
+      "symIndex": [
+        "v1 7edb59aa462b a2ed2286959c phpactor/2026.10.07.0"
+      ]
+    },
+    "stored": {
+      "symDefs": [
+        "App\\Http\\Handler interface 4-4",
+        "App\\Http\\Kernel class 6-9",
+        "App\\Http\\Kernel.boot method 8-8 App\\Http\\Kernel",
+        "App\\Http\\Kernel.handle method 7-7 App\\Http\\Kernel"
+      ],
+      "symImpls": [
+        "src/Http/Kernel.php#App\\Http\\Handler App\\Http\\Kernel"
+      ],
+      "symRefs": [
+        "src/Http/Kernel.php#App\\Http\\Handler 6",
+        "src/Http/Kernel.php#App\\Http\\Kernel.boot 7"
+      ],
+      "symIndex": [
+        "v1 7edb59aa462b a2ed2286959c phpactor/2026.10.07.0"
+      ]
+    }
+  },
+  {
+    "name": "more than 64 lines for one symbol continue in a second value",
+    "key": "big.go",
+    "path": "big.go",
+    "language": "go",
+    "content": "package big\n",
+    "source": "gopls/0.24.0",
+    "facts": {
+      "refs": [
+        {
+          "target": "util.go#log",
+          "lines": [
+            70,
+            69,
+            68,
+            67,
+            66,
+            65,
+            64,
+            63,
+            62,
+            61,
+            60,
+            59,
+            58,
+            57,
+            56,
+            55,
+            54,
+            53,
+            52,
+            51,
+            50,
+            49,
+            48,
+            47,
+            46,
+            45,
+            44,
+            43,
+            42,
+            41,
+            40,
+            39,
+            38,
+            37,
+            36,
+            35,
+            34,
+            33,
+            32,
+            31,
+            30,
+            29,
+            28,
+            27,
+            26,
+            25,
+            24,
+            23,
+            22,
+            21,
+            20,
+            19,
+            18,
+            17,
+            16,
+            15,
+            14,
+            13,
+            12,
+            11,
+            10,
+            9,
+            8,
+            7,
+            6,
+            5,
+            4,
+            3,
+            2,
+            1,
+            5
+          ]
+        }
+      ]
+    },
+    "isCode": true,
+    "maxFacts": 2048,
+    "encoded": {
+      "symRefs": [
+        "util.go#log 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64",
+        "util.go#log 65,66,67,68,69,70"
+      ],
+      "symIndex": [
+        "v1 d371e241e234 4f49bb128f80 gopls/0.24.0"
+      ]
+    },
+    "stored": {
+      "symRefs": [
+        "util.go#log 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64",
+        "util.go#log 65,66,67,68,69,70"
+      ],
+      "symIndex": [
+        "v1 d371e241e234 4f49bb128f80 gopls/0.24.0"
+      ]
+    }
+  },
+  {
+    "name": "a path may contain # (the name follows the last #)",
+    "key": "c#/x.go",
+    "path": "c#/x.go",
+    "language": "go",
+    "content": "package x\n",
+    "source": "gopls/0.24.0",
+    "facts": {
+      "refs": [
+        {
+          "target": "c#/y.go#Run",
+          "lines": [
+            1
+          ]
+        }
+      ]
+    },
+    "isCode": true,
+    "maxFacts": 2048,
+    "encoded": {
+      "symRefs": [
+        "c#/y.go#Run 1"
+      ],
+      "symIndex": [
+        "v1 3ea66a23367f 4893a65de24f gopls/0.24.0"
+      ]
+    },
+    "stored": {
+      "symRefs": [
+        "c#/y.go#Run 1"
+      ],
+      "symIndex": [
+        "v1 3ea66a23367f 4893a65de24f gopls/0.24.0"
+      ]
+    }
+  },
+  {
+    "name": "a file with nothing to say keeps symIndex alone",
+    "key": "empty.go",
+    "path": "empty.go",
+    "language": "go",
+    "content": "package empty\n",
+    "source": "gopls/0.24.0",
+    "facts": {},
+    "isCode": true,
+    "maxFacts": 2048,
+    "encoded": {
+      "symIndex": [
+        "v1 fd4735f61af7 e3b0c44298fc gopls/0.24.0"
+      ]
+    },
+    "stored": {
+      "symIndex": [
+        "v1 fd4735f61af7 e3b0c44298fc gopls/0.24.0"
+      ]
+    }
+  },
+  {
+    "name": "over the limit: definitions first, then implementations, then references",
+    "key": "store/file.go",
+    "path": "store/file.go",
+    "language": "go",
+    "content": "package store\n\ntype Closer interface {\n\tClose() error\n}\n\ntype File struct{ name string }\n\nfunc (f *File) Close() error {\n\treturn flush(f.name)\n}\n\nfunc flush(name string) error { return nil }\n",
+    "source": "gopls/0.24.0",
+    "maxFacts": 5,
+    "facts": {
+      "defs": [
+        {
+          "name": "Closer",
+          "kind": "interface",
+          "start": 3,
+          "end": 5
+        },
+        {
+          "name": "File",
+          "kind": "struct",
+          "start": 7,
+          "end": 7
+        },
+        {
+          "name": "File.Close",
+          "kind": "method",
+          "start": 9,
+          "end": 11,
+          "container": "File"
+        },
+        {
+          "name": "flush",
+          "kind": "function",
+          "start": 13,
+          "end": 13
+        }
+      ],
+      "refs": [
+        {
+          "target": "store/file.go#flush",
+          "lines": [
+            10
+          ]
+        },
+        {
+          "target": "store/file.go#File",
+          "lines": [
+            9
+          ]
+        }
+      ],
+      "impls": [
+        {
+          "target": "store/file.go#Closer",
+          "local": "File"
+        }
+      ]
+    },
+    "isCode": true,
+    "encoded": {
+      "symDefs": [
+        "Closer interface 3-5",
+        "File struct 7-7",
+        "File.Close method 9-11 File",
+        "flush function 13-13"
+      ],
+      "symRefs": [
+        "store/file.go#File 9",
+        "store/file.go#flush 10"
+      ],
+      "symImpls": [
+        "store/file.go#Closer File"
+      ],
+      "symIndex": [
+        "v1 c9332cc79af9 f5718f67477f gopls/0.24.0"
+      ]
+    },
+    "stored": {
+      "symDefs": [
+        "Closer interface 3-5",
+        "File struct 7-7",
+        "File.Close method 9-11 File",
+        "flush function 13-13"
+      ],
+      "symImpls": [
+        "store/file.go#Closer File"
+      ],
+      "symIndex": [
+        "v1 c9332cc79af9 f5718f67477f gopls/0.24.0 truncated"
+      ]
+    }
+  },
+  {
+    "name": "content changed after the facts were computed: all removed",
+    "key": "store/file.go",
+    "path": "store/file.go",
+    "language": "go",
+    "content": "package store\n\ntype Closer interface {\n\tClose() error\n}\n\ntype File struct{ name string }\n\nfunc (f *File) Close() error {\n\treturn flush(f.name)\n}\n\nfunc flush(name string) error { return nil }\n",
+    "storedContent": "package store\n\ntype Closer interface {\n\tClose() error\n}\n\ntype File struct{ name string }\n\nfunc (f *File) Close() error {\n\treturn flush(f.name)\n}\n\nfunc flush(name string) error { return nil }\n// edited\n",
+    "source": "gopls/0.24.0",
+    "facts": {
+      "defs": [
+        {
+          "name": "flush",
+          "kind": "function",
+          "start": 13,
+          "end": 13
+        }
+      ]
+    },
+    "isCode": true,
+    "maxFacts": 2048,
+    "encoded": {
+      "symDefs": [
+        "flush function 13-13"
+      ],
+      "symIndex": [
+        "v1 c9332cc79af9 3eff762f66a2 gopls/0.24.0"
+      ]
+    },
+    "stored": {}
+  },
+  {
+    "name": "not code: sym keys are not kept",
+    "key": "notes.md",
+    "path": "notes.md",
+    "language": "",
+    "content": "# Notes\n",
+    "source": "gopls/0.24.0",
+    "isCode": false,
+    "facts": {
+      "defs": [
+        {
+          "name": "Notes",
+          "kind": "type",
+          "start": 1,
+          "end": 1
+        }
+      ]
+    },
+    "maxFacts": 2048,
+    "encoded": {
+      "symDefs": [
+        "Notes type 1-1"
+      ],
+      "symIndex": [
+        "v1 365d0b84ae63 d45b60b54468 gopls/0.24.0"
+      ]
+    },
+    "stored": {}
+  },
+  {
+    "name": "server only: malformed values are dropped, the rest kept",
+    "key": "a.go",
+    "path": "a.go",
+    "language": "go",
+    "content": "package a\n",
+    "isCode": true,
+    "maxFacts": 2048,
+    "sent": {
+      "symIndex": [
+        "v1 7b39baa38a2e 000000000000 gopls/0.24.0"
+      ],
+      "symDefs": [
+        "Good function 1-1",
+        "Bad|Pipe function 1-1",
+        "Unknown widget 1-1",
+        "Backwards function 5-2",
+        "Zero function 0-1",
+        "Too many fields function 1-1 X Y"
+      ],
+      "symRefs": [
+        "b.go#Run 1,2",
+        "b.go#Run 2,1",
+        "b.go#Run 1,1",
+        "noHash 3",
+        "b.go#Run x",
+        "b.go#Run 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65"
+      ],
+      "symImpls": [
+        "i.go#Iface Local",
+        "i.go#Iface",
+        "i.go#Iface Lo cal"
+      ]
+    },
+    "stored": {
+      "symDefs": [
+        "Good function 1-1"
+      ],
+      "symImpls": [
+        "i.go#Iface Local"
+      ],
+      "symRefs": [
+        "b.go#Run 1,2"
+      ],
+      "symIndex": [
+        "v1 7b39baa38a2e 000000000000 gopls/0.24.0"
+      ]
+    }
+  },
+  {
+    "name": "server only: two symIndex values or another version remove everything",
+    "key": "a.go",
+    "path": "a.go",
+    "language": "go",
+    "content": "package a\n",
+    "isCode": true,
+    "maxFacts": 2048,
+    "sent": {
+      "symIndex": [
+        "v2 7b39baa38a2e 000000000000 gopls/0.24.0"
+      ],
+      "symDefs": [
+        "Good function 1-1"
+      ]
+    },
+    "stored": {}
+  }
+]
