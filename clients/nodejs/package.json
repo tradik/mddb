@@ -13,7 +13,7 @@
   "type": "commonjs",
   "main": "index.js",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.5",

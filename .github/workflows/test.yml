@@ -585,8 +585,15 @@ jobs:
         run: python3 scripts/gen-agent-instructions.py --check
 
   clients-nodejs:
-    name: Node client (lockfile + audit)
+    name: Node client (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    # The package promises engines.node >=22 (Node 22 is supported until
+    # April 2027); every version it promises is tested. The audit, the
+    # OpenAPI lint and the coverage upload run once, on 24.
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['22', '24', '26']
 
     steps:
       - name: Checkout code
@@ -595,7 +602,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
-          node-version: '24'
+          node-version: ${{ matrix.node-version }}
           cache: npm
           cache-dependency-path: clients/nodejs/package-lock.json
 
@@ -611,6 +618,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: npm audit (production, high+)
+        if: matrix.node-version == '24'
         working-directory: clients/nodejs
         run: npm audit --omit=dev --audit-level=high
 
@@ -618,6 +626,7 @@ jobs:
       # reference: Redocly recommended-strict, so any warning fails. The
       # version is pinned in the Makefile (REDOCLY_CLI_VERSION).
       - name: Lint the OpenAPI spec (Redocly)
+        if: matrix.node-version == '24'
         run: make openapi-lint
 
       # TEST-001: the package had no tests and no importable client — `main`
@@ -629,6 +638,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Keep the coverage for the scan
+        if: matrix.node-version == '24'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: sonar-lcov-nodejs

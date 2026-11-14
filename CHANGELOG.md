@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+
+- **The Node.js client (`@tradik/mddb-client`) requires Node.js 22 or newer.** It declared `>=20`, but Node.js 20 left support on 30 April 2026 and CI never tested it. Node.js 22 is supported until April 2027. CI now runs the client's tests on Node.js 22, 24 and 26. Installing on Node.js 20 prints an `EBADENGINE` warning and the code still runs, but that version is no longer tested.
 - **Five functions from 2.19.3 are simpler, with no change in behaviour (CODE-017).** Each one Sonar flagged for cognitive complexity is now at most 14.
 
 ### Notes
