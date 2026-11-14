@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.19.4] - 2026-11-14
+
 ### Added
 
 - **C and C++ semantic facts through clangd (#418).** `mddb-cli autoindex --semantic` now runs clangd for `c` and `cpp`; `MDDB_LSP_C` and `MDDB_LSP_CPP` replace its command. `code_symbol` then tells apart the many `static` helpers called `init` or `close` across translation units: it returns `ambiguous: true` with one candidate per file, and each candidate keeps only its own references. C++ subclasses and overrides of virtual methods appear under `implementations`. clangd needs the build's `compile_commands.json`. The new `--compile-commands <file-or-dir>` names it; otherwise the root and `<root>/build` are searched. Without one, `auto` warns and those files keep the heuristics, and `--semantic=c` stops before anything is written. If clangd still compiles an indexed file with guessed flags ("clangd fallback"), the run sends no C or C++ facts at all, rather than partial ones. C and C++ indexed together share one clangd, so `.h` headers and `.cpp` files see each other's references. Header prototypes are not counted as definitions. The run waits for clangd's background index, within `--semantic-timeout`. `GET /v1/code-languages` announces `c` and `cpp`, and `mddb-cli diagnose` lists clangd with its version. `code_symbol` also accepts a C++ name written with `::` (`geo::Square::area`). Tested with clangd 23.1.0.
