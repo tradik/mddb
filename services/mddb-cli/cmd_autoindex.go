@@ -2,13 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -42,43 +39,8 @@ type autoindexOptions struct {
 	// extraMeta is added to every document: a reference repository's
 	// licence and source (AGT-003).
 	extraMeta map[string][]string
-}
-
-// autoindexReport is what a run did; printed as text or, with --json, as is.
-type autoindexReport struct {
-	Collection  string     `json:"collection"`
-	Root        string     `json:"root"`
-	Git         *gitInfo   `json:"git,omitempty"`
-	Files       int        `json:"files"`
-	Bytes       int64      `json:"bytes"`
-	Added       int        `json:"added"`
-	Updated     int        `json:"updated"`
-	Unchanged   int        `json:"unchanged"`
-	Failed      int        `json:"failed"`
-	Pruned      int        `json:"pruned"`
-	DurationMs  int64      `json:"durationMs"`
-	DryRun      bool       `json:"dryRun,omitempty"`
-	IncludeDirs []string   `json:"includePaths,omitempty"`
-	Plan        []autoFile `json:"plan,omitempty"`
-	ToPrune     []string   `json:"toPrune,omitempty"`
-	// pruneCounts is how many documents carry each path in ToPrune: more
-	// than one means a mail file's messages and attachments (GO-046).
-	pruneCounts map[string]int
-	Skipped     []autoSkip `json:"skipped,omitempty"`
-	// Converted lists the files the server converted to Markdown, with the
-	// format each was converted from.
-	Converted []autoConverted `json:"converted,omitempty"`
-	Errors    []string        `json:"errors,omitempty"`
-}
-
-// autoConverted is a document the server converted from a file: its key
-// (the file's path, or a path below it for a mailbox's messages and an
-// email's attachments), the format, and how well it converted.
-type autoConverted struct {
-	Rel        string   `json:"path"`
-	Format     string   `json:"format"`
-	Confidence *float64 `json:"conversionConfidence,omitempty"`
-	Warnings   []string `json:"conversionWarnings,omitempty"`
+	// semantic runs language servers and sends their facts (CODE-011).
+	semantic semanticOptions
 }
 
 func newAutoindexCmd() *cobra.Command {
@@ -97,7 +59,15 @@ language, size and modified (and gitCommit, gitBranch in a repository); the
 server extracts symbols. A Markdown file's frontmatter becomes meta too, read by
 the server as /v1/upload reads it, and the body is stored without it; the meta
 above wins for a key both name, and --no-frontmatter turns this off.
-A second run only rewrites files whose content changed.`,
+A second run only rewrites files whose content changed.
+
+--semantic runs a language server (gopls; basedpyright or pyrefly; phpactor or
+PHPantom) over the checkout, one language after another, and sends where each
+symbol is defined, referenced and implemented with the documents. Alone it
+means auto: every language in the tree that the server keeps facts for and
+that has a server installed; a missing server is a warning. --semantic=go,python
+names the languages: a missing or failing server is then an error and nothing
+is sent. Write the list with '=': a separate word is the path.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			o.root = "."
@@ -118,6 +88,11 @@ A second run only rewrites files whose content changed.`,
 	f.BoolVar(&o.dryRun, "dry-run", false, "Show what would be indexed, skipped and pruned; write nothing")
 	f.BoolVar(&o.noFrontmatter, "no-frontmatter", false, "Store Markdown files as they are; do not read frontmatter as meta")
 	f.BoolVar(&o.images, "images", false, "Store the images of Markdown files (their linked JPEG, PNG, GIF and WebP files) and PDFs as image documents")
+	f.StringVar(&o.semantic.langs, "semantic", "", "Send language-server facts: auto, or a list ("+semanticLanguagesUsage()+"); off by default")
+	f.Lookup("semantic").NoOptDefVal = semanticAuto
+	f.DurationVar(&o.semantic.timeout, "semantic-timeout", defaultSemanticTimeout, "Stop a language's server after this long")
+	f.IntVar(&o.semantic.concurrency, "semantic-concurrency", defaultSemanticConcurrency, "Requests in flight to a language server")
+	f.IntVar(&o.semantic.memoryMb, "semantic-memory-mb", 0, "Memory limit passed to servers that take one (gopls), in MiB; 0 = none")
 	return cmd
 }
 
@@ -144,6 +119,12 @@ func runAutoindex(ctx context.Context, client *mddb.Client, o autoindexOptions) 
 			return err
 		}
 	}
+	// Facts come before the first write: a named language that fails stops
+	// the run with nothing sent.
+	facts, err := semanticFacts(ctx, root, files, rep, o.semantic)
+	if err != nil {
+		return err
+	}
 	if o.dryRun {
 		rep.Plan = files
 		return printAutoindex(rep, start)
@@ -151,7 +132,12 @@ func runAutoindex(ctx context.Context, client *mddb.Client, o autoindexOptions) 
 	if err := setIncludePaths(ctx, client, rep.Collection, rep.IncludeDirs); err != nil {
 		rep.Errors = append(rep.Errors, "code.includePaths: "+err.Error())
 	}
-	ingestFiles(ctx, client, rep, files, o)
+	semSync := newSemanticSync(ctx, client, rep, facts)
+	ingestFiles(ctx, client, rep, files, o, semSync)
+	if semSync != nil {
+		semSync.reconcile(ctx, client, rep.Collection, o.lang)
+		semSync.count(rep)
+	}
 	if len(rep.ToPrune) > 0 {
 		pruneDocs(ctx, client, rep, o.lang)
 	}
@@ -188,7 +174,7 @@ func planFiles(ctx context.Context, client *mddb.Client, root string, rep *autoi
 	}
 	c := classifier{include: o.include, exclude: o.exclude, maxSize: o.maxSize}
 	if langs, err := client.CodeLanguages(ctx); err == nil {
-		c.extensions = langs.Extensions
+		c.extensions, rep.announced = langs.Extensions, langs.Semantic
 	} else {
 		rep.Errors = append(rep.Errors, "code languages unavailable, the server will classify files: "+err.Error())
 	}
@@ -223,157 +209,4 @@ func fileMeta(f autoFile, g *gitInfo) map[string][]string {
 		m["gitCommit"], m["gitBranch"] = []string{g.Commit}, []string{g.Branch}
 	}
 	return m
-}
-
-// ingestFiles sends the files in batches of at most 200 documents or 4 MiB.
-// Unchanged content is skipped by the server (skipDuplicates), which is what
-// makes a second run cheap.
-func ingestFiles(ctx context.Context, client *mddb.Client, rep *autoindexReport, files []autoFile, o autoindexOptions) {
-	b := &ingestBatch{client: client, rep: rep, o: o}
-	for _, f := range files {
-		content, err := os.ReadFile(f.abs) // #nosec G304 -- a file under the directory the user asked to index
-		if err != nil {
-			rep.Failed++
-			rep.Errors = append(rep.Errors, f.Rel+": "+err.Error())
-			continue
-		}
-		b.add(ctx, f, content)
-	}
-	b.flush(ctx)
-}
-
-// ingestBatch collects documents for one /v1/ingest call and records what
-// each call did in the report.
-type ingestBatch struct {
-	client *mddb.Client
-	rep    *autoindexReport
-	o      autoindexOptions
-	docs   []mddb.IngestDocument
-	size   int
-}
-
-// add queues a file's document, sending the batch first when the file
-// would take it over the document or byte limit.
-func (b *ingestBatch) add(ctx context.Context, f autoFile, content []byte) {
-	isMarkdown := docExtensions[strings.ToLower(filepath.Ext(f.Rel))]
-	// The server reads the frontmatter, once, with the /v1/upload parser.
-	doc := mddb.IngestDocument{Key: f.Rel, Lang: b.o.lang, ExtractFrontmatter: isMarkdown && !b.o.noFrontmatter}
-	if b.o.images && isMarkdown {
-		doc.Images = markdownImageFiles(b.rep.Root, f.Rel, content) // RAG-010
-	}
-	n := wireSize(f, content, doc.Images)
-	if len(b.docs) > 0 && (len(b.docs) >= autoindexBatchDocs || b.size+n > autoindexBatchBytes) {
-		b.flush(ctx)
-	}
-	doc.Meta = fileMeta(f, b.rep.Git)
-	for k, v := range b.o.extraMeta {
-		doc.Meta[k] = v
-	}
-	if f.Format != "" {
-		// The server converts it, with the converters /v1/upload uses.
-		doc.Format, doc.Content = f.Format, content
-		b.rep.Converted = append(b.rep.Converted, autoConverted{Rel: f.Rel, Format: f.Format})
-	} else {
-		doc.ContentMD = string(content)
-	}
-	b.docs = append(b.docs, doc)
-	b.size += n
-}
-
-// flush sends the queued documents, if any, and empties the batch.
-func (b *ingestBatch) flush(ctx context.Context) {
-	if len(b.docs) == 0 {
-		return
-	}
-	rep := b.rep
-	resp, err := b.client.Ingest(ctx, mddb.IngestRequest{Collection: rep.Collection, Documents: b.docs,
-		Options: mddb.IngestOptions{SkipDuplicates: true, Profile: b.o.profile, ExtractImages: b.o.images}})
-	if err != nil {
-		rep.Failed += len(b.docs)
-		rep.Errors = append(rep.Errors, err.Error())
-	} else {
-		rep.Added, rep.Updated, rep.Unchanged = rep.Added+resp.Added, rep.Updated+resp.Updated, rep.Unchanged+resp.Skipped
-		rep.Failed += resp.Failed
-		rep.Errors = append(rep.Errors, resp.Errors...)
-		rep.noteConversions(resp.Conversions)
-	}
-	b.docs, b.size = nil, 0
-}
-
-// noteConversions records how well the server converted each document:
-// the file's own, and the messages and attachments it held.
-func (rep *autoindexReport) noteConversions(convs []mddb.IngestConversion) {
-	for _, c := range convs {
-		confidence := c.Confidence
-		entry := autoConverted{Rel: c.Key, Format: c.Format, Confidence: &confidence, Warnings: c.Warnings}
-		found := false
-		for i := range rep.Converted {
-			if rep.Converted[i].Rel == c.Key {
-				rep.Converted[i], found = entry, true
-			}
-		}
-		if !found {
-			rep.Converted = append(rep.Converted, entry)
-		}
-	}
-}
-
-// quality is the report's note on a conversion: its confidence, and the
-// first warning when there is one.
-func (c autoConverted) quality() string {
-	if c.Confidence == nil {
-		return ""
-	}
-	q := fmt.Sprintf(" (confidence %.2f", *c.Confidence)
-	if len(c.Warnings) > 0 {
-		q += ": " + c.Warnings[0]
-	}
-	return q + ")"
-}
-
-// wireSize is what a file adds to a batch: its bytes, or their base64 when
-// it is sent for conversion, and the base64 of the images sent with it.
-func wireSize(f autoFile, content []byte, images []mddb.IngestImage) int {
-	n := len(content)
-	if f.Format != "" {
-		n = base64.StdEncoding.EncodedLen(len(content))
-	}
-	for _, im := range images {
-		n += base64.StdEncoding.EncodedLen(len(im.Content))
-	}
-	return n
-}
-
-func printAutoindex(rep *autoindexReport, start time.Time) error {
-	rep.DurationMs = time.Since(start).Milliseconds()
-	if outputJSON {
-		// A struct of plain fields: marshalling it cannot fail.
-		data, _ := json.MarshalIndent(rep, "", "  ")
-		fmt.Println(string(data))
-		return nil
-	}
-	if rep.DryRun {
-		fmt.Printf("Dry run: %d files (%.1f MB) would go to collection %q; %d skipped; %d would be pruned\n",
-			rep.Files, float64(rep.Bytes)/1e6, rep.Collection, len(rep.Skipped), len(rep.ToPrune))
-		for _, f := range rep.Plan {
-			fmt.Printf("  + %s (%s %s%s)\n", f.Rel, f.Kind, f.Language, f.Format)
-		}
-		for _, s := range rep.Skipped {
-			fmt.Printf("  - %s: %s\n", s.Rel, s.Reason)
-		}
-		for _, p := range rep.ToPrune {
-			fmt.Printf("  x %s\n", p)
-		}
-		return nil
-	}
-	fmt.Printf("✓ %s: %d files (%.1f MB) — %d added, %d updated, %d unchanged, %d failed, %d pruned, %d skipped in %dms\n",
-		rep.Collection, rep.Files, float64(rep.Bytes)/1e6, rep.Added, rep.Updated, rep.Unchanged, rep.Failed,
-		rep.Pruned, len(rep.Skipped), rep.DurationMs)
-	for _, c := range rep.Converted {
-		fmt.Printf("  ~ %s: converted from %s%s\n", c.Rel, c.Format, c.quality())
-	}
-	for _, e := range rep.Errors {
-		fmt.Println("  !", e)
-	}
-	return nil
 }

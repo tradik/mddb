@@ -181,6 +181,33 @@ Delete documents whose file no longer exists.
 .TP
 .B \-\-dry\-run
 Print the plan \(em files, skipped files and why, documents to prune \(em and write nothing.
+With \fB\-\-semantic\fR the language servers still run and the report gives their numbers.
+.TP
+.BR \-\-semantic [=\fIauto\fR|\fILIST\fR]
+Run a language server over the checkout and send its facts \(em where each
+symbol is defined, referenced and implemented \(em with the documents as meta
+symIndex, symDefs, symRefs and symImpls (v2.19.3). Off by default; alone it
+means \fBauto\fR. Servers: gopls for go; basedpyright\-langserver, else pyrefly,
+for python; phpactor, else phpantom_lsp, for php; MDDB_LSP_GO, MDDB_LSP_PYTHON
+and MDDB_LSP_PHP replace them with a command line. \fBauto\fR indexes every
+language in the tree that the server keeps facts for and that has a language
+server installed; a missing or failing server is a warning and those files go
+without facts. A comma\-separated \fILIST\fR (go,python,php) fails before
+anything is written when a named language has no server, the server keeps no
+facts for it, or its server fails. Write the list with \fB=\fR: a separate
+word is the path. Languages run one after another. A second run sends only
+the documents whose content or facts changed; facts that changed under
+unchanged content are written with a meta\-only update, which re\-embeds
+nothing. Not available over MCP.
+.TP
+.BR \-\-semantic\-timeout " " \fIDURATION\fR
+Stop one language's server after this long (default 20m).
+.TP
+.BR \-\-semantic\-concurrency " " \fIN\fR
+Requests in flight to a language server (default 4).
+.TP
+.BR \-\-semantic\-memory\-mb " " \fIMIB\fR
+Memory limit for servers that take one (gopls); 0, the default, sets none.
 .SS add
 Add or update a markdown document in the database.
 .PP
@@ -805,6 +832,11 @@ content, metadata values, document IDs, query text, keys, actors, IP addresses
 or paths. Collection names are hashed unless \fB\-\-keep\-names\fR is given.
 MANIFEST.json lists every file, its size, its SHA-256 and the redaction
 applied; the CLI checks each file against it. Needs an admin login or key.
+.PP
+The CLI then lists the language servers \fBautoindex \-\-semantic\fR would
+start on this machine, by program name and the first line of its version
+output (v2.19.3); with \fB\-\-json\fR, under languageServers. Where a program
+is installed is not shown.
 .PP
 .B mddb-cli diagnose
 [\fB\-\-out\fR \fIfile\fR] [\fB\-\-profiles\fR] [\fB\-\-integrity\fR] [\fB\-\-keep\-names\fR] [\fB\-\-inspect\fR]

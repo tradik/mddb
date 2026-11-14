@@ -41,6 +41,77 @@ there is no endpoint that could be pointed at the server's own disk. For
 the same reason there is no MCP tool for it: an agent runs `mddb-cli
 autoindex` like any other command.
 
+### Semantic facts from a language server: `--semantic` (v2.19.3+)
+
+The server's own symbol extraction is heuristic: it reads each file alone, so
+it cannot tell which of three `Run` functions a call means or which types
+implement an interface. With `--semantic`, autoindex runs a language server
+over the checkout before it sends anything and adds what the server knows to
+each source file's document: where every symbol is defined, which lines of
+which files reference it, and which types implement which interfaces. The
+facts travel as four meta keys (`symIndex`, `symDefs`, `symRefs`,
+`symImpls`; format in
+[testdata/semantic-facts/README.md](https://github.com/tradik/mddb/blob/main/testdata/semantic-facts/README.md)),
+and the server keeps them only while they describe the content it stores.
+
+```bash
+mddb-cli autoindex . --semantic              # auto: every language it can do
+mddb-cli autoindex . --semantic=go,python    # these languages, or fail
+mddb-cli autoindex . --semantic --dry-run    # run the servers, report, send nothing
+```
+
+| Language | Server (first found on `PATH`) | Override |
+|---|---|---|
+| Go | `gopls serve` | `MDDB_LSP_GO` |
+| Python | `basedpyright-langserver --stdio`, else `pyrefly lsp --indexing-mode lazy-blocking` | `MDDB_LSP_PYTHON` |
+| PHP | `phpactor language-server`, else `phpantom_lsp` | `MDDB_LSP_PHP` |
+
+basedpyright comes before pyrefly because pyrefly 1.4.1 finds no
+implementations of classes (ABC subclasses, Protocols) and basedpyright does.
+An `MDDB_LSP_*` variable replaces the table with a command line of your own
+(split on spaces, no shell). `mddb-cli diagnose` lists the servers it finds
+and their versions.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--semantic[=auto\|LIST]` | off | Alone it means `auto`. Write a list with `=`: `--semantic go` would take `go` as the path. |
+| `--semantic-timeout` | `20m` | Stops one language's server after this long. |
+| `--semantic-concurrency` | `4` | Requests in flight to a server. |
+| `--semantic-memory-mb` | `0` (none) | Memory limit for servers that take one (gopls `memoryLimit`). |
+
+- **auto** indexes each language that is in the tree, that the server keeps
+  facts for (`semantic` in `GET /v1/code-languages`) and that has a server
+  installed. A missing server, or one that fails or never loads the project,
+  is a warning: that language's files go without facts and keep the
+  heuristics. A server older than 2.19.3 announces no languages; the run then
+  sends no facts and says so.
+- **A list** is a demand: a language the driver does not know, a server
+  that keeps no facts for it, a missing language server, or one that fails
+  stops the run with a non-zero exit before anything is written.
+- Languages run one after another; two servers at once would need the sum of
+  their memory. gopls over `services/mddbd` (1343 files) took about two
+  minutes and peaked between 3.5 and 5.5 GB.
+- **Second runs.** The facts are recomputed for the whole tree on every
+  `--semantic` run. One facet request over `symIndex` (which carries the
+  content's hash and a digest of the facts) tells which documents the
+  collection already holds as they are; those are not sent. A file whose
+  content changed is sent as usual. A file whose content did not change but
+  whose facts did — another file started calling it — gets a meta-only
+  `PATCH /v1/update` with its whole meta, after a second facet request finds
+  it; the content is not rewritten and nothing is re-embedded (the update
+  queues an embedding job, which finds the same content hash and calls no
+  provider).
+- **Report.** One line per language: server and version, files, definitions,
+  references, implementations, skipped (failed or timed-out requests),
+  unencodable facts, time, load wait and peak RSS; then how many documents
+  were sent with facts, held back as unchanged, and updated in their facts
+  only. `--json` has the same under `semantic`.
+- Without `--semantic` nothing changes: the documents, the requests and the
+  output are those of 2.19.2.
+- **Not over MCP.** autoindex has no MCP tool, and `--semantic` would not be
+  offered on one: starting language servers on a tool call is a separate
+  security decision.
+
 ## Overview (load-md-folder.sh, legacy)
 
 `autoindex` replaces this script for new work. The `load-md-folder.sh` script imports markdown files from a folder into MDDB. It's perfect for migrating existing documentation, importing blog posts, or loading large collections of markdown content.

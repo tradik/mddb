@@ -1,0 +1,73 @@
+{
+  "collection": "proj",
+  "root": "<ROOT>",
+  "files": 9,
+  "bytes": 2183,
+  "added": 0,
+  "updated": 0,
+  "unchanged": 0,
+  "failed": 0,
+  "pruned": 0,
+  "durationMs": <N>,
+  "dryRun": true,
+  "includePaths": [
+    "lib/include"
+  ],
+  "plan": [
+    {
+      "path": "README.md",
+      "size": 5,
+      "kind": "doc"
+    },
+    {
+      "path": "big.log",
+      "size": 2048,
+      "kind": "text"
+    },
+    {
+      "path": "docs/skip-me/secret.md",
+      "size": 3,
+      "kind": "doc"
+    },
+    {
+      "path": "lib/include/net/conn.h",
+      "size": 16,
+      "kind": "code",
+      "language": "c"
+    },
+    {
+      "path": "lib/src/conn.c",
+      "size": 51,
+      "kind": "code",
+      "language": "c"
+    },
+    {
+      "path": "main.go",
+      "size": 29,
+      "kind": "code",
+      "language": "go"
+    },
+    {
+      "path": "notes.txt",
+      "size": 6,
+      "kind": "text"
+    },
+    {
+      "path": "scripts/.hidden/keep.txt",
+      "size": 5,
+      "kind": "text"
+    },
+    {
+      "path": "scripts/tool.py",
+      "size": 20,
+      "kind": "code",
+      "language": "python"
+    }
+  ],
+  "skipped": [
+    {
+      "path": "image.png",
+      "reason": "binary"
+    }
+  ]
+}

@@ -120,6 +120,15 @@ func TestDiagnoseRefusesWhatIsNotABundle(t *testing.T) {
 	zw := gzip.NewWriter(&cut)
 	_, _ = zw.Write([]byte("not a tar archive, just some bytes that end too soon"))
 	_ = zw.Close()
+	// A header that promises more bytes than the archive holds: the entry
+	// is found, its body cannot be read.
+	var shortTar, short bytes.Buffer
+	tw := tar.NewWriter(&shortTar)
+	_ = tw.WriteHeader(&tar.Header{Name: "build.json", Mode: 0o644, Size: 1000})
+	_, _ = tw.Write([]byte("{}"))
+	zw = gzip.NewWriter(&short)
+	_, _ = zw.Write(shortTar.Bytes())
+	_ = zw.Close()
 	for name, c := range map[string]struct {
 		route interface{}
 		want  string
@@ -131,6 +140,7 @@ func TestDiagnoseRefusesWhatIsNotABundle(t *testing.T) {
 		"bad manifest":   {string(badManifest), "unreadable MANIFEST.json"},
 		"damaged":        {string(testBundle(t, "00")), "damaged"},
 		"truncated file": {string(truncated[:len(truncated)-30]), "not a diagnose bundle"},
+		"short entry":    {short.String(), "not a diagnose bundle"},
 	} {
 		srv := newFakeServer(t, map[string]interface{}{"/v1/admin/diagnose": c.route})
 		if _, err := runCLI(t, srv.URL, "diagnose", "--inspect"); err == nil || !strings.Contains(err.Error(), c.want) {

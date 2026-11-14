@@ -74,6 +74,11 @@ func factsDigest(meta map[string][]string) string {
 	return hash12(b.String())
 }
 
+// ContentHash is symIndex's contentHash for content: a caller holding a
+// stored document checks with it that facts computed from a file match the
+// content the server holds.
+func ContentHash(content string) string { return hash12(content) }
+
 // hash12 is the first 12 hex digits of SHA-256.
 func hash12(s string) string {
 	sum := sha256.Sum256([]byte(s))

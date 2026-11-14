@@ -27,9 +27,9 @@ func typedCases() []typedCase {
 			name:   "CodeLanguages",
 			call:   func(ctx context.Context, c *Client) (any, error) { return c.CodeLanguages(ctx) },
 			method: "GET", path: "/v1/code-languages",
-			respBody: `{"extensions":{".go":"go"},"languages":["go"]}`,
+			respBody: `{"extensions":{".go":"go"},"languages":["go"],"semantic":{"go":true}}`,
 			check: func(t *testing.T, got any) {
-				if r := got.(*CodeLanguages); r.Extensions[".go"] != "go" || r.Languages[0] != "go" {
+				if r := got.(*CodeLanguages); r.Extensions[".go"] != "go" || r.Languages[0] != "go" || !r.Semantic["go"] {
 					t.Errorf("CodeLanguages = %+v", r)
 				}
 			},

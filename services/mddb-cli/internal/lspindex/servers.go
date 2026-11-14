@@ -55,13 +55,17 @@ type Candidate struct {
 	Name string
 	// Argv is the program and its arguments.
 	Argv []string
+	// VersionArgs make the program print its version (see Version); nil
+	// means --version.
+	VersionArgs []string
 }
 
 // servers is the table, keyed by language.
 var servers = map[string]ServerSpec{
 	"go": {
 		Language: "go", LanguageID: "go", EnvVar: "MDDB_LSP_GO",
-		Candidates: []Candidate{{Name: "gopls", Argv: []string{"gopls", "serve"}}},
+		// gopls has no --version flag; its version is a subcommand.
+		Candidates: []Candidate{{Name: "gopls", Argv: []string{"gopls", "serve"}, VersionArgs: []string{"version"}}},
 		// gopls reports every named type that is not a struct or interface
 		// (type Num int, aliases) as Class.
 		Kinds:     map[int]string{symbolClass: "type"},
@@ -73,11 +77,15 @@ var servers = map[string]ServerSpec{
 	"python": {
 		Language: "python", LanguageID: "python", EnvVar: "MDDB_LSP_PYTHON",
 		Candidates: []Candidate{
+			// basedpyright first: measured for CODE-009, pyrefly 1.4.1 answers
+			// textDocument/implementation for no class, while basedpyright
+			// finds ABC subclasses and Protocol implementations, and
+			// implementations are what the facts add over the heuristics.
+			{Name: "basedpyright", Argv: []string{"basedpyright-langserver", "--stdio"}},
 			// lazy-blocking: references wait for the workspace index instead
 			// of answering from the files indexed so far, which is what a
 			// batch run needs (pyrefly's help names it the deterministic mode).
 			{Name: "pyrefly", Argv: []string{"pyrefly", "lsp", "--indexing-mode", "lazy-blocking"}},
-			{Name: "basedpyright", Argv: []string{"basedpyright-langserver", "--stdio"}},
 		},
 		ImplKinds: []int{symbolInterface, symbolClass},
 	},
@@ -129,20 +137,20 @@ func (s ServerSpec) resolve(getenv func(string) string, lookPath func(string) (s
 			}
 			// A table program at another path keeps the table's name, so
 			// symIndex says pyrefly/1.4.1 however pyrefly was found.
-			name := ""
+			found := Candidate{Argv: append([]string{prog}, argv[1:]...)}
 			for _, c := range s.Candidates {
 				if c.Argv[0] == filepath.Base(argv[0]) {
-					name = c.Name
+					found.Name, found.VersionArgs = c.Name, c.VersionArgs
 				}
 			}
-			return Candidate{Name: name, Argv: append([]string{prog}, argv[1:]...)}, nil
+			return found, nil
 		}
 	}
 	var tried []string
 	for _, c := range s.Candidates {
 		prog, err := lookPath(c.Argv[0])
 		if err == nil {
-			return Candidate{Name: c.Name, Argv: append([]string{prog}, c.Argv[1:]...)}, nil
+			return Candidate{Name: c.Name, Argv: append([]string{prog}, c.Argv[1:]...), VersionArgs: c.VersionArgs}, nil
 		}
 		tried = append(tried, strings.Join(c.Argv, " "))
 	}

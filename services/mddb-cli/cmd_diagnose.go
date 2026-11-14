@@ -58,7 +58,10 @@ allowlist, stats, metrics, query-shape counters, recent error classes — withou
 document content, metadata values, queries, keys, actors, IP addresses or paths.
 Collection names are hashed unless --keep-names is given. MANIFEST.json lists
 every file, its size, its SHA-256 and the redaction applied; --inspect prints it
-without writing anything. Needs an admin login or key.`,
+without writing anything. Needs an admin login or key.
+
+It also lists the language servers autoindex --semantic would start on this
+machine, by program name and version.`,
 		Args: cobra.NoArgs,
 		RunE: runDiagnose,
 	}
@@ -92,8 +95,13 @@ func runDiagnose(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
+	servers := detectLanguageServers(ctx)
 	if inspect {
-		return printManifest(man)
+		if err := printManifest(man); err != nil || outputJSON {
+			return err
+		}
+		printLanguageServers(servers)
+		return nil
 	}
 	if out == "" {
 		out = fmt.Sprintf("mddb-diagnose-%s-%s.tar.gz", bundleHost(serverURL), time.Now().UTC().Format("20060102-150405"))
@@ -102,10 +110,12 @@ func runDiagnose(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if outputJSON {
-		return json.NewEncoder(os.Stdout).Encode(map[string]any{"file": out, "bytes": len(bundle), "files": len(man.Files)})
+		return json.NewEncoder(os.Stdout).Encode(map[string]any{"file": out, "bytes": len(bundle), "files": len(man.Files),
+			"languageServers": servers})
 	}
 	fmt.Printf("✓ Diagnose bundle written: %s (%d bytes, %d files)\n", out, len(bundle), len(man.Files))
 	fmt.Println("  Review it with `mddb-cli diagnose --inspect`, or open MANIFEST.json, before attaching it to an issue.")
+	printLanguageServers(servers)
 	return nil
 }
 

@@ -334,7 +334,7 @@ func TestAutoindex_BatchBytesAndReadErrors(t *testing.T) {
 	// A file that vanished between planning and sending is counted, not fatal.
 	rep := &autoindexReport{Collection: "x"}
 	serverURL = fs.URL
-	ingestFiles(context.Background(), newClient(), rep, []autoFile{{Rel: "gone.txt", abs: filepath.Join(dir, "gone.txt")}}, autoindexOptions{lang: "en"})
+	ingestFiles(context.Background(), newClient(), rep, []autoFile{{Rel: "gone.txt", abs: filepath.Join(dir, "gone.txt")}}, autoindexOptions{lang: "en"}, nil)
 	if rep.Failed != 1 || !strings.Contains(strings.Join(rep.Errors, " "), "gone.txt") {
 		t.Fatalf("read error: %+v", rep)
 	}

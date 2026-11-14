@@ -22,8 +22,9 @@ func TestServerArgv(t *testing.T) {
 		wantName  string
 	}{
 		{"go", []string{"gopls"}, "gopls", []string{"serve"}, "gopls/1.0"},
-		{"python", []string{"pyrefly", "basedpyright-langserver"}, "pyrefly", []string{"lsp", "--indexing-mode", "lazy-blocking"}, "pyrefly/1.0"},
-		{"python", []string{"basedpyright-langserver"}, "basedpyright-langserver", []string{"--stdio"}, "basedpyright/1.0"},
+		// basedpyright is preferred: it finds class implementations.
+		{"python", []string{"pyrefly", "basedpyright-langserver"}, "basedpyright-langserver", []string{"--stdio"}, "basedpyright/1.0"},
+		{"python", []string{"pyrefly"}, "pyrefly", []string{"lsp", "--indexing-mode", "lazy-blocking"}, "pyrefly/1.0"},
 		{"php", []string{"phpactor", "phpantom_lsp"}, "phpactor", []string{"language-server"}, "phpactor/1.0"},
 		{"php", []string{"phpantom_lsp"}, "phpantom_lsp", []string{}, "phpantom/1.0"},
 	}
@@ -181,7 +182,7 @@ func TestPHPNamespace(t *testing.T) {
 func TestResolveReportsEveryCandidate(t *testing.T) {
 	spec, _ := Spec("python")
 	_, err := spec.resolve(func(string) string { return "" }, func(string) (string, error) { return "", errors.New("no") })
-	if !errors.Is(err, ErrNoServer) || !strings.Contains(err.Error(), "pyrefly lsp --indexing-mode lazy-blocking; basedpyright-langserver --stdio") {
+	if !errors.Is(err, ErrNoServer) || !strings.Contains(err.Error(), "basedpyright-langserver --stdio; pyrefly lsp --indexing-mode lazy-blocking") {
 		t.Errorf("err = %v", err)
 	}
 }

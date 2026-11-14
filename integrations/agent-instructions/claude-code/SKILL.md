@@ -160,7 +160,10 @@ Record decisions and constraints, not transcripts.
   call. Don't list keys and delete them one by one.
 - To make a repository or folder searchable, run `mddb-cli autoindex <dir>`
   rather than adding files one by one: it sets path, kind and language, lets
-  the server extract symbols, and skips what has not changed.
+  the server extract symbols, and skips what has not changed. Add
+  `--semantic` when gopls, basedpyright/pyrefly or phpactor is installed:
+  definitions, references and implementations then come from the language
+  server instead of heuristics. It is a CLI flag only; no MCP tool runs it.
 
 - `add_document` for one document; `bulk_ingest_submit` for many. The bulk path
   is asynchronous — poll `bulk_ingest_status`, or subscribe to the job's events

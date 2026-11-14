@@ -1,0 +1,12 @@
+Dry run: 9 files (0.0 MB) would go to collection "proj"; 1 skipped; 1 would be pruned
+  + README.md (doc )
+  + big.log (text )
+  + docs/skip-me/secret.md (doc )
+  + lib/include/net/conn.h (code c)
+  + lib/src/conn.c (code c)
+  + main.go (code go)
+  + notes.txt (text )
+  + scripts/.hidden/keep.txt (text )
+  + scripts/tool.py (code python)
+  - image.png: binary
+  x gone.go

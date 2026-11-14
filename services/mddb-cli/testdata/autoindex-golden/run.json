@@ -1,0 +1,24 @@
+{
+  "collection": "proj",
+  "root": "<ROOT>",
+  "files": 9,
+  "bytes": 2183,
+  "added": 2,
+  "updated": 1,
+  "unchanged": 3,
+  "failed": 0,
+  "pruned": 1,
+  "durationMs": <N>,
+  "includePaths": [
+    "lib/include"
+  ],
+  "toPrune": [
+    "gone.go"
+  ],
+  "skipped": [
+    {
+      "path": "image.png",
+      "reason": "binary"
+    }
+  ]
+}

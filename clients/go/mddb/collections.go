@@ -44,6 +44,9 @@ func (c *Client) Storage(ctx context.Context, collection string) (*StorageBreakd
 type CodeLanguages struct {
 	Extensions map[string]string `json:"extensions"`
 	Languages  []string          `json:"languages"`
+	// Semantic marks the languages the server keeps semantic code facts for
+	// (mddb-cli autoindex --semantic, v2.19.3); nil from an older server.
+	Semantic map[string]bool `json:"semantic,omitempty"`
 }
 
 // CodeLanguages returns the table the server classifies source files by, so

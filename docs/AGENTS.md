@@ -120,8 +120,20 @@ TSV, EML and MBOX. Every converted document has `meta.conversionConfidence`
 (0–1; a scanned PDF without a text layer scores 0), and
 `filter: {"conversionConfidence": {"lt": 0.5}}` finds the ones worth checking.
 
+With `--semantic` (2.19.3+) autoindex also runs a language server over the
+checkout — gopls for Go, basedpyright or pyrefly for Python, phpactor or
+PHPantom for PHP — and sends where each symbol is defined, referenced and
+implemented with the documents. `code_symbol` and graph retrieval then answer
+from the compiler's view instead of name matching; files without facts keep
+the heuristics. Alone the flag means `auto` (a missing server is a warning);
+`--semantic=go,python` fails before writing anything when a named language
+cannot be indexed. `mddb-cli diagnose` lists the servers it finds
+([BULK-IMPORT.md](BULK-IMPORT.md#semantic-facts-from-a-language-server---semantic-v2193)).
+
 There is no MCP tool for this: the server never reads its own filesystem on
-request, so an agent runs `mddb-cli autoindex` like any other command.
+request, so an agent runs `mddb-cli autoindex` like any other command. For the
+same reason `--semantic` is not offered to agents over MCP: starting language
+servers from a tool call is a separate security decision.
 
 ## 4. Ask for less: passages and the context budget
 
