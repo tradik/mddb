@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Semantic code facts in document meta (CODE-010).** A code document can carry what a language server knows about it, in four meta keys: `symIndex`, `symDefs`, `symRefs` and `symImpls`. `mddb-cli autoindex --semantic` writes them; nothing else changes without it. The format, and the cases mddbd and mddb-cli both test against, are in `testdata/semantic-facts/`. On every write — add, batch, bulk ingest and update, on every transport — mddbd keeps the facts only while `symIndex` carries the hash of the content as stored. An edit to the content, a document that is not code, or another format version drops them all. Malformed values are dropped and the rest kept. No value is longer than 1024 bytes or contains `|`. At most `MDDB_CODE_MAX_FACTS` values are kept (default 2048): definitions first, then implementations, then references, and `symIndex` then ends in ` truncated`. Search results, curated pins and document listings leave the keys out on REST, gRPC, GraphQL and MCP; reading a single document and exporting return them. `GET /v1/code-languages` gains `semantic` (`{"go":true,"php":true,"python":true}`). No new buckets, endpoints or proto fields; the facts replicate and back up like any other meta.
+
 ## [2.19.2] - 2026-11-14
 
 ### Security
