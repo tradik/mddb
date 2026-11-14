@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A git repository as a synced source (#421).** A cron rule's `sync` takes `source: "git"`, which keeps a collection in step with a repository:
+  - `url` must be https.
+  - `ref` is a branch, a tag, or `latest-release`: the forge's latest release, else the highest stable semver tag. An empty `ref` follows the default branch.
+  - `include` and `exclude` take the same globs as `mddb-cli autoindex`.
+  - `forge` names a self-hosted GitHub, GitLab, Gitea or Forgejo; github.com, gitlab.com and codeberg.org are recognised.
+
+  mddbd needs no git binary. It reads the repository's refs over HTTP, the forge's release API and the commit's tar.gz archive. The archive is streamed with size limits; links are skipped and paths that leave the repository refuse the run.
+
+  Keys are repository-relative paths, with the same metadata `autoindex` writes plus `syncRef` and `syncCommit`. A collection seeded by `autoindex` can be taken over with `adopt: true`, without duplicates.
+
+  When the commit is the one the last run read, the run downloads nothing and `lastResult.upToDate` says so. Otherwise only files whose content changed are written, and `prune` removes deleted ones. `lastResult` reports the `ref`, the `commit` and a link to it.
+
+  Private repositories use a stored, sealed secret (`tokenSecretRef`). `POST /v1/automation/{id}/hook` runs the sync from a signed GitHub, Gitea or Forgejo webhook, or a GitLab token (`hookSecretRef`).
+
+  gRPC adds fields only: `SyncActionProto` 12–18 and `AutomationRunResultProto` 10–13.
+
+  In the panel, the synced-sources form has a new source type, "Git repository": URL, ref, include/exclude, the forge for self-hosted servers, the token and webhook secrets, and adopt. A rule's last run shows the ref and the short commit, linked to the forge, or "up to date". Collection settings list the git source with its URL and ref. Tested by syncing this repository's documentation at its latest release: 65 documents; the next run downloaded nothing.
+
 ### Fixed
 
 - **`--compile-commands` reaches a versioned clangd (#420).** With `MDDB_LSP_C=/usr/bin/clangd-22`, which is how Debian and Ubuntu install clangd, autoindex did not recognise the program as clangd. It therefore never passed `--compile-commands-dir`, so an out-of-tree database (`make O=…`, `cmake -B …`) never reached clangd, and the run stopped with advice to generate a database that already existed. Program names with a version suffix (`clangd-22`, `clangd-22.1`) or `.exe` now count as the server in the table and get its arguments. When the command really is another program, the error now names the argument to add to `MDDB_LSP_C`.
