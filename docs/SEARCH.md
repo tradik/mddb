@@ -1989,7 +1989,17 @@ and cannot tell whether the search is working.
 | `graphDecay` | 0.5 | Fraction of the source's score a neighbour inherits per hop |
 | `graphMaxNeighbours` | 10 | Stops a hub document flooding the answer |
 | `graphDirection` | `both` | `in` = what depends on this, `out` = what it depends on |
-| `graphKinds` | — | (v2.18.8) Expand by symbol relation instead: `callers`, `callees`, `tests`, `siblings` (code in the same directory). Each expansion reports its `kind`. Unknown values are a 422 |
+| `graphKinds` | — | (v2.18.8) Expand by symbol relation instead: `callers`, `callees`, `tests`, `siblings` (code in the same directory), and (v2.19.3) `implementations` (documents implementing an interface a result defines; needs semantic facts). Each expansion reports its `kind`. Unknown values are a 422 |
+
+(v2.19.3) A result carrying semantic facts (`mddb-cli autoindex --semantic`)
+expands `callers`, `callees`, `tests` and `implementations` from its facts —
+the documents whose `symRefs` point at what it defines, the documents its own
+`symRefs` point at, the documents whose `symImpls` name its interfaces — one
+hop, with the qualified name as the expansion's `symbol`. A result without
+facts expands as before. The same reader answers `/v1/symbol`, so a graph
+search and a symbol lookup agree. In passage results (`format: "passages"`),
+`symbol` is the qualified name from the facts (`Server.Close`) when the
+document has them.
 
 With `graphKinds` the question changes from "what is connected" to "what do I
 need next to change this": `["tests", "callers"]` adds the tests that call a

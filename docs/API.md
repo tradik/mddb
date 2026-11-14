@@ -5712,6 +5712,53 @@ computed from the documents at query time, so nothing is stored and a reindex
 cannot make the answer drift. The same lookup is the `code_symbol` MCP tool
 (read-only, toolset `code`) and the `codeSymbol` GraphQL query.
 
+#### Precise answers from semantic facts (v2.19.3+)
+
+Documents indexed with `mddb-cli autoindex --semantic` carry a language
+server's facts (`symIndex`, `symDefs`, `symRefs`, `symImpls`;
+[format](../testdata/semantic-facts/README.md)). Where they do, the same
+endpoint answers from them:
+
+- `name` may be qualified (`Conn.Close`); a bare name (`Close`) finds every
+  definition whose qualified name ends in it.
+- `path` (new, optional) picks the definition in one file (`meta.path`).
+- A bare name with several definitions and no `path` returns them all with
+  `ambiguous: true` and `candidates` (`path`, qualified `name`, `kind`); ask
+  again with a candidate's `name` and `path`.
+- References, callers, callees and implementations are read from the facts,
+  and each passage's `target` (`<path>#<qualified name>`) says which
+  definition it belongs to — two `Close` methods get two separate lists.
+  Definition passages also carry `container` (the type holding a method).
+- `include=implementations` (new relation) lists the types implementing an
+  interface, at their definitions. It needs facts; without them the list is
+  empty.
+- `precision`: `semantic` (every definition and use came from facts),
+  `mixed` (facts for some files, text matching for the rest), `heuristic`.
+  It is left out of a heuristic answer to a request that uses neither `path`
+  nor `implementations`, so a collection without facts answers exactly as
+  before. `semanticSource` names the language server (`gopls/0.24.0`).
+
+In a mixed collection, files without facts are answered as before, and a text
+match in a file that has facts is dropped when the facts define the name: the
+facts list every real use, so the match is a namesake.
+
+```bash
+curl -s "$MDDB/v1/symbol?collection=repo&name=Close&path=internal/net/conn.go&include=definitions,references"
+```
+
+```json
+{
+  "collection": "repo",
+  "symbol": "Close",
+  "definitions": [{"path": "internal/net/conn.go", "lines": {"start": 5, "end": 7},
+                   "symbol": "Conn.Close", "kind": "method", "container": "Conn", ...}],
+  "references": [{"path": "app/main.go", "lines": {"start": 4, "end": 4}, "symbol": "run",
+                  "target": "internal/net/conn.go#Conn.Close", "content": "c.Close()", ...}],
+  "precision": "semantic",
+  "semanticSource": "gopls/0.24.0"
+}
+```
+
 Spans by language:
 
 | Language | Span ends at | Kinds |

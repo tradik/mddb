@@ -133,6 +133,13 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   It lists definitions, references, callers, callees, tests and siblings as
   path:line passages, with their text when asked, and says when a list was
   cut. *Recognised languages* lists `GET /v1/code-languages`.
+  (v2.19.3) A *Definition file* field sends `path`; *Implementations* is an
+  opt-in relation (it needs `mddb-cli autoindex --semantic`). Each answer
+  shows its precision as a labelled badge — "Precision: semantic", "mixed" or
+  "heuristic", with the language server when known — so the colour is never
+  the only cue (contrast above 7:1, WCAG 2.2). An ambiguous name lists its
+  candidates; choosing one asks again with its qualified name and file.
+  Passages from facts say which definition they are `for`.
 - **Indexing status** (System page): queued embedding and metadata work for
   the server or one collection, with a progress bar, image embedding, and the
   collections whose index is still training. It refreshes every 5 s until

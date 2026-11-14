@@ -213,6 +213,24 @@ query {
 }
 ```
 
+With semantic facts (v2.19.3, `mddb-cli autoindex --semantic`) the input takes
+`path` and the `implementations` relation, `Passage` has `container` and
+`target`, and `CodeSymbol` has `implementations`, `precision`
+(`semantic` / `mixed` / `heuristic`; null for a heuristic answer to a request
+without `path` or `implementations`), `semanticSource`, `ambiguous` and
+`candidates { path name kind }`:
+
+```graphql
+query {
+  codeSymbol(input: { collection: "repo", name: "Closer", include: ["definitions", "implementations"] }) {
+    precision
+    ambiguous
+    candidates { path name kind }
+    implementations { path lines { start end } symbol kind target }
+  }
+}
+```
+
 ### Passages
 
 `fts` and `vectorSearch` take `format: "passages"` and `passageLines`

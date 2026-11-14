@@ -201,6 +201,27 @@ A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/f
 
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
 
+### New in v2.19.3
+
+`CodeSymbol` answers from semantic facts where documents carry them
+(`mddb-cli autoindex --semantic`; see
+[API.md](API.md#precise-answers-from-semantic-facts-v2193)). New fields, all
+additive with new numbers:
+
+| Message | Field | Number | Meaning |
+|---|---|---|---|
+| `CodeSymbolRequest` | `path` | 6 | The file (`meta.path`) of the one definition wanted |
+| `CodeSymbolResponse` | `implementations` | 12 | Types implementing the interface; needs facts |
+| `CodeSymbolResponse` | `precision` | 13 | `semantic`, `mixed` or `heuristic`; empty for a heuristic answer to a request without `path` or `implementations` |
+| `CodeSymbolResponse` | `semantic_source` | 14 | Language servers behind the facts, e.g. `gopls/0.24.0` |
+| `CodeSymbolResponse` | `ambiguous` | 15 | Several definitions and no `path` chose one |
+| `CodeSymbolResponse` | `candidates` | 16 | `SymbolCandidate { path = 1, name = 2, kind = 3 }`, the definitions an ambiguous name may mean |
+| `Passage` | `container` | 14 | Type or class holding the definition |
+| `Passage` | `target` | 15 | `<path>#<qualified name>` of the looked-up definition this passage is about |
+
+`include` accepts `implementations`. A collection without facts answers with
+none of these set.
+
 ### New in v2.19.0
 
 #### Chat scenarios (v2.19.0)

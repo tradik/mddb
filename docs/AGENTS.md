@@ -181,7 +181,12 @@ For a code collection, two calls replace most search-then-read loops
   symbol's definitions with their line span, every reference with the
   definition it sits in, callers, callees, tests and siblings, as passages.
   `include` picks among `definitions`, `references`, `callers`, `callees`,
-  `tests`, `siblings`; `limit` is per relation (default 20, at most 200).
+  `tests`, `siblings`, `implementations`; `limit` is per relation (default
+  20, at most 200). After `mddb-cli autoindex --semantic` the answer comes from
+  a language server's facts (`precision: semantic`): qualified names
+  (`Conn.Close`), references per definition (`target`), and implementations
+  of an interface. A name with several definitions returns `ambiguous: true`
+  and `candidates`; ask again with the candidate's `name` and `path`.
 - **`code_graph`** (`GET /v1/code-graph?collection=…&key=…&direction=in`)
   answers the file-level question: what depends on this document (`in`), what
   it depends on (`out`), or both, up to 3 hops.

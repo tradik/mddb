@@ -89,7 +89,10 @@ Ask `code_symbol` about the function, type or selector first: one call returns
 where it is defined (path and lines), every place it is used and from inside
 which definition, what it calls and which tests touch it. Read those passages,
 not the files around them. `code_graph` answers the file-level question —
-which documents depend on which.
+which documents depend on which. When the answer says `ambiguous: true`, pick
+one of its `candidates` and ask again with that `name` and `path`; with
+`precision: semantic` the references are exact, and `implementations` lists
+the types implementing an interface.
 
 ## Asking for less
 

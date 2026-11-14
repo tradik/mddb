@@ -4178,6 +4178,13 @@ paths:
         documents at query time, so nothing is stored. Also the `code_symbol`
         MCP tool and the `codeSymbol` GraphQL query. POST takes the same
         fields as a JSON body.
+
+        (v2.19.3, CODE-012) Where documents carry semantic facts
+        (`mddb-cli autoindex --semantic`), the answer comes from them:
+        qualified names, `path` to pick one definition, `ambiguous` and
+        `candidates` for a name with several, passages grouped per definition
+        (`target`), the `implementations` relation, and `precision`. A
+        collection without facts answers exactly as before.
       operationId: getSymbol
       parameters:
         - name: collection
@@ -4189,10 +4196,16 @@ paths:
           required: true
           schema: { type: string }
           example: SearchHybrid
+          description: Bare (Close) or, with semantic facts, qualified (Conn.Close).
+        - name: path
+          in: query
+          required: false
+          description: (v2.19.3) The file (meta.path) of the one definition wanted.
+          schema: { type: string, example: internal/net/conn.go }
         - name: include
           in: query
           required: false
-          description: Comma-separated relations; default all.
+          description: Comma-separated relations (definitions, references, callers, callees, tests, siblings, implementations); default all.
           schema: { type: string, example: 'definitions,callers,tests' }
         - name: limit
           in: query
@@ -9445,6 +9458,8 @@ components:
           type: array
           items: { $ref: '#/components/schemas/ImageRef' }
           description: (v2.18.9, RAG-010) The document's images, with includeImages.
+        container: { type: string, description: '(v2.19.3, CODE-012) The type or class holding the definition, from semantic facts.' }
+        target: { type: string, description: '(v2.19.3, CODE-012) <path>#<qualified name> of the looked-up definition this passage is about, from semantic facts.' }
     ImageRef:
       type: object
       description: >
@@ -9476,10 +9491,11 @@ components:
       required: [ collection, name ]
       properties:
         collection: { type: string }
-        name: { type: string }
+        name: { type: string, description: 'Bare (Close) or, with semantic facts, qualified (Conn.Close).' }
+        path: { type: string, description: '(v2.19.3) The file (meta.path) of the one definition wanted.' }
         include:
           type: array
-          items: { type: string, enum: [ definitions, references, callers, callees, tests, siblings ] }
+          items: { type: string, enum: [ definitions, references, callers, callees, tests, siblings, implementations ] }
         limit:
           type: integer
           default: 20
@@ -9499,6 +9515,26 @@ components:
         callees: { type: array, items: { $ref: '#/components/schemas/Passage' } }
         tests: { type: array, items: { $ref: '#/components/schemas/Passage' } }
         siblings: { type: array, items: { $ref: '#/components/schemas/Passage' } }
+        implementations:
+          type: array
+          items: { $ref: '#/components/schemas/Passage' }
+          description: (v2.19.3) Types implementing the interface; needs semantic facts.
+        precision:
+          type: string
+          enum: [ semantic, mixed, heuristic ]
+          description: (v2.19.3) Where the answer came from. Absent for a heuristic answer to a request without path or implementations.
+        semanticSource: { type: string, description: '(v2.19.3) Language servers behind the facts, e.g. gopls/0.24.0.' }
+        ambiguous: { type: boolean, description: (v2.19.3) Several definitions and no path chose one. }
+        candidates:
+          type: array
+          description: (v2.19.3) The definitions an ambiguous name may mean; ask again with name and path.
+          items:
+            type: object
+            required: [ path, name, kind ]
+            properties:
+              path: { type: string }
+              name: { type: string, description: 'Qualified, e.g. Conn.Close.' }
+              kind: { type: string }
         truncated: { type: boolean }
     GraphExpandOptions:
       type: object
@@ -9510,8 +9546,8 @@ components:
         graphDirection: { type: string, enum: [ in, out, both ], default: both }
         graphKinds:
           type: array
-          items: { type: string, enum: [ callers, callees, tests, siblings ] }
-          description: Expand by symbol relation instead of following graphDirection.
+          items: { type: string, enum: [ callers, callees, tests, siblings, implementations ] }
+          description: Expand by symbol relation instead of following graphDirection. implementations (v2.19.3) needs semantic facts; a result with facts expands callers, callees and tests from them.
     IndexingStatus:
       type: object
       description: Queued indexing work (GO-042). Counters are since server start.
