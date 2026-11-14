@@ -105,10 +105,19 @@ func TestDetectLocalProviderRespectsTheOptOut(t *testing.T) {
 	defer server.Close()
 
 	t.Setenv("OLLAMA_HOST", server.URL)
-	t.Setenv("MDDB_EMBEDDING_AUTODETECT", "0")
+	for _, off := range []string{"0", "false", "FALSE", "no", " off "} {
+		t.Setenv("MDDB_EMBEDDING_AUTODETECT", off)
+		if got := DetectLocalProvider(context.Background()); got != nil {
+			t.Errorf("%q: detected %+v with the probe disabled", off, got)
+		}
+	}
+}
 
-	if got := DetectLocalProvider(context.Background()); got != nil {
-		t.Errorf("detected %+v with the probe disabled", got)
+func TestAutodetectDisabledKeepsTheProbeOnOtherwise(t *testing.T) {
+	for _, on := range []string{"", "1", "true", "yes"} {
+		if autodetectDisabled(on) {
+			t.Errorf("%q disabled the probe", on)
+		}
 	}
 }
 

@@ -5562,7 +5562,7 @@ update, from any transport):
   update that sends the keys back, a TTL change or an `updateWhere` keeps them.
 - **Malformed values are dropped**, the rest kept, sorted. A value is at most
   1024 bytes and never contains `|`, so a large one cannot break the write.
-- **Capped.** At most `MDDB_CODE_MAX_FACTS` (default 2048) values across the
+- **Capped.** At most `MDDB_CODE_MAX_FACTS` (default 4096) values across the
   three keys: definitions first, then implementations, then references;
   `symIndex` then ends in ` truncated`.
 - **Hidden from results.** Full-text, vector (graph neighbours and pending

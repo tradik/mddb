@@ -79,9 +79,10 @@ type ollamaTagsResponse struct {
 // DetectLocalProvider looks for a usable embedding provider on this machine.
 //
 // Returns nil when there is nothing to find, which is the ordinary case and
-// not an error. Set MDDB_EMBEDDING_AUTODETECT=0 to skip the probe entirely.
+// not an error. Set MDDB_EMBEDDING_AUTODETECT=0 (or false, no, off) to skip
+// the probe entirely.
 func DetectLocalProvider(ctx context.Context) *DetectedProvider {
-	if os.Getenv("MDDB_EMBEDDING_AUTODETECT") == "0" {
+	if autodetectDisabled(os.Getenv("MDDB_EMBEDDING_AUTODETECT")) {
 		return nil
 	}
 
@@ -169,4 +170,15 @@ func envOr(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// autodetectDisabled reads the opt-out. Only "0" used to count, so an operator
+// writing MDDB_EMBEDDING_AUTODETECT=false — the way most switches are written —
+// still had the probe run.
+func autodetectDisabled(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "0", "false", "no", "off":
+		return true
+	}
+	return false
 }

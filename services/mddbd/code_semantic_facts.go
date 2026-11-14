@@ -33,7 +33,7 @@ const (
 	// symDefs, symRefs and symImpls (MDDB_CODE_MAX_FACTS). Meta is loaded with
 	// the document on every read, so a generated file with thousands of
 	// references must not make each read of it heavy.
-	DefaultMaxSemanticFacts = 2048
+	DefaultMaxSemanticFacts = 4096
 
 	semanticFactsVersion   = "v1"
 	semanticFactsTruncated = "truncated"

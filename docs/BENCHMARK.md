@@ -330,7 +330,9 @@ and `LSPREAL_LANG=python` (`php`).
   returned 9 lines of other `init` functions. Only that file is over the
   limit in this tree. Indexed again with `MDDB_CODE_MAX_FACTS=4096`, nothing
   is cut, all 50 answers are semantic and precision is 100% (435/435); the
-  largest document's facts then take 246 KB.
+  largest document's facts then take 246 KB. **2.19.3 ships with 4096 as the
+  default** for that reason: the limit protects reads of very large files,
+  and at 4096 it still does, while cutting none of this tree.
 - **The first run found three bugs.** Before they were fixed (in this
   release), the semantic collection scored 39.3% (435/1107): with a path,
   interface methods and methods past the scanner's 512-name `defines` cap

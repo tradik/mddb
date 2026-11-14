@@ -14,7 +14,7 @@ import re
 
 MAX_LINES = 64
 MAX_VALUE = 1024
-DEFAULT_MAX_FACTS = 2048
+DEFAULT_MAX_FACTS = 4096
 KINDS = {"function", "method", "class", "interface", "struct", "type", "enum", "constructor"}
 NAME_RE = re.compile(r"^[^\s|#]+$")
 PATH_RE = re.compile(r"^[^\s|]+$")

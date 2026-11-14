@@ -59,7 +59,7 @@ Every key's values are sorted bytewise (Go `sort.Strings`, Python `sorted`).
    is not the hash of the stored content: every `sym*` key is removed.
 3. Each other value that does not parse under the rules above is dropped.
 4. If more than `maxFacts` values remain across `symDefs`, `symRefs` and
-   `symImpls` (default 2048, `MDDB_CODE_MAX_FACTS`), the server keeps
+   `symImpls` (default 4096, `MDDB_CODE_MAX_FACTS`), the server keeps
    `symDefs` first, then `symImpls`, then `symRefs`, each in sorted order,
    until the limit, and appends ` truncated` to `symIndex`.
 5. An empty key is removed. If all three are empty, `symIndex` stays: the file

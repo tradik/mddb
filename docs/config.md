@@ -485,7 +485,7 @@ Query parameters on `GET /v1/audit`: `from` / `to` (RFC3339) or `fromNanos` / `t
 |---------|---------|------|-------------|
 | `MDDB_EMBEDDING_PROVIDER` | `""` (disabled) | string | Provider: `"openai"`, `"ollama"`, `"voyage"`, `"cohere"`, `"lexical"` (v2.18.9+: hashed words and n-grams, no model, no network, does not match by meaning — see [EMBEDDING_PROVIDERS.md](EMBEDDING_PROVIDERS.md#5-lexical-no-model-no-network--v2189); never autodetected), or `""`. When empty and nothing is stored, MDDB probes a local Ollama once at startup — see `MDDB_EMBEDDING_AUTODETECT` |
 | `MDDB_UPDATE_CHECK` | `"1"` | bool | Set to `0` to skip the startup release check. One GET to a pinned GitHub URL, carrying nothing about this installation; the answer is cached in `/health` |
-| `MDDB_EMBEDDING_AUTODETECT` | `"1"` | bool | Set to `0` to skip the startup probe for a local Ollama. The probe is one `GET localhost:11434/api/tags` with a two-second budget, and only runs when no provider is configured |
+| `MDDB_EMBEDDING_AUTODETECT` | `"1"` | bool | Set to `0` (or `false`, `no`, `off`) to skip the startup probe for a local Ollama. The probe is one `GET localhost:11434/api/tags` with a two-second budget, and only runs when no provider is configured |
 | `OLLAMA_HOST` | `http://localhost:11434` | string | Where the autodetection probe looks. Accepted with or without a scheme |
 | `MDDB_EMBEDDING_API_KEY` | `""` | string | API key (for openai/voyage/cohere) |
 | `MDDB_EMBEDDING_API_URL` | *(see below)* | string | API base URL |
@@ -668,7 +668,7 @@ Access log lines take their level from the status: 5xx is `error`, 4xx is
 | `MDDB_FTS_SYNONYMS` | `true` | bool | Enable synonym expansion in FTS queries |
 | `MDDB_FTS_DEFAULT_LANG` | `"en"` | string | Default language for stemming and stop words |
 | `MDDB_CODE_MAX_SYMBOLS` | `512` | int | Most `defines`, `uses` and `imports` entries kept per code document ([API.md](API.md#symbols-which-file-declares-this)) |
-| `MDDB_CODE_MAX_FACTS` | `2048` | int | Most semantic-fact values (`symDefs`, `symImpls`, `symRefs` together) kept per code document; over it, `symIndex` gains ` truncated` ([API.md](API.md#semantic-code-facts)) |
+| `MDDB_CODE_MAX_FACTS` | `4096` | int | Most semantic-fact values (`symDefs`, `symImpls`, `symRefs` together) kept per code document; over it, `symIndex` gains ` truncated` ([API.md](API.md#semantic-code-facts)) |
 
 ---
 

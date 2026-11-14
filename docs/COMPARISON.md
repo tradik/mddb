@@ -290,8 +290,8 @@ case and about 3% of its typical case, in one call per task. The method and
 every number are in
 [BENCHMARK.md](BENCHMARK.md#finding-code-grep-and-read-vs-mddb-passages-v2188).
 Asked where 50 random Go symbols are used, `code_symbol` built on gopls facts
-(`autoindex --semantic`) returned 98.0% correct reference lines and 93.5% of
-the true ones, against 38.5% and 88.8% from name matching, at about two and a
+(`autoindex --semantic`) returned 100% correct reference lines (98.0% under
+the pre-release fact limit of 2048) and 93.5% of the true ones, against 38.5% and 88.8% from name matching, at about two and a
 half minutes of indexing and 4 GB of language-server memory for 1,349 files
 ([BENCHMARK.md](BENCHMARK.md#symbol-lookup-heuristics-vs-language-server-facts-v2193)).
 

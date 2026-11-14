@@ -29,6 +29,11 @@ func serverVersion(v string) string {
 		_ = json.Unmarshal([]byte(v), &bi)
 		v = bi.Version
 	}
+	// phpactor reports "phpactor/2026.10.07.0"; the name is already in front
+	// of the slash serverName adds, so keep only what follows the last one.
+	if i := strings.LastIndexByte(v, '/'); i >= 0 {
+		v = v[i+1:]
+	}
 	v = strings.TrimPrefix(v, "v")
 	if v == "" {
 		return "unknown"

@@ -110,11 +110,37 @@ mddb-cli autoindex . --semantic --dry-run      # run the servers, report, send n
   older clients see exactly the answers they saw before.
 - **`implementations`** is empty without facts — that is the answer "not
   known", not "none".
+- **Known limit:** without `path`, the candidates for a bare name come from
+  the heuristic `defines` list, so interface methods and names in very large
+  files (past its 512 names) are missing from them — `Close` in mddbd lists 21
+  of 23. With `path` every definition in that file is found from the facts.
+- **References through interfaces** count: gopls reports a call through
+  `io.Closer` as a reference to every `Close` that satisfies it, and so does
+  the answer.
 
 Full field list: [API](API.md#precise-answers-from-semantic-facts-v2193),
 [MCP](MCP.md), [GraphQL](GRAPHQL.md), [gRPC](GRPC.md). In
 `retrievalMode: graph`, `graphKinds` accepts `implementations`
 ([Search](SEARCH.md)).
+
+## How much better
+
+Measured on 50 random symbols per language (fixed seed), against what the
+language server itself reports; method and commands in
+[Benchmark](BENCHMARK.md#symbol-lookup-heuristics-vs-language-server-facts-v2193).
+
+| Language | References correct (heuristic → semantic) | References found | Implementations right |
+|---|---|---|---|
+| Go (1349 files) | 38.5% → **100%** | 88.8% → 93.5% (the rest is the 200-per-relation limit) | 40 → **50** of 50 |
+| Go, methods with a shared name | 4.4% → **100%** | 58.8% → 100% | |
+| Python (14 files) | 57.8% → **100%** | 70.5% → 100% | |
+| PHP (39 files) | 84.2% → **100%** | 91.7% → 100% | |
+
+The heuristic answer for `Close` in mddbd returned 681 lines for 51 true ones;
+the semantic answer lists 21 candidates and, for `WAL.Close`, exactly the 55
+lines gopls reports. Answers are about as large in tokens and no slower
+(around 200 ms per lookup on the Go collection, either way). Search results
+are unchanged.
 
 ## Cost
 
@@ -124,7 +150,8 @@ Measured on mddbd's own code (1343 Go files, 300 000 lines), gopls 0.24.0:
 |---|---|
 | First run | about 2.5 minutes; 18 272 definitions, 89 551 reference lines, 192 implementations |
 | Second run, nothing changed | the language server runs again, 0 documents sent |
-| Language server memory | 3.5–5.5 GB peak (gopls) |
+| Language server memory | 3.3–5.5 GB peak (gopls) |
+| Facts in meta | median 1.2 KB, p99 9.2 KB per document; +55–65 MB on disk for the collection |
 | Without `--semantic` | unchanged from 2.19.2 |
 
 Languages run one after another, so the peak is the largest single server, not
@@ -147,7 +174,7 @@ reading a single document returns them.
 | `--semantic=php` stops with `semantic facts for php: ...` | a listed language is required | install the server, or use `--semantic` (auto) |
 | `the server keeps no semantic facts (it predates 2.19.3)` | mddbd is older than the CLI | upgrade mddbd |
 | `precision: mixed` | some files have no facts | index those languages with a server, or accept the mix |
-| `symIndex` ends in ` truncated` | the file had more than `MDDB_CODE_MAX_FACTS` (2048) facts | references were cut first; raise the limit on mddbd if needed |
+| `symIndex` ends in ` truncated` | the file had more than `MDDB_CODE_MAX_FACTS` (4096) facts | references were cut first; raise the limit on mddbd if needed |
 
 ## What MDDB does not do
 

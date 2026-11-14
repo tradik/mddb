@@ -110,6 +110,8 @@ func TestServerName(t *testing.T) {
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{Name: "my server", Version: "2 beta|1#x"}, "my-server/2-beta-1-x"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{}, "srv/unknown"},
 		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{Version: "{broken"}, "srv/unknown"},
+		{Candidate{Name: "phpactor", Argv: []string{"/x/phpactor"}}, serverInfo{Version: "phpactor/2026.10.07.0"}, "phpactor/2026.10.07.0"},
+		{Candidate{Argv: []string{"/x/srv"}}, serverInfo{Version: "srv/"}, "srv/unknown"},
 	}
 	for _, c := range cases {
 		if got := serverName(c.cand, c.info); got != c.want {
