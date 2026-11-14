@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
@@ -32,6 +33,9 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// exeSuffix is what Windows needs on a program's name before it runs it.
+var exeSuffix = map[bool]string{true: ".exe"}[runtime.GOOS == "windows"]
+
 // fakePath builds the fake once and returns its path.
 func fakePath(t *testing.T) string {
 	t.Helper()
@@ -39,7 +43,7 @@ func fakePath(t *testing.T) string {
 		if fakeDir, fakeErr = os.MkdirTemp("", "lspindex-fake-"); fakeErr != nil {
 			return
 		}
-		fakeBin = filepath.Join(fakeDir, "fakelsp")
+		fakeBin = filepath.Join(fakeDir, "fakelsp"+exeSuffix)
 		cmd := exec.Command("go", "build", "-o", fakeBin, "./testdata/fakelsp")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fakeErr = fmt.Errorf("building the fake language server: %v\n%s", err, out)

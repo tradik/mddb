@@ -36,9 +36,9 @@ func TestServerArgv(t *testing.T) {
 			}
 			bin := t.TempDir()
 			for _, name := range c.installed {
-				if err := os.Symlink(fakePath(t), filepath.Join(bin, name)); err != nil {
-					t.Fatal(err)
-				}
+				// A copy, not a symlink: Windows allows symlinks only with
+				// a privilege the CI runner need not have.
+				copyFile(t, fakePath(t), filepath.Join(bin, name+exeSuffix))
 			}
 			f := newFakeRun(t, map[string]string{"x.src": "x\n"}, fakeScript{
 				ServerInfo: map[string]string{"name": "reported-name", "version": "1.0"},
@@ -48,7 +48,7 @@ func TestServerArgv(t *testing.T) {
 			opt := Options{
 				Getenv: func(string) string { return "" },
 				LookPath: func(name string) (string, error) {
-					p := filepath.Join(bin, name)
+					p := filepath.Join(bin, name+exeSuffix)
 					if _, err := os.Lstat(p); err != nil {
 						return "", err
 					}
@@ -186,5 +186,17 @@ func TestResolveReportsEveryCandidate(t *testing.T) {
 	_, err := spec.resolve(func(string) string { return "" }, func(string) (string, error) { return "", errors.New("no") })
 	if !errors.Is(err, ErrNoServer) || !strings.Contains(err.Error(), "basedpyright-langserver --stdio; pyrefly lsp --indexing-mode lazy-blocking") {
 		t.Errorf("err = %v", err)
+	}
+}
+
+// copyFile copies an executable.
+func copyFile(t *testing.T, from, to string) {
+	t.Helper()
+	data, err := os.ReadFile(from) // #nosec G304 -- the fake built by this test binary
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(to, data, 0o700); err != nil { // #nosec G306 -- a test program must be executable
+		t.Fatal(err)
 	}
 }

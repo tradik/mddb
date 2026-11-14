@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -14,6 +15,11 @@ import (
 // after body's output.
 func writeScript(t *testing.T, name, body string) string {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		// The fake is a #!/bin/sh script, which Windows cannot run; the logic
+		// under test does not depend on the platform and runs on Linux.
+		t.Skip("shell-script fakes need a POSIX shell")
+	}
 	p := filepath.Join(t.TempDir(), name)
 	if err := os.WriteFile(p, []byte("#!/bin/sh\n"+body+"\n"), 0o700); err != nil { // #nosec G306 -- a test program must be executable
 		t.Fatal(err)

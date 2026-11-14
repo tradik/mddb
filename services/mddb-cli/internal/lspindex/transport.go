@@ -62,9 +62,9 @@ func writeMessage(w io.Writer, v any) error {
 	if err != nil {
 		return err
 	}
-	frame := make([]byte, 0, len(body)+32)
-	frame = append(frame, "Content-Length: "...)
-	frame = strconv.AppendInt(frame, int64(len(body)), 10)
+	// The header first, the body appended: no size arithmetic feeds the
+	// allocation, and a body is at most what json.Marshal could build.
+	frame := strconv.AppendInt([]byte("Content-Length: "), int64(len(body)), 10)
 	frame = append(frame, "\r\n\r\n"...)
 	frame = append(frame, body...)
 	_, err = w.Write(frame)

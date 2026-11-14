@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"sync"
 	"testing"
@@ -42,6 +43,9 @@ func fakeLSP(t *testing.T) string {
 			return
 		}
 		fakeLSPBin = filepath.Join(fakeLSPDir, "fakelsp")
+		if runtime.GOOS == "windows" {
+			fakeLSPBin += ".exe" // Windows runs a program only with its extension
+		}
 		cmd := exec.Command("go", "build", "-o", fakeLSPBin, "./internal/lspindex/testdata/fakelsp")
 		if out, err := cmd.CombinedOutput(); err != nil {
 			fakeLSPErr = fmt.Errorf("building the fake language server: %v\n%s", err, out)

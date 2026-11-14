@@ -20,6 +20,8 @@ var (
 
 func normalizeGolden(out, dir string) string {
 	out = strings.ReplaceAll(out, dir, "<ROOT>")
+	// JSON doubles each backslash of a Windows path.
+	out = strings.ReplaceAll(out, strings.ReplaceAll(dir, `\`, `\\`), "<ROOT>")
 	return goldenDuration.ReplaceAllStringFunc(out, func(m string) string {
 		if strings.HasPrefix(m, "in ") {
 			return "in <N>ms"

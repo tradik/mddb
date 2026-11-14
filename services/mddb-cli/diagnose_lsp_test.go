@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -12,6 +13,11 @@ import (
 // a phpactor that prints nothing; Python has no server.
 func fakeVersionTools(t *testing.T) string {
 	t.Helper()
+	if runtime.GOOS == "windows" {
+		// The fake is a #!/bin/sh script, which Windows cannot run; the logic
+		// under test does not depend on the platform and runs on Linux.
+		t.Skip("shell-script fakes need a POSIX shell")
+	}
 	bin := t.TempDir()
 	write := func(name, body string) {
 		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"+body+"\n"), 0o700); err != nil { // #nosec G306 -- a test program must be executable

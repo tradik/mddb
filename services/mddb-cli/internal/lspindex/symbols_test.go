@@ -2,7 +2,9 @@ package lspindex
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -164,5 +166,25 @@ func TestURIRoundTrip(t *testing.T) {
 		if _, ok := uriPath(bad); ok {
 			t.Errorf("uriPath(%q) accepted", bad)
 		}
+	}
+}
+
+// Windows paths: the drive letter follows a slash in the URI and loses it on
+// the way back, whether the server writes the colon or %3A.
+func TestURIRoundTripWithADriveLetter(t *testing.T) {
+	old := windowsPaths
+	windowsPaths = true
+	t.Cleanup(func() { windowsPaths = old })
+	if uri := fileURI(`C:\src\a b.go`); uri != "file:///C:/src/a%20b.go" {
+		t.Errorf("fileURI = %q", uri)
+	}
+	for _, uri := range []string{"file:///C:/src/a%20b.go", "file:///c%3A/src/a%20b.go"} {
+		p, ok := uriPath(uri)
+		if !ok || !strings.EqualFold(filepath.ToSlash(p), "C:/src/a b.go") {
+			t.Errorf("uriPath(%q) = %q %v", uri, p, ok)
+		}
+	}
+	if p, _ := uriPath("file:///9:/x"); filepath.ToSlash(p) != "/9:/x" {
+		t.Errorf("not a drive letter: %q", p)
 	}
 }

@@ -3,6 +3,8 @@ package lspindex
 import (
 	"net/url"
 	"path/filepath"
+	"runtime"
+	"strings"
 )
 
 // The LSP 3.17 structures the driver reads and writes, reduced to the fields
@@ -95,17 +97,38 @@ const (
 	symbolStruct      = 23
 )
 
+// windowsPaths says whether paths carry a drive letter (C:\src). A variable,
+// so the drive-letter handling is tested on every platform.
+var windowsPaths = runtime.GOOS == "windows"
+
 // fileURI turns an absolute path into a file:// URI, escaping as servers do.
+// A Windows path gets the slash before its drive letter: C:\src\a.go is
+// file:///C:/src/a.go, not file://C:/src/a.go, where C: would be the host.
 func fileURI(abs string) string {
-	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(abs)}).String()
+	p := filepath.ToSlash(abs)
+	if windowsPaths {
+		p = strings.ReplaceAll(p, `\`, "/")
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return (&url.URL{Scheme: "file", Path: p}).String()
 }
 
 // uriPath turns a file:// URI back into a path; ok is false for any other
 // scheme (servers report locations in untitled buffers and jar-like archives).
+// On Windows the slash before the drive letter goes again (/c:/src → c:/src;
+// servers often write the colon as %3A, which url.Parse decodes).
 func uriPath(uri string) (string, bool) {
 	u, err := url.Parse(uri)
 	if err != nil || u.Scheme != "file" || u.Path == "" {
 		return "", false
 	}
-	return filepath.FromSlash(u.Path), true
+	p := u.Path
+	if windowsPaths && len(p) >= 3 && p[0] == '/' && p[2] == ':' && isASCIILetter(p[1]) {
+		p = p[1:]
+	}
+	return filepath.FromSlash(p), true
 }
+
+func isASCIILetter(b byte) bool { return (b|0x20) >= 'a' && (b|0x20) <= 'z' }

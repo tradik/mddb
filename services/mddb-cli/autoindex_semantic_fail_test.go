@@ -97,6 +97,9 @@ func TestSemantic_ServerWithoutSemantic(t *testing.T) {
 }
 
 func TestSemantic_PlanEdges(t *testing.T) {
+	// go must resolve, so that the run reaches rust; the machine running the
+	// tests need not have gopls.
+	t.Setenv("MDDB_LSP_GO", fakeLSP(t))
 	files := []autoFile{{Rel: "a.go", Language: "go"}, {Rel: "doc.pdf", Language: "go", Format: "pdf"}}
 	announced := map[string]bool{"go": true}
 
