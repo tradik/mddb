@@ -52,10 +52,10 @@ type syncSource interface {
 	fetch(ctx context.Context, it syncItem, prev syncState) (syncFetched, error)
 }
 
-// resolvedSource is a source that reads a version of itself: a git
+// resolver is a source that reads a version of itself: a git
 // source's ref and commit, which the run reports.
-type resolvedSource interface {
-	resolved() (ref, commit string)
+type resolver interface {
+	resolve() (ref, commit string)
 }
 
 // newSyncSource connects to the source a rule's sync names.

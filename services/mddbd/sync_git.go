@@ -67,7 +67,7 @@ func (s *Server) syncSecret(name string) (string, error) {
 }
 
 // resolved is the ref and commit the run read, for its result.
-func (g *gitSyncSource) resolved() (ref, commit string) { return g.ref, g.commit }
+func (g *gitSyncSource) resolve() (ref, commit string) { return g.ref, g.commit }
 
 // list resolves the ref and, unless the commit is the last run's, reads its
 // archive: one item per included file, keyed by its path.

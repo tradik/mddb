@@ -134,9 +134,9 @@ func (r *syncRun) execute(ctx context.Context) error {
 // last run already read ends the run with nothing to do (UpToDate).
 func (r *syncRun) list(ctx context.Context, src syncSource) ([]syncItem, bool, error) {
 	items, truncated, err := src.list(ctx)
-	if rs, ok := src.(resolvedSource); ok {
+	if rs, ok := src.(resolver); ok {
 		c := &r.out.counts
-		c.Ref, c.Commit = rs.resolved()
+		c.Ref, c.Commit = rs.resolve()
 		c.Fingerprint = r.action.fingerprint()
 		c.UpToDate = errors.Is(err, errSyncUpToDate)
 	}
