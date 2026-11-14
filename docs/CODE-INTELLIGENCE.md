@@ -67,6 +67,11 @@ because pyrefly 1.4.1 returns no implementations of classes. An `MDDB_LSP_*`
 variable replaces the built-in command (split on spaces, no shell), e.g.
 `MDDB_LSP_PHP="php /opt/phpactor.phar language-server"`.
 
+**Assembly stays on the heuristic level.** The one maintained assembly
+language server (asm-lsp 0.10) resolves definitions and references only
+inside the file that is open, so it would add nothing to what the scanner
+already gives: every label, its span, and calls to it from other files.
+
 ### C and C++ (clangd, 2.19.4)
 
 clangd 23.1.0 was tested on 2026-11-14. It runs as

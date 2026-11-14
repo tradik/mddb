@@ -161,6 +161,10 @@ func TestLookupSymbolSemantic_QualifiedNameAndImplementations(t *testing.T) {
 	if got := passageKeys(res.Definitions); got != "file/file.go:5-8@File.Close" || res.Ambiguous {
 		t.Fatalf("qualified: %s", got)
 	}
+	// A C++ caller writes the same name with :: (#418).
+	if cpp := lookup(t, s, SymbolRequest{Collection: semColl, Name: "File::Close"}); passageKeys(cpp.Definitions) != "file/file.go:5-8@File.Close" {
+		t.Fatalf("File::Close: %s", passageKeys(cpp.Definitions))
+	}
 	impl := lookup(t, s, SymbolRequest{Collection: semColl, Name: "Closer", Include: []string{RelImplementations}})
 	want := "buf/buf.go:3@Buffer>io/closer.go#Closer file/file.go:3@File>io/closer.go#Closer net/conn.go:3@Conn>io/closer.go#Closer"
 	if got := targets(impl.Implementations); got != want {

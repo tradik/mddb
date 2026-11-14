@@ -37,6 +37,11 @@ func matchesSymbol(qualified, name string) bool {
 	return qualified == name || strings.HasSuffix(qualified, "."+name) || strings.HasSuffix(qualified, `\`+name)
 }
 
+// semanticName writes a C++ name the way the facts do: clangd's
+// geo::Square::area is stored as geo.Square.area (#418). Only the semantic
+// path converts it; the scanner's own names keep their "::".
+func semanticName(name string) string { return strings.ReplaceAll(name, "::", ".") }
+
 // bareName is the last segment of a qualified name.
 func bareName(name string) string { return name[strings.LastIndexByte(name, '.')+1:] }
 
@@ -48,6 +53,7 @@ func bareName(name string) string { return name[strings.LastIndexByte(name, '.')
 // defined is the second, already loaded for the heuristic path when the name
 // has no dots.
 func semanticDefinitions(r *factReader, req SymbolRequest, defined []*sourceText) []semanticDef {
+	req.Name = semanticName(req.Name)
 	var out []semanticDef
 	seen := map[string]bool{}
 	for _, st := range definitionCandidates(r, req, defined) {
