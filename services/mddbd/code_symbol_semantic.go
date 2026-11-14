@@ -31,20 +31,22 @@ func passageOf(collection string, st *sourceText, def SymbolDefFact, source stri
 
 // matchesSymbol reports whether a qualified name answers a request's name:
 // the same name, or one ending in ".name" — Close finds Conn.Close,
-// Server.LookupSymbol finds pkg.Server.LookupSymbol.
+// Server.LookupSymbol finds pkg.Server.LookupSymbol — or, past a PHP
+// namespace, in `\name`: Kernel finds App\Http\Kernel (CODE-013).
 func matchesSymbol(qualified, name string) bool {
-	return qualified == name || strings.HasSuffix(qualified, "."+name)
+	return qualified == name || strings.HasSuffix(qualified, "."+name) || strings.HasSuffix(qualified, `\`+name)
 }
 
 // bareName is the last segment of a qualified name.
 func bareName(name string) string { return name[strings.LastIndexByte(name, '.')+1:] }
 
 // semanticDefinitions resolves a name to the definitions the facts hold,
-// ordered by path and line. Candidates come from two places: documents whose
-// symDefs hold the name exactly (a top-level name, or a qualified one), and
+// ordered by path and line. Candidates come from three places: documents
+// whose symDefs hold the name exactly (a top-level name, or a qualified one),
 // documents the defines index lists under its last segment (a method, whose
-// qualified name starts with its type). defined is the latter, already loaded
-// for the heuristic path when the name has no dots.
+// qualified name starts with its type), and the document at req.Path.
+// defined is the second, already loaded for the heuristic path when the name
+// has no dots.
 func semanticDefinitions(r *factReader, req SymbolRequest, defined []*sourceText) []semanticDef {
 	candidates := append([]*sourceText{}, defined...)
 	if bare := bareName(req.Name); bare != req.Name && bare != "" && r.bIdx != nil {
@@ -53,6 +55,14 @@ func semanticDefinitions(r *factReader, req SymbolRequest, defined []*sourceText
 	}
 	for _, h := range r.scan(MetaKeySymDefs, req.Name+" ") {
 		if st := r.doc(h.DocID); st != nil {
+			candidates = append(candidates, st)
+		}
+	}
+	// The defines index lists what the scanner finds, which misses interface
+	// methods and names past its cap in a large file; a path names the
+	// document whose facts to read (CODE-013).
+	if req.Path != "" {
+		if st := r.atPath(req.Path); st != nil {
 			candidates = append(candidates, st)
 		}
 	}

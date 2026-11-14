@@ -78,8 +78,11 @@ func symbolReferences(req SymbolRequest, users []*sourceText, callsOnly bool) []
 			p := st.passage(req.Collection, line, line, RelReferences, true)
 			p.Content = strings.TrimSpace(p.Content)
 			p.Tokens = approxTokens(p.Content)
-			if p.Symbol == req.Name {
-				continue // the definition naming itself, or a recursive call
+			// The definition naming itself, or a recursive call. In a document
+			// with facts the definition holding the line has its qualified
+			// name (Pipe.Close for Close, CODE-013).
+			if p.Symbol == req.Name || (st.facts != nil && bareName(p.Symbol) == req.Name) {
+				continue
 			}
 			out = append(out, p)
 		}

@@ -178,7 +178,12 @@ func passageAround(collection string, doc *storage.Doc, hit, radius int, score f
 		start, end = sp.StartLine, sp.EndLine
 	}
 	p := st.passage(collection, start, end, source, true)
-	p.Symbol = st.symbolAt(hit)
+	// The hit's definition names the passage; a hit outside any keeps the
+	// name of the one the window starts in (as before CODE-012: a
+	// collection without facts must answer byte for byte as it did).
+	if sym := st.symbolAt(hit); sym != "" {
+		p.Symbol = sym
+	}
 	p.Score = score
 	return p
 }
