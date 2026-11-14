@@ -15,16 +15,18 @@ import (
 //
 // A cron rule with a `sync` block keeps a collection in step with a source on
 // its schedule — the pages of a sitemap, a list of URLs, or the objects under
-// a prefix of an S3-compatible bucket. The same scheduler that fires webhooks
+// a prefix of an S3-compatible bucket, or the files of a git repository at a
+// branch, a tag or its latest release (#421). The same scheduler that fires webhooks
 // and takes backups (OPS-023) runs it; this file holds the action's shape and
-// its validation, sync_run.go the run, sync_http.go and sync_s3.go the
-// sources.
+// its validation, sync_run.go the run, sync_http.go, sync_s3.go and
+// sync_git*.go the sources.
 
 // Sync sources.
 const (
 	SyncSourceSitemap = "sitemap"
 	SyncSourceURLs    = "urls"
 	SyncSourceS3      = "s3"
+	SyncSourceGit     = "git"
 )
 
 // Bounds of a run. A rule may lower them; the caps are what it may raise
@@ -48,16 +50,20 @@ const (
 	syncMetaHash         = "syncHash"
 	syncMetaETag         = "syncEtag"
 	syncMetaLastModified = "syncLastModified"
+	// A git source's documents also name the ref and commit they are at.
+	syncMetaRef    = "syncRef"
+	syncMetaCommit = "syncCommit"
 )
 
 // SyncAction is what a cron rule with a sync does on each run.
 type SyncAction struct {
-	// Source is "sitemap", "urls" or "s3".
+	// Source is "sitemap", "urls", "s3" or "git".
 	Source string `json:"source"`
 	// Collection and Lang are where the documents go.
 	Collection string `json:"collection"`
 	Lang       string `json:"lang"`
-	// URL is the sitemap (or sitemap index) of a sitemap source.
+	// URL is the sitemap (or sitemap index) of a sitemap source, or the https
+	// URL of a git source's repository.
 	URL string `json:"url,omitempty"`
 	// URLs are the pages of a urls source.
 	URLs []string `json:"urls,omitempty"`
@@ -77,6 +83,8 @@ type SyncAction struct {
 	MaxDocuments int `json:"maxDocuments,omitempty"`
 	// MaxBytes bounds one fetched document (default 10 MiB, at most 100 MiB).
 	MaxBytes int64 `json:"maxBytes,omitempty"`
+	// GitSyncFields are the fields of a git source (#421).
+	GitSyncFields
 }
 
 // normalize fills the defaults and rejects what cannot run.
@@ -114,6 +122,8 @@ func (a *SyncAction) checkSource() error {
 				return err
 			}
 		}
+	case SyncSourceGit:
+		return a.checkGit()
 	case SyncSourceS3:
 		if a.StorageConfig != nil {
 			a.Bucket = cmp.Or(strings.TrimSpace(a.Bucket), a.StorageConfig.Bucket)
@@ -124,7 +134,7 @@ func (a *SyncAction) checkSource() error {
 			return errors.New("an s3 sync needs storageConfig.endpoint and a bucket")
 		}
 	default:
-		return fmt.Errorf("invalid sync source: %q (valid: sitemap, urls, s3)", a.Source)
+		return fmt.Errorf("invalid sync source: %q (valid: sitemap, urls, s3, git)", a.Source)
 	}
 	return nil
 }
@@ -141,13 +151,15 @@ func checkSyncURL(raw string) error {
 }
 
 // describe names the source for logs and the webhook: the sitemap, the
-// number of URLs, or s3://bucket/prefix.
+// number of URLs, the repository and its ref, or s3://bucket/prefix.
 func (a *SyncAction) describe() string {
 	switch a.Source {
 	case SyncSourceSitemap:
 		return a.URL
 	case SyncSourceURLs:
 		return fmt.Sprintf("%d urls", len(a.URLs))
+	case SyncSourceGit:
+		return a.URL + "@" + cmp.Or(a.Ref, "HEAD")
 	}
 	return "s3://" + a.Bucket + "/" + a.Prefix
 }
@@ -176,6 +188,7 @@ func redactedSync(a *SyncAction) *SyncAction {
 	}
 	c := *a
 	c.URLs = slices.Clone(a.URLs)
+	c.Include, c.Exclude = slices.Clone(a.Include), slices.Clone(a.Exclude)
 	c.StorageConfig = redactedStorageConfig(a.StorageConfig)
 	return &c
 }

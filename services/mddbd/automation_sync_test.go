@@ -21,7 +21,7 @@ func TestSyncActionNormalize(t *testing.T) {
 		"maxBytes":                func(a *SyncAction) { a.MaxBytes = -1 },
 		"needs urls":              func(a *SyncAction) { a.URLs = nil },
 		"absolute http":           func(a *SyncAction) { a.URLs = []string{"/relative"} },
-		"invalid sync source":     func(a *SyncAction) { a.Source = "git" },
+		"invalid sync source":     func(a *SyncAction) { a.Source = "svn" },
 		"storageConfig.endpoint":  func(a *SyncAction) { a.Source = SyncSourceS3 },
 		"absolute http or https ": func(a *SyncAction) { a.Source, a.URL = SyncSourceSitemap, "file:///etc/passwd" },
 	} {

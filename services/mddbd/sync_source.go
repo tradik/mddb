@@ -8,7 +8,8 @@ import (
 )
 
 // What every source of a sync (INT-022) provides: a listing and a fetch that
-// skips what has not changed. sync_http.go and sync_s3.go implement it.
+// skips what has not changed. sync_http.go, sync_s3.go and sync_git.go
+// implement it.
 
 // errSourceGone is a source that answers 404 or 410, or an object that has
 // vanished between the listing and the fetch.
@@ -32,10 +33,17 @@ type syncFetched struct {
 	etag        string
 	modified    string
 	contentType string
+	// A git source (#421) names what the others leave to the run: the
+	// hash its documents are compared by (the blob id), the format, the
+	// meta autoindex writes, and that only Markdown has frontmatter.
+	hash          string
+	format        string
+	meta          map[string][]string
+	noFrontmatter bool
 }
 
 // syncSource is where a sync reads from: a sitemap or URL list over HTTP(S),
-// or an S3 prefix.
+// an S3 prefix, or a git repository.
 type syncSource interface {
 	// list returns the sources up to the action's maxDocuments, and whether
 	// there were more.
@@ -44,10 +52,20 @@ type syncSource interface {
 	fetch(ctx context.Context, it syncItem, prev syncState) (syncFetched, error)
 }
 
-// newSyncSource connects to the source an action names.
-func newSyncSource(a *SyncAction) (syncSource, error) {
-	if a.Source == SyncSourceS3 {
+// resolvedSource is a source that reads a version of itself: a git
+// source's ref and commit, which the run reports.
+type resolvedSource interface {
+	resolved() (ref, commit string)
+}
+
+// newSyncSource connects to the source a rule's sync names.
+func (s *Server) newSyncSource(rule AutomationRule) (syncSource, error) {
+	a := rule.Sync
+	switch a.Source {
+	case SyncSourceS3:
 		return newS3SyncSource(a)
+	case SyncSourceGit:
+		return s.newGitSyncSource(rule)
 	}
 	return &httpSyncSource{action: a}, nil
 }

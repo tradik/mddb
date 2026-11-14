@@ -64,5 +64,9 @@ func automationRunResultToProto(r *AutomationRunResult) *proto.AutomationRunResu
 		Unchanged:  safeInt32(r.Unchanged),
 		Deleted:    safeInt32(r.Deleted),
 		Failed:     safeInt32(r.Failed),
+		Ref:        r.Ref,
+		Commit:     r.Commit,
+		CommitUrl:  r.CommitURL,
+		UpToDate:   r.UpToDate,
 	}
 }

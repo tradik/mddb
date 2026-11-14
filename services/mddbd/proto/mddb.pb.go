@@ -7200,16 +7200,23 @@ func (x *AutomationRuleProto) GetLastResult() *AutomationRunResultProto {
 
 // AutomationRunResultProto is the latest run of a cron rule's action.
 type AutomationRunResultProto struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	At            int64                  `protobuf:"varint,1,opt,name=at,proto3" json:"at,omitempty"`        // unix seconds the run started
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // "success", "error" or "skipped"
-	DurationMs    int64                  `protobuf:"varint,3,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
-	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
-	Added         int32                  `protobuf:"varint,5,opt,name=added,proto3" json:"added,omitempty"` // sync counts
-	Updated       int32                  `protobuf:"varint,6,opt,name=updated,proto3" json:"updated,omitempty"`
-	Unchanged     int32                  `protobuf:"varint,7,opt,name=unchanged,proto3" json:"unchanged,omitempty"`
-	Deleted       int32                  `protobuf:"varint,8,opt,name=deleted,proto3" json:"deleted,omitempty"`
-	Failed        int32                  `protobuf:"varint,9,opt,name=failed,proto3" json:"failed,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	At         int64                  `protobuf:"varint,1,opt,name=at,proto3" json:"at,omitempty"`        // unix seconds the run started
+	Status     string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // "success", "error" or "skipped"
+	DurationMs int64                  `protobuf:"varint,3,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	Error      string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	Added      int32                  `protobuf:"varint,5,opt,name=added,proto3" json:"added,omitempty"` // sync counts
+	Updated    int32                  `protobuf:"varint,6,opt,name=updated,proto3" json:"updated,omitempty"`
+	Unchanged  int32                  `protobuf:"varint,7,opt,name=unchanged,proto3" json:"unchanged,omitempty"`
+	Deleted    int32                  `protobuf:"varint,8,opt,name=deleted,proto3" json:"deleted,omitempty"`
+	Failed     int32                  `protobuf:"varint,9,opt,name=failed,proto3" json:"failed,omitempty"`
+	// (v2.19.5+) A git sync (#421): the ref and commit the run read, the
+	// commit's page on the forge, and whether the commit was the last run's
+	// (nothing downloaded or written).
+	Ref           string `protobuf:"bytes,10,opt,name=ref,proto3" json:"ref,omitempty"`
+	Commit        string `protobuf:"bytes,11,opt,name=commit,proto3" json:"commit,omitempty"`
+	CommitUrl     string `protobuf:"bytes,12,opt,name=commit_url,json=commitUrl,proto3" json:"commit_url,omitempty"`
+	UpToDate      bool   `protobuf:"varint,13,opt,name=up_to_date,json=upToDate,proto3" json:"up_to_date,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7307,15 +7314,43 @@ func (x *AutomationRunResultProto) GetFailed() int32 {
 	return 0
 }
 
+func (x *AutomationRunResultProto) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+func (x *AutomationRunResultProto) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *AutomationRunResultProto) GetCommitUrl() string {
+	if x != nil {
+		return x.CommitUrl
+	}
+	return ""
+}
+
+func (x *AutomationRunResultProto) GetUpToDate() bool {
+	if x != nil {
+		return x.UpToDate
+	}
+	return false
+}
+
 // SyncActionProto is what a cron rule with a sync does on each run
 // (INT-022). Its storage_config (s3) follows BackupActionProto's: the secret
 // is write-only and an update without one keeps the stored one.
 type SyncActionProto struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Source        string                 `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"` // "sitemap", "urls" or "s3"
+	Source        string                 `protobuf:"bytes,1,opt,name=source,proto3" json:"source,omitempty"` // "sitemap", "urls", "s3" or "git" (v2.19.5+)
 	Collection    string                 `protobuf:"bytes,2,opt,name=collection,proto3" json:"collection,omitempty"`
 	Lang          string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
-	Url           string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`                                          // sitemap: the sitemap or sitemap index
+	Url           string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`                                          // sitemap: the sitemap or sitemap index; git: the https repository URL
 	Urls          []string               `protobuf:"bytes,5,rep,name=urls,proto3" json:"urls,omitempty"`                                        // urls: the pages
 	Bucket        string                 `protobuf:"bytes,6,opt,name=bucket,proto3" json:"bucket,omitempty"`                                    // s3: empty takes storage_config.bucket
 	Prefix        string                 `protobuf:"bytes,7,opt,name=prefix,proto3" json:"prefix,omitempty"`                                    // s3: empty takes storage_config.prefix
@@ -7323,8 +7358,16 @@ type SyncActionProto struct {
 	Prune         bool                   `protobuf:"varint,9,opt,name=prune,proto3" json:"prune,omitempty"`                                     // delete documents whose source is gone
 	MaxDocuments  int32                  `protobuf:"varint,10,opt,name=max_documents,json=maxDocuments,proto3" json:"max_documents,omitempty"`  // sources per run; 0 = 1000, at most 50000
 	MaxBytes      int64                  `protobuf:"varint,11,opt,name=max_bytes,json=maxBytes,proto3" json:"max_bytes,omitempty"`              // bytes per document; 0 = 10 MiB, at most 100 MiB
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	// (v2.19.5+) A git repository as the source (#421).
+	Ref            string   `protobuf:"bytes,12,opt,name=ref,proto3" json:"ref,omitempty"`                                               // a branch, a tag or "latest-release"; empty = the default branch
+	Include        []string `protobuf:"bytes,13,rep,name=include,proto3" json:"include,omitempty"`                                       // globs over repository-relative paths, as mddb-cli autoindex --include
+	Exclude        []string `protobuf:"bytes,14,rep,name=exclude,proto3" json:"exclude,omitempty"`                                       // globs, as mddb-cli autoindex --exclude
+	Forge          string   `protobuf:"bytes,15,opt,name=forge,proto3" json:"forge,omitempty"`                                           // "github", "gitlab", "gitea" or "forgejo" for a self-hosted host
+	TokenSecretRef string   `protobuf:"bytes,16,opt,name=token_secret_ref,json=tokenSecretRef,proto3" json:"token_secret_ref,omitempty"` // a stored secret (/v1/chat/mcp-secrets) holding the token of a private repository
+	HookSecretRef  string   `protobuf:"bytes,17,opt,name=hook_secret_ref,json=hookSecretRef,proto3" json:"hook_secret_ref,omitempty"`    // a stored secret POST /v1/automation/{id}/hook verifies webhooks with
+	Adopt          bool     `protobuf:"varint,18,opt,name=adopt,proto3" json:"adopt,omitempty"`                                          // take over documents of the same key that no sync wrote
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SyncActionProto) Reset() {
@@ -7432,6 +7475,55 @@ func (x *SyncActionProto) GetMaxBytes() int64 {
 		return x.MaxBytes
 	}
 	return 0
+}
+
+func (x *SyncActionProto) GetRef() string {
+	if x != nil {
+		return x.Ref
+	}
+	return ""
+}
+
+func (x *SyncActionProto) GetInclude() []string {
+	if x != nil {
+		return x.Include
+	}
+	return nil
+}
+
+func (x *SyncActionProto) GetExclude() []string {
+	if x != nil {
+		return x.Exclude
+	}
+	return nil
+}
+
+func (x *SyncActionProto) GetForge() string {
+	if x != nil {
+		return x.Forge
+	}
+	return ""
+}
+
+func (x *SyncActionProto) GetTokenSecretRef() string {
+	if x != nil {
+		return x.TokenSecretRef
+	}
+	return ""
+}
+
+func (x *SyncActionProto) GetHookSecretRef() string {
+	if x != nil {
+		return x.HookSecretRef
+	}
+	return ""
+}
+
+func (x *SyncActionProto) GetAdopt() bool {
+	if x != nil {
+		return x.Adopt
+	}
+	return false
 }
 
 // BackupActionProto is what a cron rule with a backup does on each run
@@ -23340,7 +23432,7 @@ const file_mddb_proto_rawDesc = "" +
 	"lastResult\x1a:\n" +
 	"\fHeadersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf9\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xe0\x02\n" +
 	"\x18AutomationRunResultProto\x12\x0e\n" +
 	"\x02at\x18\x01 \x01(\x03R\x02at\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1f\n" +
@@ -23351,7 +23443,14 @@ const file_mddb_proto_rawDesc = "" +
 	"\aupdated\x18\x06 \x01(\x05R\aupdated\x12\x1c\n" +
 	"\tunchanged\x18\a \x01(\x05R\tunchanged\x12\x18\n" +
 	"\adeleted\x18\b \x01(\x05R\adeleted\x12\x16\n" +
-	"\x06failed\x18\t \x01(\x05R\x06failed\"\xcc\x02\n" +
+	"\x06failed\x18\t \x01(\x05R\x06failed\x12\x10\n" +
+	"\x03ref\x18\n" +
+	" \x01(\tR\x03ref\x12\x16\n" +
+	"\x06commit\x18\v \x01(\tR\x06commit\x12\x1d\n" +
+	"\n" +
+	"commit_url\x18\f \x01(\tR\tcommitUrl\x12\x1c\n" +
+	"\n" +
+	"up_to_date\x18\r \x01(\bR\bupToDate\"\x90\x04\n" +
 	"\x0fSyncActionProto\x12\x16\n" +
 	"\x06source\x18\x01 \x01(\tR\x06source\x12\x1e\n" +
 	"\n" +
@@ -23366,7 +23465,14 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05prune\x18\t \x01(\bR\x05prune\x12#\n" +
 	"\rmax_documents\x18\n" +
 	" \x01(\x05R\fmaxDocuments\x12\x1b\n" +
-	"\tmax_bytes\x18\v \x01(\x03R\bmaxBytes\"\xe6\x01\n" +
+	"\tmax_bytes\x18\v \x01(\x03R\bmaxBytes\x12\x10\n" +
+	"\x03ref\x18\f \x01(\tR\x03ref\x12\x18\n" +
+	"\ainclude\x18\r \x03(\tR\ainclude\x12\x18\n" +
+	"\aexclude\x18\x0e \x03(\tR\aexclude\x12\x14\n" +
+	"\x05forge\x18\x0f \x01(\tR\x05forge\x12(\n" +
+	"\x10token_secret_ref\x18\x10 \x01(\tR\x0etokenSecretRef\x12&\n" +
+	"\x0fhook_secret_ref\x18\x11 \x01(\tR\rhookSecretRef\x12\x14\n" +
+	"\x05adopt\x18\x12 \x01(\bR\x05adopt\"\xe6\x01\n" +
 	"\x11BackupActionProto\x12\x16\n" +
 	"\x06target\x18\x01 \x01(\tR\x06target\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x16\n" +

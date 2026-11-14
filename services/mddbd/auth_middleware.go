@@ -172,10 +172,12 @@ func extractTokenFromRequest(r *http.Request) string {
 // isPublicEndpoint reports whether path is exempt from authentication for
 // this AuthManager. The exempt set is computed once at construction
 // (NewAuthManager) from the environment; a nil set (manager built via a raw
-// struct literal) is treated as "nothing public" so it fails closed.
+// struct literal) is treated as "nothing public" so it fails closed. A
+// sync's webhook (/v1/automation/{id}/hook, #421) is public too: it proves
+// itself with the signature its handler verifies.
 func (am *AuthManager) isPublicEndpoint(path string) bool {
 	if am.publicEndpoints == nil {
 		return false
 	}
-	return am.publicEndpoints[path]
+	return am.publicEndpoints[path] || isAutomationHookPath(path)
 }

@@ -83,13 +83,13 @@ func (s *Server) runSourceSync(rule AutomationRule, now time.Time) (syncOutcome,
 // is the run's: the listing failed, sources failed, or a prune was withheld.
 func (r *syncRun) execute(ctx context.Context) error {
 	a := r.action
-	src, err := newSyncSource(a)
+	src, err := r.server.newSyncSource(r.rule)
 	if err != nil {
 		return fmt.Errorf("connecting to the source: %w", err)
 	}
-	items, truncated, err := src.list(ctx)
-	if err != nil {
-		return fmt.Errorf("listing the source: %w", err)
+	items, truncated, err := r.list(ctx, src)
+	if err != nil || r.out.counts.UpToDate {
+		return err
 	}
 	r.job.Total = len(items)
 
@@ -130,6 +130,25 @@ func (r *syncRun) execute(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
+// list lists the source and notes what a git source resolved. A commit the
+// last run already read ends the run with nothing to do (UpToDate).
+func (r *syncRun) list(ctx context.Context, src syncSource) ([]syncItem, bool, error) {
+	items, truncated, err := src.list(ctx)
+	if rs, ok := src.(resolvedSource); ok {
+		c := &r.out.counts
+		c.Ref, c.Commit = rs.resolved()
+		c.Fingerprint = r.action.fingerprint()
+		c.UpToDate = errors.Is(err, errSyncUpToDate)
+	}
+	switch {
+	case errors.Is(err, errSyncUpToDate):
+		return nil, false, nil
+	case err != nil:
+		return nil, false, fmt.Errorf("listing the source: %w", err)
+	}
+	return items, truncated, nil
+}
+
 // sync brings one source's document up to date.
 func (r *syncRun) sync(ctx context.Context, src syncSource, it syncItem) {
 	a := r.action
@@ -151,20 +170,19 @@ func (r *syncRun) sync(ctx context.Context, src syncSource, it syncItem) {
 		return
 	}
 
-	sum := sha256.Sum256(got.body)
-	hash := hex.EncodeToString(sum[:])
+	hash := got.hash
+	if hash == "" {
+		sum := sha256.Sum256(got.body)
+		hash = hex.EncodeToString(sum[:])
+	}
 	if owned && hash == prev.hash {
 		r.counted(func(c *automationlog.SyncCounts) { c.Unchanged++ })
 		return
 	}
-	conv, err := convertToMarkdown(syncFormat(got.contentType, it.ref), got.body, false)
+	meta, body, err := syncDocument(got, it.ref)
 	if err != nil {
 		r.failed(it.ref, err)
 		return
-	}
-	meta, body := map[string][]string{}, conv.Markdown
-	if fm, rest := parseFrontmatter(body); fm != nil && !conv.Converted {
-		meta, body = fm, rest
 	}
 	meta[syncMetaRule] = []string{r.rule.ID}
 	meta[syncMetaSource] = []string{it.ref}
@@ -185,9 +203,32 @@ func (r *syncRun) sync(ctx context.Context, src syncSource, it syncItem) {
 	}
 }
 
+// syncDocument converts a fetched source into a document's meta and body:
+// the frontmatter of a source stored as Markdown (not a converted one, nor a
+// git source's code) under the meta the source names.
+func syncDocument(got syncFetched, ref string) (map[string][]string, string, error) {
+	format := got.format
+	if format == "" {
+		format = syncFormat(got.contentType, ref)
+	}
+	conv, err := convertToMarkdown(format, got.body, false)
+	if err != nil {
+		return nil, "", err
+	}
+	meta, body := map[string][]string{}, conv.Markdown
+	if fm, rest := parseFrontmatter(body); fm != nil && !conv.Converted && !got.noFrontmatter {
+		meta, body = fm, rest
+	}
+	for k, v := range got.meta {
+		meta[k] = v
+	}
+	return meta, body, nil
+}
+
 // state reads the validators the previous run left on key's document.
 // owned is false when there is none; a document of the same key that this
-// rule did not write is an error — a sync never overwrites another's.
+// rule did not write is an error — a sync never overwrites another's —
+// unless the rule adopts documents no sync wrote (#421).
 func (r *syncRun) state(key string) (prev syncState, owned bool, err error) {
 	doc, err := r.server.loadDocByRef(r.action.Collection, key, r.action.Lang)
 	if errors.Is(err, errDocNotFound) {
@@ -196,7 +237,10 @@ func (r *syncRun) state(key string) (prev syncState, owned bool, err error) {
 	if err != nil {
 		return prev, false, err
 	}
-	if metaFirst(doc.Meta, syncMetaRule) != r.rule.ID {
+	switch owner := metaFirst(doc.Meta, syncMetaRule); {
+	case owner == "" && r.action.Adopt:
+		return prev, false, nil
+	case owner != r.rule.ID:
 		return prev, false, fmt.Errorf("document %q exists and was not written by this sync", key)
 	}
 	return syncState{

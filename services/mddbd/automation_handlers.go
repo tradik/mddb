@@ -86,8 +86,15 @@ func (s *Server) automationCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAutomationDetail dispatches GET/PUT/DELETE for /v1/automation/{id}
-// and POST for /v1/automation/{id}/test and /v1/automation/{id}/run.
+// and POST for /v1/automation/{id}/test and /v1/automation/{id}/run. POST
+// /v1/automation/{id}/hook is a forge's webhook: it carries a signature,
+// not mddb credentials (#421).
 func (s *Server) handleAutomationDetail(w http.ResponseWriter, r *http.Request) {
+	if isAutomationHookPath(r.URL.Path) {
+		id, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, "/v1/automation/"), "/")
+		s.handleAutomationHook(w, r, id)
+		return
+	}
 	if !s.automationAllowed(w, r) {
 		return
 	}

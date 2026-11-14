@@ -54,6 +54,9 @@ func (s *Server) fireSourceSynced(rule AutomationRule, out syncOutcome, err erro
 		"deleted":    out.counts.Deleted,
 		"failed":     out.counts.Failed,
 	}
+	if c := out.counts; c.Commit != "" { // a git source (#421)
+		payload["ref"], payload["commit"], payload["upToDate"] = c.Ref, c.Commit, c.UpToDate
+	}
 	if err != nil {
 		payload["error"] = err.Error()
 		payload["errors"] = out.errors

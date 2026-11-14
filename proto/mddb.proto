@@ -1187,16 +1187,23 @@ message AutomationRunResultProto {
   int32 unchanged = 7;
   int32 deleted = 8;
   int32 failed = 9;
+  // (v2.19.5+) A git sync (#421): the ref and commit the run read, the
+  // commit's page on the forge, and whether the commit was the last run's
+  // (nothing downloaded or written).
+  string ref = 10;
+  string commit = 11;
+  string commit_url = 12;
+  bool up_to_date = 13;
 }
 
 // SyncActionProto is what a cron rule with a sync does on each run
 // (INT-022). Its storage_config (s3) follows BackupActionProto's: the secret
 // is write-only and an update without one keeps the stored one.
 message SyncActionProto {
-  string source = 1;                     // "sitemap", "urls" or "s3"
+  string source = 1;                     // "sitemap", "urls", "s3" or "git" (v2.19.5+)
   string collection = 2;
   string lang = 3;
-  string url = 4;                        // sitemap: the sitemap or sitemap index
+  string url = 4;                        // sitemap: the sitemap or sitemap index; git: the https repository URL
   repeated string urls = 5;              // urls: the pages
   string bucket = 6;                     // s3: empty takes storage_config.bucket
   string prefix = 7;                     // s3: empty takes storage_config.prefix
@@ -1204,6 +1211,14 @@ message SyncActionProto {
   bool prune = 9;                        // delete documents whose source is gone
   int32 max_documents = 10;              // sources per run; 0 = 1000, at most 50000
   int64 max_bytes = 11;                  // bytes per document; 0 = 10 MiB, at most 100 MiB
+  // (v2.19.5+) A git repository as the source (#421).
+  string ref = 12;                       // a branch, a tag or "latest-release"; empty = the default branch
+  repeated string include = 13;          // globs over repository-relative paths, as mddb-cli autoindex --include
+  repeated string exclude = 14;          // globs, as mddb-cli autoindex --exclude
+  string forge = 15;                     // "github", "gitlab", "gitea" or "forgejo" for a self-hosted host
+  string token_secret_ref = 16;          // a stored secret (/v1/chat/mcp-secrets) holding the token of a private repository
+  string hook_secret_ref = 17;           // a stored secret POST /v1/automation/{id}/hook verifies webhooks with
+  bool adopt = 18;                       // take over documents of the same key that no sync wrote
 }
 
 // BackupActionProto is what a cron rule with a backup does on each run

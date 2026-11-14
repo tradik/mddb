@@ -1,0 +1,19 @@
+[
+  {"name": "base name glob anywhere", "globs": ["*.md"], "path": "docs/API.md", "match": true},
+  {"name": "base name glob at the root", "globs": ["*.md"], "path": "README.md", "match": true},
+  {"name": "another extension", "globs": ["*.md"], "path": "main.go", "match": false},
+  {"name": "directory glob, one level", "globs": ["docs/*.md"], "path": "docs/API.md", "match": true},
+  {"name": "directory glob does not cross a slash", "globs": ["docs/*.md"], "path": "docs/deep/API.md", "match": false},
+  {"name": "directory glob, another directory", "globs": ["docs/*.md"], "path": "other/API.md", "match": false},
+  {"name": "double star under a directory", "globs": ["testdata/**"], "path": "testdata/a/b/c.md", "match": true},
+  {"name": "double star needs the directory at the root", "globs": ["testdata/**"], "path": "src/testdata/c.md", "match": false},
+  {"name": "double star is not a prefix of a longer name", "globs": ["test/**"], "path": "tests/x.md", "match": false},
+  {"name": "exact path", "globs": ["CHANGELOG.md"], "path": "CHANGELOG.md", "match": true},
+  {"name": "exact base name in a directory", "globs": ["CHANGELOG.md"], "path": "services/x/CHANGELOG.md", "match": true},
+  {"name": "character class", "globs": ["[A-Z]*.md"], "path": "docs/API.md", "match": true},
+  {"name": "character class misses", "globs": ["[A-Z]*.md"], "path": "docs/api.md", "match": false},
+  {"name": "question mark", "globs": ["?.md"], "path": "a.md", "match": true},
+  {"name": "any of several", "globs": ["*.go", "*.md"], "path": "docs/x.md", "match": true},
+  {"name": "no globs", "globs": [], "path": "docs/x.md", "match": false},
+  {"name": "a bad pattern never matches", "globs": ["[.md"], "path": "[.md", "match": false}
+]

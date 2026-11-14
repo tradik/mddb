@@ -62,6 +62,13 @@ type AutomationRunResult struct {
 	Unchanged int `json:"unchanged"`
 	Deleted   int `json:"deleted"`
 	Failed    int `json:"failed"`
+	// Ref and Commit are what a git sync (#421) read; CommitURL is the
+	// commit's page on the forge, and UpToDate says the commit was the last
+	// run's, so nothing was downloaded or written.
+	Ref       string `json:"ref,omitempty"`
+	Commit    string `json:"commit,omitempty"`
+	CommitURL string `json:"commitUrl,omitempty"`
+	UpToDate  bool   `json:"upToDate,omitempty"`
 }
 
 // cronAction names a rule's runnable action and the set of its runs in
@@ -162,6 +169,8 @@ func (s *Server) lastRunResult(r *AutomationRule) *AutomationRunResult {
 	if c := e.Sync; c != nil {
 		res.Added, res.Updated, res.Unchanged, res.Deleted, res.Failed =
 			c.Added, c.Updated, c.Unchanged, c.Deleted, c.Failed
+		res.Ref, res.Commit, res.UpToDate = c.Ref, c.Commit, c.UpToDate
+		res.CommitURL = r.Sync.commitURL(c.Commit)
 	}
 	return res
 }

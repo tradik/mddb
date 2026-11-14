@@ -138,17 +138,24 @@ func syncActionToProto(a *SyncAction) *proto.SyncActionProto {
 		return nil
 	}
 	return &proto.SyncActionProto{
-		Source:        a.Source,
-		Collection:    a.Collection,
-		Lang:          a.Lang,
-		Url:           a.URL,
-		Urls:          a.URLs,
-		Bucket:        a.Bucket,
-		Prefix:        a.Prefix,
-		StorageConfig: storageConfigToProto(a.StorageConfig),
-		Prune:         a.Prune,
-		MaxDocuments:  clampInt32(a.MaxDocuments),
-		MaxBytes:      a.MaxBytes,
+		Source:         a.Source,
+		Collection:     a.Collection,
+		Lang:           a.Lang,
+		Url:            a.URL,
+		Urls:           a.URLs,
+		Bucket:         a.Bucket,
+		Prefix:         a.Prefix,
+		StorageConfig:  storageConfigToProto(a.StorageConfig),
+		Prune:          a.Prune,
+		MaxDocuments:   clampInt32(a.MaxDocuments),
+		MaxBytes:       a.MaxBytes,
+		Ref:            a.Ref,
+		Include:        a.Include,
+		Exclude:        a.Exclude,
+		Forge:          a.Forge,
+		TokenSecretRef: a.TokenSecretRef,
+		HookSecretRef:  a.HookSecretRef,
+		Adopt:          a.Adopt,
 	}
 }
 
@@ -170,6 +177,9 @@ func syncActionFromProto(p *proto.SyncActionProto) *SyncAction {
 		Prune:         p.GetPrune(),
 		MaxDocuments:  int(p.GetMaxDocuments()),
 		MaxBytes:      p.GetMaxBytes(),
+		GitSyncFields: GitSyncFields{Ref: p.GetRef(), Include: p.GetInclude(), Exclude: p.GetExclude(),
+			Forge: p.GetForge(), TokenSecretRef: p.GetTokenSecretRef(), HookSecretRef: p.GetHookSecretRef(),
+			Adopt: p.GetAdopt()},
 	}
 }
 

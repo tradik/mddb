@@ -48,6 +48,15 @@ type SyncCounts struct {
 	Unchanged int `json:"unchanged"`
 	Deleted   int `json:"deleted"`
 	Failed    int `json:"failed"`
+	// Ref and Commit are what a git source (#421) resolved: the branch or
+	// tag, and the commit read. UpToDate says the commit was the last
+	// run's, so nothing was downloaded.
+	Ref      string `json:"ref,omitempty"`
+	Commit   string `json:"commit,omitempty"`
+	UpToDate bool   `json:"upToDate,omitempty"`
+	// Fingerprint identifies the rule's settings at the run: a commit is
+	// only skipped for a rule read the same way.
+	Fingerprint string `json:"fingerprint,omitempty"`
 }
 
 // Store persists and queries automation execution logs in BoltDB.

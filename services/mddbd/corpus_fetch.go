@@ -39,7 +39,7 @@ var corpusFetchClient = func() *http.Client {
 func httpsOnlyRedirect(next func(*http.Request, []*http.Request) error) func(*http.Request, []*http.Request) error {
 	return func(req *http.Request, via []*http.Request) error {
 		if req.URL.Scheme != "https" {
-			return fmt.Errorf("refusing a redirect to %s: packs are fetched over https only", req.URL.Scheme)
+			return fmt.Errorf("refusing a redirect to %s: redirects are followed over https only", req.URL.Scheme)
 		}
 		return next(req, via)
 	}
