@@ -60,14 +60,14 @@ export default function CodeSymbolPanel() {
 
   const lookup = (e) => {
     e.preventDefault();
-    run(name, path);
+    void run(name, path); // run reports its own errors
   };
 
   // A candidate is asked for by its qualified name in its own file.
   const pick = (candidate) => {
     setName(candidate.name);
     setPath(candidate.path);
-    run(candidate.name, candidate.path);
+    void run(candidate.name, candidate.path);
   };
 
   const cancel = () => {
