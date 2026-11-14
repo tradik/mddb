@@ -98,6 +98,7 @@ Complete list of MDDB features organized by category.
 - **Chunking on brackets** - `embedding.chunkMode: code` (v2.18.1+) splits code for embedding where brackets balance, so a chunk is a whole function
 - **Symbols** - `defines`, `uses` and `imports` extracted on save for CSS, JavaScript/TypeScript, HTML (v2.12+), C, C++, assembly (v2.18.0+), Go, Rust, Java, Python, Ruby, PHP, Terraform, Kubernetes/OpenShift manifests, Kustomize and Ansible (v2.18.6+); filter on them with `meta.defines=` / `meta.uses=`
 - **Connection graph** - `GET /v1/code-graph` and the `code_graph` MCP tool return what a file depends on and what depends on it, with `uses-selector`, `calls`, `references` and `imports` edges and the symbol behind each. See [API.md](API.md#the-connection-graph)
+- **Semantic facts (v2.19.3+)** - `mddb-cli autoindex --semantic` runs gopls, basedpyright or phpactor over the checkout; `code_symbol` then answers with qualified names, the exact references per definition, `implementations` and a `precision` field. See [CODE-INTELLIGENCE.md](CODE-INTELLIGENCE.md)
 
 #### Geospatial Search
 - **R-tree Index** - Radius and bounding-box queries over lat/lng points

@@ -670,6 +670,7 @@ mddb-cli corpus install ./blog-1.0.mddbpack    # on another server
 - **[LLM Connections](docs/LLM_CONNECTIONS.md)** - MCP for Claude, ChatGPT, Ollama, DeepSeek
 - **[Using MDDB from AI Agents](docs/AGENTS.md)** - MCP toolsets and keys, agent instructions for Claude Code / Cursor / Windsurf, `autoindex`, passages and the context budget, code symbols and graph, corpus packs, confirming destructive tools
 - **[Reference Coding](docs/REFERENCE-CODING.md)** - Other projects' code as searchable references, with their licences
+- **[Code Intelligence](docs/CODE-INTELLIGENCE.md)** - Definitions, references, callers and implementations: heuristic for 13 languages, precise from a language server with `autoindex --semantic`
 - **[Integrations](docs/INTEGRATIONS.md)** - Docling, Langflow, OpenSearch (and when MDDB alone is enough), SSG, wpexporter, Airbyte, WordPress Sync, GitHub Action, Grafana datasource, Chrome browser extension, LangChain / LangGraph
 - **[Elasticsearch-compatible subset](docs/ELASTICSEARCH-COMPAT.md)** - `MDDB_ES_COMPAT=true`: unmodified Elasticsearch clients index, search (`match`, `bool`, `term`, `range`, `knn`, `highlight`, `terms` aggs) and delete under `/es`; unsupported clauses are a 400 naming them (v2.18.10+)
 - **[Bulk Import](docs/BULK-IMPORT.md)** - `mddb-cli autoindex` for a directory or repository, and the converters it uses
