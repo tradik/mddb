@@ -5771,8 +5771,10 @@ Spans by language:
 | Assembly | the line before the next label | label |
 | HTML, YAML | no spans; a definition is placed on the line it first appears | — |
 
-Interfaces and traits ("implementations") are left out on purpose: telling an
-implementation from a namesake needs type information a scanner does not have.
+The heuristic level has no "implementations" (interfaces, traits, abstract
+classes): telling an implementation from a namesake needs type information a
+scanner does not have. A collection indexed with `mddb-cli autoindex --semantic`
+has it — see "Precise answers from semantic facts" above.
 
 ### GET /v1/code-languages (v2.18.8+)
 
