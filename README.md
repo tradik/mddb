@@ -123,6 +123,10 @@ stores a retrieval profile. Running it again only rewrites what changed;
 `--prune` removes what was deleted, `--dry-run` shows the plan first. See
 [Bulk Import](docs/BULK-IMPORT.md#autoindex-one-command-v2188).
 
+Add `--semantic` to take definitions, references and implementations from a
+language server — gopls, basedpyright or phpactor — instead of heuristics; see
+[semantic facts](docs/BULK-IMPORT.md#semantic-facts-from-a-language-server---semantic-v2193).
+
 Learning from another project before implementing something:
 `mddb-cli reference add github.com/etcd-io/bbolt` indexes it as a reference
 collection, and `mddb-cli reference search "..."` (or the `reference_search`

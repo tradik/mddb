@@ -130,7 +130,15 @@ kept, so you can roll back with `alias set`.
 mddb-cli autoindex [path] [-c collection] [--lang en] [--include glob]... [--exclude glob]...
                    [--max-file-size bytes] [--profile fast] [--images] [--no-frontmatter]
                    [--prune] [--dry-run]
+                   [--semantic[=go,python,php]] [--semantic-timeout 20m]
+                   [--semantic-concurrency 4] [--semantic-memory-mb N]
 ```
+
+`--semantic` runs a language server over the checkout (gopls, basedpyright or
+pyrefly, phpactor or PHPantom) and sends definitions, references and
+implementations with the documents. Alone it means `auto`; a list after `=`
+makes those languages required. See
+[docs/BULK-IMPORT.md](../../docs/BULK-IMPORT.md#semantic-facts-from-a-language-server---semantic-v2193).
 
 A Markdown file's frontmatter becomes metadata (v2.19.0+): the file is sent as
 it is and the server reads the frontmatter once, with the parser `/v1/upload`
