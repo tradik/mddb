@@ -159,7 +159,7 @@ func TestURIRoundTrip(t *testing.T) {
 	if uri != "file:///tmp/a%20b/c%23d.go" {
 		t.Errorf("fileURI = %q", uri)
 	}
-	if p, ok := uriPath(uri); !ok || p != "/tmp/a b/c#d.go" {
+	if p, ok := uriPath(uri); !ok || filepath.ToSlash(p) != "/tmp/a b/c#d.go" {
 		t.Errorf("uriPath = %q %v", p, ok)
 	}
 	for _, bad := range []string{"untitled:1", "%zz", "file:"} {

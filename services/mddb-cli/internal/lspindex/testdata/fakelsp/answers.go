@@ -25,8 +25,8 @@ func (f *fake) request(m *msg) {
 		} `json:"position"`
 	}
 	_ = json.Unmarshal(m.Params, &p)
-	u, _ := url.Parse(p.TextDocument.URI)
-	rel, _ := filepath.Rel(f.root, u.Path)
+	rel, _ := filepath.Rel(f.root, uriToPath(p.TextDocument.URI))
+	rel = filepath.ToSlash(rel)
 	key := method + " " + rel
 	if method != "documentSymbol" {
 		key += ":" + strconv.Itoa(p.Position.Line)
@@ -87,7 +87,7 @@ func (f *fake) locations(locs []loc) []any {
 			if !filepath.IsAbs(path) {
 				path = filepath.Join(f.root, path)
 			}
-			uri = (&url.URL{Scheme: "file", Path: path}).String()
+			uri = pathToURI(path)
 		}
 		end := max(l.End, l.Line)
 		out = append(out, map[string]any{"uri": uri, "range": map[string]any{
@@ -104,4 +104,23 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// uriToPath and pathToURI convert as a real server does, so on Windows the
+// fake reports file:///C:/... like gopls rather than a path with backslashes.
+func uriToPath(uri string) string {
+	u, _ := url.Parse(uri)
+	p := u.Path
+	if len(p) >= 3 && p[0] == '/' && p[2] == ':' {
+		p = p[1:]
+	}
+	return filepath.FromSlash(p)
+}
+
+func pathToURI(path string) string {
+	p := filepath.ToSlash(path)
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	return (&url.URL{Scheme: "file", Path: p}).String()
 }

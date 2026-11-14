@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -141,8 +140,7 @@ func (f *fake) handle(m *msg) {
 			RootURI string `json:"rootUri"`
 		}
 		_ = json.Unmarshal(m.Params, &p)
-		u, _ := url.Parse(p.RootURI)
-		f.root = u.Path
+		f.root = uriToPath(p.RootURI)
 		f.record["initialize"] = m.Params
 		f.save()
 		if f.s.Garbage == "initialize" {
