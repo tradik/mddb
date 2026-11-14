@@ -124,7 +124,7 @@ stores a retrieval profile. Running it again only rewrites what changed;
 [Bulk Import](docs/BULK-IMPORT.md#autoindex-one-command-v2188).
 
 Add `--semantic` to take definitions, references and implementations from a
-language server — gopls, basedpyright, phpactor or clangd (C/C++) — instead of heuristics; see
+language server — gopls, basedpyright, phpactor, clangd (C/C++) or rust-analyzer — instead of heuristics; see
 [semantic facts](docs/BULK-IMPORT.md#semantic-facts-from-a-language-server---semantic-v2193).
 
 Learning from another project before implementing something:
