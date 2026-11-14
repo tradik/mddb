@@ -144,7 +144,7 @@ Workflow: [`.github/workflows/github-action.yml`](../../.github/workflows/github
 
 | Job | When | What |
 | --- | --- | --- |
-| `test` | every PR + push (matrix: Node 22, 24) | `npm ci`, `npm run all` (format check + lint + tests w/ coverage + build), uploads `coverage/`. |
+| `test` | every PR + push (matrix: Node 24, 26) | `npm ci`, `npm run all` (format check + lint + tests w/ coverage + build), uploads `coverage/`. |
 | `verify-dist` | every PR + push | Rebuild and assert `dist/` matches the committed bundle (catches stale releases). |
 | `smoke` | every PR + push | Run the bundled action with `dry-run: true` against the integration's own README to confirm it boots. |
 | `release` | tag push `gha-v*` | Publish a GitHub Release pinning `v<major>` / `v<major>.<minor>` floating tags via [`mhausenblas/mkdocs-deploy-gh-pages`-style tag bumping](#release). |

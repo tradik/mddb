@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
-- **minimatch 11.0.8 in the GitHub Action, the Grafana data source and the Chrome extension** (GHSA-g3hv-75wg-m249, denial of service through glob-part amplification; Dependabot alerts 170–172). An npm override lifts every copy in the vulnerable range. One copy stays on 10.x: `@actions/glob` 0.7.0, the newest release, calls `minimatch.matchOne`, which minimatch 11 removed. Its patterns come from the workflow that uses the action, not from outside input.
+- **minimatch 11.0.8 in the GitHub Action, the Grafana data source and the Chrome extension** (GHSA-g3hv-75wg-m249, denial of service through glob-part amplification; Dependabot alerts 170–172). An npm override lifts every copy in the vulnerable range. One copy stays on 10.x: `@actions/glob` 0.7.0, the newest release, calls `minimatch.matchOne`, which minimatch 11 removed. Its patterns come from the workflow that uses the action, not from outside input. The three integrations now install with npm 11 (Node 24 or newer), which their `engines` already required: npm 10 misreads the range-keyed override, so CI no longer tests them on Node 22.
 - **Go:** `golang.org/x/crypto` 0.59.0, `x/sys` 0.50.0, `x/text` 0.44.0, `x/sync` 0.25.0 and `klauspost/compress` 1.20.4 in mddbd; `spf13/pflag` 1.1.0 and the Go client 2.19.1 in mddb-cli. govulncheck reports no reachable vulnerability.
 - **mddb-chat:** 122 crates raised to their newest compatible versions, among them `aws-lc-rs` 1.19.0 / `aws-lc-sys` 0.47.0 under rustls. `cargo audit` is clean.
 - **Images:** the panel and the chat widget build on `node:26.13-alpine3.24`.

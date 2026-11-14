@@ -133,7 +133,7 @@ runs on every push and PR touching this directory:
 
 1. **format check** (`prettier --check`)
 2. **lint** (ESLint)
-3. **tests with coverage** on a Node 22 & 24 matrix, 90 % threshold enforced
+3. **tests with coverage** on a Node 24 & 26 matrix, 90 % threshold enforced
 4. **security audit** (`npm audit --omit=dev --audit-level=high`)
 5. **build** (esbuild bundle into `build/`)
 6. **package** (zip into `dist/`)
