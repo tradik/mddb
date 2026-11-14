@@ -76,6 +76,17 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   shows the job id, or why the server refused — 409 while the previous run is
   going) and its row shows the last result: status, the sync's added +,
   updated ~, unchanged =, deleted −, failed ✕ counts, and the error.
+  Since 2.19.5 the source can be a **Git repository**: repository URL, ref
+  (a branch, a tag or `latest-release` — the forge's newest release, else
+  the highest `v1.2.3` tag; empty follows the default branch), include and
+  exclude globs one per line (as `mddb-cli autoindex`), the forge for a
+  self-hosted host (the field appears only then), the token and webhook
+  secrets picked by name from the stored secrets (each marked *set* or not;
+  values are written in Chat → MCP secrets and never shown) and *Adopt*
+  (take over a collection seeded by autoindex). A git rule's last result
+  shows the ref and the short commit linked to its page on the forge, and
+  *up to date … nothing downloaded or written* when the commit was the last
+  run's.
 - **Search playground**: vector index `Auto (server chooses)` on vector,
   hybrid and cross-collection search; *Explain plan* shows how the search ran
   (index, filter strategy, candidates, reasons, feedback, query parts);
@@ -151,7 +162,8 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   alternative, and bytes per bucket.
 - **Collection settings** list the syncs writing to and the triggers watching
   the collection (`GET /v1/automation?collection=`), each sync or backup with
-  its last result and a Run now button.
+  its last result and a Run now button; a git source shows its repository
+  URL and ref, and the commit its last run read (2.19.5).
 - **Vector reindex** runs as a background job (`async: true`, *Force
   re-embed* optional). The row shows percent, documents done and time left,
   then the final counts or the error. A second reindex of the same collection

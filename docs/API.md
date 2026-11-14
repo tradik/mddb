@@ -4605,6 +4605,25 @@ stream, firing its webhook). `202`:
 logged), `404` for no such rule, `400` for a rule with no sync or backup,
 `503` without a cron scheduler (`MDDB_CRONS` off). Global administrator.
 
+A git sync's `lastResult` (2.19.5) also has `ref`, `commit`, `commitUrl`
+(the commit's page on the forge) and `upToDate` (the commit was the last
+run's: nothing downloaded or written). The `git` source's fields — `url`,
+`ref` (a branch, a tag or `latest-release`), `include`, `exclude`, `forge`,
+`tokenSecretRef`, `hookSecretRef`, `adopt` — are described in
+[AUTOMATIONS.md](AUTOMATIONS.md#git-repositories). A rule naming a stored
+secret that does not exist is refused with `400`.
+
+**POST /v1/automation/:id/hook** (2.19.5) — A forge's push or release
+webhook runs a git sync now. No mddb credentials: the request is verified
+against the rule's `hookSecretRef` secret — `X-Hub-Signature-256:
+sha256=<hex HMAC-SHA256 of the body>` (GitHub; Gitea and Forgejo send it
+too), `X-Gitea-Signature` / `X-Forgejo-Signature: <hex>`, or
+`X-Gitlab-Token: <secret>`. `202` with the run (as `/run`), `200`
+`{"status":"pong"}` for GitHub's `X-GitHub-Event: ping`, `401` for a
+missing or wrong signature, `404` for an id without a hook, `409` while
+the previous run is going, `413` for a body over 25 MB, `503` when the
+secret cannot be opened or no cron scheduler runs.
+
 **POST /v1/automation/:id/test** — Test a trigger rule:
 ```json
 {

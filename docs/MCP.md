@@ -766,7 +766,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | Tool | Description |
 |------|-------------|
 | `list_automation` | List all automation rules (webhooks, triggers, crons). `type` filters by kind; `collection` (2.19.0) lists the rules acting on a collection — the sources syncing into it — each sync and backup with `lastResult`. |
-| `create_automation` | Create a new automation rule (webhook target, search trigger, or cron schedule). |
+| `create_automation` | Create a new automation rule (webhook target, search trigger, or cron schedule). A cron rule's `sync` object takes `source: "git"` since 2.19.5, with `url`, `ref` (a branch, a tag or `latest-release`), `include`, `exclude`, `forge`, `tokenSecretRef`, `hookSecretRef` and `adopt` — see [AUTOMATIONS.md](AUTOMATIONS.md#git-repositories). |
 | `get_automation` | Get a specific automation rule by ID. |
 | `update_automation` | Update an existing automation rule. |
 | `delete_automation` | Delete an automation rule by ID. |

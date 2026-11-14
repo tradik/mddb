@@ -772,9 +772,9 @@ curl -X POST http://localhost:11023/v1/automation \
 
 | `sync` field | Default | Description |
 |---|---|---|
-| `source` | (required) | `sitemap`, `urls` or `s3` |
+| `source` | (required) | `sitemap`, `urls`, `s3` or `git` (2.19.5, see [Git repositories](#git-repositories)) |
 | `collection`, `lang` | (required) | where the documents go |
-| `url` | | `sitemap`: a sitemap or sitemap index, plain or gzipped |
+| `url` | | `sitemap`: a sitemap or sitemap index, plain or gzipped; `git`: the repository's https URL |
 | `urls` | | `urls`: the pages |
 | `bucket` | `storageConfig.bucket` | `s3`: the bucket. It must exist: a sync only reads it and never creates it |
 | `prefix` | `storageConfig.prefix` | `s3`: the objects synced are the keys under it |
@@ -885,6 +885,122 @@ the `collection` argument of `list_automation`; from the CLI
 administration: a tenant user is refused, so a listing never crosses
 tenants.
 
+#### Git repositories
+
+Since 2.19.5 (#421) a sync can follow a git repository at a branch, a tag
+or its latest release — a project's documentation, kept current release
+after release without a job that clones it and runs `mddb-cli autoindex`:
+
+```bash
+curl -X POST http://localhost:11023/v1/automation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "cron",
+    "name": "project docs",
+    "schedule": "0 4 * * *",
+    "enabled": true,
+    "sync": {
+      "source": "git",
+      "url": "https://github.com/example/project.git",
+      "ref": "latest-release",
+      "include": ["*.md"],
+      "exclude": ["testdata/**", "dist/**"],
+      "collection": "project-docs",
+      "lang": "en",
+      "prune": true
+    }
+  }'
+```
+
+| `sync` field (`git`) | Default | Description |
+|---|---|---|
+| `url` | (required) | the repository over https, no credentials or query in it: `https://github.com/owner/repo(.git)` |
+| `ref` | the default branch | a branch (`main`), a tag (`v1.2.0`), a full ref (`refs/heads/main`), a commit id, or `latest-release`: the forge's latest release, else the highest `v1.2.3` / `1.2.3` tag (pre-releases left out) |
+| `include`, `exclude` | every file / none | globs over repository-relative paths, exactly as `mddb-cli autoindex --include/--exclude`: a glob matches the path or the file name, `dir/**` everything under `dir` |
+| `forge` | known by host | `github` (GitHub Enterprise Server), `gitlab`, `gitea` or `forgejo` — needed for any host but github.com, gitlab.com and codeberg.org; an unknown host without it is refused with the list of what is supported |
+| `tokenSecretRef` | | a stored secret holding the token of a private repository |
+| `hookSecretRef` | | a stored secret that `POST /v1/automation/{id}/hook` verifies webhooks with; empty: no hook |
+| `adopt` | `false` | take over documents with the same key that no sync wrote — a collection seeded by `mddb-cli autoindex` |
+
+`maxDocuments` bounds the files a run takes, `maxBytes` each file (a larger
+one fails and is reported); the whole archive may be 1 GiB uncompressed.
+
+**How it is read, without git.** The server has no git binary. It resolves
+the ref from the ref advertisement of git's smart HTTP protocol
+(`GET <repo>.git/info/refs?service=git-upload-pack`, an annotated tag
+peeled to its commit), asks the forge's API for the latest release
+(GitHub `/repos/{o}/{r}/releases/latest`, GitLab
+`/api/v4/projects/:id/releases`, Gitea/Forgejo
+`/api/v1/repos/{o}/{r}/releases/latest`), and downloads the forge's tar.gz
+archive of the resolved commit (github.com's archive host for a public
+repository, otherwise the forge's API). Every request goes through the SSRF
+guard and a redirect may not leave https. The archive is streamed: only
+regular files are read — symlinks, hard links and devices are skipped — a
+path that is absolute or climbs out with `..` fails the run before
+anything is written, the forge's top directory (`<repo>-<commit>/`) is
+dropped, and a file with a NUL byte in its first 8 KiB is left out as
+binary unless it is a format the converters read (PDF, the office
+formats).
+
+**Keys and meta as autoindex writes them.** A document's key is the file's
+repository-relative path (`docs/API.md`) — the key `mddb-cli autoindex`
+gives it, so citations by key keep working and a collection seeded by
+autoindex can switch to the rule. Markdown's frontmatter becomes meta; code
+and other text are stored as they are, HTML, CSV, LaTeX, mail, RTF, PDF and
+the office formats converted. Meta: `path`, `extension`, `size`,
+`modified`, `kind` (`doc`, `code` with `language`, or `text`),
+`gitCommit`, `gitBranch` (the resolved ref), and the sync's `syncRule`,
+`syncSource` (the path), `syncHash` — the file's git blob id, what
+`git hash-object` prints — plus `syncRef` and `syncCommit`, the ref and
+commit the content was written at.
+
+**Incremental.** When the ref resolves to the commit the last successful
+run of the unchanged rule read, the run ends there: no archive is
+downloaded, nothing is written, and the result says `upToDate`. Any change
+to the rule's settings reads the archive again. Otherwise each file is
+compared by blob id with the `syncHash` of its document and only what
+changed is written; with `prune`, the documents of files that are gone are
+deleted (a run cut at `maxDocuments` prunes nothing, as for every source).
+
+**Adopting a collection.** Without `adopt` a document of the same key that
+the rule did not write fails, as for every source. With `adopt: true` a
+document that carries no `syncRule` (one autoindex wrote) is taken over —
+rewritten with the sync's meta under the same key, so there is no
+duplicate; a document another sync wrote is still never touched.
+
+**Credentials.** A token is never stored in the rule: `tokenSecretRef` and
+`hookSecretRef` name secrets of the write-only store the chat's MCP
+servers use (`PUT /v1/chat/mcp-secrets/{name}` with `{"value": "..."}`,
+sealed with `MDDB_ENCRYPTION_KEY`; the secret's `header` is ignored here).
+A rule naming a secret that does not exist is refused, and a secret a rule
+names cannot be deleted (`409`, `usedBy: ["automation:<rule>"]`). The token
+goes to git's smart HTTP as basic auth (`x-access-token` on GitHub,
+`oauth2` on GitLab, Gitea and Forgejo) and to the APIs as
+`Authorization: Bearer` (Gitea and Forgejo: `token`). Reads return the
+names, never a value.
+
+**Webhook.** `POST /v1/automation/{id}/hook` runs the sync at once when a
+forge reports a push or a release. The forge has no mddb credentials, so
+this one route is open; the request proves itself against the
+`hookSecretRef` secret instead: GitHub's `X-Hub-Signature-256` (an
+HMAC-SHA256 of the body, which Gitea and Forgejo send too), Gitea's
+`X-Gitea-Signature`, Forgejo's `X-Forgejo-Signature`, or GitLab's
+`X-Gitlab-Token`. Answers: `202` with the run (as Run now), `200` for
+GitHub's `ping`, `401` for a missing or wrong signature, `404` for an id
+without a hook, `409` while the previous run is going, `413` past 25 MB,
+`503` when the secret cannot be opened or no cron scheduler runs.
+Point the forge's webhook at `https://<mddb>/v1/automation/<id>/hook` with
+the secret's value and content type `application/json`.
+
+**What a run reports.** `lastResult` and the automation log carry `ref`,
+`commit` and `upToDate` next to the counts, `lastResult` also `commitUrl`
+(the commit's page on the forge); the `source.synced` webhook carries
+`ref`, `commit` and `upToDate`. Over gRPC the fields are
+`SyncActionProto` 12–18 (`ref`, `include`, `exclude`, `forge`,
+`token_secret_ref`, `hook_secret_ref`, `adopt`) and
+`AutomationRunResultProto` 10–13 (`ref`, `commit`, `commit_url`,
+`up_to_date`); over MCP the same names in the `sync` object.
+
 ---
 
 ## Panel UI
@@ -900,6 +1016,7 @@ The MDDB Panel (React web UI) includes an **Automations** section under the Admi
 - **View** cron metadata including `lastRun`, `nextRun`, and the human-readable schedule description.
 - **Choose a cron rule's action** (2.18.10): call a webhook, take a [scheduled backup](BACKUP.md) (local directory or S3, retention `keep`, collections) or [sync a source](#synced-sources) (sitemap, URL list or S3 prefix, `prune`, `maxDocuments`, max MiB per document). A stored S3 secret is never shown: leave the field blank to keep it.
 - **Run a sync or backup now** (2.19.0): the Run now button of a sync or backup rule starts it and shows the job id; the rule's row shows its last result (status, the sync's counts, the error).
+- **Sync a git repository** (2.19.5): *Git repository* as the source shows the repository URL, the ref (a branch, a tag or `latest-release`, explained under the field), include and exclude globs (one per line), the forge (only for a host other than github.com, gitlab.com and codeberg.org), the token and webhook secrets — picked by name from the stored secrets, each marked *set* or not; their values are written in Chat → MCP secrets and never shown — and *Adopt*. A git rule's last result names the ref and the short commit, linked to the commit's page on the forge, and says plainly when the commit was the last run's: *up to date … nothing downloaded or written*.
 - **Read the log** (Logs tab): rule type, status, HTTP status, and per run what it did — the webhook URL, the backup's target and how many old backups retention removed, or a sync's added / updated / unchanged / deleted / failed counts.
 
 The Panel communicates with the same `/v1/automation` REST API documented above. No additional configuration is required.

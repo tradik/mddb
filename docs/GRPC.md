@@ -465,7 +465,13 @@ action: keep a collection in step with a sitemap, a URL list or an S3
 prefix (`source`, `collection`, `lang`, `url`, `urls`, `bucket`, `prefix`,
 `storage_config`, `prune`, `max_documents`, `max_bytes`). Validation,
 defaults and secret masking are those of the REST body; see
-[AUTOMATIONS.md](AUTOMATIONS.md#synced-sources).
+[AUTOMATIONS.md](AUTOMATIONS.md#synced-sources). Since 2.19.5 `source` may
+be `git` (a repository at a branch, a tag or its latest release), with
+`ref` (12), `include` (13), `exclude` (14), `forge` (15),
+`token_secret_ref` (16), `hook_secret_ref` (17) and `adopt` (18); a git
+run's `AutomationRunResultProto` adds `ref` (10), `commit` (11),
+`commit_url` (12) and `up_to_date` (13). See
+[AUTOMATIONS.md](AUTOMATIONS.md#git-repositories).
 
 `CollectionConfigProto.read_only` (23) and `corpus` (24, `CorpusInfoProto`:
 name, version, license, building server version, document count, archive
