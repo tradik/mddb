@@ -18,6 +18,8 @@ vi.mock('./RevisionHistory', () => ({
 vi.mock('./ImagePreview', () => ({ default: ({ docKey }) => <div>image preview {docKey}</div> }));
 vi.mock('./DocumentTools', () => ({ default: ({ document }) => <div>document tools {document.key}</div> }));
 vi.mock('./DocumentActions', () => ({ default: ({ document }) => <div>document actions {document.key}</div> }));
+// FE-019: the draft notice has its own suite; a stand-in offers its Open button.
+vi.mock('./DraftNotice', () => ({ default: ({ document, onOpen }) => <button onClick={onOpen}>open draft of {document.key}</button> }));
 // The Markdown itself renders through MarkdownView (its own suite); a
 // stand-in throws on a marker so the error boundary can be exercised.
 vi.mock('./MarkdownView', () => ({
@@ -128,6 +130,12 @@ describe('DocumentViewer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.click(screen.getByRole('button', { name: 'close editor' }));
     expect(screen.queryByText('editor guide')).toBeNull();
+  });
+
+  test('the draft notice opens the editor (FE-019)', () => {
+    renderWith(doc);
+    fireEvent.click(screen.getByRole('button', { name: 'open draft of guide' }));
+    expect(screen.getByText('editor guide')).toBeTruthy();
   });
 
   test('the revision link opens the history and its close hides it', () => {

@@ -8,6 +8,7 @@ import ImagePreview from './ImagePreview';
 import DocumentTools from './DocumentTools';
 import MarkdownView from './MarkdownView';
 import DocumentActions from './DocumentActions';
+import DraftNotice from './DraftNotice';
 
 // Error Boundary component
 class ErrorBoundary extends Component {
@@ -257,6 +258,9 @@ export default function DocumentViewer() {
           </div>
         </div>
       </div>
+
+      {/* FE-019: an unsaved draft of this document, if one was left behind */}
+      <DraftNotice document={currentDocument} onOpen={() => setShowEditor(true)} />
 
       {/* Metadata */}
       {currentDocument.meta && Object.keys(currentDocument.meta).length > 0 && (

@@ -2,12 +2,24 @@ import { useState, useRef } from 'react';
 import { Eye, Code, Maximize2, Minimize2 } from 'lucide-react';
 import MarkdownToolbar from './MarkdownToolbar';
 import MarkdownView from './MarkdownView';
+import CollectionSpelling from './CollectionSpelling';
 import { getTemplate } from '../lib/markdown-templates';
+import { applyFormat, findFormatAction, indentLines, selectionIsList } from '../lib/markdown-format';
+import { editorCommand, isMacPlatform } from '../lib/editor-shortcuts';
 
-export default function MarkdownEditor({ value, onChange, placeholder }) {
+/**
+ * MarkdownEditor: a Markdown textarea with a toolbar, edit / split / preview
+ * modes and fullscreen. Keyboard (FE-016): Ctrl/Cmd+B, I, K format like the
+ * toolbar, Ctrl/Cmd+S calls `onSave` (when given), Tab / Shift+Tab indent
+ * list items, Esc leaves fullscreen. With `spelling` ({ collection, lang })
+ * it offers the collection spelling check (FE-020).
+ */
+export default function MarkdownEditor({ value, onChange, placeholder, onSave, spelling }) {
   const [mode, setMode] = useState('split'); // 'edit', 'preview', 'split'
   const [isFullscreen, setIsFullscreen] = useState(false);
   const textareaRef = useRef(null);
+  const isMac = isMacPlatform();
+  const text = value || '';
 
   const handleChange = (e) => {
     if (onChange) {
@@ -15,30 +27,48 @@ export default function MarkdownEditor({ value, onChange, placeholder }) {
     }
   };
 
-  const handleInsert = (before, after = '', placeholder = '') => {
+  /** Writes `next` and, once React has rendered it, selects [start, end). */
+  const replaceText = (next, start, end = start) => {
+    if (onChange) onChange(next);
     const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = value.substring(start, end);
-    const textToInsert = selectedText || placeholder;
-    
-    const newValue = 
-      value.substring(0, start) + 
-      before + textToInsert + after + 
-      value.substring(end);
-    
-    if (onChange) {
-      onChange(newValue);
-    }
-
-    // Set cursor position after insert
     setTimeout(() => {
-      const newCursorPos = start + before.length + textToInsert.length;
       textarea.focus();
-      textarea.setSelectionRange(newCursorPos, newCursorPos);
+      textarea.setSelectionRange(start, end);
     }, 0);
+  };
+
+  /** Runs a format action at the selection — the toolbar and the keys call this. */
+  const runFormat = (id) => {
+    const textarea = textareaRef.current;
+    const action = findFormatAction(id);
+    if (!textarea || !action) return;
+    const result = applyFormat(text, textarea.selectionStart, textarea.selectionEnd, action);
+    replaceText(result.value, result.cursor);
+  };
+
+  const handleKeyDown = (e) => {
+    const command = editorCommand(e, isMac);
+    if (!command) return;
+    const { selectionStart: start, selectionEnd: end } = e.currentTarget;
+    if (command === 'escape') {
+      if (isFullscreen) {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsFullscreen(false);
+      }
+      return;
+    }
+    if (command === 'indent' || command === 'outdent') {
+      // Outside a list Tab keeps moving the focus (no keyboard trap).
+      if (!selectionIsList(text, start, end)) return;
+      e.preventDefault();
+      const result = indentLines(text, start, end, command === 'outdent');
+      replaceText(result.value, result.start, result.end);
+      return;
+    }
+    e.preventDefault();
+    if (command === 'save') onSave?.();
+    else runFormat(command);
   };
 
   const handleTemplate = (templateType) => {
@@ -51,7 +81,7 @@ export default function MarkdownEditor({ value, onChange, placeholder }) {
   return (
     <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'relative'}`}>
       {/* Markdown Toolbar */}
-      <MarkdownToolbar onInsert={handleInsert} onTemplate={handleTemplate} />
+      <MarkdownToolbar onFormat={runFormat} onTemplate={handleTemplate} isMac={isMac} />
 
       {/* View Mode Toolbar */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
@@ -93,7 +123,8 @@ export default function MarkdownEditor({ value, onChange, placeholder }) {
         <button
           onClick={() => setIsFullscreen(!isFullscreen)}
           className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
-          title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
+          aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
         >
           {isFullscreen ? (
             <Minimize2 className="w-4 h-4" />
@@ -112,7 +143,9 @@ export default function MarkdownEditor({ value, onChange, placeholder }) {
               ref={textareaRef}
               value={value}
               onChange={handleChange}
+              onKeyDown={handleKeyDown}
               placeholder={placeholder || 'Write your markdown here...'}
+              aria-label="Markdown content"
               className="w-full h-full px-4 py-3 text-sm font-mono resize-none focus:outline-none"
             />
           </div>
@@ -127,6 +160,10 @@ export default function MarkdownEditor({ value, onChange, placeholder }) {
           </div>
         )}
       </div>
+
+      {spelling && (
+        <CollectionSpelling collection={spelling.collection} lang={spelling.lang} text={text} onChange={onChange} />
+      )}
 
       {/* Character Count */}
       <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 text-xs text-gray-500">

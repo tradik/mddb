@@ -2,8 +2,26 @@ import { useState, useEffect } from 'react';
 import { X, Save, AlertCircle, Check } from 'lucide-react';
 import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
+import { readDraft, removeDraft, draftDiffers, sameMeta } from '../lib/drafts';
+import { useDraftAutosave } from '../lib/use-draft';
 import MarkdownEditor from './MarkdownEditor';
+import DraftRestoreBanner from './DraftRestoreBanner';
+import RevisionConflictNotice from './RevisionConflictNotice';
 
+/** A stored draft of `document` worth offering: one that differs from it. */
+function offeredDraft(document) {
+  if (!document) return null;
+  const draft = readDraft(document);
+  return draft && draftDiffers(draft, document) ? draft : null;
+}
+
+/**
+ * DocumentEditor: the full-page editor of one document's metadata and
+ * Markdown. FE-019: unsaved changes are kept as a draft (see use-draft.js);
+ * a draft found on opening is offered for restore; a save is conditional on
+ * the revision the edit started from, so a newer change on the server is
+ * reported (409) instead of overwritten. Ctrl/Cmd+S in the editor saves.
+ */
 export default function DocumentEditor({ document, onClose, onSave }) {
   const { setCurrentDocument } = useStore();
   const [contentMd, setContentMd] = useState(document?.contentMd || '');
@@ -13,13 +31,37 @@ export default function DocumentEditor({ document, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [baseRevision, setBaseRevision] = useState(document?.revision || '');
+  const [pendingDraft, setPendingDraft] = useState(() => offeredDraft(document));
+  const [conflict, setConflict] = useState(null);
 
   useEffect(() => {
     if (document) {
       setContentMd(document.contentMd || '');
       setMetadata(document.meta || {});
+      setBaseRevision(document.revision || '');
     }
   }, [document]);
+
+  const docRef = { collection: document?.collection, key: document?.key, lang: document?.lang };
+  const dirty = Boolean(document) && (contentMd !== (document.contentMd || '') || !sameMeta(metadata, document.meta));
+  const { discard } = useDraftAutosave(
+    docRef,
+    { contentMd, meta: metadata, baseRevision },
+    { dirty, paused: Boolean(pendingDraft) || !document },
+  );
+
+  const restoreDraft = () => {
+    setContentMd(pendingDraft.contentMd);
+    setMetadata(pendingDraft.meta);
+    setBaseRevision(pendingDraft.baseRevision);
+    setPendingDraft(null);
+  };
+
+  const discardDraft = () => {
+    removeDraft(docRef);
+    setPendingDraft(null);
+  };
 
   const handleAddMetadata = () => {
     if (newMetaKey && newMetaValue) {
@@ -45,10 +87,16 @@ export default function DocumentEditor({ document, onClose, onSave }) {
     });
   };
 
-  const handleSave = async () => {
+  /**
+   * Saves the edit, conditional on `expected` (by default the revision the
+   * edit started from). A 409 keeps the edit and shows the conflict.
+   */
+  const handleSave = async (expected = baseRevision) => {
+    if (saving) return;
     setSaving(true);
     setError(null);
     setSuccess(false);
+    setConflict(null);
 
     try {
       await mddbClient.addDocument({
@@ -57,7 +105,9 @@ export default function DocumentEditor({ document, onClose, onSave }) {
         lang: document.lang,
         meta: metadata,
         contentMd: contentMd,
+        expectedRevision: expected,
       });
+      discard();
 
       // Refresh the document in the store so viewer shows updated content
       const refreshed = await mddbClient.getDocument({
@@ -73,7 +123,8 @@ export default function DocumentEditor({ document, onClose, onSave }) {
         if (onSave) onSave();
       }, 1500);
     } catch (err) {
-      setError(err.message);
+      if (err.status === 409) setConflict({ expected, current: err.body?.currentRevision || '' });
+      else setError(err.message);
     } finally {
       setSaving(false);
     }
@@ -96,6 +147,7 @@ export default function DocumentEditor({ document, onClose, onSave }) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close editor"
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
           >
             <X className="w-5 h-5" />
@@ -105,6 +157,19 @@ export default function DocumentEditor({ document, onClose, onSave }) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        {pendingDraft && (
+          <DraftRestoreBanner draft={pendingDraft} document={document} onRestore={restoreDraft} onDiscard={discardDraft} />
+        )}
+
+        {conflict && (
+          <RevisionConflictNotice
+            expected={conflict.expected}
+            current={conflict.current}
+            busy={saving}
+            onOverwrite={() => handleSave(conflict.current)}
+          />
+        )}
+
         {/* Error Message */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start space-x-3">
@@ -187,6 +252,8 @@ export default function DocumentEditor({ document, onClose, onSave }) {
             <MarkdownEditor
               value={contentMd}
               onChange={setContentMd}
+              onSave={() => handleSave()}
+              spelling={{ collection: document.collection, lang: document.lang }}
               placeholder="Enter markdown content..."
             />
           </div>
@@ -202,7 +269,7 @@ export default function DocumentEditor({ document, onClose, onSave }) {
           Cancel
         </button>
         <button
-          onClick={handleSave}
+          onClick={() => handleSave()}
           disabled={saving}
           className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >

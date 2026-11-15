@@ -18,6 +18,7 @@ vi.mock('./components/DocumentList', () => ({ default: ({ sseRefreshKey }) => <d
 vi.mock('./components/DocumentViewer', () => ({ default: () => <div>document viewer</div> }));
 vi.mock('./components/SSEToast', () => ({ default: ({ connected }) => <div>toast {connected ? 'on' : 'off'}</div> }));
 vi.mock('./components/ComplianceBanner', () => ({ default: () => <div>banner</div> }));
+vi.mock('./components/GlobalShortcuts', () => ({ default: () => null }));
 vi.mock('./components/VectorSearchPanel', () => ({ default: () => 'vector search panel' }));
 vi.mock('./components/HybridSearchPanel', () => ({ default: () => 'hybrid search panel' }));
 vi.mock('./components/FTSSearchPanel', () => ({ default: () => 'fts search panel' }));

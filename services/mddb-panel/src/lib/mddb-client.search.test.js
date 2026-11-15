@@ -18,6 +18,7 @@ describe('documents', () => {
     ['getReplicationStatus', (c) => c.getReplicationStatus(), '/v1/replication/status', GET],
     ['getDocument defaults env', (c) => c.getDocument({ collection: 'c', key: 'k', lang: 'en' }), '/v1/get', POST, { collection: 'c', key: 'k', lang: 'en', env: {} }],
     ['addDocument defaults meta', (c) => c.addDocument({ collection: 'c', key: 'k', lang: 'en', contentMd: '# x' }), '/v1/add', POST, { collection: 'c', key: 'k', lang: 'en', meta: {}, contentMd: '# x' }],
+    ['addDocument with expectedRevision (FE-019)', (c) => c.addDocument({ collection: 'c', key: 'k', lang: 'en', contentMd: '# x', expectedRevision: 'r1' }), '/v1/add', POST, { collection: 'c', key: 'k', lang: 'en', meta: {}, contentMd: '# x', expectedRevision: 'r1' }],
     ['backup without a name', (c) => c.backup(), '/v1/backup', GET],
     ['backup encodes the name', (c) => c.backup('a b&x=1.db'), '/v1/backup?to=a%20b%26x%3D1.db', GET],
     ['truncate defaults', (c) => c.truncate({ collection: 'c' }), '/v1/truncate', POST, { collection: 'c', keepRevs: 3, dropCache: true }],

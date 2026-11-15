@@ -44,6 +44,8 @@ export default function NavMenu({ authEnabled = false, clusterEnabled = false, a
           onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
           placeholder="Search the menu"
           aria-label="Search the menu"
+          aria-keyshortcuts="/"
+          data-shortcut="search"
           className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-500 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-600"
         />
       </div>

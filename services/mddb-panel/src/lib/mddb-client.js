@@ -227,18 +227,16 @@ class MDDBClient {
   }
 
   /**
-   * Add or update a document
+   * Add or update a document. With `expectedRevision` the write is
+   * conditional (INT-021, 2.18.8+): the server answers 409 — `error.body` holds
+   * `currentRevision` — when the document is no longer at that revision.
    */
-  async addDocument({ collection, key, lang, meta = {}, contentMd }) {
+  async addDocument({ collection, key, lang, meta = {}, contentMd, expectedRevision }) {
+    const body = { collection, key, lang, meta, contentMd };
+    if (expectedRevision) body.expectedRevision = expectedRevision;
     return this.request('/add', {
       method: 'POST',
-      body: JSON.stringify({
-        collection,
-        key,
-        lang,
-        meta,
-        contentMd,
-      }),
+      body: JSON.stringify(body),
     });
   }
 

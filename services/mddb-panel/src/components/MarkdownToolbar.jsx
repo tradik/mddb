@@ -1,10 +1,11 @@
-import { 
-  Bold, 
-  Italic, 
-  Strikethrough, 
-  Code, 
-  Link, 
-  List, 
+import { Fragment } from 'react';
+import {
+  Bold,
+  Italic,
+  Strikethrough,
+  Code,
+  Link,
+  List,
   ListOrdered,
   Quote,
   Heading1,
@@ -14,89 +15,32 @@ import {
   CheckSquare,
   FileText
 } from 'lucide-react';
+import { formatActions } from '../lib/markdown-format';
+import { actionTitle } from '../lib/editor-shortcuts';
 
-export default function MarkdownToolbar({ onInsert, onTemplate }) {
-  const insertMarkdown = (before, after = '', placeholder = '') => {
-    if (onInsert) {
-      onInsert(before, after, placeholder);
-    }
-  };
+/** The icon of each format action of markdown-format.js. */
+const icons = {
+  h1: Heading1,
+  h2: Heading2,
+  h3: Heading3,
+  bold: Bold,
+  italic: Italic,
+  strike: Strikethrough,
+  code: Code,
+  link: Link,
+  ul: List,
+  ol: ListOrdered,
+  task: CheckSquare,
+  quote: Quote,
+  table: Table,
+};
 
-  const buttons = [
-    {
-      icon: Heading1,
-      title: 'Heading 1',
-      action: () => insertMarkdown('# ', '', 'Heading 1'),
-    },
-    {
-      icon: Heading2,
-      title: 'Heading 2',
-      action: () => insertMarkdown('## ', '', 'Heading 2'),
-    },
-    {
-      icon: Heading3,
-      title: 'Heading 3',
-      action: () => insertMarkdown('### ', '', 'Heading 3'),
-    },
-    { divider: true },
-    {
-      icon: Bold,
-      title: 'Bold',
-      action: () => insertMarkdown('**', '**', 'bold text'),
-    },
-    {
-      icon: Italic,
-      title: 'Italic',
-      action: () => insertMarkdown('*', '*', 'italic text'),
-    },
-    {
-      icon: Strikethrough,
-      title: 'Strikethrough',
-      action: () => insertMarkdown('~~', '~~', 'strikethrough text'),
-    },
-    {
-      icon: Code,
-      title: 'Inline Code',
-      action: () => insertMarkdown('`', '`', 'code'),
-    },
-    { divider: true },
-    {
-      icon: Link,
-      title: 'Link',
-      action: () => insertMarkdown('[', '](url)', 'link text'),
-    },
-    {
-      icon: List,
-      title: 'Bullet List',
-      action: () => insertMarkdown('- ', '', 'list item'),
-    },
-    {
-      icon: ListOrdered,
-      title: 'Numbered List',
-      action: () => insertMarkdown('1. ', '', 'list item'),
-    },
-    {
-      icon: CheckSquare,
-      title: 'Task List',
-      action: () => insertMarkdown('- [ ] ', '', 'task item'),
-    },
-    { divider: true },
-    {
-      icon: Quote,
-      title: 'Blockquote',
-      action: () => insertMarkdown('> ', '', 'quote'),
-    },
-    {
-      icon: Table,
-      title: 'Table',
-      action: () => insertMarkdown(
-        '| Header 1 | Header 2 |\n| -------- | -------- |\n| Cell 1   | Cell 2   |\n',
-        '',
-        ''
-      ),
-    },
-  ];
-
+/**
+ * MarkdownToolbar: the templates menu and one button per format action.
+ * A button calls `onFormat(actionId)` — the entry point the editor's
+ * keyboard shortcuts use too (FE-016) — and its tooltip names the shortcut.
+ */
+export default function MarkdownToolbar({ onFormat, onTemplate, isMac = false }) {
   return (
     <div className="flex items-center space-x-1 px-2 py-1 bg-gray-50 border-b border-gray-200 flex-wrap">
       {/* Template Dropdown */}
@@ -147,22 +91,25 @@ export default function MarkdownToolbar({ onInsert, onTemplate }) {
         </>
       )}
 
-      {/* Formatting Buttons */}
-      {buttons.map((button, index) => {
-        if (button.divider) {
-          return <div key={`divider-${index}`} className="w-px h-6 bg-gray-300" />;
-        }
-
-        const Icon = button.icon;
+      {/* Formatting Buttons: a divider between groups */}
+      {formatActions.map((action, index) => {
+        const Icon = icons[action.id];
+        const title = actionTitle(action, isMac);
         return (
-          <button
-            key={index}
-            onClick={button.action}
-            className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
-            title={button.title}
-          >
-            <Icon className="w-4 h-4" />
-          </button>
+          <Fragment key={action.id}>
+            {index > 0 && action.group !== formatActions[index - 1].group && (
+              <div className="w-px h-6 bg-gray-300" />
+            )}
+            <button
+              type="button"
+              onClick={() => onFormat?.(action.id)}
+              className="p-1.5 text-gray-600 hover:bg-gray-200 rounded transition-colors"
+              title={title}
+              aria-label={title}
+            >
+              <Icon className="w-4 h-4" aria-hidden="true" />
+            </button>
+          </Fragment>
         );
       })}
     </div>

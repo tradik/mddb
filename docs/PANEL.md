@@ -43,6 +43,9 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   ![Edit Document dialog: metadata rows and the Markdown editor in split view, source on the left and the rendered preview on the right](panel-document-editor.png)
 
 - **Markdown toolbar** - Quick formatting (bold, italic, headings, lists, tables, etc.)
+- **Keyboard shortcuts** (2.19.7) - `Ctrl/Cmd+B`, `I`, `K` format, `Ctrl/Cmd+S` saves, `Tab` indents list items, `?` lists them all (see [Keyboard Shortcuts](#keyboard-shortcuts))
+- **Drafts** (2.19.7) - unsaved edits survive a reload, an expired session or a closed tab; saves never silently overwrite a newer server revision (see [Drafts and revision conflicts](#drafts-and-revision-conflicts))
+- **Collection spelling** (2.19.7) - an opt-in check of the editor text against the collection's spelling dictionary (see [Spelling against the collection dictionary](#spelling-against-the-collection-dictionary))
 - **Syntax highlighting** - Code blocks with 100+ language support
 - **Templates** - Pre-built templates for common document types, plus your
   team's own templates kept in the `_templates` collection (2.19.7)
@@ -584,6 +587,7 @@ and bars and other meaningful graphics meet SC 1.4.11 (3:1):
 | Quota bar fill: under 80% / 80–99% / at the limit | `primary-700`, `amber-700`, `red-700` | 4.8:1, 4.1:1, 5.2:1 against the track |
 | Warning / error notes on white | `amber-800`, `red-700` | 7.1:1, 6.5:1 |
 | *Enabled* label on the Config page | `green-700` | 5.0:1 |
+| Draft, conflict and spelling notes (2.19.7) | `amber-900` on `amber-50`, white on `amber-800` buttons | 9.6:1, 7.1:1 |
 | Diff lines added / removed, chat notes (#404) | `green-900` on `green-50`, `red-900` on `red-50`, `amber-900` on `amber-50` | 9.9:1, 9.3:1, 9.6:1 |
 
 Colour never carries a state alone: every bar has its numbers as text, and
@@ -789,8 +793,8 @@ Both development and production servers proxy `/v1/*` requests to mddbd:
    - **Edit Mode**: Write markdown in the editor
    - **Preview Mode**: See rendered markdown with syntax highlighting
    - **Split Mode**: Edit and preview side-by-side (default)
-   - **Fullscreen**: Toggle fullscreen for better focus
-   - **Toolbar**: Quick formatting buttons
+   - **Fullscreen**: Toggle fullscreen for better focus; `Esc` leaves it
+   - **Toolbar**: Quick formatting buttons (each tooltip names its shortcut, if it has one)
      - Headings (H1, H2, H3)
      - Bold, Italic, Strikethrough
      - Inline code
@@ -812,9 +816,59 @@ Both development and production servers proxy `/v1/*` requests to mddbd:
    - See character, line, and word count
    - All changes are tracked
 
-5. **Save Changes**: Click "Save Changes" to update the document.
+5. **Save Changes**: Click "Save Changes" (or press `Ctrl/Cmd+S` in the editor) to update the document.
 
 6. **Success**: Document is updated and a new revision is created.
+
+#### Drafts and revision conflicts
+
+Since 2.19.7 the editor keeps unsaved changes as a **draft** in the
+browser's `localStorage`, one second after typing pauses, and at once when the
+editor closes or the page is left. While changes are unsaved, leaving or
+reloading the page asks for confirmation first.
+
+- **Key**: `draft:<panel host>:<collection>:<key>:<lang>`. A draft holds the
+  Markdown, the metadata, the revision the edit started from and the time it
+  was saved — never a token or any other credential. When the browser blocks
+  storage (private mode, quota, policy) no drafts are kept and nothing fails.
+- **Opening a document** with a draft that differs from it shows *This
+  document has an unsaved draft from …* above the metadata, with *Open in
+  editor* and *Discard draft*.
+- **Opening the editor** with such a draft shows a banner: *Restore draft*,
+  *Discard draft*, and *Show changes* (a line diff of the draft against the
+  document). If the document has a newer revision than the one the draft
+  started from, the banner says so. Autosave waits until you restore or
+  discard, so the older draft is not overwritten.
+- **Going back** to the stored text and metadata removes the draft; a
+  successful save removes it as well.
+- **Saving is conditional**: the editor sends `expectedRevision` (the revision
+  the edit — or the restored draft — started from) with `POST /v1/add`. If
+  someone saved the document in the meantime the server answers `409` and the
+  editor shows *Not saved: the document changed on the server* with both
+  revisions; your text stays in the editor and in the draft. *Save my version
+  anyway* saves again, conditional on the revision just reported, so it can
+  only replace the version you were told about.
+
+#### Spelling against the collection dictionary
+
+The editor's browser spellcheck works as before. Below the editor, *Check
+spelling against the collection dictionary* (off by default, not remembered)
+checks the text with the server's spell index (`POST /v1/spell-suggest`):
+
+- The panel sends a plain list of words — prose only: fenced and inline code,
+  link targets, HTML tags, URLs and e-mail addresses are left out, and words
+  shorter than three letters are skipped as the server skips them. The server
+  splits its text on whitespace only, so a word sent with punctuation would
+  come back as a misspelling of itself; sending words avoids that.
+- A request goes 1.5 s after typing pauses and carries only words not checked
+  before (at most 200; a longer text is checked over several requests). The
+  answers are kept per collection and language while the editor is open.
+- The server looks a word up in the collection's dictionary first and then in
+  its dictionary for the language (the document's language).
+- Each suggestion is listed as *word → correction* with *Replace*, which
+  replaces every whole-word occurrence, keeping capitals (`Teh` → `The`).
+- When the spell module is off or its index is still loading, the error is
+  shown once; the check is not retried until the text has new words.
 
 ### Creating New Documents
 
@@ -834,9 +888,30 @@ Both development and production servers proxy `/v1/*` requests to mddbd:
 
 ### Keyboard Shortcuts
 
-- `Esc` - Close document viewer, editor, or filter panel
-- `Ctrl/Cmd + C` - Copy document content (when viewer is open)
-- `Enter` - Add metadata field (when in metadata input)
+Since 2.19.7 (`Ctrl` on Windows and Linux, `Cmd` on macOS). Press `?` anywhere
+outside a form field for this list in the panel.
+
+In the Markdown editor (the toolbar buttons and these keys run the same
+actions; each button's tooltip names its key):
+
+| Keys | Action |
+|------|--------|
+| `Ctrl/Cmd+B` | Bold |
+| `Ctrl/Cmd+I` | Italic |
+| `Ctrl/Cmd+K` | Link |
+| `Ctrl/Cmd+S` | Save the document (Edit Document) or create it (New Document, once a key is set) — the browser's *Save page* does not open |
+| `Tab` / `Shift+Tab` | Indent / outdent the selected list items by two spaces. Outside a list `Tab` moves the focus as usual, so the editor is no keyboard trap |
+| `Esc` | Leave the editor's fullscreen mode |
+
+Anywhere in the panel, when the focus is not in a form field:
+
+| Keys | Action |
+|------|--------|
+| `/` | Focus *Search the menu* |
+| `?` | Show the list of shortcuts (`Esc` or *Close* closes it) |
+
+Also: `Enter` adds a metadata field (in the metadata value input), `Escape`
+clears *Search the menu*.
 
 ## Architecture
 
@@ -878,6 +953,12 @@ services/mddb-panel/
 │   │   ├── MarkdownEditor.jsx   # Markdown editor with preview
 │   │   ├── MarkdownView.jsx     # Markdown renderer shared by the preview and the document viewer
 │   │   ├── MarkdownToolbar.jsx  # Formatting toolbar
+│   │   ├── CollectionSpelling.jsx # Opt-in collection spelling below the editor (2.19.7)
+│   │   ├── DraftNotice.jsx      # "Unsaved draft" note in the viewer (2.19.7)
+│   │   ├── DraftRestoreBanner.jsx # Restore / discard a draft in the editor (2.19.7)
+│   │   ├── RevisionConflictNotice.jsx # A save refused with 409 (2.19.7)
+│   │   ├── GlobalShortcuts.jsx  # `/` and `?` anywhere in the panel (2.19.7)
+│   │   ├── ShortcutsDialog.jsx  # The list of shortcuts (2.19.7)
 │   │   ├── EndpointsPanel.jsx   # API endpoints browser
 │   │   ├── ChatScenariosPanel.jsx      # Chat scenarios: list, save, delete
 │   │   ├── ChatScenarioForm.jsx        # Scenario editor (prompt, collections, skills)
@@ -916,6 +997,12 @@ services/mddb-panel/
 │   │   ├── meta-diff.js         # Metadata diff
 │   │   ├── document-html.js     # The standalone page of an HTML export
 │   │   ├── document-export.jsx  # Download HTML
+│   │   ├── markdown-format.js   # Format actions shared by the toolbar and the keys (2.19.7)
+│   │   ├── editor-shortcuts.js  # Key events to commands, the shortcut list (2.19.7)
+│   │   ├── drafts.js            # Drafts in localStorage (2.19.7)
+│   │   ├── use-draft.js         # Draft autosave and the leave-page warning (2.19.7)
+│   │   ├── spell-words.js       # The word list sent for spelling, Replace (2.19.7)
+│   │   ├── use-collection-spelling.js # Debounced, cached spelling requests (2.19.7)
 │   │   └── store.js             # Zustand store
 │   ├── App.jsx                  # Main application
 │   ├── main.jsx                 # Entry point

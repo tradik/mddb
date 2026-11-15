@@ -42,6 +42,7 @@ import FeaturesPanel from './components/FeaturesPanel';
 import FeatureDisabledNotice from './components/FeatureDisabledNotice';
 import { useFeatures, disabledFeatureForView } from './lib/features';
 import ComplianceBanner from './components/ComplianceBanner';
+import GlobalShortcuts from './components/GlobalShortcuts';
 import SSEToast from './components/SSEToast';
 import { useSSE } from './lib/useSSE';
 // 2.19.0: memory, schemas, duplicates, import and account pages.
@@ -170,6 +171,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-50">
       <ComplianceBanner />
+      <GlobalShortcuts />
       <Header onRefresh={loadStats} />
 
       <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>

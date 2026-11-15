@@ -46,6 +46,9 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - ⏱️ **TTL & classify** (2.19.0) - In the document viewer: set or remove expiry (`/v1/set-ttl`), zero-shot labels (`/v1/classify`)
 - 🧰 **Maintenance** (2.19.0) - On the System page: checksum, export (NDJSON/ZIP), truncate revisions, back up now, restore
 - 🕸️ **Code graph, geo tools, temporal events, spell cleanup** (2.19.0) - `/v1/code-graph`; bounding box, polygon, geohash and geo reindex; one document's events; `/v1/spell-cleanup`
+- ⌨️ **Editor shortcuts** (2.19.7) - `Ctrl/Cmd+B`, `I`, `K`, `S`, `Tab` for list indent, `Esc` leaves fullscreen; `/` focuses the menu search, `?` lists every shortcut
+- 💾 **Drafts** (2.19.7) - Unsaved edits are kept in `localStorage` and offered for restore; saves send `expectedRevision`, so a newer server version is reported (409), not overwritten
+- 🔤 **Collection spelling** (2.19.7) - Opt-in check of the editor text against the collection's spelling dictionary (`/v1/spell-suggest`), with *Replace*
 
 ## Screenshots
 

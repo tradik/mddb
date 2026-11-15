@@ -8,8 +8,11 @@ import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 
 vi.mock('../lib/mddb-client', () => ({ default: { addDocument: vi.fn() } }));
 vi.mock('./MarkdownEditor', () => ({
-  default: ({ value, onChange }) => (
-    <textarea aria-label="markdown" value={value} onChange={(e) => onChange(e.target.value)} />
+  default: ({ value, onChange, onSave }) => (
+    <>
+      <textarea aria-label="markdown" value={value} onChange={(e) => onChange(e.target.value)} />
+      <button type="button" onClick={onSave}>editor save</button>
+    </>
   ),
 }));
 
@@ -137,6 +140,28 @@ describe('NewDocumentModal', () => {
     expect(mddbClient.addDocument).toHaveBeenCalledWith({
       collection: 'blog', key: 'standup', lang: 'en_US', meta: { type: ['notes'] }, contentMd: '# Meeting',
     });
+  });
+
+  test('Ctrl/Cmd+S in the editor creates, but only once a key is typed and not twice (FE-016)', async () => {
+    let finish;
+    mddbClient.addDocument.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { keyInput, onClose } = setup();
+    fireEvent.click(screen.getByRole('button', { name: 'editor save' }));
+    expect(mddbClient.addDocument).not.toHaveBeenCalled();
+    fireEvent.change(keyInput, { target: { value: 'hello' } });
+    fireEvent.click(screen.getByRole('button', { name: 'editor save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'editor save' }));
+    expect(mddbClient.addDocument).toHaveBeenCalledTimes(1);
+    await act(async () => finish({}));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('without a language Ctrl/Cmd+S does nothing', () => {
+    const { keyInput } = setup();
+    fireEvent.change(keyInput, { target: { value: 'hello' } });
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'editor save' }));
+    expect(mddbClient.addDocument).not.toHaveBeenCalled();
   });
 
   test('Cancel and the X button close without saving', () => {

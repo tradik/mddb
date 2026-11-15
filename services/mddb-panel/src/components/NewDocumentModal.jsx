@@ -203,6 +203,7 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
               <MarkdownEditor
                 value={contentMd}
                 onChange={setContentMd}
+                onSave={() => { if (!creating && key && lang) handleCreate(); }}
                 placeholder="# New Document&#10;&#10;Start writing your markdown content here..."
               />
             </div>

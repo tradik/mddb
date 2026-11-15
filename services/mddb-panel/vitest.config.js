@@ -241,6 +241,22 @@ const coverageFiles = [
   'src/components/DocumentPrintView.jsx',
   'src/components/TemplatePicker.jsx',
   'src/components/SaveTemplateDialog.jsx',
+  // 2.19.7: editor keyboard shortcuts (FE-016), draft autosave with
+  // conditional saves (FE-019), collection spelling in the editor (FE-020).
+  'src/lib/markdown-format.js',
+  'src/lib/editor-shortcuts.js',
+  'src/lib/drafts.js',
+  'src/lib/use-draft.js',
+  'src/lib/spell-words.js',
+  'src/lib/use-collection-spelling.js',
+  'src/components/MarkdownToolbar.jsx',
+  'src/components/GlobalShortcuts.jsx',
+  'src/components/ShortcutsDialog.jsx',
+  'src/components/DocumentEditor.jsx',
+  'src/components/DraftNotice.jsx',
+  'src/components/DraftRestoreBanner.jsx',
+  'src/components/RevisionConflictNotice.jsx',
+  'src/components/CollectionSpelling.jsx',
 ];
 
 export default mergeConfig(
