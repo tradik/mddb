@@ -80,11 +80,9 @@ func (m *spellModel) suggest(token string) (SpellSuggestion, bool) {
 		return SpellSuggestion{}, false
 	}
 
-	// Confidence: inversely proportional to edit distance, weighted by freq
+	// Confidence: inversely proportional to edit distance. Candidates are
+	// limited to distance 1–2 above, so this is 0.65 or 0.30.
 	confidence := 1.0 - float64(best.dist)*0.35
-	if confidence < 0.1 {
-		confidence = 0.1
-	}
 
 	return SpellSuggestion{
 		Original:   token,
@@ -142,35 +140,39 @@ func (sm *SpellManager) LoadAll() {
 				return nil
 			}
 			return b.ForEach(func(k, v []byte) error {
-				ks := string(k)
-				parts := strings.SplitN(ks, "|", 3) // lang|word  or  col|collection|lang|word
-				if len(parts) < 2 {
+				key, word, ok := parseDictKey(string(k))
+				if !ok {
 					return nil
-				}
-				var modelKey, word string
-				if parts[0] == "col" && len(parts) == 3 {
-					// collection-specific: "col|{collection}|{lang}|{word}" but SplitN(3) gives ["col", "collection", "lang|word"]
-					sub := strings.SplitN(parts[2], "|", 2)
-					if len(sub) != 2 {
-						return nil
-					}
-					modelKey = "col:" + parts[1] + ":" + sub[0]
-					word = sub[1]
-				} else {
-					// global language dict: "{lang}|{word}"
-					modelKey = parts[0]
-					word = parts[1]
 				}
 				var freq uint32
 				if len(v) == 4 {
 					freq = binary.LittleEndian.Uint32(v)
 				}
-				sm.getOrCreate(modelKey).train(word, freq)
+				sm.getOrCreate(key).train(word, freq)
 				return nil
 			})
 		})
 		sm.ready.Store(true)
 	}()
+}
+
+// parseDictKey splits a stored dictionary key into the model it trains and
+// the word: "{lang}|{word}" is a global language dictionary,
+// "col|{collection}|{lang}|{word}" a collection's. ok is false for keys in
+// neither shape.
+func parseDictKey(ks string) (model, word string, ok bool) {
+	parts := strings.SplitN(ks, "|", 3)
+	if len(parts) < 2 {
+		return "", "", false
+	}
+	if parts[0] != "col" || len(parts) != 3 {
+		return parts[0], parts[1], true
+	}
+	sub := strings.SplitN(parts[2], "|", 2)
+	if len(sub) != 2 {
+		return "", "", false
+	}
+	return "col:" + parts[1] + ":" + sub[0], sub[1], true
 }
 
 // getOrCreate returns (creating if needed) the model for the given key.
@@ -311,24 +313,22 @@ func (sm *SpellManager) Suggest(collection, lang, text string, maxSuggestions in
 
 	for i, tok := range tokens {
 		correctedParts[i] = tok
-		if !isSpellableToken(tok) {
+		lead, word, trail := splitPunctuation(tok)
+		if !isSpellableToken(word) {
 			continue
 		}
 		// Prefer collection-specific model, fall back to global
-		if sug, ok := colModel.suggest(tok); ok {
-			correctedParts[i] = sug.Corrected
-			suggestions = append(suggestions, sug)
-			if len(suggestions) >= maxSuggestions {
-				break
-			}
+		sug, ok := colModel.suggest(word)
+		if !ok {
+			sug, ok = globalModel.suggest(word)
+		}
+		if !ok {
 			continue
 		}
-		if sug, ok := globalModel.suggest(tok); ok {
-			correctedParts[i] = sug.Corrected
-			suggestions = append(suggestions, sug)
-			if len(suggestions) >= maxSuggestions {
-				break
-			}
+		correctedParts[i] = lead + sug.Corrected + trail
+		suggestions = append(suggestions, sug)
+		if len(suggestions) >= maxSuggestions {
+			break
 		}
 	}
 
@@ -346,6 +346,19 @@ func tokenizeForSpell(text string) []string {
 	return strings.FieldsFunc(text, func(r rune) bool {
 		return unicode.IsSpace(r)
 	})
+}
+
+// splitPunctuation separates the punctuation and symbols around a token, so
+// prose like "word," or "(word)." is checked as "word" and the corrected text
+// keeps the punctuation where it was. Punctuation inside a word ("don't",
+// "e-mail") stays part of it.
+func splitPunctuation(tok string) (lead, word, trail string) {
+	isMark := func(r rune) bool { return unicode.IsPunct(r) || unicode.IsSymbol(r) }
+	word = strings.TrimLeftFunc(tok, isMark)
+	lead = tok[:len(tok)-len(word)]
+	trimmed := strings.TrimRightFunc(word, isMark)
+	trail = word[len(trimmed):]
+	return lead, trimmed, trail
 }
 
 // isSpellableToken returns true for tokens that look like natural-language words
