@@ -201,6 +201,21 @@ A separate `mddb.MDDBReplication` service exposes 4 additional RPCs for leader/f
 
 Full service definition: [`proto/mddb.proto`](https://github.com/tradik/mddb/blob/main/proto/mddb.proto)
 
+### New in v2.19.6
+
+Conditional create and delete, and the revision in search results (see
+[conditional writes](API.md#patch-v1update)). New fields, additive with new
+numbers:
+
+| Message | Field | Number | Meaning |
+|---|---|---|---|
+| `AddRequest` | `if_absent` | 8 | Create only: `ABORTED`, nothing written, when the document exists (#423) |
+| `DeleteDocumentRequest` | `expected_revision` | 4 | Delete only at this revision; otherwise `ABORTED`, also for a missing document (#424) |
+
+`Search` now fills `Document.revision` (9) on each result, the value `Get`
+returns (#425). The checks run in the write's own transaction, so of two
+racing creates exactly one succeeds.
+
 ### New in v2.19.3
 
 `CodeSymbol` answers from semantic facts where documents carry them

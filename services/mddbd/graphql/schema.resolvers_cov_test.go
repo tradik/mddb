@@ -54,7 +54,7 @@ func (s *covFServer) AddDocument(_ context.Context, in AddDocumentInput) (*Docum
 func (s *covFServer) UpdateDocument(_ context.Context, in UpdateDocumentInput) (*Document, error) {
 	return covFReply(s, &Document{ID: "update"}, "UpdateDocument", in.Collection)
 }
-func (s *covFServer) DeleteDocument(_ context.Context, c, k, l string) error {
+func (s *covFServer) DeleteDocument(_ context.Context, c, k, l string, _ *string) error {
 	return covFErr(s, "DeleteDocument", c, k, l)
 }
 func (s *covFServer) DeleteCollection(_ context.Context, c string) (int, error) {
@@ -184,7 +184,7 @@ func covFCases() []covFCase {
 			return m.UpdateDocument(ctx, UpdateDocumentInput{Collection: "docs"})
 		}},
 		{"DeleteDocument", "DeleteDocument docs k1 en", func(ctx context.Context, m MutationResolver, _ QueryResolver) (any, error) {
-			return m.DeleteDocument(ctx, "docs", "k1", "en")
+			return m.DeleteDocument(ctx, "docs", "k1", "en", nil)
 		}},
 		{"DeleteCollection", "DeleteCollection docs", func(ctx context.Context, m MutationResolver, _ QueryResolver) (any, error) {
 			return m.DeleteCollection(ctx, "docs")

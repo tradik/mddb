@@ -104,6 +104,7 @@ func (a *GraphQLAdapter) AddDocument(ctx context.Context, input gql.AddDocumentI
 		Lang:       input.Lang,
 		Meta:       gql.MapMetaInputToInternal(input.Meta),
 		ContentMD:  input.ContentMd,
+		IfAbsent:   derefBool(input.IfAbsent, false),
 	})
 	if err != nil {
 		return nil, err
@@ -144,14 +145,15 @@ func (a *GraphQLAdapter) UpdateDocument(ctx context.Context, input gql.UpdateDoc
 	return mcpDocToGQL(doc), nil
 }
 
-func (a *GraphQLAdapter) DeleteDocument(ctx context.Context, collection, key, lang string) error {
+func (a *GraphQLAdapter) DeleteDocument(ctx context.Context, collection, key, lang string, expectedRevision *string) error {
 	if _, err := a.requireAuthenticated(ctx); err != nil {
 		return err
 	}
 	if err := a.CheckPermission(ctx, collection, int(PermWrite)); err != nil {
 		return err
 	}
-	return a.mcp.Delete(ctx, &MCPDeleteRequest{Collection: collection, Key: key, Lang: lang})
+	return a.mcp.Delete(ctx, &MCPDeleteRequest{Collection: collection, Key: key, Lang: lang,
+		ExpectedRevision: derefString(expectedRevision)})
 }
 
 func (a *GraphQLAdapter) DeleteCollection(ctx context.Context, collection string) (int, error) {

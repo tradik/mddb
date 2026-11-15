@@ -163,7 +163,7 @@ func TestGraphQLE2E_DeleteDocument(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
-	if err := a.DeleteDocument(ctx, "tmp", "soon-gone", "en_US"); err != nil {
+	if err := a.DeleteDocument(ctx, "tmp", "soon-gone", "en_US", nil); err != nil {
 		t.Fatalf("DeleteDocument: %v", err)
 	}
 	// Subsequent get should fail (document gone).

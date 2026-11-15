@@ -383,12 +383,8 @@ func (g *GRPCServer) DeleteDocument(ctx context.Context, req *proto.DeleteDocume
 	if req.Collection == "" || req.Key == "" || req.Lang == "" {
 		return nil, status.Error(codes.InvalidArgument, "missing required fields: collection, key, lang")
 	}
-	if err := g.server.deleteDocumentInternal(req.Collection, req.Key, req.Lang); err != nil {
-		// A missing document is the caller's NotFound, not a server fault.
-		if errors.Is(err, errNotFound) {
-			return nil, status.Error(codes.NotFound, err.Error())
-		}
-		return nil, status.Error(codes.Internal, err.Error())
+	if err := g.server.deleteDocumentIf(req.Collection, req.Key, req.Lang, req.ExpectedRevision); err != nil {
+		return nil, grpcDeleteError(err)
 	}
 	return &proto.DeleteDocumentResponse{
 		Status:     "deleted",
@@ -596,4 +592,19 @@ func anyNonBlank(ss []string) bool {
 		}
 	}
 	return false
+}
+
+// grpcDeleteError maps a failed delete to its status: a missing document is
+// the caller's NotFound and a lost conditional delete ABORTED, as for
+// UpdateDocument (#424), not a server fault.
+func grpcDeleteError(err error) error {
+	var conflict *RevisionConflictError
+	switch {
+	case errors.Is(err, errNotFound):
+		return status.Error(codes.NotFound, err.Error())
+	case errors.As(err, &conflict):
+		return status.Error(codes.Aborted, conflict.Error())
+	default:
+		return status.Error(codes.Internal, err.Error())
+	}
 }

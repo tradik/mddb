@@ -379,6 +379,8 @@ input AddDocumentInput {
   meta: [MetaInput!]
   contentMd: String!
   ttl: Int
+  "Create only: when the document already exists, fail with a revision conflict and write nothing (#423)."
+  ifAbsent: Boolean
 }
 
 input UpdateDocumentInput {
@@ -637,7 +639,8 @@ type Mutation {
   # Document operations
   addDocument(input: AddDocumentInput!): Document! @auth
   updateDocument(input: UpdateDocumentInput!): Document! @auth
-  deleteDocument(collection: String!, key: String!, lang: String!): Boolean! @auth
+  "Deletes a document; with expectedRevision, only while it is still at that revision, otherwise a revision conflict (#424)."
+  deleteDocument(collection: String!, key: String!, lang: String!, expectedRevision: String): Boolean! @auth
   deleteCollection(collection: String!): Int! @auth
 
   # Batch operations

@@ -229,7 +229,7 @@ type ComplexityRoot struct {
 		CreateAPIKey       func(childComplexity int, input CreateAPIKeyInput) int
 		CreateGroup        func(childComplexity int, input CreateGroupInput) int
 		DeleteCollection   func(childComplexity int, collection string) int
-		DeleteDocument     func(childComplexity int, collection string, key string, lang string) int
+		DeleteDocument     func(childComplexity int, collection string, key string, lang string, expectedRevision *string) int
 		DeleteGroup        func(childComplexity int, name string) int
 		DeleteSchema       func(childComplexity int, collection string) int
 		DeleteWebhook      func(childComplexity int, id string) int
@@ -406,7 +406,7 @@ type ComplexityRoot struct {
 type MutationResolver interface {
 	AddDocument(ctx context.Context, input AddDocumentInput) (*Document, error)
 	UpdateDocument(ctx context.Context, input UpdateDocumentInput) (*Document, error)
-	DeleteDocument(ctx context.Context, collection string, key string, lang string) (bool, error)
+	DeleteDocument(ctx context.Context, collection string, key string, lang string, expectedRevision *string) (bool, error)
 	DeleteCollection(ctx context.Context, collection string) (int, error)
 	AddBatch(ctx context.Context, collection string, documents []*AddBatchDocumentInput) (*BatchAddResult, error)
 	IngestDocuments(ctx context.Context, collection string, documents []*IngestDocumentInput, options *IngestOptionsInput) (*IngestResult, error)
@@ -1300,7 +1300,7 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Mutation.DeleteDocument(childComplexity, args["collection"].(string), args["key"].(string), args["lang"].(string)), true
+		return e.ComplexityRoot.Mutation.DeleteDocument(childComplexity, args["collection"].(string), args["key"].(string), args["lang"].(string), args["expectedRevision"].(*string)), true
 	case "Mutation.deleteGroup":
 		if e.ComplexityRoot.Mutation.DeleteGroup == nil {
 			break
@@ -3134,6 +3134,14 @@ func (ec *executionContext) field_Mutation_deleteDocument_args(ctx context.Conte
 		return nil, err
 	}
 	args["lang"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "expectedRevision",
+		func(ctx context.Context, v any) (*string, error) {
+			return ec.unmarshalOString2ᚖstring(ctx, v)
+		})
+	if err != nil {
+		return nil, err
+	}
+	args["expectedRevision"] = arg3
 	return args, nil
 }
 
@@ -6916,7 +6924,7 @@ func (ec *executionContext) _Mutation_deleteDocument(ctx context.Context, field 
 		},
 		func(ctx context.Context) (any, error) {
 			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Mutation().DeleteDocument(ctx, fc.Args["collection"].(string), fc.Args["key"].(string), fc.Args["lang"].(string))
+			return ec.Resolvers.Mutation().DeleteDocument(ctx, fc.Args["collection"].(string), fc.Args["key"].(string), fc.Args["lang"].(string), fc.Args["expectedRevision"].(*string))
 		},
 		func(ctx context.Context, next graphql.Resolver) graphql.Resolver {
 			directive0 := next
@@ -12334,7 +12342,7 @@ func (ec *executionContext) unmarshalInputAddDocumentInput(ctx context.Context, 
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"collection", "key", "lang", "meta", "contentMd", "ttl"}
+	fieldsInOrder := [...]string{"collection", "key", "lang", "meta", "contentMd", "ttl", "ifAbsent"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
@@ -12383,6 +12391,13 @@ func (ec *executionContext) unmarshalInputAddDocumentInput(ctx context.Context, 
 				return it, err
 			}
 			it.TTL = data
+		case "ifAbsent":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("ifAbsent"))
+			data, err := ec.unmarshalOBoolean2ᚖbool(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.IfAbsent = data
 		}
 	}
 	return it, nil

@@ -460,7 +460,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/AddResponse"
         "409":
-          description: expectedRevision did not match; nothing was written
+          description: |
+            expectedRevision did not match, or (v2.19.6, #423) ifAbsent was set
+            and the document exists — then expectedRevision is empty and
+            currentRevision is the existing document's. Nothing was written.
           content:
             application/json:
               schema:
@@ -857,7 +860,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Document"
+                  $ref: "#/components/schemas/ListedDocument"
         "400":
           description: Invalid request
           content:
@@ -870,7 +873,10 @@ paths:
       tags:
         - Documents
       summary: Delete document
-      description: Delete a specific document by collection, key, and language
+      description: |
+        Delete a specific document by collection, key, and language. With
+        expectedRevision (v2.19.6, #424) only while the document is still at
+        that revision.
       operationId: deleteDocument
       requestBody:
         required: true
@@ -901,6 +907,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: |
+            (v2.19.6, #424) expectedRevision did not match; nothing was
+            deleted. currentRevision is empty when the document does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevisionConflict"
         "403":
           description: Read-only mode
           content:
@@ -9959,6 +9973,16 @@ components:
           description: Unix timestamp when document was last updated
           example: 1704931200
 
+    ListedDocument:
+      description: A POST /v1/search result.
+      allOf:
+        - $ref: '#/components/schemas/Document'
+        - type: object
+          properties:
+            revision:
+              type: string
+              description: (v2.19.6, #425) The revision POST /v1/get reports for this document; send it back as expectedRevision.
+
     AddRequest:
       type: object
       required:
@@ -9970,6 +9994,9 @@ components:
         expectedRevision:
           type: string
           description: '(v2.18.8, INT-021) Write only if the document is at this revision; 409 otherwise, including when it does not exist yet.'
+        ifAbsent:
+          type: boolean
+          description: '(v2.19.6, #423) Create only: 409 with the current revision, and nothing written, when the document exists. A document past its TTL counts as absent. 400 when combined with expectedRevision.'
         collection:
           type: string
           description: Collection name
@@ -10708,6 +10735,9 @@ components:
           type: string
           description: Language code
           example: en_US
+        expectedRevision:
+          type: string
+          description: '(v2.19.6, #424) Delete only if the document is at this revision; 409 otherwise, including when it does not exist.'
 
     DeleteCollectionRequest:
       type: object

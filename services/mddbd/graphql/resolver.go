@@ -33,7 +33,7 @@ type ServerInterface interface {
 	// --- Documents (Mutation) ---
 	AddDocument(ctx context.Context, input AddDocumentInput) (*Document, error)
 	UpdateDocument(ctx context.Context, input UpdateDocumentInput) (*Document, error)
-	DeleteDocument(ctx context.Context, collection, key, lang string) error
+	DeleteDocument(ctx context.Context, collection, key, lang string, expectedRevision *string) error
 	DeleteCollection(ctx context.Context, collection string) (int, error)
 	AddBatch(ctx context.Context, collection string, docs []*AddBatchDocumentInput) (*BatchAddResult, error)
 	IngestDocuments(ctx context.Context, collection string, docs []*IngestDocumentInput, opts *IngestOptionsInput) (*IngestResult, error)

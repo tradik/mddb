@@ -173,12 +173,18 @@ Add or update a markdown document in a collection.
   },
   "contentMd": "# Welcome\n\nThis is the homepage content.",
   "addedAt": 1699296000,
-  "updatedAt": 1699296000
+  "updatedAt": 1699296000,
+  "revision": "53f8149d734342a9"
 }
 ```
 
+**Optional fields**:
+- `ttl`: seconds until the document expires (0 = never)
+- `expectedRevision` (v2.18.8): write only if the document is still at this revision; otherwise `409 Conflict` — see [conditional writes](#patch-v1update)
+- `ifAbsent` (v2.19.6): create only. When the document already exists the answer is `409 Conflict` with its `currentRevision` and an empty `expectedRevision`, and nothing is written. A document past its TTL counts as absent. Cannot be combined with `expectedRevision` (`400`)
+
 **Features**:
-- Creates a new document or updates an existing one
+- Creates a new document or updates an existing one (`ifAbsent` makes it create-only)
 - Automatically generates a deterministic ID based on collection, key, and lang
 - Maintains revision history
 - Updates metadata indices
@@ -764,7 +770,8 @@ Search for documents in a collection with optional metadata filtering and sortin
     },
     "contentMd": "# Post 1",
     "addedAt": 1699296000,
-    "updatedAt": 1699296100
+    "updatedAt": 1699296100,
+    "revision": "53f8149d734342a9"
   },
   {
     "id": "blog|post2|en_gb",
@@ -776,10 +783,17 @@ Search for documents in a collection with optional metadata filtering and sortin
     },
     "contentMd": "# Post 2",
     "addedAt": 1699295000,
-    "updatedAt": 1699296200
+    "updatedAt": 1699296200,
+    "revision": "9a0c6e1f2b3d4c5e"
   }
 ]
 ```
+
+Each result carries `revision` (v2.19.6), the same value `POST /v1/get`
+returns for that document, so a list can be edited with
+[conditional writes](#patch-v1update) without reading each document first.
+gRPC `Search`, MCP `search_documents` and GraphQL `search` carry it too.
+Full-text, vector and hybrid hits do not.
 
 **Filtering Logic**:
 - Multiple values for the same key are combined with OR
@@ -2778,6 +2792,25 @@ conflict). gRPC `UpdateDocument` takes `expected_revision` and answers
 `ABORTED`; MCP `update_document` and `add_document` take `expected_revision`;
 GraphQL `updateDocument` takes `expectedRevision`.
 
+Since v2.19.6 `POST /v1/search` results carry `revision` as well, and two
+more conditions use the same `409` body:
+
+- **Create only if absent (#423).** `POST /v1/add` with `"ifAbsent": true`
+  writes only when the document does not exist. Otherwise the answer is
+  `409` with the existing document's `currentRevision` and an empty
+  `expectedRevision`. The check runs in the write's own transaction, so two
+  clients creating one key at once cannot both succeed. gRPC `Add` takes
+  `if_absent` (`ABORTED`), MCP `add_document` takes `if_absent`, and
+  GraphQL `addDocument` takes `ifAbsent`. It cannot be combined with
+  `expectedRevision` (`400`). The Elasticsearch-compatible `_create` uses
+  the same check.
+- **Delete only at a revision (#424).** `POST /v1/delete` with
+  `expectedRevision` deletes only while the document is at that revision;
+  a missing document is a conflict with an empty `currentRevision`. gRPC
+  `DeleteDocument` takes `expected_revision` (`ABORTED`), MCP
+  `delete_document` takes `expected_revision`, and GraphQL `deleteDocument`
+  takes `expectedRevision`.
+
 ```bash
 curl -X PATCH http://localhost:11023/v1/update -d '{"collection":"notes","key":"plan.md","lang":"en",
   "contentMd":"# Plan v2","expectedRevision":"53f8149d734342a9"}'
@@ -2846,9 +2879,17 @@ Delete a document from a collection.
 {
   "collection": "blog",
   "key": "homepage",
-  "lang": "en"
+  "lang": "en",
+  "expectedRevision": "53f8149d734342a9"
 }
 ```
+
+`expectedRevision` (optional, v2.19.6) deletes the document only while it
+is still at that revision. Otherwise the answer is `409 Conflict`,
+`{"error":"revision conflict","expectedRevision":"…","currentRevision":"…"}`,
+and nothing is deleted. A missing document is a conflict with an empty
+`currentRevision`. Without it, a delete is unconditional and a missing
+document is `404`, as before.
 
 **Response**:
 ```json

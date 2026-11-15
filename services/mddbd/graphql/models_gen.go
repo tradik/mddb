@@ -31,6 +31,8 @@ type AddDocumentInput struct {
 	Meta       []*MetaInput `json:"meta,omitempty"`
 	ContentMd  string       `json:"contentMd"`
 	TTL        *int         `json:"ttl,omitempty"`
+	// Create only: when the document already exists, fail with a revision conflict and write nothing (#423).
+	IfAbsent *bool `json:"ifAbsent,omitempty"`
 }
 
 type AuthPayload struct {

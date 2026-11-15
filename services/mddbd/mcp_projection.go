@@ -26,7 +26,7 @@ func mcpProjectionActive(fields []string, includeContent bool) bool {
 //   - fields set        -> keep only id, key and the requested meta.<field> keys
 //     (the aggressive shape used by narrow lookups).
 //   - fields empty      -> keep the full document shape (id, key, lang, meta,
-//     timestamps) minus the body.
+//     timestamps, revision) minus the body.
 //   - includeContent    -> content_md is included only when true.
 //
 // The result is a plain map so absent keys are genuinely omitted from the JSON,
@@ -43,6 +43,11 @@ func projectMCPDocument(doc MCPDocument, fields []string, includeContent bool) m
 		m["meta"] = doc.Meta
 		m["added_at"] = doc.AddedAt
 		m["updated_at"] = doc.UpdatedAt
+		// A listing without its bodies is what an editor shows before a
+		// conditional write (#425); the fields shape stays as narrow as asked.
+		if doc.Revision != "" {
+			m["revision"] = doc.Revision
+		}
 	}
 	if includeContent {
 		m["content_md"] = doc.ContentMD

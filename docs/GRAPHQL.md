@@ -259,6 +259,7 @@ query {
         lang
         contentMd
         meta
+        revision
       }
     }
     pageInfo {
@@ -269,6 +270,9 @@ query {
   }
 }
 ```
+
+Each node carries `revision` (v2.19.6), the value `document` returns, ready
+to pass back as `expectedRevision`.
 
 `filter` (v2.18.8+) takes the operator filter from
 [Filter Operators](SEARCH.md#filter-operators-v2188) as a JSON object, on
@@ -572,9 +576,14 @@ mutation {
     id
     key
     addedAt
+    revision
   }
 }
 ```
+
+`ifAbsent: true` (v2.19.6) makes it a create: when the document already
+exists the mutation fails with a revision conflict and writes nothing. It
+cannot be combined with a revision condition.
 
 ### Update Document
 
@@ -603,9 +612,14 @@ mutation {
     collection: "blog"
     key: "my-post"
     lang: "en"
+    expectedRevision: "53f8149d734342a9"  # optional (v2.19.6)
   )
 }
 ```
+
+With `expectedRevision` the document is deleted only while it is still at
+that revision; otherwise, or when it does not exist, the mutation fails with
+a revision conflict.
 
 ### Delete Collection
 

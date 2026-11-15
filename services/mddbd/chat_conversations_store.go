@@ -184,7 +184,7 @@ func (s *Server) chatSave(coll string, conv *ChatConversation) error {
 		"ended":    {strconv.FormatBool(conv.Ended)},
 	}
 	saved, _, err := s.addDocumentWith(coll, conv.ID, chatLang, meta, string(body),
-		int64(conv.RetentionDays)*secondsPerDay, false, "", chatWriteOpts)
+		int64(conv.RetentionDays)*secondsPerDay, false, writeCondition{}, chatWriteOpts)
 	if err != nil {
 		return err
 	}

@@ -61,6 +61,8 @@ type MCPAddRequest struct {
 	SaveRevision bool                `json:"save_revision"`
 	// ExpectedRevision makes the write conditional (INT-021).
 	ExpectedRevision string `json:"expected_revision,omitempty"`
+	// IfAbsent makes it a create (#423): a conflict when the document exists.
+	IfAbsent bool `json:"if_absent,omitempty"`
 }
 
 // MCPGetRequest represents request to get a document.
@@ -102,6 +104,8 @@ type MCPDeleteRequest struct {
 	Collection string `json:"collection"`
 	Key        string `json:"key"`
 	Lang       string `json:"lang"`
+	// ExpectedRevision makes the delete conditional (#424).
+	ExpectedRevision string `json:"expected_revision,omitempty"`
 }
 
 // MCPDeleteCollectionRequest represents request to delete a collection.

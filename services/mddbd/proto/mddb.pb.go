@@ -178,14 +178,17 @@ func (x *MetaValues) GetValues() []string {
 
 // Add/Update document request
 type AddRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
-	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
-	Lang          string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
-	Meta          map[string]*MetaValues `protobuf:"bytes,4,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ContentMd     string                 `protobuf:"bytes,5,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
-	SaveRevision  bool                   `protobuf:"varint,6,opt,name=save_revision,json=saveRevision,proto3" json:"save_revision,omitempty"` // Optional: save revision history (default: false)
-	Ttl           int64                  `protobuf:"varint,7,opt,name=ttl,proto3" json:"ttl,omitempty"`                                       // Optional: time-to-live in seconds (0 = no expiry)
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Collection   string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Key          string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Lang         string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
+	Meta         map[string]*MetaValues `protobuf:"bytes,4,rep,name=meta,proto3" json:"meta,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ContentMd    string                 `protobuf:"bytes,5,opt,name=content_md,json=contentMd,proto3" json:"content_md,omitempty"`
+	SaveRevision bool                   `protobuf:"varint,6,opt,name=save_revision,json=saveRevision,proto3" json:"save_revision,omitempty"` // Optional: save revision history (default: false)
+	Ttl          int64                  `protobuf:"varint,7,opt,name=ttl,proto3" json:"ttl,omitempty"`                                       // Optional: time-to-live in seconds (0 = no expiry)
+	// (v2.19.6, #423) create only: fail with ABORTED, writing nothing, when the
+	// document already exists (an expired one counts as absent).
+	IfAbsent      bool `protobuf:"varint,8,opt,name=if_absent,json=ifAbsent,proto3" json:"if_absent,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -267,6 +270,13 @@ func (x *AddRequest) GetTtl() int64 {
 		return x.Ttl
 	}
 	return 0
+}
+
+func (x *AddRequest) GetIfAbsent() bool {
+	if x != nil {
+		return x.IfAbsent
+	}
+	return false
 }
 
 // Batch add request
@@ -5769,12 +5779,15 @@ func (x *ClassifyResponse) GetDimensions() int32 {
 }
 
 type DeleteDocumentRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Collection    string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
-	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
-	Lang          string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Collection string                 `protobuf:"bytes,1,opt,name=collection,proto3" json:"collection,omitempty"`
+	Key        string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	Lang       string                 `protobuf:"bytes,3,opt,name=lang,proto3" json:"lang,omitempty"`
+	// (v2.19.6, #424) delete only if the document is still at this revision
+	// (Document.revision); otherwise ABORTED. Empty = unconditional.
+	ExpectedRevision string `protobuf:"bytes,4,opt,name=expected_revision,json=expectedRevision,proto3" json:"expected_revision,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *DeleteDocumentRequest) Reset() {
@@ -5824,6 +5837,13 @@ func (x *DeleteDocumentRequest) GetKey() string {
 func (x *DeleteDocumentRequest) GetLang() string {
 	if x != nil {
 		return x.Lang
+	}
+	return ""
+}
+
+func (x *DeleteDocumentRequest) GetExpectedRevision() string {
+	if x != nil {
+		return x.ExpectedRevision
 	}
 	return ""
 }
@@ -22675,7 +22695,7 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"$\n" +
 	"\n" +
 	"MetaValues\x12\x16\n" +
-	"\x06values\x18\x01 \x03(\tR\x06values\"\xa3\x02\n" +
+	"\x06values\x18\x01 \x03(\tR\x06values\"\xc0\x02\n" +
 	"\n" +
 	"AddRequest\x12\x1e\n" +
 	"\n" +
@@ -22687,7 +22707,8 @@ const file_mddb_proto_rawDesc = "" +
 	"\n" +
 	"content_md\x18\x05 \x01(\tR\tcontentMd\x12#\n" +
 	"\rsave_revision\x18\x06 \x01(\bR\fsaveRevision\x12\x10\n" +
-	"\x03ttl\x18\a \x01(\x03R\x03ttl\x1aI\n" +
+	"\x03ttl\x18\a \x01(\x03R\x03ttl\x12\x1b\n" +
+	"\tif_absent\x18\b \x01(\bR\bifAbsent\x1aI\n" +
 	"\tMetaEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12&\n" +
 	"\x05value\x18\x02 \x01(\v2\x10.mddb.MetaValuesR\x05value:\x028\x01\"d\n" +
@@ -23289,13 +23310,14 @@ const file_mddb_proto_rawDesc = "" +
 	"\x05model\x18\x02 \x01(\tR\x05model\x12\x1e\n" +
 	"\n" +
 	"dimensions\x18\x03 \x01(\x05R\n" +
-	"dimensions\"]\n" +
+	"dimensions\"\x8a\x01\n" +
 	"\x15DeleteDocumentRequest\x12\x1e\n" +
 	"\n" +
 	"collection\x18\x01 \x01(\tR\n" +
 	"collection\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\x12\x12\n" +
-	"\x04lang\x18\x03 \x01(\tR\x04lang\"v\n" +
+	"\x04lang\x18\x03 \x01(\tR\x04lang\x12+\n" +
+	"\x11expected_revision\x18\x04 \x01(\tR\x10expectedRevision\"v\n" +
 	"\x16DeleteDocumentResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1e\n" +
 	"\n" +

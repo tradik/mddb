@@ -31,7 +31,7 @@ func TestGraphNeighboursCarryNoSemanticFacts(t *testing.T) {
 		MetaKeySymIndex: {"v1 " + semanticContentHash(content) + " d tsserver/1"},
 		MetaKeySymDefs:  {"c function 1-1"},
 	}
-	if _, _, err := srv.addDocumentIf("chain", "c.js", "en", meta, content, 0, false, ""); err != nil {
+	if _, _, err := srv.addDocumentIf("chain", "c.js", "en", meta, content, 0, false, writeCondition{}); err != nil {
 		t.Fatal(err)
 	}
 	seed := []VectorSearchResultItem{{Document: storage.Doc{Key: "b.js"}, Score: 0.8, Rank: 1}}

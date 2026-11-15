@@ -55,12 +55,16 @@ func docRevision(doc *storage.Doc) string {
 // RevisionConflictError is a conditional write that lost: the document is
 // not at the revision the writer expected.
 type RevisionConflictError struct {
+	// Expected is the revision the writer named; "" for an ifAbsent create.
 	Expected string
 	// Current is the document's revision now; "" when it does not exist.
 	Current string
 }
 
 func (e *RevisionConflictError) Error() string {
+	if e.Expected == "" { // a create that required the document to be absent (#423)
+		return fmt.Sprintf("revision conflict: document already exists, current %q", e.Current)
+	}
 	return fmt.Sprintf("revision conflict: expected %s, current %q", e.Expected, e.Current)
 }
 

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"mddb/internal/metrics"
-	"mddb/internal/storage"
 
 	"google.golang.org/grpc"
 )
@@ -181,7 +180,7 @@ type listingQuery struct {
 
 // shapedListing is searchDocuments for a metadata listing, counted; rep says
 // whether the server's cap lowered the page size.
-func (s *Server) shapedListing(ctx context.Context, q listingQuery, rep LimitReport) ([]storage.Doc, int, error) {
+func (s *Server) shapedListing(ctx context.Context, q listingQuery, rep LimitReport) ([]DocResponse, int, error) {
 	page, total, err := s.searchDocuments(q.Collection, q.Filter, q.SortBy, q.Asc, q.Offset, q.Limit)
 	if err != nil {
 		return nil, 0, err

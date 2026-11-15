@@ -56,7 +56,7 @@ func (s *stubServer) AddDocument(_ context.Context, _ AddDocumentInput) (*Docume
 func (s *stubServer) UpdateDocument(_ context.Context, _ UpdateDocumentInput) (*Document, error) {
 	return nil, errors.New("not implemented")
 }
-func (s *stubServer) DeleteDocument(ctx context.Context, collection, key, lang string) error {
+func (s *stubServer) DeleteDocument(ctx context.Context, collection, key, lang string, _ *string) error {
 	if s.deleteDocument != nil {
 		return s.deleteDocument(ctx, collection, key, lang)
 	}
@@ -220,7 +220,7 @@ func TestDeleteDocument_Success(t *testing.T) {
 	}
 	mut := &mutationResolver{&Resolver{server: stub}}
 
-	ok, err := mut.DeleteDocument(context.Background(), "blog", "post1", "en")
+	ok, err := mut.DeleteDocument(context.Background(), "blog", "post1", "en", nil)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -237,7 +237,7 @@ func TestDeleteDocument_PropagatesError(t *testing.T) {
 	}
 	mut := &mutationResolver{&Resolver{server: stub}}
 
-	ok, err := mut.DeleteDocument(context.Background(), "blog", "post1", "en")
+	ok, err := mut.DeleteDocument(context.Background(), "blog", "post1", "en", nil)
 	if err == nil {
 		t.Fatal("Expected error")
 	}

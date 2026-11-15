@@ -10,16 +10,26 @@ type Document struct {
 	AddedAt   int64               `json:"addedAt"`
 	UpdatedAt int64               `json:"updatedAt"`
 	ExpiresAt int64               `json:"expiresAt,omitempty"`
+	// Revision identifies this version. Add, Get and Search return it; send
+	// it back as ExpectedRevision to make a write or delete conditional.
+	Revision string `json:"revision,omitempty"`
 }
 
 // AddRequest adds or updates a document. TTL is in seconds (0 = no expiry).
+//
+// ExpectedRevision writes only over that revision; IfAbsent only when the
+// document does not exist. A write that loses is an *APIError with status
+// 409 whose RevisionConflict reports the current revision. The two cannot
+// be combined.
 type AddRequest struct {
-	Collection string              `json:"collection"`
-	Key        string              `json:"key"`
-	Lang       string              `json:"lang"`
-	Meta       map[string][]string `json:"meta,omitempty"`
-	ContentMD  string              `json:"contentMd"`
-	TTL        int64               `json:"ttl,omitempty"`
+	Collection       string              `json:"collection"`
+	Key              string              `json:"key"`
+	Lang             string              `json:"lang"`
+	Meta             map[string][]string `json:"meta,omitempty"`
+	ContentMD        string              `json:"contentMd"`
+	TTL              int64               `json:"ttl,omitempty"`
+	ExpectedRevision string              `json:"expectedRevision,omitempty"`
+	IfAbsent         bool                `json:"ifAbsent,omitempty"`
 }
 
 // GetRequest fetches a single document. Env supplies templating variables.
@@ -40,11 +50,13 @@ type SearchRequest struct {
 	Offset     int                 `json:"offset,omitempty"`
 }
 
-// DeleteRequest removes a single document.
+// DeleteRequest removes a single document; with ExpectedRevision, only while
+// it is still at that revision.
 type DeleteRequest struct {
-	Collection string `json:"collection"`
-	Key        string `json:"key"`
-	Lang       string `json:"lang"`
+	Collection       string `json:"collection"`
+	Key              string `json:"key"`
+	Lang             string `json:"lang"`
+	ExpectedRevision string `json:"expectedRevision,omitempty"`
 }
 
 // SetTTLRequest sets (ttl>0) or clears (ttl=0) a document's expiry, in seconds.

@@ -69,7 +69,8 @@ func (c *DirectClient) Stats(ctx context.Context) (*MCPStats, error) {
 
 // Add creates a new document via the direct client.
 func (c *DirectClient) Add(ctx context.Context, req *MCPAddRequest) (*MCPDocument, error) {
-	saved, _, err := c.server.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, 0, true, req.ExpectedRevision)
+	saved, _, err := c.server.addDocumentIf(req.Collection, req.Key, req.Lang, req.Meta, req.ContentMD, 0, true,
+		writeCondition{ExpectedRevision: req.ExpectedRevision, IfAbsent: req.IfAbsent})
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +231,7 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 	if req.wantsPassages() {
 		hits := make([]passageSource, 0, len(page))
 		for _, d := range page {
-			hits = append(hits, passageSource{doc: d, bestChunk: -1})
+			hits = append(hits, passageSource{doc: d.Doc, bestChunk: -1})
 		}
 		p := c.server.finishPassages(req.Collection, c.server.buildPassages(req.Collection, hits, req.PassageOptions, "search"), nil)
 		p.LimitReport = limitReport
@@ -242,14 +243,16 @@ func (c *DirectClient) Search(ctx context.Context, req *MCPSearchRequest) (*MCPS
 		if !req.IncludeContent {
 			d.ContentMD = "" // GO-022: don't carry a body the caller discards
 		}
-		docs = append(docs, docToMCPDocument(d))
+		doc := docToMCPDocument(d.Doc)
+		doc.Revision = d.Revision // #425: the revision a get reports
+		docs = append(docs, doc)
 	}
 	return &MCPSearchResponse{Documents: docs, Total: total, LimitReport: limitReport}, nil
 }
 
 // Delete removes a document via the direct client.
 func (c *DirectClient) Delete(ctx context.Context, req *MCPDeleteRequest) error {
-	return c.server.deleteDocumentInternal(req.Collection, req.Key, req.Lang)
+	return c.server.deleteDocumentIf(req.Collection, req.Key, req.Lang, req.ExpectedRevision)
 }
 
 // DeleteCollection removes an entire collection via the direct client.

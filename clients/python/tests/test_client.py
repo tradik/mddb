@@ -38,6 +38,8 @@ class RecordingServicer(mddb_pb2_grpc.MDDBServicer):
 
     def Add(self, request, context):
         self._record("Add", request, context)
+        if request.if_absent and request.key == "taken":
+            context.abort(grpc.StatusCode.ABORTED, 'revision conflict: document already exists, current "r1"')
         return mddb_pb2.Document(
             id=f"{request.collection}|{request.key}|{request.lang}",
             key=request.key,
@@ -54,9 +56,15 @@ class RecordingServicer(mddb_pb2_grpc.MDDBServicer):
     def Search(self, request, context):
         self._record("Search", request, context)
         return mddb_pb2.SearchResponse(
-            documents=[mddb_pb2.Document(key="a"), mddb_pb2.Document(key="b")],
+            documents=[mddb_pb2.Document(key="a", revision="r1"), mddb_pb2.Document(key="b", revision="r2")],
             total=2,
         )
+
+    def DeleteDocument(self, request, context):
+        self._record("DeleteDocument", request, context)
+        if request.expected_revision == "stale":
+            context.abort(grpc.StatusCode.ABORTED, 'revision conflict: expected stale, current "r2"')
+        return mddb_pb2.DeleteDocumentResponse(status="deleted", key=request.key)
 
     def Stats(self, request, context):
         self._record("Stats", request, context)
@@ -304,3 +312,40 @@ def test_a_secure_channel_can_be_requested():
     """
     with MddbClient("example.test:443", secure=True) as c:
         assert c.address == "example.test:443"
+
+
+# -- conditional writes (#423, #424) and revisions in results (#425) ---------
+
+
+def test_add_if_absent_creates_only_a_new_document(server, client):
+    _, servicer = server
+
+    client.Add(mddb_pb2.AddRequest(collection="blog", key="fresh", lang="en", content_md="x", if_absent=True))
+    assert servicer.last[1].if_absent is True
+
+    with pytest.raises(grpc.RpcError) as excinfo:
+        client.Add(mddb_pb2.AddRequest(collection="blog", key="taken", lang="en", content_md="x", if_absent=True))
+    assert excinfo.value.code() == grpc.StatusCode.ABORTED
+    assert "already exists" in excinfo.value.details()
+
+
+def test_delete_with_expected_revision_is_conditional(server, client):
+    _, servicer = server
+
+    response = client.DeleteDocument(
+        mddb_pb2.DeleteDocumentRequest(collection="blog", key="post", lang="en", expected_revision="r2")
+    )
+    assert response.status == "deleted"
+    assert servicer.last[1].expected_revision == "r2"
+
+    with pytest.raises(grpc.RpcError) as excinfo:
+        client.DeleteDocument(
+            mddb_pb2.DeleteDocumentRequest(collection="blog", key="post", lang="en", expected_revision="stale")
+        )
+    assert excinfo.value.code() == grpc.StatusCode.ABORTED
+
+
+def test_search_results_carry_revisions(client):
+    response = client.Search(mddb_pb2.SearchRequest(collection="blog"))
+
+    assert [d.revision for d in response.documents] == ["r1", "r2"]

@@ -28,8 +28,8 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := s.deleteDocumentInternal(req.Collection, req.Key, req.Lang); err != nil {
-		bad(w, err)
+	if err := s.deleteDocumentIf(req.Collection, req.Key, req.Lang, req.ExpectedRevision); err != nil {
+		writeDeleteError(w, err)
 		return
 	}
 
