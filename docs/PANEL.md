@@ -1067,44 +1067,6 @@ Files listed in `coverageFiles` in `vitest.config.js` must keep at least 98% of
 their statements, branches, functions and lines covered, per file. See the
 panel's README for how the suites are written.
 
-## Roadmap
-
-### Completed Features
-
-- [x] Document editing interface
-- [x] Document creation from UI
-- [x] Metadata editor
-- [x] Markdown editor with live preview
-- [x] Split-view editing (edit/preview/both)
-- [x] Fullscreen editing mode
-- [x] GitHub Flavored Markdown support
-- [x] Markdown toolbar with formatting buttons
-- [x] Syntax highlighting for code blocks (100+ languages)
-- [x] Document templates (blog, docs, README, API, changelog)
-- [x] API Endpoints browser with HTTP/gRPC/MCP tabs
-- [x] OpenAPI spec link with auto-detected version
-
-### Planned Features
-
-- [ ] Document deletion
-- [ ] Bulk operations (delete, export multiple)
-- [ ] Advanced search with full-text
-- [ ] Document comparison (diff view)
-- [ ] Revision history viewer with diff
-- [ ] User authentication
-- [ ] Role-based access control
-- [ ] Dark mode
-- [ ] More keyboard shortcuts
-- [ ] Export to various formats (PDF, HTML)
-- [ ] Import from files (drag & drop)
-- [ ] Collection management (create, delete)
-- [ ] Server configuration UI
-- [ ] More syntax themes (light/dark)
-- [ ] Custom markdown templates
-- [ ] Markdown shortcuts (Ctrl+B for bold, etc.)
-- [ ] Auto-save drafts
-- [ ] Spell checker
-
 ## See Also
 
 - [MDDB Documentation](/docs/readme/)

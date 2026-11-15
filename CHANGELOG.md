@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Documentation site on phones.** Below 768px the docs sidebar no longer appears as a list of about 50 links above every page. It folds into a "Documentation / <current page>" bar under the navbar that stays in view while scrolling. A tap opens the full list as a scrollable overlay; Escape, a tap outside, or picking a page closes it. Without JavaScript the list stays open as before. The wide-screen layout is unchanged.
 
+### Removed
+
+- **Panel roadmap in docs/PANEL.md.** Its "Completed" and "Planned" lists had drifted from the code: half of the planned items (document deletion, bulk delete, full-text search, revision history, login, roles, drag-and-drop import, collection management, settings) had shipped long ago. Planned panel work is now tracked as tasks in the project's issue backlog, not in a hand-kept list.
+
 ## [2.19.6] - 2026-11-15
 
 ### Added
