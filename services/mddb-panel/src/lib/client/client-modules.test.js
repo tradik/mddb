@@ -66,6 +66,15 @@ describe('file-shaped answers', () => {
     expect(req.headers).toEqual({ 'Content-Type': 'application/json', Authorization: 'Bearer tok' });
   });
 
+  test('export sends keys only when a selection is given (FE-014)', async () => {
+    let fetchMock = stubFetch(new Response('{"key":"a"}\n'));
+    await client.export({ collection: 'c', format: 'ndjson', keys: [{ key: 'a', lang: 'en' }] });
+    expect(lastRequest(fetchMock).body).toEqual({ collection: 'c', filterMeta: {}, format: 'ndjson', keys: [{ key: 'a', lang: 'en' }] });
+    fetchMock = stubFetch(new Response(''));
+    await client.export({ collection: 'c', keys: [] });
+    expect(lastRequest(fetchMock).body).toEqual({ collection: 'c', filterMeta: {}, format: 'ndjson' });
+  });
+
   test('export takes the file name the server gives', async () => {
     stubFetch(new Response('PK', { headers: { 'Content-Disposition': 'attachment; filename="my-docs.zip"' } }));
     const { filename } = await client.export({ collection: 'my docs', format: 'zip' });

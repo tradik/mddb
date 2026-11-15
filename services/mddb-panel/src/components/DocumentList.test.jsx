@@ -3,7 +3,7 @@
 // errors (corrupted data has its own message), the range header, pagination,
 // the key filter, opening a document (full content loaded in the background),
 // the delete confirmation, the upload modal's refresh paths, and a read-only
-// corpus-pack collection (no upload, no delete, a notice).
+// corpus-pack collection (no upload, no delete, a notice; selection exports only).
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from '@testing-library/react';
 
@@ -424,7 +424,7 @@ describe('DocumentList batch delete', () => {
     expect(screen.getByText('Deleted 0, 2 already gone, 1 failed: gamma: locked.')).toBeTruthy(); // not_found: a server before 2.19.0
   });
 
-  test('a refused batch delete says not permitted; no selection on a read-only or empty list', async () => {
+  test('a refused batch delete says not permitted; a read-only list selects for export only; an empty one not at all', async () => {
     vi.mocked(mddbClient.deleteBatch).mockRejectedValueOnce(Object.assign(new Error('API Error (403): forbidden'), { status: 403, body: { error: 'forbidden' } }));
     await renderList();
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select alpha (en)' }));
@@ -433,7 +433,9 @@ describe('DocumentList batch delete', () => {
     expect(screen.getByText('Not permitted')).toBeTruthy();
     cleanup();
     await renderList({ collectionConfigs: { docs: { readOnly: true } } });
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select alpha (en)' }));
+    expect(screen.getByRole('button', { name: 'Export ZIP' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Delete selected' })).toBeNull();
     cleanup();
     await renderList({}, { documents: [], totalCount: 0 });
     expect(screen.queryByRole('checkbox')).toBeNull();

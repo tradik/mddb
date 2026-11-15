@@ -177,6 +177,7 @@ func (s *MCPToolServer) toolExport(ctx context.Context, args map[string]interfac
 		Collection: mcpGetString(args, "collection"),
 		FilterMeta: mcpGetMetaMap(args, "filter_meta"),
 		Format:     mcpGetString(args, "format"),
+		Keys:       mcpGetDocRefs(args, "keys"),
 	}
 
 	stream, err := s.client.Export(ctx, req)

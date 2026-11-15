@@ -241,6 +241,9 @@ type ExportRequest struct {
 	Collection string              `json:"collection"`
 	FilterMeta map[string][]string `json:"filterMeta"`
 	Format     string              `json:"format"` // ndjson|zip
+	// Keys exports only these documents (FE-014), narrowed further by
+	// filterMeta when both are given; empty exports the whole selection.
+	Keys []DocRef `json:"keys,omitempty"`
 }
 
 // TruncateRequest is the HTTP request body for truncating a collection.

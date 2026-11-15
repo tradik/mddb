@@ -182,6 +182,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		Collection: req.Collection,
 		FilterMeta: req.FilterMeta,
 		Format:     req.Format,
+		Keys:       req.Keys,
 	}
 
 	switch req.Format {

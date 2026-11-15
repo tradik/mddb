@@ -6,7 +6,7 @@ import mddbClient from '../lib/mddb-client';
 import UploadModal from './UploadModal';
 import CommandModal from './CommandModal';
 import ReadOnlyNotice from './ReadOnlyNotice';
-import BatchDeleteBar from './BatchDeleteBar';
+import SelectionActionBar from './SelectionActionBar';
 import FacetsPanel from './FacetsPanel';
 import FilterPanel from './FilterPanel';
 import { useSelection } from '../lib/use-selection';
@@ -41,8 +41,9 @@ export default function DocumentList({ sseRefreshKey } = {}) {
   // controls are off and the notice says why.
   const collectionConfig = collectionConfigs?.[currentCollection];
   const readOnly = collectionConfig?.readOnly === true;
-  // 2.19.0: documents ticked for a batch delete (/v1/delete-batch); a
-  // reloaded list starts with none ticked.
+  // 2.19.0: documents ticked for a batch delete (/v1/delete-batch) or, on a
+  // read-only collection too, an export of just them (FE-014); a reloaded
+  // list starts with none ticked.
   const selection = useSelection(documents);
   const [batchOutcome, setBatchOutcome] = useState(null);
   // 2.19.0: per-value counts of metadata keys (/v1/aggregate).
@@ -249,13 +250,13 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             <ReadOnlyNotice config={collectionConfig} compact />
           </div>
         )}
-        {!readOnly && shownDocs.length > 0 && (
+        {shownDocs.length > 0 && (
           <>
             <label className="mt-2 flex items-center gap-2 text-xs text-gray-800">
               <input type="checkbox" checked={allShownSelected} onChange={() => selection.toggleAll(shownDocs)} />
               Select all shown
             </label>
-            <BatchDeleteBar collection={currentCollection} documents={selection.selected} onClear={selection.clear} onDeleted={afterBatchDelete} />
+            <SelectionActionBar collection={currentCollection} documents={selection.selected} readOnly={readOnly} onClear={selection.clear} onDeleted={afterBatchDelete} />
           </>
         )}
         {batchOutcome && <p role="status" className="mt-1 text-xs text-gray-800">{batchOutcome}</p>}
@@ -282,15 +283,13 @@ export default function DocumentList({ sseRefreshKey } = {}) {
                     selected ? 'bg-blue-50 border-l-4 border-blue-600' : ''
                   }`}
                 >
-                  {!readOnly && (
-                    <input
-                      type="checkbox"
-                      checked={selection.isSelected(doc)}
-                      onChange={() => selection.toggle(doc)}
-                      aria-label={`Select ${doc.key} (${doc.lang})`}
-                      className="mt-5 ml-3"
-                    />
-                  )}
+                  <input
+                    type="checkbox"
+                    checked={selection.isSelected(doc)}
+                    onChange={() => selection.toggle(doc)}
+                    aria-label={`Select ${doc.key} (${doc.lang})`}
+                    className="mt-5 ml-3"
+                  />
                   <button
                     type="button"
                     onClick={() => handleDocumentClick(doc)}

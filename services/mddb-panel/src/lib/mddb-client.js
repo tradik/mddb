@@ -246,8 +246,10 @@ class MDDBClient {
    * Export documents as a file: `{ blob, filename }`. The answer is NDJSON or
    * a ZIP, not JSON; the server names it (`<collection>.ndjson` or `.zip`,
    * Content-Disposition, 2.19.0+) — `filename` is null from an older server.
+   * `keys` (`[{ key, lang }]`, 2.19.7+) exports only those documents; left
+   * out or empty, the whole collection (or what `filterMeta` selects).
    */
-  async export({ collection, filterMeta = {}, format = 'ndjson' }) {
+  async export({ collection, filterMeta = {}, format = 'ndjson', keys = [] }) {
     return this.requestBlob('/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -255,6 +257,7 @@ class MDDBClient {
         collection,
         filterMeta,
         format,
+        ...(keys.length > 0 && { keys }),
       }),
     });
   }

@@ -271,17 +271,18 @@ func (c *DirectClient) DeleteCollection(ctx context.Context, req *MCPDeleteColle
 // Separate from Export because the HTTP handler's zip format needs the same
 // selection and must not re-derive it: the two used to disagree about what
 // "filterMeta" means because each wrote its own query.
+//
+// Keys, when listed, restrict the export to those documents (FE-014); see
+// exportSelection for how they combine with the filter.
 func (c *DirectClient) collectExportDocs(req *MCPExportRequest) ([]storage.Doc, error) {
+	if err := validateDocRefs(req.Keys); err != nil {
+		return nil, err
+	}
 	var docs []storage.Doc
 
 	filter := filterMetaAsFilter(req.FilterMeta)
 	err := c.server.DBViewC(req.Collection, func(tx *bolt.Tx) error {
-		bDocs := tx.Bucket([]byte("docs"))
-		if len(filter) == 0 {
-			docs = collectionDocs(bDocs, req.Collection)
-		} else {
-			docs = docsByID(bDocs, req.Collection, sortedIDs(metaFilterIDs(tx, req.Collection, filter)))
-		}
+		docs = exportSelection(tx, req.Collection, filter, req.Keys)
 		return nil
 	})
 	if err != nil {

@@ -42,7 +42,7 @@ Web-based admin interface for MDDB (Markdown Database). A simple, modern single-
 - 📦 **Import** (2.19.0) - From a URL, a Wikipedia dump, or JSON/NDJSON documents at once (`/v1/add-batch`) or as bulk ingest jobs with progress and cancel
 - 🧬 **Duplicates** (2.19.0) - Exact, similar and minhash groups with open and delete (`/v1/find-duplicates`)
 - 👤 **My account** (2.19.0) - Signed-in identity in the header (`/v1/auth/me`) and personal API keys: create (secret shown once), list, revoke
-- ☑️ **Batch delete & facets** (2.19.0) - Multi-select in the document list with *Delete selected* (`/v1/delete-batch`); per-value metadata counts (`/v1/aggregate`)
+- ☑️ **Batch delete, export & facets** (2.19.0, export 2.19.7) - Multi-select in the document list with *Export ZIP / NDJSON* of the selection (`/v1/export` with `keys`) and *Delete selected* (`/v1/delete-batch`); per-value metadata counts (`/v1/aggregate`)
 - ⏱️ **TTL & classify** (2.19.0) - In the document viewer: set or remove expiry (`/v1/set-ttl`), zero-shot labels (`/v1/classify`)
 - 🧰 **Maintenance** (2.19.0) - On the System page: checksum, export (NDJSON/ZIP), truncate revisions, back up now, restore
 - 🕸️ **Code graph, geo tools, temporal events, spell cleanup** (2.19.0) - `/v1/code-graph`; bounding box, polygon, geohash and geo reindex; one document's events; `/v1/spell-cleanup`

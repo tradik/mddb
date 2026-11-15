@@ -149,7 +149,7 @@ const coverageFiles = [
   'src/components/UrlImportCard.jsx',
   'src/components/WikiImportCard.jsx',
   'src/lib/use-selection.js',
-  'src/components/BatchDeleteBar.jsx',
+  'src/components/SelectionActionBar.jsx', // FE-014: was BatchDeleteBar
   'src/lib/duplicates-format.js',
   'src/components/DuplicatesPanel.jsx',
   'src/components/DuplicateGroups.jsx',

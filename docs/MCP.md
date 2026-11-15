@@ -832,7 +832,7 @@ supports `retrieval_mode`/`window_size` (passage-level results) and
 | Tool | Description |
 |------|-------------|
 | `get_stats` | Get MDDB server statistics. |
-| `export_documents` | Export documents from a collection in NDJSON format. |
+| `export_documents` | Export documents from a collection in NDJSON format. Optional `keys` (2.19.7+, `[{key, lang}]`) exports only those documents. |
 | `create_backup` | Create a backup of the MDDB database. |
 | `restore_backup` | Restore the MDDB database from a backup file. |
 | `corpus_list` | (v2.19.0) The corpus packs installed in the caller's tenant: collection, name, version, licence, document count, whether its vectors are disabled. Read-only. See [CORPUS-PACKS.md](CORPUS-PACKS.md). |

@@ -197,6 +197,9 @@ type MCPExportRequest struct {
 	Collection string              `json:"collection"`
 	FilterMeta map[string][]string `json:"filter_meta,omitempty"`
 	Format     string              `json:"format"`
+	// Keys restricts the export to these documents (FE-014); empty exports
+	// everything the filter selects, as before.
+	Keys []DocRef `json:"keys,omitempty"`
 }
 
 // MCPBackupRequest represents backup request.

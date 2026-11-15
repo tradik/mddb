@@ -1046,6 +1046,13 @@ paths:
       description: |
         Export documents in NDJSON or ZIP format with optional metadata filtering.
 
+        **Selected documents (2.19.7+):** `keys` lists the documents to export,
+        each `{key, lang}`; they are exported in the order listed, each once, and
+        a key that names no document is skipped. With `filterMeta` as well, only
+        the listed documents that also match are exported. Without `keys` the
+        export is the whole collection (or what `filterMeta` selects), as before.
+        An entry without `key` or `lang` is refused with 400.
+
         **NDJSON:** Newline-delimited JSON, one document per line.
 
         **ZIP:** Archive with markdown files named `{key}.{lang}.md`.
@@ -10780,6 +10787,31 @@ components:
           enum: [ ndjson, zip ]
           description: Export format
           example: ndjson
+        keys:
+          type: array
+          description: >
+            Optional (2.19.7+): export only these documents, in this order;
+            narrowed further by filterMeta when both are given. Empty or
+            absent exports the whole selection.
+          items:
+            $ref: "#/components/schemas/DocRef"
+          example:
+            - key: post1
+              lang: en_GB
+
+    DocRef:
+      type: object
+      description: One document of a collection, named by key and language.
+      required:
+        - key
+        - lang
+      properties:
+        key:
+          type: string
+          example: post1
+        lang:
+          type: string
+          example: en_GB
 
     TruncateRequest:
       type: object

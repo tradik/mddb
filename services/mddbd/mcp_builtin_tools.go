@@ -453,6 +453,15 @@ func mcpBuiltinToolsCore() []MCPTool {
 					"collection":  map[string]interface{}{"type": "string", "description": "Collection to export"},
 					"filter_meta": map[string]interface{}{"type": "object", "description": "Optional metadata filter"},
 					"format":      map[string]interface{}{"type": "string", "description": "Export format: ndjson (default) or zip"},
+					"keys": map[string]interface{}{
+						"type":        "array",
+						"description": "Optional: export only these documents, each {key, lang}",
+						"items": map[string]interface{}{
+							"type":       "object",
+							"properties": map[string]interface{}{"key": map[string]interface{}{"type": "string"}, "lang": map[string]interface{}{"type": "string"}},
+							"required":   []string{"key", "lang"},
+						},
+					},
 				},
 				"required": []string{"collection"},
 			},

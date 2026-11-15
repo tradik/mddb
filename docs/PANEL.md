@@ -89,7 +89,8 @@ existed but nothing showed them):
   disabled (another embedding model), install from a `.mddbpack` file,
   remove after a confirm, and build-and-download of a collection's pack.
   A read-only collection shows a notice in its document list and settings,
-  and its Upload and delete controls are off. Needs admin on `"*"`.
+  and its Upload and delete controls are off (its documents can still be
+  selected and exported). Needs admin on `"*"`.
 - **Diagnose bundle** (System page): downloads `GET /v1/admin/diagnose` with
   the opt-in profiles, integrity check and real collection names.
 - **Automations**: a cron rule's action is a webhook, a scheduled backup
@@ -294,9 +295,13 @@ refused request (403) reads *Not permitted* and says which grant it needs.
   `/v1/auth/me` — also named in the header — and the user's own API keys:
   create with an optional expiry (the secret is shown once, with a copy
   button), list by hash, revoke (confirmed).
-- **Document list**: a checkbox per document and *Select all shown*; *Delete
-  selected* removes them in one `/v1/delete-batch` request after naming the
-  collection, count and first keys. *Facets* counts documents per value of
+- **Document list**: a checkbox per document and *Select all shown*; the
+  selection bar acts on what is ticked. *Export ZIP* / *Export NDJSON*
+  (2.19.7) download just those documents in one `/v1/export` request with
+  `keys`, the file named by the server (`<collection>.zip|.ndjson`); export
+  is offered on a read-only collection too. *Delete selected* removes them
+  in one `/v1/delete-batch` request after naming the collection, count and
+  first keys (not on a read-only collection). *Facets* counts documents per value of
   chosen metadata keys (`/v1/aggregate`) within the active filters, one table
   per key.
 - **Document viewer**: *Expiry (TTL)* sets or removes a document's TTL

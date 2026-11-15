@@ -1520,6 +1520,13 @@ Export documents from a collection in NDJSON or ZIP format.
 - `collection` (required): Collection name
 - `filterMeta` (optional): Metadata filters (same as search)
 - `format` (required): Export format - `ndjson` or `zip`
+- `keys` (optional, 2.19.7+): export only these documents, each
+  `{"key": "...", "lang": "..."}` — in the order listed, each once; a key that
+  names no document is skipped. Combined with `filterMeta`, only the listed
+  documents that also match are exported. Empty or absent exports the whole
+  collection (or what `filterMeta` selects), as before. An entry without
+  `key` or `lang` is refused with `400` (`keys[<index>]: key and lang are
+  required`).
 
 **Response (NDJSON)**:
 ```
@@ -1557,6 +1564,17 @@ curl -X POST http://localhost:11023/v1/export \
     "collection": "blog",
     "format": "zip"
   }' > export.zip
+```
+
+Selected documents as a ZIP:
+```bash
+curl -X POST http://localhost:11023/v1/export \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "collection": "blog",
+    "format": "zip",
+    "keys": [{"key": "post1", "lang": "en_GB"}, {"key": "post2", "lang": "en_GB"}]
+  }' > selection.zip
 ```
 
 ---
