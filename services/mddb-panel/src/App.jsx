@@ -202,119 +202,119 @@ function App() {
           </button>
         )}
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 min-w-0 flex overflow-hidden">
           {viewMode === 'cluster' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <ClusterPanel />
             </div>
           )}
           {viewMode === 'system' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <SystemInfo />
             </div>
           )}
           {viewMode === 'config' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <ConfigPanel />
             </div>
           )}
             {viewMode === 'features' && (
-              <div className="flex-1 border-l border-gray-200">
+              <div className="flex-1 min-w-0 border-l border-gray-200">
                 <FeaturesPanel />
               </div>
             )}
             {viewMode === 'featureDisabled' && (
-              <div className="flex-1 border-l border-gray-200">
+              <div className="flex-1 min-w-0 border-l border-gray-200">
                 <FeatureDisabledNotice feature={disabledFeature} />
               </div>
             )}
           {viewMode === 'mcp' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <MCPConfigPanel />
             </div>
           )}
           {viewMode === 'endpoints' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <EndpointsPanel />
             </div>
           )}
           {viewMode === 'chat' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <ChatScenariosPanel />
             </div>
           )}
           {viewMode === 'users' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <UsersPanel />
             </div>
           )}
           {viewMode === 'groups' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <GroupsPanel />
             </div>
           )}
           {viewMode === 'vectors' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <VectorPanel />
             </div>
           )}
           {viewMode === 'vectorSpace' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <VectorSpacePanel />
             </div>
           )}
           {viewMode === 'searchAdvisor' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <SearchAdvisorPanel />
             </div>
           )}
           {viewMode === 'embeddings' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <EmbeddingModelsPanel />
             </div>
           )}
           {viewMode === 'synonyms' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <SynonymsPanel />
             </div>
           )}
           {viewMode === 'stopwords' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <StopWordsPanel />
             </div>
           )}
           {viewMode === 'curation' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <CurationPanel />
             </div>
           )}
           {viewMode === 'aliases' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <AliasesPanel />
             </div>
           )}
           {viewMode === 'eval' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <EvalPanel />
             </div>
           )}
           {viewMode === 'codeSymbols' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <CodeSymbolPanel />
             </div>
           )}
           {viewMode === 'automation' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <AutomationPanel />
             </div>
           )}
           {viewMode === 'crossSearch' && (
             <>
-              <div className="flex-1 border-l border-gray-200">
+              <div className="flex-1 min-w-0 border-l border-gray-200">
                 <CrossSearchPanel />
               </div>
               {currentDocument && (
-                <div className="flex-1 border-l border-gray-200">
+                <div className="flex-1 min-w-0 border-l border-gray-200">
                   <DocumentViewer />
                 </div>
               )}
@@ -322,48 +322,48 @@ function App() {
           )}
           {viewMode === 'geo' && (
             <>
-              <div className="flex-1 border-l border-gray-200">
+              <div className="flex-1 min-w-0 border-l border-gray-200">
                 <GeoPanel />
               </div>
               {currentDocument && (
-                <div className="flex-1 border-l border-gray-200">
+                <div className="flex-1 min-w-0 border-l border-gray-200">
                   <DocumentViewer />
                 </div>
               )}
             </>
           )}
           {viewMode === 'settings' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <SettingsPanel />
             </div>
           )}
           {viewMode === 'temporal' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <TemporalPanel />
             </div>
           )}
           {viewMode === 'spellcheck' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <SpellCheckPanel />
             </div>
           )}
           {viewMode === 'auditLog' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <AuditLogPanel />
             </div>
           )}
           {viewMode === 'webhooks' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <WebhooksPanel />
             </div>
           )}
           {viewMode === 'security' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <SecurityDashboard />
             </div>
           )}
           {viewMode === 'encryption' && (
-            <div className="flex-1 border-l border-gray-200">
+            <div className="flex-1 min-w-0 border-l border-gray-200">
               <EncryptionPanel />
             </div>
           )}
@@ -371,44 +371,44 @@ function App() {
             <>
               {searchMode === 'vector' ? (
                 <>
-                  <div className="flex-1 border-l border-gray-200">
+                  <div className="flex-1 min-w-0 border-l border-gray-200">
                     <VectorSearchPanel />
                   </div>
                   {currentDocument && (
-                    <div className="flex-1 border-l border-gray-200">
+                    <div className="flex-1 min-w-0 border-l border-gray-200">
                       <DocumentViewer />
                     </div>
                   )}
                 </>
               ) : searchMode === 'hybrid' ? (
                 <>
-                  <div className="flex-1 border-l border-gray-200">
+                  <div className="flex-1 min-w-0 border-l border-gray-200">
                     <HybridSearchPanel />
                   </div>
                   {currentDocument && (
-                    <div className="flex-1 border-l border-gray-200">
+                    <div className="flex-1 min-w-0 border-l border-gray-200">
                       <DocumentViewer />
                     </div>
                   )}
                 </>
               ) : searchMode === 'fulltext' ? (
                 <>
-                  <div className="flex-1 border-l border-gray-200">
+                  <div className="flex-1 min-w-0 border-l border-gray-200">
                     <FTSSearchPanel />
                   </div>
                   {currentDocument && (
-                    <div className="flex-1 border-l border-gray-200">
+                    <div className="flex-1 min-w-0 border-l border-gray-200">
                       <DocumentViewer />
                     </div>
                   )}
                 </>
               ) : (
                 <>
-                  <div className="flex-1 border-l border-gray-200">
+                  <div className="flex-1 min-w-0 border-l border-gray-200">
                     <DocumentList sseRefreshKey={sseRefreshKey} />
                   </div>
                   {currentDocument && (
-                    <div className="flex-1 border-l border-gray-200">
+                    <div className="flex-1 min-w-0 border-l border-gray-200">
                       <DocumentViewer />
                     </div>
                   )}

@@ -30,12 +30,8 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
     setMetadata(updated);
   };
 
+  // Create is disabled until a key and a language are set, so both are here.
   const handleCreate = async () => {
-    if (!key || !lang) {
-      setError('Key and language are required');
-      return;
-    }
-
     setCreating(true);
     setError(null);
 
@@ -58,7 +54,7 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="border-b border-gray-200 p-4">
@@ -148,7 +144,7 @@ export default function NewDocumentModal({ collection, onClose, onSuccess }) {
                     />
                     <input
                       type="text"
-                      value={Array.isArray(values) ? values.join(', ') : values}
+                      value={values.join(', ')}
                       disabled
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-50"
                     />

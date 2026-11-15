@@ -7,6 +7,9 @@ import CreateCollectionModal from './CreateCollectionModal';
 import CollectionConfigModal from './CollectionConfigModal';
 // 2.19.0: the menu, grouped and searchable.
 import NavMenu from './NavMenu';
+// The panel's own version, read from package.json at build time, so a release
+// bump (scripts/bump-version.sh) shows up here with no further edit.
+import { version as panelVersion } from '../../package.json';
 
 export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse }) {
   const { currentCollection, setCurrentCollection, vectorStats, setVectorStats, config, setViewMode, setStats, collectionConfigs, setCollectionConfigs } = useStore();
@@ -230,15 +233,17 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
                     setCurrentCollection(collection.name);
                     setViewMode('documents');
                   }}
-                  className="flex-1 flex items-center space-x-2 text-left"
+                  className="flex-1 min-w-0 flex items-center gap-2 text-left"
                 >
                   {getCollectionIcon(collection.name)}
-                  <span className="text-sm font-medium truncate">
+                  {/* A long name ends in an ellipsis (full name in the title)
+                      instead of running into the document count. */}
+                  <span className="text-sm font-medium truncate" title={collection.name}>
                     {collection.name}
                   </span>
                 </button>
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs text-gray-500">
+                <div className="flex-shrink-0 ml-2 flex items-center space-x-2">
+                  <span className="text-xs text-gray-600">
                     {collection.documentCount}
                   </span>
                   <button
@@ -246,7 +251,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
                       e.stopPropagation();
                       setConfigCollection(collection.name);
                     }}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-opacity"
                     title="Collection settings"
                   >
                     <Settings2 className="w-3 h-3" />
@@ -254,7 +259,7 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
                   <button
                     onClick={(e) => handleDeleteCollection(collection.name, e)}
                     disabled={deletingCollection === collection.name}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded transition-opacity"
                     title="Delete collection"
                   >
                     {deletingCollection === collection.name ? (
@@ -281,8 +286,8 @@ export default function Sidebar({ stats, statsError, onStatsRefresh, onCollapse 
 
       {/* Version Footer */}
       <div className="px-4 py-2 border-t border-gray-200 text-center">
-        <span className="text-[10px] text-gray-400">
-          Server v{config?.version || '...'} · Panel v2.11.4
+        <span className="text-[10px] text-gray-600">
+          Server v{config?.version || '...'} · Panel v{panelVersion}
         </span>
       </div>
 

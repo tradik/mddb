@@ -40,7 +40,8 @@ describe('CronActionFields', () => {
     const seen = renderFields({});
     expect(screen.getByRole('option', { name: 'Slack (POST https://hooks/slack)' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'Ping (GET https://ping)' })).toBeTruthy();
-    expect(screen.getByText('6 fields: sec min hour day month weekday')).toBeTruthy();
+    expect(screen.getByText(/^5 fields: min hour day month weekday/)).toBeTruthy();
+    expect(screen.getByText(/or 6 with seconds first, or @daily/)).toBeTruthy();
     const schedule = screen.getByLabelText(/^Schedule/);
     expect(schedule.className).toContain('font-mono');
 

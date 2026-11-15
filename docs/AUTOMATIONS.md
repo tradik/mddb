@@ -836,7 +836,9 @@ action keeps the rule's `sync`. Over gRPC the block is
 `AutomationRuleProto.sync` (26, `SyncActionProto`); over MCP it is the
 `sync` argument of `create_automation` / `update_automation`.
 
-**Run now** (2.19.0). `POST /v1/automation/{id}/run` runs a cron rule's
+**Run now** (2.19.0). Run now needs the cron scheduler: without
+`MDDB_CRONS=true` it answers `503` "the cron scheduler is not running".
+`POST /v1/automation/{id}/run` runs a cron rule's
 sync — or its backup — at once, through the code its schedule fires: the
 run is logged, announced on the jobs SSE stream and fires `source.synced`
 (a backup: `backup.failed` when it fails), and it sets `lastRun`. A

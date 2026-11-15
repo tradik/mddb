@@ -29,6 +29,8 @@ describe('system and MCP', () => {
     ['createMCPAPIKey default expiry', (c) => c.createMCPAPIKey('ci'), '/v1/mcp/keys', POST, { name: 'ci', expiresAt: 0 }],
     ['deleteMCPAPIKey', (c) => c.deleteMCPAPIKey('k'), '/v1/mcp/keys', DELETE, { key: 'k' }],
     ['disableMCPAPIKey', (c) => c.disableMCPAPIKey('k'), '/v1/mcp/keys/disable', POST, { key: 'k' }],
+    ['deleteMCPAPIKey by fingerprint', (c) => c.deleteMCPAPIKey({ fingerprint: '9f2a41c7' }), '/v1/mcp/keys', DELETE, { fingerprint: '9f2a41c7' }],
+    ['disableMCPAPIKey by fingerprint', (c) => c.disableMCPAPIKey({ fingerprint: '9f2a41c7' }), '/v1/mcp/keys/disable', POST, { fingerprint: '9f2a41c7' }],
     ['getGain defaults to 30 days', (c) => c.getGain(), '/v1/gain?window=30d', GET],
     ['getGain custom window', (c) => c.getGain({ window: '7d' }), '/v1/gain?window=7d', GET],
   ])('%s', (_label, ...row) => expectEndpoint(client, ...row));

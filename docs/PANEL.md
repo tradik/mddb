@@ -56,18 +56,21 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
 - Tabbed view of all HTTP, gRPC, and MCP endpoints
 - HTTP tab with method badges, paths, descriptions, and auth status icons
 - gRPC tab with method names and descriptions
-- MCP tab with all 44 built-in tool names and descriptions
+- MCP tab with the tool names and descriptions the server reports in `GET /v1/endpoints`
 - Link to versioned OpenAPI spec on GitHub (auto-detects server version)
 
 ### 🔍 Advanced Filtering
 
 ![Vector search on the places collection with the metadata filter open and the category values landmark and museum selected](panel-metadata-filter.png)
 
-- Filter documents by metadata fields
-- Multiple filter criteria support
-- Sort by date, key, or custom fields
+**Sort & filter** above a collection's document list (2.19.6; the controls
+existed but nothing showed them):
+
+- Filter documents by metadata fields, several at once (applied with
+  *Apply filters*; the button shows how many are active)
+- Sort by added date, updated date or key
 - Ascending/descending order
-- Configurable result limits
+- Documents per page, 1 to 1000
 
 ### 🗺️ Vector Space Explorer
 
@@ -94,7 +97,8 @@ MDDB Panel is a modern, web-based admin interface for MDDB (Markdown Database). 
   the log shows backup targets and sync counts. Since 2.19.0 a sync or
   backup rule has a **Run now** button (`POST /v1/automation/{id}/run`; it
   shows the job id, or why the server refused — 409 while the previous run is
-  going) and its row shows the last result: status, the sync's added +,
+  going; without `MDDB_CRONS=true` the server runs no scheduler, answers 503,
+  and the panel says to set it) and its row shows the last result: status, the sync's added +,
   updated ~, unchanged =, deleted −, failed ✕ counts, and the error.
   Since 2.19.5 the source can be a **Git repository**: repository URL, ref
   (a branch, a tag or `latest-release` — the forge's newest release, else
@@ -785,6 +789,7 @@ services/mddb-panel/
 │   │   ├── DocumentEditor.jsx   # Document editing modal
 │   │   ├── NewDocumentModal.jsx # New document creation
 │   │   ├── MarkdownEditor.jsx   # Markdown editor with preview
+│   │   ├── MarkdownView.jsx     # Markdown renderer shared by the preview and the document viewer
 │   │   ├── MarkdownToolbar.jsx  # Formatting toolbar
 │   │   ├── EndpointsPanel.jsx   # API endpoints browser
 │   │   ├── ChatScenariosPanel.jsx      # Chat scenarios: list, save, delete
@@ -812,7 +817,7 @@ services/mddb-panel/
 │   │   ├── ChatLogFilters.jsx          # Its filters
 │   │   ├── ChatLogRow.jsx              # One turn, expandable
 │   │   ├── ChatGaps.jsx                # Docs gaps
-│   │   └── FilterPanel.jsx      # Filter controls
+│   │   └── FilterPanel.jsx      # Sort & filter of the document list
 │   ├── lib/
 │   │   ├── mddb-client.js       # API client
 │   │   ├── chat-scenario.js     # Scenario form state and its conversion
@@ -926,7 +931,7 @@ All components are in `src/components/` and can be customized:
 - `Sidebar.jsx` - Left sidebar with collections
 - `DocumentList.jsx` - Document browser
 - `DocumentViewer.jsx` - Document details
-- `FilterPanel.jsx` - Filter controls
+- `FilterPanel.jsx` - Sort & filter of the document list (metadata filters, sort, page size)
 
 ### API Client
 

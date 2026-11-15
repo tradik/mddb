@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // DocumentViewer: nothing without a document, the loading state before its
-// content arrives, header/metadata/content/footer with their fallbacks, the
-// code renderer's three shapes, Copy, the editor and revision overlays, the
+// content arrives, header/metadata/content/footer with their fallbacks, long
+// values that must not widen the pane, Copy, the editor and revision overlays, the
 // delete dialog, hover colours and the Markdown error boundary's raw view.
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
@@ -16,22 +16,12 @@ vi.mock('./RevisionHistory', () => ({
 }));
 vi.mock('./ImagePreview', () => ({ default: ({ docKey }) => <div>image preview {docKey}</div> }));
 vi.mock('./DocumentTools', () => ({ default: ({ document }) => <div>document tools {document.key}</div> }));
-vi.mock('react-syntax-highlighter', () => ({ Prism: ({ children, language }) => <pre data-language={language}>{children}</pre> }));
-vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({ vscDarkPlus: {} }));
-// A stand-in for react-markdown hands the `code` renderer the three shapes it
-// handles (fenced with a language, fenced without one, inline) and throws on
-// a marker so the error boundary can be exercised.
-vi.mock('react-markdown', () => ({
-  default: ({ children, components: { code: Code } }) => {
+// The Markdown itself renders through MarkdownView (its own suite); a
+// stand-in throws on a marker so the error boundary can be exercised.
+vi.mock('./MarkdownView', () => ({
+  default: ({ children }) => {
     if (children.includes('<<throw>>')) throw new Error('bad markdown');
-    return (
-      <div>
-        <Code node={{}} className="language-js">{'const a = 1;\n'}</Code>
-        <Code node={{}}>plain block</Code>
-        <Code node={{}} inline>inline code</Code>
-        <p>{children}</p>
-      </div>
-    );
+    return <p>{children}</p>;
   },
 }));
 
@@ -92,12 +82,17 @@ describe('DocumentViewer', () => {
     expect(screen.getByRole('button', { name: /Revision:\s*3/ })).toBeTruthy();
   });
 
-  test('highlights a fenced block with a language and styles the other two shapes', () => {
-    const { container } = renderWith(doc);
-    const highlighted = container.querySelector('pre[data-language="js"]');
-    expect(highlighted.textContent).toBe('const a = 1;');
-    expect(screen.getByText('plain block').style.display).toBe('block');
-    expect(screen.getByText('inline code').style.color).toBe('rgb(220, 38, 38)');
+  test('long keys, meta values and collection names wrap or truncate instead of widening the pane (2.19.6)', () => {
+    const long = 'https://example.com/' + 'a'.repeat(300);
+    renderWith({ ...doc, key: 'k'.repeat(200), collection: 'c'.repeat(120), meta: { url: [long] } });
+    expect(screen.getByRole('heading', { level: 3 }).style.overflowWrap).toBe('anywhere');
+    expect(screen.getByText(long).style.overflowWrap).toBe('anywhere');
+    expect(screen.getByText(long).style.minWidth).toBe('0px');
+    expect(screen.getByRole('button', { name: 'Edit' }).parentElement.style.flexShrink).toBe('0');
+    const collection = screen.getByText('c'.repeat(120)).parentElement;
+    expect(collection.getAttribute('title')).toBe('c'.repeat(120));
+    expect(collection.style.textOverflow).toBe('ellipsis');
+    expect(screen.getByRole('button', { name: 'Close document' })).toBeTruthy();
   });
 
   test.each([undefined, {}])('falls back when dates, collection, revision are missing and meta is %o', (meta) => {

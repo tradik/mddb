@@ -4,6 +4,7 @@ import { useStore } from '../lib/store';
 import mddbClient from '../lib/mddb-client';
 import mddbModelPyRaw from '@scripts/mddb_model.py?raw';
 import MCPAPIKeysPanel from './MCPAPIKeysPanel';
+import { withServerDomain, urlOnHost } from '../lib/server-address';
 
 const TABS = [
   { id: 'mcp', label: 'MCP Config', desc: 'Custom MCP tools configuration (YAML)' },
@@ -17,12 +18,12 @@ const TABS = [
   { id: 'openwebui', label: 'Open WebUI', desc: 'Open WebUI RAG pipeline model' },
 ];
 
-function generateConfig(tabId, httpAddr, mcpAddr) {
-  const http = httpAddr || 'http://localhost:11023';
-  const mcp = mcpAddr || 'http://localhost:9000';
-  const httpBase = http.startsWith(':') ? `http://localhost${http}` : http;
-  const mcpBase = mcp.startsWith(':') ? `http://localhost${mcp}` : mcp;
-
+/**
+ * generateConfig is a tab's example: file name, content and setup steps, with
+ * the HTTP API at `httpBase` and MCP at `mcpBase` (both full URLs on the
+ * Server Domain).
+ */
+function generateConfig(tabId, httpBase, mcpBase) {
   switch (tabId) {
     case 'mcp':
       return {
@@ -454,10 +455,12 @@ export default function MCPConfigPanel() {
   const httpAddr = config?.protocols?.http?.addr || config?.httpAddr || ':11023';
   const mcpAddr = config?.protocols?.mcp?.addr || ':9000';
   const host = domain || window.location.hostname || 'localhost';
-  const tabConfig = generateConfig(activeTab, `http://${host}${httpAddr}`, `http://${host}${mcpAddr}`);
+  const tabConfig = generateConfig(activeTab, urlOnHost(host, httpAddr), urlOnHost(host, mcpAddr));
 
-  // For MCP tab, prefer the live server config if available
-  const displayContent = activeTab === 'mcp' && mcpYaml ? mcpYaml : (showAlt && tabConfig.alt ? tabConfig.alt.content : tabConfig.content);
+  // The MCP tab prefers the server's live config, with its addresses on the
+  // Server Domain like every other example here (2.19.6).
+  let displayContent = showAlt && tabConfig.alt ? tabConfig.alt.content : tabConfig.content;
+  if (activeTab === 'mcp' && mcpYaml) displayContent = withServerDomain(mcpYaml, host);
   const displayFilename = showAlt && tabConfig.alt ? `${tabConfig.filename} (${tabConfig.alt.label})` : tabConfig.filename;
 
   const handleCopy = async () => {
@@ -494,16 +497,17 @@ export default function MCPConfigPanel() {
 
         {/* Domain Input */}
         <div className="bg-white rounded-lg shadow mb-6 p-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Server Domain</label>
+          <label htmlFor="mcp-server-domain" className="block text-sm font-medium text-gray-700 mb-1">Server Domain</label>
           <div className="flex items-center gap-3">
             <input
+              id="mcp-server-domain"
               type="text"
               value={domain}
               onChange={(e) => setDomain(e.target.value)}
               placeholder="e.g. myserver.com"
               className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-primary-500 focus:border-primary-500"
             />
-            <span className="text-xs text-gray-400 whitespace-nowrap">All examples below use this domain</span>
+            <span className="text-xs text-gray-600 whitespace-nowrap">All examples below use this domain</span>
           </div>
           <p className="text-xs text-gray-500 mt-1">Set <code className="bg-gray-100 px-1 rounded">MDDB_MCP_DOMAIN</code> env var to persist this value.</p>
         </div>

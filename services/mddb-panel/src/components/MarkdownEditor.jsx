@@ -1,12 +1,7 @@
 import { useState, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Eye, Code, Maximize2, Minimize2 } from 'lucide-react';
 import MarkdownToolbar from './MarkdownToolbar';
+import MarkdownView from './MarkdownView';
 import { getTemplate } from '../lib/markdown-templates';
 
 export default function MarkdownEditor({ value, onChange, placeholder }) {
@@ -127,92 +122,7 @@ export default function MarkdownEditor({ value, onChange, placeholder }) {
         {(mode === 'preview' || mode === 'split') && (
           <div className={`${mode === 'split' ? 'w-1/2' : 'w-full'} overflow-y-auto`}>
             <div className="px-4 py-3 prose prose-sm max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                components={{
-                  // Custom styling for markdown elements
-                  h1: ({ node, ...props }) => (
-                    <h1 className="text-3xl font-bold mb-4 mt-6 text-gray-900" {...props} />
-                  ),
-                  h2: ({ node, ...props }) => (
-                    <h2 className="text-2xl font-bold mb-3 mt-5 text-gray-900" {...props} />
-                  ),
-                  h3: ({ node, ...props }) => (
-                    <h3 className="text-xl font-bold mb-2 mt-4 text-gray-900" {...props} />
-                  ),
-                  h4: ({ node, ...props }) => (
-                    <h4 className="text-lg font-semibold mb-2 mt-3 text-gray-900" {...props} />
-                  ),
-                  p: ({ node, ...props }) => (
-                    <p className="mb-4 text-gray-700 leading-relaxed" {...props} />
-                  ),
-                  a: ({ node, ...props }) => (
-                    <a className="text-primary-600 hover:text-primary-700 underline" {...props} />
-                  ),
-                  ul: ({ node, ...props }) => (
-                    <ul className="list-disc list-inside mb-4 space-y-1" {...props} />
-                  ),
-                  ol: ({ node, ...props }) => (
-                    <ol className="list-decimal list-inside mb-4 space-y-1" {...props} />
-                  ),
-                  li: ({ node, ...props }) => (
-                    <li className="text-gray-700" {...props} />
-                  ),
-                  blockquote: ({ node, ...props }) => (
-                    <blockquote className="border-l-4 border-gray-300 pl-4 italic my-4 text-gray-600" {...props} />
-                  ),
-                  code: ({ node, inline, className, children, ...props }) => {
-                    const match = /language-(\w+)/.exec(className || '');
-                    const language = match ? match[1] : '';
-                    
-                    return !inline && language ? (
-                      <SyntaxHighlighter
-                        style={vscDarkPlus}
-                        language={language}
-                        PreTag="div"
-                        className="my-4 rounded-lg"
-                        {...props}
-                      >
-                        {String(children).replace(/\n$/, '')}
-                      </SyntaxHighlighter>
-                    ) : inline ? (
-                      <code className="bg-gray-100 text-red-600 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-                        {children}
-                      </code>
-                    ) : (
-                      <code className="block bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-sm font-mono my-4" {...props}>
-                        {children}
-                      </code>
-                    );
-                  },
-                  pre: ({ node, ...props }) => (
-                    <div {...props} />
-                  ),
-                  table: ({ node, ...props }) => (
-                    <div className="overflow-x-auto my-4">
-                      <table className="min-w-full divide-y divide-gray-200 border border-gray-200" {...props} />
-                    </div>
-                  ),
-                  thead: ({ node, ...props }) => (
-                    <thead className="bg-gray-50" {...props} />
-                  ),
-                  th: ({ node, ...props }) => (
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider" {...props} />
-                  ),
-                  td: ({ node, ...props }) => (
-                    <td className="px-4 py-2 text-sm text-gray-700 border-t border-gray-200" {...props} />
-                  ),
-                  hr: ({ node, ...props }) => (
-                    <hr className="my-6 border-gray-300" {...props} />
-                  ),
-                  img: ({ node, ...props }) => (
-                    <img className="max-w-full h-auto rounded-lg my-4" {...props} />
-                  ),
-                }}
-              >
-                {value || '*Nothing to preview*'}
-              </ReactMarkdown>
+              <MarkdownView>{value || '*Nothing to preview*'}</MarkdownView>
             </div>
           </div>
         )}

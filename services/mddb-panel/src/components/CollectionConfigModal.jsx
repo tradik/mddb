@@ -190,7 +190,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
@@ -252,7 +252,7 @@ export default function CollectionConfigModal({ collection, onClose, onSave }) {
                     type="text"
                     value={icon}
                     onChange={(e) => setIcon(e.target.value)}
-                    placeholder="e.g. \uD83D\uDCDA"
+                    placeholder="e.g. 📚"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                     maxLength={4}
                   />

@@ -14,6 +14,9 @@ const { default: mddbClient } = await import('../lib/mddb-client');
 const { useStore } = await import('../lib/store');
 const { default: Sidebar } = await import('./Sidebar');
 const { resetFeatures } = await import('../lib/features');
+// The footer shows the panel's own version from package.json (2.19.6), not a
+// string that a release bump leaves behind.
+const { version: panelVersion } = await import('../../package.json');
 
 const initialStore = useStore.getState();
 const stats = {
@@ -43,6 +46,27 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe('Sidebar footer and collection names', () => {
+  test('the panel version is the one package.json carries', async () => {
+    await renderWith();
+    expect(panelVersion).toMatch(/^\d+\.\d+\.\d+/);
+    expect(screen.getByText(/Panel v/).textContent).toContain(`Panel v${panelVersion}`);
+    expect(screen.queryByText(/Panel v2\.11\.4/)).toBeNull();
+  });
+
+  test('a long collection name truncates with its full name as the title, apart from its count', async () => {
+    const name = 'chat_conversations_of_the_support_team';
+    await renderWith({ stats: { ...stats, collections: [{ name, documentCount: 8 }] } });
+    const label = screen.getByText(name);
+    expect(label.className).toContain('truncate');
+    expect(label.getAttribute('title')).toBe(name);
+    expect(label.closest('button').className).toContain('min-w-0');
+    const count = screen.getByText('8');
+    expect(count.parentElement.className).toContain('flex-shrink-0');
+    expect(count.parentElement.className).toContain('ml-2');
+  });
+});
+
 describe('Sidebar stats and embeddings', () => {
   test('shows the totals, the size and the server version', async () => {
     useStore.setState({ config: { version: '2.19.0' } });
@@ -50,7 +74,7 @@ describe('Sidebar stats and embeddings', () => {
     expect(screen.getByText('1,234')).toBeTruthy();
     expect(screen.getByText('5')).toBeTruthy();
     expect(screen.getByText('1.5 KB')).toBeTruthy();
-    expect(screen.getByText('Server v2.19.0 · Panel v2.11.4')).toBeTruthy();
+    expect(screen.getByText(`Server v2.19.0 · Panel v${panelVersion}`)).toBeTruthy();
     fireEvent.click(screen.getByTitle('Hide sidebar'));
   });
 
@@ -61,7 +85,7 @@ describe('Sidebar stats and embeddings', () => {
     expect(screen.getByText('0 B')).toBeTruthy();
     expect(screen.getByText('Collections (0)')).toBeTruthy();
     expect(screen.getByText('No collections found')).toBeTruthy();
-    expect(screen.getByText('Server v... · Panel v2.11.4')).toBeTruthy();
+    expect(screen.getByText(`Server v... · Panel v${panelVersion}`)).toBeTruthy();
     fireEvent.click(screen.getByTitle('Hide sidebar'));
     expect(onCollapse).toHaveBeenCalledTimes(1);
   });

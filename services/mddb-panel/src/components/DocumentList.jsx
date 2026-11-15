@@ -8,6 +8,7 @@ import CommandModal from './CommandModal';
 import ReadOnlyNotice from './ReadOnlyNotice';
 import BatchDeleteBar from './BatchDeleteBar';
 import FacetsPanel from './FacetsPanel';
+import FilterPanel from './FilterPanel';
 import { useSelection } from '../lib/use-selection';
 
 export default function DocumentList({ sseRefreshKey } = {}) {
@@ -46,6 +47,10 @@ export default function DocumentList({ sseRefreshKey } = {}) {
   const [batchOutcome, setBatchOutcome] = useState(null);
   // 2.19.0: per-value counts of metadata keys (/v1/aggregate).
   const [showFacets, setShowFacets] = useState(false);
+  // 2.19.6: metadata filters, sort and page size (docs/PANEL.md "Advanced
+  // Filtering") — the store fields the search above reads.
+  const [showFilters, setShowFilters] = useState(false);
+  const activeFilters = Object.keys(filters).length;
 
   useEffect(() => {
     setOffset(0);
@@ -187,6 +192,15 @@ export default function DocumentList({ sseRefreshKey } = {}) {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              aria-expanded={showFilters}
+              disabled={!currentCollection}
+              className="px-3 py-1.5 bg-gray-100 text-gray-800 text-xs rounded hover:bg-gray-200 disabled:opacity-50"
+            >
+              Sort &amp; filter{activeFilters > 0 && ` (${activeFilters})`}
+            </button>
+            <button
+              type="button"
               onClick={() => setShowFacets(!showFacets)}
               aria-expanded={showFacets}
               disabled={!currentCollection}
@@ -228,6 +242,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
             className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
+        {showFilters && currentCollection && <FilterPanel onClose={() => setShowFilters(false)} />}
         {showFacets && currentCollection && <FacetsPanel key={currentCollection} collection={currentCollection} filters={filters} />}
         {readOnly && (
           <div className="mt-2">
@@ -357,7 +372,7 @@ export default function DocumentList({ sseRefreshKey } = {}) {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-sm mx-4">
             <div className="flex items-center mb-4">
               <Trash2 className="w-6 h-6 text-red-600 mr-3" />

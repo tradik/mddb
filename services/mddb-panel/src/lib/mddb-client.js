@@ -51,6 +51,11 @@ export async function apiError(response, prefix = 'API Error') {
   return error;
 }
 
+/** The body naming an MCP API key: `{ key }` for a key, else the ref as given. */
+function mcpKeyRef(ref) {
+  return typeof ref === 'string' ? { key: ref } : ref;
+}
+
 /**
  * The optional fields of a vector-backed search, sent only when set so a
  * request without them is byte-for-byte what it was before:
@@ -688,12 +693,17 @@ class MDDBClient {
     return this.request('/mcp/keys', { method: 'POST', body: JSON.stringify({ name, expiresAt }) });
   }
 
-  async deleteMCPAPIKey(key) {
-    return this.request('/mcp/keys', { method: 'DELETE', body: JSON.stringify({ key }) });
+  /**
+   * Deletes an MCP API key named by its value (a string) or, since 2.19.6,
+   * by `{ fingerprint }` — the identifier the listing shows.
+   */
+  async deleteMCPAPIKey(ref) {
+    return this.request('/mcp/keys', { method: 'DELETE', body: JSON.stringify(mcpKeyRef(ref)) });
   }
 
-  async disableMCPAPIKey(key) {
-    return this.request('/mcp/keys/disable', { method: 'POST', body: JSON.stringify({ key }) });
+  /** Disables an MCP API key named as deleteMCPAPIKey names it. */
+  async disableMCPAPIKey(ref) {
+    return this.request('/mcp/keys/disable', { method: 'POST', body: JSON.stringify(mcpKeyRef(ref)) });
   }
 
   /**
