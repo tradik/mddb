@@ -17,59 +17,18 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse raw JSON to detect which fields are present
+	// Raw JSON, so that which fields are present decides what changes.
 	var raw map[string]json.RawMessage
 	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 		bad(w, err)
 		return
 	}
-
-	// Required fields
-	var collection, key, lang string
-	if v, ok := raw["collection"]; ok {
-		_ = json.Unmarshal(v, &collection)
-	}
-	if v, ok := raw["key"]; ok {
-		_ = json.Unmarshal(v, &key)
-	}
-	if v, ok := raw["lang"]; ok {
-		_ = json.Unmarshal(v, &lang)
-	}
-
-	if collection == "" || key == "" || lang == "" {
-		bad(w, errors.New("missing required fields: collection, key, lang"))
+	collection, key, lang, patch, err := updateRequest(raw)
+	if err != nil {
+		bad(w, err)
 		return
 	}
 
-	// Check which optional fields are present
-	_, hasMeta := raw["meta"]
-	_, hasContent := raw["contentMd"]
-	_, hasTTL := raw["ttl"]
-
-	if !hasMeta && !hasContent && !hasTTL {
-		bad(w, errors.New("no fields to update"))
-		return
-	}
-
-	// Parse optional fields
-	var newMeta map[string][]string
-	if hasMeta {
-		_ = json.Unmarshal(raw["meta"], &newMeta)
-	}
-	var newContent string
-	if hasContent {
-		_ = json.Unmarshal(raw["contentMd"], &newContent)
-	}
-	var newTTL int64
-	if hasTTL {
-		_ = json.Unmarshal(raw["ttl"], &newTTL)
-	}
-	var expectedRevision string
-	if v, ok := raw["expectedRevision"]; ok {
-		_ = json.Unmarshal(v, &expectedRevision)
-	}
-
-	// Auth check
 	if s.AuthManager != nil {
 		if err := s.AuthManager.CheckPermission(r.Context(), collection, PermWrite); err != nil {
 			http.Error(w, `{"error":"forbidden"}`, http.StatusForbidden)
@@ -77,19 +36,50 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	patch := DocPatch{Meta: newMeta, HasMeta: hasMeta, ExpectedRevision: expectedRevision}
-	if hasContent {
-		patch.Content = &newContent
-	}
-	if hasTTL {
-		patch.TTL = &newTTL
-	}
 	saved, err := s.updateDocument(collection, key, lang, patch)
 	if err != nil {
 		writeDocWriteError(w, err)
 		return
 	}
 	ok(w, docResponse(saved, nil))
+}
+
+// updateRequest reads a PATCH /v1/update body. A field that is present is
+// changed; one that is absent is left alone.
+func updateRequest(raw map[string]json.RawMessage) (collection, key, lang string, patch DocPatch, err error) {
+	rawField(raw, "collection", &collection)
+	rawField(raw, "key", &key)
+	rawField(raw, "lang", &lang)
+	if collection == "" || key == "" || lang == "" {
+		return "", "", "", DocPatch{}, errors.New("missing required fields: collection, key, lang")
+	}
+	var content string
+	var ttl int64
+	patch.HasMeta = rawField(raw, "meta", &patch.Meta)
+	hasContent := rawField(raw, "contentMd", &content)
+	hasTTL := rawField(raw, "ttl", &ttl)
+	if !patch.HasMeta && !hasContent && !hasTTL {
+		return "", "", "", DocPatch{}, errors.New("no fields to update")
+	}
+	rawField(raw, "expectedRevision", &patch.ExpectedRevision)
+	if hasContent {
+		patch.Content = &content
+	}
+	if hasTTL {
+		patch.TTL = &ttl
+	}
+	return collection, key, lang, patch, nil
+}
+
+// rawField decodes raw[name] into dst when the field is present and reports
+// whether it was. A value that does not decode leaves dst at its zero value,
+// as the handler always treated it.
+func rawField(raw map[string]json.RawMessage, name string, dst any) bool {
+	v, present := raw[name]
+	if present {
+		_ = json.Unmarshal(v, dst)
+	}
+	return present
 }
 
 func (s *Server) handleDocMeta(w http.ResponseWriter, r *http.Request) {
