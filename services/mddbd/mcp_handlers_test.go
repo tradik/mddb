@@ -186,3 +186,65 @@ func TestHandleMCPConfig_NonEmptyBody(t *testing.T) {
 		t.Error("expected YAML key:value pairs in response")
 	}
 }
+
+// ---------- advertisedAddr and the generated addresses (2.19.6) ----------
+
+func TestHandleMCPConfig_UnwritableAnswer(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+
+	rec := httptest.NewRecorder()
+	s.handleMCPConfig(brokenResponse{rec}, httptest.NewRequest(http.MethodGet, "/v1/mcp/config", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Errorf("unwritable answer = %d, want 500", rec.Code)
+	}
+}
+
+func TestAdvertisedAddr(t *testing.T) {
+	cases := []struct{ domain, listen, want string }{
+		{"", ":11024", "localhost:11024"},
+		{"", "0.0.0.0:11024", "localhost:11024"},
+		{"", "[::]:11024", "localhost:11024"},
+		{"", "127.0.0.1:18924", "127.0.0.1:18924"},
+		{"db.example.com", "127.0.0.1:18924", "db.example.com:18924"},
+		{"db.example.com", ":11023", "db.example.com:11023"},
+		{"", "unix-socket", "unix-socket"},
+	}
+	for _, c := range cases {
+		if got := advertisedAddr(c.domain, c.listen); got != c.want {
+			t.Errorf("advertisedAddr(%q, %q) = %q, want %q", c.domain, c.listen, got, c.want)
+		}
+	}
+}
+
+func TestHandleMCPConfig_BoundAddressAndDomain(t *testing.T) {
+	s, cleanup := newHandlerTestServer(t)
+	defer cleanup()
+
+	t.Setenv("MDDB_GRPC_ADDR", "127.0.0.1:18924")
+	t.Setenv("MDDB_ADDR", "127.0.0.1:18923")
+	t.Setenv("MDDB_MCP_DOMAIN", "")
+	get := func() string {
+		rec := httptest.NewRecorder()
+		s.handleMCPConfig(rec, httptest.NewRequest(http.MethodGet, "/v1/mcp/config", nil))
+		return rec.Body.String()
+	}
+
+	body := get()
+	if strings.Contains(body, "localhost127.0.0.1") {
+		t.Fatalf("listen host concatenated onto localhost: %s", body)
+	}
+	for _, want := range []string{`grpcAddress: "127.0.0.1:18924"`, `restBaseUrl: "http://127.0.0.1:18923"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s in %s", want, body)
+		}
+	}
+
+	t.Setenv("MDDB_MCP_DOMAIN", "db.example.com")
+	body = get()
+	for _, want := range []string{`grpcAddress: "db.example.com:18924"`, `restBaseUrl: "http://db.example.com:18923"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s in %s", want, body)
+		}
+	}
+}

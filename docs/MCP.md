@@ -308,7 +308,8 @@ curl -X POST http://localhost:11023/v1/mcp/keys \
   -d '{"name": "claude-prod", "expiresAt": 0}'
 # Response: {"key":"mcp_a1b2c3d4e5f6...","name":"claude-prod","createdAt":1711...}
 
-# List keys (full keys NOT shown, only prefixes)
+# List keys (no key material: the "mcp_" scheme marker and a fingerprint,
+# four bytes of SHA-256 of the key that the server log shows too)
 curl http://localhost:11023/v1/mcp/keys \
   -H "Authorization: Bearer <admin-token>"
 
@@ -316,6 +317,12 @@ curl http://localhost:11023/v1/mcp/keys \
 curl -X DELETE http://localhost:11023/v1/mcp/keys \
   -H "Authorization: Bearer <admin-token>" \
   -d '{"key": "mcp_a1b2c3d4e5f6..."}'
+
+# ...or name it by the fingerprint the listing shows (2.19.6); the same works
+# for disable. A fingerprint two keys share is refused with 409.
+curl -X DELETE http://localhost:11023/v1/mcp/keys \
+  -H "Authorization: Bearer <admin-token>" \
+  -d '{"fingerprint": "9f2a41c7"}'
 
 # Disable a key (revoke without deleting)
 curl -X POST http://localhost:11023/v1/mcp/keys/disable \
@@ -327,7 +334,7 @@ Key features:
 - **TTL support** — `expiresAt` Unix timestamp (0 = never expires)
 - **Disable without delete** — revoke instantly, keep for audit
 - **Cache** — lookups cached for `MDDB_MCP_API_KEY_CACHE_TTL` (default 60s), auto-invalidated on create/delete/disable
-- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab)
+- **Panel UI** — manage keys from the web panel (LLM Connections → API Keys tab); each key is listed as `mcp_… · <fingerprint>`, and its Disable and Delete buttons name it by that fingerprint
 
   ![LLM Connections page, API Keys tab: a new key shown once with a copy button, and the stored key docs-agent](panel-mcp-api-keys.png)
 
